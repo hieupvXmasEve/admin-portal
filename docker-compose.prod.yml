@@ -1,0 +1,22 @@
+services:
+  db:
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${PROD_DB_NAME}
+      MYSQL_USER: ${PROD_DB_USER}
+      MYSQL_PASSWORD: ${PROD_DB_PASSWORD}
+    # Không expose ports ra ngoài trong production
+    # Chỉ cho phép dịch vụ khác trong mạng nội bộ kết nối
+
+#  phpmyadmin:
+#    restart: always
+#    environment:
+#      PMA_HOST: db
+#      PMA_PORT: 3306
+#      MYSQL_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD}
+#    ports:
+#      - "8080:80"
+    # Trong môi trường production thực tế, bạn có thể muốn:
+    # 1. Không sử dụng phpMyAdmin
+    # 2. Hoặc chỉ expose nó qua VPN/proxy bảo mật
