@@ -7,28 +7,32 @@ import { computed } from 'vue';
 interface Props {
     user: User;
     showEmail?: boolean;
+    class?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    showEmail: false,
+    showEmail: true,
+    class: '',
 });
 
 const { getInitials } = useInitials();
 
 // Compute whether we should show the avatar image
-const showAvatar = computed(() => props.user.avatar && props.user.avatar !== '');
+const showAvatar = computed(() => Boolean(props.user.avatar && props.user.avatar !== ''));
 </script>
 
 <template>
-    <Avatar class="h-8 w-8 overflow-hidden rounded-lg">
-        <AvatarImage v-if="showAvatar" :src="user.avatar" :alt="user.name" />
-        <AvatarFallback class="rounded-lg text-black dark:text-white">
-            {{ getInitials(user.name) }}
-        </AvatarFallback>
-    </Avatar>
+    <div :class="`flex items-center gap-3 ${props.class}`">
+        <Avatar class="h-9 w-9 overflow-hidden rounded-lg border-2 border-white shadow-sm dark:border-gray-700">
+            <AvatarImage v-if="showAvatar" :src="user.avatar || ''" :alt="user.name" />
+            <AvatarFallback class="rounded-lg bg-blue-600 text-white font-semibold dark:bg-blue-500">
+                {{ getInitials(user.name) }}
+            </AvatarFallback>
+        </Avatar>
 
-    <div class="grid flex-1 text-left text-sm leading-tight">
-        <span class="truncate font-medium">{{ user.name }}</span>
-        <span v-if="showEmail" class="truncate text-xs text-muted-foreground">{{ user.email }}</span>
+        <div class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+            <span class="truncate font-semibold text-gray-900 dark:text-gray-100">{{ user.name }}</span>
+            <span v-if="showEmail" class="truncate text-xs text-gray-500 dark:text-gray-400">{{ user.email }}</span>
+        </div>
     </div>
 </template>

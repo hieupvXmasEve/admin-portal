@@ -25,14 +25,23 @@ class SelectCampus extends Controller
 
     public function setCurrentCampus(Request $request)
     {
+
         try {
             $validated = $request->validate([
                 'selectedCampus' => 'required|exists:campuses,id',
             ]);
 
-            Session::put('current_campus_id', $validated['selectedCampus']);
-            Session::save();
+            $campusId = $validated['selectedCampus'];
+            // Lưu campus vào session
+            Session::put('current_campus_id', $campusId);
 
+            // Lấy tất cả permission code từ User model
+            $user = Auth::user();
+            $permissions = $user->getAllPermissions($campusId);
+
+            // Lưu permissions vào session
+            Session::put('permissions', $permissions);
+            Session::save();
 
             return redirect()->route('dashboard');
 
