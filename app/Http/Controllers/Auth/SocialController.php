@@ -18,18 +18,17 @@ class SocialController extends Controller
     public function callback(Request $request)
     {
         try {
-
             $user_social = Socialite::driver('google')->user();
-
             $user = User::where('email', $user_social->getEmail())->first();
-
             if ($user) {
                 Auth::login($user);
                 $request->session()->put('email', $user->email);
-
-                return redirect()->route('dashboard');
+                return redirect()->route('select-campus.index');
             } else {
-                return redirect()->route('home');
+                return redirect()->route('login', [
+                    'error' => 'Email is not registered',
+                    'email' => $user_social->email
+                ]);
             }
         } catch (\Exception $e) {
             throw $e;

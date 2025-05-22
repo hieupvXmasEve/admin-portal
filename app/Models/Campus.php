@@ -14,7 +14,7 @@ class Campus extends Model
 
     public function users()
     {
-        return $this->belongsToMany(User::class, 'user_campus_roles', 'campus_id', 'user_id')
+        return $this->belongsToMany(User::class, 'campus_user_roles')
             ->withPivot('role_id')
             ->withTimestamps();
     }

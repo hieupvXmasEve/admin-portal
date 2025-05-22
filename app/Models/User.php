@@ -4,7 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -47,54 +47,33 @@ class User extends Authenticatable
         ];
     }
 
-    /**
-     * Get the campuses associated with the user.
-     *
-     * This defines a many-to-many relationship between users and campuses
-     * through the 'user_campus_roles' pivot table. The pivot table also
-     * contains the 'role_id' field and timestamps for the relationship.
-     *
-     * @return BelongsToMany
-     */
-    public function campuses(): BelongsToMany
+    public function campusRoles(): HasMany
     {
-        return $this->belongsToMany(Campus::class, 'user_campus_roles', 'user_id', 'campus_id')
-            ->withPivot('role_id')
-            ->withTimestamps();
+        return $this->hasMany(CampusUserRole::class);
     }
 
-    /**
-     * Get the roles associated with the user.
-     *
-     * This defines a many-to-many relationship between users and roles
-     * through the 'user_campus_roles' pivot table. The pivot table also
-     * contains the 'campus_id' field and timestamps for the relationship.
-     *
-     * @return BelongsToMany
-     */
-    public function roles(): BelongsToMany
+    public function campuses()
     {
-        return $this->belongsToMany(Role::class, 'user_campus_roles', 'user_id', 'role_id')
-            ->withPivot('campus_id')
-            ->withTimestamps();
+        return $this->belongsToMany(Campus::class, 'campus_user_roles')->withPivot('role_id')->withTimestamps();
     }
 
-    public function hasPermission($permissionName, $campusId)
+    public function hasPermission($permission, $campusId)
     {
+        $campusId = $campusId ?? session('current_campus_id');
+
         // Lấy Role ID của user tại campus đó
-        $roleId = DB::table('user_campus_roles')
-            ->where('user_id', $this->id)
+        $roleId = $this->campuses()
             ->where('campus_id', $campusId)
-            ->value('role_id');
+            ->pluck('pivot.role_id')
+            ->first();
 
         if (!$roleId) return false;
 
         // Kiểm tra xem role đó có permission không
-        return DB::table('role_permissions')
-            ->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
-            ->where('role_permissions.role_id', $roleId)
-            ->where('permissions.permission_name', $permissionName)
-            ->exists();
+        return Role::where('id', $roleId)
+            ->whereHas('permissions', function ($q) use ($permission) {
+                $q->where('code', $permission);
+            })->exists();
     }
 
 }

@@ -7,6 +7,12 @@ return [
             'edit_user' => 'edit_user',
             'delete_user' => 'delete_user',
         ],
+        'campuses' => [
+            'view_campus' => 'view_campus',
+            'add_campus' => 'add_campus',
+            'edit_campus' => 'edit_campus',
+            'delete_campus' => 'delete_campus',
+        ],
         'roles' => [
             'view_roles' => 'view_roles',
             'add_roles' => 'add_roles',
