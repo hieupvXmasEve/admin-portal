@@ -57,22 +57,36 @@ class User extends Authenticatable
         return $this->belongsToMany(Campus::class, 'campus_user_roles')->withPivot('role_id')->withTimestamps();
     }
 
-    public function hasPermission($permission, $campusId)
+    public function hasPermission($permission_code, $campusId)
+    {
+        return $this->getAllPermissions($campusId)->contains($permission_code);
+    }
+
+    public function getAllPermissions($campusId = null)
     {
         $campusId = $campusId ?? session('current_campus_id');
-        // Get user's role ID for the specified campus
-        $roleId = $this->campuses()
+
+        // Lấy tất cả role_id của user trong campus hiện tại
+        $roleIds = $this->campusRoles()
             ->where('campus_id', $campusId)
-            ->pluck('campus_user_roles.role_id')
-            ->first();
+            ->pluck('role_id');
+        if ($roleIds->isEmpty()) return collect();
 
-        if (!$roleId) return false;
+        // Lấy tất cả permissions từ các roles (kèm children nếu cần)
+        $roles = Role::with('permissions.children')->whereIn('id', $roleIds)->get();
 
-        // Check if the role has the specified permission
-        return Role::where('id', $roleId)
-            ->whereHas('permissions', function ($q) use ($permission) {
-                $q->where('code', $permission);
-            })->exists();
+        $permissions = collect();
+        foreach ($roles as $role) {
+            foreach ($role->permissions as $perm) {
+                $permissions->push($perm); // permission cha
+                foreach ($perm->children as $child) {
+                    $permissions->push($child); // permission con
+                }
+            }
+        }
+
+        // Trả về unique theo code (hoặc id nếu bạn muốn)
+        return $permissions->unique('code')->pluck('code')->values();
     }
 
 }

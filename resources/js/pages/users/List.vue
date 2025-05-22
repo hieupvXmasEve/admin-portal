@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,38 +42,9 @@ const filters = ref({
     search: props.filters?.search || '',
 });
 
-// Dialog và form state
-const isDialogOpen = ref(false);
-const selectedUser = ref<User | null>(null);
-const editForm = ref({
-    name: '',
-    email: '',
-});
-
-// Dialog functions
-const openEditDialog = (user: User) => {
-    selectedUser.value = user;
-    editForm.value = {
-        name: user.name,
-        email: user.email,
-    };
-    isDialogOpen.value = true;
-};
-
-const handleSubmit = () => {
-    if (selectedUser.value) {
-        console.log('Updating user:', selectedUser.value.id, editForm.value);
-        closeDialog();
-    }
-};
-
-const closeDialog = () => {
-    isDialogOpen.value = false;
-    selectedUser.value = null;
-    editForm.value = {
-        name: '',
-        email: '',
-    };
+// Edit user function
+const editUser = (user: User) => {
+    router.visit(`/users/edit/${user.id}`);
 };
 
 // Server-side filtering functions
@@ -100,18 +70,18 @@ const debouncedApplyFilters = useDebounceFn((newFilters) => {
     applyFilters(newFilters);
 }, 500);
 
-const updateNameFilter = (value: string) => {
-    filters.value.name = value;
+const updateNameFilter = (value: string | number) => {
+    filters.value.name = String(value);
     debouncedApplyFilters(filters.value);
 };
 
-const updateEmailFilter = (value: string) => {
-    filters.value.email = value;
+const updateEmailFilter = (value: string | number) => {
+    filters.value.email = String(value);
     debouncedApplyFilters(filters.value);
 };
 
-const updateSearchFilter = (value: string) => {
-    filters.value.search = value;
+const updateSearchFilter = (value: string | number) => {
+    filters.value.search = String(value);
     debouncedApplyFilters(filters.value);
 };
 
@@ -146,6 +116,7 @@ const columns: ColumnDef<User>[] = [
     },
     {
         id: 'actions',
+        header: 'Actions',
         enableHiding: false,
         enableSorting: false,
         cell: 'actions',
@@ -212,6 +183,17 @@ const goToNextPage = () => {
     <Head title="List Users" />
     <AppLayout :breadcrumbs="breadcrumbItems">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+            <!-- Header with Add User Button -->
+            <div class="flex items-center justify-between">
+                <h1 class="text-2xl font-semibold">Users</h1>
+                <Button @click="router.visit('/users/add')" class="flex items-center gap-2">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add User
+                </Button>
+            </div>
+
             <!-- Filters Section -->
             <div class="space-y-4">
                 <!-- Global Search -->
@@ -249,7 +231,7 @@ const goToNextPage = () => {
                 </div>
 
                 <!-- Column Filters -->
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <div class="flex flex-col gap-1">
                         <Label class="text-muted-foreground text-xs">Name</Label>
                         <Input :model-value="filters.name" @update:model-value="updateNameFilter" placeholder="Filter by name..." class="w-48" />
@@ -337,14 +319,14 @@ const goToNextPage = () => {
                                                 <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                                                     <Tooltip>
                                                         <TooltipTrigger as-child>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                @click="openEditDialog(row.original)"
-                                                                class="cursor-pointer"
-                                                            >
-                                                                <Edit2 class="h-4 w-4" />
-                                                            </Button>
+                                                                                                        <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                @click="editUser(row.original)"
+                                                class="cursor-pointer"
+                                            >
+                                                <Edit2 class="h-4 w-4" />
+                                            </Button>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
                                                             <p>Edit</p>
@@ -392,27 +374,6 @@ const goToNextPage = () => {
             </div>
         </div>
 
-        <!-- Edit User Dialog -->
-        <Dialog v-model:open="isDialogOpen">
-            <DialogContent class="sm:max-w-[425px]">
-                <DialogHeader>
-                    <DialogTitle>Edit User</DialogTitle>
-                </DialogHeader>
-                <form @submit.prevent="handleSubmit" class="space-y-4">
-                    <div class="space-y-2">
-                        <Label for="name">Name</Label>
-                        <Input id="name" v-model="editForm.name" placeholder="Enter user name" required />
-                    </div>
-                    <div class="space-y-2">
-                        <Label for="email">Email</Label>
-                        <Input id="email" v-model="editForm.email" type="email" placeholder="Enter user email" required />
-                    </div>
-                    <div class="flex justify-end space-x-2">
-                        <Button type="button" variant="outline" @click="closeDialog"> Cancel</Button>
-                        <Button type="submit"> Save Changes</Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
+
     </AppLayout>
 </template>
