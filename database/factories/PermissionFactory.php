@@ -16,9 +16,10 @@ class PermissionFactory extends Factory
      */
     public function definition(): array
     {
+        $name = $this->faker->unique()->word;
         return [
-            'name' => $this->faker->unique()->word . ' Permission ' . $this->faker->unique()->numberBetween(1000, 9999),
-            'code' => strtoupper($this->faker->unique()->lexify('PERM??')),
+            'name' => ucfirst($name),
+            'code' => $name . '.access',
             'description' => $this->faker->sentence,
         ];
     }

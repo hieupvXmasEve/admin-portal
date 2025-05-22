@@ -2,14 +2,21 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\SelectCampus;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome');
-})->name('home');
+    return redirect()->route('dashboard');
+})->middleware(['auth', 'verified']);
 
 Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
+
+
+Route::middleware(['auth'])->group(callback: function () {
+    Route::get('select-campus', [SelectCampus::class, 'index'])->name('select-campus.index');
+    Route::post('select-campus/set-current', [SelectCampus::class, 'setCurrentCampus'])->name('select-campus.set-current');
+});
 
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
