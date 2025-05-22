@@ -199,6 +199,7 @@ class DatabaseSeeder extends Seeder
             ]
         ];
         User::insert($users);
+        User::factory(50)->create();
 
 //        Insert data into user_campus_roles table
         $userCampusRoles = [

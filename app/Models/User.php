@@ -60,16 +60,15 @@ class User extends Authenticatable
     public function hasPermission($permission, $campusId)
     {
         $campusId = $campusId ?? session('current_campus_id');
-
-        // Lấy Role ID của user tại campus đó
+        // Get user's role ID for the specified campus
         $roleId = $this->campuses()
             ->where('campus_id', $campusId)
-            ->pluck('pivot.role_id')
+            ->pluck('campus_user_roles.role_id')
             ->first();
 
         if (!$roleId) return false;
 
-        // Kiểm tra xem role đó có permission không
+        // Check if the role has the specified permission
         return Role::where('id', $roleId)
             ->whereHas('permissions', function ($q) use ($permission) {
                 $q->where('code', $permission);
