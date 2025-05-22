@@ -12,6 +12,11 @@ const page = usePage<SharedData>();
 // State để lưu menu đang mở
 const openItems = ref<Record<string, boolean>>({});
 
+// Helper function to get base URL without query parameters
+function getBaseUrl(url: string): string {
+    return url.split('?')[0];
+}
+
 function toggle(item: NavItem) {
     openItems.value[item.title] = !openItems.value[item.title];
 }
@@ -19,7 +24,7 @@ function toggle(item: NavItem) {
 function hasActiveChild(item: NavItem): boolean {
     if (!item.children) return false;
     return item.children.some((child) => {
-        if (child.href === page.url) return true;
+        if (child.href && getBaseUrl(child.href) === getBaseUrl(page.url)) return true;
         return hasActiveChild(child);
     });
 }
@@ -58,8 +63,8 @@ watch(
         <SidebarMenu>
             <template v-for="item in items" :key="item.title">
                 <SidebarMenuItem>
-                    <SidebarMenuButton as-child :is-active="!item.children && item.href === page.url" :tooltip="item.title">
-                        <Link v-if="!item.children" :href="item.href" :class="{ 'submenu-active': item.href === page.url }">
+                    <SidebarMenuButton as-child :is-active="!item.children && getBaseUrl(item.href) === getBaseUrl(page.url)" :tooltip="item.title">
+                        <Link v-if="!item.children" :href="item.href" :class="{ 'submenu-active': getBaseUrl(item.href) === getBaseUrl(page.url) }">
                             <component :is="item.icon" />
                             <span>{{ item.title }}</span>
                         </Link>
