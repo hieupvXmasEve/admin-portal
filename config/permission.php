@@ -14,16 +14,16 @@ return [
             'delete_campus' => 'delete_campus',
         ],
         'roles' => [
-            'view_roles' => 'view_roles',
-            'add_roles' => 'add_roles',
-            'edit_roles' => 'edit_roles',
-            'delete_roles' => 'delete_roles',
+            'view_role' => 'view_role',
+            'add_role' => 'add_role',
+            'edit_role' => 'edit_role',
+            'delete_role' => 'delete_role',
         ],
         'permissions' => [
-            'view_permissions' => 'view_permissions',
-            'add_permissions' => 'add_permissions',
-            'edit_permissions' => 'edit_permissions',
-            'delete_permissions' => 'delete_permissions',
+            'view_permission' => 'view_permission',
+            'add_permission' => 'add_permission',
+            'edit_permission' => 'edit_permission',
+            'delete_permission' => 'delete_permission',
         ],
         'activity' => [
             'view_activity' => 'view_activity',
@@ -54,6 +54,7 @@ return [
             'add_groups' => 'add_groups',
             'edit_groups' => 'edit_groups',
             'delete_groups' => 'delete_groups',
+            'add_student_group' => 'add_student_group',
         ],
         'events' => [
             'view_events' => 'view_events',
@@ -72,9 +73,11 @@ return [
             'add_fees' => 'add_fees',
             'edit_fees' => 'edit_fees',
             'delete_fees' => 'delete_fees',
+            'import_fees' => 'import_fees',
         ],
         'queries' => [
             'view_queries' => 'view_queries',
+            'detail_queries' => 'detail_queries',
             'add_queries' => 'add_queries',
             'edit_queries' => 'edit_queries',
             'delete_queries' => 'delete_queries',
@@ -84,6 +87,7 @@ return [
             'add_golds' => 'add_golds',
             'edit_golds' => 'edit_golds',
             'delete_golds' => 'delete_golds',
+            'detail_golds' => 'detail_golds',
         ],
         'items' => [
             'view_items' => 'view_items',

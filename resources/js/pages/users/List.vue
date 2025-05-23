@@ -1,19 +1,17 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import DataTable from '@/components/DataTable.vue';
+import DataPagination from '@/components/DataPagination.vue';
+import TableActions from '@/components/TableActions.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { cn, valueUpdater } from '@/lib/utils';
 import type { BreadcrumbItem, PaginatedResponse } from '@/types';
 import type { User } from '@/types/User';
 import { Head, router } from '@inertiajs/vue3';
-import type { ColumnDef, ExpandedState, SortingState, VisibilityState } from '@tanstack/vue-table';
-import { FlexRender, getCoreRowModel, getExpandedRowModel, getSortedRowModel, useVueTable } from '@tanstack/vue-table';
+import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
-import { ChevronDown, Edit2, X } from 'lucide-vue-next';
+import { X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
@@ -24,6 +22,7 @@ const props = defineProps<{
         search?: string;
     };
 }>();
+
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'List Users',
@@ -32,7 +31,6 @@ const breadcrumbItems: BreadcrumbItem[] = [
 ];
 
 // Reactive data
-// const data = ref<User[]>(props.users.data);
 const data = computed(() => props.users.data);
 
 // Filter state - khởi tạo từ props
@@ -61,7 +59,7 @@ const applyFilters = (newFilters: typeof filters.value) => {
     router.visit(url, {
         preserveState: true,
         preserveScroll: true,
-        only: ['users', 'filters'], // Chỉ reload data cần thiết
+        only: ['users', 'filters'],
     });
 };
 
@@ -102,8 +100,20 @@ const hasActiveFilters = computed(() => {
     return filters.value.name || filters.value.email || filters.value.search;
 });
 
-// Column definitions - loại bỏ client-side filtering
+// Column definitions
 const columns: ColumnDef<User>[] = [
+    {
+        header: 'No',
+        id: 'no',
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => {
+            const currentPage = props.users.current_page;
+            const perPage = props.users.per_page;
+            const rowIndex = row.index;
+            return (currentPage - 1) * perPage + rowIndex + 1;
+        },
+    },
     {
         header: 'Name',
         accessorKey: 'name',
@@ -123,62 +133,29 @@ const columns: ColumnDef<User>[] = [
     },
 ];
 
-// Table state - loại bỏ columnFilters và globalFilter
-const sorting = ref<SortingState>([]);
-const columnVisibility = ref<VisibilityState>({});
-const rowSelection = ref({});
-const expanded = ref<ExpandedState>({});
-
-// Table instance - loại bỏ filtering models
-const table = useVueTable({
-    get data() {
-        return data.value; // Sử dụng computed value
-    },
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
-    onSortingChange: (updaterOrValue) => valueUpdater(updaterOrValue, sorting),
-    onColumnVisibilityChange: (updaterOrValue) => valueUpdater(updaterOrValue, columnVisibility),
-    onRowSelectionChange: (updaterOrValue) => valueUpdater(updaterOrValue, rowSelection),
-    onExpandedChange: (updaterOrValue) => valueUpdater(updaterOrValue, expanded),
-    state: {
-        get sorting() {
-            return sorting.value;
-        },
-        get columnVisibility() {
-            return columnVisibility.value;
-        },
-        get rowSelection() {
-            return rowSelection.value;
-        },
-        get expanded() {
-            return expanded.value;
-        },
-    },
-    manualFiltering: true, // Báo cho table biết là server-side filtering
-    manualPagination: true, // Server-side pagination
-});
-
-// Pagination functions
-const goToPage = (url: string | null) => {
-    if (url) {
-        router.visit(url, {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['users'],
-        });
-    }
+// Pagination navigation
+const handlePaginationNavigate = (url: string) => {
+    router.visit(url, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['users'],
+    });
 };
 
-const goToPreviousPage = () => {
-    goToPage(props.users.prev_page_url);
-};
+const handlePageSizeChange = (pageSize: number) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('per_page', pageSize.toString());
+    params.delete('page'); // Reset to first page when changing page size
 
-const goToNextPage = () => {
-    goToPage(props.users.next_page_url);
+    const url = `/users?${params.toString()}`;
+    router.visit(url, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['users', 'filters'],
+    });
 };
 </script>
+
 <template>
     <Head title="List Users" />
     <AppLayout :breadcrumbs="breadcrumbItems">
@@ -204,30 +181,6 @@ const goToNextPage = () => {
                         placeholder="Search all columns..."
                         class="max-w-sm"
                     />
-
-                    <DropdownMenu>
-                        <DropdownMenuTrigger as-child>
-                            <Button variant="outline" class="ml-auto">
-                                Columns
-                                <ChevronDown class="ml-2 h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuCheckboxItem
-                                v-for="column in table.getAllColumns().filter((column) => column.getCanHide())"
-                                :key="column.id"
-                                class="capitalize"
-                                :model-value="column.getIsVisible()"
-                                @update:model-value="
-                                    (value) => {
-                                        column.toggleVisibility(!!value);
-                                    }
-                                "
-                            >
-                                {{ column.id }}
-                            </DropdownMenuCheckboxItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
                 </div>
 
                 <!-- Column Filters -->
@@ -279,101 +232,20 @@ const goToNextPage = () => {
                 </div>
             </div>
 
-            <!-- Table -->
-            <div class="rounded-md border">
-                <Table>
-                    <TableHeader>
-                        <TableRow v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
-                            <TableHead
-                                v-for="header in headerGroup.headers"
-                                :key="header.id"
-                                :data-pinned="header.column.getIsPinned()"
-                                :class="
-                                    cn(
-                                        { 'bg-background/95 sticky': header.column.getIsPinned() },
-                                        header.column.getIsPinned() === 'left' ? 'left-0' : 'right-0',
-                                    )
-                                "
-                            >
-                                <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()" />
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <template v-if="table.getRowModel().rows?.length">
-                            <template v-for="row in table.getRowModel().rows" :key="row.id">
-                                <TableRow :data-state="row.getIsSelected() && 'selected'">
-                                    <TableCell
-                                        v-for="cell in row.getVisibleCells()"
-                                        :key="cell.id"
-                                        :data-pinned="cell.column.getIsPinned()"
-                                        :class="
-                                            cn(
-                                                { 'bg-background/95 sticky': cell.column.getIsPinned() },
-                                                cell.column.getIsPinned() === 'left' ? 'left-0' : 'right-0',
-                                            )
-                                        "
-                                    >
-                                        <template v-if="cell.column.id === 'actions'">
-                                            <div class="flex items-center gap-2">
-                                                <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                                                    <Tooltip>
-                                                        <TooltipTrigger as-child>
-                                                                                                        <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                @click="editUser(row.original)"
-                                                class="cursor-pointer"
-                                            >
-                                                <Edit2 class="h-4 w-4" />
-                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>Edit</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                            </div>
-                                        </template>
-                                        <FlexRender v-else :render="cell.column.columnDef.cell" :props="cell.getContext()" />
-                                    </TableCell>
-                                </TableRow>
-                            </template>
-                        </template>
-
-                        <TableRow v-else>
-                            <TableCell :colspan="columns.length" class="h-24 text-center"> No results found.</TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </div>
+            <!-- Data Table -->
+            <DataTable :data="data" :columns="columns" :show-column-toggle="false">
+                <template #cell-actions="{ row }">
+                    <TableActions @edit="editUser(row.original)" />
+                </template>
+            </DataTable>
 
             <!-- Pagination -->
-            <div class="flex items-center justify-between space-x-2 py-4">
-                <div class="text-muted-foreground text-sm">
-                    Showing {{ props.users.from || 0 }} to {{ props.users.to || 0 }} of {{ props.users.total }} users (Page
-                    {{ props.users.current_page }} of {{ props.users.last_page }})
-                </div>
-                <div class="flex space-x-2">
-                    <Button variant="outline" size="sm" :disabled="!props.users.prev_page_url" @click="goToPreviousPage"> Previous </Button>
-                    <div class="flex space-x-1">
-                        <template v-for="link in props.users.links" :key="link.label">
-                            <Button
-                                v-if="link.url && !link.label.includes('Previous') && !link.label.includes('Next')"
-                                :variant="link.active ? 'default' : 'outline'"
-                                size="sm"
-                                @click="goToPage(link.url)"
-                                class="min-w-[2.5rem]"
-                            >
-                                {{ link.label }}
-                            </Button>
-                        </template>
-                    </div>
-                    <Button variant="outline" size="sm" :disabled="!props.users.next_page_url" @click="goToNextPage"> Next </Button>
-                </div>
-            </div>
+            <DataPagination
+                :pagination-data="users"
+                item-name="users"
+                @navigate="handlePaginationNavigate"
+                @page-size-change="handlePageSizeChange"
+            />
         </div>
-
-
     </AppLayout>
 </template>
