@@ -57,7 +57,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function add()
+    public function create()
     {
         $roleController = new \App\Http\Controllers\RoleController();
         $roles = $roleController->getRolesWithPermissions();

@@ -37,12 +37,12 @@ export const mainNavItems: NavItem[] = [
                 icon: UserPlus,
                 requiredPermissions: ['add_user'],
             },
-            {
-                title: 'User Roles',
-                href: '/users/roles',
-                icon: UserCheck,
-                requiredPermissions: ['view_user'],
-            },
+            // {
+            //     title: 'User Roles',
+            //     href: '/users/roles',
+            //     icon: UserCheck,
+            //     requiredPermissions: ['view_user'],
+            // },
         ],
     },
     {
@@ -61,12 +61,12 @@ export const mainNavItems: NavItem[] = [
                     },
                     {
                         title: 'Create Role',
-                        href: '/roles/create',
+                        href: '/roles/add',
                     },
-                    {
-                        title: 'Role Permissions',
-                        href: '/roles/permissions',
-                    },
+                    // {
+                    //     title: 'Role Permissions',
+                    //     href: '/roles/permissions',
+                    // },
                 ],
             },
             {

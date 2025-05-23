@@ -76,7 +76,7 @@ watch(
                         :is-active="isActive(item)"
                         class="mx-1 rounded-lg transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
                         :class="{
-                            'bg-primary/10 text-primary border-r-2 border-primary font-medium': isActive(item),
+                            'bg-primary/10 text-primary  border-primary font-medium': isActive(item),
                             'text-gray-700 dark:text-gray-300': !isActive(item)
                         }"
                     >
@@ -149,7 +149,7 @@ watch(
                                         }"
                                         @click="toggle(subItem)"
                                     >
-                                        <div class="flex w-full items-center py-2 pl-11 pr-3">
+                                        <div class="flex w-full items-center py-2 pl-3 pr-3">
                                             <span class="flex-1 text-sm">{{ subItem.title }}</span>
                                             <ChevronRight
                                                 class="h-3 w-3 transition-transform duration-200 shrink-0"
@@ -180,7 +180,7 @@ watch(
                                                     }"
                                                 >
                                                     <Link :href="nestedItem.href" class="flex items-center py-1.5 pl-16 pr-3">
-                                                        <span class="text-xs">{{ nestedItem.title }}</span>
+                                                        <span class="">{{ nestedItem.title }}</span>
                                                     </Link>
                                                 </SidebarMenuSubButton>
                                             </template>

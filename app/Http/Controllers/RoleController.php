@@ -69,4 +69,73 @@ class RoleController extends Controller
 
         return $rolesWithGroupedPermissions;
     }
+
+    public function create()
+    {
+        $permissions = \App\Models\Permission::with('children')
+            ->whereNull('parent_id')
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('roles/Add', [
+            'permissions' => $permissions
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:roles',
+            'selectedPermissions' => 'array',
+            'selectedPermissions.*' => 'exists:permissions,id',
+        ]);
+
+        // Create the role
+        $role = Role::create([
+            'name' => $validated['name'],
+        ]);
+
+        // Assign permissions to the role
+        if (!empty($validated['selectedPermissions'])) {
+            $role->permissions()->attach($validated['selectedPermissions']);
+        }
+
+        return redirect()->route('roles.index')->with('success', 'Role created successfully!');
+    }
+
+    public function edit(Role $role)
+    {
+        $permissions = \App\Models\Permission::with('children')
+            ->whereNull('parent_id')
+            ->orderBy('name')
+            ->get();
+
+        // Get role's current permissions
+        $rolePermissionIds = $role->permissions()->pluck('permissions.id')->toArray();
+
+        return Inertia::render('roles/Edit', [
+            'role' => $role,
+            'permissions' => $permissions,
+            'rolePermissionIds' => $rolePermissionIds
+        ]);
+    }
+
+    public function update(Request $request, Role $role)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:roles,name,' . $role->id,
+            'selectedPermissions' => 'array',
+            'selectedPermissions.*' => 'exists:permissions,id',
+        ]);
+
+        // Update the role
+        $role->update([
+            'name' => $validated['name'],
+        ]);
+
+        // Sync permissions
+        $role->permissions()->sync($validated['selectedPermissions'] ?? []);
+
+        return redirect()->route('roles.index')->with('success', 'Role updated successfully!');
+    }
 }
