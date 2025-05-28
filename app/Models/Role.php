@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Str;
 
 class Role extends Model
 {
@@ -13,7 +14,42 @@ class Role extends Model
 
     protected $table = 'roles';
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'code'];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($role) {
+            if (empty($role->code)) {
+                $role->code = static::generateRoleCode($role->name);
+            }
+        });
+
+        static::updating(function ($role) {
+            if ($role->isDirty('name') && empty($role->code)) {
+                $role->code = static::generateRoleCode($role->name);
+            }
+        });
+    }
+
+    public static function generateRoleCode(string $name): string
+    {
+        // Convert to snake_case and remove special characters
+        $code = Str::snake(Str::ascii($name));
+        $code = preg_replace('/[^a-z0-9_]/', '', $code);
+
+        // Ensure uniqueness
+        $originalCode = $code;
+        $counter = 1;
+
+        while (static::where('code', $code)->exists()) {
+            $code = $originalCode . '_' . $counter;
+            $counter++;
+        }
+
+        return $code;
+    }
 
     public function users()
     {
@@ -26,5 +62,4 @@ class Role extends Model
     {
         return $this->belongsToMany(Permission::class, 'role_permissions');
     }
-
 }

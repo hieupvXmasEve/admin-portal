@@ -11,7 +11,7 @@ import type { User } from '@/types/User';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
-import { X } from 'lucide-vue-next';
+import { X, FileSpreadsheet, Upload } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
@@ -100,6 +100,40 @@ const hasActiveFilters = computed(() => {
     return filters.value.name || filters.value.email || filters.value.search;
 });
 
+// Export functionality
+const isExporting = ref(false);
+
+const exportToExcel = async () => {
+    if (isExporting.value) return;
+
+    isExporting.value = true;
+
+    try {
+        // Build export URL with current filters
+        const params = new URLSearchParams();
+
+        if (filters.value.name) params.set('filter[name]', filters.value.name);
+        if (filters.value.email) params.set('filter[email]', filters.value.email);
+        if (filters.value.search) params.set('search', filters.value.search);
+
+        const exportUrl = `/users/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
+
+        // Create a temporary link to trigger download
+        const link = document.createElement('a');
+        link.href = exportUrl;
+        link.download = `users_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } catch (error) {
+        console.error('Export failed:', error);
+        // You can add toast notification here if needed
+    } finally {
+        isExporting.value = false;
+    }
+};
+
 // Column definitions
 const columns: ColumnDef<User>[] = [
     {
@@ -163,28 +197,47 @@ const handlePageSizeChange = (pageSize: number) => {
             <!-- Header with Add User Button -->
             <div class="flex items-center justify-between">
                 <h1 class="text-2xl font-semibold">Users</h1>
-                <Button @click="router.visit('/users/add')" class="flex items-center gap-2">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Add User
-                </Button>
+                <div class="flex items-center gap-2">
+                    <Button
+                        @click="exportToExcel"
+                        variant="outline"
+                        :disabled="isExporting"
+                        class="flex items-center gap-2"
+                    >
+                        <FileSpreadsheet class="h-4 w-4" />
+                        {{ isExporting ? 'Exporting...' : 'Export Excel' }}
+                    </Button>
+                    <Button
+                        @click="router.visit('/users/import')"
+                        variant="outline"
+                        class="flex items-center gap-2"
+                    >
+                        <Upload class="h-4 w-4" />
+                        Import Excel
+                    </Button>
+                    <Button @click="router.visit('/users/add')" class="flex items-center gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add User
+                    </Button>
+                </div>
             </div>
 
             <!-- Filters Section -->
             <div class="space-y-4">
-                <!-- Global Search -->
-                <div class="flex items-center gap-2">
-                    <Input
+                <!-- Column Filters -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- Global Search -->
+                    <div class="flex flex-col gap-1">
+                        <Label class="text-muted-foreground text-xs">Search</Label>
+                        <Input
                         :model-value="filters.search"
                         @update:model-value="updateSearchFilter"
                         placeholder="Search all columns..."
                         class="max-w-sm"
                     />
-                </div>
-
-                <!-- Column Filters -->
-                <div class="flex flex-wrap items-center gap-2">
+                        </div>
                     <div class="flex flex-col gap-1">
                         <Label class="text-muted-foreground text-xs">Name</Label>
                         <Input :model-value="filters.name" @update:model-value="updateNameFilter" placeholder="Filter by name..." class="w-48" />

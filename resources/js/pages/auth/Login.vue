@@ -36,7 +36,7 @@ const loginWithGoogle = () => {
 
         <Button
             type="button"
-            class="flex w-full items-center justify-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+            class="flex w-full cursor-pointer items-center justify-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
             @click="loginWithGoogle"
         >
             <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="h-5 w-5" />

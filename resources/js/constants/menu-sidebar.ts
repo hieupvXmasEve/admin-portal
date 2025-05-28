@@ -9,9 +9,9 @@ import {
     Settings,
     Shield,
     ShieldCheck,
-    UserCheck,
     UserPlus,
     Users,
+    BookOpen,
 } from 'lucide-vue-next';
 
 export const mainNavItems: NavItem[] = [
@@ -19,6 +19,19 @@ export const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: '/dashboard',
         icon: LayoutDashboard,
+    },
+    {
+        title: 'Academic',
+        href: '#',
+        icon: BookOpen,
+        children: [
+            {
+                title: 'Semesters',
+                href: '/semesters',
+                icon: Calendar,
+                requiredPermissions: ['view_semester'],
+            },
+        ],
     },
     {
         title: 'User Management',
@@ -69,21 +82,21 @@ export const mainNavItems: NavItem[] = [
                     // },
                 ],
             },
-            {
-                title: 'Permissions',
-                href: '#',
-                icon: Shield,
-                children: [
-                    {
-                        title: 'All Permissions',
-                        href: '/permissions',
-                    },
-                    {
-                        title: 'Create Permission',
-                        href: '/permissions/create',
-                    },
-                ],
-            },
+            // {
+            //     title: 'Permissions',
+            //     href: '#',
+            //     icon: Shield,
+            //     children: [
+            //         {
+            //             title: 'All Permissions',
+            //             href: '/permissions',
+            //         },
+            //         {
+            //             title: 'Create Permission',
+            //             href: '/permissions/create',
+            //         },
+            //     ],
+            // },
         ],
     },
     {

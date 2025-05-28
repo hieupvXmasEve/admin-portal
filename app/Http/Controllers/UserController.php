@@ -149,4 +149,24 @@ class UserController extends Controller
 
         return redirect()->route('users')->with('success', 'User updated successfully!');
     }
+
+
+    public function destroy(User $user)
+    {
+        // Get current campus ID
+        $currentCampusId = session('current_campus_id');
+
+        // Remove user's roles for this campus only
+        $user->campusRoles()->where('campus_id', $currentCampusId)->delete();
+
+        // If user has no roles in any campus, delete the user
+        if ($user->campusRoles()->count() === 0) {
+            $user->delete();
+            $message = 'User deleted successfully!';
+        } else {
+            $message = 'User removed from current campus successfully!';
+        }
+
+        return redirect()->route('users')->with('success', $message);
+    }
 }
