@@ -35,25 +35,25 @@ class RoutePermissionHelper
 
             // Edit routes
             if (isset($permissions["edit_{$moduleSingular}"])) {
-                Route::get('/edit/{{$moduleSingular}}', [$controller, 'edit'])
+                Route::get("/edit/{{$moduleSingular}}", [$controller, 'edit'])
                     ->middleware("can:edit_{$moduleSingular}")
                     ->name("{$moduleSingular}.edit");
 
-                Route::put('/{{$moduleSingular}}', [$controller, 'update'])
+                Route::put("/{{$moduleSingular}}", [$controller, 'update'])
                     ->middleware("can:edit_{$moduleSingular}")
                     ->name("{$moduleSingular}.update");
             }
 
             // Delete route
             if (isset($permissions["delete_{$moduleSingular}"])) {
-                Route::delete('/{{$moduleSingular}}', [$controller, 'destroy'])
+                Route::delete("/{{$moduleSingular}}", [$controller, 'destroy'])
                     ->middleware("can:delete_{$moduleSingular}")
                     ->name("{$moduleSingular}.destroy");
             }
 
             // Show route (if view permission exists)
             if (isset($permissions["view_{$moduleSingular}"])) {
-                Route::get('/{{$moduleSingular}}', [$controller, 'show'])
+                Route::get("/{{$moduleSingular}}", [$controller, 'show'])
                     ->middleware("can:view_{$moduleSingular}")
                     ->name("{$moduleSingular}.show");
             }

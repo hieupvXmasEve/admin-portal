@@ -22,6 +22,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'phone',
+        'address',
     ];
 
     /**
@@ -88,5 +90,4 @@ class User extends Authenticatable
         // Trả về unique theo code (hoặc id nếu bạn muốn)
         return $permissions->unique('code')->pluck('code')->values();
     }
-
 }

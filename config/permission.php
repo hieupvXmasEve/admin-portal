@@ -6,6 +6,8 @@ return [
             'add_user' => 'add_user',
             'edit_user' => 'edit_user',
             'delete_user' => 'delete_user',
+            'import_user' => 'import_user',
+            'export_user' => 'export_user',
         ],
         'campuses' => [
             'view_campus' => 'view_campus',
@@ -42,12 +44,6 @@ return [
             'add_course' => 'add_course',
             'edit_course' => 'edit_course',
             'delete_course' => 'delete_course',
-        ],
-        'terms' => [
-            'view_terms' => 'view_terms',
-            'add_terms' => 'add_terms',
-            'edit_terms' => 'edit_terms',
-            'delete_terms' => 'delete_terms',
         ],
         'groups' => [
             'view_groups' => 'view_groups',
@@ -100,6 +96,12 @@ return [
             'add_news' => 'add_news',
             'edit_news' => 'edit_news',
             'delete_news' => 'delete_news',
+        ],
+        'semesters' => [
+            'view_semester' => 'view_semester',
+            'add_semester' => 'add_semester',
+            'edit_semester' => 'edit_semester',
+            'delete_semester' => 'delete_semester',
         ]
     ],
 
@@ -118,7 +120,8 @@ return [
         'item',
         'fee',
         'queris',
-        'gold'
+        'gold',
+        'semesters'
     ],
 
     'module_children' => [
