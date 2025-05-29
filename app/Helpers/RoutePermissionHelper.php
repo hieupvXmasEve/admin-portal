@@ -23,13 +23,13 @@ class RoutePermissionHelper
             }
 
             // Create routes
-            if (isset($permissions["add_{$moduleSingular}"])) {
-                Route::get('/add', [$controller, 'create'])
-                    ->middleware("can:add_{$moduleSingular}")
+            if (isset($permissions["create_{$moduleSingular}"])) {
+                Route::get('/create', [$controller, 'create'])
+                    ->middleware("can:create_{$moduleSingular}")
                     ->name("{$moduleSingular}.create");
 
                 Route::post('/', [$controller, 'store'])
-                    ->middleware("can:add_{$moduleSingular}")
+                    ->middleware("can:create_{$moduleSingular}")
                     ->name("{$moduleSingular}.store");
             }
 
@@ -91,7 +91,7 @@ class RoutePermissionHelper
 
         $actionMap = [
             'view' => "view_{$moduleSingular}",
-            'add' => "add_{$moduleSingular}",
+            'create' => "create_{$moduleSingular}",
             'edit' => "edit_{$moduleSingular}",
             'delete' => "delete_{$moduleSingular}",
         ];
@@ -123,7 +123,7 @@ class RoutePermissionHelper
 
         $actionMap = [
             'view' => "view_{$moduleSingular}",
-            'add' => "add_{$moduleSingular}",
+            'create' => "create_{$moduleSingular}",
             'edit' => "edit_{$moduleSingular}",
             'delete' => "delete_{$moduleSingular}",
         ];

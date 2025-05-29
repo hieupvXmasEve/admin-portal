@@ -24,7 +24,7 @@ class RoleController extends Controller
         $roles = $query->paginate($per_page, ['*'], 'page', $page)
             ->withQueryString();
 
-        return Inertia::render('roles/List', [
+        return Inertia::render('roles/Index', [
             'roles' => Inertia::deepMerge($roles),
         ]);
     }

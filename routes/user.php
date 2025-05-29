@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserImportController;
+use App\Http\Controllers\UserExportController;
 use App\Helpers\RoutePermissionHelper;
 use Illuminate\Support\Facades\Route;
 
@@ -51,6 +52,15 @@ Route::middleware('auth')->group(function () {
                 ->name('download')
                 ->where('format', 'simple|detailed|relationship');
         });
+
+        // Export data
+        Route::get('/export/excel', [UserExportController::class, 'exportExcel'])
+            ->middleware('can:view_user')
+            ->name('users.export.excel');
+
+        Route::get('/export/excel/filtered', [UserExportController::class, 'exportExcelWithCurrentFilters'])
+            ->middleware('can:view_user')
+            ->name('users.export.excel.filtered');
     });
 
     // Resource routes come AFTER specific routes

@@ -47,7 +47,7 @@ class UserController extends Controller
         $users = $query->paginate($per_page, ['*'], 'page', $page)
             ->withQueryString();
 
-        return Inertia::render('users/List', [
+        return Inertia::render('users/Index', [
             'users' => Inertia::deepMerge($users),
             'filters' => [
                 'search' => $validated['search'] ?? null,

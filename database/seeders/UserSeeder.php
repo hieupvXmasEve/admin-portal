@@ -63,56 +63,56 @@ class UserSeeder extends Seeder
         $permissions = [
             ['id' => 1, 'name' => 'User Management', 'parent_id' => null, 'code' => 'user_management'],
             ['id' => 2, 'name' => 'View User', 'parent_id' => 1, 'code' => config('permission.access.users.view_user')],
-            ['id' => 3, 'name' => 'Add User', 'parent_id' => 1, 'code' => config('permission.access.users.add_user')],
+            ['id' => 3, 'name' => 'Create User', 'parent_id' => 1, 'code' => config('permission.access.users.create_user')],
             ['id' => 4, 'name' => 'Edit User', 'parent_id' => 1, 'code' => config('permission.access.users.edit_user')],
             ['id' => 5, 'name' => 'Delete User', 'parent_id' => 1, 'code' => config('permission.access.users.delete_user')],
 
             ['id' => 6, 'name' => 'Room', 'parent_id' => null, 'code' => 'room'],
             ['id' => 7, 'name' => 'View Room', 'parent_id' => 6, 'code' => config('permission.access.room.view_room')],
-            ['id' => 8, 'name' => 'Add Room', 'parent_id' => 6, 'code' => config('permission.access.room.add_room')],
+            ['id' => 8, 'name' => 'Create Room', 'parent_id' => 6, 'code' => config('permission.access.room.create_room')],
             ['id' => 9, 'name' => 'Edit Room', 'parent_id' => 6, 'code' => config('permission.access.room.edit_room')],
             ['id' => 10, 'name' => 'Delete Room', 'parent_id' => 6, 'code' => config('permission.access.room.delete_room')],
 
             ['id' => 11, 'name' => 'Course', 'parent_id' => null, 'code' => 'course'],
             ['id' => 12, 'name' => 'View Course', 'parent_id' => 11, 'code' => config('permission.access.course.view_course')],
-            ['id' => 13, 'name' => 'Add Course', 'parent_id' => 11, 'code' => config('permission.access.course.add_course')],
+            ['id' => 13, 'name' => 'Create Course', 'parent_id' => 11, 'code' => config('permission.access.course.create_course')],
             ['id' => 14, 'name' => 'Edit Course', 'parent_id' => 11, 'code' => config('permission.access.course.edit_course')],
             ['id' => 15, 'name' => 'Delete Course', 'parent_id' => 11, 'code' => config('permission.access.course.delete_course')],
 
             ['id' => 16, 'name' => 'Semesters', 'parent_id' => null, 'code' => 'semesters'],
             ['id' => 17, 'name' => 'View Semesters', 'parent_id' => 16, 'code' => config('permission.access.semesters.view_semester')],
-            ['id' => 18, 'name' => 'Add Semesters', 'parent_id' => 16, 'code' => config('permission.access.semesters.add_semester')],
+            ['id' => 18, 'name' => 'Create Semesters', 'parent_id' => 16, 'code' => config('permission.access.semesters.create_semester')],
             ['id' => 19, 'name' => 'Edit Semesters', 'parent_id' => 16, 'code' => config('permission.access.semesters.edit_semester')],
             ['id' => 20, 'name' => 'Delete Semesters', 'parent_id' => 16, 'code' => config('permission.access.semesters.delete_semester')],
 
             ['id' => 21, 'name' => 'Groups', 'parent_id' => null, 'code' => 'groups'],
             ['id' => 22, 'name' => 'View Groups', 'parent_id' => 21, 'code' => config('permission.access.groups.view_groups')],
-            ['id' => 23, 'name' => 'Add Groups', 'parent_id' => 21, 'code' => config('permission.access.groups.add_groups')],
-            ['id' => 24, 'name' => 'Add Student Group', 'parent_id' => 21, 'code' => config('permission.access.groups.add_student_group')],
+            ['id' => 23, 'name' => 'Create Groups', 'parent_id' => 21, 'code' => config('permission.access.groups.create_groups')],
+            ['id' => 24, 'name' => 'Create Student Group', 'parent_id' => 21, 'code' => config('permission.access.groups.create_student_group')],
             ['id' => 25, 'name' => 'Edit Groups', 'parent_id' => 21, 'code' => config('permission.access.groups.edit_groups')],
             ['id' => 26, 'name' => 'Delete Groups', 'parent_id' => 21, 'code' => config('permission.access.groups.delete_groups')],
 
             ['id' => 27, 'name' => 'Events', 'parent_id' => null, 'code' => 'events'],
             ['id' => 28, 'name' => 'View Events', 'parent_id' => 27, 'code' => config('permission.access.events.view_events')],
-            ['id' => 29, 'name' => 'Add Events', 'parent_id' => 27, 'code' => config('permission.access.events.add_events')],
+            ['id' => 29, 'name' => 'Create Events', 'parent_id' => 27, 'code' => config('permission.access.events.create_events')],
             ['id' => 30, 'name' => 'Edit Events', 'parent_id' => 27, 'code' => config('permission.access.events.edit_events')],
             ['id' => 31, 'name' => 'Delete Events', 'parent_id' => 27, 'code' => config('permission.access.events.delete_events')],
 
             ['id' => 32, 'name' => 'Clubs', 'parent_id' => null, 'code' => 'clubs'],
             ['id' => 33, 'name' => 'View Clubs', 'parent_id' => 32, 'code' => config('permission.access.clubs.view_clubs')],
-            ['id' => 34, 'name' => 'Add Clubs', 'parent_id' => 32, 'code' => config('permission.access.clubs.add_clubs')],
+            ['id' => 34, 'name' => 'Create Clubs', 'parent_id' => 32, 'code' => config('permission.access.clubs.create_clubs')],
             ['id' => 35, 'name' => 'Edit Clubs', 'parent_id' => 32, 'code' => config('permission.access.clubs.edit_clubs')],
             ['id' => 36, 'name' => 'Delete Clubs', 'parent_id' => 32, 'code' => config('permission.access.clubs.delete_clubs')],
 
             ['id' => 37, 'name' => 'Items', 'parent_id' => null, 'code' => 'items'],
             ['id' => 38, 'name' => 'View Items', 'parent_id' => 37, 'code' => config('permission.access.items.view_items')],
-            ['id' => 39, 'name' => 'Add Items', 'parent_id' => 37, 'code' => config('permission.access.items.add_items')],
+            ['id' => 39, 'name' => 'Create Items', 'parent_id' => 37, 'code' => config('permission.access.items.create_items')],
             ['id' => 40, 'name' => 'Edit Items', 'parent_id' => 37, 'code' => config('permission.access.items.edit_items')],
             ['id' => 41, 'name' => 'Delete Items', 'parent_id' => 37, 'code' => config('permission.access.items.delete_items')],
 
             ['id' => 42, 'name' => 'Fees', 'parent_id' => null, 'code' => 'fees'],
             ['id' => 43, 'name' => 'View Fees', 'parent_id' => 42, 'code' => config('permission.access.fees.view_fees')],
-            ['id' => 44, 'name' => 'Add Fees', 'parent_id' => 42, 'code' => config('permission.access.fees.add_fees')],
+            ['id' => 44, 'name' => 'Create Fees', 'parent_id' => 42, 'code' => config('permission.access.fees.create_fees')],
             ['id' => 45, 'name' => 'Import Fees', 'parent_id' => 42, 'code' => config('permission.access.fees.import_fees')],
 
             ['id' => 46, 'name' => 'Queries', 'parent_id' => null, 'code' => 'queries'],
@@ -121,40 +121,49 @@ class UserSeeder extends Seeder
 
             ['id' => 49, 'name' => 'Golds', 'parent_id' => null, 'code' => 'golds'],
             ['id' => 50, 'name' => 'View Golds', 'parent_id' => 49, 'code' => config('permission.access.golds.view_golds')],
-            ['id' => 51, 'name' => 'Add Golds', 'parent_id' => 49, 'code' => config('permission.access.golds.add_golds')],
+            ['id' => 51, 'name' => 'Create Golds', 'parent_id' => 49, 'code' => config('permission.access.golds.create_golds')],
             ['id' => 52, 'name' => 'Edit Golds', 'parent_id' => 49, 'code' => config('permission.access.golds.edit_golds')],
             ['id' => 53, 'name' => 'Detail Golds', 'parent_id' => 49, 'code' => config('permission.access.golds.detail_golds')],
 
             ['id' => 54, 'name' => 'Role Management', 'parent_id' => null, 'code' => 'role_management'],
             ['id' => 55, 'name' => 'View Role', 'parent_id' => 54, 'code' => config('permission.access.roles.view_role')],
-            ['id' => 56, 'name' => 'Add Role', 'parent_id' => 54, 'code' => config('permission.access.roles.add_role')],
+            ['id' => 56, 'name' => 'Create Role', 'parent_id' => 54, 'code' => config('permission.access.roles.create_role')],
             ['id' => 57, 'name' => 'Edit Role', 'parent_id' => 54, 'code' => config('permission.access.roles.edit_role')],
             ['id' => 58, 'name' => 'Delete Role', 'parent_id' => 54, 'code' => config('permission.access.roles.delete_role')],
 
             ['id' => 59, 'name' => 'Permission Management', 'parent_id' => null, 'code' => 'permission_management'],
             ['id' => 60, 'name' => 'View Permission', 'parent_id' => 59, 'code' => config('permission.access.permissions.view_permission')],
-            ['id' => 61, 'name' => 'Add Permission', 'parent_id' => 59, 'code' => config('permission.access.permissions.add_permission')],
+            ['id' => 61, 'name' => 'Create Permission', 'parent_id' => 59, 'code' => config('permission.access.permissions.create_permission')],
             ['id' => 62, 'name' => 'Edit Permission', 'parent_id' => 59, 'code' => config('permission.access.permissions.edit_permission')],
             ['id' => 63, 'name' => 'Delete Permission', 'parent_id' => 59, 'code' => config('permission.access.permissions.delete_permission')],
 
             ['id' => 64, 'name' => 'Campus Management', 'parent_id' => null, 'code' => 'campus_management'],
             ['id' => 65, 'name' => 'View Campus', 'parent_id' => 64, 'code' => config('permission.access.campuses.view_campus')],
-            ['id' => 66, 'name' => 'Add Campus', 'parent_id' => 64, 'code' => config('permission.access.campuses.add_campus')],
+            ['id' => 66, 'name' => 'Create Campus', 'parent_id' => 64, 'code' => config('permission.access.campuses.create_campus')],
             ['id' => 67, 'name' => 'Edit Campus', 'parent_id' => 64, 'code' => config('permission.access.campuses.edit_campus')],
             ['id' => 68, 'name' => 'Delete Campus', 'parent_id' => 64, 'code' => config('permission.access.campuses.delete_campus')],
 
             ['id' => 69, 'name' => 'Import User', 'parent_id' => 1, 'code' => config('permission.access.users.import_user')],
             ['id' => 70, 'name' => 'Export User', 'parent_id' => 1, 'code' => config('permission.access.users.export_user')],
+
+            ['id' => 71, 'name' => 'Units', 'parent_id' => null, 'code' => 'units'],
+            ['id' => 72, 'name' => 'View Units', 'parent_id' => 71, 'code' => config('permission.access.units.view_unit')],
+            ['id' => 73, 'name' => 'Create Units', 'parent_id' => 71, 'code' => config('permission.access.units.create_unit')],
+            ['id' => 74, 'name' => 'Edit Units', 'parent_id' => 71, 'code' => config('permission.access.units.edit_unit')],
+            ['id' => 75, 'name' => 'Delete Units', 'parent_id' => 71, 'code' => config('permission.access.units.delete_unit')],
         ];
 
-        foreach ($permissions as &$permission) {
-            $permission['created_at'] = $now;
-            $permission['updated_at'] = $now;
+        // foreach ($permissions as &$permission) {
+        //     $permission['created_at'] = $now;
+        //     $permission['updated_at'] = $now;
+        // }
+
+        // unset($permission);
+
+        foreach ($permissions as $permission) {
+            Permission::create($permission);
         }
 
-        unset($permission);
-
-        Permission::insert($permissions);
         $rolePermissions = [
             ['role_id' => 1, 'permission_id' => 2],
             ['role_id' => 1, 'permission_id' => 3],
@@ -227,6 +236,11 @@ class UserSeeder extends Seeder
 
             ['role_id' => 1, 'permission_id' => 69],
             ['role_id' => 1, 'permission_id' => 70],
+
+            ['role_id' => 1, 'permission_id' => 72],
+            ['role_id' => 1, 'permission_id' => 73],
+            ['role_id' => 1, 'permission_id' => 74],
+            ['role_id' => 1, 'permission_id' => 75],
         ];
 
         foreach ($rolePermissions as &$rp) {

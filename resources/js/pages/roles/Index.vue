@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button';
-import DataTable from '@/components/DataTable.vue';
 import DataPagination from '@/components/DataPagination.vue';
+import DataTable from '@/components/DataTable.vue';
 import TableActions from '@/components/TableActions.vue';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem, PaginatedResponse } from '@/types';
 import type { Role } from '@/types/Role';
@@ -87,7 +87,7 @@ const handlePageSizeChange = (pageSize: number) => {
             <!-- Header with Add Role Button -->
             <div class="flex items-center justify-between">
                 <h1 class="text-2xl font-semibold">Roles</h1>
-                <Button @click="router.visit('/roles/add')" class="flex items-center gap-2">
+                <Button @click="router.visit('/roles/create')" class="flex items-center gap-2">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
