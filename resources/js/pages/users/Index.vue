@@ -1,17 +1,17 @@
 <script setup lang="ts">
+import DataPagination from '@/components/DataPagination.vue';
+import DataTable from '@/components/DataTable.vue';
+import TableActions from '@/components/TableActions.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import DataTable from '@/components/DataTable.vue';
-import DataPagination from '@/components/DataPagination.vue';
-import TableActions from '@/components/TableActions.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem, PaginatedResponse } from '@/types';
 import type { User } from '@/types/User';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
-import { X, FileSpreadsheet, Upload } from 'lucide-vue-next';
+import { FileSpreadsheet, Upload, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
@@ -125,7 +125,6 @@ const exportToExcel = async () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-
     } catch (error) {
         console.error('Export failed:', error);
         // You can add toast notification here if needed
@@ -198,24 +197,15 @@ const handlePageSizeChange = (pageSize: number) => {
             <div class="flex items-center justify-between">
                 <h1 class="text-2xl font-semibold">Users</h1>
                 <div class="flex items-center gap-2">
-                    <Button
-                        @click="exportToExcel"
-                        variant="outline"
-                        :disabled="isExporting"
-                        class="flex items-center gap-2"
-                    >
+                    <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
                         <FileSpreadsheet class="h-4 w-4" />
                         {{ isExporting ? 'Exporting...' : 'Export Excel' }}
                     </Button>
-                    <Button
-                        @click="router.visit('/users/import')"
-                        variant="outline"
-                        class="flex items-center gap-2"
-                    >
+                    <Button @click="router.visit('/users/import')" variant="outline" class="flex items-center gap-2">
                         <Upload class="h-4 w-4" />
                         Import Excel
                     </Button>
-                    <Button @click="router.visit('/users/add')" class="flex items-center gap-2">
+                    <Button @click="router.visit('/users/create')" class="flex items-center gap-2">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                         </svg>
@@ -232,12 +222,12 @@ const handlePageSizeChange = (pageSize: number) => {
                     <div class="flex flex-col gap-1">
                         <Label class="text-muted-foreground text-xs">Search</Label>
                         <Input
-                        :model-value="filters.search"
-                        @update:model-value="updateSearchFilter"
-                        placeholder="Search all columns..."
-                        class="max-w-sm"
-                    />
-                        </div>
+                            :model-value="filters.search"
+                            @update:model-value="updateSearchFilter"
+                            placeholder="Search all columns..."
+                            class="max-w-sm"
+                        />
+                    </div>
                     <div class="flex flex-col gap-1">
                         <Label class="text-muted-foreground text-xs">Name</Label>
                         <Input :model-value="filters.name" @update:model-value="updateNameFilter" placeholder="Filter by name..." class="w-48" />

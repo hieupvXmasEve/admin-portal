@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { computed, onBeforeUnmount, ref } from 'vue';
+import { Input } from './ui/input';
 
 const props = defineProps({
     modelValue: {
@@ -32,5 +33,5 @@ onBeforeUnmount(() => clearTimeout(timeout.value));
 </script>
 
 <template>
-    <input v-model="localValue" v-bind="$attrs" class="rounded border px-2 py-1 text-sm" />
+    <Input v-model="localValue" v-bind="$attrs" />
 </template>

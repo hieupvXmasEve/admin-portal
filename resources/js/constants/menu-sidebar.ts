@@ -1,9 +1,11 @@
 import type { NavItem } from '@/types';
 import {
     BarChart3,
+    BookOpen,
     Calendar,
     Database,
     FileText,
+    GraduationCap,
     LayoutDashboard,
     Mail,
     Settings,
@@ -11,7 +13,6 @@ import {
     ShieldCheck,
     UserPlus,
     Users,
-    BookOpen,
 } from 'lucide-vue-next';
 
 export const mainNavItems: NavItem[] = [
@@ -31,6 +32,12 @@ export const mainNavItems: NavItem[] = [
                 icon: Calendar,
                 requiredPermissions: ['view_semester'],
             },
+            {
+                title: 'Units',
+                href: '/units',
+                icon: GraduationCap,
+                requiredPermissions: ['view_unit'],
+            },
         ],
     },
     {
@@ -46,7 +53,7 @@ export const mainNavItems: NavItem[] = [
             },
             {
                 title: 'Add User',
-                href: '/users/add',
+                href: '/users/create',
                 icon: UserPlus,
                 requiredPermissions: ['add_user'],
             },
@@ -74,7 +81,7 @@ export const mainNavItems: NavItem[] = [
                     },
                     {
                         title: 'Create Role',
-                        href: '/roles/add',
+                        href: '/roles/create',
                     },
                     // {
                     //     title: 'Role Permissions',

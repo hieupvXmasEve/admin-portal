@@ -22,3 +22,6 @@ require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/user.php';
 require __DIR__ . '/role.php';
+require __DIR__ . '/semester.php';
+require __DIR__ . '/units.php';
+require __DIR__ . '/syllabi.php';

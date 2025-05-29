@@ -19,4 +19,8 @@ class Campus extends Model
             ->withTimestamps();
     }
 
+    public function semesters()
+    {
+        return $this->hasMany(Semester::class);
+    }
 }

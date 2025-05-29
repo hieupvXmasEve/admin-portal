@@ -11,9 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->string('phone', 20)->nullable()->after('email');
-            $table->string('address', 500)->nullable()->after('phone');
+        Schema::table('curriculum_versions', function (Blueprint $table) {
+            $table->foreign('specialization_id')->references('id')->on('specializations')->onDelete('cascade');
         });
     }
 
@@ -22,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['phone', 'address']);
+        Schema::table('curriculum_versions', function (Blueprint $table) {
+            $table->dropForeign(['specialization_id']);
         });
     }
 };
