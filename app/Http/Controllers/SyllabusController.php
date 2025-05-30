@@ -31,7 +31,7 @@ class SyllabusController extends Controller
             $syllabus->total_assessment_weight = $syllabus->assessmentComponents->sum('weight');
         });
 
-        return Inertia::render('syllabi/Index', [
+        return Inertia::render('syllabus/Index', [
             'unit' => $unit,
             'syllabi' => $syllabi,
         ]);
@@ -42,10 +42,10 @@ class SyllabusController extends Controller
      */
     public function create(Unit $unit): Response
     {
-        $semesters = Semester::orderBy('academic_year', 'desc')
+        $semesters = Semester::orderBy('year', 'desc')
             ->get();
 
-        return Inertia::render('syllabi/Create', [
+        return Inertia::render('syllabus/Create', [
             'unit' => $unit,
             'semesters' => $semesters,
             'assessmentTypes' => AssessmentComponent::TYPES,
@@ -138,7 +138,7 @@ class SyllabusController extends Controller
 
         $syllabus->total_assessment_weight = $syllabus->assessmentComponents->sum('weight');
 
-        return Inertia::render('syllabi/Show', [
+        return Inertia::render('syllabus/Show', [
             'unit' => $unit,
             'syllabus' => $syllabus,
         ]);
@@ -151,10 +151,10 @@ class SyllabusController extends Controller
     {
         $syllabus->load(['assessmentComponents.details']);
 
-        $semesters = Semester::orderBy('academic_year', 'desc')
+        $semesters = Semester::orderBy('year', 'desc')
             ->get();
 
-        return Inertia::render('syllabi/Edit', [
+        return Inertia::render('syllabus/Edit', [
             'unit' => $unit,
             'syllabus' => $syllabus,
             'semesters' => $semesters,

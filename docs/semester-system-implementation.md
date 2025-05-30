@@ -36,7 +36,7 @@ The enhanced semester system provides comprehensive campus-wide semester managem
 -- Enhanced semesters table with academic calendar features
 ALTER TABLE semesters ADD COLUMN (
     semester_type ENUM('fall', 'spring', 'summer', 'winter', 'intersession') DEFAULT 'fall',
-    academic_year VARCHAR(9), -- e.g., "2024-2025"
+    year VARCHAR(4), -- e.g., "2024"
     enrollment_start_date DATE,
     enrollment_end_date DATE,
     add_drop_deadline DATE,

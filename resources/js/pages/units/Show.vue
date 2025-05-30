@@ -8,7 +8,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger
+    AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
@@ -18,20 +18,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import type { UnitData as Unit } from '@/types/Unit';
 import { Head, router } from '@inertiajs/vue3';
-import {
-    ArrowLeft,
-    BookOpen,
-    CheckCircle,
-    Clock,
-    Edit,
-    FileText,
-    GitBranch,
-    GraduationCap,
-    Network,
-    Shield,
-    Target,
-    Trash2
-} from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, CheckCircle, Clock, Edit, FileText, GitBranch, GraduationCap, Network, Shield, Target, Trash2 } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -80,23 +67,41 @@ interface RelationshipStats {
     syllabi_count: number;
 }
 
+interface EquivalentUnitItem {
+    id: number;
+    unit: {
+        id: number;
+        code: string;
+        name: string;
+        credit_points: number;
+    };
+    reason: string | null;
+    valid_from_semester: {
+        id: number;
+        term: string;
+        year: number;
+    } | null;
+    relationship_type: 'equivalent_to' | 'equivalent_from';
+}
+
 const props = defineProps<{
     unit: UnitData;
+    equivalentUnits: EquivalentUnitItem[];
     relationshipStats: RelationshipStats;
     prerequisiteDescriptions?: string | null;
     canEdit: boolean;
     canDelete: boolean;
 }>();
-
+console.log(props.unit);
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'Units',
-        href: '/units'
+        href: '/units',
     },
     {
         title: props.unit.code,
-        href: `/units/${props.unit.id}`
-    }
+        href: `/units/${props.unit.id}`,
+    },
 ];
 
 // Delete confirmation
@@ -112,7 +117,7 @@ const deleteUnit = () => {
         onError: () => {
             toast.error('Failed to delete unit');
             isDeleting.value = false;
-        }
+        },
     });
 };
 
@@ -203,8 +208,7 @@ const getAssessmentTypeColor = (type: string) => {
 const hasRelationships = () => {
     return (
         (props.unit.prerequisite_groups && props.unit.prerequisite_groups.length > 0) ||
-        (props.unit.equivalent_units && props.unit.equivalent_units.length > 0) ||
-        (props.unit.equivalent_to && props.unit.equivalent_to.length > 0) ||
+        (props.equivalentUnits && props.equivalentUnits.length > 0) ||
         (props.unit.curriculum_units && props.unit.curriculum_units.length > 0)
     );
 };
@@ -244,14 +248,12 @@ const hasRelationships = () => {
                                 <AlertDialogTitle>Delete Unit</AlertDialogTitle>
                                 <AlertDialogDescription>
                                     Are you sure you want to delete unit <strong>{{ unit.code }}</strong
-                                >? This action cannot be undone and will remove all related data.
+                                    >? This action cannot be undone and will remove all related data.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction @click="deleteUnit" class="bg-red-600 hover:bg-red-700"> Delete
-                                    Unit
-                                </AlertDialogAction>
+                                <AlertDialogAction @click="deleteUnit" class="bg-red-600 hover:bg-red-700"> Delete Unit </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
@@ -369,24 +371,19 @@ const hasRelationships = () => {
                             <Network class="h-5 w-5" />
                             Prerequisites Structure
                         </CardTitle>
-                        <CardDescription> Requirements that students must meet before taking {{ unit.code }}
-                        </CardDescription>
+                        <CardDescription> Requirements that students must meet before taking {{ unit.code }} </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div v-if="unit.prerequisite_groups && unit.prerequisite_groups.length > 0" class="space-y-4">
                             <!-- Human-readable description -->
-                            <div v-if="prerequisiteDescriptions"
-                                 class="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                            <div v-if="prerequisiteDescriptions" class="rounded-lg border border-blue-200 bg-blue-50 p-4">
                                 <h4 class="mb-2 text-sm font-semibold text-blue-800">Summary</h4>
-                                <pre
-                                    class="text-sm font-medium whitespace-pre-wrap text-blue-700">{{ prerequisiteDescriptions
-                                    }}</pre>
+                                <pre class="text-sm font-medium whitespace-pre-wrap text-blue-700">{{ prerequisiteDescriptions }}</pre>
                             </div>
 
                             <!-- Detailed prerequisite groups -->
                             <div class="space-y-4">
-                                <div v-for="(group, groupIndex) in unit.prerequisite_groups" :key="group.id"
-                                     class="rounded-lg border bg-gray-50 p-4">
+                                <div v-for="(group, groupIndex) in unit.prerequisite_groups" :key="group.id" class="rounded-lg border bg-gray-50 p-4">
                                     <div class="mb-3 flex items-center justify-between">
                                         <div class="flex items-center gap-2">
                                             <Badge
@@ -396,8 +393,7 @@ const hasRelationships = () => {
                                             >
                                                 {{ group.logic_operator }}
                                             </Badge>
-                                            <span class="text-sm font-medium text-gray-600">Group {{ groupIndex + 1
-                                                }}</span>
+                                            <span class="text-sm font-medium text-gray-600">Group {{ groupIndex + 1 }}</span>
                                         </div>
                                     </div>
 
@@ -416,30 +412,24 @@ const hasRelationships = () => {
                                             <div class="flex items-start justify-between">
                                                 <div class="flex-1">
                                                     <div class="mb-2 flex items-center gap-2">
-                                                        <component :is="getConditionTypeIcon(condition.type)"
-                                                                   class="h-4 w-4" />
-                                                        <Badge :class="getConditionTypeColor(condition.type)"
-                                                               class="text-xs">
+                                                        <component :is="getConditionTypeIcon(condition.type)" class="h-4 w-4" />
+                                                        <Badge :class="getConditionTypeColor(condition.type)" class="text-xs">
                                                             {{ condition.type.replace('_', ' ').toUpperCase() }}
                                                         </Badge>
                                                     </div>
 
                                                     <!-- Unit prerequisite -->
                                                     <div v-if="condition.required_unit">
-                                                        <code
-                                                            class="font-mono text-sm font-semibold">{{ condition.required_unit.code
-                                                            }}</code>
+                                                        <code class="font-mono text-sm font-semibold">{{ condition.required_unit.code }}</code>
                                                         <p class="mt-1 text-sm text-gray-600">
                                                             {{ condition.required_unit.name }}
                                                         </p>
-                                                        <p class="mt-1 text-xs text-gray-500">
-                                                            {{ condition.required_unit.credit_points }} CP</p>
+                                                        <p class="mt-1 text-xs text-gray-500">{{ condition.required_unit.credit_points }} CP</p>
                                                     </div>
 
                                                     <!-- Credit requirement -->
                                                     <div v-else-if="condition.required_credits">
-                                                        <p class="text-sm font-medium">{{ condition.required_credits }}
-                                                            Credit Points Required</p>
+                                                        <p class="text-sm font-medium">{{ condition.required_credits }} Credit Points Required</p>
                                                     </div>
 
                                                     <!-- Free text requirement -->
@@ -462,86 +452,51 @@ const hasRelationships = () => {
             </div>
 
             <!-- Equivalent Units Section -->
-            <div
-                v-if="(unit.equivalent_units && unit.equivalent_units.length > 0) || (unit.equivalent_to && unit.equivalent_to.length > 0)"
-                class="grid gap-6 md:grid-cols-2"
-            >
-                <!-- Units equivalent to this unit -->
-                <Card v-if="unit.equivalent_units && unit.equivalent_units.length > 0">
-                    <CardHeader>
-                        <CardTitle class="flex items-center gap-2">
-                            <Target class="h-5 w-5" />
-                            Equivalent Units
-                        </CardTitle>
-                        <CardDescription> Units that are equivalent to {{ unit.code }}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="space-y-3">
-                            <div
-                                v-for="equivalent in unit.equivalent_units"
-                                :key="equivalent.id"
-                                class="cursor-pointer rounded-lg border p-3 transition-colors hover:bg-gray-50"
-                                @click="router.visit(`/units/${equivalent.equivalent_unit.id}`)"
-                            >
-                                <div class="mb-2 flex items-start justify-between">
-                                    <div>
-                                        <code class="font-mono text-sm font-semibold">{{ equivalent.equivalent_unit.code
-                                            }}</code>
-                                        <p class="text-sm text-gray-600">{{ equivalent.equivalent_unit.name }}</p>
-                                    </div>
+            <Card v-if="equivalentUnits && equivalentUnits.length > 0">
+                <CardHeader>
+                    <CardTitle class="flex items-center gap-2">
+                        <Target class="h-5 w-5" />
+                        Equivalent Units
+                    </CardTitle>
+                    <CardDescription>
+                        Units that are equivalent to {{ unit.code }} (including transitive relationships)
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="space-y-3">
+                        <div
+                            v-for="equivalent in equivalentUnits"
+                            :key="equivalent.id"
+                            class="cursor-pointer rounded-lg border p-3 transition-colors hover:bg-gray-50"
+                            @click="router.visit(`/units/${equivalent.unit.id}`)"
+                        >
+                            <div class="mb-2 flex items-start justify-between">
+                                <div>
+                                    <code class="font-mono text-sm font-semibold">{{ equivalent.unit.code }}</code>
+                                    <p class="text-sm text-gray-600">{{ equivalent.unit.name }}</p>
+                                </div>
+                                <div class="flex items-center gap-2">
                                     <Badge class="bg-purple-100 text-xs text-purple-800">
-                                        {{ equivalent.equivalent_unit.credit_points }} CP
+                                        {{ equivalent.unit.credit_points }} CP
+                                    </Badge>
+                                    <Badge
+                                        class="text-xs"
+                                        :class="equivalent.relationship_type === 'equivalent_to'
+                                            ? 'bg-blue-100 text-blue-800'
+                                            : 'bg-green-100 text-green-800'"
+                                    >
+                                        {{ equivalent.relationship_type === 'equivalent_to' ? 'Replaces' : 'Replaced by' }}
                                     </Badge>
                                 </div>
-                                <p v-if="equivalent.reason" class="mb-1 text-xs text-gray-500">{{ equivalent.reason
-                                    }}</p>
-                                <p class="text-xs text-gray-400">
-                                    Valid from {{ equivalent.valid_from_semester.year }}
-                                    {{ equivalent.valid_from_semester.term }}
-                                </p>
                             </div>
+                            <p v-if="equivalent.reason" class="mb-1 text-xs text-gray-500">{{ equivalent.reason }}</p>
+                            <p v-if="equivalent.valid_from_semester" class="text-xs text-gray-400">
+                                Valid from {{ equivalent.valid_from_semester.term }} {{ equivalent.valid_from_semester.year }}
+                            </p>
                         </div>
-                    </CardContent>
-                </Card>
-
-                <!-- Units this unit is equivalent to -->
-                <Card v-if="unit.equivalent_to && unit.equivalent_to.length > 0">
-                    <CardHeader>
-                        <CardTitle class="flex items-center gap-2">
-                            <Target class="h-5 w-5" />
-                            Replaces Units
-                        </CardTitle>
-                        <CardDescription> Units that {{ unit.code }} replaces or is equivalent to</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="space-y-3">
-                            <div
-                                v-for="equivalentTo in unit.equivalent_to"
-                                :key="equivalentTo.id"
-                                class="cursor-pointer rounded-lg border p-3 transition-colors hover:bg-gray-50"
-                                @click="router.visit(`/units/${equivalentTo.unit.id}`)"
-                            >
-                                <div class="mb-2 flex items-start justify-between">
-                                    <div>
-                                        <code class="font-mono text-sm font-semibold">{{ equivalentTo.unit.code
-                                            }}</code>
-                                        <p class="text-sm text-gray-600">{{ equivalentTo.unit.name }}</p>
-                                    </div>
-                                    <Badge class="bg-purple-100 text-xs text-purple-800">
-                                        {{ equivalentTo.unit.credit_points }} CP
-                                    </Badge>
-                                </div>
-                                <p v-if="equivalentTo.reason" class="mb-1 text-xs text-gray-500">{{ equivalentTo.reason
-                                    }}</p>
-                                <p class="text-xs text-gray-400">
-                                    Valid from {{ equivalentTo.valid_from_semester.year }}
-                                    {{ equivalentTo.valid_from_semester.term }}
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             <!-- Curriculum Usage Section -->
             <Card v-if="unit.curriculum_units && unit.curriculum_units.length > 0">
@@ -561,10 +516,8 @@ const hasRelationships = () => {
                         >
                             <div class="mb-3 flex items-start justify-between">
                                 <div class="flex-1">
-                                    <p class="text-sm font-semibold">{{ curriculumUnit.curriculum_version.program.name
-                                        }}</p>
-                                    <p v-if="curriculumUnit.curriculum_version.specialization"
-                                       class="text-xs text-gray-600">
+                                    <p class="text-sm font-semibold">{{ curriculumUnit.curriculum_version.program.name }}</p>
+                                    <p v-if="curriculumUnit.curriculum_version.specialization" class="text-xs text-gray-600">
                                         {{ curriculumUnit.curriculum_version.specialization.name }}
                                     </p>
                                     <p class="mt-1 text-xs text-gray-500">
@@ -577,15 +530,12 @@ const hasRelationships = () => {
                             </div>
 
                             <div class="flex items-center justify-between text-xs">
-                                <span
-                                    :class="curriculumUnit.is_required ? 'font-medium text-red-600' : 'text-gray-500'">
+                                <span :class="curriculumUnit.is_required ? 'font-medium text-red-600' : 'text-gray-500'">
                                     {{ curriculumUnit.is_required ? 'Required' : 'Elective' }}
                                 </span>
-                                <span v-if="curriculumUnit.year_level || curriculumUnit.semester_number"
-                                      class="text-gray-500">
+                                <span v-if="curriculumUnit.year_level || curriculumUnit.semester_number" class="text-gray-500">
                                     <span v-if="curriculumUnit.year_level">Year {{ curriculumUnit.year_level }}</span>
-                                    <span v-if="curriculumUnit.semester_number"> Sem {{ curriculumUnit.semester_number
-                                        }}</span>
+                                    <span v-if="curriculumUnit.semester_number"> Sem {{ curriculumUnit.semester_number }}</span>
                                 </span>
                             </div>
                         </div>
@@ -602,8 +552,7 @@ const hasRelationships = () => {
                                 <FileText class="h-5 w-5" />
                                 Syllabi
                             </CardTitle>
-                            <CardDescription>Course syllabi and assessment structures for {{ unit.code }}
-                            </CardDescription>
+                            <CardDescription>Course syllabi and assessment structures for {{ unit.code }} </CardDescription>
                         </div>
                         <Button v-if="canEdit" variant="outline" @click="router.visit(`/units/${unit.id}/syllabi`)">
                             <FileText class="mr-2 h-4 w-4" />
@@ -625,19 +574,14 @@ const hasRelationships = () => {
                                         <span class="font-semibold">
                                             {{ syllabus.version || 'No Version' }}
                                         </span>
-                                        <Badge v-if="syllabus.is_active" class="bg-green-100 text-green-800">
-                                            Active
-                                        </Badge>
-                                        <Badge v-else class="bg-gray-100 text-gray-800">
-                                            Inactive
-                                        </Badge>
+                                        <Badge v-if="syllabus.is_active" class="bg-green-100 text-green-800"> Active </Badge>
+                                        <Badge v-else class="bg-gray-100 text-gray-800"> Inactive</Badge>
                                     </div>
                                     <div class="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                                         <div v-if="syllabus.effective_from_semester">
                                             <span class="font-medium text-gray-500">Effective From:</span>
                                             <span class="ml-1">
-                                                {{ syllabus.effective_from_semester.term
-                                                }} {{ syllabus.effective_from_semester.year }}
+                                                {{ syllabus.effective_from_semester.term }} {{ syllabus.effective_from_semester.year }}
                                             </span>
                                         </div>
                                         <div v-if="syllabus.total_hours">
@@ -651,33 +595,22 @@ const hasRelationships = () => {
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <div
-                                        v-if="syllabus.assessment_components && syllabus.assessment_components.length > 0"
-                                        class="text-right">
+                                    <div v-if="syllabus.assessment_components && syllabus.assessment_components.length > 0" class="text-right">
                                         <div class="text-sm font-medium">
-                                            {{ syllabus.assessment_components.length }} Components
+                                            {{ syllabus.assessment_components.length }}
+                                            Components
                                         </div>
-                                        <div class="text-xs text-gray-500">
-                                            {{ syllabus.total_assessment_weight || 0 }}% Total Weight
-                                        </div>
-                                        <div v-if="syllabus.total_assessment_weight !== 100"
-                                             class="text-xs text-orange-600">
-                                            ⚠️ Incomplete
-                                        </div>
+                                        <div class="text-xs text-gray-500">{{ syllabus.total_assessment_weight || 0 }}% Total Weight</div>
+                                        <div v-if="syllabus.total_assessment_weight !== 100" class="text-xs text-orange-600">⚠️ Incomplete</div>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        @click="router.visit(`/units/${unit.id}/syllabi/${syllabus.id}`)"
-                                    >
+                                    <Button variant="ghost" size="sm" @click="router.visit(`/units/${unit.id}/syllabi/${syllabus.id}`)">
                                         View Details
                                     </Button>
                                 </div>
                             </div>
 
                             <!-- Assessment Components Preview -->
-                            <div v-if="syllabus.assessment_components && syllabus.assessment_components.length > 0"
-                                 class="mt-3">
+                            <div v-if="syllabus.assessment_components && syllabus.assessment_components.length > 0" class="mt-3">
                                 <h4 class="mb-2 text-sm font-medium text-gray-700">Assessment Components</h4>
                                 <div class="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                                     <div
@@ -696,7 +629,8 @@ const hasRelationships = () => {
                                         </div>
                                         <div v-if="component.details && component.details.length > 0" class="mt-1">
                                             <div class="text-xs text-gray-500">
-                                                {{ component.details.length }} sub-tasks
+                                                {{ component.details.length }}
+                                                sub-tasks
                                             </div>
                                         </div>
                                     </div>
@@ -712,7 +646,7 @@ const hasRelationships = () => {
                             <!-- Description Preview -->
                             <div v-if="syllabus.description" class="mt-3">
                                 <h4 class="mb-1 text-sm font-medium text-gray-700">Description</h4>
-                                <p class="text-sm text-gray-600 line-clamp-2">{{ syllabus.description }}</p>
+                                <p class="line-clamp-2 text-sm text-gray-600">{{ syllabus.description }}</p>
                             </div>
                         </div>
                     </div>
@@ -725,8 +659,7 @@ const hasRelationships = () => {
                     <BookOpen class="mb-4 h-16 w-16 text-gray-400" />
                     <h3 class="mb-2 text-xl font-semibold text-gray-900">No Relationships</h3>
                     <p class="max-w-md text-gray-500">
-                        This unit doesn't have any prerequisites, equivalencies, or curriculum relationships yet. You
-                        can add these relationships by
+                        This unit doesn't have any prerequisites, equivalencies, or curriculum relationships yet. You can add these relationships by
                         editing the unit.
                     </p>
                     <Button v-if="canEdit" class="mt-4" as="a" :href="`/units/edit/${unit.id}`">

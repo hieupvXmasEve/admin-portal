@@ -19,7 +19,7 @@ interface Semester {
     id: number;
     name: string;
     semester_type: string;
-    academic_year: string;
+    year: string;
 }
 
 interface AssessmentComponentDetail {
@@ -147,7 +147,7 @@ const getAssessmentTypeColor = (type: string) => {
                                 <Calendar class="h-4 w-4 text-gray-400" />
                                 <p class="text-lg">
                                     {{ syllabus.effective_from_semester.semester_type }}
-                                    {{ syllabus.effective_from_semester.academic_year }}
+                                    {{ syllabus.effective_from_semester.year }}
                                 </p>
                             </div>
                         </div>
