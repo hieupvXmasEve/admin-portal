@@ -23,9 +23,7 @@ class UnitController extends Controller
         private UnitValidationService    $validationService,
         private UnitRelationshipService  $relationshipService,
         private PrerequisiteLogicService $prerequisiteLogicService
-    )
-    {
-    }
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -180,8 +178,6 @@ class UnitController extends Controller
     public function show(Unit $unit)
     {
         $unit->load([
-            'equivalentUnits.equivalentUnit',
-            'equivalentTo.unit',
             'curriculumUnits.curriculumVersion.program',
             'curriculumUnits.curriculumVersion.specialization',
             'prerequisiteGroups.conditions.requiredUnit',
@@ -199,6 +195,9 @@ class UnitController extends Controller
             $syllabus->total_assessment_weight = $syllabus->assessmentComponents->sum('weight');
         });
 
+        // Get all equivalent units (both direct and transitive relationships)
+        $allEquivalentUnits = $this->relationshipService->getAllEquivalentUnits($unit);
+
         // Generate human-readable prerequisite descriptions
         $prerequisiteDescriptions = $unit->prerequisiteGroups->isNotEmpty()
             ? $this->prerequisiteLogicService->generatePrerequisiteDescription($unit->id)
@@ -206,13 +205,14 @@ class UnitController extends Controller
 
         return Inertia::render('units/Show', [
             'unit' => $unit,
+            'equivalentUnits' => $allEquivalentUnits,
             'prerequisiteDescriptions' => $prerequisiteDescriptions,
             'relationshipStats' => [
                 'prerequisite_count' => $unit->prerequisiteConditions()->where('type', 'prerequisite')->count(),
                 'corequisite_count' => $unit->prerequisiteConditions()->where('type', 'co_requisite')->count(),
                 'antirequisite_count' => $unit->prerequisiteConditions()->where('type', 'anti_requisite')->count(),
                 'prerequisite_conditions_count' => $unit->prerequisiteConditions()->count(),
-                'equivalent_count' => $unit->equivalentUnits()->count(),
+                'equivalent_count' => $allEquivalentUnits->count(),
                 'curriculum_count' => $unit->curriculumUnits()->count(),
                 'syllabi_count' => $unit->syllabi()->count(),
                 'active_syllabi_count' => $unit->syllabi()->where('is_active', true)->count(),
@@ -226,7 +226,7 @@ class UnitController extends Controller
     {
         // Check if unit can be edited
         if (!$this->validationService->canEditUnit($unit)) {
-            return redirect()->route('units.show', $unit)
+            return redirect()->route('unit.show', $unit)
                 ->with('error', 'Unit cannot be edited due to active relationships.');
         }
 

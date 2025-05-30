@@ -209,4 +209,70 @@ class UnitRelationshipService
 
         return $results;
     }
+
+    public function getAllEquivalentUnits(Unit $unit): Collection
+    {
+        $equivalentUnits = collect();
+        $processedIds = [$unit->id]; // Don't include the original unit
+        $toProcess = collect([$unit]);
+
+        while ($toProcess->isNotEmpty()) {
+            $currentUnit = $toProcess->shift();
+
+            // Get units this unit is equivalent to (outgoing relationships)
+            $outgoingEquivalents = EquivalentUnit::where('unit_id', $currentUnit->id)
+                ->with([
+                    'equivalentUnit',
+                    'validFromSemester'
+                ])
+                ->get();
+
+            // Get units that are equivalent to this unit (incoming relationships)
+            $incomingEquivalents = EquivalentUnit::where('equivalent_unit_id', $currentUnit->id)
+                ->with([
+                    'unit',
+                    'validFromSemester'
+                ])
+                ->get();
+
+            // Process outgoing relationships
+            foreach ($outgoingEquivalents as $equivalent) {
+                if (!in_array($equivalent->equivalent_unit_id, $processedIds)) {
+                    $equivalentUnits->push([
+                        'id' => $equivalent->id,
+                        'unit' => $equivalent->equivalentUnit,
+                        'reason' => $equivalent->reason,
+                        'valid_from_semester' => $equivalent->validFromSemester,
+                        'relationship_type' => 'equivalent_to' // This unit is equivalent to the found unit
+                    ]);
+
+                    $processedIds[] = $equivalent->equivalent_unit_id;
+                    $toProcess->push($equivalent->equivalentUnit);
+                }
+            }
+
+            // Process incoming relationships
+            foreach ($incomingEquivalents as $equivalent) {
+                if (!in_array($equivalent->unit_id, $processedIds)) {
+                    $equivalentUnits->push([
+                        'id' => $equivalent->id,
+                        'unit' => $equivalent->unit,
+                        'reason' => $equivalent->reason,
+                        'valid_from_semester' => $equivalent->validFromSemester,
+                        'relationship_type' => 'equivalent_from' // The found unit is equivalent to this unit
+                    ]);
+
+                    $processedIds[] = $equivalent->unit_id;
+                    $toProcess->push($equivalent->unit);
+                }
+            }
+        }
+
+        // Remove duplicates based on unit ID and sort by unit code
+        return $equivalentUnits->unique(function ($item) {
+            return $item['unit']->id;
+        })->sortBy(function ($item) {
+            return $item['unit']->code;
+        })->values();
+    }
 }

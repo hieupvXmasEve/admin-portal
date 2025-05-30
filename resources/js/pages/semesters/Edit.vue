@@ -9,24 +9,54 @@ import type { BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/vue3';
 import { CalendarDays, Save, ArrowLeft } from 'lucide-vue-next';
 
+interface Semester {
+    id: number;
+    code: string;
+    name: string;
+    start_date: string;
+    end_date: string;
+    enrollment_start_date: string | null;
+    enrollment_end_date: string | null;
+    is_active: boolean;
+    is_archived: boolean;
+}
+
+interface Props {
+    semester: Semester;
+}
+
+const props = defineProps<Props>();
+
 const breadcrumbItems: BreadcrumbItem[] = [
     { title: 'Semesters', href: '/semesters' },
-    { title: 'Add Semester', href: '/semesters/create' }
+    { title: 'Edit Semester', href: `/semesters/${props.semester.id}/edit` }
 ];
 
+// Format datetime strings to the format expected by datetime-local inputs
+const formatDateTimeLocal = (dateTime: string | null): string => {
+    if (!dateTime) return '';
+    const date = new Date(dateTime);
+    return date.toISOString().slice(0, 16);
+};
+
+// Format date strings to the format expected by date inputs
+const formatDate = (date: string): string => {
+    return new Date(date).toISOString().split('T')[0];
+};
+
 const form = useForm({
-    code: '',
-    name: '',
-    start_date: '',
-    end_date: '',
-    enrollment_start_date: '',
-    enrollment_end_date: '',
-    is_active: false,
-    is_archived: false,
+    code: props.semester.code || '',
+    name: props.semester.name || '',
+    start_date: formatDate(props.semester.start_date),
+    end_date: formatDate(props.semester.end_date),
+    enrollment_start_date: formatDateTimeLocal(props.semester.enrollment_start_date),
+    enrollment_end_date: formatDateTimeLocal(props.semester.enrollment_end_date),
+    is_active: props.semester.is_active,
+    is_archived: props.semester.is_archived,
 });
 
 const submit = () => {
-    form.post(route('semester.store'), {
+    form.put(route('semester.update', props.semester.id), {
         onSuccess: () => {
             router.visit(route('semester.index'));
         }
@@ -39,14 +69,14 @@ const cancel = () => {
 </script>
 
 <template>
-    <Head title="Add Semester" />
+    <Head title="Edit Semester" />
 
     <AppLayout :breadcrumbs="breadcrumbItems">
         <div class="flex h-full flex-1 flex-col gap-6 rounded-xl p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight">Add New Semester</h1>
-                    <p class="text-muted-foreground">Create a new semester with enrollment periods</p>
+                    <h1 class="text-2xl font-bold tracking-tight">Edit Semester</h1>
+                    <p class="text-muted-foreground">Update semester information and enrollment periods</p>
                 </div>
             </div>
 
@@ -57,7 +87,7 @@ const cancel = () => {
                         Semester Information
                     </CardTitle>
                     <CardDescription>
-                        Enter the basic information and schedule for the new semester.
+                        Update the information and schedule for this semester.
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-6">
@@ -173,7 +203,7 @@ const cancel = () => {
                         <div class="flex gap-4 pt-6">
                             <Button type="submit" :disabled="form.processing" class="flex-1">
                                 <Save class="mr-2 h-4 w-4" />
-                                {{ form.processing ? 'Creating...' : 'Create Semester' }}
+                                {{ form.processing ? 'Updating...' : 'Update Semester' }}
                             </Button>
                             <Button type="button" variant="outline" @click="cancel" class="flex-1">
                                 <ArrowLeft class="mr-2 h-4 w-4" />

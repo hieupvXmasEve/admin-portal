@@ -27,17 +27,22 @@ class SemesterManagementService
             $this->validateSemesterDates($data);
 
             // Generate academic year if not provided
-            if (!isset($data['academic_year'])) {
-                $data['academic_year'] = $this->generateAcademicYear($data['start_date']);
+            if (!isset($data['year'])) {
+                $data['year'] = $this->generateAcademicYear($data['start_date']);
             }
 
             $semester = Semester::create([
                 'campus_id' => $campus->id,
+                'code' => $data['code'] ?? null,
                 'name' => $data['name'],
                 'semester_type' => $data['semester_type'],
-                'academic_year' => $data['academic_year'],
+                'year' => $data['year'],
                 'start_date' => $data['start_date'],
                 'end_date' => $data['end_date'],
+                'enrollment_start_date' => $data['enrollment_start_date'] ?? null,
+                'enrollment_end_date' => $data['enrollment_end_date'] ?? null,
+                'is_active' => $data['is_active'] ?? false,
+                'is_archived' => $data['is_archived'] ?? false,
                 'enrollment_start_date' => $data['enrollment_start_date'] ?? null,
                 'enrollment_end_date' => $data['enrollment_end_date'] ?? null,
                 'add_drop_deadline' => $data['add_drop_deadline'] ?? null,
@@ -49,9 +54,16 @@ class SemesterManagementService
                 'is_registration_open' => $data['is_registration_open'] ?? false,
                 'max_credit_load' => $data['max_credit_load'] ?? 18.00,
                 'min_credit_load' => $data['min_credit_load'] ?? 12.00,
+                'is_attendance_locked' => $data['is_attendance_locked'] ?? false,
+                'is_certificate_locked' => $data['is_certificate_locked'] ?? false,
                 'has_tuition_fee' => $data['has_tuition_fee'] ?? false,
                 'has_gc_fee' => $data['has_gc_fee'] ?? false,
             ]);
+
+            // Auto-generate code if not provided
+            if (!$semester->code) {
+                $semester->update(['code' => $semester->generateCode()]);
+            }
 
             Log::info("Created semester: {$semester->name} for campus: {$campus->name}");
 

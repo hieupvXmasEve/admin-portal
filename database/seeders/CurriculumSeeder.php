@@ -34,13 +34,31 @@ class CurriculumSeeder extends Seeder
         // Create a default semester
         $semester = \App\Models\Semester::create([
             'campus_id' => $campus->id,
+            'code' => 'FALL2024',
             'name' => 'Fall 2024',
             'semester_type' => 'fall',
-            'academic_year' => '2024-2025',
+            'year' => '2024',
             'start_date' => '2024-08-26',
             'end_date' => '2024-12-15',
+            'enrollment_start_date' => '2024-08-01 08:00:00',
+            'enrollment_end_date' => '2024-08-25 23:59:59',
+            'is_active' => true,
+            'is_archived' => false,
             'is_current' => true,
             'is_registration_open' => true,
+            'locked_status' => 'unlocked',
+            'enrollment_start_date' => '2024-08-26',
+            'enrollment_end_date' => '2024-12-15',
+            'add_drop_deadline' => '2024-09-01',
+            'withdrawal_deadline' => '2024-12-15',
+            'final_exam_start' => '2024-12-16',
+            'final_exam_end' => '2024-12-20',
+            'max_credit_load' => 18.00,
+            'min_credit_load' => 12.00,
+            'is_attendance_locked' => false,
+            'is_certificate_locked' => false,
+            'has_tuition_fee' => true,
+            'has_gc_fee' => true,
         ]);
 
         // Create Units
