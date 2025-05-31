@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem } from '@/components/ui/sidebar';
+import {
+    SidebarGroup,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubButton,
+    SidebarMenuSubItem,
+} from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { ref } from 'vue';
 import { ChevronRight } from 'lucide-vue-next';
+import { ref } from 'vue';
 
 const props = defineProps<{
     items: NavItem[];
@@ -65,7 +73,7 @@ watch(
 </script>
 
 <template>
-    <SidebarGroup class="px-0 py-0">
+    <SidebarGroup class="">
         <SidebarMenu class="space-y-1">
             <template v-for="item in items" :key="item.title">
                 <SidebarMenuItem>
@@ -74,14 +82,17 @@ watch(
                         v-if="!item.children"
                         as-child
                         :is-active="isActive(item)"
-                        class="mx-1 rounded-lg transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+                        class="rounded-lg transition-all duration-200 group-data-[collapsible=icon]:justify-center hover:bg-gray-100 dark:hover:bg-gray-800"
                         :class="{
-                            'bg-primary/10 text-primary  border-primary font-medium': isActive(item),
-                            'text-gray-700 dark:text-gray-300': !isActive(item)
+                            'bg-primary/10 text-primary border-primary font-medium': isActive(item),
+                            'text-gray-700 dark:text-gray-300': !isActive(item),
                         }"
                     >
-                        <Link :href="item.href" class="flex items-center gap-3 px-3 py-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
-                            <div class="flex h-5 w-5 items-center justify-center shrink-0">
+                        <Link
+                            :href="item.href"
+                            class="flex items-center gap-3 py-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+                        >
+                            <div class="flex h-5 w-5 shrink-0 items-center justify-center">
                                 <component :is="item.icon" class="h-4 w-4" />
                             </div>
                             <span class="text-sm font-medium group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
@@ -91,20 +102,22 @@ watch(
                     <!-- Parent menu item with children -->
                     <SidebarMenuButton
                         v-else
-                        class="mx-1 rounded-lg transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+                        class="rounded-lg transition-all duration-200 group-data-[collapsible=icon]:justify-center hover:bg-gray-100 dark:hover:bg-gray-800"
                         :class="{
                             'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100': isOpen(item) || hasActiveChild(item),
-                            'text-gray-700 dark:text-gray-300': !isOpen(item) && !hasActiveChild(item)
+                            'text-gray-700 dark:text-gray-300': !isOpen(item) && !hasActiveChild(item),
                         }"
                         @click="toggle(item)"
                     >
-                        <div class="flex w-full items-center gap-3 px-3 py-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
-                            <div class="flex h-5 w-5 items-center justify-center shrink-0">
+                        <div
+                            class="flex w-full items-center gap-3 py-2.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+                        >
+                            <div class="flex h-5 w-5 shrink-0 items-center justify-center">
                                 <component :is="item.icon" class="h-4 w-4" />
                             </div>
                             <span class="flex-1 text-sm font-medium group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
                             <ChevronRight
-                                class="h-4 w-4 transition-transform duration-200 shrink-0 group-data-[collapsible=icon]:hidden"
+                                class="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden"
                                 :class="{ 'rotate-90': isOpen(item) }"
                             />
                         </div>
@@ -131,10 +144,10 @@ watch(
                                         class="mx-1 rounded-md transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                                         :class="{
                                             'bg-primary/5 text-primary font-medium': isActive(subItem),
-                                            'text-gray-600 dark:text-gray-400': !isActive(subItem)
+                                            'text-gray-600 dark:text-gray-400': !isActive(subItem),
                                         }"
                                     >
-                                        <Link :href="subItem.href" class="flex items-center py-2 pl-11 pr-3">
+                                        <Link :href="subItem.href" class="flex items-center py-2 pr-3 pl-5">
                                             <span class="text-sm">{{ subItem.title }}</span>
                                         </Link>
                                     </SidebarMenuSubButton>
@@ -144,15 +157,16 @@ watch(
                                         v-else
                                         class="mx-1 rounded-md transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                                         :class="{
-                                            'bg-gray-50 text-gray-900 dark:bg-gray-800/50 dark:text-gray-100': isOpen(subItem) || hasActiveChild(subItem),
-                                            'text-gray-600 dark:text-gray-400': !isOpen(subItem) && !hasActiveChild(subItem)
+                                            'bg-gray-50 text-gray-900 dark:bg-gray-800/50 dark:text-gray-100':
+                                                isOpen(subItem) || hasActiveChild(subItem),
+                                            'text-gray-600 dark:text-gray-400': !isOpen(subItem) && !hasActiveChild(subItem),
                                         }"
                                         @click="toggle(subItem)"
                                     >
-                                        <div class="flex w-full items-center py-2 pl-3 pr-3">
+                                        <div class="flex w-full items-center py-2 pr-3 pl-3">
                                             <span class="flex-1 text-sm">{{ subItem.title }}</span>
                                             <ChevronRight
-                                                class="h-3 w-3 transition-transform duration-200 shrink-0"
+                                                class="size-4 shrink-0 transition-transform duration-200"
                                                 :class="{ 'rotate-90': isOpen(subItem) }"
                                             />
                                         </div>
@@ -176,10 +190,10 @@ watch(
                                                     class="mx-1 mb-1 rounded-md transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                                                     :class="{
                                                         'bg-primary/5 text-primary font-medium': isActive(nestedItem),
-                                                        'text-gray-600 dark:text-gray-400': !isActive(nestedItem)
+                                                        'text-gray-600 dark:text-gray-400': !isActive(nestedItem),
                                                     }"
                                                 >
-                                                    <Link :href="nestedItem.href" class="flex items-center py-1.5 pl-16 pr-3">
+                                                    <Link :href="nestedItem.href" class="flex items-center py-1.5 pr-3 pl-10">
                                                         <span class="">{{ nestedItem.title }}</span>
                                                     </Link>
                                                 </SidebarMenuSubButton>

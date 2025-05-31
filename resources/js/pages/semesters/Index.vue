@@ -16,6 +16,7 @@ import { fromDate } from '@internationalized/date';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Edit, Plus, Trash2, X } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 
 interface Semester {
     id: number;
@@ -53,6 +54,7 @@ interface Props {
         is_active: boolean | null;
         is_archived: boolean | null;
     };
+    errors: any;
 }
 
 const props = defineProps<Props>();
@@ -294,6 +296,7 @@ const closeModals = () => {
 
 // Form submissions
 const submitCreate = () => {
+
     // Transform date ranges to individual date fields for backend
     const formData: any = {
         code: createForm.code,
@@ -358,7 +361,9 @@ const clearFilters = () => {
     isActiveFilterString.value = 'null';
     isArchivedFilterString.value = 'null';
 };
-const hasActiveFilters = computed(() => search.value || nameFilter.value || yearFilter.value || isActiveFilter.value !== null || isArchivedFilter.value !== null);
+const hasActiveFilters = computed(
+    () => search.value || nameFilter.value || yearFilter.value || isActiveFilter.value !== null || isArchivedFilter.value !== null,
+);
 
 // Pagination navigation
 const handlePaginationNavigate = (url: string) => {
@@ -401,6 +406,7 @@ const handlePageSizeChange = (pageSize: number) => {
                 <Button @click="openCreateModal" size="sm">
                     <Plus class="mr-2 h-4 w-4" />
                     Add Semester
+                    <p>{{console.log(errors)}}</p>
                 </Button>
             </div>
 
@@ -408,21 +414,21 @@ const handlePageSizeChange = (pageSize: number) => {
             <div class="mb-6 flex flex-wrap items-center gap-4">
                 <div class="flex flex-col gap-1">
                     <Label for="search">Search</Label>
-                    <Input id="search" v-model="search" placeholder="Search semesters..."/>
+                    <Input id="search" v-model="search" placeholder="Search semesters..." />
                 </div>
                 <div class="flex flex-col gap-1">
                     <Label for="name-filter">Name</Label>
-                    <Input id="name-filter" v-model="nameFilter" placeholder="Filter by name..."/>
+                    <Input id="name-filter" v-model="nameFilter" placeholder="Filter by name..." />
                 </div>
                 <div class="flex flex-col gap-1">
                     <Label for="year-filter">Year</Label>
-                    <Input id="year-filter" v-model="yearFilter" placeholder="e.g., 2025"/>
+                    <Input id="year-filter" v-model="yearFilter" placeholder="e.g., 2025" />
                 </div>
                 <div class="flex flex-col gap-1">
                     <Label for="active-filter">Active Status</Label>
-                    <Select v-model="isActiveFilterString" >
+                    <Select v-model="isActiveFilterString">
                         <SelectTrigger class="w-full">
-                            <SelectValue placeholder="Select active status"  />
+                            <SelectValue placeholder="Select active status" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="null">All</SelectItem>
@@ -444,8 +450,8 @@ const handlePageSizeChange = (pageSize: number) => {
                         </SelectContent>
                     </Select>
                 </div>
-                <div class="flex items-end">
-                    <Button variant="outline" @click="clearFilters" :disabled="!hasActiveFilters" >
+                <div class="flex h-full items-end">
+                    <Button variant="outline" @click="clearFilters" :disabled="!hasActiveFilters">
                         <X class="h-4 w-4" />
                         Clear
                     </Button>
