@@ -27,7 +27,7 @@ class SyllabusSeeder extends Seeder
         }
 
         foreach ($units as $unit) {
-            // Create 1-2 syllabi per unit
+            // Create 1-2 syllabus per unit
             $syllabusCount = rand(1, 2);
 
             for ($i = 0; $i < $syllabusCount; $i++) {
@@ -46,7 +46,7 @@ class SyllabusSeeder extends Seeder
             }
         }
 
-        $this->command->info('Created syllabi with assessment components for ' . $units->count() . ' units.');
+        $this->command->info('Created syllabus with assessment components for ' . $units->count() . ' units.');
     }
 
     private function createAssessmentComponents(Syllabus $syllabus): void

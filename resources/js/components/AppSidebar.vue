@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/sidebar';
 import { mainNavItems } from '@/constants/menu-sidebar';
 import { Link } from '@inertiajs/vue3';
-import { GraduationCap, User } from 'lucide-vue-next';
+import { GraduationCap } from 'lucide-vue-next';
+import NavUser from './NavUser.vue';
 </script>
 
 <template>
@@ -41,15 +42,11 @@ import { GraduationCap, User } from 'lucide-vue-next';
             <NavMain :items="mainNavItems" />
         </SidebarContent>
 
-        <SidebarFooter>
-            <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton>
-                        <User class="size-4" />
-                        <span>User Account</span>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
+        <SidebarFooter class="border-t border-gray-200 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-900/50">
+            <div class="p-2">
+                <SidebarSeparator class="my-2 bg-gray-200 group-data-[collapsible=icon]:hidden dark:bg-gray-700" />
+                <NavUser />
+            </div>
         </SidebarFooter>
         <SidebarRail />
     </Sidebar>

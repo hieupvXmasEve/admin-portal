@@ -13,11 +13,15 @@ import {
 import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, CheckCircle, Edit, FileText, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ArrowLeft, Copy, Edit, Eye, FileText, Filter, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface Unit {
@@ -64,9 +68,9 @@ interface Syllabus {
 
 const props = defineProps<{
     unit: Unit;
-    syllabi: Syllabus[];
+    syllabus: Syllabus[];
 }>();
-console.log('props', props.syllabi);
+console.log('props', props.syllabus);
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'Units',
@@ -77,17 +81,62 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: `/units/${props.unit.id}`,
     },
     {
-        title: 'Syllabi',
-        href: `/units/${props.unit.id}/syllabi`,
+        title: 'Syllabus',
+        href: `/units/${props.unit.id}/syllabus`,
     },
 ];
 
+// Filters
+const searchVersion = ref('');
+const filterSemester = ref('');
+const filterActive = ref('');
+const showFilters = ref(false);
+
+// Delete state
 const isDeleting = ref<number | null>(null);
+
+// Get unique semesters for filter
+const availableSemesters = computed(() => {
+    const semesters = props.syllabus
+        .map((s) => s.effective_from_semester)
+        .filter((semester): semester is Semester => semester !== null)
+        .reduce((acc, semester) => {
+            const exists = acc.find((s) => s.id === semester.id);
+            if (!exists) acc.push(semester);
+            return acc;
+        }, [] as Semester[]);
+
+    return semesters.sort((a, b) => b.year - a.year || a.name.localeCompare(b.name));
+});
+
+// Filtered syllabi
+const filteredSyllabi = computed(() => {
+    return props.syllabus.filter((syllabus) => {
+        const matchesVersion =
+            !searchVersion.value || (syllabus.version && syllabus.version.toLowerCase().includes(searchVersion.value.toLowerCase()));
+
+        const matchesSemester =
+            !filterSemester.value || (syllabus.effective_from_semester && syllabus.effective_from_semester.id.toString() === filterSemester.value);
+
+        const matchesActive =
+            !filterActive.value ||
+            (filterActive.value === 'active' && syllabus.is_active) ||
+            (filterActive.value === 'inactive' && !syllabus.is_active);
+
+        return matchesVersion && matchesSemester && matchesActive;
+    });
+});
+
+const clearFilters = () => {
+    searchVersion.value = '';
+    filterSemester.value = '';
+    filterActive.value = '';
+};
 
 const deleteSyllabus = (syllabusId: number) => {
     isDeleting.value = syllabusId;
 
-    router.delete(`/units/${props.unit.id}/syllabi/${syllabusId}`, {
+    router.delete(`/units/${props.unit.id}/syllabus/${syllabusId}`, {
         onSuccess: () => {
             toast.success('Syllabus deleted successfully');
             isDeleting.value = null;
@@ -101,7 +150,7 @@ const deleteSyllabus = (syllabusId: number) => {
 
 const toggleActive = (syllabusId: number) => {
     router.patch(
-        `/units/${props.unit.id}/syllabi/${syllabusId}/toggle-active`,
+        `/units/${props.unit.id}/syllabus/${syllabusId}/toggle-active`,
         {},
         {
             onSuccess: () => {
@@ -114,39 +163,39 @@ const toggleActive = (syllabusId: number) => {
     );
 };
 
-const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+const cloneSyllabus = (syllabusId: number) => {
+    router.post(
+        `/units/${props.unit.id}/syllabus/${syllabusId}/clone`,
+        {},
+        {
+            onSuccess: () => {
+                toast.success('Syllabus cloned successfully');
+            },
+            onError: () => {
+                toast.error('Failed to clone syllabus');
+            },
+        },
+    );
 };
 
-const getAssessmentTypeColor = (type: string) => {
-    switch (type) {
-        case 'quiz':
-            return 'bg-blue-100 text-blue-800';
-        case 'assignment':
-            return 'bg-green-100 text-green-800';
-        case 'project':
-            return 'bg-purple-100 text-purple-800';
-        case 'exam':
-            return 'bg-red-100 text-red-800';
-        case 'online_activity':
-            return 'bg-yellow-100 text-yellow-800';
-        case 'other':
-            return 'bg-gray-100 text-gray-800';
-        default:
-            return 'bg-gray-100 text-gray-800';
-    }
+const getCurrentSemesterStatus = (syllabus: Syllabus) => {
+    if (!syllabus.is_active) return null;
+
+    // This would ideally check against current semester from backend
+    // For now, just mark active syllabi
+    return syllabus.is_active ? 'Currently in use' : null;
 };
 </script>
 
 <template>
-    <Head :title="`Syllabi - ${unit.code}`" />
+    <Head :title="`Syllabus - ${unit.code}`" />
     <AppLayout :breadcrumbs="breadcrumbItems">
         <div class="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <div>
                     <div class="mb-2 flex items-center gap-3">
-                        <h1 class="text-3xl font-bold">{{ unit.code }} Syllabi</h1>
+                        <h1 class="text-3xl font-bold">{{ unit.code }} Syllabus</h1>
                         <Badge class="bg-blue-100 text-blue-800">{{ unit.credit_points }} CP</Badge>
                     </div>
                     <p class="text-xl text-gray-700">{{ unit.name }}</p>
@@ -156,144 +205,210 @@ const getAssessmentTypeColor = (type: string) => {
                         <ArrowLeft class="mr-2 h-4 w-4" />
                         Back to Unit
                     </Button>
-                    <Button @click="router.visit(`/units/${unit.id}/syllabi/create`)">
+                    <Button @click="router.visit(`/units/${unit.id}/syllabus/create`)">
                         <Plus class="mr-2 h-4 w-4" />
                         Add Syllabus
                     </Button>
                 </div>
             </div>
 
-            <!-- Syllabi List -->
-            <div v-if="syllabi.length > 0" class="space-y-4">
-                <div
-                    v-for="syllabus in syllabi"
-                    :key="syllabus.id"
-                    class="rounded-lg border p-6 transition-colors"
-                    :class="syllabus.is_active ? 'border-green-200 bg-green-50' : 'hover:bg-gray-50'"
-                >
-                    <div class="mb-4 flex items-start justify-between">
-                        <div class="flex-1">
-                            <div class="mb-3 flex items-center gap-3">
-                                <h2 class="text-xl font-semibold">
-                                    {{ syllabus.version || 'No Version' }}
-                                </h2>
-                                <Badge v-if="syllabus.is_active" class="bg-green-100 text-green-800"> Active</Badge>
-                                <Badge v-else class="bg-gray-100 text-gray-800"> Inactive</Badge>
-                            </div>
+            <!-- Filters -->
+            <Card>
+                <CardContent class="p-4">
+                    <div class="mb-4 flex items-center justify-between">
+                        <Button variant="outline" @click="showFilters = !showFilters" class="flex items-center gap-2">
+                            <Filter class="h-4 w-4" />
+                            {{ showFilters ? 'Hide Filters' : 'Show Filters' }}
+                        </Button>
 
-                            <div class="grid grid-cols-1 gap-4 text-sm md:grid-cols-4">
-                                <div v-if="syllabus.effective_from_semester">
-                                    <span class="font-medium text-gray-500">Effective From:</span>
-                                    <div class="mt-1">
-                                        {{ syllabus.effective_from_semester.name }}
-                                    </div>
-                                </div>
-                                <div v-if="syllabus.total_hours">
-                                    <span class="font-medium text-gray-500">Total Hours:</span>
-                                    <div class="mt-1">{{ syllabus.total_hours }}</div>
-                                </div>
-                                <div v-if="syllabus.hours_per_session">
-                                    <span class="font-medium text-gray-500">Hours/Session:</span>
-                                    <div class="mt-1">{{ syllabus.hours_per_session }}</div>
-                                </div>
-                                <div v-if="syllabus.assessment_components.length > 0">
-                                    <span class="font-medium text-gray-500">Assessment Weight:</span>
-                                    <div class="mt-1 flex items-center gap-2">
-                                        <span>{{ syllabus.total_assessment_weight || 0 }}%</span>
-                                        <CheckCircle v-if="syllabus.total_assessment_weight === 100" class="h-4 w-4 text-green-600" />
-                                        <span v-else class="text-xs text-orange-600">Incomplete</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                @click="toggleActive(syllabus.id)"
-                                :title="syllabus.is_active ? 'Deactivate' : 'Activate'"
-                            >
-                                <ToggleRight v-if="syllabus.is_active" class="h-4 w-4 text-green-600" />
-                                <ToggleLeft v-else class="h-4 w-4 text-gray-400" />
-                            </Button>
-                            <Button variant="ghost" size="sm" @click="router.visit(`/units/${unit.id}/syllabi/${syllabus.id}`)">
-                                <FileText class="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" @click="router.visit(`/units/${unit.id}/syllabi/${syllabus.id}/edit`)">
-                                <Edit class="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                                <AlertDialogTrigger as-child>
-                                    <Button variant="ghost" size="sm" :disabled="isDeleting === syllabus.id">
-                                        <Trash2 class="h-4 w-4 text-red-600" />
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Delete Syllabus</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Are you sure you want to delete this syllabus? This action cannot be undone.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction @click="deleteSyllabus(syllabus.id)" class="bg-red-600 hover:bg-red-700">
-                                            Delete
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                        <div v-if="searchVersion || filterSemester || filterActive" class="flex items-center gap-2">
+                            <span class="text-sm text-gray-500">{{ filteredSyllabi.length }} of {{ syllabus.length }} syllabi</span>
+                            <Button variant="ghost" size="sm" @click="clearFilters">Clear Filters</Button>
                         </div>
                     </div>
 
-                    <!-- Assessment Components Preview -->
-                    <div v-if="syllabus.assessment_components.length > 0" class="mt-4">
-                        <h3 class="mb-3 text-sm font-medium text-gray-700">Assessment Components</h3>
-                        <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                            <div v-for="component in syllabus.assessment_components" :key="component.id" class="rounded border bg-white p-3">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-medium">{{ component.name }}</span>
+                    <div v-if="showFilters" class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div>
+                            <Label for="search-version">Version</Label>
+                            <Input id="search-version" v-model="searchVersion" placeholder="Search version..." class="mt-1" />
+                        </div>
+
+                        <div>
+                            <Label for="filter-semester">Semester</Label>
+                            <Select v-model="filterSemester">
+                                <SelectTrigger class="mt-1">
+                                    <SelectValue placeholder="All semesters" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="">All semesters</SelectItem>
+                                    <SelectItem v-for="semester in availableSemesters" :key="semester.id" :value="semester.id.toString()">
+                                        {{ semester.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div>
+                            <Label for="filter-active">Status</Label>
+                            <Select v-model="filterActive">
+                                <SelectTrigger class="mt-1">
+                                    <SelectValue placeholder="All statuses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="">All statuses</SelectItem>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="inactive">Inactive</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <!-- Syllabus Table -->
+            <Card v-if="filteredSyllabi.length > 0">
+                <CardContent class="p-0">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Version</TableHead>
+                                <TableHead>Semester</TableHead>
+                                <TableHead>Active?</TableHead>
+                                <TableHead>Total Hours</TableHead>
+                                <TableHead>Hours/Session</TableHead>
+                                <TableHead>Assessment</TableHead>
+                                <TableHead class="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-for="syllabus in filteredSyllabi" :key="syllabus.id" :class="syllabus.is_active ? 'bg-green-50' : ''">
+                                <TableCell class="font-medium">
                                     <div class="flex items-center gap-2">
-                                        <Badge class="text-xs" :class="getAssessmentTypeColor(component.type)">
-                                            {{ component.type.toUpperCase() }}
-                                        </Badge>
-                                        <span class="text-sm text-gray-500">{{ component.weight }}%</span>
+                                        {{ syllabus.version || 'No Version' }}
+                                        <span v-if="getCurrentSemesterStatus(syllabus)" class="text-xs font-medium text-green-600">
+                                            {{ getCurrentSemesterStatus(syllabus) }}
+                                        </span>
                                     </div>
-                                </div>
-                                <div v-if="component.details.length > 0" class="mt-2">
-                                    <div class="text-xs text-gray-500">{{ component.details.length }} sub-tasks</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                                </TableCell>
 
-                    <!-- Description -->
-                    <div v-if="syllabus.description" class="mt-4">
-                        <h3 class="mb-2 text-sm font-medium text-gray-700">Description</h3>
-                        <p class="text-sm text-gray-600">{{ syllabus.description }}</p>
-                    </div>
+                                <TableCell>
+                                    {{ syllabus.effective_from_semester?.name || '-' }}
+                                </TableCell>
 
-                    <!-- Metadata -->
-                    <div class="mt-4 flex justify-between text-xs text-gray-500">
-                        <span>Created: {{ formatDate(syllabus.created_at) }}</span>
-                        <span>Updated: {{ formatDate(syllabus.updated_at) }}</span>
-                    </div>
-                </div>
-            </div>
+                                <TableCell>
+                                    <Badge v-if="syllabus.is_active" class="bg-green-100 text-green-800"> ✅ Active </Badge>
+                                    <Badge v-else class="bg-gray-100 text-gray-800"> ❌ Inactive </Badge>
+                                </TableCell>
+
+                                <TableCell>
+                                    {{ syllabus.total_hours || '-' }}
+                                </TableCell>
+
+                                <TableCell>
+                                    {{ syllabus.hours_per_session || '-' }}
+                                </TableCell>
+
+                                <TableCell>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-sm">{{ syllabus.total_assessment_weight || 0 }}%</span>
+                                        <Badge v-if="syllabus.total_assessment_weight === 100" class="bg-green-100 text-xs text-green-800">
+                                            Complete
+                                        </Badge>
+                                        <Badge v-else class="bg-orange-100 text-xs text-orange-800"> Incomplete </Badge>
+                                    </div>
+                                </TableCell>
+
+                                <TableCell class="text-right">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <!-- Toggle Active -->
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            @click="toggleActive(syllabus.id)"
+                                            :title="syllabus.is_active ? 'Deactivate' : 'Activate'"
+                                        >
+                                            <ToggleRight v-if="syllabus.is_active" class="h-4 w-4 text-green-600" />
+                                            <ToggleLeft v-else class="h-4 w-4 text-gray-400" />
+                                        </Button>
+
+                                        <!-- View -->
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            @click="router.visit(`/units/${unit.id}/syllabus/${syllabus.id}`)"
+                                            title="View"
+                                        >
+                                            <Eye class="h-4 w-4" />
+                                        </Button>
+
+                                        <!-- Edit -->
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            @click="router.visit(`/units/${unit.id}/syllabus/${syllabus.id}/edit`)"
+                                            title="Edit"
+                                        >
+                                            <Edit class="h-4 w-4" />
+                                        </Button>
+
+                                        <!-- Clone -->
+                                        <Button variant="ghost" size="sm" @click="cloneSyllabus(syllabus.id)" title="Clone">
+                                            <Copy class="h-4 w-4" />
+                                        </Button>
+
+                                        <!-- Delete -->
+                                        <AlertDialog>
+                                            <AlertDialogTrigger as-child>
+                                                <Button variant="ghost" size="sm" :disabled="isDeleting === syllabus.id" title="Delete">
+                                                    <Trash2 class="h-4 w-4 text-red-600" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete Syllabus</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Are you sure you want to delete syllabus "{{ syllabus.version || 'Untitled' }}"? This action
+                                                        cannot be undone.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction @click="deleteSyllabus(syllabus.id)" class="bg-red-600 hover:bg-red-700">
+                                                        Delete
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
 
             <!-- Empty State -->
-            <Card v-else>
+            <Card v-else-if="syllabus.length === 0">
                 <CardContent class="flex flex-col items-center justify-center py-12 text-center">
                     <FileText class="mb-4 h-16 w-16 text-gray-400" />
-                    <h3 class="mb-2 text-xl font-semibold text-gray-900">No Syllabi</h3>
+                    <h3 class="mb-2 text-xl font-semibold text-gray-900">No Syllabus</h3>
                     <p class="max-w-md text-gray-500">
-                        This unit doesn't have any syllabi yet. Create the first syllabus to define the course structure and assessment components.
+                        This unit doesn't have any syllabus yet. Create the first syllabus to define the course structure and assessment components.
                     </p>
-                    <Button class="mt-4" @click="router.visit(`/units/${unit.id}/syllabi/create`)">
+                    <Button class="mt-4" @click="router.visit(`/units/${unit.id}/syllabus/create`)">
                         <Plus class="mr-2 h-4 w-4" />
                         Create First Syllabus
                     </Button>
+                </CardContent>
+            </Card>
+
+            <!-- No Results State -->
+            <Card v-else>
+                <CardContent class="flex flex-col items-center justify-center py-12 text-center">
+                    <Filter class="mb-4 h-16 w-16 text-gray-400" />
+                    <h3 class="mb-2 text-xl font-semibold text-gray-900">No Results Found</h3>
+                    <p class="max-w-md text-gray-500">No syllabi match your current filters. Try adjusting your search criteria.</p>
+                    <Button variant="outline" class="mt-4" @click="clearFilters"> Clear Filters </Button>
                 </CardContent>
             </Card>
         </div>

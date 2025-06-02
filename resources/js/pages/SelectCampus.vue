@@ -24,7 +24,6 @@ onMounted(() => {
 const submit = () => {
     form.post(route('select-campus.set-current'), {
         onSuccess: () => {
-            console.log('ok');
             // window.location.href = route('dashboard');
         },
     });

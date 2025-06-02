@@ -11,16 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('syllabi', function (Blueprint $table) {
+        Schema::create('syllabus', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('unit_id')->constrained('units')->onDelete('cascade');
-            $table->string('version', 10)->nullable();
+            $table->string('version', 30)->nullable();
             $table->text('description')->nullable();
             $table->integer('total_hours')->nullable();
             $table->integer('hours_per_session')->nullable();
             $table->foreignId('effective_from_semester_id')->nullable()->constrained('semesters')->onDelete('set null');
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+
+            $table->foreignId('unit_id')->constrained('units')->onDelete('cascade');
 
             // Ensure only one active syllabus per unit per semester
             $table->unique(['unit_id', 'effective_from_semester_id', 'is_active']);
@@ -32,6 +33,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('syllabi');
+        Schema::dropIfExists('syllabus');
     }
 };

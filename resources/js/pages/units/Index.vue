@@ -63,7 +63,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
 // Reactive data
 const data = computed(() => props.units.data);
-console.log('data', data.value);
+
 // Filter state
 const filters = ref({
     search: props.filters?.search || '',
@@ -270,10 +270,10 @@ const columns: ColumnDef<Unit>[] = [
     },
     {
         header: 'Syllabus',
-        accessorKey: 'syllabi_count',
+        accessorKey: 'syllabus_count',
         enableSorting: false,
         cell: ({ row }) => {
-            const count = row.original.syllabi_count;
+            const count = row.original.syllabus_count;
             return count > 0
                 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800' }, count)
                 : h('span', { class: 'text-gray-400' }, 'None');

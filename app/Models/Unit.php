@@ -69,9 +69,9 @@ class Unit extends Model
     }
 
     /**
-     * Get all syllabi for this unit.
+     * Get all syllabus for this unit.
      */
-    public function syllabi(): HasMany
+    public function syllabus(): HasMany
     {
         return $this->hasMany(Syllabus::class);
     }
