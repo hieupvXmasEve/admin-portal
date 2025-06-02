@@ -20,7 +20,7 @@ import type { BreadcrumbItem, PaginatedResponse } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
-import { Edit, Eye, Plus, Search, Trash2, X } from 'lucide-vue-next';
+import { Edit, Eye, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -33,6 +33,7 @@ interface Unit {
     prerequisite_conditions_count: number;
     equivalent_units_count: number;
     curriculum_units_count: number;
+    syllabus_count: number;
     created_at: string;
     updated_at: string;
 }
@@ -64,7 +65,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
 // Reactive data
 const data = computed(() => props.units.data);
 
-// Filter state
+// Filter state - Initialize with props or defaults (like Users page)
 const filters = ref({
     search: props.filters?.search || '',
     sort: props.filters?.sort || '',
@@ -196,6 +197,39 @@ const confirmBulkDelete = async () => {
         toast.error('Failed to delete units');
     } finally {
         isBulkDeleting.value = false;
+    }
+};
+
+// Export functionality
+const isExporting = ref(false);
+
+const exportToExcel = async () => {
+    if (isExporting.value) return;
+
+    isExporting.value = true;
+
+    try {
+        // Build export URL with current filters
+        const params = new URLSearchParams();
+
+        if (filters.value.search) params.set('search', filters.value.search);
+        if (filters.value.sort) params.set('sort', filters.value.sort);
+        if (filters.value.direction) params.set('direction', filters.value.direction);
+
+        const exportUrl = `/units/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
+
+        // Use window.location for file downloads to trigger browser download
+        window.location.href = exportUrl;
+
+        // Show success message after a short delay
+        setTimeout(() => {
+            toast.success('Export started successfully');
+        }, 500);
+    } catch (error) {
+        console.error('Export failed:', error);
+        toast.error('Failed to export units');
+    } finally {
+        isExporting.value = false;
     }
 };
 
@@ -345,6 +379,32 @@ const handlePageSizeChange = (pageSize: number) => {
                         <Trash2 class="mr-2 h-4 w-4" />
                         Delete Selected ({{ selectedRows.length }})
                     </Button> -->
+                    <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
+                        <FileSpreadsheet class="h-4 w-4" />
+                        {{ isExporting ? 'Exporting...' : 'Export Excel' }}
+                    </Button>
+                    <Button
+                        @click="
+                            () => {
+                                console.log('Attempting to navigate to /units/import');
+                                router.visit('/units/import', {
+                                    onError: (errors) => {
+                                        console.error('Navigation error:', errors);
+                                        toast.error('Failed to navigate to import page');
+                                    },
+                                    onSuccess: () => {
+                                        console.log('Navigation successful');
+                                    },
+                                });
+                            }
+                        "
+                        variant="outline"
+                        class="flex items-center gap-2"
+                    >
+                        <Upload class="h-4 w-4" />
+                        Import Excel
+                    </Button>
+
                     <Button size="sm" @click="router.visit('/units/create')">
                         <Plus class="mr-2 h-4 w-4" />
                         Add Unit

@@ -10,7 +10,7 @@ return [
     |
     */
 
-    'max_file_size' => env('IMPORT_MAX_FILE_SIZE', '2MB'),
+    'max_file_size' => env('IMPORT_MAX_FILE_SIZE', '10MB'),
 
     'allowed_extensions' => ['xlsx', 'xls'],
 
@@ -20,7 +20,7 @@ return [
 
     'default_password' => env('IMPORT_DEFAULT_PASSWORD', 'TempPassword123!'),
 
-    'duplicate_handling' => env('IMPORT_DUPLICATE_HANDLING', 'update'), // skip, update, error
+    'duplicate_handling' => env('IMPORT_DUPLICATE_HANDLING', 'update'), // update, skip, error
 
     'create_missing_campuses' => env('IMPORT_CREATE_MISSING_CAMPUSES', false),
 

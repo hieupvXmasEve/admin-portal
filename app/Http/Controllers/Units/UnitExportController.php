@@ -2,41 +2,41 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Units;
 
-use App\Services\UserExcelExportService;
+use App\Http\Controllers\Controller;
+use App\Services\UnitExcelExportService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
-class UserExportController extends Controller
+class UnitExportController extends Controller
 {
     public function __construct(
-        private readonly UserExcelExportService $exportService
+        private readonly UnitExcelExportService $exportService
     ) {}
 
     public function exportExcel(Request $request): BinaryFileResponse|JsonResponse
     {
         // Validate request parameters
         $validated = $request->validate([
-            'campus_id' => 'nullable|array',
-            'campus_id.*' => 'exists:campuses,id',
-            'role_id' => 'nullable|array',
-            'role_id.*' => 'exists:roles,id',
-            'date_from' => 'nullable|date',
-            'date_to' => 'nullable|date|after_or_equal:date_from',
+            'credit_points_from' => 'nullable|numeric|min:0',
+            'credit_points_to' => 'nullable|numeric|min:0|gte:credit_points_from',
+            'has_prerequisites' => 'nullable|boolean',
+            'has_equivalents' => 'nullable|boolean',
+            'in_curricula' => 'nullable|boolean',
             'search' => 'nullable|string|max:255',
         ]);
 
         try {
             // Generate Excel file
-            $filePath = $this->exportService->exportUsersToExcel($validated);
+            $filePath = $this->exportService->exportUnitsToExcel($validated);
 
             // Generate download filename
-            $downloadName = 'users_export_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            $downloadName = 'units_export_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [
@@ -44,7 +44,7 @@ class UserExportController extends Controller
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
             // Log the error
-            Log::error('Excel export failed: ' . $e->getMessage(), [
+            Log::error('Units Excel export failed: ' . $e->getMessage(), [
                 'filters' => $validated,
                 'user_id' => Auth::id(),
             ]);
@@ -60,25 +60,25 @@ class UserExportController extends Controller
         // Extract current filters from the request
         $filters = [];
 
-        // Map Laravel query builder filters to our export filters
-        if ($request->has('filter.name')) {
-            $filters['search'] = $request->input('filter.name');
-        }
-
-        if ($request->has('filter.email')) {
-            $filters['search'] = $request->input('filter.email');
-        }
-
+        // Map query parameters to export filters
         if ($request->has('search')) {
             $filters['search'] = $request->input('search');
         }
 
+        if ($request->has('credit_points_from')) {
+            $filters['credit_points_from'] = $request->input('credit_points_from');
+        }
+
+        if ($request->has('credit_points_to')) {
+            $filters['credit_points_to'] = $request->input('credit_points_to');
+        }
+
         try {
             // Generate Excel file with current filters
-            $filePath = $this->exportService->exportUsersToExcel($filters);
+            $filePath = $this->exportService->exportUnitsToExcel($filters);
 
             // Generate download filename
-            $downloadName = 'users_export_filtered_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            $downloadName = 'units_export_filtered_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [
@@ -86,7 +86,7 @@ class UserExportController extends Controller
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
             // Log the error
-            Log::error('Excel export with filters failed: ' . $e->getMessage(), [
+            Log::error('Units Excel export with filters failed: ' . $e->getMessage(), [
                 'filters' => $filters,
                 'user_id' => Auth::id(),
             ]);
