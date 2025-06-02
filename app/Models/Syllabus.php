@@ -13,7 +13,7 @@ class Syllabus extends Model
 {
     use HasFactory;
 
-    protected $table = 'syllabi';
+    protected $table = 'syllabus';
 
     protected $fillable = [
         'unit_id',

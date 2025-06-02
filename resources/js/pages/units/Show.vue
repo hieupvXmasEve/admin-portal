@@ -54,7 +54,7 @@ interface AssessmentComponentDetail {
 }
 
 interface UnitData extends Unit {
-    syllabi: Syllabus[];
+    syllabus: Syllabus[];
 }
 
 interface RelationshipStats {
@@ -64,7 +64,7 @@ interface RelationshipStats {
     prerequisite_conditions_count: number;
     equivalent_count: number;
     curriculum_count: number;
-    syllabi_count: number;
+    syllabus_count: number;
 }
 
 interface EquivalentUnitItem {
@@ -320,8 +320,8 @@ const hasRelationships = () => {
                     <div class="flex items-center gap-2">
                         <FileText class="h-5 w-5 text-indigo-600" />
                         <div>
-                            <p class="text-sm text-gray-600">Syllabi</p>
-                            <p class="text-2xl font-bold">{{ relationshipStats.syllabi_count || 0 }}</p>
+                            <p class="text-sm text-gray-600">syllabus</p>
+                            <p class="text-2xl font-bold">{{ relationshipStats.syllabus_count || 0 }}</p>
                         </div>
                     </div>
                 </Card>
@@ -458,9 +458,7 @@ const hasRelationships = () => {
                         <Target class="h-5 w-5" />
                         Equivalent Units
                     </CardTitle>
-                    <CardDescription>
-                        Units that are equivalent to {{ unit.code }} (including transitive relationships)
-                    </CardDescription>
+                    <CardDescription> Units that are equivalent to {{ unit.code }} (including transitive relationships) </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div class="space-y-3">
@@ -476,14 +474,14 @@ const hasRelationships = () => {
                                     <p class="text-sm text-gray-600">{{ equivalent.unit.name }}</p>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <Badge class="bg-purple-100 text-xs text-purple-800">
-                                        {{ equivalent.unit.credit_points }} CP
-                                    </Badge>
+                                    <Badge class="bg-purple-100 text-xs text-purple-800"> {{ equivalent.unit.credit_points }} CP </Badge>
                                     <Badge
                                         class="text-xs"
-                                        :class="equivalent.relationship_type === 'equivalent_to'
-                                            ? 'bg-blue-100 text-blue-800'
-                                            : 'bg-green-100 text-green-800'"
+                                        :class="
+                                            equivalent.relationship_type === 'equivalent_to'
+                                                ? 'bg-blue-100 text-blue-800'
+                                                : 'bg-green-100 text-green-800'
+                                        "
                                     >
                                         {{ equivalent.relationship_type === 'equivalent_to' ? 'Replaces' : 'Replaced by' }}
                                     </Badge>
@@ -543,27 +541,27 @@ const hasRelationships = () => {
                 </CardContent>
             </Card>
 
-            <!-- Syllabi Section -->
+            <!-- syllabus Section -->
             <Card>
                 <CardHeader>
                     <div class="flex items-center justify-between">
                         <div>
                             <CardTitle class="flex items-center gap-2">
                                 <FileText class="h-5 w-5" />
-                                Syllabi
+                                syllabus
                             </CardTitle>
-                            <CardDescription>Course syllabi and assessment structures for {{ unit.code }} </CardDescription>
+                            <CardDescription>Course syllabus and assessment structures for {{ unit.code }} </CardDescription>
                         </div>
-                        <Button v-if="canEdit" variant="outline" @click="router.visit(`/units/${unit.id}/syllabi`)">
+                        <Button v-if="canEdit" variant="outline" @click="router.visit(`/units/${unit.id}/syllabus`)">
                             <FileText class="mr-2 h-4 w-4" />
-                            Manage Syllabi
+                            Manage syllabus
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent v-if="unit.syllabi && unit.syllabi.length > 0">
+                <CardContent v-if="unit.syllabus && unit.syllabus.length > 0">
                     <div class="space-y-4">
                         <div
-                            v-for="syllabus in unit.syllabi"
+                            v-for="syllabus in unit.syllabus"
                             :key="syllabus.id"
                             class="rounded-lg border p-4 transition-colors hover:bg-gray-50"
                             :class="syllabus.is_active ? 'border-green-200 bg-green-50' : ''"
@@ -603,7 +601,7 @@ const hasRelationships = () => {
                                         <div class="text-xs text-gray-500">{{ syllabus.total_assessment_weight || 0 }}% Total Weight</div>
                                         <div v-if="syllabus.total_assessment_weight !== 100" class="text-xs text-orange-600">⚠️ Incomplete</div>
                                     </div>
-                                    <Button variant="ghost" size="sm" @click="router.visit(`/units/${unit.id}/syllabi/${syllabus.id}`)">
+                                    <Button variant="ghost" size="sm" @click="router.visit(`/units/${unit.id}/syllabus/${syllabus.id}`)">
                                         View Details
                                     </Button>
                                 </div>

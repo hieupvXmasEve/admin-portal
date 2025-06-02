@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('assessment_components', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('syllabus_id')->constrained('syllabi')->onDelete('cascade');
+            $table->foreignId('syllabus_id')->constrained('syllabus')->onDelete('cascade');
             $table->string('name', 100)->nullable();
             $table->decimal('weight', 5, 2)->nullable();
             $table->enum('type', ['quiz', 'assignment', 'project', 'exam', 'online_activity', 'other']);

@@ -2,11 +2,14 @@
 import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, Calendar, CheckCircle, Clock, Edit, FileText, User } from 'lucide-vue-next';
+import { ArrowLeft, Calendar, CheckCircle, ChevronDown, ChevronRight, Clock, Edit, FileText, User } from 'lucide-vue-next';
+import { ref } from 'vue';
 
 interface Unit {
     id: number;
@@ -66,14 +69,25 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: `/units/${props.unit.id}`,
     },
     {
-        title: 'Syllabi',
-        href: `/units/${props.unit.id}/syllabi`,
+        title: 'Syllabus',
+        href: `/units/${props.unit.id}/syllabus`,
     },
     {
         title: props.syllabus.version || 'Untitled',
-        href: `/units/${props.unit.id}/syllabi/${props.syllabus.id}`,
+        href: `/units/${props.unit.id}/syllabus/${props.syllabus.id}`,
     },
 ];
+
+// Track which components have expanded details
+const expandedComponents = ref<Set<number>>(new Set());
+
+const toggleComponentDetails = (componentId: number) => {
+    if (expandedComponents.value.has(componentId)) {
+        expandedComponents.value.delete(componentId);
+    } else {
+        expandedComponents.value.add(componentId);
+    }
+};
 
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -114,11 +128,11 @@ const getAssessmentTypeColor = (type: string) => {
                     <p class="text-xl text-gray-700">{{ unit.code }} - {{ unit.name }}</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <Button variant="outline" @click="router.visit(`/units/${unit.id}/syllabi`)">
+                    <Button variant="outline" @click="router.visit(`/units/${unit.id}/syllabus`)">
                         <ArrowLeft class="mr-2 h-4 w-4" />
-                        Back to Syllabi
+                        Back to Syllabus
                     </Button>
-                    <Button @click="router.visit(`/units/${unit.id}/syllabi/${syllabus.id}/edit`)">
+                    <Button @click="router.visit(`/units/${unit.id}/syllabus/${syllabus.id}/edit`)">
                         <Edit class="mr-2 h-4 w-4" />
                         Edit
                     </Button>
@@ -146,8 +160,7 @@ const getAssessmentTypeColor = (type: string) => {
                             <div class="flex items-center gap-2">
                                 <Calendar class="h-4 w-4 text-gray-400" />
                                 <p class="text-lg">
-                                    {{ syllabus.effective_from_semester.semester_type }}
-                                    {{ syllabus.effective_from_semester.year }}
+                                    {{ syllabus.effective_from_semester.name }}
                                 </p>
                             </div>
                         </div>
@@ -191,9 +204,9 @@ const getAssessmentTypeColor = (type: string) => {
                             <div>
                                 <CardTitle class="flex items-center gap-2">
                                     <CheckCircle class="h-5 w-5" />
-                                    Assessment Overview
+                                    Assessment Components
                                 </CardTitle>
-                                <CardDescription> Assessment components and their weightings </CardDescription>
+                                <CardDescription>Assessment components and their weightings</CardDescription>
                             </div>
                             <div class="text-right">
                                 <div class="text-2xl font-bold">{{ syllabus.total_assessment_weight || 0 }}%</div>
@@ -205,39 +218,79 @@ const getAssessmentTypeColor = (type: string) => {
                     </CardHeader>
                     <CardContent>
                         <div v-if="syllabus.assessment_components.length > 0" class="space-y-4">
-                            <div v-for="component in syllabus.assessment_components" :key="component.id" class="rounded-lg border p-4">
-                                <div class="mb-3 flex items-start justify-between">
-                                    <div class="flex-1">
-                                        <div class="mb-2 flex items-center gap-3">
-                                            <h3 class="text-lg font-semibold">{{ component.name }}</h3>
+                            <!-- Assessment Components Table -->
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Weight</TableHead>
+                                        <TableHead>Required for Final Exam?</TableHead>
+                                        <TableHead>Details</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <TableRow v-for="component in syllabus.assessment_components" :key="component.id">
+                                        <TableCell class="font-medium">{{ component.name }}</TableCell>
+                                        <TableCell>
                                             <Badge :class="getAssessmentTypeColor(component.type)">
-                                                {{ component.type.toUpperCase() }}
+                                                {{ component.type.toLowerCase().replace('_', ' ') }}
                                             </Badge>
-                                        </div>
-                                        <div class="flex items-center gap-4 text-sm text-gray-600">
-                                            <span>Weight: {{ component.weight }}%</span>
-                                            <span v-if="component.is_required_to_sit_final_exam" class="text-orange-600">
-                                                Required for final exam
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-xl font-bold">{{ component.weight }}%</div>
-                                    </div>
-                                </div>
+                                        </TableCell>
+                                        <TableCell>{{ component.weight }}</TableCell>
+                                        <TableCell>
+                                            <span v-if="component.is_required_to_sit_final_exam" class="text-orange-600">Yes</span>
+                                            <span v-else class="text-gray-500">No</span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Button
+                                                v-if="component.details.length > 0"
+                                                variant="outline"
+                                                size="sm"
+                                                @click="toggleComponentDetails(component.id)"
+                                                class="text-xs"
+                                            >
+                                                View Details
+                                            </Button>
+                                            <span v-else class="text-sm text-gray-400">-</span>
+                                        </TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
 
-                                <!-- Component Details -->
-                                <div v-if="component.details.length > 0" class="mt-3">
-                                    <h4 class="mb-2 text-sm font-medium text-gray-700">Sub-components</h4>
-                                    <div class="grid gap-2 md:grid-cols-2">
-                                        <div v-for="detail in component.details" :key="detail.id" class="rounded border bg-gray-50 p-3">
-                                            <div class="flex items-center justify-between">
-                                                <span class="text-sm font-medium">{{ detail.name }}</span>
-                                                <span class="text-sm text-gray-500">{{ detail.weight }}%</span>
-                                            </div>
+                            <!-- Component Details Sections -->
+                            <div
+                                v-for="component in syllabus.assessment_components.filter((c) => c.details.length > 0)"
+                                :key="`details-${component.id}`"
+                            >
+                                <Collapsible :open="expandedComponents.has(component.id)">
+                                    <CollapsibleTrigger
+                                        @click="toggleComponentDetails(component.id)"
+                                        class="flex w-full items-center gap-2 rounded-lg border p-3 text-left transition-colors hover:bg-gray-50"
+                                    >
+                                        <ChevronRight v-if="!expandedComponents.has(component.id)" class="h-4 w-4 text-gray-400" />
+                                        <ChevronDown v-else class="h-4 w-4 text-gray-400" />
+                                        <span class="font-medium">{{ component.name }} - Sub-components</span>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent class="mt-2">
+                                        <div class="border-l-2 border-gray-200 pl-6">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead class="text-sm">Sub-task</TableHead>
+                                                        <TableHead class="text-sm">Weight</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    <TableRow v-for="detail in component.details" :key="detail.id">
+                                                        <TableCell class="text-sm">{{ detail.name }}</TableCell>
+                                                        <TableCell class="text-sm">{{ detail.weight?.toFixed(2) || '-' }}</TableCell>
+                                                    </TableRow>
+                                                </TableBody>
+                                            </Table>
                                         </div>
-                                    </div>
-                                </div>
+                                    </CollapsibleContent>
+                                </Collapsible>
                             </div>
                         </div>
                         <div v-else class="py-8 text-center">
