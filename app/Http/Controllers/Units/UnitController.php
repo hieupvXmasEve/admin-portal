@@ -2,20 +2,19 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Units;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUnitRequest;
 use App\Http\Requests\UpdateUnitRequest;
 use App\Models\Unit;
-use App\Services\UnitValidationService;
-use App\Services\UnitRelationshipService;
 use App\Services\PrerequisiteLogicService;
+use App\Services\UnitRelationshipService;
+use App\Services\UnitValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Http\RedirectResponse;
-use App\Models\UnitPrerequisite;
 
 class UnitController extends Controller
 {
@@ -52,7 +51,12 @@ class UnitController extends Controller
 
         return Inertia::render('units/Index', [
             'units' => $units,
-            'filters' => $request->only(['search', 'sort', 'direction', 'per_page']),
+            'filters' => [
+                'search' => $validated['search'] ?? '',
+                'sort' => $validated['sort'] ?? '',
+                'direction' => $validated['direction'] ?? 'asc',
+                'per_page' => $validated['per_page'] ?? 15,
+            ],
             'statistics' => [
                 'total_units' => Unit::count(),
                 'units_with_prerequisites' => Unit::has('prerequisiteGroups')->count(),
@@ -522,5 +526,23 @@ class UnitController extends Controller
                 'message' => 'Bulk delete failed: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function exportExcel(Request $request)
+    {
+        $validated = $request->validate([
+            'search' => 'nullable|string|max:255',
+            'sort' => 'nullable|string|in:code,name,credit_points,created_at',
+            'direction' => 'nullable|string|in:asc,desc',
+            'credit_points_from' => 'nullable|numeric|min:0',
+            'credit_points_to' => 'nullable|numeric|min:0|gte:credit_points_from',
+            'has_prerequisites' => 'nullable|boolean',
+            'has_equivalents' => 'nullable|boolean',
+            'in_curricula' => 'nullable|boolean',
+        ]);
+
+        // Redirect to the UnitExportController
+        return app(\App\Http\Controllers\Units\UnitExportController::class)
+            ->exportExcelWithCurrentFilters($request);
     }
 }

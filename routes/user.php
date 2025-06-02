@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\UserImportController;
-use App\Http\Controllers\UserExportController;
 use App\Helpers\RoutePermissionHelper;
+use App\Http\Controllers\Users\UserController;
+use App\Http\Controllers\Users\UserExportController;
+use App\Http\Controllers\Users\UserImportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
