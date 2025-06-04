@@ -12,7 +12,7 @@ import type { EquivalentUnit, PrerequisiteGroup, Unit } from '@/types/Unit';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { AlertTriangle, ArrowLeft, Plus, Save, Search, X } from 'lucide-vue-next';
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface UnitData {
@@ -33,8 +33,7 @@ const props = defineProps<{
     editRestrictions: EditRestriction[];
     prerequisiteDescriptions?: string | null;
 }>();
-console.log('props', props);
-console.log('props.unit.prerequisite_groups', props.unit.prerequisite_groups);
+
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'Units',
@@ -70,10 +69,6 @@ const unitSearchQuery = ref('');
 const unitSearchResults = ref<Unit[]>([]);
 const isSearchingUnits = ref(false);
 const showUnitSearch = ref(false);
-
-// Debounced validation timeouts
-let codeValidationTimeout: number;
-let unitSearchTimeout: number;
 
 // Check if field is restricted
 const isFieldRestricted = (fieldName: string) => {
@@ -141,28 +136,26 @@ const searchUnits = async (query: string) => {
     }
 };
 
-// Watch for code changes and validate
-watch(
-    () => form.code,
-    (newCode) => {
-        clearTimeout(codeValidationTimeout);
-        codeValidation.value = null;
-
-        if (newCode && newCode.length >= 2 && newCode !== props.unit.code) {
-            codeValidationTimeout = setTimeout(() => {
-                validateCode(newCode);
-            }, 500);
+// Debounced code validation handler
+const handleCodeChange = (value: string | number) => {
+    const stringValue = String(value);
+    const formattedCode = stringValue.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!isFieldRestricted('code')) {
+        form.code = formattedCode;
+        if (formattedCode && formattedCode.length >= 2 && formattedCode !== props.unit.code) {
+            validateCode(formattedCode);
+        } else {
+            codeValidation.value = null;
         }
-    },
-);
+    }
+};
 
-// Watch for unit search changes
-watch(
-    () => unitSearchQuery.value,
-    (newQuery) => {
-        searchUnits(newQuery);
-    },
-);
+// Debounced unit search handler
+const handleUnitSearch = (value: string | number) => {
+    const query = String(value);
+    unitSearchQuery.value = query;
+    searchUnits(query);
+};
 
 // Form submission
 const handleSubmit = () => {
@@ -179,9 +172,6 @@ const handleSubmit = () => {
         }));
     }
 
-    console.log('Edit - prerequisiteGroups', prerequisiteGroups.value);
-    console.log('Edit - formData', formData);
-
     router.put(`/units/${props.unit.id}`, formData, {
         preserveScroll: true,
         onSuccess: () => {
@@ -191,13 +181,6 @@ const handleSubmit = () => {
             toast.error('Unit update failed');
         },
     });
-};
-
-// Format code to uppercase
-const formatCode = (value: string) => {
-    if (!isFieldRestricted('code')) {
-        form.code = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    }
 };
 
 // Validate credit points
@@ -291,10 +274,10 @@ const selectUnit = (unit: Unit) => {
                             <div class="space-y-2">
                                 <Label for="code">Unit Code *</Label>
                                 <div class="relative">
-                                    <Input
+                                    <DebouncedInput
                                         id="code"
-                                        v-model="form.code"
-                                        @input="formatCode($event.target.value)"
+                                        :model-value="form.code"
+                                        @debounced="handleCodeChange"
                                         placeholder="e.g., CS101, MATH201"
                                         :class="{
                                             'border-red-500': form.errors.code || codeValidation?.valid === false,
@@ -302,6 +285,7 @@ const selectUnit = (unit: Unit) => {
                                             'bg-gray-50': isFieldRestricted('code'),
                                         }"
                                         :disabled="isFieldRestricted('code')"
+                                        :debounce="500"
                                         maxlength="20"
                                         required
                                     />
@@ -501,7 +485,13 @@ const selectUnit = (unit: Unit) => {
                 <div class="space-y-4">
                     <div class="relative">
                         <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                        <DebouncedInput v-model="unitSearchQuery" placeholder="Search by unit code or name..." class="pl-9" autofocus />
+                        <DebouncedInput
+                            v-model="unitSearchQuery"
+                            @debounced="handleUnitSearch"
+                            placeholder="Search by unit code or name..."
+                            class="pl-9"
+                            autofocus
+                        />
                     </div>
 
                     <div v-if="isSearchingUnits" class="py-4 text-center">

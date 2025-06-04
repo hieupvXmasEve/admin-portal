@@ -17,6 +17,10 @@ class CurriculumUnit extends Model
     protected $fillable = [
         'curriculum_version_id',
         'unit_id',
+        'unit_type_id',
+        'semester_order',
+        'is_compulsory',
+        'note',
         'group_type',
         'unit_scope',
         'is_required',
@@ -28,6 +32,9 @@ class CurriculumUnit extends Model
     ];
 
     protected $casts = [
+        'unit_type_id' => 'integer',
+        'semester_order' => 'integer',
+        'is_compulsory' => 'boolean',
         'group_type' => 'string',
         'unit_scope' => 'string',
         'is_required' => 'boolean',
@@ -51,6 +58,14 @@ class CurriculumUnit extends Model
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    /**
+     * Get the unit type for this curriculum unit.
+     */
+    public function unitType(): BelongsTo
+    {
+        return $this->belongsTo(CurriculumUnitType::class, 'unit_type_id');
     }
 
     /**

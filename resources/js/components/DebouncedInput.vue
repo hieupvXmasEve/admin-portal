@@ -1,37 +1,30 @@
 <script lang="ts" setup>
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { refDebounced } from '@vueuse/core';
+import { watch } from 'vue';
 import { Input } from './ui/input';
 
-const props = defineProps({
-    modelValue: {
-        type: [String, Number],
-        required: true,
-    },
-    debounce: {
-        type: Number,
-        default: 500,
-    },
+const props = defineProps<{
+    debounce?: number;
+}>();
+
+const model = defineModel<string | number>({
+    required: true,
 });
 
-const emit = defineEmits(['update:modelValue']);
+// emit custom event
+const emit = defineEmits<{
+    (e: 'debounced', value: string | number): void;
+}>();
 
-const timeout = ref<ReturnType<typeof setTimeout>>();
+const debounced = refDebounced(model, props.debounce ?? 500);
 
-const localValue = computed({
-    get() {
-        return props.modelValue;
-    },
-    set(newValue) {
-        if (timeout.value) {
-            clearTimeout(timeout.value);
-        }
-        timeout.value = setTimeout(() => emit('update:modelValue', newValue), props.debounce);
-    },
+// emit khi debounce xong
+watch(debounced, (value) => {
+    model.value = value;
+    emit('debounced', value);
 });
-
-onBeforeUnmount(() => clearTimeout(timeout.value));
 </script>
 
 <template>
-    <Input v-model="localValue" v-bind="$attrs" />
+    <Input v-model="model" v-bind="$attrs" />
 </template>

@@ -120,7 +120,25 @@ return [
             'create_semester' => 'create_semester',
             'edit_semester' => 'edit_semester',
             'delete_semester' => 'delete_semester',
-        ]
+        ],
+        'programs' => [
+            'view_program' => 'view_program',
+            'create_program' => 'create_program',
+            'edit_program' => 'edit_program',
+            'delete_program' => 'delete_program',
+        ],
+        'curriculum_versions' => [
+            'view_curriculum_version' => 'view_curriculum_version',
+            'create_curriculum_version' => 'create_curriculum_version',
+            'edit_curriculum_version' => 'edit_curriculum_version',
+            'delete_curriculum_version' => 'delete_curriculum_version',
+        ],
+        'curriculum_units' => [
+            'view_curriculum_unit' => 'view_curriculum_unit',
+            'create_curriculum_unit' => 'create_curriculum_unit',
+            'edit_curriculum_unit' => 'edit_curriculum_unit',
+            'delete_curriculum_unit' => 'delete_curriculum_unit',
+        ],
     ],
 
     'module_parent' => [

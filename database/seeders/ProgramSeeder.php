@@ -17,24 +17,29 @@ class ProgramSeeder extends Seeder
     {
         $programs = [
             [
-                'name' => 'IT',
-                'degree_level' => 'bachelor',
+                'name' => 'Information Technology',
+                'code' => 'IT',
+                'description' => 'Comprehensive program covering computer science, software engineering, and information systems.',
             ],
             [
-                'name' => 'Business',
-                'degree_level' => 'bachelor',
+                'name' => 'Business Administration',
+                'code' => 'BUS',
+                'description' => 'Strategic business management with focus on leadership, finance, and operations.',
             ],
             [
-                'name' => 'Global Citizen',
-                'degree_level' => 'bachelor',
+                'name' => 'Global Citizenship Studies',
+                'code' => 'GCS',
+                'description' => 'Interdisciplinary program exploring global issues, cultural awareness, and social responsibility.',
             ],
             [
-                'name' => 'Vovinam',
-                'degree_level' => 'master',
+                'name' => 'Vovinam Martial Arts',
+                'code' => 'VMA',
+                'description' => 'Traditional Vietnamese martial arts program focusing on philosophy, technique, and cultural heritage.',
             ],
             [
-                'name' => 'MC',
-                'degree_level' => 'phd',
+                'name' => 'Media Communications',
+                'code' => 'MC',
+                'description' => 'Modern communication strategies across digital, print, and broadcast media platforms.',
             ],
         ];
 

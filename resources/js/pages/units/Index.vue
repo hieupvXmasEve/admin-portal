@@ -413,7 +413,7 @@ const handlePageSizeChange = (pageSize: number) => {
             </div>
 
             <!-- Filters Section -->
-            <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
+            <div class="flex flex-wrap items-center gap-4 rounded-lg">
                 <div class="min-w-[200px] flex-1">
                     <div class="relative">
                         <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
@@ -428,52 +428,50 @@ const handlePageSizeChange = (pageSize: number) => {
             </div>
 
             <!-- Data Table -->
-            <div class="rounded-md border">
-                <DataTable :data="data" :columns="columns" :loading="false">
-                    <template #cell-actions="{ row }">
-                        <div class="flex items-center gap-2">
-                            <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button variant="ghost" size="sm" @click="viewUnit(row.original)" title="View unit">
-                                            <Eye class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>View unit</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+            <DataTable :data="data" :columns="columns" :loading="false">
+                <template #cell-actions="{ row }">
+                    <div class="flex items-center gap-2">
+                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button variant="ghost" size="sm" @click="viewUnit(row.original)" title="View unit">
+                                        <Eye class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>View unit</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
 
-                            <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button variant="ghost" size="sm" @click="editUnit(row.original)" title="Edit unit">
-                                            <Edit class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Edit unit</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button variant="ghost" size="sm" @click="editUnit(row.original)" title="Edit unit">
+                                        <Edit class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Edit unit</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
 
-                            <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button variant="ghost" size="sm" @click="deleteUnit(row.original)" title="Delete unit">
-                                            <Trash2 class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Delete unit</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-                    </template>
-                </DataTable>
-            </div>
+                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button variant="ghost" size="sm" @click="deleteUnit(row.original)" title="Delete unit">
+                                        <Trash2 class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Delete unit</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                </template>
+            </DataTable>
 
             <!-- Pagination -->
             <DataPagination :pagination-data="units" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />

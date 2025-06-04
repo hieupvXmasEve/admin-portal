@@ -15,11 +15,13 @@ class Program extends Model
 
     protected $fillable = [
         'name',
-        'degree_level',
+        'code',
+        'description'
     ];
 
     protected $casts = [
-        'degree_level' => 'string',
+        'code' => 'string',
+        'description' => 'string',
     ];
 
     /**
