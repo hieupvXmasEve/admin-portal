@@ -13,14 +13,11 @@ import {
 import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, Copy, Edit, Eye, FileText, Filter, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, Copy, Edit, Eye, FileText, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -90,25 +87,9 @@ const breadcrumbItems: BreadcrumbItem[] = [
 const searchVersion = ref('');
 const filterSemester = ref('');
 const filterActive = ref('');
-const showFilters = ref(false);
 
 // Delete state
 const isDeleting = ref<number | null>(null);
-
-// Get unique semesters for filter
-const availableSemesters = computed(() => {
-    const semesters = props.syllabus
-        .map((s) => s.effective_from_semester)
-        .filter((semester): semester is Semester => semester !== null)
-        .reduce((acc, semester) => {
-            const exists = acc.find((s) => s.id === semester.id);
-            if (!exists) acc.push(semester);
-            return acc;
-        }, [] as Semester[]);
-
-    return semesters.sort((a, b) => b.year - a.year || a.name.localeCompare(b.name));
-});
-
 // Filtered syllabi
 const filteredSyllabi = computed(() => {
     return props.syllabus.filter((syllabus) => {
@@ -211,59 +192,6 @@ const getCurrentSemesterStatus = (syllabus: Syllabus) => {
                     </Button>
                 </div>
             </div>
-
-            <!-- Filters -->
-            <Card>
-                <CardContent class="p-4">
-                    <div class="mb-4 flex items-center justify-between">
-                        <Button variant="outline" @click="showFilters = !showFilters" class="flex items-center gap-2">
-                            <Filter class="h-4 w-4" />
-                            {{ showFilters ? 'Hide Filters' : 'Show Filters' }}
-                        </Button>
-
-                        <div v-if="searchVersion || filterSemester || filterActive" class="flex items-center gap-2">
-                            <span class="text-sm text-gray-500">{{ filteredSyllabi.length }} of {{ syllabus.length }} syllabi</span>
-                            <Button variant="ghost" size="sm" @click="clearFilters">Clear Filters</Button>
-                        </div>
-                    </div>
-
-                    <div v-if="showFilters" class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div>
-                            <Label for="search-version">Version</Label>
-                            <Input id="search-version" v-model="searchVersion" placeholder="Search version..." class="mt-1" />
-                        </div>
-
-                        <div>
-                            <Label for="filter-semester">Semester</Label>
-                            <Select v-model="filterSemester">
-                                <SelectTrigger class="mt-1">
-                                    <SelectValue placeholder="All semesters" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="">All semesters</SelectItem>
-                                    <SelectItem v-for="semester in availableSemesters" :key="semester.id" :value="semester.id.toString()">
-                                        {{ semester.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <Label for="filter-active">Status</Label>
-                            <Select v-model="filterActive">
-                                <SelectTrigger class="mt-1">
-                                    <SelectValue placeholder="All statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="">All statuses</SelectItem>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="inactive">Inactive</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
 
             <!-- Syllabus Table -->
             <Card v-if="filteredSyllabi.length > 0">
@@ -405,7 +333,6 @@ const getCurrentSemesterStatus = (syllabus: Syllabus) => {
             <!-- No Results State -->
             <Card v-else>
                 <CardContent class="flex flex-col items-center justify-center py-12 text-center">
-                    <Filter class="mb-4 h-16 w-16 text-gray-400" />
                     <h3 class="mb-2 text-xl font-semibold text-gray-900">No Results Found</h3>
                     <p class="max-w-md text-gray-500">No syllabi match your current filters. Try adjusting your search criteria.</p>
                     <Button variant="outline" class="mt-4" @click="clearFilters"> Clear Filters </Button>

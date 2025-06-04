@@ -151,6 +151,24 @@ class UserSeeder extends Seeder
             ['id' => 73, 'name' => 'Create Units', 'parent_id' => 71, 'code' => config('permission.access.units.create_unit')],
             ['id' => 74, 'name' => 'Edit Units', 'parent_id' => 71, 'code' => config('permission.access.units.edit_unit')],
             ['id' => 75, 'name' => 'Delete Units', 'parent_id' => 71, 'code' => config('permission.access.units.delete_unit')],
+
+            ['id' => 76, 'name' => 'Programs', 'parent_id' => null, 'code' => 'programs'],
+            ['id' => 77, 'name' => 'View Programs', 'parent_id' => 76, 'code' => config('permission.access.programs.view_program')],
+            ['id' => 78, 'name' => 'Create Programs', 'parent_id' => 76, 'code' => config('permission.access.programs.create_program')],
+            ['id' => 79, 'name' => 'Edit Programs', 'parent_id' => 76, 'code' => config('permission.access.programs.edit_program')],
+            ['id' => 80, 'name' => 'Delete Programs', 'parent_id' => 76, 'code' => config('permission.access.programs.delete_program')],
+
+            ['id' => 81, 'name' => 'Curriculum Versions', 'parent_id' => null, 'code' => 'curriculum_versions'],
+            ['id' => 82, 'name' => 'View Curriculum Versions', 'parent_id' => 81, 'code' => config('permission.access.curriculum_versions.view_curriculum_version')],
+            ['id' => 83, 'name' => 'Create Curriculum Versions', 'parent_id' => 81, 'code' => config('permission.access.curriculum_versions.create_curriculum_version')],
+            ['id' => 84, 'name' => 'Edit Curriculum Versions', 'parent_id' => 81, 'code' => config('permission.access.curriculum_versions.edit_curriculum_version')],
+            ['id' => 85, 'name' => 'Delete Curriculum Versions', 'parent_id' => 81, 'code' => config('permission.access.curriculum_versions.delete_curriculum_version')],
+
+            ['id' => 86, 'name' => 'Curriculum Units', 'parent_id' => null, 'code' => 'curriculum_units'],
+            ['id' => 87, 'name' => 'View Curriculum Units', 'parent_id' => 86, 'code' => config('permission.access.curriculum_units.view_curriculum_unit')],
+            ['id' => 88, 'name' => 'Create Curriculum Units', 'parent_id' => 86, 'code' => config('permission.access.curriculum_units.create_curriculum_unit')],
+            ['id' => 89, 'name' => 'Edit Curriculum Units', 'parent_id' => 86, 'code' => config('permission.access.curriculum_units.edit_curriculum_unit')],
+            ['id' => 90, 'name' => 'Delete Curriculum Units', 'parent_id' => 86, 'code' => config('permission.access.curriculum_units.delete_curriculum_unit')],
         ];
 
         // foreach ($permissions as &$permission) {
@@ -241,6 +259,19 @@ class UserSeeder extends Seeder
             ['role_id' => 1, 'permission_id' => 73],
             ['role_id' => 1, 'permission_id' => 74],
             ['role_id' => 1, 'permission_id' => 75],
+
+            ['role_id' => 1, 'permission_id' => 77],
+            ['role_id' => 1, 'permission_id' => 78],
+            ['role_id' => 1, 'permission_id' => 79],
+            ['role_id' => 1, 'permission_id' => 80],
+
+            ['role_id' => 1, 'permission_id' => 82],
+            ['role_id' => 1, 'permission_id' => 83],
+            ['role_id' => 1, 'permission_id' => 84],
+            ['role_id' => 1, 'permission_id' => 85],
+
+            ['role_id' => 1, 'permission_id' => 87],
+            ['role_id' => 1, 'permission_id' => 88],
         ];
 
         foreach ($rolePermissions as &$rp) {

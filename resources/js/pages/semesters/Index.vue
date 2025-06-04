@@ -16,7 +16,6 @@ import { fromDate } from '@internationalized/date';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Edit, Plus, Trash2, X } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
-import { toast } from 'vue-sonner';
 
 interface Semester {
     id: number;
@@ -296,7 +295,6 @@ const closeModals = () => {
 
 // Form submissions
 const submitCreate = () => {
-
     // Transform date ranges to individual date fields for backend
     const formData: any = {
         code: createForm.code,
@@ -406,12 +404,12 @@ const handlePageSizeChange = (pageSize: number) => {
                 <Button @click="openCreateModal" size="sm">
                     <Plus class="mr-2 h-4 w-4" />
                     Add Semester
-                    <p>{{console.log(errors)}}</p>
+                    <p>{{ console.log(errors) }}</p>
                 </Button>
             </div>
 
             <!-- Filters -->
-            <div class="mb-6 flex flex-wrap items-center gap-4">
+            <div class="flex flex-wrap items-center gap-4">
                 <div class="flex flex-col gap-1">
                     <Label for="search">Search</Label>
                     <Input id="search" v-model="search" placeholder="Search semesters..." />

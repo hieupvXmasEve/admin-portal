@@ -13,6 +13,9 @@ import {
     ShieldCheck,
     UserPlus,
     Users,
+    Building2,
+    BookMarked,
+    Layers,
 } from 'lucide-vue-next';
 
 export const mainNavItems: NavItem[] = [
@@ -37,6 +40,31 @@ export const mainNavItems: NavItem[] = [
                 href: '/units',
                 icon: GraduationCap,
                 requiredPermissions: ['view_unit'],
+            },
+            {
+                title: 'Curriculum',
+                href: '#',
+                icon: BookMarked,
+                children: [
+                    {
+                        title: 'Programs',
+                        href: '/programs',
+                        icon: Building2,
+                        requiredPermissions: ['view_program'],
+                    },
+                    {
+                        title: 'Curriculum Versions',
+                        href: '/curriculum-versions',
+                        icon: Layers,
+                        requiredPermissions: ['view_curriculum_version'],
+                    },
+                    {
+                        title: 'Curriculum Units',
+                        href: '/curriculum-units',
+                        icon: GraduationCap,
+                        requiredPermissions: ['view_curriculum_unit'],
+                    },
+                ],
             },
         ],
     },

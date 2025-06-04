@@ -13,7 +13,8 @@ return new class extends Migration {
         Schema::create('programs', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->enum('degree_level', ['bachelor', 'master', 'phd']);
+            $table->string('code')->unique();
+            $table->text('description')->nullable();
             $table->timestamps();
         });
     }
