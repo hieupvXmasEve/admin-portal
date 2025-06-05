@@ -58,12 +58,12 @@ export const mainNavItems: NavItem[] = [
                         icon: Layers,
                         requiredPermissions: ['view_curriculum_version'],
                     },
-                    {
-                        title: 'Curriculum Units',
-                        href: '/curriculum-units',
-                        icon: GraduationCap,
-                        requiredPermissions: ['view_curriculum_unit'],
-                    },
+                    // {
+                    //     title: 'Curriculum Units',
+                    //     href: '/curriculum-units',
+                    //     icon: GraduationCap,
+                    //     requiredPermissions: ['view_curriculum_unit'],
+                    // },
                 ],
             },
         ],
@@ -79,12 +79,12 @@ export const mainNavItems: NavItem[] = [
                 icon: Users,
                 requiredPermissions: ['view_user'],
             },
-            {
-                title: 'Add User',
-                href: '/users/create',
-                icon: UserPlus,
-                requiredPermissions: ['add_user'],
-            },
+            // {
+            //     title: 'Add User',
+            //     href: '/users/create',
+            //     icon: UserPlus,
+            //     requiredPermissions: ['add_user'],
+            // },
             // {
             //     title: 'User Roles',
             //     href: '/users/roles',
@@ -107,10 +107,10 @@ export const mainNavItems: NavItem[] = [
                         title: 'All Roles',
                         href: '/roles',
                     },
-                    {
-                        title: 'Create Role',
-                        href: '/roles/create',
-                    },
+                    // {
+                    //     title: 'Create Role',
+                    //     href: '/roles/create',
+                    // },
                     // {
                     //     title: 'Role Permissions',
                     //     href: '/roles/permissions',
@@ -134,116 +134,116 @@ export const mainNavItems: NavItem[] = [
             // },
         ],
     },
-    {
-        title: 'Reports',
-        href: '#',
-        icon: BarChart3,
-        children: [
-            {
-                title: 'Analytics',
-                href: '#',
-                icon: BarChart3,
-                children: [
-                    {
-                        title: 'User Analytics',
-                        href: '/reports/analytics/users',
-                    },
-                    {
-                        title: 'System Analytics',
-                        href: '/reports/analytics/system',
-                    },
-                    {
-                        title: 'Performance Metrics',
-                        href: '/reports/analytics/performance',
-                    },
-                ],
-            },
-            {
-                title: 'User Activity',
-                href: '/reports/activity',
-                icon: FileText,
-            },
-            {
-                title: 'System Logs',
-                href: '#',
-                icon: Database,
-                children: [
-                    {
-                        title: 'Error Logs',
-                        href: '/reports/logs/errors',
-                    },
-                    {
-                        title: 'Access Logs',
-                        href: '/reports/logs/access',
-                    },
-                    {
-                        title: 'Audit Logs',
-                        href: '/reports/logs/audit',
-                    },
-                ],
-            },
-        ],
-    },
-    {
-        title: 'Communication',
-        href: '#',
-        icon: Mail,
-        children: [
-            {
-                title: 'Messages',
-                href: '/messages',
-                icon: Mail,
-            },
-            {
-                title: 'Notifications',
-                href: '#',
-                icon: Calendar,
-                children: [
-                    {
-                        title: 'All Notifications',
-                        href: '/notifications',
-                    },
-                    {
-                        title: 'Email Templates',
-                        href: '/notifications/templates',
-                    },
-                    {
-                        title: 'Push Settings',
-                        href: '/notifications/push-settings',
-                    },
-                ],
-            },
-        ],
-    },
-    {
-        title: 'System',
-        href: '#',
-        icon: Settings,
-        children: [
-            {
-                title: 'Settings',
-                href: '#',
-                icon: Settings,
-                children: [
-                    {
-                        title: 'General Settings',
-                        href: '/settings/general',
-                    },
-                    {
-                        title: 'Security Settings',
-                        href: '/settings/security',
-                    },
-                    {
-                        title: 'Email Settings',
-                        href: '/settings/email',
-                    },
-                ],
-            },
-            {
-                title: 'Maintenance',
-                href: '/maintenance',
-                icon: Database,
-            },
-        ],
-    },
+    // {
+    //     title: 'Reports',
+    //     href: '#',
+    //     icon: BarChart3,
+    //     children: [
+    //         {
+    //             title: 'Analytics',
+    //             href: '#',
+    //             icon: BarChart3,
+    //             children: [
+    //                 {
+    //                     title: 'User Analytics',
+    //                     href: '/reports/analytics/users',
+    //                 },
+    //                 {
+    //                     title: 'System Analytics',
+    //                     href: '/reports/analytics/system',
+    //                 },
+    //                 {
+    //                     title: 'Performance Metrics',
+    //                     href: '/reports/analytics/performance',
+    //                 },
+    //             ],
+    //         },
+    //         {
+    //             title: 'User Activity',
+    //             href: '/reports/activity',
+    //             icon: FileText,
+    //         },
+    //         {
+    //             title: 'System Logs',
+    //             href: '#',
+    //             icon: Database,
+    //             children: [
+    //                 {
+    //                     title: 'Error Logs',
+    //                     href: '/reports/logs/errors',
+    //                 },
+    //                 {
+    //                     title: 'Access Logs',
+    //                     href: '/reports/logs/access',
+    //                 },
+    //                 {
+    //                     title: 'Audit Logs',
+    //                     href: '/reports/logs/audit',
+    //                 },
+    //             ],
+    //         },
+    //     ],
+    // },
+    // {
+    //     title: 'Communication',
+    //     href: '#',
+    //     icon: Mail,
+    //     children: [
+    //         {
+    //             title: 'Messages',
+    //             href: '/messages',
+    //             icon: Mail,
+    //         },
+    //         {
+    //             title: 'Notifications',
+    //             href: '#',
+    //             icon: Calendar,
+    //             children: [
+    //                 {
+    //                     title: 'All Notifications',
+    //                     href: '/notifications',
+    //                 },
+    //                 {
+    //                     title: 'Email Templates',
+    //                     href: '/notifications/templates',
+    //                 },
+    //                 {
+    //                     title: 'Push Settings',
+    //                     href: '/notifications/push-settings',
+    //                 },
+    //             ],
+    //         },
+    //     ],
+    // },
+    // {
+    //     title: 'System',
+    //     href: '#',
+    //     icon: Settings,
+    //     children: [
+    //         {
+    //             title: 'Settings',
+    //             href: '#',
+    //             icon: Settings,
+    //             children: [
+    //                 {
+    //                     title: 'General Settings',
+    //                     href: '/settings/general',
+    //                 },
+    //                 {
+    //                     title: 'Security Settings',
+    //                     href: '/settings/security',
+    //                 },
+    //                 {
+    //                     title: 'Email Settings',
+    //                     href: '/settings/email',
+    //                 },
+    //             ],
+    //         },
+    //         {
+    //             title: 'Maintenance',
+    //             href: '/maintenance',
+    //             icon: Database,
+    //         },
+    //     ],
+    // },
 ];

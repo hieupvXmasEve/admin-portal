@@ -52,10 +52,14 @@ export interface UnitData {
     }>;
     curriculum_units: Array<{
         id: number;
-        group_type: string;
-        is_required: boolean;
-        year_level?: number;
-        semester_number?: number;
+        unit_type: {
+            id: number;
+            name: string;
+            code: string;
+        };
+        is_compulsory: boolean;
+        semester_order?: number;
+        note?: string;
         curriculum_version: {
             id: number;
             version_code: string;
@@ -67,6 +71,11 @@ export interface UnitData {
                 id: number;
                 name: string;
             };
+        };
+        semester: {
+            id: number;
+            term: string;
+            year: number;
         };
     }>;
 }

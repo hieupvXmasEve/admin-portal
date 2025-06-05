@@ -69,6 +69,14 @@ class CurriculumUnit extends Model
     }
 
     /**
+     * Get the semester for this curriculum unit.
+     */
+    public function semester(): BelongsTo
+    {
+        return $this->belongsTo(Semester::class);
+    }
+
+    /**
      * Check if prerequisites are met for this curriculum unit.
      */
     public function checkPrerequisites(array $completedUnits = []): array

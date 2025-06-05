@@ -31,8 +31,7 @@ class CurriculumVersionFactory extends Factory
             'program_id' => Program::factory(),
             'specialization_id' => null, // Can be set when needed
             'version_code' => 'V' . $this->faker->randomFloat(1, 1.0, 9.9),
-            'effective_from_semester_id' => null, // Can be set when needed
-            'scope' => $this->faker->randomElement(['program', 'specialization']),
+            'semester_id' => null, // Can be set when needed
             'notes' => $this->faker->optional()->paragraph(),
         ];
     }
@@ -55,7 +54,6 @@ class CurriculumVersionFactory extends Factory
         return $this->state(fn(array $attributes) => [
             'program_id' => $specialization->program_id,
             'specialization_id' => $specialization->id,
-            'scope' => 'specialization',
         ]);
     }
 
@@ -65,28 +63,16 @@ class CurriculumVersionFactory extends Factory
     public function programLevel(): static
     {
         return $this->state(fn(array $attributes) => [
-            'scope' => 'program',
             'specialization_id' => null,
         ]);
     }
-
-    /**
-     * Create a specialization-level curriculum version.
-     */
-    public function specializationLevel(): static
-    {
-        return $this->state(fn(array $attributes) => [
-            'scope' => 'specialization',
-        ]);
-    }
-
     /**
      * Create a curriculum version with an effective semester.
      */
     public function withEffectiveSemester(Semester $semester): static
     {
         return $this->state(fn(array $attributes) => [
-            'effective_from_semester_id' => $semester->id,
+            'semester_id' => $semester->id,
         ]);
     }
 }

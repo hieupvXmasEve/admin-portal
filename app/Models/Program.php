@@ -47,20 +47,4 @@ class Program extends Model
     {
         return $this->hasMany(Specialization::class)->where('is_active', true);
     }
-
-    /**
-     * Get program-level curriculum versions (common to all specializations).
-     */
-    public function programCurriculumVersions(): HasMany
-    {
-        return $this->hasMany(CurriculumVersion::class)->where('scope', 'program');
-    }
-
-    /**
-     * Get specialization-level curriculum versions.
-     */
-    public function specializationCurriculumVersions(): HasMany
-    {
-        return $this->hasMany(CurriculumVersion::class)->where('scope', 'specialization');
-    }
 }

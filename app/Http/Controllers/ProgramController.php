@@ -75,7 +75,6 @@ class ProgramController extends Controller
             'curriculumVersions' => function ($query) {
                 $query->with(['specialization', 'effectiveFromSemester'])
                     ->withCount('curriculumUnits')
-                    ->orderBy('scope')
                     ->orderBy('created_at', 'desc');
             }
         ]);
@@ -85,8 +84,6 @@ class ProgramController extends Controller
             'totalSpecializations' => $program->specializations()->count(),
             'activeSpecializations' => $program->activeSpecializations()->count(),
             'totalCurriculumVersions' => $program->curriculumVersions()->count(),
-            'programLevelVersions' => $program->programCurriculumVersions()->count(),
-            'specializationLevelVersions' => $program->specializationCurriculumVersions()->count(),
         ];
 
         return Inertia::render('programs/Show', [

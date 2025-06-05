@@ -54,7 +54,7 @@ The implemented schema includes the following main entities:
 - program_id: foreign key → programs.id
 - specialization_id: foreign key → specializations.id, nullable
 - version_code: string, nullable
-- effective_from_semester_id: foreign key → semesters.id, nullable
+- semester_id: foreign key → semesters.id, nullable
 - created_at, updated_at
 ```
 
@@ -118,7 +118,7 @@ The implemented schema includes the following main entities:
 ### CurriculumVersion Model
 - `belongsTo(Program::class)` - Program
 - `belongsTo(Specialization::class)` - Specialization
-- `belongsTo(Semester::class, 'effective_from_semester_id')` - Effective semester
+- `belongsTo(Semester::class, 'semester_id')` - Effective semester
 - `hasMany(CurriculumUnit::class)` - Units in this version
 
 ### CurriculumUnit Model

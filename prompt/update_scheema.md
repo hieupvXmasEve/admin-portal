@@ -58,7 +58,7 @@ Update the academic system to support a new **curriculum\_version**, including:
 ### Required Input from User:
 
 * `program_id` of the program being updated
-* `version_code` and `effective_from_semester_id` for the new curriculum\_version
+* `version_code` and `semester_id` for the new curriculum\_version
 * List of tracks: name + type (major, minor...)
 * List of units per track and their group\_type
 * List of units shared across the entire program (if any)

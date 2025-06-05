@@ -37,7 +37,7 @@ Schema:
 - id: bigint, primary key
 - program_id: foreign key → programs.id
 - version_code: string, nullable
-- effective_from_semester_id: foreign key → semesters.id, nullable
+- semester_id: foreign key → semesters.id, nullable
 - created_at, updated_at
 
 ### Table: curriculum_units
@@ -96,12 +96,12 @@ CREATE TABLE curriculum_versions (
     program_id BIGINT NOT NULL,
     specialization_id BIGINT NULL,
     version_code VARCHAR(20) NULL,
-    effective_from_semester_id BIGINT NULL,
+    semester_id BIGINT NULL,
     created_at TIMESTAMP NULL,
     updated_at TIMESTAMP NULL,
     FOREIGN KEY (program_id) REFERENCES  programs(id),
     FOREIGN KEY (specialization_id) REFERENCES specializations(id),
-    FOREIGN KEY (effective_from_semester_id) REFERENCES semesters(id)
+    FOREIGN KEY (semester_id) REFERENCES semesters(id)
 );
 
 -- Loại môn học (core, elective, general,...)

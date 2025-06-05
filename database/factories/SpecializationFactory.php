@@ -31,7 +31,6 @@ class SpecializationFactory extends Factory
             'code' => strtoupper($this->faker->lexify('???-??')),
             'description' => $this->faker->optional()->paragraph(),
             'is_active' => $this->faker->boolean(80), // 80% chance of being active
-            'duration_years' => $this->faker->randomElement([3, 4, 5]),
         ];
     }
 
@@ -75,7 +74,6 @@ class SpecializationFactory extends Factory
             'code' => 'IT-SD',
             'description' => 'Focuses on application development, programming languages, and software engineering principles.',
             'is_active' => true,
-            'duration_years' => 4,
         ]);
     }
 
@@ -89,7 +87,6 @@ class SpecializationFactory extends Factory
             'code' => 'IT-CS',
             'description' => 'Specialized track focusing on information security, network security, and digital forensics.',
             'is_active' => true,
-            'duration_years' => 4,
         ]);
     }
 
@@ -103,7 +100,6 @@ class SpecializationFactory extends Factory
             'code' => 'IT-DS',
             'description' => 'Combines statistics, programming, and domain expertise to extract insights from data.',
             'is_active' => true,
-            'duration_years' => 4,
         ]);
     }
 
@@ -117,7 +113,6 @@ class SpecializationFactory extends Factory
             'code' => 'BUS-MKT',
             'description' => 'Focuses on digital marketing, consumer behavior, and brand management.',
             'is_active' => true,
-            'duration_years' => 4,
         ]);
     }
 
@@ -131,7 +126,6 @@ class SpecializationFactory extends Factory
             'code' => 'BUS-FIN',
             'description' => 'Covers financial analysis, investment strategies, and corporate finance.',
             'is_active' => true,
-            'duration_years' => 4,
         ]);
     }
 }

@@ -25,7 +25,6 @@ class CurriculumVersionController extends Controller
             'search' => 'nullable|string|max:255',
             'filter.program_id' => 'nullable|exists:programs,id',
             'filter.specialization_id' => 'nullable|exists:specializations,id',
-            'filter.scope' => 'nullable|string|in:program,specialization',
             'sort' => 'nullable|string|in:version_code,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
@@ -46,9 +45,6 @@ class CurriculumVersionController extends Controller
             ->when($validated['filter']['specialization_id'] ?? null, function ($query, $specializationId) {
                 $query->where('specialization_id', $specializationId);
             })
-            ->when($validated['filter']['scope'] ?? null, function ($query, $scope) {
-                $query->where('scope', $scope);
-            })
             ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
                 $direction = $validated['direction'] ?? 'asc';
                 $query->orderBy($sort, $direction);
@@ -58,50 +54,61 @@ class CurriculumVersionController extends Controller
             ->paginate($validated['per_page'] ?? 15)
             ->withQueryString();
 
+        // Calculate statistics
+        $statistics = [
+            'total_curriculum_versions' => CurriculumVersion::count(),
+            'active_versions' => CurriculumVersion::count(), // All versions are active for now
+            'inactive_versions' => 0, // No inactive status in current schema
+            'avg_credit_points' => 0, // No credit points field in current schema
+            'by_year' => [], // No year field in current schema
+            'by_program' => CurriculumVersion::with('program')
+                ->get()
+                ->groupBy('program.name')
+                ->map(fn($group) => $group->count())
+                ->toArray(),
+        ];
+
         return Inertia::render('curriculum-versions/Index', [
             'curriculumVersions' => $curriculumVersions,
             'filters' => [
                 'search' => $validated['search'] ?? null,
                 'program_id' => $validated['filter']['program_id'] ?? null,
                 'specialization_id' => $validated['filter']['specialization_id'] ?? null,
-                'scope' => $validated['filter']['scope'] ?? null,
             ],
+            'statistics' => $statistics,
             'programs' => Program::orderBy('name')->get(['id', 'name']),
             'specializations' => Specialization::with('program')->orderBy('name')->get(['id', 'name', 'program_id']),
-            'scopeOptions' => [
-                ['value' => 'program', 'label' => 'Program Level'],
-                ['value' => 'specialization', 'label' => 'Specialization Level'],
-            ],
+            'semesters' => Semester::orderBy('name')->get(['id', 'name', 'code']),
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $programId = $request->query('program_id');
+        $specializationId = $request->query('specialization_id');
+        $source = $request->query('source');
+
         return Inertia::render('curriculum-versions/Create', [
             'programs' => Program::orderBy('name')->get(['id', 'name']),
             'specializations' => Specialization::with('program')->orderBy('name')->get(['id', 'name', 'program_id']),
             'semesters' => Semester::orderBy('name')->get(['id', 'name', 'code']),
-            'scopeOptions' => [
-                ['value' => 'program', 'label' => 'Program Level'],
-                ['value' => 'specialization', 'label' => 'Specialization Level'],
-            ],
+            'selectedProgramId' => $programId ? (int) $programId : null,
+            'selectedSpecializationId' => $specializationId ? (int) $specializationId : null,
+            'source' => $source,
         ]);
     }
 
     public function store(StoreCurriculumVersionRequest $request): RedirectResponse
     {
         try {
-            DB::beginTransaction();
-
-            $curriculumVersion = CurriculumVersion::create($request->validated());
-
-            DB::commit();
+            DB::transaction(function () use ($request) {
+                CurriculumVersion::create($request->validated());
+            });
 
             return redirect()
-                ->route('curriculum-versions.index')
+                ->route('curriculum_version.index')
                 ->with('success', 'Curriculum version created successfully.');
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Curriculum version creation failed: ' . $e->getMessage());
 
             return back()
@@ -125,6 +132,9 @@ class CurriculumVersionController extends Controller
 
         return Inertia::render('curriculum-versions/Show', [
             'curriculumVersion' => $curriculumVersion,
+            'programs' => Program::orderBy('name')->get(['id', 'name', 'code']),
+            'specializations' => Specialization::with('program')->orderBy('name')->get(['id', 'name', 'code', 'program_id']),
+            'semesters' => Semester::orderBy('name')->get(['id', 'name', 'code']),
         ]);
     }
 
@@ -137,10 +147,6 @@ class CurriculumVersionController extends Controller
             'programs' => Program::orderBy('name')->get(['id', 'name']),
             'specializations' => Specialization::with('program')->orderBy('name')->get(['id', 'name', 'program_id']),
             'semesters' => Semester::orderBy('name')->get(['id', 'name', 'code']),
-            'scopeOptions' => [
-                ['value' => 'program', 'label' => 'Program Level'],
-                ['value' => 'specialization', 'label' => 'Specialization Level'],
-            ],
         ]);
     }
 
@@ -154,7 +160,7 @@ class CurriculumVersionController extends Controller
             DB::commit();
 
             return redirect()
-                ->route('curriculum-versions.index')
+                ->route('curriculum_version.index')
                 ->with('success', 'Curriculum version updated successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -181,7 +187,7 @@ class CurriculumVersionController extends Controller
             DB::commit();
 
             return redirect()
-                ->route('curriculum-versions.index')
+                ->route('curriculum_version.index')
                 ->with('success', 'Curriculum version deleted successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -244,6 +250,67 @@ class CurriculumVersionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Bulk delete failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function apiStore(StoreCurriculumVersionRequest $request)
+    {
+        try {
+            DB::transaction(function () use ($request, &$curriculumVersion) {
+                $curriculumVersion = CurriculumVersion::create($request->validated());
+            });
+
+            // Load relationships for the response
+            $curriculumVersion->load([
+                'program:id,name',
+                'specialization:id,name',
+                'effectiveFromSemester:id,name,code'
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Curriculum version created successfully.',
+                'data' => $curriculumVersion
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Curriculum version creation failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create curriculum version. Please try again.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function apiDestroy(CurriculumVersion $curriculumVersion)
+    {
+        try {
+            // Check if curriculum version has any curriculum units
+            if ($curriculumVersion->curriculumUnits()->count() > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete curriculum version with existing curriculum units.',
+                    'error' => 'HAS_CURRICULUM_UNITS'
+                ], 400);
+            }
+
+            DB::transaction(function () use ($curriculumVersion) {
+                $curriculumVersion->delete();
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Curriculum version deleted successfully.',
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Curriculum version deletion failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete curriculum version. Please try again.',
+                'error' => $e->getMessage()
             ], 500);
         }
     }

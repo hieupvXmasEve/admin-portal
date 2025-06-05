@@ -19,13 +19,8 @@ class CurriculumVersion extends Model
         'program_id',
         'specialization_id',
         'version_code',
-        'effective_from_semester_id',
-        'scope',
+        'semester_id',
         'notes',
-    ];
-
-    protected $casts = [
-        'scope' => 'string',
     ];
 
     /**
@@ -49,7 +44,7 @@ class CurriculumVersion extends Model
      */
     public function effectiveFromSemester(): BelongsTo
     {
-        return $this->belongsTo(Semester::class, 'effective_from_semester_id');
+        return $this->belongsTo(Semester::class, 'semester_id');
     }
 
     /**
@@ -93,42 +88,10 @@ class CurriculumVersion extends Model
     }
 
     /**
-     * Scope for program-level curricula (common to all specializations).
-     */
-    public function scopeProgramLevel(Builder $query): void
-    {
-        $query->where('scope', 'program');
-    }
-
-    /**
-     * Scope for specialization-specific curricula.
-     */
-    public function scopeSpecializationLevel(Builder $query): void
-    {
-        $query->where('scope', 'specialization');
-    }
-
-    /**
      * Scope for a specific specialization.
      */
     public function scopeForSpecialization(Builder $query, Specialization $specialization): void
     {
         $query->where('specialization_id', $specialization->id);
-    }
-
-    /**
-     * Check if this curriculum version is program-level (common).
-     */
-    public function isProgramLevel(): bool
-    {
-        return $this->scope === 'program';
-    }
-
-    /**
-     * Check if this curriculum version is specialization-specific.
-     */
-    public function isSpecializationLevel(): bool
-    {
-        return $this->scope === 'specialization';
     }
 }

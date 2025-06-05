@@ -18,12 +18,10 @@ return new class extends Migration
             $table->foreignId('program_id')->constrained('programs');
             $table->foreignId('specialization_id')->nullable()->constrained('specializations')->onDelete('cascade');
             $table->string('version_code', 20)->nullable();
-            $table->foreignId('effective_from_semester_id')->nullable()->constrained('semesters');
-            $table->enum('scope', ['program', 'specialization'])->default('specialization');
+            $table->foreignId('semester_id')->constrained('semesters');
             $table->text('notes')->nullable();
             $table->timestamps();
-
-            $table->index(['program_id', 'specialization_id', 'scope']);
+            $table->index(['program_id', 'specialization_id']);
         });
     }
 

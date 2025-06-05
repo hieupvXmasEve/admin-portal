@@ -37,7 +37,7 @@ class SyllabusSeeder extends Seeder
                     'description' => "Course syllabus for {$unit->code} covering fundamental concepts and practical applications.",
                     'total_hours' => rand(60, 150),
                     'hours_per_session' => rand(2, 4),
-                    'effective_from_semester_id' => $semesters->random()->id,
+                    'semester_id' => $semesters->random()->id,
                     'is_active' => $i === 0, // First syllabus is active
                 ]);
 

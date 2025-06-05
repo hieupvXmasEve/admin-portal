@@ -11,7 +11,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -37,15 +36,16 @@ interface Specialization {
         degree_level: string;
     };
     curriculum_versions_count: number;
+    is_active: boolean;
     created_at: string;
     updated_at: string;
 }
 
 interface Statistics {
     total_specializations: number;
+    active_specializations: number;
+    inactive_specializations: number;
     by_program: Record<string, number>;
-    avg_curriculum_versions: number;
-    recent_additions: number;
 }
 
 const props = defineProps<{
@@ -58,8 +58,9 @@ const props = defineProps<{
         per_page?: number;
     };
     statistics: Statistics;
-    programs: Array<{ id: number; name: string; degree_level: string }>;
+    programs: Array<{ id: number; name: string }>;
 }>();
+console.log('props', props.programs);
 
 const page = usePage();
 
@@ -100,7 +101,7 @@ const can = (permission: string) => {
 
 // Action functions
 const editSpecialization = (specialization: Specialization) => {
-    router.visit(`/specializations/edit/${specialization.id}`);
+    router.visit(`/specializations/${specialization.id}/edit`);
 };
 
 const viewSpecialization = (specialization: Specialization) => {
@@ -110,6 +111,17 @@ const viewSpecialization = (specialization: Specialization) => {
 const deleteSpecialization = (specialization: Specialization) => {
     specializationToDelete.value = specialization;
     deleteDialogOpen.value = true;
+};
+
+const navigateToCreate = () => {
+    const createUrl = new URL('/specializations/create', window.location.origin);
+
+    // Pass current program filter if exists
+    if (filters.value.program_id) {
+        createUrl.searchParams.set('program_id', filters.value.program_id);
+    }
+
+    router.visit(createUrl.pathname + createUrl.search);
 };
 
 const confirmDelete = () => {
@@ -158,7 +170,9 @@ const updateSearchFilter = (value: string | number) => {
 };
 
 const updateProgramFilter = (value: any) => {
-    filters.value.program_id = String(value || '');
+    // Handle "all" option by converting it to empty string for the backend
+    const programId = value === 'all' ? '' : String(value || '');
+    filters.value.program_id = programId;
     applyFilters(filters.value);
 };
 
@@ -283,12 +297,7 @@ const columns: ColumnDef<Specialization>[] = [
             const program = row.original.program;
             if (!program) return h('span', { class: 'text-gray-400' }, 'No Program');
 
-            const variant = program.degree_level === 'bachelor' ? 'default' : program.degree_level === 'master' ? 'secondary' : 'outline';
-
-            return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'font-medium text-sm' }, program.name),
-                h(Badge, { variant, class: 'capitalize text-xs' }, program.degree_level),
-            ]);
+            return h('div', { class: 'font-medium text-sm' }, program.name);
         },
     },
     {
@@ -300,6 +309,15 @@ const columns: ColumnDef<Specialization>[] = [
             return count > 0
                 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800' }, count)
                 : h('span', { class: 'text-gray-400' }, 'None');
+        },
+    },
+    {
+        header: 'Status',
+        accessorKey: 'is_active',
+        enableSorting: false,
+        cell: ({ row }) => {
+            const isActive = row.original.is_active;
+            return isActive ? h('span', { class: 'text-green-500' }, 'Active') : h('span', { class: 'text-red-500' }, 'Inactive');
         },
     },
     {
@@ -343,20 +361,19 @@ const handlePageSizeChange = (pageSize: number) => {
 
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Avg. Curriculum Versions</CardTitle>
+                        <CardTitle class="text-sm font-medium">Active Specializations</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.avg_curriculum_versions }}</div>
+                        <div class="text-2xl font-bold">{{ statistics.active_specializations }}</div>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Recent Additions</CardTitle>
+                        <CardTitle class="text-sm font-medium">Inactive Specializations</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.recent_additions }}</div>
-                        <p class="text-muted-foreground text-xs">Last 30 days</p>
+                        <div class="text-2xl font-bold">{{ statistics.inactive_specializations }}</div>
                     </CardContent>
                 </Card>
 
@@ -384,7 +401,7 @@ const handlePageSizeChange = (pageSize: number) => {
                         Import Excel
                     </Button>
 
-                    <Button v-if="can('create_specialization')" size="sm" @click="router.visit('/specializations/create')">
+                    <Button v-if="can('create_specialization')" size="sm" @click="navigateToCreate">
                         <Plus class="mr-2 h-4 w-4" />
                         Add Specialization
                     </Button>
@@ -406,14 +423,14 @@ const handlePageSizeChange = (pageSize: number) => {
                 </div>
 
                 <div class="min-w-[180px]">
-                    <Select :model-value="filters.program_id" @update:model-value="updateProgramFilter">
+                    <Select :model-value="filters.program_id || 'all'" @update:model-value="updateProgramFilter">
                         <SelectTrigger>
                             <SelectValue placeholder="All programs" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All programs</SelectItem>
+                            <SelectItem value="all">All programs</SelectItem>
                             <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
-                                {{ program.name }} ({{ program.degree_level }})
+                                {{ program.name }}
                             </SelectItem>
                         </SelectContent>
                     </Select>
@@ -426,62 +443,50 @@ const handlePageSizeChange = (pageSize: number) => {
             </div>
 
             <!-- Data Table -->
-            <div class="rounded-md border">
-                <DataTable :data="data" :columns="columns" :loading="false">
-                    <template #cell-actions="{ row }">
-                        <div class="flex items-center gap-2">
-                            <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button variant="ghost" size="sm" @click="viewSpecialization(row.original)" title="View specialization">
-                                            <Eye class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>View specialization</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+            <DataTable :data="data" :columns="columns" :loading="false">
+                <template #cell-actions="{ row }">
+                    <div class="flex items-center gap-2">
+                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button variant="ghost" size="sm" @click="viewSpecialization(row.original)" title="View specialization">
+                                        <Eye class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>View specialization</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
 
-                            <TooltipProvider
-                                v-if="can('edit_specialization')"
-                                :delay-duration="0"
-                                ignore-non-keyboard-focus
-                                disable-hoverable-content
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button variant="ghost" size="sm" @click="editSpecialization(row.original)" title="Edit specialization">
-                                            <Edit class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Edit specialization</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+                        <TooltipProvider v-if="can('edit_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button variant="ghost" size="sm" @click="editSpecialization(row.original)" title="Edit specialization">
+                                        <Edit class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Edit specialization</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
 
-                            <TooltipProvider
-                                v-if="can('delete_specialization')"
-                                :delay-duration="0"
-                                ignore-non-keyboard-focus
-                                disable-hoverable-content
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button variant="ghost" size="sm" @click="deleteSpecialization(row.original)" title="Delete specialization">
-                                            <Trash2 class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Delete specialization</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-                    </template>
-                </DataTable>
-            </div>
+                        <TooltipProvider v-if="can('delete_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button variant="ghost" size="sm" @click="deleteSpecialization(row.original)" title="Delete specialization">
+                                        <Trash2 class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Delete specialization</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                </template>
+            </DataTable>
 
             <!-- Pagination -->
             <DataPagination :pagination-data="specializations" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />

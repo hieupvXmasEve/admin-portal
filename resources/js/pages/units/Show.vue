@@ -168,8 +168,8 @@ const getConditionTypeIcon = (type: string) => {
     }
 };
 
-const getGroupTypeColor = (groupType: string) => {
-    switch (groupType) {
+const getUnitTypeColor = (unitTypeCode: string) => {
+    switch (unitTypeCode.toLowerCase()) {
         case 'core':
             return 'bg-red-100 text-red-800';
         case 'major':
@@ -180,6 +180,8 @@ const getGroupTypeColor = (groupType: string) => {
             return 'bg-purple-100 text-purple-800';
         case 'second_major':
             return 'bg-orange-100 text-orange-800';
+        case 'unknown':
+            return 'bg-yellow-100 text-yellow-800';
         default:
             return 'bg-gray-100 text-gray-800';
     }
@@ -521,20 +523,24 @@ const hasRelationships = () => {
                                     <p class="mt-1 text-xs text-gray-500">
                                         {{ curriculumUnit.curriculum_version.version_code }}
                                     </p>
+                                    <p v-if="curriculumUnit.semester" class="text-xs text-gray-500">
+                                        {{ curriculumUnit.semester.term }} {{ curriculumUnit.semester.year }}
+                                    </p>
                                 </div>
-                                <Badge :class="getGroupTypeColor(curriculumUnit.group_type)" class="text-xs">
-                                    {{ curriculumUnit.group_type.toUpperCase() }}
+                                <Badge :class="getUnitTypeColor(curriculumUnit.unit_type?.code || 'unknown')" class="text-xs">
+                                    {{ curriculumUnit.unit_type?.name?.toUpperCase() || 'UNKNOWN TYPE' }}
                                 </Badge>
                             </div>
 
                             <div class="flex items-center justify-between text-xs">
-                                <span :class="curriculumUnit.is_required ? 'font-medium text-red-600' : 'text-gray-500'">
-                                    {{ curriculumUnit.is_required ? 'Required' : 'Elective' }}
+                                <span :class="curriculumUnit.is_compulsory ? 'font-medium text-red-600' : 'text-gray-500'">
+                                    {{ curriculumUnit.is_compulsory ? 'Compulsory' : 'Elective' }}
                                 </span>
-                                <span v-if="curriculumUnit.year_level || curriculumUnit.semester_number" class="text-gray-500">
-                                    <span v-if="curriculumUnit.year_level">Year {{ curriculumUnit.year_level }}</span>
-                                    <span v-if="curriculumUnit.semester_number"> Sem {{ curriculumUnit.semester_number }}</span>
-                                </span>
+                                <span v-if="curriculumUnit.semester_order" class="text-gray-500"> Semester {{ curriculumUnit.semester_order }} </span>
+                            </div>
+
+                            <div v-if="curriculumUnit.note" class="mt-2 text-xs text-gray-600 italic">
+                                {{ curriculumUnit.note }}
                             </div>
                         </div>
                     </div>

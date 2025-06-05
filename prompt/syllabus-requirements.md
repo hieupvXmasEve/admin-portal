@@ -49,7 +49,7 @@ This module allows the academic team to define and manage course syllabi (`sylla
 | `description`                | TEXT        | Optional syllabus description                                   |
 | `total_hours`                | INTEGER     | Total contact hours for the unit                                |
 | `hours_per_session`          | INTEGER     | Number of hours per teaching session                            |
-| `effective_from_semester_id` | BIGINT      | FK to `semesters`, nullable, defines when syllabus takes effect |
+| `semester_id` | BIGINT      | FK to `semesters`, nullable, defines when syllabus takes effect |
 | `is_active`                  | BOOLEAN     | Whether this syllabus is currently active (default: true)       |
 | `unit_id`                    | BIGINT      | FK to `units`, required                                         |
 | `created_at`                 | TIMESTAMP   | Timestamp of creation                                           |

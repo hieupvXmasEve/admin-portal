@@ -17,14 +17,14 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->integer('total_hours')->nullable();
             $table->integer('hours_per_session')->nullable();
-            $table->foreignId('effective_from_semester_id')->nullable()->constrained('semesters')->onDelete('set null');
+            $table->foreignId('semester_id')->nullable()->constrained('semesters')->onDelete('set null');
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
             $table->foreignId('unit_id')->constrained('units')->onDelete('cascade');
 
             // Ensure only one active syllabus per unit per semester
-            $table->unique(['unit_id', 'effective_from_semester_id', 'is_active']);
+            $table->unique(['unit_id', 'semester_id', 'is_active']);
         });
     }
 

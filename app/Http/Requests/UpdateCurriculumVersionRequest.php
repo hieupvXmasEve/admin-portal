@@ -19,8 +19,7 @@ class UpdateCurriculumVersionRequest extends FormRequest
             'program_id' => ['required', 'exists:programs,id'],
             'specialization_id' => ['nullable', 'exists:specializations,id'],
             'version_code' => ['required', 'string', 'max:50'],
-            'effective_from_semester_id' => ['nullable', 'exists:semesters,id'],
-            'scope' => ['nullable', 'string', 'in:program,specialization'],
+            'semester_id' => ['nullable', 'exists:semesters,id'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
     }
@@ -33,19 +32,8 @@ class UpdateCurriculumVersionRequest extends FormRequest
             'specialization_id.exists' => 'Selected specialization does not exist.',
             'version_code.required' => 'Version code is required.',
             'version_code.max' => 'Version code must not exceed 50 characters.',
-            'effective_from_semester_id.exists' => 'Selected semester does not exist.',
-            'scope.in' => 'Scope must be either program or specialization.',
+            'semester_id.exists' => 'Selected semester does not exist.',
             'notes.max' => 'Notes must not exceed 1000 characters.',
         ];
-    }
-
-    protected function prepareForValidation(): void
-    {
-        // Set default scope based on specialization_id
-        if (!$this->has('scope')) {
-            $this->merge([
-                'scope' => $this->specialization_id ? 'specialization' : 'program'
-            ]);
-        }
     }
 }

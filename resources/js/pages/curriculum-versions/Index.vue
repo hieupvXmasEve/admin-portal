@@ -14,30 +14,36 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem, PaginatedResponse } from '@/types';
+import { ValidationRules } from '@/types/validation';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
+import { toTypedSchema } from '@vee-validate/zod';
 import { useDebounceFn } from '@vueuse/core';
-import { Book, Calendar, Edit, Eye, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
+import { Book, Edit, Eye, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
+import { useForm } from 'vee-validate';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { z } from 'zod';
 
 interface CurriculumVersion {
     id: number;
-    name: string;
-    version: string;
-    year: number;
-    is_active: boolean;
     program_id: number;
     specialization_id?: number;
+    version_code: string;
+    semester_id: number;
+    notes?: string;
     program?: {
         id: number;
         name: string;
-        degree_level: string;
+        code: string;
     };
     specialization?: {
         id: number;
@@ -45,7 +51,6 @@ interface CurriculumVersion {
         code: string;
     };
     curriculum_units_count: number;
-    total_credit_points: number;
     created_at: string;
     updated_at: string;
 }
@@ -65,16 +70,14 @@ const props = defineProps<{
         search?: string;
         program_id?: string;
         specialization_id?: string;
-        year?: string;
-        is_active?: string;
         sort?: string;
         direction?: string;
         per_page?: number;
     };
     statistics: Statistics;
-    programs: Array<{ id: number; name: string; degree_level: string }>;
+    programs: Array<{ id: number; name: string; code: string }>;
     specializations: Array<{ id: number; name: string; code: string; program_id: number }>;
-    years: number[];
+    semesters?: Array<{ id: number; name: string; code: string }>;
 }>();
 
 const page = usePage();
@@ -94,8 +97,6 @@ const filters = ref({
     search: props.filters?.search || '',
     program_id: props.filters?.program_id || '',
     specialization_id: props.filters?.specialization_id || '',
-    year: props.filters?.year || '',
-    is_active: props.filters?.is_active || '',
     sort: props.filters?.sort || '',
     direction: props.filters?.direction || 'asc',
     per_page: props.filters?.per_page || 15,
@@ -107,15 +108,42 @@ const filteredSpecializations = computed(() => {
     return props.specializations.filter((spec) => spec.program_id.toString() === filters.value.program_id);
 });
 
-// Selected rows for bulk actions
-const selectedRows = ref<number[]>([]);
+// Computed display values for select components
+const displayProgramId = computed(() => filters.value.program_id || 'all');
+const displaySpecializationId = computed(() => filters.value.specialization_id || 'all');
 
 // Delete dialog state
 const deleteDialogOpen = ref(false);
 const curriculumVersionToDelete = ref<CurriculumVersion | null>(null);
 
-// Bulk delete dialog state
-const bulkDeleteDialogOpen = ref(false);
+// Edit modal state
+const showEditModal = ref(false);
+const curriculumVersionToEdit = ref<CurriculumVersion | null>(null);
+
+// Define validation schema for edit form
+const editFormSchema = toTypedSchema(
+    z.object({
+        program_id: z.string().min(1, 'Program is required'),
+        specialization_id: z.string().min(1, 'Specialization is required'),
+        version_code: z
+            .string()
+            .min(ValidationRules.curriculumVersion.versionCode.minLength, 'Version code is required')
+            .max(ValidationRules.curriculumVersion.versionCode.maxLength, 'Version code cannot exceed 50 characters'),
+        semester_id: z.string().min(1, 'Semester is required'),
+        notes: z.string().max(ValidationRules.curriculumVersion.notes.maxLength, 'Notes cannot exceed 1000 characters').optional(),
+    }),
+);
+
+// Form setup for edit modal
+const { isSubmitting } = useForm({
+    validationSchema: editFormSchema,
+});
+
+// Computed specializations filtered by selected program for edit modal
+const editFilteredSpecializations = computed(() => {
+    if (!curriculumVersionToEdit.value?.program_id || !props.specializations) return props.specializations || [];
+    return props.specializations.filter((spec) => spec.program_id === curriculumVersionToEdit.value!.program_id);
+});
 
 // Permission check function
 const can = (permission: string) => {
@@ -125,7 +153,8 @@ const can = (permission: string) => {
 
 // Action functions
 const editCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
-    router.visit(`/curriculum-versions/edit/${curriculumVersion.id}`);
+    curriculumVersionToEdit.value = curriculumVersion;
+    showEditModal.value = true;
 };
 
 const viewCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
@@ -153,21 +182,31 @@ const confirmDelete = () => {
     }
 };
 
-// Toggle active status
-const toggleActiveStatus = (curriculumVersion: CurriculumVersion) => {
-    router.patch(
-        `/curriculum-versions/${curriculumVersion.id}/toggle-status`,
-        {},
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success(`Curriculum version ${curriculumVersion.is_active ? 'deactivated' : 'activated'} successfully`);
-            },
-            onError: () => {
-                toast.error('Failed to update curriculum version status');
-            },
+// Edit modal functions
+const closeEditModal = () => {
+    showEditModal.value = false;
+    curriculumVersionToEdit.value = null;
+};
+
+const onEditSubmit = (values: any) => {
+    if (!curriculumVersionToEdit.value) return;
+
+    const submitData = {
+        ...values,
+        program_id: parseInt(values.program_id),
+        specialization_id: values.specialization_id ? parseInt(values.specialization_id) : null,
+        semester_id: values.semester_id ? parseInt(values.semester_id) : null,
+    };
+
+    router.put(`/curriculum-versions/${curriculumVersionToEdit.value.id}`, submitData, {
+        onSuccess: () => {
+            toast.success('Curriculum version updated successfully');
+            closeEditModal();
         },
-    );
+        onError: () => {
+            toast.error('Failed to update curriculum version');
+        },
+    });
 };
 
 // Server-side filtering functions
@@ -177,8 +216,6 @@ const applyFilters = (newFilters: typeof filters.value) => {
     if (newFilters.search) params.set('search', newFilters.search);
     if (newFilters.program_id) params.set('program_id', newFilters.program_id);
     if (newFilters.specialization_id) params.set('specialization_id', newFilters.specialization_id);
-    if (newFilters.year) params.set('year', newFilters.year);
-    if (newFilters.is_active) params.set('is_active', newFilters.is_active);
     if (newFilters.sort) params.set('sort', newFilters.sort);
     if (newFilters.direction) params.set('direction', newFilters.direction);
     if (newFilters.per_page) params.set('per_page', newFilters.per_page.toString());
@@ -203,23 +240,13 @@ const updateSearchFilter = (value: string | number) => {
 };
 
 const updateProgramFilter = (value: any) => {
-    filters.value.program_id = String(value || '');
+    filters.value.program_id = value === 'all' ? '' : String(value || '');
     filters.value.specialization_id = ''; // Reset specialization when program changes
     applyFilters(filters.value);
 };
 
 const updateSpecializationFilter = (value: any) => {
-    filters.value.specialization_id = String(value || '');
-    applyFilters(filters.value);
-};
-
-const updateYearFilter = (value: any) => {
-    filters.value.year = String(value || '');
-    applyFilters(filters.value);
-};
-
-const updateActiveFilter = (value: any) => {
-    filters.value.is_active = String(value || '');
+    filters.value.specialization_id = value === 'all' ? '' : String(value || '');
     applyFilters(filters.value);
 };
 
@@ -228,8 +255,6 @@ const clearFilters = () => {
         search: '',
         program_id: '',
         specialization_id: '',
-        year: '',
-        is_active: '',
         sort: '',
         direction: 'asc',
         per_page: 15,
@@ -242,40 +267,8 @@ const clearFilters = () => {
 };
 
 const hasActiveFilters = computed(() => {
-    return filters.value.search || filters.value.program_id || filters.value.specialization_id || filters.value.year || filters.value.is_active;
+    return filters.value.search || filters.value.program_id || filters.value.specialization_id;
 });
-
-// Bulk delete functionality
-const isBulkDeleting = ref(false);
-
-const confirmBulkDelete = async () => {
-    if (selectedRows.value.length === 0) return;
-
-    isBulkDeleting.value = true;
-
-    try {
-        await fetch('/api/curriculum-versions/bulk-delete', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            },
-            body: JSON.stringify({
-                curriculum_version_ids: selectedRows.value,
-            }),
-        });
-
-        selectedRows.value = [];
-        bulkDeleteDialogOpen.value = false;
-        toast.success('Curriculum versions deleted successfully');
-        router.reload();
-    } catch (error) {
-        console.error('Bulk delete failed:', error);
-        toast.error('Failed to delete curriculum versions');
-    } finally {
-        isBulkDeleting.value = false;
-    }
-};
 
 // Export functionality
 const isExporting = ref(false);
@@ -291,8 +284,6 @@ const exportToExcel = async () => {
         if (filters.value.search) params.set('search', filters.value.search);
         if (filters.value.program_id) params.set('program_id', filters.value.program_id);
         if (filters.value.specialization_id) params.set('specialization_id', filters.value.specialization_id);
-        if (filters.value.year) params.set('year', filters.value.year);
-        if (filters.value.is_active) params.set('is_active', filters.value.is_active);
 
         const exportUrl = `/curriculum-versions/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
 
@@ -324,15 +315,12 @@ const columns: ColumnDef<CurriculumVersion>[] = [
         },
     },
     {
-        header: 'Name',
-        accessorKey: 'name',
+        header: 'Version Code',
+        accessorKey: 'version_code',
         enableSorting: true,
         cell: ({ row }) => {
             const cv = row.original;
-            return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'font-medium text-sm' }, cv.name),
-                h('div', { class: 'text-xs text-gray-500' }, `Version ${cv.version}`),
-            ]);
+            return h('div', { class: 'font-medium text-sm' }, cv.version_code || 'N/A');
         },
     },
     {
@@ -350,24 +338,18 @@ const columns: ColumnDef<CurriculumVersion>[] = [
                 [
                     program
                         ? h('div', { class: 'space-y-1' }, [
-                              h('div', { class: 'font-medium text-sm' }, program.name),
+                              h('div', { class: 'font-medium' }, program.name),
                               h(
                                   Badge,
                                   {
-                                      variant:
-                                          program.degree_level === 'bachelor'
-                                              ? 'default'
-                                              : program.degree_level === 'master'
-                                                ? 'secondary'
-                                                : 'outline',
-                                      class: 'capitalize text-xs',
+                                      variant: 'default',
                                   },
-                                  program.degree_level,
+                                  program.code,
                               ),
                           ])
                         : null,
                     specialization
-                        ? h('div', { class: 'text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded' }, [
+                        ? h(Badge, { variant: 'outline', class: 'bg-blue-50 text-blue-600' }, [
                               h('span', { class: 'font-mono' }, specialization.code),
                               ' - ',
                               specialization.name,
@@ -378,44 +360,14 @@ const columns: ColumnDef<CurriculumVersion>[] = [
         },
     },
     {
-        header: 'Year',
-        accessorKey: 'year',
-        enableSorting: true,
-        cell: ({ row }) => {
-            return h('div', { class: 'flex items-center gap-2' }, [
-                h(Calendar, { class: 'h-4 w-4 text-gray-400' }),
-                h('span', { class: 'font-medium' }, row.original.year),
-            ]);
-        },
-    },
-    {
-        header: 'Status',
-        accessorKey: 'is_active',
-        enableSorting: true,
-        cell: ({ row }) => {
-            const isActive = row.original.is_active;
-            return h(
-                Badge,
-                {
-                    variant: isActive ? 'default' : 'secondary',
-                    class: 'capitalize',
-                },
-                isActive ? 'Active' : 'Inactive',
-            );
-        },
-    },
-    {
-        header: 'Units & Credits',
+        header: 'Units',
         accessorKey: 'curriculum_units_count',
         enableSorting: false,
         cell: ({ row }) => {
             const cv = row.original;
-            return h('div', { class: 'space-y-1 text-sm' }, [
-                h('div', { class: 'flex items-center gap-1' }, [
-                    h(Book, { class: 'h-3 w-3 text-gray-400' }),
-                    h('span', {}, `${cv.curriculum_units_count} units`),
-                ]),
-                h('div', { class: 'text-xs text-gray-500' }, `${cv.total_credit_points} credits`),
+            return h('div', { class: 'flex items-center gap-1' }, [
+                h(Book, { class: 'h-3 w-3 text-gray-400' }),
+                h('span', {}, `${cv.curriculum_units_count} units`),
             ]);
         },
     },
@@ -440,6 +392,20 @@ const handlePaginationNavigate = (url: string) => {
 const handlePageSizeChange = (pageSize: number) => {
     filters.value.per_page = pageSize;
     applyFilters(filters.value);
+};
+
+const navigateToCreate = () => {
+    const createUrl = new URL('/curriculum-versions/create', window.location.origin);
+
+    // Pass current filters if they exist
+    if (filters.value.program_id) {
+        createUrl.searchParams.set('program_id', filters.value.program_id);
+    }
+    if (filters.value.specialization_id) {
+        createUrl.searchParams.set('specialization_id', filters.value.specialization_id);
+    }
+
+    router.visit(createUrl.toString());
 };
 </script>
 
@@ -499,7 +465,7 @@ const handlePageSizeChange = (pageSize: number) => {
                         Import Excel
                     </Button>
 
-                    <Button v-if="can('create_curriculum_version')" size="sm" @click="router.visit('/curriculum-versions/create')">
+                    <Button v-if="can('create_curriculum_version')" size="sm" @click="navigateToCreate">
                         <Plus class="mr-2 h-4 w-4" />
                         Add Curriculum Version
                     </Button>
@@ -521,12 +487,12 @@ const handlePageSizeChange = (pageSize: number) => {
                 </div>
 
                 <div class="min-w-[150px]">
-                    <Select :model-value="filters.program_id" @update:model-value="updateProgramFilter">
+                    <Select :model-value="displayProgramId" @update:model-value="updateProgramFilter">
                         <SelectTrigger>
                             <SelectValue placeholder="All programs" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All programs</SelectItem>
+                            <SelectItem value="all">All programs</SelectItem>
                             <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
                                 {{ program.name }}
                             </SelectItem>
@@ -535,12 +501,12 @@ const handlePageSizeChange = (pageSize: number) => {
                 </div>
 
                 <div class="min-w-[150px]">
-                    <Select :model-value="filters.specialization_id" @update:model-value="updateSpecializationFilter" :disabled="!filters.program_id">
+                    <Select :model-value="displaySpecializationId" @update:model-value="updateSpecializationFilter" :disabled="!filters.program_id">
                         <SelectTrigger>
                             <SelectValue placeholder="All specializations" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All specializations</SelectItem>
+                            <SelectItem value="all">All specializations</SelectItem>
                             <SelectItem
                                 v-for="specialization in filteredSpecializations"
                                 :key="specialization.id"
@@ -548,33 +514,6 @@ const handlePageSizeChange = (pageSize: number) => {
                             >
                                 {{ specialization.code }} - {{ specialization.name }}
                             </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div class="min-w-[120px]">
-                    <Select :model-value="filters.year" @update:model-value="updateYearFilter">
-                        <SelectTrigger>
-                            <SelectValue placeholder="All years" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="">All years</SelectItem>
-                            <SelectItem v-for="year in years" :key="year" :value="year.toString()">
-                                {{ year }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div class="min-w-[120px]">
-                    <Select :model-value="filters.is_active" @update:model-value="updateActiveFilter">
-                        <SelectTrigger>
-                            <SelectValue placeholder="All status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="">All status</SelectItem>
-                            <SelectItem value="1">Active</SelectItem>
-                            <SelectItem value="0">Inactive</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -587,7 +526,7 @@ const handlePageSizeChange = (pageSize: number) => {
 
             <!-- Data Table -->
             <div class="rounded-md border">
-                <DataTable :data="data" :columns="columns" :loading="false">
+                <DataTable :data="data" :columns="columns">
                     <template #cell-actions="{ row }">
                         <div class="flex items-center gap-2">
                             <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
@@ -632,34 +571,6 @@ const handlePageSizeChange = (pageSize: number) => {
                             </TooltipProvider>
 
                             <TooltipProvider
-                                v-if="can('manage_curriculum_version')"
-                                :delay-duration="0"
-                                ignore-non-keyboard-focus
-                                disable-hoverable-content
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            @click="toggleActiveStatus(row.original)"
-                                            :title="row.original.is_active ? 'Deactivate' : 'Activate'"
-                                            :class="
-                                                row.original.is_active ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'
-                                            "
-                                        >
-                                            <Badge variant="outline" :class="row.original.is_active ? 'border-red-200' : 'border-green-200'">
-                                                {{ row.original.is_active ? 'Active' : 'Inactive' }}
-                                            </Badge>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>{{ row.original.is_active ? 'Deactivate' : 'Activate' }} curriculum version</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider
                                 v-if="can('delete_curriculum_version')"
                                 :delay-duration="0"
                                 ignore-non-keyboard-focus
@@ -696,7 +607,7 @@ const handlePageSizeChange = (pageSize: number) => {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Delete Curriculum Version</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Are you sure you want to delete curriculum version <strong>{{ curriculumVersionToDelete?.name }}</strong
+                        Are you sure you want to delete curriculum version <strong>{{ curriculumVersionToDelete?.version_code }}</strong
                         >? This action cannot be undone and will permanently remove the curriculum version and all its associated units.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -706,24 +617,127 @@ const handlePageSizeChange = (pageSize: number) => {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-
-        <!-- Bulk Delete Confirmation Dialog -->
-        <AlertDialog :open="bulkDeleteDialogOpen" @update:open="bulkDeleteDialogOpen = $event">
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Multiple Curriculum Versions</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected curriculum versions? This action cannot be
-                        undone and will permanently remove all selected curriculum versions and their associated units.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="bulkDeleteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="confirmBulkDelete" :disabled="isBulkDeleting" class="bg-red-600 hover:bg-red-700">
-                        {{ isBulkDeleting ? 'Deleting...' : 'Delete Curriculum Versions' }}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
     </AppLayout>
+
+    <!-- Edit Modal -->
+    <Dialog v-model:open="showEditModal">
+        <DialogContent class="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Edit Curriculum Version</DialogTitle>
+                <DialogDescription>Update curriculum version information.</DialogDescription>
+            </DialogHeader>
+
+            <Form
+                v-if="curriculumVersionToEdit"
+                :validation-schema="editFormSchema"
+                :initial-values="{
+                    program_id: curriculumVersionToEdit.program_id.toString(),
+                    specialization_id: curriculumVersionToEdit.specialization_id?.toString() || '',
+                    version_code: curriculumVersionToEdit.version_code,
+                    semester_id: curriculumVersionToEdit.semester_id?.toString() || '',
+                    notes: curriculumVersionToEdit.notes || '',
+                }"
+                @submit="onEditSubmit"
+            >
+                <div class="grid grid-cols-1 gap-4">
+                    <FormField v-slot="{ componentField }" name="program_id">
+                        <FormItem>
+                            <FormLabel>Program *</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a program" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
+                                            {{ program.name }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="specialization_id">
+                        <FormItem>
+                            <FormLabel>Specialization *</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a specialization" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem
+                                            v-for="specialization in editFilteredSpecializations"
+                                            :key="specialization.id"
+                                            :value="specialization.id.toString()"
+                                        >
+                                            {{ specialization.name }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="version_code">
+                        <FormItem>
+                            <FormLabel>Version Code *</FormLabel>
+                            <FormControl>
+                                <Input
+                                    v-bind="componentField"
+                                    placeholder="e.g., v1.0, 2023-S1"
+                                    :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength"
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="semester_id">
+                        <FormItem>
+                            <FormLabel>Effective From Semester *</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select semester" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                                            {{ semester.name }} ({{ semester.code }})
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="notes">
+                        <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                                <Textarea
+                                    v-bind="componentField"
+                                    placeholder="Enter any additional notes..."
+                                    rows="4"
+                                    :maxlength="ValidationRules.curriculumVersion.notes.maxLength"
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <DialogFooter class="mt-4">
+                    <Button type="button" variant="outline" @click="closeEditModal">Cancel</Button>
+                    <Button type="submit" :disabled="isSubmitting">
+                        {{ isSubmitting ? 'Updating...' : 'Update Version' }}
+                    </Button>
+                </DialogFooter>
+            </Form>
+        </DialogContent>
+    </Dialog>
 </template>
