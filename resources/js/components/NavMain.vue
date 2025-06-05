@@ -33,7 +33,12 @@ function toggle(item: NavItem) {
 function hasActiveChild(item: NavItem): boolean {
     if (!item.children) return false;
     return item.children.some((child) => {
-        if (child.href && child.href !== '#' && getBaseUrl(child.href) === getBaseUrl(page.url)) return true;
+        if (child.href && child.href !== '#') {
+            const childBaseUrl = getBaseUrl(child.href);
+            const currentBaseUrl = getBaseUrl(page.url);
+            // Check if current URL starts with the child URL (prefix match)
+            if (currentBaseUrl.startsWith(childBaseUrl)) return true;
+        }
         return hasActiveChild(child);
     });
 }
@@ -45,7 +50,10 @@ function isOpen(item: NavItem) {
 
 function isActive(item: NavItem): boolean {
     if (!item.href || item.href === '#') return false;
-    return getBaseUrl(item.href) === getBaseUrl(page.url);
+    const itemBaseUrl = getBaseUrl(item.href);
+    const currentBaseUrl = getBaseUrl(page.url);
+    // Check for exact match or prefix match
+    return currentBaseUrl === itemBaseUrl || currentBaseUrl.startsWith(itemBaseUrl + '/');
 }
 
 // Tự động mở menu cha khi route thay đổi

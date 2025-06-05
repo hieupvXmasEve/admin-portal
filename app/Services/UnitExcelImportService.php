@@ -971,7 +971,7 @@ class UnitExcelImportService
                             'description' => $description ?: $existingSyllabus->description,
                             'total_hours' => $totalHours ?: $existingSyllabus->total_hours,
                             'hours_per_session' => $hoursPerSession ?: $existingSyllabus->hours_per_session,
-                            'effective_from_semester_id' => $semesterId ?: $existingSyllabus->effective_from_semester_id,
+                            'semester_id' => $semesterId ?: $existingSyllabus->semester_id,
                             'is_active' => $isActive,
                         ]);
                         $results['syllabus']['updated']++;
@@ -989,7 +989,7 @@ class UnitExcelImportService
                         'description' => $description,
                         'total_hours' => $totalHours,
                         'hours_per_session' => $hoursPerSession,
-                        'effective_from_semester_id' => $semesterId,
+                        'semester_id' => $semesterId,
                         'is_active' => $isActive,
                     ]);
                     $results['syllabus']['created']++;

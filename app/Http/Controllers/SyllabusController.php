@@ -68,7 +68,7 @@ class SyllabusController extends Controller
             'description' => 'nullable|string',
             'total_hours' => 'nullable|numeric|min:0',
             'hours_per_session' => 'nullable|numeric|min:0',
-            'effective_from_semester_id' => 'nullable|exists:semesters,id',
+            'semester_id' => 'nullable|exists:semesters,id',
             'is_active' => 'boolean',
             'assessment_components' => 'nullable|array',
             'assessment_components.*.name' => 'required_with:assessment_components|string|max:100',
@@ -114,7 +114,7 @@ class SyllabusController extends Controller
                 'description' => $validated['description'],
                 'total_hours' => $validated['total_hours'],
                 'hours_per_session' => $validated['hours_per_session'],
-                'effective_from_semester_id' => $validated['effective_from_semester_id'],
+                'semester_id' => $validated['semester_id'],
                 'is_active' => $validated['is_active'] ?? false,
             ]);
 
@@ -199,7 +199,7 @@ class SyllabusController extends Controller
             'description' => 'nullable|string',
             'total_hours' => 'nullable|numeric|min:0',
             'hours_per_session' => 'nullable|numeric|min:0',
-            'effective_from_semester_id' => 'nullable|exists:semesters,id',
+            'semester_id' => 'nullable|exists:semesters,id',
             'is_active' => 'boolean',
             'assessment_components' => 'nullable|array',
             'assessment_components.*.id' => 'nullable|exists:assessment_components,id',
@@ -246,7 +246,7 @@ class SyllabusController extends Controller
                 'description' => $validated['description'],
                 'total_hours' => $validated['total_hours'],
                 'hours_per_session' => $validated['hours_per_session'],
-                'effective_from_semester_id' => $validated['effective_from_semester_id'],
+                'semester_id' => $validated['semester_id'],
                 'is_active' => $validated['is_active'] ?? false,
             ]);
 
@@ -454,7 +454,7 @@ class SyllabusController extends Controller
                 'description' => $syllabus->description,
                 'total_hours' => $syllabus->total_hours,
                 'hours_per_session' => $syllabus->hours_per_session,
-                'effective_from_semester_id' => $syllabus->effective_from_semester_id,
+                'semester_id' => $syllabus->semester_id,
                 'is_active' => false, // New clone is never active by default
             ]);
 

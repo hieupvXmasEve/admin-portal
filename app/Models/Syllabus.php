@@ -21,7 +21,7 @@ class Syllabus extends Model
         'description',
         'total_hours',
         'hours_per_session',
-        'effective_from_semester_id',
+        'semester_id',
         'is_active',
     ];
 
@@ -44,7 +44,7 @@ class Syllabus extends Model
      */
     public function effectiveFromSemester(): BelongsTo
     {
-        return $this->belongsTo(Semester::class, 'effective_from_semester_id');
+        return $this->belongsTo(Semester::class, 'semester_id');
     }
 
     /**

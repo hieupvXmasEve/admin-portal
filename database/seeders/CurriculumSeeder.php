@@ -105,7 +105,7 @@ class CurriculumSeeder extends Seeder
             $curriculumVersion = CurriculumVersion::create([
                 'program_id' => $program->id,
                 'version_code' => $program->name . '_V1.0',
-                'effective_from_semester_id' => $semester->id,
+                'semester_id' => $semester->id,
             ]);
 
             // Add units to curriculum based on program

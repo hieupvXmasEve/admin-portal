@@ -54,7 +54,7 @@ interface Syllabus {
     total_hours: number | null;
     hours_per_session: number | null;
     is_active: boolean;
-    effective_from_semester_id: number | null;
+    semester_id: number | null;
     assessment_components: AssessmentComponent[];
 }
 
@@ -91,7 +91,7 @@ const formSchema = toTypedSchema(
         description: z.string().min(1, { message: 'Description is required' }),
         total_hours: z.number().positive({ message: 'Total hours must be a positive number' }),
         hours_per_session: z.number().positive({ message: 'Hours per session must be a positive number' }),
-        effective_from_semester_id: z.number().int().positive().optional().nullable(),
+        semester_id: z.number().int().positive().optional().nullable(),
         is_active: z.boolean().default(false),
         assessment_components: z
             .array(
@@ -146,7 +146,7 @@ const form = useForm({
         description: props.syllabus.description || '',
         total_hours: Number(props.syllabus.total_hours) || 0,
         hours_per_session: Number(props.syllabus.hours_per_session) || 0,
-        effective_from_semester_id: props.syllabus.effective_from_semester_id,
+        semester_id: props.syllabus.semester_id,
         is_active: props.syllabus.is_active,
         assessment_components:
             props.syllabus.assessment_components.map((comp) => ({
@@ -256,10 +256,10 @@ const onSubmit = form.handleSubmit((formData) => {
     console.log('Form is valid, submitting:', formData);
     isSubmitting.value = true;
 
-    // Convert effective_from_semester_id to number if it's a string
+    // Convert semester_id to number if it's a string
     const submitData = {
         ...formData,
-        effective_from_semester_id: formData.effective_from_semester_id ? Number(formData.effective_from_semester_id) : null,
+        semester_id: formData.semester_id ? Number(formData.semester_id) : null,
     };
 
     router.put(`/units/${props.unit.id}/syllabus/${props.syllabus.id}`, submitData, {
@@ -318,9 +318,9 @@ const onSubmit = form.handleSubmit((formData) => {
                                 </FormItem>
                             </FormField>
 
-                            <FormField v-slot="{ componentField }" name="effective_from_semester_id">
+                            <FormField v-slot="{ componentField }" name="semester_id">
                                 <FormItem>
-                                    <FormLabel for="effective_from_semester_id">Effective From Semester</FormLabel>
+                                    <FormLabel for="semester_id">Effective From Semester</FormLabel>
                                     <FormControl>
                                         <Select v-bind="componentField">
                                             <SelectTrigger>

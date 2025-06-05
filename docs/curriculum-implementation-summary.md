@@ -11,8 +11,8 @@ A complete Laravel implementation of a curriculum management system as specified
 - **Enum Values**: `bachelor`, `master`, `phd`
 
 ### 2. `curriculum_versions` (Updated)
-- **Fields**: `id`, `program_id`, `version_code`, `effective_from_semester_id`, `timestamps`
-- **Changes**: Renamed `semester_id` to `effective_from_semester_id`
+- **Fields**: `id`, `program_id`, `version_code`, `semester_id`, `timestamps`
+- **Changes**: Renamed `semester_id` to `semester_id`
 - **Foreign Keys**: References `programs` and `semesters`
 
 ### 3. `units` (New)
@@ -47,10 +47,10 @@ A complete Laravel implementation of a curriculum management system as specified
 
 ### CurriculumVersion Model
 ```php
-- Fillable: ['program_id', 'version_code', 'effective_from_semester_id']
+- Fillable: ['program_id', 'version_code', 'semester_id']
 - Relationships: 
   - belongsTo(Program::class)
-  - belongsTo(Semester::class, 'effective_from_semester_id')
+  - belongsTo(Semester::class, 'semester_id')
   - hasMany(CurriculumUnit::class)
 ```
 

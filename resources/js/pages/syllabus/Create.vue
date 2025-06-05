@@ -63,7 +63,7 @@ const formSchema = toTypedSchema(
         description: z.string().min(1, { message: 'Description is required' }),
         total_hours: z.number().positive({ message: 'Total hours must be a positive number' }),
         hours_per_session: z.number().positive({ message: 'Hours per session must be a positive number' }),
-        effective_from_semester_id: z.number().int().positive().optional().nullable(),
+        semester_id: z.number().int().positive().optional().nullable(),
         is_active: z.boolean().default(false),
         assessment_components: z
             .array(
@@ -116,7 +116,7 @@ const form = useForm({
         description: '',
         total_hours: 0,
         hours_per_session: 0,
-        effective_from_semester_id: null,
+        semester_id: null,
         is_active: false,
         // init 3 components
         assessment_components: [
@@ -239,10 +239,10 @@ const onSubmit = form.handleSubmit((formData) => {
     console.log('Form is valid, submitting:', formData);
     isSubmitting.value = true;
 
-    // Convert effective_from_semester_id to number if it's a string
+    // Convert semester_id to number if it's a string
     const submitData = {
         ...formData,
-        effective_from_semester_id: formData.effective_from_semester_id ? Number(formData.effective_from_semester_id) : null,
+        semester_id: formData.semester_id ? Number(formData.semester_id) : null,
     };
 
     router.post(`/units/${props.unit.id}/syllabus`, submitData, {
@@ -301,9 +301,9 @@ const onSubmit = form.handleSubmit((formData) => {
                                 </FormItem>
                             </FormField>
 
-                            <FormField v-slot="{ componentField }" name="effective_from_semester_id">
+                            <FormField v-slot="{ componentField }" name="semester_id">
                                 <FormItem>
-                                    <FormLabel for="effective_from_semester_id">Effective From Semester</FormLabel>
+                                    <FormLabel for="semester_id">Effective From Semester</FormLabel>
                                     <FormControl>
                                         <Select v-bind="componentField">
                                             <SelectTrigger>

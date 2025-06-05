@@ -103,8 +103,7 @@ public function rules(): array
         'program_id' => ['required', 'exists:programs,id'],
         'specialization_id' => ['nullable', 'exists:specializations,id'],
         'version_code' => ['required', 'string', 'max:50'],
-        'effective_from_semester_id' => ['nullable', 'exists:semesters,id'],
-        'scope' => ['nullable', 'string', 'in:program,specialization'],
+        'semester_id' => ['nullable', 'exists:semesters,id'],
         'notes' => ['nullable', 'string', 'max:1000'],
     ];
 }

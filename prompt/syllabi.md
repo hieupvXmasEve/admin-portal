@@ -13,12 +13,12 @@ Create migrations for the following tables:
   - `description` (text, nullable)
   - `total_hours` (int, nullable)
   - `hours_per_session` (int, nullable)
-  - `effective_from_semester_id` (foreign key to `semesters`, nullable)
+  - `semester_id` (foreign key to `semesters`, nullable)
   - `is_active` (boolean, default true)
 
 - Constraints:
   - Foreign key `unit_id → units.id`
-  - Foreign key `effective_from_semester_id → semesters.id`
+  - Foreign key `semester_id → semesters.id`
 
 ---
 
@@ -57,7 +57,7 @@ Create Eloquent models:
 ### ✅ `Syllabus`
 
 - `belongsTo(Unit::class)`
-- `belongsTo(Semester::class, 'effective_from_semester_id')`
+- `belongsTo(Semester::class, 'semester_id')`
 - `hasMany(AssessmentComponent::class)`
 
 ### ✅ `AssessmentComponent`
@@ -82,7 +82,7 @@ Create model factories for testing & seeding:
 - `description`: faker paragraph
 - `total_hours`: random between 30–180
 - `hours_per_session`: random between 1–4
-- `effective_from_semester_id`: random from `semesters`
+- `semester_id`: random from `semesters`
 - `is_active`: true/false
 
 ### 🏭 `AssessmentComponentFactory`

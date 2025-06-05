@@ -26,4 +26,5 @@ require __DIR__ . '/semester.php';
 require __DIR__ . '/units.php';
 require __DIR__ . '/syllabus.php';
 require __DIR__ . '/programs.php';
+require __DIR__ . '/specializations.php';
 require __DIR__ . '/curriculum.php';

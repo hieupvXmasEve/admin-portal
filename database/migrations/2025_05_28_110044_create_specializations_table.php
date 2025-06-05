@@ -20,7 +20,6 @@ return new class extends Migration
             $table->string('code')->unique(); // e.g., 'IT-SD', 'IT-CS', 'BUS-MKT'
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->integer('duration_years')->default(4); // Program duration in years
             $table->timestamps();
 
             // Ensure unique specialization names within a program

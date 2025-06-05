@@ -9,6 +9,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail,
+    SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { mainNavItems } from '@/constants/menu-sidebar';
 import { Link } from '@inertiajs/vue3';

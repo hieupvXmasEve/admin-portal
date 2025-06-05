@@ -54,7 +54,6 @@ class SpecializationSeeder extends Seeder
                         'name' => $spec['name'],
                         'code' => $spec['code'],
                         'description' => $spec['description'],
-                        'duration_years' => 4,
                     ]);
                 }
             }
@@ -126,8 +125,7 @@ class SpecializationSeeder extends Seeder
             $programCurriculum = CurriculumVersion::create([
                 'program_id' => $program->id,
                 'version_code' => $program->name . '_Common_V1.0',
-                'effective_from_semester_id' => $semester?->id,
-                'scope' => 'program',
+                'semester_id' => $semester?->id,
                 'notes' => 'Common curriculum for all ' . $program->name . ' specializations',
             ]);
 
@@ -139,8 +137,7 @@ class SpecializationSeeder extends Seeder
                     'program_id' => $program->id,
                     'specialization_id' => $specialization->id,
                     'version_code' => $specialization->code . '_V1.0',
-                    'effective_from_semester_id' => $semester?->id,
-                    'scope' => 'specialization',
+                    'semester_id' => $semester?->id,
                     'notes' => 'Specialization-specific curriculum for ' . $specialization->name,
                 ]);
 

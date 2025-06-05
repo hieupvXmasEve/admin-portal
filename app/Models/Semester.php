@@ -38,7 +38,7 @@ class Semester extends Model
 
     public function curriculumVersions(): HasMany
     {
-        return $this->hasMany(CurriculumVersion::class, 'effective_from_semester_id');
+        return $this->hasMany(CurriculumVersion::class, 'semester_id');
     }
 
     public function enrollments(): HasMany

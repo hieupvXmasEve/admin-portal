@@ -101,7 +101,6 @@ class CurriculumSchemaSeeder extends Seeder
                     array_merge($specializationData, [
                         'program_id' => $program->id,
                         'is_active' => true,
-                        'duration_years' => 3,
                     ])
                 );
             }
@@ -138,29 +137,15 @@ class CurriculumSchemaSeeder extends Seeder
             ]);
         }
 
-        // Create a program-level curriculum version
-        $programCurriculum = CurriculumVersion::firstOrCreate(
-            [
-                'program_id' => $csProgram->id,
-                'version_code' => 'CS-2025-V1',
-                'scope' => 'program'
-            ],
-            [
-                'effective_from_semester_id' => $semester->id,
-                'notes' => 'Computer Science core curriculum for 2025.',
-            ]
-        );
-
         // Create a specialization-level curriculum version
         $specializationCurriculum = CurriculumVersion::firstOrCreate(
             [
                 'program_id' => $csProgram->id,
                 'specialization_id' => $sdSpecialization->id,
                 'version_code' => 'CS-SD-2025-V1',
-                'scope' => 'specialization'
             ],
             [
-                'effective_from_semester_id' => $semester->id,
+                'semester_id' => $semester->id,
                 'notes' => 'Software Development specialization curriculum for 2025.',
             ]
         );
@@ -173,10 +158,11 @@ class CurriculumSchemaSeeder extends Seeder
             foreach ($units->take(3) as $index => $unit) {
                 CurriculumUnit::firstOrCreate(
                     [
-                        'curriculum_version_id' => $programCurriculum->id,
+                        'curriculum_version_id' => $specializationCurriculum->id,
                         'unit_id' => $unit->id,
                     ],
                     [
+                        'semester_id' => $semester->id,
                         'unit_type_id' => $unitTypes->random()->id,
                         'semester_order' => $index + 1,
                         'is_compulsory' => $index < 2, // First 2 are compulsory
@@ -192,6 +178,7 @@ class CurriculumSchemaSeeder extends Seeder
                         'unit_id' => $unit->id,
                     ],
                     [
+                        'semester_id' => $semester->id,
                         'unit_type_id' => $unitTypes->where('name', 'major')->first()?->id,
                         'semester_order' => $index + 4,
                         'is_compulsory' => true,

@@ -27,7 +27,7 @@ class SyllabusFactory extends Factory
             'description' => $this->faker->paragraphs(3, true),
             'total_hours' => $this->faker->numberBetween(30, 180),
             'hours_per_session' => $this->faker->numberBetween(1, 4),
-            'effective_from_semester_id' => Semester::factory(),
+            'semester_id' => Semester::factory(),
             'is_active' => $this->faker->boolean(70), // 70% chance of being active
         ];
     }

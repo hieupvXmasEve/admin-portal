@@ -184,6 +184,8 @@ class UnitController extends Controller
         $unit->load([
             'curriculumUnits.curriculumVersion.program',
             'curriculumUnits.curriculumVersion.specialization',
+            'curriculumUnits.unitType',
+            'curriculumUnits.semester',
             'prerequisiteGroups.conditions.requiredUnit',
             'syllabus.effectiveFromSemester',
             'syllabus.assessmentComponents.details'

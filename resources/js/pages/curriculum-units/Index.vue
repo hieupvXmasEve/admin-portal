@@ -120,6 +120,12 @@ const filters = ref({
     per_page: props.filters?.per_page || 15,
 });
 
+// Computed display values for select components
+const displayCurriculumVersionId = computed(() => filters.value.curriculum_version_id || 'all');
+const displaySemesterId = computed(() => filters.value.semester_id || 'all');
+const displayYearLevel = computed(() => filters.value.year_level || 'all');
+const displayIsCore = computed(() => filters.value.is_core || 'all');
+
 // Selected rows for bulk actions
 const selectedRows = ref<number[]>([]);
 
@@ -216,22 +222,22 @@ const updateSearchFilter = (value: string | number) => {
 };
 
 const updateCurriculumVersionFilter = (value: any) => {
-    filters.value.curriculum_version_id = String(value || '');
+    filters.value.curriculum_version_id = value === 'all' ? '' : String(value || '');
     applyFilters(filters.value);
 };
 
 const updateSemesterFilter = (value: any) => {
-    filters.value.semester_id = String(value || '');
+    filters.value.semester_id = value === 'all' ? '' : String(value || '');
     applyFilters(filters.value);
 };
 
 const updateYearLevelFilter = (value: any) => {
-    filters.value.year_level = String(value || '');
+    filters.value.year_level = value === 'all' ? '' : String(value || '');
     applyFilters(filters.value);
 };
 
 const updateCoreFilter = (value: any) => {
-    filters.value.is_core = String(value || '');
+    filters.value.is_core = value === 'all' ? '' : String(value || '');
     applyFilters(filters.value);
 };
 
@@ -524,52 +530,54 @@ const handlePageSizeChange = (pageSize: number) => {
                 </div>
 
                 <div class="min-w-[180px]">
-                    <Select :model-value="filters.curriculum_version_id" @update:model-value="updateCurriculumVersionFilter">
+                    <Select :model-value="displayCurriculumVersionId" @update:model-value="updateCurriculumVersionFilter">
                         <SelectTrigger>
                             <SelectValue placeholder="All curricula" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All curricula</SelectItem>
-                            <SelectItem v-for="cv in curriculumVersions" :key="cv.id" :value="cv.id.toString()">
-                                {{ cv.name }} ({{ cv.version }})
+                            <SelectItem value="all">All curricula</SelectItem>
+                            <SelectItem v-for="curriculum in curriculumVersions" :key="curriculum.id" :value="curriculum.id.toString()">
+                                {{ curriculum.name }} ({{ curriculum.version }})
                             </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                <div class="min-w-[120px]">
-                    <Select :model-value="filters.semester_id" @update:model-value="updateSemesterFilter">
+                <div class="min-w-[150px]">
+                    <Select :model-value="displaySemesterId" @update:model-value="updateSemesterFilter">
                         <SelectTrigger>
                             <SelectValue placeholder="All semesters" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All semesters</SelectItem>
+                            <SelectItem value="all">All semesters</SelectItem>
                             <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                {{ semester.name }}
+                                {{ semester.name }} ({{ semester.number }})
                             </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                <div class="min-w-[100px]">
-                    <Select :model-value="filters.year_level" @update:model-value="updateYearLevelFilter">
+                <div class="min-w-[120px]">
+                    <Select :model-value="displayYearLevel" @update:model-value="updateYearLevelFilter">
                         <SelectTrigger>
                             <SelectValue placeholder="All years" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All years</SelectItem>
-                            <SelectItem v-for="year in yearLevels" :key="year" :value="year.toString()"> Year {{ year }} </SelectItem>
+                            <SelectItem value="all">All years</SelectItem>
+                            <SelectItem v-for="year in yearLevels" :key="year" :value="year.toString()">
+                                {{ year }}
+                            </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
                 <div class="min-w-[120px]">
-                    <Select :model-value="filters.is_core" @update:model-value="updateCoreFilter">
+                    <Select :model-value="displayIsCore" @update:model-value="updateCoreFilter">
                         <SelectTrigger>
                             <SelectValue placeholder="All types" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All types</SelectItem>
+                            <SelectItem value="all">All types</SelectItem>
                             <SelectItem value="1">Core units</SelectItem>
                             <SelectItem value="0">Elective units</SelectItem>
                         </SelectContent>

@@ -21,12 +21,10 @@ class Specialization extends Model
         'code',
         'description',
         'is_active',
-        'duration_years',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'duration_years' => 'integer',
     ];
 
     /**
@@ -51,8 +49,7 @@ class Specialization extends Model
     public function activeCurriculumVersion(): HasMany
     {
         return $this->hasMany(CurriculumVersion::class)
-            ->where('scope', 'specialization')
-            ->latest('effective_from_semester_id');
+            ->latest('semester_id');
     }
 
     /**
@@ -62,7 +59,6 @@ class Specialization extends Model
     {
         // Get program-level common units
         $programUnits = $this->program->curriculumVersions()
-            ->where('scope', 'program')
             ->with('curriculumUnits.unit')
             ->get()
             ->flatMap(function ($curriculum) {
@@ -81,7 +77,6 @@ class Specialization extends Model
 
         // Get specialization-specific units
         $specializationUnits = $this->curriculumVersions()
-            ->where('scope', 'specialization')
             ->with('curriculumUnits.unit')
             ->get()
             ->flatMap(function ($curriculum) {
@@ -129,5 +124,37 @@ class Specialization extends Model
     public function scopeForProgram(Builder $query, Program $program): void
     {
         $query->where('program_id', $program->id);
+    }
+
+    /**
+     * Get validation rules for creating/updating specializations.
+     */
+    public static function validationRules(int $id = null): array
+    {
+        return [
+            'program_id' => ['required', 'exists:programs,id'],
+            'name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:50', 'unique:specializations,code' . ($id ? ",$id" : '')],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'is_active' => ['boolean'],
+        ];
+    }
+
+    /**
+     * Get validation messages for specializations.
+     */
+    public static function validationMessages(): array
+    {
+        return [
+            'program_id.required' => 'Program is required',
+            'program_id.exists' => 'Selected program does not exist',
+            'name.required' => 'Specialization name is required',
+            'name.max' => 'Specialization name cannot exceed 255 characters',
+            'code.required' => 'Specialization code is required',
+            'code.max' => 'Specialization code cannot exceed 50 characters',
+            'code.unique' => 'This specialization code is already taken',
+            'description.max' => 'Description cannot exceed 1000 characters',
+            'is_active.boolean' => 'Active status must be true or false',
+        ];
     }
 }

@@ -69,17 +69,11 @@ const filters = ref({
     per_page: props.filters?.per_page || 15,
 });
 
-// Selected rows for bulk actions
-const selectedRows = ref<number[]>([]);
-
 // Modal states
 const showCreateModal = ref(false);
 const showEditModal = ref(false);
 const deleteDialogOpen = ref(false);
 const selectedProgram = ref<Program | null>(null);
-
-// Bulk delete dialog state
-const bulkDeleteDialogOpen = ref(false);
 
 // Validation schema
 const programSchema = toTypedSchema(
@@ -260,39 +254,6 @@ const clearFilters = () => {
 const hasActiveFilters = computed(() => {
     return filters.value.search;
 });
-
-// Bulk delete functionality
-const isBulkDeleting = ref(false);
-
-const confirmBulkDelete = async () => {
-    if (selectedRows.value.length === 0) return;
-
-    isBulkDeleting.value = true;
-
-    try {
-        await fetch('/api/programs/bulk-delete', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            },
-            body: JSON.stringify({
-                program_ids: selectedRows.value,
-            }),
-        });
-
-        selectedRows.value = [];
-        bulkDeleteDialogOpen.value = false;
-        toast.success('Programs deleted successfully');
-        // Refresh the page
-        router.reload();
-    } catch (error) {
-        console.error('Bulk delete failed:', error);
-        toast.error('Failed to delete programs');
-    } finally {
-        isBulkDeleting.value = false;
-    }
-};
 
 // Column definitions
 const columns: ColumnDef<Program>[] = [
@@ -587,25 +548,6 @@ const handlePageSizeChange = (pageSize: number) => {
                         <AlertDialogCancel @click="closeModals">Cancel</AlertDialogCancel>
                         <AlertDialogAction @click="submitDelete" :disabled="deleteForm.processing" class="bg-red-600 hover:bg-red-700">
                             {{ deleteForm.processing ? 'Deleting...' : 'Delete Program' }}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <!-- Bulk Delete Confirmation Dialog -->
-            <AlertDialog :open="bulkDeleteDialogOpen" @update:open="bulkDeleteDialogOpen = $event">
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Multiple Programs</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected programs? This action cannot be undone
-                            and will permanently remove all selected programs from the system.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel @click="bulkDeleteDialogOpen = false">Cancel</AlertDialogCancel>
-                        <AlertDialogAction @click="confirmBulkDelete" :disabled="isBulkDeleting" class="bg-red-600 hover:bg-red-700">
-                            {{ isBulkDeleting ? 'Deleting...' : 'Delete Programs' }}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

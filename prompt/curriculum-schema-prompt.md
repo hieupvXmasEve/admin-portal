@@ -26,7 +26,7 @@ Represents different versions of a curriculum for each program.
 - id (bigint, auto-increment)
 - program_id (foreign key to programs)
 - version_code (string, optional)
-- effective_from_semester_id (foreign key to semesters — assume the table exists)
+- semester_id (foreign key to semesters — assume the table exists)
 - timestamps
 
 ---
