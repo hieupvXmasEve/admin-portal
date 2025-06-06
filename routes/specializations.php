@@ -50,9 +50,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // API routes for curriculum version operations within specializations
     Route::delete('api/curriculum-versions/{curriculumVersion}', [SpecializationController::class, 'apiDeleteCurriculumVersion'])
         ->middleware('can:delete_curriculum_version')
-        ->name('api.curriculum-versions.destroy');
+        ->name('api.curriculum_version.destroy');
 
     Route::put('api/curriculum-versions/{curriculumVersion}', [SpecializationController::class, 'apiUpdateCurriculumVersion'])
         ->middleware('can:edit_curriculum_version')
-        ->name('api.curriculum-versions.update');
+        ->name('api.curriculum_version.update');
 });

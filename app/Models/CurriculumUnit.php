@@ -18,30 +18,15 @@ class CurriculumUnit extends Model
         'curriculum_version_id',
         'unit_id',
         'unit_type_id',
-        'semester_order',
-        'is_compulsory',
-        'note',
-        'group_type',
-        'unit_scope',
-        'is_required',
         'year_level',
         'semester_number',
-        'minimum_grade',
-        'special_conditions',
-        'allows_concurrent_enrollment',
+        'note',
     ];
 
     protected $casts = [
         'unit_type_id' => 'integer',
-        'semester_order' => 'integer',
-        'is_compulsory' => 'boolean',
-        'group_type' => 'string',
-        'unit_scope' => 'string',
-        'is_required' => 'boolean',
         'year_level' => 'integer',
         'semester_number' => 'integer',
-        'minimum_grade' => 'decimal:2',
-        'allows_concurrent_enrollment' => 'boolean',
     ];
 
     /**
@@ -232,5 +217,92 @@ class CurriculumUnit extends Model
     public function scopeSpecializationSpecific(Builder $query): void
     {
         $query->where('unit_scope', 'specialization_specific');
+    }
+
+    /**
+     * Get all available elective units for this specialization.
+     * Students can choose from all units across the university.
+     */
+    public function getAvailableElectiveUnits(): \Illuminate\Support\Collection
+    {
+        if (!$this->isElective()) {
+            return collect();
+        }
+
+        $currentSpecializationId = $this->curriculumVersion->specialization_id;
+
+        // Lấy tất cả units từ các chuyên ngành khác
+        return Unit::query()
+            ->whereHas('curriculumUnits', function ($query) use ($currentSpecializationId) {
+                $query->whereHas('curriculumVersion', function ($q) use ($currentSpecializationId) {
+                    // Units từ các chuyên ngành khác
+                    $q->where('specialization_id', '!=', $currentSpecializationId)
+                        ->orWhereNull('specialization_id'); // Hoặc units common
+                });
+            })
+            ->orWhereDoesntHave('curriculumUnits') // Units chưa được assign
+            ->distinct()
+            ->get();
+    }
+
+    /**
+     * Get all units from other specializations within the same program.
+     */
+    public function getUnitsFromOtherSpecializations(): \Illuminate\Support\Collection
+    {
+        $currentProgramId = $this->curriculumVersion->program_id;
+        $currentSpecializationId = $this->curriculumVersion->specialization_id;
+
+        return Unit::query()
+            ->whereHas('curriculumUnits.curriculumVersion', function ($query) use ($currentProgramId, $currentSpecializationId) {
+                $query->where('program_id', $currentProgramId)
+                    ->where('specialization_id', '!=', $currentSpecializationId);
+            })
+            ->distinct()
+            ->get();
+    }
+
+    /**
+     * Get all units from other programs (cross-program electives).
+     */
+    public function getUnitsFromOtherPrograms(): \Illuminate\Support\Collection
+    {
+        $currentProgramId = $this->curriculumVersion->program_id;
+
+        return Unit::query()
+            ->whereHas('curriculumUnits.curriculumVersion', function ($query) use ($currentProgramId) {
+                $query->where('program_id', '!=', $currentProgramId);
+            })
+            ->distinct()
+            ->get();
+    }
+
+    /**
+     * Get all units available as electives for this curriculum unit.
+     */
+    public function getAllAvailableElectives(): array
+    {
+        if (!$this->isElective()) {
+            return [];
+        }
+
+        return [
+            'same_program_other_specializations' => $this->getUnitsFromOtherSpecializations(),
+            'other_programs' => $this->getUnitsFromOtherPrograms(),
+            'unassigned_units' => Unit::whereDoesntHave('curriculumUnits')->get(),
+        ];
+    }
+
+    /**
+     * Check if this curriculum unit can be substituted with another unit.
+     */
+    public function canBeSubstitutedWith(Unit $unit): bool
+    {
+        if (!$this->isElective()) {
+            return false;
+        }
+
+        // Basic validation - can be extended with more business rules
+        return $unit->credit_points >= $this->unit->credit_points * 0.8; // At least 80% of credit points
     }
 }

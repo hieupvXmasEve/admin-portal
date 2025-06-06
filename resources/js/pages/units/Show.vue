@@ -536,7 +536,6 @@ const hasRelationships = () => {
                                 <span :class="curriculumUnit.is_compulsory ? 'font-medium text-red-600' : 'text-gray-500'">
                                     {{ curriculumUnit.is_compulsory ? 'Compulsory' : 'Elective' }}
                                 </span>
-                                <span v-if="curriculumUnit.semester_order" class="text-gray-500"> Semester {{ curriculumUnit.semester_order }} </span>
                             </div>
 
                             <div v-if="curriculumUnit.note" class="mt-2 text-xs text-gray-600 italic">

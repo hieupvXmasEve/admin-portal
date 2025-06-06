@@ -33,4 +33,17 @@ export const ValidationRules = {
       maxLength: 1000,
     },
   },
+  curriculumUnit: {
+    note: {
+      maxLength: 1000,
+    },
+    yearLevel: {
+      min: 1,
+      max: 5,
+    },
+    semesterNumber: {
+      min: 1,
+      max: 3,
+    },
+  },
 } as const;

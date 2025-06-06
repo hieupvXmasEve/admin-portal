@@ -83,4 +83,79 @@ class Unit extends Model
     {
         return $this->hasOne(Syllabus::class)->where('is_active', true);
     }
+
+    /**
+     * Check if this unit can be used as an elective for a given specialization.
+     */
+    public function canBeElectiveFor(int $specializationId, int $programId): bool
+    {
+        // Logic để kiểm tra unit có thể được chọn làm môn tự chọn không
+        // Unit không thể là elective cho chính specialization của nó
+        $isFromSameSpecialization = $this->curriculumUnits()
+            ->whereHas('curriculumVersion', function ($query) use ($specializationId) {
+                $query->where('specialization_id', $specializationId);
+            })
+            ->exists();
+
+        return !$isFromSameSpecialization;
+    }
+
+    /**
+     * Get available elective units for a specific specialization and curriculum version.
+     */
+    public static function getAvailableElectives(int $specializationId, int $programId): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::query()
+            ->whereDoesntHave('curriculumUnits', function ($query) use ($specializationId) {
+                $query->whereHas('curriculumVersion', function ($q) use ($specializationId) {
+                    $q->where('specialization_id', $specializationId);
+                });
+            })
+            ->where(function ($query) use ($programId, $specializationId) {
+                // Units from other specializations in same program
+                $query->whereHas('curriculumUnits.curriculumVersion', function ($q) use ($programId, $specializationId) {
+                    $q->where('program_id', $programId)
+                        ->where('specialization_id', '!=', $specializationId);
+                })
+                    // Or units from other programs
+                    ->orWhereHas('curriculumUnits.curriculumVersion', function ($q) use ($programId) {
+                        $q->where('program_id', '!=', $programId);
+                    })
+                    // Or unassigned units
+                    ->orWhereDoesntHave('curriculumUnits');
+            });
+    }
+
+    /**
+     * Get units from other specializations within the same program.
+     */
+    public static function getFromOtherSpecializationsInProgram(int $programId, int $excludeSpecializationId): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::query()
+            ->whereHas('curriculumUnits.curriculumVersion', function ($query) use ($programId, $excludeSpecializationId) {
+                $query->where('program_id', $programId)
+                    ->where('specialization_id', '!=', $excludeSpecializationId);
+            })
+            ->distinct();
+    }
+
+    /**
+     * Get units from other programs.
+     */
+    public static function getFromOtherPrograms(int $excludeProgramId): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::query()
+            ->whereHas('curriculumUnits.curriculumVersion', function ($query) use ($excludeProgramId) {
+                $query->where('program_id', '!=', $excludeProgramId);
+            })
+            ->distinct();
+    }
+
+    /**
+     * Get unassigned units (not in any curriculum).
+     */
+    public static function getUnassignedUnits(): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::query()->whereDoesntHave('curriculumUnits');
+    }
 }

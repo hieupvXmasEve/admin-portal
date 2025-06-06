@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
+import DebouncedInput from '@/components/DebouncedInput.vue';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -29,7 +30,7 @@ import { toTypedSchema } from '@vee-validate/zod';
 import { useDebounceFn } from '@vueuse/core';
 import { Book, Edit, Eye, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
-import { computed, h, ref } from 'vue';
+import { computed, h, nextTick, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
@@ -50,6 +51,11 @@ interface CurriculumVersion {
         name: string;
         code: string;
     };
+    effective_from_semester?: {
+        id: number;
+        name: string;
+        code: string;
+    };
     curriculum_units_count: number;
     created_at: string;
     updated_at: string;
@@ -59,7 +65,6 @@ interface Statistics {
     total_curriculum_versions: number;
     active_versions: number;
     inactive_versions: number;
-    avg_credit_points: number;
     by_year: Record<string, number>;
     by_program: Record<string, number>;
 }
@@ -92,14 +97,87 @@ const breadcrumbItems: BreadcrumbItem[] = [
 // Reactive data
 const data = computed(() => props.curriculumVersions.data);
 
-// Filter state
-const filters = ref({
-    search: props.filters?.search || '',
-    program_id: props.filters?.program_id || '',
-    specialization_id: props.filters?.specialization_id || '',
-    sort: props.filters?.sort || '',
-    direction: props.filters?.direction || 'asc',
-    per_page: props.filters?.per_page || 15,
+// Filter state - Handle case where props.filters might be empty array or object
+const getInitialFilters = () => {
+    // Check if props.filters is a valid object (not array) and has properties
+    const validFilters = props.filters && typeof props.filters === 'object' && !Array.isArray(props.filters) ? props.filters : {};
+
+    return {
+        search: validFilters.search || '',
+        program_id: validFilters.program_id || '',
+        specialization_id: validFilters.specialization_id || '',
+        sort: validFilters.sort || '',
+        direction: validFilters.direction || 'asc',
+        per_page: validFilters.per_page || 15,
+    };
+};
+
+const filters = ref(getInitialFilters());
+
+// Track if user is currently interacting with filters to prevent overriding their input
+const isUserInteracting = ref(false);
+
+// Debounced function to reset user interaction flag
+const resetUserInteraction = useDebounceFn(() => {
+    isUserInteracting.value = false;
+}, 800);
+
+// Sync filters with props when they change (e.g., from navigation), but only if user is not currently typing
+watch(
+    () => props.filters,
+    (newFilters, oldFilters) => {
+        // Only sync if user is not currently interacting and filters actually changed
+        if (
+            !isUserInteracting.value &&
+            newFilters &&
+            typeof newFilters === 'object' &&
+            !Array.isArray(newFilters) &&
+            JSON.stringify(newFilters) !== JSON.stringify(oldFilters)
+        ) {
+            const updatedFilters = {
+                search: newFilters.search || '',
+                program_id: newFilters.program_id || '',
+                specialization_id: newFilters.specialization_id || '',
+                sort: newFilters.sort || '',
+                direction: newFilters.direction || 'asc',
+                per_page: newFilters.per_page || 15,
+            };
+
+            // Only update if there's actually a difference to prevent unnecessary reactivity
+            if (JSON.stringify(filters.value) !== JSON.stringify(updatedFilters)) {
+                filters.value = updatedFilters;
+            }
+        }
+    },
+    { immediate: false }, // Don't run on initial mount
+);
+
+// Ensure filters are properly initialized on mount
+onMounted(async () => {
+    await nextTick();
+
+    // Debug: Log initial filter state
+    console.log('Initial filters:', filters.value);
+    console.log('Props filters:', props.filters);
+
+    // On initial mount, sync once from props if available
+    if (props.filters && Object.values(props.filters).some((value) => value !== undefined && value !== '' && value !== null)) {
+        const initialFilters = {
+            search: props.filters.search || '',
+            program_id: props.filters.program_id || '',
+            specialization_id: props.filters.specialization_id || '',
+            sort: props.filters.sort || '',
+            direction: props.filters.direction || 'asc',
+            per_page: props.filters.per_page || 15,
+        };
+
+        if (JSON.stringify(filters.value) !== JSON.stringify(initialFilters)) {
+            filters.value = initialFilters;
+        }
+        console.log('Filters synced from server-side props');
+    } else {
+        console.log('No initial filters, starting with defaults');
+    }
 });
 
 // Computed specializations based on selected program
@@ -108,9 +186,28 @@ const filteredSpecializations = computed(() => {
     return props.specializations.filter((spec) => spec.program_id.toString() === filters.value.program_id);
 });
 
+// Watch for program changes to reset specialization
+watch(
+    () => filters.value.program_id,
+    (newProgramId, oldProgramId) => {
+        if (newProgramId !== oldProgramId && filters.value.specialization_id) {
+            // Check if current specialization belongs to new program
+            const currentSpec = props.specializations.find((spec) => spec.id.toString() === filters.value.specialization_id);
+            if (!currentSpec || currentSpec.program_id.toString() !== newProgramId) {
+                filters.value.specialization_id = '';
+            }
+        }
+    },
+);
+
 // Computed display values for select components
 const displayProgramId = computed(() => filters.value.program_id || 'all');
 const displaySpecializationId = computed(() => filters.value.specialization_id || 'all');
+
+// Computed for checking if filters have active values
+const hasActiveFilters = computed(() => {
+    return !!(filters.value.search || filters.value.program_id || filters.value.specialization_id);
+});
 
 // Delete dialog state
 const deleteDialogOpen = ref(false);
@@ -229,28 +326,49 @@ const applyFilters = (newFilters: typeof filters.value) => {
     });
 };
 
-// Debounced filter functions
-const debouncedApplyFilters = useDebounceFn((newFilters) => {
-    applyFilters(newFilters);
-}, 500);
+// Filter application functions
 
-const updateSearchFilter = (value: string | number) => {
+// Handle search using DebouncedInput pattern (following development standards)
+const handleSearch = (value: string | number) => {
+    isUserInteracting.value = true;
     filters.value.search = String(value);
-    debouncedApplyFilters(filters.value);
+
+    // Reset the flag and apply filters
+    resetUserInteraction();
+    router.get('/curriculum-versions', filters.value, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['curriculumVersions', 'filters'],
+    });
 };
 
 const updateProgramFilter = (value: any) => {
+    isUserInteracting.value = true;
     filters.value.program_id = value === 'all' ? '' : String(value || '');
-    filters.value.specialization_id = ''; // Reset specialization when program changes
+
+    // Auto-reset specialization when program changes
+    if (!filters.value.program_id || !filteredSpecializations.value.some((spec) => spec.id.toString() === filters.value.specialization_id)) {
+        filters.value.specialization_id = '';
+    }
+
+    // Reset the flag after applying filters
+    resetUserInteraction();
+
     applyFilters(filters.value);
 };
 
 const updateSpecializationFilter = (value: any) => {
+    isUserInteracting.value = true;
     filters.value.specialization_id = value === 'all' ? '' : String(value || '');
+
+    // Reset the flag after applying filters
+    resetUserInteraction();
+
     applyFilters(filters.value);
 };
 
 const clearFilters = () => {
+    isUserInteracting.value = true;
     filters.value = {
         search: '',
         program_id: '',
@@ -259,16 +377,16 @@ const clearFilters = () => {
         direction: 'asc',
         per_page: 15,
     };
+
+    // Reset the flag after navigation
+    resetUserInteraction();
+
     router.visit('/curriculum-versions', {
         preserveState: true,
         preserveScroll: true,
         only: ['curriculumVersions', 'filters'],
     });
 };
-
-const hasActiveFilters = computed(() => {
-    return filters.value.search || filters.value.program_id || filters.value.specialization_id;
-});
 
 // Export functionality
 const isExporting = ref(false);
@@ -300,7 +418,7 @@ const exportToExcel = async () => {
     }
 };
 
-// Column definitions
+// Column definitions - Fixed Badge warning by using function slots
 const columns: ColumnDef<CurriculumVersion>[] = [
     {
         header: 'No',
@@ -344,12 +462,12 @@ const columns: ColumnDef<CurriculumVersion>[] = [
                                   {
                                       variant: 'default',
                                   },
-                                  program.code,
+                                  () => program.code, // Function slot to fix warning
                               ),
                           ])
                         : null,
                     specialization
-                        ? h(Badge, { variant: 'outline', class: 'bg-blue-50 text-blue-600' }, [
+                        ? h(Badge, { variant: 'outline', class: 'bg-blue-50 text-blue-600' }, () => [
                               h('span', { class: 'font-mono' }, specialization.code),
                               ' - ',
                               specialization.name,
@@ -357,6 +475,24 @@ const columns: ColumnDef<CurriculumVersion>[] = [
                         : null,
                 ].filter(Boolean),
             );
+        },
+    },
+    {
+        header: 'Effective Semester',
+        accessorKey: 'effective_from_semester.name',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const cv = row.original;
+            const semester = cv.effective_from_semester;
+
+            if (!semester) {
+                return h('div', { class: 'text-gray-400 text-sm' }, 'Not set');
+            }
+
+            return h('div', { class: 'space-y-1' }, [
+                h('div', { class: 'font-medium text-sm' }, semester.name),
+                h(Badge, { variant: 'secondary', class: 'text-xs' }, () => semester.code),
+            ]);
         },
     },
     {
@@ -414,7 +550,7 @@ const navigateToCreate = () => {
     <AppLayout :breadcrumbs="breadcrumbItems">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
             <!-- Statistics Cards -->
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Total Versions</CardTitle>
@@ -441,15 +577,6 @@ const navigateToCreate = () => {
                         <div class="text-2xl font-bold text-gray-500">{{ statistics.inactive_versions }}</div>
                     </CardContent>
                 </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Avg. Credit Points</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.avg_credit_points }}</div>
-                    </CardContent>
-                </Card>
             </div>
 
             <!-- Header with Add Button -->
@@ -472,21 +599,24 @@ const navigateToCreate = () => {
                 </div>
             </div>
 
-            <!-- Filters Section -->
+            <!-- Enhanced Filters Section -->
             <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
+                <!-- Search Input using DebouncedInput (following development standards) -->
                 <div class="min-w-[200px] flex-1">
                     <div class="relative">
                         <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                        <Input
+                        <DebouncedInput
+                            v-model="filters.search"
+                            @debounced="handleSearch"
                             placeholder="Search curriculum versions..."
-                            :model-value="filters.search"
-                            @update:model-value="updateSearchFilter"
                             class="pl-9"
+                            :debounce="300"
                         />
                     </div>
                 </div>
 
-                <div class="min-w-[150px]">
+                <!-- Program Filter -->
+                <div class="min-w-[180px]">
                     <Select :model-value="displayProgramId" @update:model-value="updateProgramFilter">
                         <SelectTrigger>
                             <SelectValue placeholder="All programs" />
@@ -494,16 +624,20 @@ const navigateToCreate = () => {
                         <SelectContent>
                             <SelectItem value="all">All programs</SelectItem>
                             <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
-                                {{ program.name }}
+                                <div class="flex items-center gap-2">
+                                    <span class="font-medium">{{ program.name }}</span>
+                                    <Badge variant="outline" class="text-xs">{{ program.code }}</Badge>
+                                </div>
                             </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                <div class="min-w-[150px]">
+                <!-- Specialization Filter - Enhanced with better UX -->
+                <div class="min-w-[200px]">
                     <Select :model-value="displaySpecializationId" @update:model-value="updateSpecializationFilter" :disabled="!filters.program_id">
-                        <SelectTrigger>
-                            <SelectValue placeholder="All specializations" />
+                        <SelectTrigger :class="{ 'opacity-50': !filters.program_id }">
+                            <SelectValue :placeholder="filters.program_id ? 'All specializations' : 'Select program first'" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All specializations</SelectItem>
@@ -512,16 +646,25 @@ const navigateToCreate = () => {
                                 :key="specialization.id"
                                 :value="specialization.id.toString()"
                             >
-                                {{ specialization.code }} - {{ specialization.name }}
+                                <div class="flex items-center gap-2">
+                                    <Badge variant="outline" class="font-mono text-xs">{{ specialization.code }}</Badge>
+                                    <span>{{ specialization.name }}</span>
+                                </div>
                             </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
+                <!-- Clear Filters Button -->
                 <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
                     <X class="mr-2 h-4 w-4" />
                     Clear Filters
                 </Button>
+
+                <!-- Active Filters Indicator -->
+                <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">
+                    {{ Object.values(filters).filter(Boolean).length }} filter(s) active
+                </div>
             </div>
 
             <!-- Data Table -->

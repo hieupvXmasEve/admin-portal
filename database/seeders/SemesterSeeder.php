@@ -6,7 +6,6 @@ namespace Database\Seeders;
 
 use App\Models\Semester;
 use Illuminate\Database\Seeder;
-use Carbon\Carbon;
 
 class SemesterSeeder extends Seeder
 {
@@ -16,25 +15,15 @@ class SemesterSeeder extends Seeder
     public function run(): void
     {
         $semesters = [
-            // Current Academic Year 2024-2025
+            // Academic Year 2025
             [
-                'code' => 'FALL2024',
-                'name' => 'Fall 2024',
-                'start_date' => '2024-08-26',
-                'end_date' => '2024-12-15',
-                'enrollment_start_date' => '2024-08-01 08:00:00',
-                'enrollment_end_date' => '2024-08-25 23:59:59',
-                'is_active' => true,
-                'is_archived' => false,
-            ],
-            [
-                'code' => 'SPR2025',
+                'code' => 'SP2025',
                 'name' => 'Spring 2025',
                 'start_date' => '2025-01-13',
                 'end_date' => '2025-05-10',
                 'enrollment_start_date' => '2024-12-01 08:00:00',
                 'enrollment_end_date' => '2025-01-12 23:59:59',
-                'is_active' => false,
+                'is_active' => true,
                 'is_archived' => false,
             ],
             [
@@ -47,20 +36,20 @@ class SemesterSeeder extends Seeder
                 'is_active' => false,
                 'is_archived' => false,
             ],
-
-            // Previous Academic Year 2023-2024 (Archived)
             [
-                'code' => 'FALL2023',
-                'name' => 'Fall 2023',
-                'start_date' => '2023-08-28',
-                'end_date' => '2023-12-17',
-                'enrollment_start_date' => '2023-08-01 08:00:00',
-                'enrollment_end_date' => '2023-08-27 23:59:59',
+                'code' => 'FAL2025',
+                'name' => 'Fall 2025',
+                'start_date' => '2025-08-25',
+                'end_date' => '2025-12-14',
+                'enrollment_start_date' => '2025-07-01 08:00:00',
+                'enrollment_end_date' => '2025-08-24 23:59:59',
                 'is_active' => false,
-                'is_archived' => true,
+                'is_archived' => false,
             ],
+
+            // Academic Year 2024 (Previous/Current)
             [
-                'code' => 'SPR2024',
+                'code' => 'SP2024',
                 'name' => 'Spring 2024',
                 'start_date' => '2024-01-15',
                 'end_date' => '2024-05-12',
@@ -69,8 +58,60 @@ class SemesterSeeder extends Seeder
                 'is_active' => false,
                 'is_archived' => true,
             ],
+            [
+                'code' => 'SUM2024',
+                'name' => 'Summer 2024',
+                'start_date' => '2024-06-03',
+                'end_date' => '2024-08-16',
+                'enrollment_start_date' => '2024-04-01 08:00:00',
+                'enrollment_end_date' => '2024-06-02 23:59:59',
+                'is_active' => false,
+                'is_archived' => true,
+            ],
+            [
+                'code' => 'FAL2024',
+                'name' => 'Fall 2024',
+                'start_date' => '2024-08-26',
+                'end_date' => '2024-12-15',
+                'enrollment_start_date' => '2024-08-01 08:00:00',
+                'enrollment_end_date' => '2024-08-25 23:59:59',
+                'is_active' => false,
+                'is_archived' => true,
+            ],
 
-            // Intersession
+            // Academic Year 2026 (Future planning)
+            [
+                'code' => 'SP2026',
+                'name' => 'Spring 2026',
+                'start_date' => '2026-01-12',
+                'end_date' => '2026-05-09',
+                'enrollment_start_date' => '2025-12-01 08:00:00',
+                'enrollment_end_date' => '2026-01-11 23:59:59',
+                'is_active' => false,
+                'is_archived' => false,
+            ],
+            [
+                'code' => 'SUM2026',
+                'name' => 'Summer 2026',
+                'start_date' => '2026-06-01',
+                'end_date' => '2026-08-14',
+                'enrollment_start_date' => '2026-04-01 08:00:00',
+                'enrollment_end_date' => '2026-05-31 23:59:59',
+                'is_active' => false,
+                'is_archived' => false,
+            ],
+            [
+                'code' => 'FAL2026',
+                'name' => 'Fall 2026',
+                'start_date' => '2026-08-24',
+                'end_date' => '2026-12-13',
+                'enrollment_start_date' => '2026-07-01 08:00:00',
+                'enrollment_end_date' => '2026-08-23 23:59:59',
+                'is_active' => false,
+                'is_archived' => false,
+            ],
+
+            // Intersession periods
             [
                 'code' => 'INT2025',
                 'name' => 'Intersession 2025',

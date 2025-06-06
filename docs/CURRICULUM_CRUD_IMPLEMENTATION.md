@@ -156,7 +156,7 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
         Route::delete('bulk-delete', [ProgramController::class, 'bulkDelete'])->name('bulk-delete');
     });
 
-    Route::prefix('curriculum-versions')->name('curriculum-versions.')->group(function () {
+    Route::prefix('curriculum-versions')->name('curriculum_version.')->group(function () {
         Route::get('specializations-by-program', [CurriculumVersionController::class, 'getSpecializationsByProgram'])
             ->name('specializations-by-program');
         Route::delete('bulk-delete', [CurriculumVersionController::class, 'bulkDelete'])->name('bulk-delete');

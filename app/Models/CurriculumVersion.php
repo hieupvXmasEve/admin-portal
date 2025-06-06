@@ -94,4 +94,71 @@ class CurriculumVersion extends Model
     {
         $query->where('specialization_id', $specialization->id);
     }
+
+    /**
+     * Get all available elective units for this curriculum version.
+     * Students can choose from all units outside their specialization.
+     */
+    public function getAvailableElectiveUnits(): \Illuminate\Support\Collection
+    {
+        // Lấy tất cả units từ:
+        // 1. Các chuyên ngành khác trong cùng program
+        // 2. Tất cả units từ các programs khác
+        // 3. Units chưa được assign vào curriculum nào
+
+        return Unit::query()
+            ->where(function ($query) {
+                // Units từ các chuyên ngành khác trong cùng program
+                $query->whereHas('curriculumUnits.curriculumVersion', function ($q) {
+                    $q->where('program_id', $this->program_id)
+                        ->where('specialization_id', '!=', $this->specialization_id);
+                })
+                    // Hoặc units từ programs khác
+                    ->orWhereHas('curriculumUnits.curriculumVersion', function ($q) {
+                        $q->where('program_id', '!=', $this->program_id);
+                    })
+                    // Hoặc units chưa được assign
+                    ->orWhereDoesntHave('curriculumUnits');
+            })
+            ->distinct()
+            ->get();
+    }
+
+    /**
+     * Get units by category for elective selection.
+     */
+    public function getElectiveUnitsByCategory(): array
+    {
+        $sameProgram = Unit::whereHas('curriculumUnits.curriculumVersion', function ($query) {
+            $query->where('program_id', $this->program_id)
+                ->where('specialization_id', '!=', $this->specialization_id);
+        })->distinct()->get();
+
+        $otherPrograms = Unit::whereHas('curriculumUnits.curriculumVersion', function ($query) {
+            $query->where('program_id', '!=', $this->program_id);
+        })->distinct()->get();
+
+        $unassigned = Unit::whereDoesntHave('curriculumUnits')->get();
+
+        return [
+            'same_program_other_specializations' => $sameProgram,
+            'cross_program_electives' => $otherPrograms,
+            'general_electives' => $unassigned,
+        ];
+    }
+
+    /**
+     * Get elective slots for this curriculum version.
+     */
+    public function getElectiveSlots(): \Illuminate\Support\Collection
+    {
+        return $this->curriculumUnits()
+            ->whereHas('unitType', function ($query) {
+                $query->where('name', 'elective');
+            })
+            ->with(['unit', 'unitType'])
+            ->orderBy('year_level')
+            ->orderBy('semester_number')
+            ->get();
+    }
 }
