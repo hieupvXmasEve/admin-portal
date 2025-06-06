@@ -92,6 +92,130 @@ class SemesterManagementService
     }
 
     /**
+     * Activate a semester with business logic validation
+     */
+    public function activateSemester(Semester $semester): array
+    {
+        // Auto-deactivate expired semesters first
+        $deactivatedCount = Semester::deactivateExpiredSemesters();
+
+        if ($deactivatedCount > 0) {
+            Log::info("Auto-deactivated {$deactivatedCount} expired semester(s)");
+        }
+
+        // Check if can change active status
+        if (!$semester->canChangeActiveStatus()) {
+            return [
+                'success' => false,
+                'message' => $semester->getActiveStatusChangeError()
+            ];
+        }
+
+        // Check if semester can be activated
+        if (!$semester->canBeActivated()) {
+            return [
+                'success' => false,
+                'message' => $semester->getActivationError()
+            ];
+        }
+
+        // Activate the semester
+        if ($semester->activate()) {
+            Log::info("Activated semester: {$semester->name}");
+            return [
+                'success' => true,
+                'message' => 'Semester activated successfully!'
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Failed to activate semester due to an unknown error.'
+        ];
+    }
+
+    /**
+     * Deactivate a semester
+     */
+    public function deactivateSemester(Semester $semester): array
+    {
+        // Check if can change active status
+        if (!$semester->canChangeActiveStatus()) {
+            return [
+                'success' => false,
+                'message' => $semester->getActiveStatusChangeError()
+            ];
+        }
+
+        if ($semester->deactivate()) {
+            Log::info("Deactivated semester: {$semester->name}");
+            return [
+                'success' => true,
+                'message' => 'Semester deactivated successfully!'
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Failed to deactivate semester.'
+        ];
+    }
+
+    /**
+     * Get the next semester that can be activated
+     */
+    public function getNextActivatableSemester(): ?Semester
+    {
+        return Semester::getNextActiveSemester();
+    }
+
+    /**
+     * Get activation status for all semesters
+     */
+    public function getSemesterActivationStatuses(): array
+    {
+        $semesters = Semester::orderBy('start_date', 'asc')->get();
+        $now = Carbon::now();
+        $activeSemester = Semester::getActiveSemester();
+        $nextSemester = Semester::getNextActiveSemester();
+
+        return $semesters->map(function ($semester) use ($now, $activeSemester, $nextSemester) {
+            $status = 'inactive';
+            $canActivate = false;
+            $reason = '';
+
+            if ($semester->is_active) {
+                $status = 'active';
+                if ($semester->shouldBeDeactivated()) {
+                    $reason = 'Expired - will be deactivated automatically';
+                }
+            } elseif ($semester->is_archived) {
+                $status = 'archived';
+                $reason = 'Cannot activate archived semester';
+            } elseif ($semester->start_date && $semester->start_date->lte($now)) {
+                $status = 'started';
+                $reason = 'Cannot activate semester that has already started';
+            } elseif ($nextSemester && $nextSemester->id === $semester->id) {
+                $status = 'next';
+                $canActivate = true;
+                $reason = 'This is the next semester that can be activated';
+            } else {
+                $status = 'future';
+                $reason = 'Can only activate the next upcoming semester';
+            }
+
+            return [
+                'semester' => $semester,
+                'status' => $status,
+                'can_activate' => $canActivate,
+                'reason' => $reason,
+                'is_current_active' => $activeSemester && $activeSemester->id === $semester->id,
+                'is_next_available' => $nextSemester && $nextSemester->id === $semester->id,
+            ];
+        })->all();
+    }
+
+    /**
      * Open enrollment for a semester
      */
     public function openEnrollment(Semester $semester): bool

@@ -47,8 +47,14 @@ class ComprehensiveEducationSeeder extends Seeder
     {
         $this->command->info('Clearing existing curriculum data...');
 
-        // Disable foreign key checks to allow truncation
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        // Handle foreign key checks based on database type
+        $databaseType = DB::getDriverName();
+
+        if ($databaseType === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        } else if ($databaseType === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys=OFF;');
+        }
 
         CurriculumUnit::truncate();
         CurriculumVersion::truncate();
@@ -58,44 +64,69 @@ class ComprehensiveEducationSeeder extends Seeder
         CurriculumUnitType::truncate();
 
         // Re-enable foreign key checks
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        if ($databaseType === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        } else if ($databaseType === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys=ON;');
+        }
     }
 
     /**
-     * Seed 9 semesters over 3 years.
+     * Seed 9 semesters over 3 years (3 semesters per year).
      */
     private function seedSemesters(): void
     {
-        $this->command->info('Seeding semesters...');
+        $this->command->info('Seeding 9 semesters over 3 years...');
 
         $semesters = [];
-        for ($year = 1; $year <= 3; $year++) {
-            for ($semester = 1; $semester <= 3; $semester++) {
-                $baseYear = 2024 + $year;
-                $semesterNumber = (($year - 1) * 3) + $semester;
 
-                $startMonth = match ($semester) {
-                    1 => 2,  // February
-                    2 => 6,  // June
-                    3 => 10, // October
+        // Define semester types and their properties
+        $semesterTypes = [
+            1 => ['code' => 'SP', 'name' => 'Spring', 'start_month' => 1, 'end_month' => 5],
+            2 => ['code' => 'SUM', 'name' => 'Summer', 'start_month' => 6, 'end_month' => 8],
+            3 => ['code' => 'FAL', 'name' => 'Fall', 'start_month' => 8, 'end_month' => 12],
+        ];
+
+        for ($year = 1; $year <= 3; $year++) {
+            $baseYear = 2024 + $year;
+
+            for ($semester = 1; $semester <= 3; $semester++) {
+                $semesterNumber = (($year - 1) * 3) + $semester;
+                $semesterInfo = $semesterTypes[$semester];
+
+                // Calculate dates based on semester type
+                $startDate = match ($semester) {
+                    1 => sprintf('%d-01-13', $baseYear), // Spring starts mid-January
+                    2 => sprintf('%d-06-02', $baseYear), // Summer starts early June
+                    3 => sprintf('%d-08-25', $baseYear), // Fall starts late August
                 };
 
-                $endMonth = $startMonth + 3;
-                if ($endMonth > 12) {
-                    $endMonth -= 12;
-                    $endYear = $baseYear + 1;
-                } else {
-                    $endYear = $baseYear;
-                }
+                $endDate = match ($semester) {
+                    1 => sprintf('%d-05-10', $baseYear), // Spring ends early May
+                    2 => sprintf('%d-08-15', $baseYear), // Summer ends mid-August
+                    3 => sprintf('%d-12-14', $baseYear), // Fall ends mid-December
+                };
+
+                $enrollmentStartDate = match ($semester) {
+                    1 => sprintf('%d-12-01 08:00:00', $baseYear - 1), // Spring enrollment starts December prior year
+                    2 => sprintf('%d-04-01 08:00:00', $baseYear), // Summer enrollment starts April
+                    3 => sprintf('%d-07-01 08:00:00', $baseYear), // Fall enrollment starts July
+                };
+
+                $enrollmentEndDate = match ($semester) {
+                    1 => sprintf('%d-01-12 23:59:59', $baseYear), // Spring enrollment ends day before start
+                    2 => sprintf('%d-06-01 23:59:59', $baseYear), // Summer enrollment ends day before start
+                    3 => sprintf('%d-08-24 23:59:59', $baseYear), // Fall enrollment ends day before start
+                };
 
                 $semesters[] = [
-                    'code' => sprintf('%dS%d', $baseYear, $semester),
-                    'name' => sprintf('%d Semester %d', $baseYear, $semester),
-                    'start_date' => sprintf('%d-%02d-01', $baseYear, $startMonth),
-                    'end_date' => sprintf('%d-%02d-30', $endYear, $endMonth),
-                    'enrollment_start_date' => sprintf('%d-%02d-01', $baseYear, $startMonth - 1 > 0 ? $startMonth - 1 : 12),
-                    'enrollment_end_date' => sprintf('%d-%02d-15', $baseYear, $startMonth),
-                    'is_active' => $semesterNumber === 1,
+                    'code' => sprintf('%s%d', $semesterInfo['code'], $baseYear),
+                    'name' => sprintf('%s %d', $semesterInfo['name'], $baseYear),
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'enrollment_start_date' => $enrollmentStartDate,
+                    'enrollment_end_date' => $enrollmentEndDate,
+                    'is_active' => $semesterNumber === 1, // First semester is active
                     'is_archived' => false,
                 ];
             }
@@ -105,7 +136,7 @@ class ComprehensiveEducationSeeder extends Seeder
             Semester::create($semester);
         }
 
-        $this->command->info('Semesters seeded.');
+        $this->command->info('9 semesters seeded.');
     }
 
     /**
@@ -309,12 +340,12 @@ class ComprehensiveEducationSeeder extends Seeder
 
     /**
      * Each specialization has 5 curriculum versions.
-     * Each curriculum version includes exactly 15 curriculum units.
-     * Units are distributed with 3 per semester pattern: 2 core/major + 1 elective.
+     * Each curriculum version includes exactly 27 curriculum units (9 semesters × 3 units).
+     * Each semester: 2 mandatory units (core/major) + 1 elective unit.
      */
     private function seedCurriculumVersions(): void
     {
-        $this->command->info('Seeding curriculum versions with units...');
+        $this->command->info('Seeding curriculum versions with 9-semester structure...');
 
         $specializations = Specialization::all();
         $semesters = Semester::all();
@@ -333,13 +364,13 @@ class ComprehensiveEducationSeeder extends Seeder
                     'version_code' => sprintf('%s-V%d-2025', $specialization->code, $version),
                     'semester_id' => $semesters->random()->id,
                     'notes' => sprintf(
-                        'Version %d curriculum for %s specialization.',
+                        'Version %d curriculum for %s specialization - 9 semesters over 3 years.',
                         $version,
                         $specialization->name
                     ),
                 ]);
 
-                // Add 15 curriculum units to each version
+                // Add 27 curriculum units to each version (9 semesters × 3 units)
                 $this->seedCurriculumUnits($curriculumVersion, $units, $semesters, $coreType, $electiveType, $majorType);
             }
         }
@@ -348,9 +379,10 @@ class ComprehensiveEducationSeeder extends Seeder
     }
 
     /**
-     * Add exactly 15 curriculum units for each curriculum version as specified.
-     * Distribute across first 5 semesters with 3 units per semester.
-     * Each semester: 2 core/major units + 1 elective unit.
+     * Add exactly 27 curriculum units for each curriculum version.
+     * Distribute across 9 semesters with 3 units per semester.
+     * Each semester: 2 mandatory units (core/major) + 1 elective unit.
+     * Elective units are marked as optional in notes.
      */
     private function seedCurriculumUnits(
         CurriculumVersion $curriculumVersion,
@@ -363,8 +395,14 @@ class ComprehensiveEducationSeeder extends Seeder
         $availableUnits = $units->shuffle();
         $unitIndex = 0;
 
-        // Distribute exactly 15 units across first 5 semesters (3 units per semester)
-        for ($semesterOrder = 1; $semesterOrder <= 5; $semesterOrder++) {
+        // Distribute 27 units across 9 semesters (3 units per semester)
+        for ($semesterNumber = 1; $semesterNumber <= 9; $semesterNumber++) {
+            // Calculate year level (1-3) from semester number (1-9)
+            $yearLevel = ceil($semesterNumber / 3);
+
+            // Calculate semester within year (1-3)
+            $semesterInYear = (($semesterNumber - 1) % 3) + 1;
+
             for ($unitInSemester = 1; $unitInSemester <= 3; $unitInSemester++) {
                 // Ensure we don't exceed available units
                 if ($unitIndex >= $units->count()) {
@@ -372,29 +410,37 @@ class ComprehensiveEducationSeeder extends Seeder
                     $availableUnits = $units->shuffle();
                 }
 
-                $semester = $semesters->random();
-
-                // Determine unit type: first 2 units are core/major, 3rd is elective
+                // Determine unit type: first 2 units are mandatory (core/major), 3rd is elective
                 if ($unitInSemester <= 2) {
                     $unitType = rand(0, 1) ? $coreType : $majorType;
+                    $groupType = $unitType === $coreType ? 'core' : 'major';
+                    $isOptional = false;
+                    $typeLabel = 'Mandatory';
                 } else {
                     $unitType = $electiveType;
+                    $groupType = 'elective';
+                    $isOptional = true;
+                    $typeLabel = 'Elective (Can choose from any available unit)';
                 }
+
+                $note = sprintf(
+                    'Semester %d (Year %d, Semester %d) - Unit %d (%s)%s',
+                    $semesterNumber,
+                    $yearLevel,
+                    $semesterInYear,
+                    $unitInSemester,
+                    $typeLabel,
+                    $isOptional ? ' - ELECTIVE SLOT: Student can choose any unit from other specializations or programs' : ''
+                );
 
                 CurriculumUnit::create([
                     'curriculum_version_id' => $curriculumVersion->id,
                     'unit_id' => $availableUnits[$unitIndex]->id,
-                    'semester_id' => $semester->id,
                     'unit_type_id' => $unitType->id,
-                    'semester_order' => $semesterOrder,
-                    'is_compulsory' => $unitType->name !== 'elective',
-                    'note' => sprintf(
-                        'Year %d, Semester %d, Unit %d (%s)',
-                        ceil($semesterOrder / 3),
-                        (($semesterOrder - 1) % 3) + 1,
-                        $unitInSemester,
-                        $unitType->name
-                    ),
+                    'year_level' => $yearLevel,
+                    'semester_number' => $semesterInYear,
+                    'group_type' => $groupType,
+                    'note' => $note,
                 ]);
 
                 $unitIndex++;

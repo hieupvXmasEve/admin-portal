@@ -250,6 +250,15 @@ const openCreateModal = () => {
     showCreateModal.value = true;
 };
 
+// Helper function to check if semester is currently running
+const isSemesterRunning = (semester: Semester): boolean => {
+    const now = new Date();
+    const startDate = new Date(semester.start_date);
+    const endDate = new Date(semester.end_date);
+
+    return now >= startDate && now <= endDate;
+};
+
 const openEditModal = (semester: Semester) => {
     selectedSemester.value = semester;
 
@@ -598,8 +607,17 @@ const handlePageSizeChange = (pageSize: number) => {
 
                         <div class="col-span-2 space-y-4">
                             <div class="flex items-center space-x-2">
-                                <Switch id="edit-is-active" v-model="editForm.is_active" />
-                                <Label for="edit-is-active">Is Active (Current Semester)</Label>
+                                <Switch
+                                    id="edit-is-active"
+                                    v-model="editForm.is_active"
+                                    :disabled="selectedSemester ? isSemesterRunning(selectedSemester) : false"
+                                />
+                                <div class="flex flex-col">
+                                    <Label for="edit-is-active">Is Active (Current Semester)</Label>
+                                    <p v-if="selectedSemester && isSemesterRunning(selectedSemester)" class="text-muted-foreground text-xs">
+                                        Cannot change active status during semester period
+                                    </p>
+                                </div>
                             </div>
 
                             <div class="flex items-center space-x-2">

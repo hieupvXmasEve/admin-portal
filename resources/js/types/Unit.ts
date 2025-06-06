@@ -58,7 +58,7 @@ export interface UnitData {
             code: string;
         };
         is_compulsory: boolean;
-        semester_order?: number;
+
         note?: string;
         curriculum_version: {
             id: number;
@@ -112,4 +112,36 @@ export interface PrerequisiteGroup {
 export interface EquivalentUnit {
     unit: Unit;
     reason?: string;
+}
+
+export interface CurriculumUnit {
+    id: number;
+    curriculum_version_id: number;
+    unit_id: number;
+    unit_type_id?: number;
+    year_level?: number;
+    semester_number?: number;
+    note?: string;
+    created_at: string;
+    updated_at: string;
+    unit?: Unit;
+    unitType?: {
+        id: number;
+        name: string;
+        description?: string;
+    };
+    curriculumVersion?: {
+        id: number;
+        version_code: string;
+        program?: {
+            id: number;
+            name: string;
+            code?: string;
+        };
+        specialization?: {
+            id: number;
+            name: string;
+            code?: string;
+        };
+    };
 }

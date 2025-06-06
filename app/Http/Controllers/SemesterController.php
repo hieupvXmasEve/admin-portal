@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Semester;
+use App\Services\SemesterManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 
 class SemesterController extends Controller
 {
@@ -125,9 +127,31 @@ class SemesterController extends Controller
         ]);
 
         try {
-            Semester::create($validated);
+            // Auto-deactivate expired semesters first
+            Semester::deactivateExpiredSemesters();
 
-            return redirect()->route('semester.index')->with('success', 'Semester created successfully!');
+            $semester = Semester::create(array_merge($validated, ['is_active' => false]));
+
+            // If user wants to activate this semester, try to activate it
+            if ($validated['is_active'] ?? false) {
+                // Check if can change active status (although for new semester this should always be true)
+                if (!$semester->canChangeActiveStatus()) {
+                    $error = $semester->getActiveStatusChangeError();
+                    return redirect()->back()->withErrors(['is_active' => $error]);
+                }
+
+                if ($semester->canBeActivated()) {
+                    $semester->activate();
+                    $message = 'Semester created and activated successfully!';
+                } else {
+                    $error = $semester->getActivationError();
+                    return redirect()->back()->withErrors(['is_active' => $error]);
+                }
+            } else {
+                $message = 'Semester created successfully!';
+            }
+
+            return redirect()->route('semester.index')->with('success', $message);
         } catch (\Exception $e) {
             Log::error('Error creating semester: ' . $e->getMessage());
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
@@ -173,9 +197,43 @@ class SemesterController extends Controller
         }
 
         try {
-            $semester->update($validated);
+            // Auto-deactivate expired semesters first
+            Semester::deactivateExpiredSemesters();
 
-            return redirect()->route('semester.index')->with('success', 'Semester updated successfully!');
+            $wasActive = $semester->is_active;
+            $wantsToBeActive = $validated['is_active'] ?? false;
+
+            // Update basic fields first (excluding is_active)
+            $updateData = array_merge($validated, ['is_active' => $semester->is_active]);
+            $semester->update($updateData);
+
+            // Handle activation/deactivation logic
+            if ($wasActive !== $wantsToBeActive) {
+                // User wants to change active status
+                if (!$semester->canChangeActiveStatus()) {
+                    $error = $semester->getActiveStatusChangeError();
+                    return redirect()->back()->withErrors(['is_active' => $error]);
+                }
+
+                if (!$wasActive && $wantsToBeActive) {
+                    // User wants to activate this semester
+                    if ($semester->canBeActivated()) {
+                        $semester->activate();
+                        $message = 'Semester updated and activated successfully!';
+                    } else {
+                        $error = $semester->getActivationError();
+                        return redirect()->back()->withErrors(['is_active' => $error]);
+                    }
+                } elseif ($wasActive && !$wantsToBeActive) {
+                    // User wants to deactivate this semester
+                    $semester->deactivate();
+                    $message = 'Semester updated and deactivated successfully!';
+                }
+            } else {
+                $message = 'Semester updated successfully!';
+            }
+
+            return redirect()->route('semester.index')->with('success', $message);
         } catch (\Exception $e) {
             Log::error('Error updating semester: ' . $e->getMessage());
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
@@ -197,5 +255,38 @@ class SemesterController extends Controller
         $semester->delete();
 
         return redirect()->route('semester.index')->with('success', 'Semester deleted successfully!');
+    }
+
+    /**
+     * Activate a semester via API
+     */
+    public function activate(Semester $semester, SemesterManagementService $service): JsonResponse
+    {
+        $result = $service->activateSemester($semester);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Deactivate a semester via API
+     */
+    public function deactivate(Semester $semester, SemesterManagementService $service): JsonResponse
+    {
+        $result = $service->deactivateSemester($semester);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Get semester activation statuses
+     */
+    public function activationStatuses(SemesterManagementService $service): JsonResponse
+    {
+        $statuses = $service->getSemesterActivationStatuses();
+
+        return response()->json([
+            'success' => true,
+            'data' => $statuses
+        ]);
     }
 }

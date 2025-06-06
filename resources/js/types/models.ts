@@ -36,6 +36,7 @@ export interface CurriculumVersion {
   program?: Program;
   effective_from_semester?: Semester;
   curriculum_units_count?: number;
+  curriculum_units?: CurriculumUnit[];
 }
 
 export interface Semester {
@@ -44,4 +45,36 @@ export interface Semester {
   code: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface Unit {
+  id: number;
+  code: string;
+  name: string;
+  credit_points: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UnitType {
+  id: number;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CurriculumUnit {
+  id: number;
+  curriculum_version_id: number;
+  unit_id: number;
+  unit_type_id?: number;
+  year_level?: number;
+  semester_number?: number;
+  note?: string;
+  created_at: string;
+  updated_at: string;
+  unit?: Unit;
+  unit_type?: UnitType;
+  curriculum_version?: CurriculumVersion;
 }

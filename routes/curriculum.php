@@ -15,6 +15,13 @@ Route::middleware('auth')->group(function () {
         module: 'curriculum_versions'
     );
 
+    // Global management routes for curriculum versions
+    Route::prefix('curriculum-versions')->name('curriculum_version.')->group(function () {
+        Route::get('export/excel/filtered', [CurriculumVersionController::class, 'exportFiltered'])
+            ->middleware('can:export_curriculum_version')
+            ->name('export.filtered');
+    });
+
     // Curriculum Units routes
     RoutePermissionHelper::resourceWithPermissions(
         prefix: 'curriculum-units',
@@ -27,16 +34,21 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
 
     // Curriculum Versions API routes
-    Route::prefix('curriculum-versions')->name('curriculum-versions.')->group(function () {
+    Route::prefix('curriculum-versions')->name('curriculum_version.')->group(function () {
         Route::post('/', [CurriculumVersionController::class, 'apiStore'])->name('store');
         Route::delete('{curriculumVersion}', [CurriculumVersionController::class, 'apiDestroy'])->name('destroy');
         Route::get('specializations-by-program', [CurriculumVersionController::class, 'getSpecializationsByProgram'])
             ->name('specializations-by-program');
         Route::delete('bulk-delete', [CurriculumVersionController::class, 'bulkDelete'])->name('bulk-delete');
+        Route::post('bulk-operations', [CurriculumVersionController::class, 'bulkOperations'])
+            ->name('bulk-operations');
     });
 
     // Curriculum Units API routes
     Route::prefix('curriculum-units')->name('curriculum-units.')->group(function () {
+        Route::post('/', [CurriculumUnitController::class, 'apiStore'])->name('store');
+        Route::put('{curriculumUnit}', [CurriculumUnitController::class, 'apiUpdate'])->name('update');
+        Route::delete('{curriculumUnit}', [CurriculumUnitController::class, 'apiDestroy'])->name('destroy');
         Route::get('by-curriculum-version', [CurriculumUnitController::class, 'getUnitsByCurriculumVersion'])
             ->name('by-curriculum-version');
         Route::delete('bulk-delete', [CurriculumUnitController::class, 'bulkDelete'])->name('bulk-delete');

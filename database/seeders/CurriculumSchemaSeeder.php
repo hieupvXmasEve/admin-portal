@@ -162,10 +162,10 @@ class CurriculumSchemaSeeder extends Seeder
                         'unit_id' => $unit->id,
                     ],
                     [
-                        'semester_id' => $semester->id,
                         'unit_type_id' => $unitTypes->random()->id,
-                        'semester_order' => $index + 1,
-                        'is_compulsory' => $index < 2, // First 2 are compulsory
+
+                        'year_level' => ceil(($index + 1) / 2),
+                        'semester_number' => (($index) % 2) + 1,
                         'note' => $index === 0 ? 'Foundation unit for all students' : null,
                     ]
                 );
@@ -178,10 +178,10 @@ class CurriculumSchemaSeeder extends Seeder
                         'unit_id' => $unit->id,
                     ],
                     [
-                        'semester_id' => $semester->id,
                         'unit_type_id' => $unitTypes->where('name', 'major')->first()?->id,
-                        'semester_order' => $index + 4,
-                        'is_compulsory' => true,
+
+                        'year_level' => ceil(($index + 4) / 2),
+                        'semester_number' => (($index + 3) % 2) + 1,
                         'note' => 'Specialization-specific unit',
                     ]
                 );

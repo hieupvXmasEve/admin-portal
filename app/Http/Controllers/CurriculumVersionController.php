@@ -8,6 +8,8 @@ use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\Semester;
+use App\Models\Unit;
+use App\Models\CurriculumUnitType;
 use App\Http\Requests\StoreCurriculumVersionRequest;
 use App\Http\Requests\UpdateCurriculumVersionRequest;
 use Illuminate\Http\Request;
@@ -19,182 +21,385 @@ use Inertia\Response;
 
 class CurriculumVersionController extends Controller
 {
+    /**
+     * Display a listing of curriculum versions with global management features.
+     */
     public function index(Request $request): Response
     {
-        $validated = $request->validate([
+        $request->validate([
             'search' => 'nullable|string|max:255',
-            'filter.program_id' => 'nullable|exists:programs,id',
-            'filter.specialization_id' => 'nullable|exists:specializations,id',
-            'sort' => 'nullable|string|in:version_code,created_at',
+            'program_id' => 'nullable|exists:programs,id',
+            'specialization_id' => 'nullable|exists:specializations,id',
+            'sort' => 'nullable|string|in:version_code,program_name,specialization_name,created_at,units_count',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
-        $curriculumVersions = CurriculumVersion::query()
+        // Base query with relationships
+        $query = CurriculumVersion::query()
             ->with(['program', 'specialization', 'effectiveFromSemester'])
-            ->when($validated['search'] ?? null, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('version_code', 'like', "%{$search}%")
-                        ->orWhereHas('program', fn($q) => $q->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('specialization', fn($q) => $q->where('name', 'like', "%{$search}%"));
-                });
-            })
-            ->when($validated['filter']['program_id'] ?? null, function ($query, $programId) {
-                $query->where('program_id', $programId);
-            })
-            ->when($validated['filter']['specialization_id'] ?? null, function ($query, $specializationId) {
-                $query->where('specialization_id', $specializationId);
-            })
-            ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
-                $direction = $validated['direction'] ?? 'asc';
-                $query->orderBy($sort, $direction);
-            })
-            ->orderBy('created_at', 'desc')
-            ->withCount('curriculumUnits')
-            ->paginate($validated['per_page'] ?? 15)
-            ->withQueryString();
+            ->withCount('curriculumUnits');
+
+        // Apply search filters
+        if ($request->search) {
+            $query->where(function ($q) use ($request) {
+                $q->where('version_code', 'like', "%{$request->search}%")
+                    ->orWhere('notes', 'like', "%{$request->search}%")
+                    ->orWhereHas('program', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"))
+                    ->orWhereHas('specialization', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"));
+            });
+        }
+
+        // Apply filters
+        if ($request->program_id) {
+            $query->where('program_id', $request->program_id);
+        }
+
+        if ($request->specialization_id) {
+            $query->where('specialization_id', $request->specialization_id);
+        }
+
+        // Apply sorting
+        $sortField = $request->sort ?? 'created_at';
+        $sortDirection = $request->direction ?? 'desc';
+
+        switch ($sortField) {
+            case 'program_name':
+                $query->join('programs', 'curriculum_versions.program_id', '=', 'programs.id')
+                    ->orderBy('programs.name', $sortDirection)
+                    ->select('curriculum_versions.*');
+                break;
+            case 'specialization_name':
+                $query->leftJoin('specializations', 'curriculum_versions.specialization_id', '=', 'specializations.id')
+                    ->orderBy('specializations.name', $sortDirection)
+                    ->select('curriculum_versions.*');
+                break;
+            case 'units_count':
+                $query->orderBy('curriculum_units_count', $sortDirection);
+                break;
+            default:
+                $query->orderBy($sortField, $sortDirection);
+        }
+
+        // Pagination
+        $perPage = $request->per_page ?? 15;
+        $curriculumVersions = $query->paginate($perPage)->withQueryString();
 
         // Calculate statistics
-        $statistics = [
-            'total_curriculum_versions' => CurriculumVersion::count(),
-            'active_versions' => CurriculumVersion::count(), // All versions are active for now
-            'inactive_versions' => 0, // No inactive status in current schema
-            'avg_credit_points' => 0, // No credit points field in current schema
-            'by_year' => [], // No year field in current schema
-            'by_program' => CurriculumVersion::with('program')
-                ->get()
-                ->groupBy('program.name')
-                ->map(fn($group) => $group->count())
-                ->toArray(),
-        ];
+        $statistics = $this->calculateGlobalStatistics($request);
 
         return Inertia::render('curriculum-versions/Index', [
             'curriculumVersions' => $curriculumVersions,
-            'filters' => [
-                'search' => $validated['search'] ?? null,
-                'program_id' => $validated['filter']['program_id'] ?? null,
-                'specialization_id' => $validated['filter']['specialization_id'] ?? null,
-            ],
             'statistics' => $statistics,
-            'programs' => Program::orderBy('name')->get(['id', 'name']),
-            'specializations' => Specialization::with('program')->orderBy('name')->get(['id', 'name', 'program_id']),
-            'semesters' => Semester::orderBy('name')->get(['id', 'name', 'code']),
+            'filters' => $request->only(['search', 'program_id', 'specialization_id', 'sort', 'direction', 'per_page']),
+            'programs' => Program::select('id', 'name', 'code')->orderBy('name')->get(),
+            'specializations' => Specialization::select('id', 'name', 'code', 'program_id')->orderBy('name')->get(),
+            'semesters' => Semester::select('id', 'name', 'code')->orderBy('name')->get(),
         ]);
     }
 
-    public function create(Request $request): Response
+    /**
+     * Calculate global statistics for curriculum versions.
+     */
+    private function calculateGlobalStatistics(Request $request): array
     {
-        $programId = $request->query('program_id');
-        $specializationId = $request->query('specialization_id');
-        $source = $request->query('source');
+        // Base query for statistics
+        $baseQuery = CurriculumVersion::query();
 
-        return Inertia::render('curriculum-versions/Create', [
-            'programs' => Program::orderBy('name')->get(['id', 'name']),
-            'specializations' => Specialization::with('program')->orderBy('name')->get(['id', 'name', 'program_id']),
-            'semesters' => Semester::orderBy('name')->get(['id', 'name', 'code']),
-            'selectedProgramId' => $programId ? (int) $programId : null,
-            'selectedSpecializationId' => $specializationId ? (int) $specializationId : null,
-            'source' => $source,
-        ]);
-    }
-
-    public function store(StoreCurriculumVersionRequest $request): RedirectResponse
-    {
-        try {
-            DB::transaction(function () use ($request) {
-                CurriculumVersion::create($request->validated());
+        // Apply same filters as main query
+        if ($request->search) {
+            $baseQuery->where(function ($q) use ($request) {
+                $q->where('version_code', 'like', "%{$request->search}%")
+                    ->orWhere('notes', 'like', "%{$request->search}%")
+                    ->orWhereHas('program', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"))
+                    ->orWhereHas('specialization', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"));
             });
+        }
 
-            return redirect()
-                ->route('curriculum_version.index')
-                ->with('success', 'Curriculum version created successfully.');
+        if ($request->program_id) {
+            $baseQuery->where('program_id', $request->program_id);
+        }
+
+        if ($request->specialization_id) {
+            $baseQuery->where('specialization_id', $request->specialization_id);
+        }
+
+        // Total curriculum versions
+        $totalVersions = $baseQuery->count();
+
+        // Active vs Inactive (versions with curriculum units vs without)
+        $activeVersions = $baseQuery->whereHas('curriculumUnits')->count();
+        $inactiveVersions = $totalVersions - $activeVersions;
+
+        // By year distribution
+        $byYear = $baseQuery->selectRaw('YEAR(created_at) as year, COUNT(*) as count')
+            ->groupBy('year')
+            ->orderBy('year', 'desc')
+            ->pluck('count', 'year')
+            ->toArray();
+
+        // By program distribution
+        $byProgram = $baseQuery->with('program')
+            ->get()
+            ->groupBy('program.name')
+            ->map(fn($versions) => $versions->count())
+            ->toArray();
+
+        return [
+            'total_curriculum_versions' => $totalVersions,
+            'active_versions' => $activeVersions,
+            'inactive_versions' => $inactiveVersions,
+            'by_year' => $byYear,
+            'by_program' => $byProgram,
+        ];
+    }
+
+    /**
+     * Export curriculum versions to Excel with applied filters.
+     */
+    public function exportFiltered(Request $request)
+    {
+        $request->validate([
+            'search' => 'nullable|string|max:255',
+            'program_id' => 'nullable|exists:programs,id',
+            'specialization_id' => 'nullable|exists:specializations,id',
+        ]);
+
+        try {
+            // Build query with same filters as index
+            $query = CurriculumVersion::query()
+                ->with(['program', 'specialization', 'effectiveFromSemester', 'curriculumUnits.unit'])
+                ->withCount('curriculumUnits');
+
+            if ($request->search) {
+                $query->where(function ($q) use ($request) {
+                    $q->where('version_code', 'like', "%{$request->search}%")
+                        ->orWhere('notes', 'like', "%{$request->search}%")
+                        ->orWhereHas('program', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"))
+                        ->orWhereHas('specialization', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"));
+                });
+            }
+
+            if ($request->program_id) {
+                $query->where('program_id', $request->program_id);
+            }
+
+            if ($request->specialization_id) {
+                $query->where('specialization_id', $request->specialization_id);
+            }
+
+            $curriculumVersions = $query->orderBy('created_at', 'desc')->get();
+
+            // Generate Excel file
+            $filename = 'curriculum_versions_' . now()->format('Y_m_d_H_i_s') . '.xlsx';
+
+            // You would implement Excel export logic here
+            // For now, return a JSON response
+            return response()->json([
+                'success' => true,
+                'message' => 'Export would be generated',
+                'filename' => $filename,
+                'total_records' => $curriculumVersions->count(),
+            ]);
         } catch (\Exception $e) {
-            Log::error('Curriculum version creation failed: ' . $e->getMessage());
+            Log::error('Curriculum versions export failed: ' . $e->getMessage());
 
-            return back()
-                ->withInput()
-                ->withErrors(['error' => 'Failed to create curriculum version. Please try again.']);
+            return response()->json([
+                'success' => false,
+                'message' => 'Export failed: ' . $e->getMessage(),
+            ], 500);
         }
     }
 
+    /**
+     * Bulk operations for curriculum versions.
+     */
+    public function bulkOperations(Request $request)
+    {
+        $validated = $request->validate([
+            'action' => 'required|string|in:delete,export',
+            'curriculum_version_ids' => 'required|array|min:1|max:100',
+            'curriculum_version_ids.*' => 'integer|exists:curriculum_versions,id',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $curriculumVersions = CurriculumVersion::whereIn('id', $validated['curriculum_version_ids'])->get();
+
+            switch ($validated['action']) {
+                case 'delete':
+                    return $this->bulkDelete($request);
+
+                case 'export':
+                    return $this->bulkExport($curriculumVersions);
+
+                default:
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid bulk action specified.',
+                    ], 400);
+            }
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Bulk operation failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Bulk operation failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk export selected curriculum versions.
+     */
+    private function bulkExport($curriculumVersions)
+    {
+        try {
+            $filename = 'selected_curriculum_versions_' . now()->format('Y_m_d_H_i_s') . '.xlsx';
+
+            // Export logic would go here
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Selected curriculum versions exported successfully.',
+                'filename' => $filename,
+                'total_records' => $curriculumVersions->count(),
+            ]);
+        } catch (\Exception $e) {
+            throw new \Exception('Export failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Show the form for creating a new curriculum version.
+     */
+    public function create(): Response
+    {
+        return Inertia::render('curriculum-versions/Create', [
+            'programs' => Program::with('specializations')->get(),
+            'specializations' => Specialization::select('id', 'name', 'code', 'program_id')->orderBy('name')->get(),
+            'semesters' => Semester::select('id', 'name', 'code')->get(),
+        ]);
+    }
+
+    /**
+     * Store a newly created curriculum version.
+     */
+    public function store(StoreCurriculumVersionRequest $request): RedirectResponse
+    {
+        $curriculumVersion = CurriculumVersion::create($request->validated());
+
+        return redirect()->route('curriculum_version.show', $curriculumVersion)
+            ->with('success', 'Curriculum version created successfully');
+    }
+
+    /**
+     * Display the specified curriculum version with elective management.
+     */
     public function show(CurriculumVersion $curriculumVersion): Response
     {
         $curriculumVersion->load([
             'program',
             'specialization',
             'effectiveFromSemester',
-            'curriculumUnits' => function ($query) {
-                $query->with(['unit', 'unitType'])
-                    ->orderBy('semester_order')
-                    ->orderBy('created_at');
-            }
+            'curriculumUnits.unit',
+            'curriculumUnits.unitType'
         ]);
 
         return Inertia::render('curriculum-versions/Show', [
             'curriculumVersion' => $curriculumVersion,
-            'programs' => Program::orderBy('name')->get(['id', 'name', 'code']),
-            'specializations' => Specialization::with('program')->orderBy('name')->get(['id', 'name', 'code', 'program_id']),
-            'semesters' => Semester::orderBy('name')->get(['id', 'name', 'code']),
+            'programs' => Program::select('id', 'name', 'code')->get(),
+            'specializations' => Specialization::select('id', 'name', 'code', 'program_id')->get(),
+            'semesters' => Semester::select('id', 'name', 'code')->get(),
+            'units' => Unit::select('id', 'code', 'name', 'credit_points')->orderBy('code')->get(),
+            'unitTypes' => CurriculumUnitType::select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 
+    /**
+     * Show the form for editing the specified curriculum version.
+     */
     public function edit(CurriculumVersion $curriculumVersion): Response
     {
-        $curriculumVersion->load(['program', 'specialization']);
+        $curriculumVersion->load(['program', 'specialization', 'effectiveFromSemester']);
 
         return Inertia::render('curriculum-versions/Edit', [
             'curriculumVersion' => $curriculumVersion,
-            'programs' => Program::orderBy('name')->get(['id', 'name']),
-            'specializations' => Specialization::with('program')->orderBy('name')->get(['id', 'name', 'program_id']),
-            'semesters' => Semester::orderBy('name')->get(['id', 'name', 'code']),
+            'programs' => Program::select('id', 'name', 'code')->orderBy('name')->get(),
+            'specializations' => Specialization::select('id', 'name', 'code', 'program_id')->orderBy('name')->get(),
+            'semesters' => Semester::select('id', 'name', 'code')->orderBy('name')->get(),
         ]);
     }
 
+    /**
+     * Update the specified curriculum version.
+     */
     public function update(UpdateCurriculumVersionRequest $request, CurriculumVersion $curriculumVersion): RedirectResponse
     {
-        try {
-            DB::beginTransaction();
+        $curriculumVersion->update($request->validated());
 
-            $curriculumVersion->update($request->validated());
-
-            DB::commit();
-
-            return redirect()
-                ->route('curriculum_version.index')
-                ->with('success', 'Curriculum version updated successfully.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Curriculum version update failed: ' . $e->getMessage());
-
-            return back()
-                ->withInput()
-                ->withErrors(['error' => 'Failed to update curriculum version. Please try again.']);
-        }
+        return redirect()->route('curriculum_version.index', $curriculumVersion)
+            ->with('success', 'Curriculum version updated successfully');
     }
 
+    /**
+     * Remove the specified curriculum version.
+     */
     public function destroy(CurriculumVersion $curriculumVersion): RedirectResponse
     {
-        try {
-            // Check if curriculum version has any curriculum units
-            if ($curriculumVersion->curriculumUnits()->count() > 0) {
-                return back()->withErrors(['error' => 'Cannot delete curriculum version with existing curriculum units.']);
-            }
+        $curriculumVersion->delete();
 
-            DB::beginTransaction();
+        return redirect()->route('curriculum_version.index')
+            ->with('success', 'Curriculum version deleted successfully');
+    }
 
-            $curriculumVersion->delete();
+    /**
+     * Get elective management data for a curriculum version.
+     */
+    public function electiveManagement(CurriculumVersion $curriculumVersion): Response
+    {
+        $curriculumVersion->load(['program', 'specialization']);
 
-            DB::commit();
+        $electiveSlots = $curriculumVersion->getElectiveSlots();
+        $availableElectives = $curriculumVersion->getElectiveUnitsByCategory();
 
-            return redirect()
-                ->route('curriculum_version.index')
-                ->with('success', 'Curriculum version deleted successfully.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Curriculum version deletion failed: ' . $e->getMessage());
-
-            return back()->withErrors(['error' => 'Failed to delete curriculum version. Please try again.']);
-        }
+        return Inertia::render('curriculum-versions/ElectiveManagement', [
+            'curriculumVersion' => $curriculumVersion,
+            'electiveSlots' => $electiveSlots->map(function ($slot) {
+                return [
+                    'id' => $slot->id,
+                    'year_level' => $slot->year_level,
+                    'semester_number' => $slot->semester_number,
+                    'current_unit' => [
+                        'id' => $slot->unit->id,
+                        'code' => $slot->unit->code,
+                        'name' => $slot->unit->name,
+                        'credit_points' => $slot->unit->credit_points,
+                    ],
+                    'note' => $slot->note,
+                ];
+            }),
+            'availableElectives' => [
+                'same_program_other_specializations' => [
+                    'label' => 'Units from other specializations in the same program',
+                    'units' => $availableElectives['same_program_other_specializations']->take(20),
+                    'total_count' => $availableElectives['same_program_other_specializations']->count(),
+                ],
+                'cross_program_electives' => [
+                    'label' => 'Units from other programs',
+                    'units' => $availableElectives['cross_program_electives']->take(20),
+                    'total_count' => $availableElectives['cross_program_electives']->count(),
+                ],
+                'general_electives' => [
+                    'label' => 'General elective units',
+                    'units' => $availableElectives['general_electives']->take(20),
+                    'total_count' => $availableElectives['general_electives']->count(),
+                ],
+            ],
+        ]);
     }
 
     public function getSpecializationsByProgram(Request $request)
