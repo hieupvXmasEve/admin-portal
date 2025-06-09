@@ -131,7 +131,7 @@ This document summarizes the comprehensive implementation of the Unit CRUD syste
 ### Technology Stack
 
 #### Backend
-- **Laravel 11** with strict typing
+- **Laravel 12** with strict typing
 - **PHP 8.3+** features
 - **Inertia.js** for seamless SPA experience
 - **Service Layer** architecture

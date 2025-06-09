@@ -39,6 +39,8 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
         Route::delete('{curriculumVersion}', [CurriculumVersionController::class, 'apiDestroy'])->name('destroy');
         Route::get('specializations-by-program', [CurriculumVersionController::class, 'getSpecializationsByProgram'])
             ->name('specializations-by-program');
+        Route::get('by-program-specialization', [CurriculumVersionController::class, 'getCurriculumVersionsByProgramSpecialization'])
+            ->name('by-program-specialization');
         Route::delete('bulk-delete', [CurriculumVersionController::class, 'bulkDelete'])->name('bulk-delete');
         Route::post('bulk-operations', [CurriculumVersionController::class, 'bulkOperations'])
             ->name('bulk-operations');

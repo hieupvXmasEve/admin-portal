@@ -37,48 +37,23 @@ class ProgramFactory extends Factory
             'Physics',
         ];
 
+        $name = $this->faker->randomElement($programNames);
+
         return [
-            'name' => $this->faker->randomElement($programNames),
-            'degree_level' => $this->faker->randomElement(['bachelor', 'master', 'phd']),
+            'name' => $name,
+            'code' => strtoupper(substr(str_replace(' ', '', $name), 0, 6)) . $this->faker->unique()->numberBetween(100, 999),
+            'description' => $this->faker->sentence(),
         ];
     }
 
-    /**
-     * Create a bachelor's degree program.
-     */
-    public function bachelor(): static
-    {
-        return $this->state(fn(array $attributes) => [
-            'degree_level' => 'bachelor',
-        ]);
-    }
 
-    /**
-     * Create a master's degree program.
-     */
-    public function master(): static
-    {
-        return $this->state(fn(array $attributes) => [
-            'degree_level' => 'master',
-        ]);
-    }
-
-    /**
-     * Create a PhD program.
-     */
-    public function phd(): static
-    {
-        return $this->state(fn(array $attributes) => [
-            'degree_level' => 'phd',
-        ]);
-    }
 
     /**
      * Create a computer science program.
      */
     public function computerScience(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn() => [
             'name' => 'Computer Science',
         ]);
     }
@@ -88,7 +63,7 @@ class ProgramFactory extends Factory
      */
     public function businessAdministration(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn() => [
             'name' => 'Business Administration',
         ]);
     }

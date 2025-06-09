@@ -415,6 +415,37 @@ class CurriculumVersionController extends Controller
         return response()->json($specializations);
     }
 
+    /**
+     * Get curriculum versions by program and specialization (AJAX)
+     */
+    public function getCurriculumVersionsByProgramSpecialization(Request $request)
+    {
+        $validated = $request->validate([
+            'program_id' => 'required|exists:programs,id',
+            'specialization_id' => 'nullable|exists:specializations,id',
+        ]);
+
+        $query = CurriculumVersion::where('program_id', $validated['program_id']);
+
+        if ($validated['specialization_id']) {
+            $query->where('specialization_id', $validated['specialization_id']);
+        } else {
+            $query->whereNull('specialization_id');
+        }
+
+        $versions = $query->orderBy('created_at', 'desc')
+            ->get(['id', 'version_code'])
+            ->map(function ($version) {
+                return [
+                    'id' => $version->id,
+                    'version_code' => $version->version_code,
+                ];
+            })
+            ->toArray();
+
+        return response()->json($versions);
+    }
+
     public function bulkDelete(Request $request)
     {
         $validated = $request->validate([

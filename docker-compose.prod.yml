@@ -1,22 +1,196 @@
-services:
-  db:
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${PROD_DB_NAME}
-      MYSQL_USER: ${PROD_DB_USER}
-      MYSQL_PASSWORD: ${PROD_DB_PASSWORD}
-    # Không expose ports ra ngoài trong production
-    # Chỉ cho phép dịch vụ khác trong mạng nội bộ kết nối
+version: '3.8'
 
-#  phpmyadmin:
-#    restart: always
-#    environment:
-#      PMA_HOST: db
-#      PMA_PORT: 3306
-#      MYSQL_ROOT_PASSWORD: ${PROD_DB_ROOT_PASSWORD}
-#    ports:
-#      - "8080:80"
-    # Trong môi trường production thực tế, bạn có thể muốn:
-    # 1. Không sử dụng phpMyAdmin
-    # 2. Hoặc chỉ expose nó qua VPN/proxy bảo mật
+services:
+  # Nginx Reverse Proxy with SSL
+  nginx:
+    image: nginx:alpine
+    container_name: swinx-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/production.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./storage/logs/nginx:/var/log/nginx
+    depends_on:
+      - app
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Laravel Application
+  app:
+    image: ${DOCKER_IMAGE:-ghcr.io/swinburne-edu/swin-new:latest}
+    container_name: swinx-app
+    expose:
+      - "8080"
+    env_file:
+      - .env.docker.production
+      - .env.docker.image
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+      - APP_ENV=production
+    volumes:
+      - app_storage:/var/www/html/storage
+      - app_cache:/var/www/html/bootstrap/cache
+      - ./ssl:/var/www/html/ssl:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: swinx-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE:-swinburne}
+      MYSQL_USER: ${DB_USERNAME:-swinx_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/production.cnf:/etc/mysql/conf.d/production.cnf:ro
+      - ./backups/mysql:/backups
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 40s
+
+  # Redis Cache
+  redis:
+    image: redis:7.4-alpine
+    container_name: swinx-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 5s
+      retries: 5
+      interval: 10s
+
+  # Queue Worker
+  queue:
+    image: ${DOCKER_IMAGE:-ghcr.io/swinburne-edu/swin-new:latest}
+    container_name: swinx-queue
+    command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    env_file:
+      - .env.docker.production
+      - .env.docker.image
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+      - APP_ENV=production
+    volumes:
+      - app_storage:/var/www/html/storage
+    depends_on:
+      - db
+      - redis
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # Scheduler
+  scheduler:
+    image: ${DOCKER_IMAGE:-ghcr.io/swinburne-edu/swin-new:latest}
+    container_name: swinx-scheduler
+    command: sh -c "while true; do php artisan schedule:run; sleep 60; done"
+    env_file:
+      - .env.docker.production
+      - .env.docker.image
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+      - APP_ENV=production
+    volumes:
+      - app_storage:/var/www/html/storage
+    depends_on:
+      - db
+      - redis
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_storage:
+    driver: local
+  app_cache:
+    driver: local
+
+networks:
+  swinx-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

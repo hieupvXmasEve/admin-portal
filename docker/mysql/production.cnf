@@ -1,0 +1,65 @@
+[mysqld]
+# Basic settings
+user = mysql
+default-storage-engine = InnoDB
+socket = /var/lib/mysql/mysql.sock
+pid-file = /var/lib/mysql/mysql.pid
+
+# Connection settings
+bind-address = 0.0.0.0
+port = 3306
+max_connections = 200
+max_connect_errors = 1000000
+
+# Buffer settings
+key_buffer_size = 32M
+max_allowed_packet = 64M
+table_open_cache = 4000
+sort_buffer_size = 4M
+net_buffer_length = 32K
+read_buffer_size = 2M
+read_rnd_buffer_size = 8M
+myisam_sort_buffer_size = 64M
+thread_cache_size = 8
+tmp_table_size = 32M
+max_heap_table_size = 32M
+
+# InnoDB settings
+innodb_buffer_pool_size = 512M
+innodb_log_file_size = 128M
+innodb_log_buffer_size = 8M
+innodb_flush_log_at_trx_commit = 1
+innodb_lock_wait_timeout = 50
+innodb_file_per_table = 1
+
+# Query cache
+query_cache_type = 1
+query_cache_size = 32M
+query_cache_limit = 2M
+
+# Logging
+general_log = 0
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 2
+log_queries_not_using_indexes = 1
+
+# Character set
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
+# Security
+local-infile = 0
+
+# Binary logging
+server-id = 1
+log-bin = mysql-bin
+binlog_format = ROW
+expire_logs_days = 7
+max_binlog_size = 100M
+
+[mysql]
+default-character-set = utf8mb4
+
+[client]
+default-character-set = utf8mb4

@@ -1,34 +1,52 @@
-# Config Database
+# 🎓 Swinburne Project Management System
 
-## Khởi tạo và chạy các container
+Modern web application built with Laravel 12 + Vue.js 3 + Inertia.js
 
-docker-compose -f docker-compose.yml up -d
-docker-compose -f docker-compose.dev.yml up -d
+## 🚀 Quick Start
 
-## Xem logs
+### Local Development (Recommended)
+```bash
+composer dev  # Start all services
+```
 
-docker-compose -f docker-compose.yml logs -f
-docker-compose -f docker-compose.dev.yml logs -f
+### Docker Compose Development
+```bash
+cp env.docker.example .env
+npm run docker:up
+```
 
-## Dừng các container
+## 🔗 Documentation
 
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml down
+- **[📋 Quick Start Guide](QUICKSTART.md)** - Essential commands and workflow
+- **[🐳 Docker Compose Guide](DOCKER-COMPOSE.md)** - Complete Docker development setup
+- **[🧪 Testing Guide](TESTING.md)** - Comprehensive testing setup and pipeline
+- **[🚀 Deployment Guide](DEPLOYMENT.md)** - Production deployment to Google Cloud
 
-## Xây dựng lại image sau khi thay đổi Dockerfile
+## 🛠️ Tech Stack
 
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml build
+- **Backend**: Laravel 12, PHP 8.4
+- **Frontend**: Vue.js 3, TypeScript, TailwindCSS
+- **Database**: MySQL 8.0
+- **Cache**: Redis
+- **Development**: Docker Compose, Vite HMR
 
-## Chạy sau khi rebuild
+---
 
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+## 🧪 Testing
 
-# Config Laravel
+### Quick Testing
+```bash
+./scripts/pre-push.sh          # Fast local tests
+./scripts/test-local.sh        # Comprehensive Docker tests
+npm run test:local             # Same as above
+```
 
-## Khởi tạo database
+### Pre-push Validation
+```bash
+./scripts/pre-push.sh --docker # Full Docker integration tests
+npm run pre-push:docker        # Same as above
+```
 
-php artisan session:table
-php artisan migrate
+---
 
-## Xoá cache
-
-php artisan route:clear && php artisan config:clear && php artisan cache:clear
+**Start developing**: `composer dev` hoặc `npm run docker:up` 🚀

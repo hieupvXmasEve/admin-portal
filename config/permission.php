@@ -86,6 +86,14 @@ return [
             'delete_course' => 'delete_course',
         ],
 
+        // Student Management
+        'students' => [
+            'view_student' => 'view_student',
+            'create_student' => 'create_student',
+            'edit_student' => 'edit_student',
+            'delete_student' => 'delete_student',
+        ],
+
         // Student Activities
         'groups' => [
             'view_groups' => 'view_groups',

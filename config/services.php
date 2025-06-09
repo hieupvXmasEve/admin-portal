@@ -17,7 +17,7 @@ return [
         'client_id' => '345290200984-nlncugvfbd8bsrrt57surrbbq9o00an6.apps.googleusercontent.com',
         'client_secret' => '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',
 
-        'redirect' => 'http://127.0.0.1:8000/auth/google/callback',
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
         'drive_folder_id_event' => env('GOOGLE_DRIVE_FOLDER_ID_EVENT'),
         'drive_folder_id_query' => env('GOOGLE_DRIVE_FOLDER_ID_QUERY'),
         'drive_folder_id_club' => env('GOOGLE_DRIVE_FOLDER_ID_CLUB'),
