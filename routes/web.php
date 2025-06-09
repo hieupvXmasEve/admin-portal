@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\ElectiveController;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
-})->middleware(['auth', 'verified']);
+})->middleware(['auth', 'verified'])->name('home');
 
 Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
@@ -60,3 +60,4 @@ require __DIR__ . '/syllabus.php';
 require __DIR__ . '/programs.php';
 require __DIR__ . '/specializations.php';
 require __DIR__ . '/curriculum.php';
+require __DIR__ . '/students.php';

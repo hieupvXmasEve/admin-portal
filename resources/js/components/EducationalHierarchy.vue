@@ -11,7 +11,6 @@ interface HierarchyData {
     programs: Array<{
         id: number;
         name: string;
-        degree_level: string;
         specializations: Array<{
             id: number;
             name: string;
@@ -69,18 +68,7 @@ const toggleSpecialization = (specializationId: number) => {
     }
 };
 
-const getDegreeColor = (degreeLevel: string) => {
-    switch (degreeLevel.toLowerCase()) {
-        case 'bachelor':
-            return 'bg-blue-100 text-blue-800';
-        case 'master':
-            return 'bg-green-100 text-green-800';
-        case 'doctoral':
-            return 'bg-purple-100 text-purple-800';
-        default:
-            return 'bg-gray-100 text-gray-800';
-    }
-};
+
 
 const totalPrograms = computed(() => props.hierarchy.programs.length);
 const totalSpecializations = computed(() => props.hierarchy.programs.reduce((sum, program) => sum + program.specializations.length, 0));
@@ -131,9 +119,6 @@ const navigateToEntity = (type: string, id: number) => {
                             <GraduationCap class="h-5 w-5 text-blue-600" />
                             <div>
                                 <div class="font-medium">{{ program.name }}</div>
-                                <Badge :class="getDegreeColor(program.degree_level)" class="mt-1 text-xs">
-                                    {{ program.degree_level }}
-                                </Badge>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">

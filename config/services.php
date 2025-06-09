@@ -17,7 +17,7 @@ return [
         'client_id' => '__REMOVED_GOOGLE_CLIENT_ID__',
         'client_secret' => '__REMOVED_GOOGLE_CLIENT_SECRET__',
 
-        'redirect' => 'http://127.0.0.1:8000/auth/google/callback',
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
         'drive_folder_id_event' => env('GOOGLE_DRIVE_FOLDER_ID_EVENT'),
         'drive_folder_id_query' => env('GOOGLE_DRIVE_FOLDER_ID_QUERY'),
         'drive_folder_id_club' => env('GOOGLE_DRIVE_FOLDER_ID_CLUB'),

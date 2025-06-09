@@ -1,21 +1,16 @@
 import type { NavItem } from '@/types';
 import {
-    BarChart3,
     BookOpen,
     Calendar,
-    Database,
-    FileText,
     GraduationCap,
     LayoutDashboard,
-    Mail,
-    Settings,
     Shield,
     ShieldCheck,
-    UserPlus,
     Users,
     Building2,
     BookMarked,
     Layers,
+    User,
 } from 'lucide-vue-next';
 
 export const mainNavItems: NavItem[] = [
@@ -91,6 +86,12 @@ export const mainNavItems: NavItem[] = [
             //     icon: UserCheck,
             //     requiredPermissions: ['view_user'],
             // },
+            {
+                title: 'Students',
+                href: '/students',
+                icon: User,
+                requiredPermissions: ['view_student'],
+            },
         ],
     },
     {

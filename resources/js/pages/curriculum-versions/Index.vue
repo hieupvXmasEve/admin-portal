@@ -112,7 +112,7 @@ const getInitialFilters = () => {
     };
 };
 
-const filters = ref(getInitialFilters());
+const filtersState = ref(getInitialFilters());
 
 // Track if user is currently interacting with filters to prevent overriding their input
 const isUserInteracting = ref(false);
@@ -144,8 +144,8 @@ watch(
             };
 
             // Only update if there's actually a difference to prevent unnecessary reactivity
-            if (JSON.stringify(filters.value) !== JSON.stringify(updatedFilters)) {
-                filters.value = updatedFilters;
+            if (JSON.stringify(filtersState.value) !== JSON.stringify(updatedFilters)) {
+                filtersState.value = updatedFilters;
             }
         }
     },
@@ -157,7 +157,7 @@ onMounted(async () => {
     await nextTick();
 
     // Debug: Log initial filter state
-    console.log('Initial filters:', filters.value);
+    console.log('Initial filters:', filtersState.value);
     console.log('Props filters:', props.filters);
 
     // On initial mount, sync once from props if available
@@ -171,8 +171,8 @@ onMounted(async () => {
             per_page: props.filters.per_page || 15,
         };
 
-        if (JSON.stringify(filters.value) !== JSON.stringify(initialFilters)) {
-            filters.value = initialFilters;
+        if (JSON.stringify(filtersState.value) !== JSON.stringify(initialFilters)) {
+            filtersState.value = initialFilters;
         }
         console.log('Filters synced from server-side props');
     } else {
@@ -182,31 +182,31 @@ onMounted(async () => {
 
 // Computed specializations based on selected program
 const filteredSpecializations = computed(() => {
-    if (!filters.value.program_id) return props.specializations;
-    return props.specializations.filter((spec) => spec.program_id.toString() === filters.value.program_id);
+    if (!filtersState.value.program_id) return props.specializations;
+    return props.specializations.filter((spec) => spec.program_id.toString() === filtersState.value.program_id);
 });
 
 // Watch for program changes to reset specialization
 watch(
-    () => filters.value.program_id,
+    () => filtersState.value.program_id,
     (newProgramId, oldProgramId) => {
-        if (newProgramId !== oldProgramId && filters.value.specialization_id) {
+        if (newProgramId !== oldProgramId && filtersState.value.specialization_id) {
             // Check if current specialization belongs to new program
-            const currentSpec = props.specializations.find((spec) => spec.id.toString() === filters.value.specialization_id);
+            const currentSpec = props.specializations.find((spec) => spec.id.toString() === filtersState.value.specialization_id);
             if (!currentSpec || currentSpec.program_id.toString() !== newProgramId) {
-                filters.value.specialization_id = '';
+                filtersState.value.specialization_id = '';
             }
         }
     },
 );
 
 // Computed display values for select components
-const displayProgramId = computed(() => filters.value.program_id || 'all');
-const displaySpecializationId = computed(() => filters.value.specialization_id || 'all');
+const displayProgramId = computed(() => filtersState.value.program_id || 'all');
+const displaySpecializationId = computed(() => filtersState.value.specialization_id || 'all');
 
 // Computed for checking if filters have active values
 const hasActiveFilters = computed(() => {
-    return !!(filters.value.search || filters.value.program_id || filters.value.specialization_id);
+    return !!(filtersState.value.search || filtersState.value.program_id || filtersState.value.specialization_id);
 });
 
 // Delete dialog state
@@ -307,7 +307,7 @@ const onEditSubmit = (values: any) => {
 };
 
 // Server-side filtering functions
-const applyFilters = (newFilters: typeof filters.value) => {
+const applyFilters = (newFilters: typeof filtersState.value) => {
     const params = new URLSearchParams();
 
     if (newFilters.search) params.set('search', newFilters.search);
@@ -331,11 +331,11 @@ const applyFilters = (newFilters: typeof filters.value) => {
 // Handle search using DebouncedInput pattern (following development standards)
 const handleSearch = (value: string | number) => {
     isUserInteracting.value = true;
-    filters.value.search = String(value);
+    filtersState.value.search = String(value);
 
     // Reset the flag and apply filters
     resetUserInteraction();
-    router.get('/curriculum-versions', filters.value, {
+    router.get('/curriculum-versions', filtersState.value, {
         preserveState: true,
         preserveScroll: true,
         only: ['curriculumVersions', 'filters'],
@@ -344,32 +344,35 @@ const handleSearch = (value: string | number) => {
 
 const updateProgramFilter = (value: any) => {
     isUserInteracting.value = true;
-    filters.value.program_id = value === 'all' ? '' : String(value || '');
+    filtersState.value.program_id = value === 'all' ? '' : String(value || '');
 
     // Auto-reset specialization when program changes
-    if (!filters.value.program_id || !filteredSpecializations.value.some((spec) => spec.id.toString() === filters.value.specialization_id)) {
-        filters.value.specialization_id = '';
+    if (
+        !filtersState.value.program_id ||
+        !filteredSpecializations.value.some((spec) => spec.id.toString() === filtersState.value.specialization_id)
+    ) {
+        filtersState.value.specialization_id = '';
     }
 
     // Reset the flag after applying filters
     resetUserInteraction();
 
-    applyFilters(filters.value);
+    applyFilters(filtersState.value);
 };
 
 const updateSpecializationFilter = (value: any) => {
     isUserInteracting.value = true;
-    filters.value.specialization_id = value === 'all' ? '' : String(value || '');
+    filtersState.value.specialization_id = value === 'all' ? '' : String(value || '');
 
     // Reset the flag after applying filters
     resetUserInteraction();
 
-    applyFilters(filters.value);
+    applyFilters(filtersState.value);
 };
 
 const clearFilters = () => {
     isUserInteracting.value = true;
-    filters.value = {
+    filtersState.value = {
         search: '',
         program_id: '',
         specialization_id: '',
@@ -399,9 +402,9 @@ const exportToExcel = async () => {
     try {
         const params = new URLSearchParams();
 
-        if (filters.value.search) params.set('search', filters.value.search);
-        if (filters.value.program_id) params.set('program_id', filters.value.program_id);
-        if (filters.value.specialization_id) params.set('specialization_id', filters.value.specialization_id);
+        if (filtersState.value.search) params.set('search', filtersState.value.search);
+        if (filtersState.value.program_id) params.set('program_id', filtersState.value.program_id);
+        if (filtersState.value.specialization_id) params.set('specialization_id', filtersState.value.specialization_id);
 
         const exportUrl = `/curriculum-versions/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
 
@@ -526,19 +529,19 @@ const handlePaginationNavigate = (url: string) => {
 };
 
 const handlePageSizeChange = (pageSize: number) => {
-    filters.value.per_page = pageSize;
-    applyFilters(filters.value);
+    filtersState.value.per_page = pageSize;
+    applyFilters(filtersState.value);
 };
 
 const navigateToCreate = () => {
     const createUrl = new URL('/curriculum-versions/create', window.location.origin);
 
     // Pass current filters if they exist
-    if (filters.value.program_id) {
-        createUrl.searchParams.set('program_id', filters.value.program_id);
+    if (filtersState.value.program_id) {
+        createUrl.searchParams.set('program_id', filtersState.value.program_id);
     }
-    if (filters.value.specialization_id) {
-        createUrl.searchParams.set('specialization_id', filters.value.specialization_id);
+    if (filtersState.value.specialization_id) {
+        createUrl.searchParams.set('specialization_id', filtersState.value.specialization_id);
     }
 
     router.visit(createUrl.toString());
@@ -606,7 +609,7 @@ const navigateToCreate = () => {
                     <div class="relative">
                         <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
                         <DebouncedInput
-                            v-model="filters.search"
+                            v-model="filtersState.search"
                             @debounced="handleSearch"
                             placeholder="Search curriculum versions..."
                             class="pl-9"
@@ -635,9 +638,13 @@ const navigateToCreate = () => {
 
                 <!-- Specialization Filter - Enhanced with better UX -->
                 <div class="min-w-[200px]">
-                    <Select :model-value="displaySpecializationId" @update:model-value="updateSpecializationFilter" :disabled="!filters.program_id">
-                        <SelectTrigger :class="{ 'opacity-50': !filters.program_id }">
-                            <SelectValue :placeholder="filters.program_id ? 'All specializations' : 'Select program first'" />
+                    <Select
+                        :model-value="displaySpecializationId"
+                        @update:model-value="updateSpecializationFilter"
+                        :disabled="!filtersState.program_id"
+                    >
+                        <SelectTrigger :class="{ 'opacity-50': !filtersState.program_id }">
+                            <SelectValue :placeholder="filtersState.program_id ? 'All specializations' : 'Select program first'" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All specializations</SelectItem>
@@ -663,7 +670,7 @@ const navigateToCreate = () => {
 
                 <!-- Active Filters Indicator -->
                 <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">
-                    {{ Object.values(filters).filter(Boolean).length }} filter(s) active
+                    {{ Object.values(filtersState).filter(Boolean).length }} filter(s) active
                 </div>
             </div>
 

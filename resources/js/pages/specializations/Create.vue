@@ -1,3 +1,104 @@
+<script setup lang="ts">
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/AppLayout.vue';
+import type { BreadcrumbItem } from '@/types';
+import type { Program } from '@/types/models';
+import { ValidationRules } from '@/types/validation';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { toTypedSchema } from '@vee-validate/zod';
+import { ArrowLeft, Plus } from 'lucide-vue-next';
+import { useForm } from 'vee-validate';
+import { toast } from 'vue-sonner';
+import { z } from 'zod';
+
+interface Props {
+    programs: Program[];
+    selectedProgramId?: number;
+}
+
+const props = defineProps<Props>();
+
+// Get program_id from URL query parameters
+const urlParams = new URLSearchParams(window.location.search);
+const programIdFromUrl = urlParams.get('program_id');
+const sourceFromUrl = urlParams.get('source');
+
+// Use selectedProgramId prop or URL parameter
+const initialProgramId = props.selectedProgramId?.toString() || programIdFromUrl || '';
+
+const breadcrumbItems: BreadcrumbItem[] = [
+    {
+        title: 'Specializations',
+        href: '/specializations',
+    },
+    {
+        title: 'Create',
+        href: '/specializations/create',
+    },
+];
+
+// Define validation schema
+const formSchema = toTypedSchema(
+    z.object({
+        program_id: z.string().min(1, 'Program is required'),
+        name: z
+            .string()
+            .min(ValidationRules.specialization.name.minLength, 'Name is required')
+            .max(ValidationRules.specialization.name.maxLength, 'Name cannot exceed 255 characters'),
+        code: z
+            .string()
+            .min(ValidationRules.specialization.code.minLength, 'Code is required')
+            .max(ValidationRules.specialization.code.maxLength, 'Code cannot exceed 50 characters'),
+        description: z.string().max(ValidationRules.specialization.description.maxLength, 'Description cannot exceed 1000 characters').optional(),
+        is_active: z.union([z.boolean(), z.string()]).transform((val) => {
+            if (typeof val === 'string') {
+                return val === 'true' || val === '1' || val === 'on';
+            }
+            return Boolean(val);
+        }),
+    }),
+);
+
+const { handleSubmit, isSubmitting } = useForm({
+    validationSchema: formSchema,
+    initialValues: {
+        program_id: initialProgramId,
+        name: '',
+        code: '',
+        description: '',
+        is_active: true,
+    },
+});
+
+const onSubmit = handleSubmit((values) => {
+    // Build URL with source parameter if present
+    let submitUrl = '/specializations';
+    if (sourceFromUrl) {
+        submitUrl += `?source=${sourceFromUrl}`;
+    }
+
+    router.post(
+        submitUrl,
+        {
+            ...values,
+            program_id: parseInt(values.program_id),
+        },
+        {
+            onSuccess: () => {
+                toast.success('Specialization created successfully');
+            },
+            onError: () => toast.error('Failed to create specialization'),
+        },
+    );
+});
+</script>
+
 <template>
     <Head title="Create Specialization" />
 
@@ -126,104 +227,3 @@
         </div>
     </AppLayout>
 </template>
-
-<script setup lang="ts">
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem } from '@/types';
-import type { Program } from '@/types/models';
-import { ValidationRules } from '@/types/validation';
-import { Head, Link, router } from '@inertiajs/vue3';
-import { toTypedSchema } from '@vee-validate/zod';
-import { ArrowLeft, Plus } from 'lucide-vue-next';
-import { useForm } from 'vee-validate';
-import { toast } from 'vue-sonner';
-import { z } from 'zod';
-
-interface Props {
-    programs: Program[];
-    selectedProgramId?: number;
-}
-
-const props = defineProps<Props>();
-
-// Get program_id from URL query parameters
-const urlParams = new URLSearchParams(window.location.search);
-const programIdFromUrl = urlParams.get('program_id');
-const sourceFromUrl = urlParams.get('source');
-
-// Use selectedProgramId prop or URL parameter
-const initialProgramId = props.selectedProgramId?.toString() || programIdFromUrl || '';
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Specializations',
-        href: '/specializations',
-    },
-    {
-        title: 'Create',
-        href: '/specializations/create',
-    },
-];
-
-// Define validation schema
-const formSchema = toTypedSchema(
-    z.object({
-        program_id: z.string().min(1, 'Program is required'),
-        name: z
-            .string()
-            .min(ValidationRules.specialization.name.minLength, 'Name is required')
-            .max(ValidationRules.specialization.name.maxLength, 'Name cannot exceed 255 characters'),
-        code: z
-            .string()
-            .min(ValidationRules.specialization.code.minLength, 'Code is required')
-            .max(ValidationRules.specialization.code.maxLength, 'Code cannot exceed 50 characters'),
-        description: z.string().max(ValidationRules.specialization.description.maxLength, 'Description cannot exceed 1000 characters').optional(),
-        is_active: z.union([z.boolean(), z.string()]).transform((val) => {
-            if (typeof val === 'string') {
-                return val === 'true' || val === '1' || val === 'on';
-            }
-            return Boolean(val);
-        }),
-    }),
-);
-
-const { handleSubmit, isSubmitting } = useForm({
-    validationSchema: formSchema,
-    initialValues: {
-        program_id: initialProgramId,
-        name: '',
-        code: '',
-        description: '',
-        is_active: true,
-    },
-});
-
-const onSubmit = handleSubmit((values) => {
-    // Build URL with source parameter if present
-    let submitUrl = '/specializations';
-    if (sourceFromUrl) {
-        submitUrl += `?source=${sourceFromUrl}`;
-    }
-
-    router.post(
-        submitUrl,
-        {
-            ...values,
-            program_id: parseInt(values.program_id),
-        },
-        {
-            onSuccess: () => {
-                toast.success('Specialization created successfully');
-            },
-            onError: () => toast.error('Failed to create specialization'),
-        },
-    );
-});
-</script>

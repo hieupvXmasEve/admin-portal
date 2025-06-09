@@ -1,9 +1,41 @@
 services:
+  # Override for development
+  app:
+    build:
+      target: php-base # Use development target if available
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_HOST=db
+      - DB_DATABASE=swinburne
+      - DB_USERNAME=swinx_user
+      - DB_PASSWORD=swinx_password
+    volumes:
+      # Mount source code for development (hot reload)
+      - .:/var/www/html
+      - /var/www/html/node_modules
+      - /var/www/html/vendor
+    command: >
+      sh -c "
+        php artisan config:clear &&
+        php artisan route:clear &&
+        php artisan view:clear &&
+        php artisan migrate --force &&
+        php artisan cache:clear &&
+        php artisan ziggy:generate &&
+        /start.sh
+      "
+
   db:
     ports:
-      - "3306:3306"
+      - '3306:3306'
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: root_password
       MYSQL_DATABASE: swinburne
-      MYSQL_USER: root
-      MYSQL_PASSWORD: admin
+      MYSQL_USER: swinx_user
+      MYSQL_PASSWORD: swinx_password
+
+  # Enable phpMyAdmin for development
+  phpmyadmin:
+    ports:
+      - '8081:80'

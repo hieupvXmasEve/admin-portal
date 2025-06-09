@@ -1,18 +1,119 @@
-version: "3.8"
-
 services:
-    db:
-        build:
-            context: ./docker/mysql
-        container_name: swinx-db
-        ports:
-            - "3306:3306"
-        environment:
-            MYSQL_ROOT_PASSWORD: admin
-            MYSQL_DATABASE: swinburne
-        volumes:
-            - mysql_data:/var/lib/mysql
-        restart: always
+  # Laravel Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: swinx-app
+    ports:
+      - '8080:8080'
+    env_file:
+      - .env.docker.dev
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./bootstrap/cache:/var/www/html/bootstrap/cache
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - swinx-network
+    restart: unless-stopped
+
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: swinx-db
+    ports:
+      - '3306:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: swinburne
+      MYSQL_USER: swinx_user
+      MYSQL_PASSWORD: swinx_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 40s
+
+  # Redis (optional - for caching and queues)
+  redis:
+    image: redis:7.4-alpine
+    container_name: swinx-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      timeout: 5s
+      retries: 5
+      interval: 10s
+
+  # phpMyAdmin (development only)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: swinx-phpmyadmin
+    ports:
+      - '8081:80'
+    environment:
+      PMA_HOST: db
+      PMA_USER: swinx_user
+      PMA_PASSWORD: swinx_password
+      MYSQL_ROOT_PASSWORD: root_password
+    depends_on:
+      - db
+    networks:
+      - swinx-network
+    restart: unless-stopped
+
+  # Test Database (for integration testing)
+  test-db:
+    image: mysql:8.0
+    container_name: swinx-test-db
+    ports:
+      - '3307:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: test_root_password
+      MYSQL_DATABASE: swinburne_test
+      MYSQL_USER: swinx_test_user
+      MYSQL_PASSWORD: swinx_test_password
+    volumes:
+      - test_mysql_data:/var/lib/mysql
+      - ./docker/mysql/init-test.sql:/docker-entrypoint-initdb.d/init-test.sql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 40s
 
 volumes:
-    mysql_data:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  test_mysql_data:
+    driver: local
+
+networks:
+  swinx-network:
+    driver: bridge
