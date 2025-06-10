@@ -1,7 +1,7 @@
 # Task: Generate Migration, Model, and Seeder
 
 ## Framework
-Assume this is a Laravel project using PHP 8+ and Laravel 11+. Use Eloquent for models and factory-based seeders. Use proper foreign key constraints and soft deletes where necessary.
+Assume this is a Laravel project using PHP 8+ and Laravel 12. Use Eloquent for models and factory-based seeders. Use proper foreign key constraints and soft deletes where necessary.
 
 ## Objective
 Create the following database structure with migrations, models, and seeders:

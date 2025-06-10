@@ -1,44 +1,52 @@
-# PHP Production stage
-FROM php:8.4-fpm-alpine AS php-base
+# ===========================================
+# FrankenPHP Development Dockerfile
+# ===========================================
+# Based on official FrankenPHP image with Laravel optimizations
 
-# Install system dependencies including Node.js
-RUN apk add --no-cache \
-    nginx \
+FROM dunglas/frankenphp:latest AS frankenphp-base
+
+# Set environment variables for development
+ENV APP_ENV=local
+ENV APP_DEBUG=true
+ENV FRANKENPHP_CONFIG=""
+ENV FRANKENPHP_NUM_THREADS=auto
+
+# Install additional system dependencies
+RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     curl \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    libzip-dev \
-    icu-dev \
-    oniguruma-dev \
-    mysql-client \
+    git \
+    default-mysql-client \
     nodejs \
-    npm
+    npm \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        pdo_mysql \
-        mysqli \
-        zip \
-        gd \
-        intl \
-        mbstring \
-        opcache \
-        bcmath
+# Install additional PHP extensions that aren't in the base image
+RUN install-php-extensions \
+    pdo_mysql \
+    mysqli \
+    zip \
+    gd \
+    intl \
+    mbstring \
+    opcache \
+    bcmath \
+    redis
+
+# Configure PHP for development
+RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Create app directory
-WORKDIR /var/www/html
+# Set working directory to /app (FrankenPHP convention)
+WORKDIR /app
 
-# Copy application code first
+# Copy application code
 COPY . .
 
-# Install PHP dependencies (include dev dependencies for development container)
+# Install PHP dependencies (include dev dependencies for development)
 RUN composer install --optimize-autoloader --no-interaction --prefer-dist
 
 # Install Node.js dependencies and build frontend assets
@@ -47,30 +55,27 @@ RUN npm ci
 # Build frontend assets
 RUN npm run build
 
-# Laravel setup - .env will be mounted from host
-# Key generation will be handled in start.sh
+# Set proper permissions for FrankenPHP
+RUN chown -R www-data:www-data /app \
+    && chmod -R 755 /app/storage \
+    && chmod -R 755 /app/bootstrap/cache
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage \
-    && chmod -R 755 /var/www/html/bootstrap/cache
+# Copy FrankenPHP configuration
+COPY Caddyfile.dev /etc/caddy/Caddyfile
 
-# Copy configuration files
-COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
+# Copy custom PHP configuration
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
-COPY docker/php/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
 
-# Create startup script
-COPY docker/start.sh /start.sh
+# Create startup script for FrankenPHP
+COPY docker/start-frankenphp.sh /start.sh
 RUN chmod +x /start.sh
 
-# Expose port
-EXPOSE 8080
+# Expose port 80 for development (HTTP only)
+EXPOSE 80
 
-# Health check
+# Health check for development
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost/health || exit 1
 
-# Start supervisor
+# Start FrankenPHP
 CMD ["/start.sh"]

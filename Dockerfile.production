@@ -1,89 +1,45 @@
-# Multi-stage production Dockerfile for Swinx Laravel Application
-# Optimized for production deployment with security and performance
-
 # ===========================================
-# Stage 1: Node.js Build Stage
+# FrankenPHP Production Dockerfile
 # ===========================================
-FROM node:22-alpine AS node-builder
+# Based on official FrankenPHP image with production optimizations
 
-WORKDIR /app
+FROM dunglas/frankenphp:latest AS production
 
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy source files
-COPY . .
-
-# Build frontend assets
-RUN npm run build
-
-# ===========================================
-# Stage 2: Composer Dependencies
-# ===========================================
-FROM composer:2.7 AS composer-builder
-
-WORKDIR /app
-
-# Copy composer files
-COPY composer.json composer.lock ./
-
-# Install PHP dependencies (production only)
-RUN composer install \
-    --no-dev \
-    --no-scripts \
-    --no-autoloader \
-    --optimize-autoloader \
-    --prefer-dist \
-    --no-interaction
-
-# Copy application code
-COPY . .
-
-# Generate optimized autoloader
-RUN composer dump-autoload --optimize --classmap-authoritative
-
-# ===========================================
-# Stage 3: Production PHP Runtime
-# ===========================================
-FROM php:8.4-fpm-alpine AS production
-
-# Set environment variables
+# Set environment variables for production
 ENV APP_ENV=production
 ENV APP_DEBUG=false
 ENV COMPOSER_ALLOW_SUPERUSER=1
+ENV FRANKENPHP_CONFIG=""
+ENV FRANKENPHP_NUM_THREADS=auto
+ENV SERVER_NAME=localhost
+ENV ACME_EMAIL=""
 
-# Install system dependencies
-RUN apk add --no-cache \
-    nginx \
-    supervisor \
+# Install additional system dependencies
+RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     curl \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    libzip-dev \
-    icu-dev \
-    oniguruma-dev \
-    mysql-client \
-    dcron \
-    && rm -rf /var/cache/apk/*
+    git \
+    default-mysql-client \
+    nodejs \
+    npm \
+    cron \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        pdo_mysql \
-        mysqli \
-        zip \
-        gd \
-        intl \
-        mbstring \
-        opcache \
-        bcmath \
-    && docker-php-ext-enable opcache
+# Install additional PHP extensions
+RUN install-php-extensions \
+    pdo_mysql \
+    mysqli \
+    zip \
+    gd \
+    intl \
+    mbstring \
+    opcache \
+    bcmath \
+    redis
+
+# Configure PHP for production
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 # Configure OPcache for production
 RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
@@ -96,57 +52,62 @@ RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.save_comments=1" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.fast_shutdown=1" >> /usr/local/etc/php/conf.d/opcache.ini
 
-# Create application directory
-WORKDIR /var/www/html
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Create non-root user
-RUN addgroup -g 1000 -S www && \
-    adduser -u 1000 -D -S -G www www
+# Set working directory to /app (FrankenPHP convention)
+WORKDIR /app
 
-# Copy application code from composer stage
-COPY --from=composer-builder --chown=www:www /app .
+# Copy application code
+COPY . .
 
-# Copy built assets from node stage
-COPY --from=node-builder --chown=www:www /app/public/build ./public/build
+# Install PHP dependencies (production only - no dev dependencies)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
-# Create necessary directories
-RUN mkdir -p \
-    storage/app/public \
-    storage/framework/cache/data \
-    storage/framework/sessions \
-    storage/framework/views \
-    storage/logs \
-    bootstrap/cache \
-    && chown -R www:www storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
+# Verify debugbar is not installed in production
+RUN if [ -d "vendor/barryvdh/laravel-debugbar" ]; then \
+        echo "ERROR: Debugbar found in production build!" && exit 1; \
+    else \
+        echo "✅ Debugbar correctly excluded from production"; \
+    fi
 
-# Copy configuration files
-COPY --chown=www:www docker/nginx/production.conf /etc/nginx/nginx.conf
-COPY --chown=www:www docker/php/production.ini /usr/local/etc/php/conf.d/production.ini
-COPY --chown=www:www docker/php/php-fpm-production.conf /usr/local/etc/php-fpm.d/www.conf
-COPY --chown=www:www docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Clear any cached service providers and rebuild autoloader
+RUN composer dump-autoload --optimize --classmap-authoritative
 
-# Copy startup script
-COPY --chown=www:www docker/start-production.sh /start.sh
+# Clear Laravel cached configs that might reference debugbar
+RUN rm -rf bootstrap/cache/*.php || true
+
+# Install Node.js dependencies and build frontend assets
+RUN npm ci --only=production
+
+# Build frontend assets
+RUN npm run build
+
+# Set proper permissions for FrankenPHP
+RUN chown -R www-data:www-data /app \
+    && chmod -R 755 /app/storage \
+    && chmod -R 755 /app/bootstrap/cache
+
+# Create log directory for Caddy
+RUN mkdir -p /var/log/caddy \
+    && chown -R www-data:www-data /var/log/caddy
+
+# Copy FrankenPHP configuration
+COPY Caddyfile.prod /etc/caddy/Caddyfile
+
+# Copy custom PHP configuration
+COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
+
+# Create startup script for FrankenPHP production
+COPY docker/start-frankenphp-production.sh /start.sh
 RUN chmod +x /start.sh
 
-# Create health check script
-RUN echo '#!/bin/sh' > /health-check.sh \
-    && echo 'curl -f http://localhost:8080/up || exit 1' >> /health-check.sh \
-    && chmod +x /health-check.sh
+# Expose ports 80 and 443 for production (HTTP and HTTPS)
+EXPOSE 80 443 443/udp
 
-# Set up cron for Laravel scheduler
-RUN echo "* * * * * www cd /var/www/html && php artisan schedule:run >> /dev/null 2>&1" > /etc/crontabs/www
+# Health check for production
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/up || exit 1
 
-# Expose port
-EXPOSE 8080
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD /health-check.sh
-
-# Switch to non-root user
-USER www
-
-# Start application
+# Start FrankenPHP
 CMD ["/start.sh"]

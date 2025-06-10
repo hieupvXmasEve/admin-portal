@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -30,8 +31,12 @@ class SocialController extends Controller
                     'email' => $user_social->email
                 ]);
             }
+        } catch (InvalidStateException $e) {
+            // Handle invalid state exception - redirect back to login
+            return redirect()->route('login')->with('error', 'Authentication failed. Please try again.');
         } catch (\Exception $e) {
-            throw $e;
+            // Handle other exceptions
+            return redirect()->route('login')->with('error', 'Authentication error: ' . $e->getMessage());
         }
     }
 }

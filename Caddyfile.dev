@@ -1,0 +1,84 @@
+# ===========================================
+# FrankenPHP Development Configuration
+# ===========================================
+# HTTP only for local development - no SSL/HTTPS
+
+{
+	# Global FrankenPHP configuration for development
+	frankenphp {
+		# Use auto-detected number of threads for development
+		# num_threads auto (commented out as 'auto' is not a valid number)
+		# Enable file watching for development (if supported)
+		# worker {
+		#     file /app/public/index.php
+		#     watch /app/**/*.php
+		# }
+	}
+	
+	# Disable automatic HTTPS for development
+	auto_https off
+	
+	# Development-friendly settings
+	log {
+		level DEBUG
+	}
+}
+
+# Development server configuration
+:80 {
+	# Set document root to Laravel's public directory
+	root * /app/public
+	
+	# Enable compression for better performance
+	encode zstd br gzip
+	
+	# Security headers (development-friendly)
+	header {
+		X-Frame-Options "SAMEORIGIN"
+		X-XSS-Protection "1; mode=block"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer-when-downgrade"
+		Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' http: https: data: blob:; connect-src 'self' ws: wss: http: https:;"
+		-Server
+		-X-Powered-By
+	}
+	
+	# Handle Laravel routes and PHP files
+	php_server {
+		# Try files in order: exact path, directory with index.php, fallback to index.php
+		root /app/public
+		# Use split directive instead of split_path
+		split .php
+	}
+	
+	# Static file caching for development (shorter cache times)
+	@static {
+		file
+		path *.css *.js *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot *.map
+	}
+	header @static {
+		Cache-Control "public, max-age=300"
+	}
+	
+	# Health check endpoint
+	respond /health "healthy" 200
+	
+	# Laravel storage symlink handling
+	@storage {
+		path /storage/*
+	}
+	rewrite @storage /storage{path}
+	
+	# Deny access to sensitive files
+	@sensitive {
+		path /.env* /.git* /composer.* /package.* /webpack.* /.docker* /Dockerfile* /docker-compose.*
+	}
+	respond @sensitive 404
+	
+	# Development logging
+	log {
+		output stdout
+		format console
+		level DEBUG
+	}
+}

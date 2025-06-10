@@ -1,12 +1,15 @@
-version: '3.8'
+# ===========================================
+# Docker Compose Local Production Override
+# ===========================================
+# For testing production FrankenPHP configuration locally
 
 services:
-  # Laravel Application with FrankenPHP (Production)
+  # Laravel Application with FrankenPHP (Local Production)
   app:
     build:
       context: .
       dockerfile: Dockerfile.production
-    container_name: swinx-app
+    container_name: swinx-app-local-prod
     ports:
       - '80:80'      # HTTP
       - '443:443'    # HTTPS
@@ -17,16 +20,21 @@ services:
       - DB_HOST=db
       - APP_ENV=production
       - FRANKENPHP_NUM_THREADS=auto
-      - SERVER_NAME=${SERVER_NAME:-localhost}
-      - ACME_EMAIL=${ACME_EMAIL:-}
+      - SERVER_NAME=swinx.test
+      - ACME_EMAIL=admin@swinx.test
+      # Override for local production testing
+      - APP_DEBUG=false
+      - LOG_LEVEL=info
     volumes:
       - ./storage:/app/storage
       - ./bootstrap/cache:/app/bootstrap/cache
       # FrankenPHP/Caddy volumes for certificates and configuration
-      - caddy_data:/data
-      - caddy_config:/config
-      # Log directory for production
+      - caddy_data_local_prod:/data
+      - caddy_config_local_prod:/config
+      # Log directory for local production
       - ./logs:/var/log/caddy
+      # Override Caddyfile for local production
+      - ./Caddyfile.local-prod:/etc/caddy/Caddyfile:ro
     depends_on:
       db:
         condition: service_healthy
@@ -34,16 +42,16 @@ services:
       - swinx-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/up"]
+      test: ["CMD", "curl", "-f", "-k", "https://localhost/up"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
-  # MySQL Database (same as dev but with production credentials)
+  # MySQL Database (Production configuration)
   db:
     image: mysql:8.0
-    container_name: swinx-db
+    container_name: swinx-db-local-prod
     ports:
       - '3306:3306'
     environment:
@@ -52,7 +60,7 @@ services:
       MYSQL_USER: ${DB_USERNAME:-swinx_prod_user}
       MYSQL_PASSWORD: ${DB_PASSWORD:-SwinxProd2024!@#SecurePass}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_data_local_prod:/var/lib/mysql
       - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
       - ./backups:/backups
     networks:
@@ -68,12 +76,12 @@ services:
 
 
 volumes:
-  mysql_data:
+  mysql_data_local_prod:
     driver: local
-  # FrankenPHP/Caddy volumes for certificates and configuration
-  caddy_data:
+  # FrankenPHP/Caddy volumes for local production certificates and configuration
+  caddy_data_local_prod:
     driver: local
-  caddy_config:
+  caddy_config_local_prod:
     driver: local
 
 networks:
