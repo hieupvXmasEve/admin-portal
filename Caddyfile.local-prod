@@ -1,0 +1,128 @@
+# ===========================================
+# FrankenPHP Local Production Configuration
+# ===========================================
+# For testing production features locally with self-signed certificates
+
+{
+	# Global FrankenPHP configuration for local production testing
+	frankenphp {
+		# Optimize for production workload
+		num_threads 4
+		# Production worker mode for better performance (optional)
+		# worker {
+		#     file /app/public/index.php
+		#     num {env.FRANKENPHP_WORKER_NUM}
+		# }
+	}
+	
+	# Use self-signed certificates for local testing
+	# This avoids Let's Encrypt rate limits and works offline
+	local_certs
+	
+	# Production logging (but more verbose for local testing)
+	log {
+		level INFO
+		output file /var/log/caddy/access.log {
+			roll_size 10mb
+			roll_keep 3
+			roll_keep_for 24h
+		}
+	}
+}
+
+# HTTP to HTTPS redirect for local production testing
+swinx.test:80 {
+	# Redirect all HTTP traffic to HTTPS
+	redir https://{host}{uri} permanent
+}
+
+# Main HTTPS server for local production testing
+swinx.test {
+	# Set document root to Laravel's public directory
+	root * /app/public
+	
+	# Enable compression for production
+	encode zstd br gzip
+	
+	# Production security headers (same as real production)
+	header {
+		# Security headers
+		X-Frame-Options "SAMEORIGIN"
+		X-XSS-Protection "1; mode=block"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;"
+		
+		# HSTS (HTTP Strict Transport Security) - shorter max-age for local testing
+		Strict-Transport-Security "max-age=3600; includeSubDomains"
+		
+		# Additional security headers
+		X-Permitted-Cross-Domain-Policies "none"
+		Cross-Origin-Embedder-Policy "require-corp"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		
+		# Remove server information
+		-Server
+		-X-Powered-By
+		
+		# Add custom header to identify local production
+		X-Environment "local-production"
+	}
+	
+	# Handle Laravel routes and PHP files
+	php_server {
+		# Set the root directory for PHP files
+		root /app/public
+		# Split path on .php for proper PATH_INFO handling
+		split .php
+	}
+	
+	# Static file caching for production (but shorter for local testing)
+	@static {
+		file
+		path *.css *.js *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot *.map
+	}
+	header @static {
+		Cache-Control "public, max-age=3600"
+		Expires "1 hour"
+	}
+	
+	# Health check endpoints
+	respond /health "healthy" 200
+	respond /up "up" 200
+	
+	# Laravel storage symlink handling
+	@storage {
+		path /storage/*
+	}
+	rewrite @storage /storage{path}
+	
+	# Rate limiting disabled for local testing (rate_limit not available in standard FrankenPHP)
+	# @login {
+	#	path /login /auth/* /password/*
+	# }
+	# rate_limit @login {
+	#	zone login
+	#	key {remote_addr}
+	#	events 20
+	#	window 1m
+	# }
+	
+	# Deny access to sensitive files
+	@sensitive {
+		path /.env* /.git* /composer.* /package.* /webpack.* /.docker* /Dockerfile* /docker-compose.* /storage/logs/* /storage/framework/*
+	}
+	respond @sensitive 404
+	
+	# Local production access logging
+	log {
+		output file /var/log/caddy/swinx-access.log {
+			roll_size 10mb
+			roll_keep 3
+			roll_keep_for 24h
+		}
+		format json
+		level INFO
+	}
+}

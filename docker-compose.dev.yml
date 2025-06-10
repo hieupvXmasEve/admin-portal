@@ -1,20 +1,40 @@
+# ===========================================
+# Docker Compose - Development Environment
+# ===========================================
+# Clean development setup with FrankenPHP + MySQL only
+
 services:
-  # Override for development
+  # Laravel Application with FrankenPHP
   app:
     build:
-      target: php-base # Use development target if available
+      context: .
+      dockerfile: Dockerfile
+    container_name: swinx-app-dev
+    ports:
+      - '8080:80'  # HTTP only for development
+    env_file:
+      - .env.docker.dev
     environment:
       - APP_ENV=local
       - APP_DEBUG=true
       - DB_HOST=db
-      - DB_DATABASE=swinburne
-      - DB_USERNAME=swinx_user
-      - DB_PASSWORD=swinx_password
     volumes:
-      # Mount source code for development (hot reload)
-      - .:/var/www/html
-      - /var/www/html/node_modules
-      - /var/www/html/vendor
+      # Mount source code for hot reload
+      - .:/app
+      - /app/node_modules
+      - /app/vendor
+      # Persistent storage
+      - ./storage:/app/storage
+      - ./bootstrap/cache:/app/bootstrap/cache
+      # Caddy data for development
+      - caddy_data_dev:/data
+      - caddy_config_dev:/config
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - swinx-network
+    restart: unless-stopped
     command: >
       sh -c "
         php artisan config:clear &&
@@ -26,7 +46,10 @@ services:
         /start.sh
       "
 
+  # MySQL Database
   db:
+    image: mysql:8.0
+    container_name: swinx-db-dev
     ports:
       - '3306:3306'
     environment:
@@ -34,8 +57,29 @@ services:
       MYSQL_DATABASE: swinburne
       MYSQL_USER: swinx_user
       MYSQL_PASSWORD: swinx_password
+    volumes:
+      - mysql_data_dev:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      - swinx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 40s
 
-  # Enable phpMyAdmin for development
-  phpmyadmin:
-    ports:
-      - '8081:80'
+volumes:
+  mysql_data_dev:
+    driver: local
+  # FrankenPHP/Caddy volumes for development
+  caddy_data_dev:
+    driver: local
+  caddy_config_dev:
+    driver: local
+
+networks:
+  swinx-network:
+    driver: bridge

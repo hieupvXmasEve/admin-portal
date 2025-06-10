@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -20,8 +21,8 @@ describe('Health Check Endpoints', function () {
             ]);
     });
 
-    test('nginx health endpoint returns success', function () {
-        $response = $this->get('/health');
+    test('laravel health endpoint returns success', function () {
+        $response = $this->get('/up');
 
         $response->assertStatus(200);
     });
@@ -29,6 +30,10 @@ describe('Health Check Endpoints', function () {
     test('application homepage is accessible', function () {
         // Create a user for authentication
         $user = \App\Models\User::factory()->create();
+        $campus = \App\Models\Campus::factory()->create();
+
+        // Set current campus in session to bypass campus selection middleware
+        session(['current_campus_id' => $campus->id]);
 
         $response = $this->actingAs($user)->get('/');
 
@@ -37,6 +42,10 @@ describe('Health Check Endpoints', function () {
 
     test('dashboard is accessible for authenticated users', function () {
         $user = \App\Models\User::factory()->create();
+        $campus = \App\Models\Campus::factory()->create();
+
+        // Set current campus in session to bypass campus selection middleware
+        session(['current_campus_id' => $campus->id]);
 
         $response = $this->actingAs($user)->get('/dashboard');
 
@@ -47,12 +56,12 @@ describe('Health Check Endpoints', function () {
 describe('Database Connectivity', function () {
     test('database connection is working', function () {
         // Test basic database connectivity
-        expect(\DB::connection()->getPdo())->not->toBeNull();
+        expect(DB::connection()->getPdo())->not->toBeNull();
     });
 
     test('migrations are up to date', function () {
         // Check if we can query the migrations table
-        $migrations = \DB::table('migrations')->count();
+        $migrations = DB::table('migrations')->count();
         expect($migrations)->toBeGreaterThan(0);
     });
 

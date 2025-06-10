@@ -1,0 +1,49 @@
+{"level":"info","ts":1749501139.8183239,"logger":"admin","msg":"admin endpoint started","address":"localhost:2019","enforce_origin":false,"origins":["//127.0.0.1:2019","//localhost:2019","//[::1]:2019"]}
+{"level":"info","ts":1749501139.8216388,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x40006b0800"}
+{"level":"info","ts":1749501139.8344665,"logger":"http.auto_https","msg":"server is listening only on the HTTPS port but has no TLS connection policies; adding one to enable TLS","server_name":"srv0","https_port":443}
+{"level":"info","ts":1749501139.8345866,"logger":"http.auto_https","msg":"enabling automatic HTTP->HTTPS redirects","server_name":"srv0"}
+{"level":"warn","ts":1749501139.8346353,"logger":"http.auto_https","msg":"server is listening only on the HTTP port, so no automatic HTTPS will be applied to this server","server_name":"srv1","http_port":80}
+{"level":"warn","ts":1749501139.835749,"logger":"pki.ca.local","msg":"installing root certificate (you might be prompted for password)","path":"storage:pki/authorities/local/root.crt"}
+{"level":"info","ts":1749501140.3944612,"logger":"frankenphp","msg":"FrankenPHP started 🐘","php_version":"8.4.8","num_threads":4,"max_threads":4}
+{"level":"info","ts":1749501140.3952584,"logger":"http","msg":"enabling HTTP/3 listener","addr":":443"}
+{"level":"info","ts":1749501140.3985667,"logger":"http.log","msg":"server running","name":"srv0","protocols":["h1","h2","h3"]}
+{"level":"warn","ts":1749501140.3989553,"logger":"http","msg":"HTTP/2 skipped because it requires TLS","network":"tcp","addr":":80"}
+{"level":"warn","ts":1749501140.3990474,"logger":"http","msg":"HTTP/3 skipped because it requires TLS","network":"tcp","addr":":80"}
+{"level":"info","ts":1749501140.3991354,"logger":"http.log","msg":"server running","name":"srv1","protocols":["h1","h2","h3"]}
+{"level":"info","ts":1749501140.399199,"logger":"http","msg":"enabling automatic TLS certificate management","domains":["swinx.test"]}
+{"level":"info","ts":1749501140.4001086,"msg":"autosaved config (load with --resume flag)","file":"/config/caddy/autosave.json"}
+{"level":"info","ts":1749501140.4032657,"logger":"tls.obtain","msg":"acquiring lock","identifier":"swinx.test"}
+{"level":"info","ts":1749501140.4035506,"logger":"tls","msg":"cleaning storage unit","storage":"FileStorage:/data/caddy"}
+{"level":"info","ts":1749501140.4056978,"logger":"tls.obtain","msg":"lock acquired","identifier":"swinx.test"}
+{"level":"info","ts":1749501140.4058173,"logger":"tls.obtain","msg":"obtaining certificate","identifier":"swinx.test"}
+{"level":"info","ts":1749501140.405748,"logger":"tls","msg":"finished cleaning storage units"}
+{"level":"info","ts":1749501140.4103734,"logger":"tls.obtain","msg":"certificate obtained successfully","identifier":"swinx.test","issuer":"local"}
+{"level":"info","ts":1749501140.4104662,"logger":"tls.obtain","msg":"releasing lock","identifier":"swinx.test"}
+{"level":"info","ts":1749501193.0165467,"msg":"shutting down apps, then terminating","signal":"SIGTERM"}
+{"level":"warn","ts":1749501193.0251088,"msg":"exiting; byeee!! 👋","signal":"SIGTERM"}
+{"level":"info","ts":1749501193.0319903,"logger":"http","msg":"servers shutting down with eternal grace period"}
+{"level":"info","ts":1749501193.0390058,"logger":"frankenphp","msg":"FrankenPHP stopped 🐘"}
+{"level":"info","ts":1749501193.0401692,"logger":"admin","msg":"stopped previous server","address":"localhost:2019"}
+{"level":"info","ts":1749501193.0403154,"msg":"shutdown complete","signal":"SIGTERM","exit_code":0}
+{"level":"info","ts":1749501199.9344692,"logger":"admin","msg":"admin endpoint started","address":"localhost:2019","enforce_origin":false,"origins":["//[::1]:2019","//127.0.0.1:2019","//localhost:2019"]}
+{"level":"info","ts":1749501199.9354265,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x400048f700"}
+{"level":"info","ts":1749501199.9367259,"logger":"http.auto_https","msg":"server is listening only on the HTTPS port but has no TLS connection policies; adding one to enable TLS","server_name":"srv0","https_port":443}
+{"level":"info","ts":1749501199.9369032,"logger":"http.auto_https","msg":"enabling automatic HTTP->HTTPS redirects","server_name":"srv0"}
+{"level":"warn","ts":1749501199.9369645,"logger":"http.auto_https","msg":"server is listening only on the HTTP port, so no automatic HTTPS will be applied to this server","server_name":"srv1","http_port":80}
+{"level":"info","ts":1749501199.9686632,"logger":"frankenphp","msg":"FrankenPHP started 🐘","php_version":"8.4.8","num_threads":4,"max_threads":4}
+{"level":"info","ts":1749501199.9689362,"logger":"http","msg":"enabling HTTP/3 listener","addr":":443"}
+{"level":"info","ts":1749501199.9692528,"logger":"http.log","msg":"server running","name":"srv0","protocols":["h1","h2","h3"]}
+{"level":"warn","ts":1749501199.969428,"logger":"http","msg":"HTTP/2 skipped because it requires TLS","network":"tcp","addr":":80"}
+{"level":"warn","ts":1749501199.9695027,"logger":"http","msg":"HTTP/3 skipped because it requires TLS","network":"tcp","addr":":80"}
+{"level":"info","ts":1749501199.9695406,"logger":"http.log","msg":"server running","name":"srv1","protocols":["h1","h2","h3"]}
+{"level":"info","ts":1749501199.969569,"logger":"http","msg":"enabling automatic TLS certificate management","domains":["swinx.test"]}
+{"level":"warn","ts":1749501199.9698782,"logger":"pki.ca.local","msg":"installing root certificate (you might be prompted for password)","path":"storage:pki/authorities/local/root.crt"}
+{"level":"info","ts":1749501199.9721959,"logger":"tls","msg":"storage cleaning happened too recently; skipping for now","storage":"FileStorage:/data/caddy","instance":"4706c1ca-9673-4c9f-ae24-eb45053429ca","try_again":1749587599.972195,"try_again_in":86399.999999625}
+{"level":"info","ts":1749501199.9725144,"logger":"tls","msg":"finished cleaning storage units"}
+{"level":"info","ts":1749501200.3142571,"msg":"autosaved config (load with --resume flag)","file":"/config/caddy/autosave.json"}
+{"level":"info","ts":1749521655.8175807,"msg":"shutting down apps, then terminating","signal":"SIGTERM"}
+{"level":"warn","ts":1749521655.820269,"msg":"exiting; byeee!! 👋","signal":"SIGTERM"}
+{"level":"info","ts":1749521655.8241813,"logger":"frankenphp","msg":"FrankenPHP stopped 🐘"}
+{"level":"info","ts":1749521655.824951,"logger":"http","msg":"servers shutting down with eternal grace period"}
+{"level":"info","ts":1749521655.8318532,"logger":"admin","msg":"stopped previous server","address":"localhost:2019"}
+{"level":"info","ts":1749521655.8319504,"msg":"shutdown complete","signal":"SIGTERM","exit_code":0}

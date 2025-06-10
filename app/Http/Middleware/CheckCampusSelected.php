@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Support\Facades\Log;
 
 class CheckCampusSelected
 {
@@ -21,8 +20,15 @@ class CheckCampusSelected
             return $next($request);
         }
 
-        // Skip kiểm tra cho các route select-campus
-        if ($request->routeIs(['select-campus.index', 'select-campus.set-current'])) {
+        // Skip kiểm tra cho các route select-campus, email verification, và password confirmation
+        if ($request->routeIs([
+            'select-campus.index',
+            'select-campus.set-current',
+            'verification.notice',
+            'verification.verify',
+            'verification.send',
+            'password.confirm'
+        ])) {
             return $next($request);
         }
 
