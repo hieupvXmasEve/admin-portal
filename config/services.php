@@ -14,10 +14,11 @@ return [
     |
     */
     'google' => [
-        'client_id' => '__REMOVED_GOOGLE_CLIENT_ID__',
-        'client_secret' => '__REMOVED_GOOGLE_CLIENT_SECRET__',
-
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
+
+        // Google Drive settings (existing)
         'drive_folder_id_event' => env('GOOGLE_DRIVE_FOLDER_ID_EVENT'),
         'drive_folder_id_query' => env('GOOGLE_DRIVE_FOLDER_ID_QUERY'),
         'drive_folder_id_club' => env('GOOGLE_DRIVE_FOLDER_ID_CLUB'),

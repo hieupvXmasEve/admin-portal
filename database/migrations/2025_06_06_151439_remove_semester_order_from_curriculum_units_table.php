@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('curriculum_units', function (Blueprint $table) {
-            // Drop the semester_order column
-            $table->dropColumn('semester_order');
+            // Drop the semester_number column
+            $table->dropColumn('semester_number');
         });
     }
 
@@ -23,8 +23,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('curriculum_units', function (Blueprint $table) {
-            // Add back the semester_order column
-            $table->unsignedTinyInteger('semester_order')->nullable()->comment('Suggested semester (1-12)');
+            // Add back the semester_number column
+            $table->unsignedTinyInteger('semester_number')->nullable()->comment('Suggested semester (1-12)');
         });
     }
 };

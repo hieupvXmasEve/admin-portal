@@ -1,0 +1,411 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Type Organization Standards
+
+## Overview
+All TypeScript interfaces and types must be centrally managed in the [resources/js/types/](mdc:resources/js/types) directory for consistency and maintainability.
+
+## File Structure (MANDATORY)
+
+### Required Type Files
+- [resources/js/types/index.ts](mdc:resources/js/types/index.ts) - Main exports for clean imports
+- [resources/js/types/models.ts](mdc:resources/js/types/models.ts) - Database model interfaces
+- [resources/js/types/api.ts](mdc:resources/js/types/api.ts) - API response types
+- [resources/js/types/forms.ts](mdc:resources/js/types/forms.ts) - Form data types
+- [resources/js/types/components.ts](mdc:resources/js/types/components.ts) - Component prop types
+- [resources/js/types/validation.ts](mdc:resources/js/types/validation.ts) - Validation rule constants
+
+## Model Interfaces
+
+### Database Models ([resources/js/types/models.ts](mdc:resources/js/types/models.ts))
+```typescript
+// Base interface for all models
+export interface BaseModel {
+  id: number
+  created_at: string
+  updated_at: string
+}
+
+// User model
+export interface User extends BaseModel {
+  name: string
+  email: string
+  email_verified_at: string | null
+  status: 'active' | 'inactive'
+  // Optional relationships
+  roles?: Role[]
+  profile?: UserProfile
+}
+
+// Role model
+export interface Role extends BaseModel {
+  name: string
+  guard_name: string
+  permissions?: Permission[]
+}
+
+// Permission model
+export interface Permission extends BaseModel {
+  name: string
+  guard_name: string
+}
+
+// Specialization model
+export interface Specialization extends BaseModel {
+  name: string
+  code: string
+  description: string | null
+  status: 'active' | 'inactive'
+  program_id: number
+  // Optional relationships
+  program?: Program
+  users?: User[]
+}
+
+// Program model
+export interface Program extends BaseModel {
+  name: string
+  code: string
+  description: string | null
+  duration_years: number
+  status: 'active' | 'inactive'
+  specializations?: Specialization[]
+}
+
+// Curriculum Version model
+export interface CurriculumVersion extends BaseModel {
+  name: string
+  version: string
+  status: 'draft' | 'active' | 'archived'
+  effective_date: string
+  program_id: number
+  program?: Program
+}
+```
+
+### Naming Conventions
+- **Models**: PascalCase matching Laravel model names
+- **Properties**: snake_case matching database columns
+- **Relationships**: camelCase for TypeScript consistency
+- **Status Fields**: Use union types for predefined values
+
+## API Response Types
+
+### Standard API Responses ([resources/js/types/api.ts](mdc:resources/js/types/api.ts))
+```typescript
+// Paginated response wrapper
+export interface PaginatedResponse<T> {
+  data: T[]
+  meta: {
+    current_page: number
+    per_page: number
+    total: number
+    last_page: number
+    from: number | null
+    to: number | null
+  }
+  links: {
+    first: string | null
+    last: string | null
+    prev: string | null
+    next: string | null
+  }
+}
+
+// Standard API response
+export interface ApiResponse<T> {
+  data: T
+  message?: string
+  errors?: Record<string, string[]>
+}
+
+// Error response
+export interface ApiError {
+  message: string
+  errors?: Record<string, string[]>
+  status: number
+}
+
+// Bulk operation response
+export interface BulkOperationResponse {
+  success_count: number
+  error_count: number
+  errors?: Array<{
+    id: number
+    message: string
+  }>
+}
+
+// Export response
+export interface ExportResponse {
+  file_url: string
+  filename: string
+  status: 'processing' | 'completed' | 'failed'
+}
+```
+
+## Form Data Types
+
+### Form Interfaces ([resources/js/types/forms.ts](mdc:resources/js/types/forms.ts))
+```typescript
+// User form data
+export interface UserFormData {
+  name: string
+  email: string
+  password?: string
+  password_confirmation?: string
+  status: 'active' | 'inactive'
+  role_ids: number[]
+}
+
+// Specialization form data
+export interface SpecializationFormData {
+  name: string
+  code: string
+  description: string | null
+  status: 'active' | 'inactive'
+  program_id: number
+}
+
+// Program form data
+export interface ProgramFormData {
+  name: string
+  code: string
+  description: string | null
+  duration_years: number
+  status: 'active' | 'inactive'
+}
+
+// Filter types
+export interface UserFilters {
+  search: string
+  status: string
+  role: string
+  page?: number
+}
+
+export interface SpecializationFilters {
+  search: string
+  status: string
+  program_id: string
+  page?: number
+}
+```
+
+## Component Prop Types
+
+### Component Interfaces ([resources/js/types/components.ts](mdc:resources/js/types/components.ts))
+```typescript
+// Table column definitions
+export interface TableColumn<T> {
+  key: keyof T
+  label: string
+  sortable?: boolean
+  width?: string
+  align?: 'left' | 'center' | 'right'
+}
+
+// Pagination props
+export interface PaginationProps {
+  currentPage: number
+  perPage: number
+  total: number
+  lastPage: number
+  from: number | null
+  to: number | null
+}
+
+// Action button props
+export interface ActionButtonProps {
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost'
+  size?: 'default' | 'sm' | 'lg' | 'icon'
+  loading?: boolean
+  disabled?: boolean
+}
+
+// Modal props
+export interface ModalProps {
+  open: boolean
+  title: string
+  description?: string
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+}
+
+// Form field props
+export interface FormFieldProps {
+  label: string
+  required?: boolean
+  error?: string
+  description?: string
+}
+```
+
+## Validation Constants
+
+### Validation Rules ([resources/js/types/validation.ts](mdc:resources/js/types/validation.ts))
+```typescript
+export const ValidationRules = {
+  user: {
+    name: {
+      minLength: 1,
+      maxLength: 255,
+    },
+    email: {
+      maxLength: 255,
+    },
+    password: {
+      minLength: 8,
+    },
+  },
+  specialization: {
+    name: {
+      minLength: 1,
+      maxLength: 255,
+    },
+    code: {
+      minLength: 1,
+      maxLength: 10,
+    },
+    description: {
+      maxLength: 1000,
+    },
+  },
+  program: {
+    name: {
+      minLength: 1,
+      maxLength: 255,
+    },
+    code: {
+      minLength: 1,
+      maxLength: 10,
+    },
+    duration_years: {
+      min: 1,
+      max: 10,
+    },
+  },
+} as const;
+
+export type ValidationRuleKey = keyof typeof ValidationRules;
+```
+
+## Index File
+
+### Main Export ([resources/js/types/index.ts](mdc:resources/js/types/index.ts))
+```typescript
+// Re-export all types for clean imports
+export * from './models'
+export * from './api'
+export * from './forms'
+export * from './components'
+export * from './validation'
+
+// Utility types
+export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>
+export type RequiredFields<T, K extends keyof T> = T & Required<Pick<T, K>>
+
+// Inertia types
+export interface InertiaPageProps {
+  auth: {
+    user: User & {
+      can: Record<string, boolean>
+    }
+  }
+  flash: {
+    success?: string
+    error?: string
+  }
+  errors: Record<string, string>
+}
+```
+
+## Critical Rules
+
+### Type Definition Requirements
+- **ALWAYS** define interfaces in the appropriate type file
+- **ALWAYS** match backend model structure exactly
+- **ALWAYS** use proper TypeScript syntax with optional properties
+- **ALWAYS** include relationships as optional properties
+- **NEVER** define types inline in components
+- **ALWAYS** use union types for enum-like fields
+
+### Naming Conventions
+- **Interfaces**: PascalCase (e.g., `User`, `PaginatedResponse`)
+- **Properties**: snake_case for model fields, camelCase for TypeScript-only fields
+- **File Names**: kebab-case for TypeScript files
+- **Export Names**: PascalCase for interfaces, camelCase for utilities
+
+### Import Standards
+```typescript
+// Preferred import style
+import type { User, Specialization, ApiResponse } from '@/types'
+
+// Avoid
+import { User } from '@/types/models'
+import { ApiResponse } from '@/types/api'
+```
+
+### Optional Properties
+```typescript
+// Correct: Mark relationships and nullable fields as optional
+export interface User extends BaseModel {
+  name: string
+  email: string
+  email_verified_at: string | null  // Nullable field
+  roles?: Role[]                    // Optional relationship
+}
+
+// Incorrect: All properties required
+export interface User extends BaseModel {
+  name: string
+  email: string
+  email_verified_at: string | null
+  roles: Role[]  // This should be optional
+}
+```
+
+## Type Safety Best Practices
+
+### Generic Types
+```typescript
+// Use generics for reusable types
+export interface FormProps<T> {
+  data: T
+  onSubmit: (data: T) => void
+  validation?: Record<keyof T, string>
+}
+
+// Table component with generic data
+export interface DataTableProps<T> {
+  data: T[]
+  columns: ColumnDef<T>[]
+  loading?: boolean
+}
+```
+
+### Utility Types
+```typescript
+// Create specific utility types for common patterns
+export type CreateData<T> = Omit<T, 'id' | 'created_at' | 'updated_at'>
+export type UpdateData<T> = Partial<CreateData<T>>
+export type FormData<T> = CreateData<T> & {
+  [K in keyof T as T[K] extends string | null ? `${K}_confirmation` : never]?: string
+}
+```
+
+## Type Organization Checklist
+
+### Before Creating New Types
+- [ ] Determine which type file the interface belongs in
+- [ ] Check if similar interfaces already exist
+- [ ] Ensure property names match backend exactly
+- [ ] Mark relationships and nullable fields as optional
+- [ ] Use union types for enum-like fields
+- [ ] Add proper JSDoc comments for complex types
+- [ ] Export from appropriate file
+- [ ] Re-export from index.ts if needed
+- [ ] Update validation constants if applicable
+- [ ] Test type usage in components

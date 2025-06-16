@@ -217,7 +217,7 @@ CREATE TABLE `curriculum_units` (
     `unit_id` bigint(20) UNSIGNED NOT NULL,
     `semester_id` bigint(20) UNSIGNED NOT NULL,
     `unit_type_id` tinyint(3) UNSIGNED NOT NULL,
-    `semester_order` tinyint(3) UNSIGNED NULL COMMENT 'Suggested semester (1-12)',
+    `semester_number` tinyint(3) UNSIGNED NULL COMMENT 'Suggested semester (1-12)',
     `is_compulsory` tinyint(1) NOT NULL DEFAULT 1,
     `note` text NULL,
     `created_at` timestamp NULL DEFAULT NULL,
@@ -225,7 +225,7 @@ CREATE TABLE `curriculum_units` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `curriculum_unit_unique` (`curriculum_version_id`, `unit_id`),
     KEY `curriculum_units_curriculum_version_id_unit_type_id_index` (`curriculum_version_id`, `unit_type_id`),
-    KEY `curriculum_units_semester_order_is_compulsory_index` (`semester_order`, `is_compulsory`),
+    KEY `curriculum_units_semester_number_is_compulsory_index` (`semester_number`, `is_compulsory`),
     CONSTRAINT `curriculum_units_curriculum_version_id_foreign` FOREIGN KEY (`curriculum_version_id`) REFERENCES `curriculum_versions` (`id`) ON DELETE CASCADE,
     CONSTRAINT `curriculum_units_unit_id_foreign` FOREIGN KEY (`unit_id`) REFERENCES `units` (`id`) ON DELETE CASCADE,
     CONSTRAINT `curriculum_units_semester_id_foreign` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`id`) ON DELETE CASCADE,
@@ -332,37 +332,7 @@ CREATE TABLE `assessment_component_details` (
 -- STUDENT ENROLLMENT AND ACADEMIC RECORDS
 -- =============================================
 
--- Student enrollments (student enrollment in programs per semester)
-CREATE TABLE `student_enrollments` (
-    `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-    `user_id` bigint(20) UNSIGNED NOT NULL,
-    `semester_id` bigint(20) UNSIGNED NOT NULL,
-    `program_id` bigint(20) UNSIGNED NOT NULL,
-    `specialization_id` bigint(20) UNSIGNED NULL,
-    `enrollment_status` enum('enrolled', 'active', 'withdrawn', 'completed', 'suspended', 'deferred') NOT NULL DEFAULT 'enrolled',
-    `enrollment_date` date NOT NULL,
-    `total_credit_hours` decimal(5, 2) NOT NULL DEFAULT 0.00,
-    `gpa_semester` decimal(3, 2) NULL,
-    `gpa_cumulative` decimal(3, 2) NULL,
-    `academic_standing` enum('good_standing', 'probation', 'suspension', 'dismissal', 'dean_list', 'honor_roll') NOT NULL DEFAULT 'good_standing',
-    `is_full_time` tinyint(1) NOT NULL DEFAULT 1,
-    `is_probation` tinyint(1) NOT NULL DEFAULT 0,
-    `is_dean_list` tinyint(1) NOT NULL DEFAULT 0,
-    `notes` text NULL,
-    `created_at` timestamp NULL DEFAULT NULL,
-    `updated_at` timestamp NULL DEFAULT NULL,
-    `deleted_at` timestamp NULL DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `unique_student_semester_enrollment` (`user_id`, `semester_id`),
-    KEY `student_enrollments_user_id_semester_id_index` (`user_id`, `semester_id`),
-    KEY `student_enrollments_semester_id_enrollment_status_index` (`semester_id`, `enrollment_status`),
-    KEY `student_enrollments_program_id_specialization_id_index` (`program_id`, `specialization_id`),
-    KEY `student_enrollments_academic_standing_is_probation_index` (`academic_standing`, `is_probation`),
-    CONSTRAINT `student_enrollments_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `student_enrollments_semester_id_foreign` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `student_enrollments_program_id_foreign` FOREIGN KEY (`program_id`) REFERENCES `programs` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `student_enrollments_specialization_id_foreign` FOREIGN KEY (`specialization_id`) REFERENCES `specializations` (`id`) ON DELETE SET NULL
-);
+-- Note: student_enrollments table removed - student enrollment is now managed through course_registrations
 
 -- Semester unit offerings (specific offerings of units in semesters)
 CREATE TABLE `semester_unit_offerings` (
@@ -399,35 +369,7 @@ CREATE TABLE `semester_unit_offerings` (
     CONSTRAINT `semester_unit_offerings_instructor_id_foreign` FOREIGN KEY (`instructor_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 );
 
--- Student unit enrollments (student enrollment in specific unit offerings)
-CREATE TABLE `student_unit_enrollments` (
-    `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-    `student_enrollment_id` bigint(20) UNSIGNED NOT NULL,
-    `semester_unit_offering_id` bigint(20) UNSIGNED NOT NULL,
-    `enrollment_status` enum('enrolled', 'active', 'dropped', 'withdrawn', 'completed', 'waitlisted') NOT NULL DEFAULT 'enrolled',
-    `enrollment_date` date NOT NULL,
-    `drop_date` date NULL,
-    `withdrawal_date` date NULL,
-    `midterm_grade` varchar(3) NULL,
-    `final_grade` varchar(3) NULL,
-    `grade_status` enum('in_progress', 'midterm', 'final', 'incomplete', 'audit') NOT NULL DEFAULT 'in_progress',
-    `attendance_percentage` decimal(5, 2) NULL,
-    `is_audit` tinyint(1) NOT NULL DEFAULT 0,
-    `payment_status` enum('paid', 'pending', 'overdue', 'waived', 'scholarship') NOT NULL DEFAULT 'pending',
-    `notes` text NULL,
-    `created_at` timestamp NULL DEFAULT NULL,
-    `updated_at` timestamp NULL DEFAULT NULL,
-    `deleted_at` timestamp NULL DEFAULT NULL,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `unique_student_unit_enrollment` (`student_enrollment_id`, `semester_unit_offering_id`),
-    KEY `sue_student_enrollment_status_idx` (`student_enrollment_id`, `enrollment_status`),
-    KEY `sue_offering_status_idx` (`semester_unit_offering_id`, `enrollment_status`),
-    KEY `sue_grade_status_idx` (`final_grade`, `grade_status`),
-    KEY `sue_payment_status_idx` (`payment_status`),
-    KEY `sue_audit_idx` (`is_audit`),
-    CONSTRAINT `student_unit_enrollments_student_enrollment_id_foreign` FOREIGN KEY (`student_enrollment_id`) REFERENCES `student_enrollments` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `student_unit_enrollments_semester_unit_offering_id_foreign` FOREIGN KEY (`semester_unit_offering_id`) REFERENCES `semester_unit_offerings` (`id`) ON DELETE CASCADE
-);
+-- Note: student_unit_enrollments table removed - functionality moved to course_registrations
 
 -- =============================================
 -- SYSTEM INFRASTRUCTURE TABLES
@@ -515,36 +457,14 @@ CREATE INDEX `idx_users_email_verified` ON `users` (`email_verified_at`);
 CREATE INDEX `idx_semesters_active_period` ON `semesters` (`is_active`, `start_date`, `end_date`);
 CREATE INDEX `idx_specializations_active` ON `specializations` (`is_active`);
 CREATE INDEX `idx_units_credit_points` ON `units` (`credit_points`);
-CREATE INDEX `idx_student_enrollments_status_date` ON `student_enrollments` (`enrollment_status`, `enrollment_date`);
-CREATE INDEX `idx_student_unit_enrollments_grades` ON `student_unit_enrollments` (`final_grade`, `grade_status`);
+-- Note: Removed indexes for deleted student_enrollments and student_unit_enrollments tables
 
 -- =============================================
 -- VIEWS FOR COMMON QUERIES (OPTIONAL)
 -- =============================================
 
--- View for active student enrollments with program details
-CREATE OR REPLACE VIEW `active_student_enrollments` AS
-SELECT
-    se.id,
-    se.user_id,
-    u.name as student_name,
-    u.email as student_email,
-    s.name as semester_name,
-    s.code as semester_code,
-    p.name as program_name,
-    p.code as program_code,
-    sp.name as specialization_name,
-    sp.code as specialization_code,
-    se.enrollment_status,
-    se.gpa_cumulative,
-    se.academic_standing
-FROM student_enrollments se
-JOIN users u ON se.user_id = u.id
-JOIN semesters s ON se.semester_id = s.id
-JOIN programs p ON se.program_id = p.id
-LEFT JOIN specializations sp ON se.specialization_id = sp.id
-WHERE se.deleted_at IS NULL
-AND se.enrollment_status IN ('enrolled', 'active');
+-- Note: Removed active_student_enrollments view as student_enrollments table was deleted
+-- Student enrollment data is now tracked through course_registrations table
 
 -- View for current semester unit offerings with enrollment stats
 CREATE OR REPLACE VIEW `current_unit_offerings` AS
@@ -579,7 +499,6 @@ ALTER TABLE `specializations` COMMENT = 'Specializations within programs (e.g., 
 ALTER TABLE `units` COMMENT = 'Individual courses/subjects with credit points';
 ALTER TABLE `curriculum_versions` COMMENT = 'Specific versions of program curricula';
 ALTER TABLE `curriculum_units` COMMENT = 'Units that belong to specific curriculum versions';
-ALTER TABLE `student_enrollments` COMMENT = 'Student enrollment in programs per semester';
+-- Note: Removed comments for deleted student_enrollments and student_unit_enrollments tables
 ALTER TABLE `semester_unit_offerings` COMMENT = 'Specific offerings of units in semesters with instructor and schedule';
-ALTER TABLE `student_unit_enrollments` COMMENT = 'Student enrollment in specific unit offerings with grades';
 ALTER TABLE `syllabus` COMMENT = 'Detailed unit content, structure and assessment information';

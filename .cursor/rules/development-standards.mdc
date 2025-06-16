@@ -1,0 +1,1107 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Development Standards & Best Practices
+
+## Database Migration Standards
+
+### Field Naming Consistency
+**CRITICAL**: Maintain consistent field naming across migrations, models, and frontend interfaces.
+
+**✅ Required Patterns:**
+```php
+// Use descriptive, consistent field names
+$table->integer('max_capacity')->default(30);           // NOT max_enrollment
+$table->enum('enrollment_status', ['open', 'closed']);  // NOT status
+$table->foreignId('course_offering_id');                // NOT semester_unit_offering_id
+```
+
+**❌ Avoid Inconsistent Naming:**
+```php
+// DON'T mix naming conventions
+$table->integer('max_enrollment');     // Later changed to max_capacity
+$table->string('status');              // Later changed to enrollment_status
+$table->foreignId('offering_id');      // Unclear relationship
+```
+
+### Migration Ordering and Dependencies
+**ALWAYS** ensure migrations run in correct dependency order:
+
+```php
+// 1. Create parent tables first
+2025_05_28_120001_create_semesters_table.php
+2025_05_28_120002_create_units_table.php
+
+// 2. Create dependent tables with proper foreign keys
+2025_05_28_120003_create_course_offerings_table.php
+2025_05_28_120004_create_student_unit_enrollments_table.php
+```
+
+**Foreign Key Best Practices:**
+```php
+// ALWAYS use descriptive constraint names
+$table->foreignId('course_offering_id')
+    ->constrained('course_offerings')
+    ->onDelete('cascade');
+
+// ALWAYS add proper indexes
+$table->index(['semester_id', 'unit_id']);
+$table->unique(['semester_id', 'unit_id', 'section_code'], 'unique_semester_unit_section');
+```
+
+## Model Relationship Guidelines
+
+### Relationship Method Consistency
+**CRITICAL**: Update ALL relationship methods when changing table structures.
+
+**✅ Complete Relationship Updates:**
+```php
+// When changing from semester_unit_offerings to course_offerings
+// Update BOTH sides of relationships
+
+// In CourseOffering model
+public function studentEnrollments(): HasMany
+{
+    return $this->hasMany(StudentUnitEnrollment::class, 'course_offering_id');
+}
+
+// In StudentUnitEnrollment model
+public function courseOffering(): BelongsTo
+{
+    return $this->belongsTo(CourseOffering::class, 'course_offering_id');
+}
+```
+
+**❌ Incomplete Updates Lead to Errors:**
+```php
+// DON'T leave old relationship methods
+public function semesterOffering(): BelongsTo  // OLD - will break
+{
+    return $this->belongsTo(SemesterUnitOffering::class, 'semester_unit_offering_id');
+}
+```
+
+### Model Validation Rules
+**ALWAYS** define validation rules in models for consistency:
+
+```php
+class CourseOffering extends Model
+{
+    public static function validationRules(): array
+    {
+        return [
+            'semester_id' => ['required', 'exists:semesters,id'],
+            'unit_id' => ['required', 'exists:units,id'],
+            'max_capacity' => ['required', 'integer', 'min:1', 'max:500'],
+            'enrollment_status' => ['nullable', 'in:open,closed,waitlist_only,cancelled'],
+            'registration_start_date' => ['nullable', 'date'],
+            'registration_end_date' => ['nullable', 'date', 'after_or_equal:registration_start_date'],
+        ];
+    }
+
+    public static function validationMessages(): array
+    {
+        return [
+            'semester_id.required' => 'Semester is required',
+            'max_capacity.min' => 'Max capacity must be at least 1',
+            'registration_end_date.after_or_equal' => 'End date must be after start date',
+        ];
+    }
+}
+```
+
+## Frontend-Backend Field Alignment
+
+### TypeScript Interface Synchronization
+**CRITICAL**: TypeScript interfaces MUST exactly match Laravel model fields after schema changes.
+
+**✅ Strict Type Alignment:**
+```typescript
+// resources/js/types/models.ts
+export interface CourseOffering {
+  id: number;
+  semester_id: number;
+  unit_id: number;
+  instructor_id?: number;
+  section_code?: string;
+  max_capacity: number;                    // MUST match database field
+  current_enrollment: number;
+  waitlist_capacity: number;
+  current_waitlist: number;
+  delivery_mode: 'in_person' | 'online' | 'hybrid' | 'blended';
+  enrollment_status: 'open' | 'closed' | 'waitlist_only' | 'cancelled';  // MUST match enum
+  registration_start_date?: string;
+  registration_end_date?: string;
+  // ... other fields matching database exactly
+  unit?: Unit;
+  instructor?: User;
+  semester?: Semester;
+  created_at: string;
+  updated_at: string;
+}
+
+// Form data type for strict validation
+export interface CourseOfferingFormData {
+  semester_id: string;
+  unit_id: string;
+  instructor_id?: string;
+  section_code?: string;
+  max_capacity: number;
+  waitlist_capacity?: number;
+  delivery_mode: 'in_person' | 'online' | 'hybrid' | 'blended';
+  enrollment_status?: 'open' | 'closed' | 'waitlist_only' | 'cancelled';
+  registration_start_date?: string;
+  registration_end_date?: string;
+  special_requirements?: string;
+  notes?: string;
+}
+```
+
+**❌ Misaligned Types Cause Runtime Errors:**
+```typescript
+// DON'T use outdated field names
+export interface CourseOffering {
+  course_code: string;        // OLD - doesn't exist in new schema
+  course_title: string;       // OLD - use unit.name instead
+  max_enrollment: number;     // OLD - should be max_capacity
+  status: string;             // OLD - should be enrollment_status
+}
+```
+
+### Type Safety with `satisfies` Keyword
+**ALWAYS** use `satisfies` for compile-time type checking:
+
+```typescript
+// Form validation with strict type checking
+const formSchema = toTypedSchema(
+    z.object({
+        semester_id: z.string().min(1, 'Semester is required'),
+        unit_id: z.string().min(1, 'Unit is required'),
+        max_capacity: z.number().int().min(1).max(500),
+        enrollment_status: z.enum(['open', 'closed', 'waitlist_only', 'cancelled']).default('open'),
+        // ... other fields
+    }),
+) satisfies z.ZodType<CourseOfferingFormData>;  // Compile-time validation
+
+// Initial values with type checking
+const initialValues = {
+    semester_id: '',
+    unit_id: '',
+    max_capacity: 30,
+    enrollment_status: 'open' as const,
+    // ... other fields
+} satisfies CourseOfferingFormData;  // Ensures all required fields present
+```
+
+## Form Validation Standards
+
+### Frontend-Backend Validation Alignment
+**CRITICAL**: Frontend Zod schemas MUST match backend Laravel validation rules exactly.
+
+**✅ Synchronized Validation:**
+
+```vue
+<script setup lang="ts">
+import { useForm } from 'vee-validate'
+import { toTypedSchema } from '@vee-validate/zod'
+import { z } from 'zod'
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import type { CourseOfferingFormData } from '@/types/models'
+
+// Define validation schema that matches backend exactly
+const formSchema = toTypedSchema(
+    z.object({
+        semester_id: z.string().min(1, 'Semester is required'),
+        unit_id: z.string().min(1, 'Unit is required'),
+        max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(500, 'Max capacity cannot exceed 500'),
+        enrollment_status: z.enum(['open', 'closed', 'waitlist_only', 'cancelled']).default('open'),
+        registration_start_date: z.string().optional(),
+        registration_end_date: z.string().optional(),
+        // ... other fields matching backend validation
+    }),
+) satisfies z.ZodType<CourseOfferingFormData>;  // Compile-time type checking
+
+const { handleSubmit, isSubmitting } = useForm({
+    validationSchema: formSchema,
+    initialValues: {
+        semester_id: '',
+        unit_id: '',
+        max_capacity: 30,
+        enrollment_status: 'open' as const,
+        // ... other fields
+    } satisfies CourseOfferingFormData,  // Ensures all required fields
+})
+
+const onSubmit = handleSubmit((values) => {
+    // Transform form data to match backend expectations
+    const formData = {
+        semester_id: values.semester_id,
+        unit_id: values.unit_id,
+        max_capacity: Number(values.max_capacity),
+        enrollment_status: values.enrollment_status,
+        registration_start_date: values.registration_start_date || null,
+        registration_end_date: values.registration_end_date || null,
+        // Convert empty strings to null for optional fields
+    };
+
+    router.post('/course-offerings', formData, {
+        onSuccess: () => {
+            console.log('Course offering created successfully');
+        },
+        onError: (errors) => {
+            console.error('Validation errors:', errors);
+            // Log detailed error information for debugging
+            Object.entries(errors).forEach(([field, messages]) => {
+                console.error(`Field "${field}":`, messages);
+            });
+        },
+    });
+})
+</script>
+
+<template>
+  <form @submit="onSubmit" class="space-y-6">
+    <FormField v-slot="{ componentField }" name="semester_id">
+      <FormItem>
+        <FormLabel>Semester</FormLabel>
+        <FormControl>
+          <Select v-bind="componentField">
+            <SelectTrigger>
+              <SelectValue placeholder="Select semester" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                {{ semester.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+    <!-- Additional fields... -->
+    <Button type="submit" :disabled="isSubmitting">
+      {{ isSubmitting ? 'Creating...' : 'Create Course Offering' }}
+    </Button>
+  </form>
+</template>
+```
+
+### Form Data Transformation Patterns
+**ALWAYS** transform form data properly between frontend and backend:
+
+```typescript
+// ✅ Proper form data transformation
+const onSubmit = handleSubmit((values) => {
+    const formData = {
+        semester_id: values.semester_id,
+        unit_id: values.unit_id,
+        instructor_id: values.instructor_id === 'none' || values.instructor_id === '' ? null : values.instructor_id,
+        section_code: values.section_code || null,
+        max_capacity: Number(values.max_capacity),
+        waitlist_capacity: Number(values.waitlist_capacity) || 10,
+        delivery_mode: values.delivery_mode,
+        schedule_days: values.schedule_days?.length ? values.schedule_days : null,
+        enrollment_status: values.enrollment_status,
+        registration_start_date: values.registration_start_date || null,
+        registration_end_date: values.registration_end_date || null,
+        special_requirements: values.special_requirements || null,
+        notes: values.notes || null,
+    };
+
+    router.post('/course-offerings', formData, {
+        onSuccess: () => console.log('Success'),
+        onError: (errors) => {
+            console.error('Validation errors:', errors);
+            Object.entries(errors).forEach(([field, messages]) => {
+                console.error(`Field "${field}":`, messages);
+            });
+        },
+    });
+});
+```
+
+## API Endpoint Implementation
+
+### Complete API Endpoint Creation
+**ALWAYS** implement complete API endpoints with proper error handling:
+
+**Step 1**: Controller Method with Proper Field Names
+```php
+// app/Http/Controllers/CourseOfferingController.php
+public function statistics(Request $request)
+{
+    $semesterId = $request->semester_id;
+
+    $query = CourseOffering::query();
+
+    if ($semesterId && $semesterId !== 'all') {
+        $query->where('semester_id', $semesterId);
+    }
+
+    $stats = [
+        'total_offerings' => $query->count(),
+        'active_offerings' => (clone $query)->where('is_active', true)->where('enrollment_status', 'open')->count(),
+        'full_offerings' => (clone $query)->whereRaw('current_enrollment >= max_capacity')->count(),
+        'cancelled_offerings' => (clone $query)->where('enrollment_status', 'cancelled')->count(),
+        'total_enrollment' => (clone $query)->sum('current_enrollment'),
+        'total_capacity' => (clone $query)->sum('max_capacity'),  // NOT max_enrollment
+    ];
+
+    $stats['enrollment_rate'] = $stats['total_capacity'] > 0
+        ? round(($stats['total_enrollment'] / $stats['total_capacity']) * 100, 2)
+        : 0;
+
+    return response()->json([
+        'success' => true,
+        'data' => $stats,
+    ]);
+}
+```
+
+**Step 2**: Route Registration
+```php
+// routes/course-offerings.php
+Route::get('/api/course-offerings/statistics', [CourseOfferingController::class, 'statistics'])
+    ->middleware('can:view_course')
+    ->name('api.course-offerings.statistics');
+```
+
+**Step 3**: Frontend API Call with Error Handling
+```typescript
+// Frontend API call with proper error handling
+const loadStatistics = async () => {
+    try {
+        const response = await fetch(`/api/course-offerings/statistics?semester_id=${filters.value.semester_id}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.success) {
+            statistics.value = data.data;
+        } else {
+            console.error('API returned error:', data);
+        }
+    } catch (error) {
+        console.error('Failed to load statistics:', error);
+        // Set default statistics on error
+        statistics.value = {
+            total_offerings: 0,
+            active_offerings: 0,
+            total_enrollment: 0,
+            total_capacity: 0,
+            enrollment_rate: 0
+        };
+    }
+};
+```
+
+## Vue.js Component Standards
+
+### SelectItem Value Requirements
+**CRITICAL**: `<SelectItem />` components **MUST NOT** have empty string values.
+
+**❌ This Will Cause Runtime Errors:**
+```vue
+<Select v-model="filters.instructor_id">
+  <SelectTrigger>
+    <SelectValue placeholder="Select instructor" />
+  </SelectTrigger>
+  <SelectContent>
+    <!-- ERROR: Empty string value will throw runtime error -->
+    <SelectItem value="">No instructor assigned</SelectItem>
+    <SelectItem v-for="instructor in instructors" :key="instructor.id" :value="instructor.id.toString()">
+      {{ instructor.name }}
+    </SelectItem>
+  </SelectContent>
+</Select>
+```
+
+**✅ Correct Implementation:**
+```vue
+<script setup lang="ts">
+const filters = ref({
+  instructor_id: 'none', // Use 'none' instead of empty string
+})
+
+const onSubmit = handleSubmit((values) => {
+    const formData = {
+        instructor_id: values.instructor_id === 'none' || values.instructor_id === '' ? null : values.instructor_id,
+        // ... other fields
+    };
+    // Submit formData
+});
+</script>
+
+<template>
+  <Select v-model="filters.instructor_id">
+    <SelectTrigger>
+      <SelectValue placeholder="Select instructor" />
+    </SelectTrigger>
+    <SelectContent>
+      <!-- CORRECT: Use 'none' instead of empty string -->
+      <SelectItem value="none">No instructor assigned</SelectItem>
+      <SelectItem v-for="instructor in instructors" :key="instructor.id" :value="instructor.id.toString()">
+        {{ instructor.name }}
+      </SelectItem>
+    </SelectContent>
+  </Select>
+</template>
+```
+
+### Error Handling in Components
+**ALWAYS** implement comprehensive error handling:
+
+```vue
+<script setup lang="ts">
+const submitError = ref<string | null>(null);
+
+const onSubmit = handleSubmit((values) => {
+    submitError.value = null;
+
+    router.post('/course-offerings', formData, {
+        onSuccess: () => {
+            console.log('Course offering created successfully');
+        },
+        onError: (errors) => {
+            console.error('Validation errors:', errors);
+            submitError.value = 'Please check the form for errors and try again.';
+
+            // Log detailed error information for debugging
+            Object.entries(errors).forEach(([field, messages]) => {
+                console.error(`Field "${field}":`, messages);
+            });
+        },
+        onFinish: () => {
+            console.log('Request finished');
+        },
+    });
+});
+</script>
+
+<template>
+  <!-- Error Display -->
+  <div v-if="submitError" class="rounded-md bg-red-50 p-4">
+    <div class="flex">
+      <div class="ml-3">
+        <h3 class="text-sm font-medium text-red-800">
+          Error creating course offering
+        </h3>
+        <div class="mt-2 text-sm text-red-700">
+          {{ submitError }}
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+```
+
+## Controller Method Updates
+
+### Field Name Consistency in Controllers
+**CRITICAL**: Update ALL controller methods when changing model field names.
+
+**✅ Complete Controller Updates:**
+```php
+// Update ALL methods that reference old field names
+class CourseOfferingController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = CourseOffering::with(['semester', 'unit', 'instructor'])
+            ->orderBy('semester_id', 'desc');
+
+        // Use NEW field names in filters
+        if ($request->filled('enrollment_status') && $request->enrollment_status !== 'all') {
+            $query->where('enrollment_status', $request->enrollment_status);  // NOT status
+        }
+
+        return Inertia::render('course-offerings/Index', [
+            'courseOfferings' => $query->paginate(15),
+            'enrollmentStatusOptions' => [  // NOT statusOptions
+                ['value' => 'open', 'label' => 'Open'],
+                ['value' => 'closed', 'label' => 'Closed'],
+                ['value' => 'waitlist_only', 'label' => 'Waitlist Only'],
+                ['value' => 'cancelled', 'label' => 'Cancelled'],
+            ],
+        ]);
+    }
+
+    public function toggleStatus(CourseOffering $courseOffering): RedirectResponse
+    {
+        // Use NEW field names
+        $newStatus = $courseOffering->enrollment_status === 'open' ? 'closed' : 'open';
+        $courseOffering->update(['enrollment_status' => $newStatus]);  // NOT status
+
+        return Redirect::back()
+            ->with('success', "Course offering status updated to {$newStatus}.");
+    }
+
+    public function destroy(CourseOffering $courseOffering): RedirectResponse
+    {
+        // Use NEW relationship names
+        if ($courseOffering->studentEnrollments()->count() > 0) {  // NOT courseRegistrations
+            return Redirect::back()
+                ->with('error', 'Cannot delete course offering with existing registrations.');
+        }
+
+        $courseOffering->delete();
+        return Redirect::route('course-offerings.index');
+    }
+}
+```
+
+## Input Components
+
+### DebouncedInput Usage
+**ALWAYS** use [DebouncedInput.vue](mdc:resources/js/components/DebouncedInput.vue) for search and filter inputs:
+
+```vue
+<script setup lang="ts">
+import DebouncedInput from '@/components/DebouncedInput.vue'
+
+const filters = ref({
+  search: '',
+  status: ''
+})
+
+const handleSearch = (value: string) => {
+  filters.value.search = value
+  // Trigger API call or filter update
+  router.get('/users', filters.value, {
+    preserveState: true,
+    preserveScroll: true
+  })
+}
+</script>
+
+<template>
+  <DebouncedInput
+    v-model="filters.search"
+    @debounced="handleSearch"
+    placeholder="Search users..."
+    :debounce="300"
+  />
+</template>
+```
+
+### Avoid watch() and setTimeout()
+- **DO NOT** use `watch()` for API calls or data fetching
+- **DO NOT** use `setTimeout()` for debouncing
+- **USE** DebouncedInput component instead
+- **USE** computed properties for reactive data transformations
+- **USE** composables for complex reactive logic
+
+**❌ Avoid:**
+```vue
+<script setup lang="ts">
+// DON'T DO THIS
+watch(searchTerm, (newValue) => {
+  setTimeout(() => {
+    fetchData(newValue)
+  }, 300)
+})
+</script>
+```
+
+**✅ Prefer:**
+```vue
+<script setup lang="ts">
+// DO THIS INSTEAD
+const handleSearch = (value: string) => {
+  router.get('/users', { search: value }, {
+    preserveState: true,
+    preserveScroll: true
+  })
+}
+</script>
+
+<template>
+  <DebouncedInput
+    @debounced="handleSearch"
+    placeholder="Search..."
+  />
+</template>
+```
+
+### Table Column Field Alignment
+**CRITICAL**: Update table column definitions when model fields change.
+
+**✅ Correct Table Columns:**
+```typescript
+// Table columns that match NEW model structure
+const columns: ColumnDef<CourseOffering>[] = [
+    {
+        accessorKey: 'unit',
+        header: 'Unit',
+        cell: ({ row }) => {
+            const course = row.original;
+            return h('div', { class: 'space-y-1' }, [
+                h('div', { class: 'font-medium' }, course.unit?.code || 'N/A'),  // NOT course_code
+                course.section_code && h('div', { class: 'text-sm text-muted-foreground' }, `Section: ${course.section_code}`),
+            ]);
+        },
+    },
+    {
+        accessorKey: 'unit.name',
+        header: 'Unit Name',
+        cell: ({ row }) => {
+            const course = row.original;
+            return h('div', { class: 'max-w-xs' }, [
+                h('div', { class: 'font-medium truncate' }, course.unit?.name || 'N/A'),  // NOT course_title
+                course.unit?.credit_points && h('div', { class: 'text-sm text-muted-foreground' }, `${course.unit.credit_points} credits`),
+            ]);
+        },
+    },
+    {
+        accessorKey: 'enrollment',
+        header: 'Enrollment',
+        cell: ({ row }) => {
+            const course = row.original;
+            const percentage = course.max_capacity > 0 ? Math.round((course.current_enrollment / course.max_capacity) * 100) : 0;  // NOT max_enrollment
+            return h('div', { class: 'text-center' }, [
+                h('div', { class: 'font-medium' }, `${course.current_enrollment}/${course.max_capacity}`),
+                h('div', { class: 'text-sm text-muted-foreground' }, `${percentage}%`),
+            ]);
+        },
+    },
+    {
+        accessorKey: 'enrollment_status',  // NOT status
+        header: 'Status',
+        cell: ({ row }) => {
+            const status = row.original.enrollment_status;
+            if (!status) return h('span', {}, 'Unknown');
+            return h(Badge, { variant: getStatusBadgeVariant(status) }, () => status.replace('_', ' ').toUpperCase());
+        },
+    },
+];
+```
+
+**❌ Outdated Table Columns Cause Errors:**
+```typescript
+// DON'T use old field names
+const columns: ColumnDef<CourseOffering>[] = [
+    {
+        accessorKey: 'course_code',  // OLD - doesn't exist
+        header: 'Course Code',
+        cell: ({ row }) => row.original.course_code,  // Will be undefined
+    },
+    {
+        accessorKey: 'status',  // OLD - should be enrollment_status
+        header: 'Status',
+        cell: ({ row }) => row.original.status?.toUpperCase(),  // Will throw error on undefined
+    },
+];
+```
+
+### Badge Variant Functions
+**ALWAYS** update badge variant functions for new enum values:
+
+```typescript
+// ✅ Updated for new enrollment_status values
+const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+        case 'open':
+            return 'default';
+        case 'waitlist_only':  // NEW status
+            return 'secondary';
+        case 'cancelled':
+            return 'destructive';
+        case 'closed':
+            return 'outline';
+        default:
+            return 'outline';
+    }
+};
+
+// ❌ Outdated function with old status values
+const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+        case 'active':      // OLD - doesn't exist anymore
+            return 'default';
+        case 'full':        // OLD - should check current_enrollment >= max_capacity
+            return 'secondary';
+        // Missing new status values...
+    }
+};
+```
+
+## Common Error Prevention Checklist
+
+### Pre-Development Checklist
+Before making any model or schema changes, verify:
+
+- [ ] **Database Migration**: Field names are consistent and descriptive
+- [ ] **Migration Order**: Dependencies are properly ordered
+- [ ] **Foreign Keys**: Proper constraint names and cascade rules
+- [ ] **Model Relationships**: Both sides of relationships updated
+- [ ] **Validation Rules**: Model validation methods updated
+- [ ] **TypeScript Interfaces**: Exact field name matches
+- [ ] **Form Schemas**: Zod validation aligns with backend
+- [ ] **Controller Methods**: All methods use new field names
+- [ ] **API Endpoints**: Routes registered and error handling implemented
+- [ ] **Table Columns**: Column definitions updated
+- [ ] **Badge Functions**: Enum values updated
+- [ ] **SelectItem Values**: No empty string values
+- [ ] **Error Handling**: Comprehensive error logging
+
+### Post-Development Testing
+After implementing changes, test:
+
+- [ ] **Form Submission**: No validation errors
+- [ ] **API Calls**: No 500 errors or undefined field access
+- [ ] **Table Display**: All columns show correct data
+- [ ] **Filter Operations**: All filters work without errors
+- [ ] **CRUD Operations**: Create, Read, Update, Delete all functional
+- [ ] **Relationship Access**: No undefined relationship errors
+- [ ] **Error Scenarios**: Proper error messages displayed
+
+### Debug Logging Standards
+**ALWAYS** implement comprehensive logging for debugging:
+
+```typescript
+// Frontend debugging
+const onSubmit = handleSubmit((values) => {
+    console.log('Form values before transformation:', values);
+
+    const formData = transformFormData(values);
+    console.log('Submitting form data:', formData);
+
+    router.post('/course-offerings', formData, {
+        onSuccess: () => {
+            console.log('Course offering created successfully');
+        },
+        onError: (errors) => {
+            console.error('Validation errors:', errors);
+            Object.entries(errors).forEach(([field, messages]) => {
+                console.error(`Field "${field}":`, messages);
+            });
+        },
+        onFinish: () => {
+            console.log('Request finished');
+        },
+    });
+});
+```
+
+```php
+// Backend debugging
+public function store(StoreCourseOfferingRequest $request): RedirectResponse
+{
+    \Log::info('Creating course offering', ['data' => $request->validated()]);
+
+    try {
+        $courseOffering = CourseOffering::create($request->validated());
+        \Log::info('Course offering created', ['id' => $courseOffering->id]);
+
+        return Redirect::route('course-offerings.index')
+            ->with('success', 'Course offering created successfully.');
+    } catch (\Exception $e) {
+        \Log::error('Failed to create course offering', [
+            'error' => $e->getMessage(),
+            'data' => $request->validated()
+        ]);
+
+        return Redirect::back()
+            ->with('error', 'Failed to create course offering.')
+            ->withInput();
+    }
+}
+```
+
+## Table Display Standards
+
+### DataTable and Pagination
+**ALWAYS** use [DataTable.vue](mdc:resources/js/components/DataTable.vue) and [DataPagination.vue](mdc:resources/js/components/DataPagination.vue) for tabular data:
+
+```vue
+<script setup lang="ts">
+import DataTable from '@/components/DataTable.vue'
+import DataPagination from '@/components/DataPagination.vue'
+import type { ColumnDef } from '@tanstack/vue-table'
+import type { User } from '@/types'
+
+interface Props {
+  users: {
+    data: User[]
+    meta: {
+      current_page: number
+      per_page: number
+      total: number
+      last_page: number
+    }
+  }
+}
+
+const props = defineProps<Props>()
+
+const columns: ColumnDef<User>[] = [
+  {
+    accessorKey: 'name',
+    header: 'Name',
+  },
+  {
+    accessorKey: 'email',
+    header: 'Email',
+  },
+  {
+    id: 'actions',
+    header: 'Actions',
+    cell: ({ row }) => h(UserActions, { user: row.original }),
+  },
+]
+
+const handlePageChange = (page: number) => {
+  router.get('/users', { page }, {
+    preserveState: true,
+    preserveScroll: true
+  })
+}
+</script>
+
+<template>
+  <div class="space-y-4">
+    <DataTable
+      :data="users.data"
+      :columns="columns"
+      :loading="false"
+    />
+    <DataPagination
+      :current-page="users.meta.current_page"
+      :per-page="users.meta.per_page"
+      :total="users.meta.total"
+      :last-page="users.meta.last_page"
+      @page-change="handlePageChange"
+    />
+  </div>
+</template>
+```
+
+## Type Organization
+
+### Central Type Management
+**ALL** interfaces and types **MUST** be stored in [resources/js/types/](mdc:resources/js/types):
+
+**File Structure:**
+- [resources/js/types/index.ts](mdc:resources/js/types/index.ts) - Main exports
+- [resources/js/types/models.ts](mdc:resources/js/types/models.ts) - Database models
+- [resources/js/types/api.ts](mdc:resources/js/types/api.ts) - API response types
+- [resources/js/types/forms.ts](mdc:resources/js/types/forms.ts) - Form data types
+- [resources/js/types/components.ts](mdc:resources/js/types/components.ts) - Component prop types
+
+**Example [resources/js/types/models.ts](mdc:resources/js/types/models.ts):**
+```typescript
+export interface User {
+  id: number
+  name: string
+  email: string
+  email_verified_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Role {
+  id: number
+  name: string
+  permissions: Permission[]
+}
+
+export interface Permission {
+  id: number
+  name: string
+  guard_name: string
+}
+```
+
+**Example [resources/js/types/api.ts](mdc:resources/js/types/api.ts):**
+```typescript
+export interface PaginatedResponse<T> {
+  data: T[]
+  meta: {
+    current_page: number
+    per_page: number
+    total: number
+    last_page: number
+    from: number | null
+    to: number | null
+  }
+  links: {
+    first: string | null
+    last: string | null
+    prev: string | null
+    next: string | null
+  }
+}
+
+export interface ApiResponse<T> {
+  data: T
+  message?: string
+  errors?: Record<string, string[]>
+}
+```
+
+## Controller Organization
+
+### Multi-Controller Pages
+When a page uses multiple controllers, **group them into a single folder** in [app/Http/Controllers/](mdc:app/Http/Controllers):
+
+**Example Structure:**
+```
+app/Http/Controllers/
+├── Dashboard/
+│   ├── DashboardController.php
+│   ├── AnalyticsController.php
+│   ├── ReportsController.php
+│   └── StatsController.php
+├── Users/
+│   ├── UserController.php
+│   ├── UserProfileController.php
+│   ├── UserPreferencesController.php
+│   └── UserNotificationsController.php
+```
+
+**Route Organization:**
+```php
+// routes/web.php
+Route::middleware(['auth', 'verified'])->group(function () {
+    // Specialization resource routes
+    Route::prefix('specializations')->name('specializations.')->group(function () {
+        Route::get('/', [SpecializationController::class, 'index'])
+            ->middleware('can:view_specialization')
+            ->name('index');
+
+        Route::get('/create', [SpecializationController::class, 'create'])
+            ->middleware('can:create_specialization')
+            ->name('create');
+
+        Route::get('/{specialization}/edit', [SpecializationController::class, 'edit'])
+            ->middleware('can:edit_specialization')
+            ->name('edit');
+
+        Route::post('/', [SpecializationController::class, 'store'])
+            ->middleware('can:create_specialization')
+            ->name('store');
+
+        Route::get('/{specialization}', [SpecializationController::class, 'show'])
+            ->middleware('can:view_specialization')
+            ->name('show');
+
+        Route::put('/{specialization}', [SpecializationController::class, 'update'])
+            ->middleware('can:edit_specialization')
+            ->name('update');
+
+        Route::delete('/{specialization}', [SpecializationController::class, 'destroy'])
+            ->middleware('can:delete_specialization')
+            ->name('destroy');
+    });
+
+    // API routes for bulk operations - moved to match frontend expectations
+    Route::delete('api/specializations/bulk-delete', [SpecializationController::class, 'bulkDelete'])
+        ->name('api.specializations.bulk-delete');
+});
+```
+
+## Component Standards
+
+### Composable Usage
+Create reusable logic in [resources/js/composables/](mdc:resources/js/composables):
+
+```typescript
+// composables/useUsers.ts
+export function useUsers() {
+  const users = ref<User[]>([])
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+
+  const fetchUsers = async (filters: Record<string, any> = {}) => {
+    loading.value = true
+    error.value = null
+
+    try {
+      router.get('/users', filters, {
+        preserveState: true,
+        onSuccess: (page) => {
+          users.value = page.props.users.data
+        },
+        onError: (errors) => {
+          error.value = 'Failed to fetch users'
+        },
+        onFinish: () => {
+          loading.value = false
+        }
+      })
+    } catch (err) {
+      error.value = err.message
+      loading.value = false
+    }
+  }
+
+  return {
+    users: readonly(users),
+    loading: readonly(loading),
+    error: readonly(error),
+    fetchUsers
+  }
+}
+```
+
+### Component Props TypeScript
+Always use proper TypeScript interfaces for component props:
+
+```vue
+<script setup lang="ts">
+import type { User } from '@/types'
+
+interface Props {
+  user: User
+  showActions?: boolean
+  variant?: 'default' | 'compact'
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  showActions: true,
+  variant: 'default'
+})
+
+interface Emits {
+  edit: [user: User]
+  delete: [userId: number]
+  view: [user: User]
+}
+
+const emit = defineEmits<Emits>()
+</script>
+```
+
+### Using link router
+```vue
+<Link :href="route('programs.index')" />
+```
+
+## Summary: Critical Integration Points
+
+### The Most Common Laravel + Vue.js Issues We Prevent:
+
+1. **Undefined Field Access**: Always update TypeScript interfaces when changing database schema
+2. **API 500 Errors**: Ensure controller methods use current field names and relationships
+3. **Form Validation Mismatches**: Keep Zod schemas synchronized with Laravel validation rules
+4. **Empty SelectItem Values**: Never use `value=""` in SelectItem components
+5. **Relationship Errors**: Update both sides of relationships when changing table structures
+6. **Migration Dependencies**: Ensure proper migration ordering for foreign key constraints
+7. **Badge/Status Inconsistencies**: Update enum handling functions when changing status fields
+8. **Filter Conversion Issues**: Properly handle "all" values in frontend filters
+
+### Key Development Principles:
+
+- **Type Safety First**: Use `satisfies` keyword for compile-time validation
+- **Complete Updates**: When changing one part, update ALL related parts
+- **Comprehensive Testing**: Test both success and error scenarios
+- **Detailed Logging**: Log form data, API calls, and errors for debugging
+- **Consistent Naming**: Use descriptive, consistent field names across all layers
+- **Error Handling**: Always implement proper error handling and user feedback
+
+Following these standards will prevent the majority of integration issues between Laravel backend and Vue.js frontend, ensuring a more stable and maintainable codebase.

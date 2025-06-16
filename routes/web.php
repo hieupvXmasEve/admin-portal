@@ -6,6 +6,7 @@ use App\Http\Controllers\SelectCampus;
 use App\Http\Controllers\CurriculumVersionController;
 use App\Http\Controllers\Api\ElectiveController;
 
+
 Route::get('/', function () {
     return redirect()->route('dashboard');
 })->middleware(['auth', 'verified'])->name('home');
@@ -50,6 +51,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 });
 
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => now()->toISOString(),
+        'version' => '1.0.0'
+    ]);
+});
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/user.php';
@@ -61,3 +69,5 @@ require __DIR__ . '/programs.php';
 require __DIR__ . '/specializations.php';
 require __DIR__ . '/curriculum.php';
 require __DIR__ . '/students.php';
+require __DIR__ . '/course-offerings.php';
+require __DIR__ . '/course-registrations.php';

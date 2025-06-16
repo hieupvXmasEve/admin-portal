@@ -1,6 +1,6 @@
 # 🎓 Swinburne Project Management System
 
-Modern web application built with Laravel 12 + Vue.js 3 + Inertia.js
+Modern web application built with Laravel 12 + Vue.js 3 + Inertia.js for comprehensive educational management.
 
 ## 🚀 Quick Start
 
@@ -21,12 +21,25 @@ Modern web application built with Laravel 12 + Vue.js 3 + Inertia.js
 composer dev  # Start all services
 ```
 
-## 🔗 Documentation
+## 📚 Documentation
 
-- **[🐳 Docker Guide](DOCKER_GUIDE.md)** - Complete Docker environment management (Development, Local Production, Production)
-- **[🧟 FrankenPHP Migration Guide](FRANKENPHP_MIGRATION_GUIDE.md)** - FrankenPHP web server configuration
-- **[🚀 Deployment Guide](DEPLOYMENT.md)** - Production deployment to Google Cloud
-- **[📋 Step-by-Step Deploy](STEP_BY_STEP_DEPLOY.md)** - Detailed deployment instructions
+### 🌐 Choose Your Language
+
+**English Documentation:**
+- **[📥 Installation Guide](docs/installation-en.md)** - Complete setup and installation
+- **[🛠️ Development Guide](docs/development-en.md)** - Development standards and workflows
+- **[🚀 Deployment Guide](docs/deployment-en.md)** - Production deployment with Docker
+- **[👥 User Guide](docs/user-guide-en.md)** - System functionality and usage
+- **[🔌 API Documentation](docs/api-documentation-en.md)** - RESTful API integration
+
+**Vietnamese Documentation (Tài liệu tiếng Việt):**
+- **[📥 Hướng Dẫn Cài Đặt](docs/installation-vi.md)** - Thiết lập và cài đặt hoàn chỉnh
+- **[🛠️ Hướng Dẫn Phát Triển](docs/development-vi.md)** - Tiêu chuẩn và quy trình phát triển
+- **[🚀 Hướng Dẫn Triển Khai](docs/deployment-vi.md)** - Triển khai production với Docker
+- **[👥 Hướng Dẫn Người Dùng](docs/user-guide-vi.md)** - Chức năng và cách sử dụng hệ thống
+- **[🔌 Tài Liệu API](docs/api-documentation-vi.md)** - Tích hợp RESTful API
+
+**[📖 Complete Documentation Index](docs/README.md)**
 
 ## 🛠️ Tech Stack
 
@@ -37,7 +50,27 @@ composer dev  # Start all services
 - **Cache**: Redis
 - **Development**: Docker Compose, Vite HMR
 
----
+## ✨ Key Features
+
+- **Multi-campus Support**: Manage multiple university campuses
+- **Role-based Access Control**: Granular permissions system
+- **User Management**: Complete CRUD with import/export functionality
+- **Modern UI**: Responsive design with Vue.js 3 and TailwindCSS
+- **RESTful API**: Full API for external integrations
+- **Docker Ready**: Complete containerization for all environments
+
+## 🏗️ System Architecture
+
+```
+Internet → FrankenPHP (SSL/HTTP) → Laravel App → MySQL/Redis
+                                ↓
+                          Queue Workers & Scheduler
+```
+
+### Environment Types
+- **Development**: HTTP-only, debug enabled, hot reload
+- **Local Production**: HTTPS testing, production-like environment  
+- **Production**: Full HTTPS, SSL certificates, optimized performance
 
 ## 🧪 Testing
 
@@ -54,6 +87,74 @@ npm run test:local             # Same as above
 npm run pre-push:docker        # Same as above
 ```
 
+## 🚀 Getting Started
+
+### For Developers
+1. **Setup**: Follow the [Installation Guide](docs/installation-en.md)
+2. **Development**: Read the [Development Guide](docs/development-en.md)
+3. **Deploy**: Use the [Deployment Guide](docs/deployment-en.md)
+
+### For End Users
+1. **Getting Started**: Check the [User Guide](docs/user-guide-en.md)
+2. **System Features**: Learn about user management and role-based access
+3. **Import/Export**: Understand bulk data operations
+
+### For Integrators
+1. **API Integration**: Review the [API Documentation](docs/api-documentation-en.md)
+2. **Authentication**: Understand token-based authentication
+3. **Data Models**: Learn about system data structures
+
+## 🔧 Development Commands
+
+```bash
+# Laravel commands
+php artisan serve              # Start development server
+php artisan migrate           # Run database migrations
+php artisan test             # Run tests
+
+# Frontend commands
+npm run dev                  # Development with hot reload
+npm run build               # Production build
+npm run type-check          # TypeScript checking
+
+# Docker commands
+./dev.sh start              # Start development environment
+./dev.sh stop               # Stop development environment
+./local-prod.sh start       # Start local production testing
+./prod.sh deploy            # Deploy to production
+```
+
+## 📊 Project Status
+
+- ✅ **User Management System**: Complete with import/export
+- ✅ **Role-based Access Control**: Multi-campus support
+- ✅ **Modern UI**: Vue.js 3 + TailwindCSS + shadcn/ui
+- ✅ **Docker Integration**: Development, testing, and production
+- ✅ **API Integration**: RESTful API with authentication
+- ✅ **Comprehensive Documentation**: Bilingual support
+
+## 🤝 Contributing
+
+1. Read the [Development Guide](docs/development-en.md) for coding standards
+2. Follow the established patterns and conventions
+3. Write tests for new functionality
+4. Update documentation for any changes
+5. Submit pull requests for review
+
+## 📞 Support
+
+- **Documentation**: Check the [docs/](docs/) directory
+- **Installation Issues**: See [Installation Guide](docs/installation-en.md)
+- **Development Questions**: Review [Development Guide](docs/development-en.md)
+- **Deployment Problems**: Follow [Deployment Guide](docs/deployment-en.md)
+- **User Support**: Refer to [User Guide](docs/user-guide-en.md)
+
+## 📄 License
+
+This project is proprietary software developed for Swinburne University.
+
 ---
 
-**Start developing**: `composer dev` hoặc `npm run docker:up` 🚀
+**Start developing**: `composer dev` or `./dev.sh start` 🚀
+
+*For detailed information, please refer to the comprehensive documentation in the [docs/](docs/) directory.*

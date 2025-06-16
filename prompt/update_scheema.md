@@ -22,12 +22,12 @@ Update the academic system to support a new **curriculum\_version**, including:
     * `FOREIGN KEY (curriculum_version_id)` references `curriculum_versions(id)`
   * Create `track_units` table:
 
-    * Fields: `id`, `track_id`, `unit_id`, `group_type` (ENUM: core, major, elective)
+    * Fields: `id`, `track_id`, `unit_id`, `type` (ENUM: core, major, elective)
     * `FOREIGN KEY (track_id)` → `program_tracks(id)`
     * `FOREIGN KEY (unit_id)` → `units(id)`
 * Check if `curriculum_units` table exists. If not, create:
 
-  * Fields: `curriculum_version_id`, `unit_id`, `group_type`
+  * Fields: `curriculum_version_id`, `unit_id`, `type`
 
 #### 2. Model
 

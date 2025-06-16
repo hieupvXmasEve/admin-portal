@@ -65,7 +65,7 @@ class Specialization extends Model
                 return $curriculum->curriculumUnits->map(function ($curriculumUnit) {
                     return [
                         'unit' => $curriculumUnit->unit,
-                        'group_type' => $curriculumUnit->group_type,
+                        'type' => $curriculumUnit->type,
                         'unit_scope' => $curriculumUnit->unit_scope,
                         'is_required' => $curriculumUnit->is_required,
                         'year_level' => $curriculumUnit->year_level,
@@ -83,7 +83,7 @@ class Specialization extends Model
                 return $curriculum->curriculumUnits->map(function ($curriculumUnit) {
                     return [
                         'unit' => $curriculumUnit->unit,
-                        'group_type' => $curriculumUnit->group_type,
+                        'type' => $curriculumUnit->type,
                         'unit_scope' => $curriculumUnit->unit_scope,
                         'is_required' => $curriculumUnit->is_required,
                         'year_level' => $curriculumUnit->year_level,

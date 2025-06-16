@@ -235,6 +235,16 @@ const columns: ColumnDef<Semester>[] = [
                         size: 'sm',
                         variant: 'outline',
                         disabled: isArchived,
+                        onClick: () => navigateToEnrollment(semester),
+                    },
+                    ['Manage Enrollment'],
+                ),
+                h(
+                    Button,
+                    {
+                        size: 'sm',
+                        variant: 'outline',
+                        disabled: isArchived,
                         onClick: () => openDeleteModal(semester),
                     },
                     [h(Trash2, { class: 'h-4 w-4' })],
@@ -367,6 +377,10 @@ const clearFilters = () => {
     isArchivedFilter.value = null;
     isActiveFilterString.value = 'null';
     isArchivedFilterString.value = 'null';
+};
+
+const navigateToEnrollment = (semester: Semester) => {
+    router.get(route('semesters.enrollment.show', semester.id));
 };
 const hasActiveFilters = computed(
     () => search.value || nameFilter.value || yearFilter.value || isActiveFilter.value !== null || isArchivedFilter.value !== null,

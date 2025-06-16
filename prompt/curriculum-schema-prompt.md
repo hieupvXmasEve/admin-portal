@@ -50,7 +50,7 @@ Links units to a specific curriculum version.
 - id (bigint, auto-increment)
 - curriculum_version_id (foreign key to curriculum_versions)
 - unit_id (foreign key to units)
-- group_type (enum: 'core', 'major', 'elective', 'minor', 'second_major')
+- type (enum: 'core', 'major', 'elective', 'minor', 'second_major')
 - timestamps
 
 ---

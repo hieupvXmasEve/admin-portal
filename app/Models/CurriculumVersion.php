@@ -56,11 +56,11 @@ class CurriculumVersion extends Model
     }
 
     /**
-     * Get required curriculum units.
+     * Get required/compulsory curriculum units.
      */
     public function requiredUnits(): HasMany
     {
-        return $this->hasMany(CurriculumUnit::class)->where('is_required', true);
+        return $this->hasMany(CurriculumUnit::class)->where('is_compulsory', true);
     }
 
     /**
@@ -68,15 +68,23 @@ class CurriculumVersion extends Model
      */
     public function electiveUnits(): HasMany
     {
-        return $this->hasMany(CurriculumUnit::class)->where('is_required', false);
+        return $this->hasMany(CurriculumUnit::class)->where('is_compulsory', false);
+    }
+
+    /**
+     * Get students enrolled with this curriculum version.
+     */
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(Enrollment::class);
     }
 
     /**
      * Get curriculum units by group type.
      */
-    public function unitsByGroupType(string $groupType): HasMany
+    public function unitsByGroupType(string $type): HasMany
     {
-        return $this->hasMany(CurriculumUnit::class)->where('group_type', $groupType);
+        return $this->hasMany(CurriculumUnit::class)->where('type', $type);
     }
 
     /**

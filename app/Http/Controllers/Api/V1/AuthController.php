@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -75,6 +77,129 @@ class AuthController extends Controller
                 'token_type' => 'Bearer'
             ]
         ]);
+    }
+
+    /**
+     * Login with Google OAuth
+     */
+    public function loginWithGoogle(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'access_token' => 'required|string',
+            'device_name' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Validate Google access token by calling Google's API directly
+            $response = @file_get_contents("https://www.googleapis.com/oauth2/v1/userinfo?access_token=" . $request->access_token);
+
+            if ($response === false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid Google access token'
+                ], 401);
+            }
+
+            $googleUserData = json_decode($response, true);
+
+            if (!$googleUserData || !isset($googleUserData['email'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to retrieve user information from Google'
+                ], 401);
+            }
+
+            // Check if student exists by email
+            $student = Student::where('email', $googleUserData['email'])->first();
+
+            if (!$student) {
+                // Create new student account if registration is allowed
+                if (!config('app.allow_student_registration', false)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No account found with this email. Student registration is not available.'
+                    ], 404);
+                }
+
+                $student = Student::create([
+                    'full_name' => $googleUserData['name'] ?? $googleUserData['email'],
+                    'email' => $googleUserData['email'],
+                    'google_id' => $googleUserData['id'],
+                    'avatar_url' => $googleUserData['picture'] ?? null,
+                    'enrollment_status' => 'admitted',
+                    'status' => 'inactive', // Requires admin activation
+                    'email_verified_at' => now(), // Google emails are already verified
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Account created successfully. Please wait for admin approval.',
+                    'data' => [
+                        'student' => [
+                            'id' => $student->id,
+                            'full_name' => $student->full_name,
+                            'email' => $student->email,
+                            'status' => $student->status,
+                        ]
+                    ]
+                ], 201);
+            }
+
+            // Update Google ID and avatar if not set
+            if (!$student->google_id) {
+                $student->update([
+                    'google_id' => $googleUserData['id'],
+                    'avatar_url' => $student->avatar_url ?: ($googleUserData['picture'] ?? null),
+                    'email_verified_at' => $student->email_verified_at ?: now(),
+                ]);
+            }
+
+            // Check if student account is active
+            if ($student->status !== 'active') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account is not active'
+                ], 403);
+            }
+
+            // Update last login
+            $student->update(['last_login_at' => now()]);
+
+            // Create token
+            $deviceName = $request->device_name ?? 'Student Portal (Google)';
+            $token = $student->createToken($deviceName, ['student'])->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Google login successful',
+                'data' => [
+                    'student' => [
+                        'id' => $student->id,
+                        'student_id' => $student->student_id,
+                        'full_name' => $student->full_name,
+                        'email' => $student->email,
+                        'enrollment_status' => $student->enrollment_status,
+                        'campus' => $student->campus->name ?? null,
+                        'program' => $student->program->name ?? null,
+                    ],
+                    'token' => $token,
+                    'token_type' => 'Bearer'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to authenticate with Google: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

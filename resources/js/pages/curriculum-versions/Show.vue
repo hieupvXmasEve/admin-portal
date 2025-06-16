@@ -85,25 +85,17 @@ const can = (permission: string) => {
 const addUnitFormSchema = toTypedSchema(
     z.object({
         unit_id: z.string().min(1, 'Unit is required'),
-        unit_type_id: z.string().min(1, 'Unit type is required'),
-        year_level: z
-            .string()
-            .min(1, 'Year level is required')
-            .refine((val) => {
-                const num = parseInt(val);
-                return num >= ValidationRules.curriculumUnit.yearLevel.min && num <= ValidationRules.curriculumUnit.yearLevel.max;
-            }, `Year level must be between ${ValidationRules.curriculumUnit.yearLevel.min} and ${ValidationRules.curriculumUnit.yearLevel.max}`),
+        semester_id: z.string().min(1, 'Semester is required'),
+        type: z.enum(['core', 'major', 'elective'], { errorMap: () => ({ message: 'Unit type is required' }) }),
         semester_number: z
             .string()
             .min(1, 'Semester number is required')
             .refine((val) => {
                 const num = parseInt(val);
-                return num >= ValidationRules.curriculumUnit.semesterNumber.min && num <= ValidationRules.curriculumUnit.semesterNumber.max;
-            }, `Semester number must be between ${ValidationRules.curriculumUnit.semesterNumber.min} and ${ValidationRules.curriculumUnit.semesterNumber.max}`),
-        note: z
-            .string()
-            .max(ValidationRules.curriculumUnit.note.maxLength, `Note cannot exceed ${ValidationRules.curriculumUnit.note.maxLength} characters`)
-            .optional(),
+                return num >= 1 && num <= 12;
+            }, 'Semester number must be between 1 and 12'),
+        is_compulsory: z.boolean(),
+        note: z.string().max(1000, 'Note cannot exceed 1000 characters').optional(),
     }),
 );
 
@@ -114,9 +106,10 @@ const { isSubmitting: isAddSubmitting, resetForm: resetAddForm } = useForm({
     validationSchema: addUnitFormSchema,
     initialValues: {
         unit_id: '',
-        unit_type_id: '',
-        year_level: '',
+        semester_id: '',
+        type: 'core' as const,
         semester_number: '',
+        is_compulsory: true,
         note: '',
     },
 });
@@ -126,9 +119,10 @@ const editFormInitialValues = computed(() => {
 
     return {
         unit_id: curriculumUnitToEdit.value.unit_id?.toString() || '',
-        unit_type_id: curriculumUnitToEdit.value.unit_type_id?.toString() || '',
-        year_level: curriculumUnitToEdit.value.year_level?.toString() || '',
+        semester_id: curriculumUnitToEdit.value.semester_id?.toString() || '',
+        type: curriculumUnitToEdit.value.type || 'core',
         semester_number: curriculumUnitToEdit.value.semester_number?.toString() || '',
+        is_compulsory: curriculumUnitToEdit.value.is_compulsory ?? true,
         note: curriculumUnitToEdit.value.note || '',
     };
 });
@@ -552,51 +546,49 @@ const getUnitTypeColor = (type: string) => {
                 </TabsList>
 
                 <!-- Academic Structure Tab -->
-                <TabsContent value="structure" class="space-y-4">
-                    <div class="space-y-6">
-                        <Card>
-                            <CardContent>
-                                <div v-for="(yearData, year) in organizedUnits" :key="year" class="space-y-4">
-                                    <h3 class="text-lg font-semibold">
-                                        {{ String(year) === '0' ? 'Unspecified Year' : `Year ${year}` }}
-                                    </h3>
-                                    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                        <div v-for="(semesterUnits, semester) in yearData" :key="semester" class="space-y-3">
-                                            <h4 class="text-sm font-medium text-gray-700">
-                                                {{ String(semester) === '0' ? 'Unspecified Semester' : `Semester ${semester}` }}
-                                            </h4>
-                                            <div class="space-y-2">
-                                                <Card v-for="unit in semesterUnits" :key="unit.id" class="p-3">
-                                                    <div class="space-y-2">
-                                                        <div class="flex items-start justify-between">
-                                                            <div>
-                                                                <p class="text-sm font-medium">{{ unit.unit?.code }}</p>
-                                                                <p class="text-xs text-gray-600">{{ unit.unit?.name }}</p>
-                                                            </div>
-                                                            <Badge :class="getUnitTypeColor(unit.unit_type?.name || 'unknown')" class="text-xs">
-                                                                {{ unit.unit_type?.name?.toUpperCase() || 'UNKNOWN' }}
-                                                            </Badge>
+                <TabsContent value="structure">
+                    <Card>
+                        <CardContent class="space-y-4">
+                            <div v-for="(yearData, year) in organizedUnits" :key="year" class="space-y-4">
+                                <h3 class="text-lg font-semibold">
+                                    {{ String(year) === '0' ? 'Unspecified Year' : `Year ${year}` }}
+                                </h3>
+                                <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    <div v-for="(semesterUnits, semester) in yearData" :key="semester" class="space-y-3">
+                                        <h4 class="text-sm font-medium text-gray-700">
+                                            {{ String(semester) === '0' ? 'Unspecified Semester' : `Semester ${semester}` }}
+                                        </h4>
+                                        <div class="space-y-2">
+                                            <Card v-for="unit in semesterUnits" :key="unit.id" class="p-3">
+                                                <div class="space-y-2">
+                                                    <div class="flex items-start justify-between">
+                                                        <div>
+                                                            <p class="text-sm font-medium">{{ unit.unit?.code }}</p>
+                                                            <p class="text-xs text-gray-600">{{ unit.unit?.name }}</p>
                                                         </div>
-                                                        <div class="flex items-center justify-between text-xs">
-                                                            <span class="text-gray-500">{{ unit.unit?.credit_points }} CP</span>
-                                                            <Button
-                                                                v-if="can('edit_curriculum_unit')"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                @click="editCurriculumUnit(unit)"
-                                                            >
-                                                                <Edit class="h-3 w-3" />
-                                                            </Button>
-                                                        </div>
+                                                        <Badge :class="getUnitTypeColor(unit.unit_type?.name || 'unknown')" class="text-xs">
+                                                            {{ unit.unit_type?.name?.toUpperCase() || 'UNKNOWN' }}
+                                                        </Badge>
                                                     </div>
-                                                </Card>
-                                            </div>
+                                                    <div class="flex items-center justify-between text-xs">
+                                                        <span class="text-gray-500">{{ unit.unit?.credit_points }} CP</span>
+                                                        <Button
+                                                            v-if="can('edit_curriculum_unit')"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            @click="editCurriculumUnit(unit)"
+                                                        >
+                                                            <Edit class="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </Card>
                                         </div>
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 <!-- Unit List Tab -->

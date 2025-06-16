@@ -146,8 +146,8 @@ class ElectiveManagementTest extends TestCase
     /** @test */
     public function it_can_update_elective_slot(): void
     {
-        // Get an elective curriculum unit by group_type
-        $electiveCurriculumUnit = CurriculumUnit::where('group_type', 'elective')->first();
+        // Get an elective curriculum unit by type
+        $electiveCurriculumUnit = CurriculumUnit::where('type', 'elective')->first();
 
         // Create a completely new unit for testing that's not assigned to any curriculum
         $newUnit = Unit::factory()->create([
@@ -190,8 +190,8 @@ class ElectiveManagementTest extends TestCase
     /** @test */
     public function it_cannot_update_non_elective_slot(): void
     {
-        // Get a non-elective curriculum unit by group_type
-        $coreCurriculumUnit = CurriculumUnit::where('group_type', 'core')->first();
+        // Get a non-elective curriculum unit by type
+        $coreCurriculumUnit = CurriculumUnit::where('type', 'core')->first();
 
         $newUnit = Unit::where('id', '!=', $coreCurriculumUnit->unit_id)->first();
 
@@ -229,7 +229,7 @@ class ElectiveManagementTest extends TestCase
     /** @test */
     public function it_can_get_elective_recommendations(): void
     {
-        $electiveCurriculumUnit = CurriculumUnit::where('group_type', 'elective')->first();
+        $electiveCurriculumUnit = CurriculumUnit::where('type', 'elective')->first();
 
         $response = $this->actingAs($this->user)
             ->getJson("/api/curriculum-units/{$electiveCurriculumUnit->id}/recommendations");
@@ -271,7 +271,7 @@ class ElectiveManagementTest extends TestCase
     /** @test */
     public function it_cannot_get_recommendations_for_non_elective_unit(): void
     {
-        $coreCurriculumUnit = CurriculumUnit::where('group_type', 'core')->first();
+        $coreCurriculumUnit = CurriculumUnit::where('type', 'core')->first();
 
         $response = $this->actingAs($this->user)
             ->getJson("/api/curriculum-units/{$coreCurriculumUnit->id}/recommendations");

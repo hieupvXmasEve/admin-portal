@@ -123,38 +123,38 @@ class CurriculumSeeder extends Seeder
     {
         $unitMappings = [
             'IT' => [
-                ['code' => 'CS101', 'group_type' => 'core'],
-                ['code' => 'CS102', 'group_type' => 'core'],
-                ['code' => 'CS201', 'group_type' => 'core'],
-                ['code' => 'CS301', 'group_type' => 'major'],
-                ['code' => 'CS401', 'group_type' => 'major'],
-                ['code' => 'BUS101', 'group_type' => 'elective'],
+                ['code' => 'CS101', 'type' => 'core'],
+                ['code' => 'CS102', 'type' => 'core'],
+                ['code' => 'CS201', 'type' => 'core'],
+                ['code' => 'CS301', 'type' => 'major'],
+                ['code' => 'CS401', 'type' => 'major'],
+                ['code' => 'BUS101', 'type' => 'elective'],
             ],
             'Business' => [
-                ['code' => 'BUS101', 'group_type' => 'core'],
-                ['code' => 'BUS201', 'group_type' => 'core'],
-                ['code' => 'BUS301', 'group_type' => 'major'],
-                ['code' => 'BUS401', 'group_type' => 'major'],
-                ['code' => 'CS101', 'group_type' => 'elective'],
-                ['code' => 'GC101', 'group_type' => 'minor'],
+                ['code' => 'BUS101', 'type' => 'core'],
+                ['code' => 'BUS201', 'type' => 'core'],
+                ['code' => 'BUS301', 'type' => 'major'],
+                ['code' => 'BUS401', 'type' => 'major'],
+                ['code' => 'CS101', 'type' => 'elective'],
+                ['code' => 'GC101', 'type' => 'minor'],
             ],
             'Global Citizen' => [
-                ['code' => 'GC101', 'group_type' => 'core'],
-                ['code' => 'GC201', 'group_type' => 'core'],
-                ['code' => 'GC301', 'group_type' => 'major'],
-                ['code' => 'BUS101', 'group_type' => 'elective'],
+                ['code' => 'GC101', 'type' => 'core'],
+                ['code' => 'GC201', 'type' => 'core'],
+                ['code' => 'GC301', 'type' => 'major'],
+                ['code' => 'BUS101', 'type' => 'elective'],
             ],
             'Vovinam' => [
-                ['code' => 'VV101', 'group_type' => 'core'],
-                ['code' => 'VV201', 'group_type' => 'core'],
-                ['code' => 'VV301', 'group_type' => 'major'],
-                ['code' => 'GC101', 'group_type' => 'elective'],
+                ['code' => 'VV101', 'type' => 'core'],
+                ['code' => 'VV201', 'type' => 'core'],
+                ['code' => 'VV301', 'type' => 'major'],
+                ['code' => 'GC101', 'type' => 'elective'],
             ],
             'MC' => [
-                ['code' => 'MC101', 'group_type' => 'core'],
-                ['code' => 'MC201', 'group_type' => 'core'],
-                ['code' => 'MC301', 'group_type' => 'major'],
-                ['code' => 'CS101', 'group_type' => 'second_major'],
+                ['code' => 'MC101', 'type' => 'core'],
+                ['code' => 'MC201', 'type' => 'core'],
+                ['code' => 'MC301', 'type' => 'major'],
+                ['code' => 'CS101', 'type' => 'second_major'],
             ],
         ];
 
@@ -165,7 +165,7 @@ class CurriculumSeeder extends Seeder
                     CurriculumUnit::create([
                         'curriculum_version_id' => $curriculumVersion->id,
                         'unit_id' => $unit->id,
-                        'group_type' => $mapping['group_type'],
+                        'type' => $mapping['type'],
                     ]);
                 }
             }

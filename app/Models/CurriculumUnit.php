@@ -17,16 +17,13 @@ class CurriculumUnit extends Model
     protected $fillable = [
         'curriculum_version_id',
         'unit_id',
-        'unit_type_id',
+        'type',
         'year_level',
-        'semester_number',
         'note',
     ];
 
     protected $casts = [
-        'unit_type_id' => 'integer',
         'year_level' => 'integer',
-        'semester_number' => 'integer',
     ];
 
     /**
@@ -45,21 +42,9 @@ class CurriculumUnit extends Model
         return $this->belongsTo(Unit::class);
     }
 
-    /**
-     * Get the unit type for this curriculum unit.
-     */
-    public function unitType(): BelongsTo
-    {
-        return $this->belongsTo(CurriculumUnitType::class, 'unit_type_id');
-    }
 
-    /**
-     * Get the semester for this curriculum unit.
-     */
-    public function semester(): BelongsTo
-    {
-        return $this->belongsTo(Semester::class);
-    }
+
+
 
     /**
      * Check if prerequisites are met for this curriculum unit.
@@ -120,7 +105,7 @@ class CurriculumUnit extends Model
      */
     public function isCore(): bool
     {
-        return $this->group_type === 'core';
+        return $this->type === 'core';
     }
 
     /**
@@ -128,7 +113,7 @@ class CurriculumUnit extends Model
      */
     public function isMajor(): bool
     {
-        return $this->group_type === 'major';
+        return $this->type === 'major';
     }
 
     /**
@@ -136,7 +121,7 @@ class CurriculumUnit extends Model
      */
     public function isElective(): bool
     {
-        return $this->group_type === 'elective';
+        return $this->type === 'elective';
     }
 
     /**
@@ -164,11 +149,11 @@ class CurriculumUnit extends Model
     }
 
     /**
-     * Scope for required units.
+     * Scope for required/compulsory units.
      */
     public function scopeRequired(Builder $query): void
     {
-        $query->where('is_required', true);
+        $query->where('is_compulsory', true);
     }
 
     /**
@@ -176,15 +161,15 @@ class CurriculumUnit extends Model
      */
     public function scopeElective(Builder $query): void
     {
-        $query->where('is_required', false);
+        $query->where('is_compulsory', false);
     }
 
     /**
      * Scope for units by group type.
      */
-    public function scopeByGroupType(Builder $query, string $groupType): void
+    public function scopeByGroupType(Builder $query, string $type): void
     {
-        $query->where('group_type', $groupType);
+        $query->where('type', $type);
     }
 
     /**
@@ -193,6 +178,14 @@ class CurriculumUnit extends Model
     public function scopeByYearLevel(Builder $query, int $yearLevel): void
     {
         $query->where('year_level', $yearLevel);
+    }
+
+    /**
+     * Scope for units by semester order.
+     */
+    public function scopeBySemesterOrder(Builder $query, int $semesterOrder): void
+    {
+        $query->where('semester_number', $semesterOrder);
     }
 
     /**
