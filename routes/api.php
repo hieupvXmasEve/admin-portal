@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1\CourseController;
 // Public authentication routes
 Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])->name('auth.login');
+    Route::post('/auth/login/google', [AuthController::class, 'loginWithGoogle'])->name('auth.login.google');
     Route::post('/auth/register', [AuthController::class, 'register'])->name('auth.register');
     Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('auth.forgot-password');
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('auth.reset-password');
@@ -65,11 +66,13 @@ Route::prefix('v1')->name('api.v1.')->middleware(['auth:sanctum', 'student'])->g
 });
 
 // Admin API routes (for internal use)
-Route::prefix('v1/admin')->name('api.v1.')->middleware(['auth:sanctum', 'admin'])->group(function () {
+Route::prefix('v1')->name('api.v1.admin.')->middleware(['auth:sanctum', 'admin'])->group(function () {
     // Student Management
     Route::get('/students', [StudentController::class, 'index'])->name('students.index');
+    Route::get('/students/search', [\App\Http\Controllers\Api\StudentController::class, 'search'])->name('students.search');
+    Route::post('/students/by-ids', [\App\Http\Controllers\Api\StudentController::class, 'getByIds'])->name('students.by-ids');
     Route::post('/students', [StudentController::class, 'store'])->name('students.store');
-    Route::get('/students/{student}', [StudentController::class, 'show'])->name('students.show');
+    Route::get('/students/{student}', [\App\Http\Controllers\Api\StudentController::class, 'show'])->name('students.show');
     Route::put('/students/{student}', [StudentController::class, 'update'])->name('students.update');
     Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
 

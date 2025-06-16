@@ -411,7 +411,7 @@ class UnitExcelExportService
                     $curriculumUnit->curriculumVersion->program->name,
                     $curriculumUnit->curriculumVersion->specialization?->name ?? 'N/A',
                     $curriculumUnit->curriculumVersion->version_code,
-                    $curriculumUnit->group_type,
+                    $curriculumUnit->type,
                     $curriculumUnit->is_required ? 'Yes' : 'No',
                     $curriculumUnit->year_level,
                     $curriculumUnit->semester_number

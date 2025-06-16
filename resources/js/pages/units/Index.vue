@@ -61,6 +61,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
         href: '/units',
     },
 ];
+console.log(props.units);
 
 // Reactive data
 const data = computed(() => props.units.data);

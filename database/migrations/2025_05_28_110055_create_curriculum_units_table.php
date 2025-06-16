@@ -19,11 +19,8 @@ return new class extends Migration
             $table->foreignId('unit_id')->constrained('units')->onDelete('cascade');
             $table->foreignId('semester_id')->constrained('semesters')->onDelete('cascade');
 
-            // Use unsignedTinyInteger to match curriculum_unit_types.id type
-            $table->unsignedTinyInteger('unit_type_id');
-            $table->foreign('unit_type_id')->references('id')->on('curriculum_unit_types')->onDelete('cascade');
-
-            $table->unsignedTinyInteger('semester_order')->nullable()->comment('Suggested semester (1-12)');
+            $table->enum('type', ['core', 'major', 'elective'])->notNull();
+            $table->unsignedTinyInteger('semester_number')->nullable()->comment('Suggested semester (1-12)');
             $table->boolean('is_compulsory')->default(true);
             $table->text('note')->nullable();
             $table->timestamps();
@@ -32,8 +29,8 @@ return new class extends Migration
             $table->unique(['curriculum_version_id', 'unit_id'], 'curriculum_unit_unique');
 
             // Add indexes for better query performance
-            $table->index(['curriculum_version_id', 'unit_type_id']);
-            $table->index(['semester_order', 'is_compulsory']);
+            $table->index(['curriculum_version_id', 'type']);
+            $table->index(['semester_number', 'is_compulsory']);
         });
     }
 

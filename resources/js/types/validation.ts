@@ -89,4 +89,96 @@ export const ValidationRules = {
       maxLength: 255,
     },
   },
+  courseOffering: {
+    section_code: {
+      maxLength: 10,
+    },
+    max_capacity: {
+      min: 1,
+      max: 500,
+    },
+    waitlist_capacity: {
+      min: 0,
+      max: 100,
+    },
+    location: {
+      maxLength: 255,
+    },
+    special_requirements: {
+      maxLength: 1000,
+    },
+    notes: {
+      maxLength: 1000,
+    },
+  },
+  courseRegistration: {
+    notes: {
+      maxLength: 1000,
+    },
+  },
+} as const;
+
+export const ValidationMessages = {
+  courseRegistration: {
+    student_id: {
+      required: 'Please select a student',
+    },
+    course_offering_id: {
+      required: 'Please select a course offering',
+    },
+    payment_status: {
+      required: 'Please select payment status',
+    },
+    notes: {
+      maxLength: 'Notes cannot exceed 1000 characters',
+    },
+  },
+  courseOffering: {
+    semester_id: {
+      required: 'Semester is required',
+    },
+    unit_id: {
+      required: 'Unit is required',
+    },
+    campus_id: {
+      required: 'Campus is required',
+    },
+    course_code: {
+      required: 'Course code is required',
+      maxLength: 'Course code too long',
+    },
+    section_code: {
+      maxLength: 'Section code too long',
+    },
+    course_title: {
+      required: 'Course title is required',
+      maxLength: 'Course title too long',
+    },
+    credit_hours: {
+      required: 'Credit hours is required',
+      range: 'Credit hours must be between 0 and 10',
+    },
+    max_enrollment: {
+      required: 'Max enrollment is required',
+      min: 'Max enrollment must be greater than 0',
+    },
+    waitlist_capacity: {
+      min: 'Waitlist capacity must be 0 or greater',
+    },
+    delivery_mode: {
+      required: 'Please select a delivery mode',
+    },
+    location: {
+      maxLength: 'Location too long',
+    },
+    tuition_per_credit: {
+      min: 'Tuition per credit must be 0 or greater',
+    },
+    additional_fees: {
+      min: 'Additional fees must be 0 or greater',
+    },
+    registration_end_date: {
+      afterOrEqual: 'Registration end date must be after or equal to start date',
+    },
+  },
 } as const;

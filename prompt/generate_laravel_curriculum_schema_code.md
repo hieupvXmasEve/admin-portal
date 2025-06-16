@@ -45,7 +45,7 @@ Schema:
 - curriculum_version_id: foreign key → curriculum_versions.id
 - unit_id: foreign key → units.id
 - unit_type_id: foreign key → curriculum_unit_types.id, nullable
-- semester_order: integer, nullable
+- semester_number: integer, nullable
 
 ### Table: curriculum_unit_types
 - id: tinyint, primary key
@@ -116,7 +116,7 @@ CREATE TABLE curriculum_units (
     curriculum_version_id BIGINT NOT NULL,
     unit_id BIGINT NOT NULL,
     unit_type_id TINYINT UNSIGNED NULL, -- core, elective,...
-    semester_order INT NULL, -- kỳ học đề xuất
+    semester_number INT NULL, -- kỳ học đề xuất
     is_compulsory BOOLEAN DEFAULT TRUE,
     note TEXT NULL,
     created_at TIMESTAMP NULL,

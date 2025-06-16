@@ -326,4 +326,102 @@ class StudentController extends Controller
             })
             ->toArray();
     }
+
+    /**
+     * Search students (API endpoint)
+     */
+    public function apiSearch(Request $request)
+    {
+        $validated = $request->validate([
+            'query' => 'nullable|string|max:255',
+            'status' => 'nullable|string|in:active,inactive,suspended',
+            'page' => 'nullable|integer|min:1',
+            'limit' => 'nullable|integer|min:1|max:50',
+        ]);
+
+        $query = Student::query()
+            ->with(['campus', 'program', 'specialization']);
+
+        // Apply status filter
+        if ($validated['status'] ?? null) {
+            $query->where('status', $validated['status']);
+        } else {
+            $query->where('status', 'active'); // Default to active students
+        }
+
+        // Apply search query
+        if ($searchQuery = $validated['query'] ?? null) {
+            $query->where(function ($q) use ($searchQuery) {
+                $q->where('student_id', 'like', "%{$searchQuery}%")
+                    ->orWhere('full_name', 'like', "%{$searchQuery}%")
+                    ->orWhere('email', 'like', "%{$searchQuery}%");
+            });
+        }
+
+        $limit = $validated['limit'] ?? 20;
+        $students = $query->orderBy('full_name')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Students retrieved successfully',
+            'data' => [
+                'items' => $students->map(function ($student) {
+                    return [
+                        'id' => $student->id,
+                        'student_id' => $student->student_id,
+                        'full_name' => $student->full_name,
+                        'email' => $student->email,
+                        'enrollment_status' => $student->enrollment_status,
+                        'status' => $student->status,
+                        'program' => $student->program ? [
+                            'id' => $student->program->id,
+                            'name' => $student->program->name,
+                        ] : null,
+                        'campus' => $student->campus ? [
+                            'id' => $student->campus->id,
+                            'name' => $student->campus->name,
+                        ] : null,
+                    ];
+                }),
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => $limit,
+                    'total' => $students->count(),
+                    'last_page' => 1,
+                    'has_more_pages' => false,
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Get student by ID (API endpoint)
+     */
+    public function apiShow(Student $student)
+    {
+        $student->load(['campus', 'program', 'specialization']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Student retrieved successfully',
+            'data' => [
+                'id' => $student->id,
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'email' => $student->email,
+                'enrollment_status' => $student->enrollment_status,
+                'status' => $student->status,
+                'program' => $student->program ? [
+                    'id' => $student->program->id,
+                    'name' => $student->program->name,
+                ] : null,
+                'campus' => $student->campus ? [
+                    'id' => $student->campus->id,
+                    'name' => $student->campus->name,
+                ] : null,
+            ],
+        ]);
+    }
 }

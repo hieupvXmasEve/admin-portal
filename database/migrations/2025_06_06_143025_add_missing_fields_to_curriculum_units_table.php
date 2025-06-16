@@ -14,8 +14,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('curriculum_units', function (Blueprint $table) {
-            $table->unsignedTinyInteger('year_level')->nullable()->comment('Academic year level (1-5)');
-            $table->unsignedTinyInteger('semester_number')->nullable()->comment('Semester within the year (1-3)');
+            $table->unsignedTinyInteger('year_level')->nullable()->comment('Academic year level (1-3)');
+            // $table->unsignedTinyInteger('semester_number')->nullable()->comment('Semester within the year (1-9)');
         });
     }
 

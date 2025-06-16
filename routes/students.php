@@ -58,6 +58,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // AJAX endpoints for student management
     Route::prefix('api/students')->name('api.students.')->group(function () {
+        Route::get('/search', [StudentController::class, 'apiSearch'])
+            ->middleware('can:view_student')
+            ->name('search');
+
+        Route::get('/{student}', [StudentController::class, 'apiShow'])
+            ->middleware('can:view_student')
+            ->name('show');
+
         Route::get('/specializations', [StudentController::class, 'getSpecializations'])
             ->middleware('can:view_student')
             ->name('specializations');

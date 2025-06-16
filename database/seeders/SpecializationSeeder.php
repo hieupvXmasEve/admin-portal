@@ -150,15 +150,15 @@ class SpecializationSeeder extends Seeder
     {
         $commonUnits = [
             'IT' => [
-                ['code' => 'CS101', 'group_type' => 'core', 'year_level' => 1, 'semester_number' => 1],
-                ['code' => 'CS102', 'group_type' => 'core', 'year_level' => 1, 'semester_number' => 2],
-                ['code' => 'CS201', 'group_type' => 'core', 'year_level' => 2, 'semester_number' => 1],
-                ['code' => 'IT301', 'group_type' => 'core', 'year_level' => 3, 'semester_number' => 1], // Database - core for all IT
+                ['code' => 'CS101', 'type' => 'core', 'year_level' => 1, 'semester_number' => 1],
+                ['code' => 'CS102', 'type' => 'core', 'year_level' => 1, 'semester_number' => 2],
+                ['code' => 'CS201', 'type' => 'core', 'year_level' => 2, 'semester_number' => 1],
+                ['code' => 'IT301', 'type' => 'core', 'year_level' => 3, 'semester_number' => 1], // Database - core for all IT
             ],
             'Business' => [
-                ['code' => 'BUS101', 'group_type' => 'core', 'year_level' => 1, 'semester_number' => 1],
-                ['code' => 'BUS201', 'group_type' => 'core', 'year_level' => 2, 'semester_number' => 1],
-                ['code' => 'BUS301', 'group_type' => 'core', 'year_level' => 3, 'semester_number' => 1],
+                ['code' => 'BUS101', 'type' => 'core', 'year_level' => 1, 'semester_number' => 1],
+                ['code' => 'BUS201', 'type' => 'core', 'year_level' => 2, 'semester_number' => 1],
+                ['code' => 'BUS301', 'type' => 'core', 'year_level' => 3, 'semester_number' => 1],
             ],
         ];
 
@@ -169,7 +169,7 @@ class SpecializationSeeder extends Seeder
                     CurriculumUnit::create([
                         'curriculum_version_id' => $curriculum->id,
                         'unit_id' => $unit->id,
-                        'group_type' => $unitData['group_type'],
+                        'type' => $unitData['type'],
                         'unit_scope' => 'common',
                         'is_required' => true,
                         'year_level' => $unitData['year_level'],
@@ -187,35 +187,35 @@ class SpecializationSeeder extends Seeder
         // Define core units for each specialization
         $specUnits = [
             'IT-SD' => [
-                ['code' => 'SD301', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 1],
-                ['code' => 'SD302', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 2],
-                ['code' => 'SD303', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 2],
-                ['code' => 'SD401', 'group_type' => 'major', 'year_level' => 4, 'semester_number' => 1],
+                ['code' => 'SD301', 'type' => 'major', 'year_level' => 3, 'semester_number' => 1],
+                ['code' => 'SD302', 'type' => 'major', 'year_level' => 3, 'semester_number' => 2],
+                ['code' => 'SD303', 'type' => 'major', 'year_level' => 3, 'semester_number' => 2],
+                ['code' => 'SD401', 'type' => 'major', 'year_level' => 4, 'semester_number' => 1],
                 // System Analysis is CORE for Software Development
-                ['code' => 'IT302', 'group_type' => 'core', 'year_level' => 3, 'semester_number' => 1],
+                ['code' => 'IT302', 'type' => 'core', 'year_level' => 3, 'semester_number' => 1],
             ],
             'IT-CS' => [
-                ['code' => 'CS301', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 1],
-                ['code' => 'CS302', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 2],
-                ['code' => 'CS303', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 2],
-                ['code' => 'CS401', 'group_type' => 'major', 'year_level' => 4, 'semester_number' => 1],
+                ['code' => 'CS301', 'type' => 'major', 'year_level' => 3, 'semester_number' => 1],
+                ['code' => 'CS302', 'type' => 'major', 'year_level' => 3, 'semester_number' => 2],
+                ['code' => 'CS303', 'type' => 'major', 'year_level' => 3, 'semester_number' => 2],
+                ['code' => 'CS401', 'type' => 'major', 'year_level' => 4, 'semester_number' => 1],
                 // Statistics is CORE for Cybersecurity (for risk analysis)
-                ['code' => 'MATH301', 'group_type' => 'core', 'year_level' => 3, 'semester_number' => 1],
+                ['code' => 'MATH301', 'type' => 'core', 'year_level' => 3, 'semester_number' => 1],
             ],
             'IT-DS' => [
-                ['code' => 'DS301', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 1],
-                ['code' => 'DS302', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 2],
-                ['code' => 'DS303', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 2],
-                ['code' => 'DS401', 'group_type' => 'major', 'year_level' => 4, 'semester_number' => 1],
+                ['code' => 'DS301', 'type' => 'major', 'year_level' => 3, 'semester_number' => 1],
+                ['code' => 'DS302', 'type' => 'major', 'year_level' => 3, 'semester_number' => 2],
+                ['code' => 'DS303', 'type' => 'major', 'year_level' => 3, 'semester_number' => 2],
+                ['code' => 'DS401', 'type' => 'major', 'year_level' => 4, 'semester_number' => 1],
                 // Statistics is CORE for Data Science
-                ['code' => 'MATH301', 'group_type' => 'core', 'year_level' => 2, 'semester_number' => 2],
+                ['code' => 'MATH301', 'type' => 'core', 'year_level' => 2, 'semester_number' => 2],
             ],
             'IT-NE' => [
-                ['code' => 'NE301', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 1],
-                ['code' => 'NE302', 'group_type' => 'major', 'year_level' => 3, 'semester_number' => 2],
-                ['code' => 'NE303', 'group_type' => 'major', 'year_level' => 4, 'semester_number' => 1],
+                ['code' => 'NE301', 'type' => 'major', 'year_level' => 3, 'semester_number' => 1],
+                ['code' => 'NE302', 'type' => 'major', 'year_level' => 3, 'semester_number' => 2],
+                ['code' => 'NE303', 'type' => 'major', 'year_level' => 4, 'semester_number' => 1],
                 // Network Security is CORE for Network Engineering
-                ['code' => 'CS301', 'group_type' => 'core', 'year_level' => 3, 'semester_number' => 2],
+                ['code' => 'CS301', 'type' => 'core', 'year_level' => 3, 'semester_number' => 2],
             ],
         ];
 
@@ -226,7 +226,7 @@ class SpecializationSeeder extends Seeder
                     CurriculumUnit::create([
                         'curriculum_version_id' => $curriculum->id,
                         'unit_id' => $unit->id,
-                        'group_type' => $unitData['group_type'],
+                        'type' => $unitData['type'],
                         'unit_scope' => 'specialization_specific',
                         'is_required' => true,
                         'year_level' => $unitData['year_level'],
@@ -282,7 +282,7 @@ class SpecializationSeeder extends Seeder
             CurriculumUnit::create([
                 'curriculum_version_id' => $curriculum->id,
                 'unit_id' => $unit->id,
-                'group_type' => 'elective',
+                'type' => 'elective',
                 'unit_scope' => 'cross_program',
                 'is_required' => false,
                 'year_level' => $yearLevel,

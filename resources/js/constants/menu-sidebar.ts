@@ -24,12 +24,7 @@ export const mainNavItems: NavItem[] = [
         href: '#',
         icon: BookOpen,
         children: [
-            {
-                title: 'Semesters',
-                href: '/semesters',
-                icon: Calendar,
-                requiredPermissions: ['view_semester'],
-            },
+
             {
                 title: 'Units',
                 href: '/units',
@@ -37,29 +32,34 @@ export const mainNavItems: NavItem[] = [
                 requiredPermissions: ['view_unit'],
             },
             {
-                title: 'Curriculum',
-                href: '#',
+                title: 'Programs',
+                href: '/programs',
+                icon: Building2,
+                requiredPermissions: ['view_program'],
+            },
+            {
+                title: 'Semesters',
+                href: '/semesters',
+                icon: Calendar,
+                requiredPermissions: ['view_semester'],
+            },
+            {
+                title: 'Curriculum Versions',
+                href: '/curriculum-versions',
+                icon: Layers,
+                requiredPermissions: ['view_curriculum_version'],
+            },
+            {
+                title: 'Course Offerings',
+                href: '/course-offerings',
+                icon: BookOpen,
+                requiredPermissions: ['view_course_offering'],
+            },
+            {
+                title: 'Course Registrations',
+                href: '/course-registrations',
                 icon: BookMarked,
-                children: [
-                    {
-                        title: 'Programs',
-                        href: '/programs',
-                        icon: Building2,
-                        requiredPermissions: ['view_program'],
-                    },
-                    {
-                        title: 'Curriculum Versions',
-                        href: '/curriculum-versions',
-                        icon: Layers,
-                        requiredPermissions: ['view_curriculum_version'],
-                    },
-                    // {
-                    //     title: 'Curriculum Units',
-                    //     href: '/curriculum-units',
-                    //     icon: GraduationCap,
-                    //     requiredPermissions: ['view_curriculum_unit'],
-                    // },
-                ],
+                requiredPermissions: ['view_course_registration'],
             },
         ],
     },

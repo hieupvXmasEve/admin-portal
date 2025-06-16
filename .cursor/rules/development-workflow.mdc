@@ -1,0 +1,251 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Development Workflow
+
+## Getting Started
+
+### Environment Setup
+1. Copy environment file: `cp .env.example .env`
+2. Install dependencies:
+   ```bash
+   composer install
+   npm install
+   ```
+3. Generate application key: `php artisan key:generate`
+4. Run migrations: `php artisan migrate`
+5. Seed database: `php artisan db:seed`
+
+### Development Scripts
+
+#### Primary Development Command
+```bash
+composer dev
+```
+This starts the complete development environment:
+- Laravel development server (`php artisan serve`)
+- Queue worker (`php artisan queue:listen`)
+- Log viewer (`php artisan pail`)
+- Vite development server (`npm run dev`)
+
+#### Individual Commands
+- `npm run dev` - Vite development server with HMR
+- `php artisan serve` - Laravel development server
+- `php artisan queue:listen --tries=1` - Queue worker
+- `php artisan pail --timeout=0` - Real-time log viewer
+
+#### Production Build
+- `npm run build` - Production build
+- `composer dev:ssr` - SSR development with Inertia
+
+## Code Quality
+
+### PHP Code Standards
+- **PSR-12**: Follow PSR-12 coding standards
+- **Laravel Pint**: Auto-format PHP code
+- **Strict Types**: Always use `declare(strict_types=1)`
+
+Run PHP code formatting:
+```bash
+./vendor/bin/pint
+```
+
+### Frontend Code Standards
+Configuration files:
+- [eslint.config.js](mdc:eslint.config.js) - ESLint rules
+- [.prettierrc](mdc:.prettierrc) - Prettier formatting
+- [tsconfig.json](mdc:tsconfig.json) - TypeScript configuration
+
+Run frontend linting and formatting:
+```bash
+npm run lint        # ESLint with auto-fix
+npm run format      # Prettier formatting
+npm run format:check # Check formatting without fixing
+```
+
+## Testing
+
+### PHP Testing (Pest)
+Configuration: [phpunit.xml](mdc:phpunit.xml)
+
+Run tests:
+```bash
+composer test           # Run all tests
+php artisan test        # Alternative command
+./vendor/bin/pest       # Direct Pest command
+```
+
+Test structure in [tests/](mdc:tests):
+- `tests/Feature/` - Feature tests
+- `tests/Unit/` - Unit tests
+
+Example test:
+```php
+<?php
+
+use App\Models\User;
+
+it('displays users on index page', function () {
+    $users = User::factory(3)->create();
+
+    $response = $this->get('/users');
+
+    $response->assertOk();
+    $response->assertInertia(fn($page) =>
+        $page->component('Users/Index')
+             ->has('users.data', 3)
+    );
+});
+```
+
+### Frontend Testing
+TypeScript compilation check:
+```bash
+npx vue-tsc --noEmit
+```
+
+## Database Management
+
+### Migrations
+Create and run migrations:
+```bash
+php artisan make:migration create_users_table
+php artisan migrate
+php artisan migrate:rollback
+php artisan migrate:fresh --seed
+```
+
+### Seeders
+Create and run seeders:
+```bash
+php artisan make:seeder UserSeeder
+php artisan db:seed
+php artisan db:seed --class=UserSeeder
+```
+
+## Development Tools
+
+### Laravel Debugbar
+Available in development ([barryvdh/laravel-debugbar](mdc:composer.json)):
+- SQL queries monitoring
+- Performance profiling
+- Variable dumping
+
+### Laravel Pail
+Real-time log viewer:
+```bash
+php artisan pail
+php artisan pail --filter="error,critical"
+```
+
+### Ziggy (Laravel Routes in JS)
+Routes available in frontend via [ziggy-js](mdc:package.json):
+```typescript
+import { route } from 'ziggy-js'
+
+// Use Laravel routes in Vue components
+router.visit(route('users.show', { user: 1 }))
+```
+
+## Asset Management
+
+### Vite Configuration
+Configuration: [vite.config.ts](mdc:vite.config.ts)
+- Vue 3 support with `@vitejs/plugin-vue`
+- Laravel integration with `laravel-vite-plugin`
+- TypeScript support
+- Hot Module Replacement (HMR)
+
+### TailwindCSS
+Configuration: [tailwind.config.js](mdc:tailwind.config.js)
+- TailwindCSS v4 with new engine
+- Custom design tokens
+- Component utilities
+
+Build assets:
+```bash
+npm run build     # Production build
+npm run dev       # Development with HMR
+```
+
+## Docker Support
+
+Development containers available:
+- [docker-compose.yml](mdc:docker-compose.yml) - Base configuration
+- [docker-compose.dev.yml](mdc:docker-compose.dev.yml) - Development overrides
+- [docker-compose.prod.yml](mdc:docker-compose.prod.yml) - Production configuration
+
+Start with Docker:
+```bash
+docker-compose up -d
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
+
+## File Watching and Hot Reload
+
+### Vite HMR
+Vite provides instant hot module replacement for:
+- Vue components
+- CSS/Scss files
+- JavaScript/TypeScript modules
+
+### Laravel File Watching
+For backend changes, use tools like:
+- Laravel Octane (for production)
+- Manual server restart during development
+
+## Debugging
+
+### PHP Debugging
+- Use Laravel Debugbar for SQL queries and performance
+- `dd()` and `dump()` for variable inspection
+- Laravel Telescope (if installed) for request monitoring
+
+### Frontend Debugging
+- Vue DevTools browser extension
+- Browser developer tools
+- Console logging with proper TypeScript support
+
+### API Debugging
+Test API endpoints:
+```bash
+# Using artisan tinker
+php artisan tinker
+
+# Using HTTP clients
+curl -X GET http://localhost:8000/api/users
+```
+
+## Performance Optimization
+
+### Laravel Optimization
+```bash
+php artisan optimize        # Cache config, routes, views
+php artisan config:cache    # Cache configuration
+php artisan route:cache     # Cache routes
+php artisan view:cache      # Cache Blade views
+```
+
+### Frontend Optimization
+```bash
+npm run build              # Optimized production build
+npm run build:ssr          # SSR optimized build
+```
+
+## Git Workflow
+
+### Ignored Files
+Configuration: [.gitignore](mdc:.gitignore)
+- Environment files (`.env`)
+- Dependency directories (`node_modules/`, `vendor/`)
+- Build artifacts
+- IDE files
+
+### Recommended Workflow
+1. Feature branches from `main`
+2. Commit with descriptive messages
+3. Run tests before pushing
+4. Code review via pull requests
+5. Merge to `main` after approval

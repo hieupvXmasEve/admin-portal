@@ -9,7 +9,9 @@
 /vendor
 .env
 .env.backup
-.env.production
+.env.docker.dev
+.env.docker.production
+
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
@@ -22,7 +24,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-/.cursor
+# /.cursor
 # prompt
 
 /screenshots

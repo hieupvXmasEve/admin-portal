@@ -52,13 +52,8 @@ export interface UnitData {
     }>;
     curriculum_units: Array<{
         id: number;
-        unit_type: {
-            id: number;
-            name: string;
-            code: string;
-        };
+        type: 'core' | 'major' | 'elective';
         is_compulsory: boolean;
-
         note?: string;
         curriculum_version: {
             id: number;
@@ -118,17 +113,18 @@ export interface CurriculumUnit {
     id: number;
     curriculum_version_id: number;
     unit_id: number;
-    unit_type_id?: number;
-    year_level?: number;
+    semester_id: number;
+    type: 'core' | 'major' | 'elective';
     semester_number?: number;
+    is_compulsory: boolean;
     note?: string;
     created_at: string;
     updated_at: string;
     unit?: Unit;
-    unitType?: {
+    semester?: {
         id: number;
         name: string;
-        description?: string;
+        code: string;
     };
     curriculumVersion?: {
         id: number;

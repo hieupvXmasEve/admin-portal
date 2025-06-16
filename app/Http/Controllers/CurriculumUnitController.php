@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CurriculumUnit;
 use App\Models\CurriculumVersion;
-use App\Models\CurriculumUnitType;
+use App\Models\Semester;
 use App\Models\Unit;
 use App\Http\Requests\StoreCurriculumUnitRequest;
 use App\Http\Requests\UpdateCurriculumUnitRequest;
@@ -24,14 +24,14 @@ class CurriculumUnitController extends Controller
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
             'filter.curriculum_version_id' => 'nullable|exists:curriculum_versions,id',
-            'filter.unit_type_id' => 'nullable|exists:curriculum_unit_types,id',
+            'filter.type' => 'nullable|in:core,major,elective',
             'sort' => 'nullable|string|in:created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
         $curriculumUnits = CurriculumUnit::query()
-            ->with(['curriculumVersion.program', 'curriculumVersion.specialization', 'unit', 'unitType'])
+            ->with(['curriculumVersion.program', 'curriculumVersion.specialization', 'unit', 'semester'])
             ->when($validated['search'] ?? null, function ($query, $search) {
                 $query->whereHas('unit', function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -41,8 +41,8 @@ class CurriculumUnitController extends Controller
             ->when($validated['filter']['curriculum_version_id'] ?? null, function ($query, $versionId) {
                 $query->where('curriculum_version_id', $versionId);
             })
-            ->when($validated['filter']['unit_type_id'] ?? null, function ($query, $typeId) {
-                $query->where('unit_type_id', $typeId);
+            ->when($validated['filter']['type'] ?? null, function ($query, $type) {
+                $query->where('type', $type);
             })
             ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
                 $direction = $validated['direction'] ?? 'asc';
@@ -57,12 +57,16 @@ class CurriculumUnitController extends Controller
             'filters' => [
                 'search' => $validated['search'] ?? null,
                 'curriculum_version_id' => $validated['filter']['curriculum_version_id'] ?? null,
-                'unit_type_id' => $validated['filter']['unit_type_id'] ?? null,
+                'type' => $validated['filter']['type'] ?? null,
             ],
             'curriculumVersions' => CurriculumVersion::with(['program', 'specialization'])
                 ->orderBy('version_code')
                 ->get(['id', 'version_code', 'program_id', 'specialization_id']),
-            'unitTypes' => CurriculumUnitType::orderBy('name')->get(['id', 'name']),
+            'unitTypes' => [
+                ['value' => 'core', 'label' => 'Core'],
+                ['value' => 'major', 'label' => 'Major'],
+                ['value' => 'elective', 'label' => 'Elective'],
+            ],
         ]);
     }
 
@@ -73,7 +77,12 @@ class CurriculumUnitController extends Controller
                 ->orderBy('version_code')
                 ->get(['id', 'version_code', 'program_id', 'specialization_id']),
             'units' => Unit::orderBy('code')->get(['id', 'code', 'name', 'credit_points']),
-            'unitTypes' => CurriculumUnitType::orderBy('name')->get(['id', 'name']),
+            'semesters' => Semester::orderBy('start_date')->get(['id', 'name', 'code']),
+            'unitTypes' => [
+                ['value' => 'core', 'label' => 'Core'],
+                ['value' => 'major', 'label' => 'Major'],
+                ['value' => 'elective', 'label' => 'Elective'],
+            ],
             'semesterOptions' => collect(range(1, 12))->map(fn($n) => ['value' => $n, 'label' => "Semester {$n}"]),
         ]);
     }
@@ -106,7 +115,7 @@ class CurriculumUnitController extends Controller
             'curriculumVersion.program',
             'curriculumVersion.specialization',
             'unit',
-            'unitType'
+            'semester'
         ]);
 
         return Inertia::render('curriculum-units/Show', [
@@ -116,7 +125,7 @@ class CurriculumUnitController extends Controller
 
     public function edit(CurriculumUnit $curriculumUnit): Response
     {
-        $curriculumUnit->load(['curriculumVersion', 'unit', 'unitType']);
+        $curriculumUnit->load(['curriculumVersion', 'unit', 'semester']);
 
         return Inertia::render('curriculum-units/Edit', [
             'curriculumUnit' => $curriculumUnit,
@@ -124,7 +133,12 @@ class CurriculumUnitController extends Controller
                 ->orderBy('version_code')
                 ->get(['id', 'version_code', 'program_id', 'specialization_id']),
             'units' => Unit::orderBy('code')->get(['id', 'code', 'name', 'credit_points']),
-            'unitTypes' => CurriculumUnitType::orderBy('name')->get(['id', 'name']),
+            'semesters' => Semester::orderBy('start_date')->get(['id', 'name', 'code']),
+            'unitTypes' => [
+                ['value' => 'core', 'label' => 'Core'],
+                ['value' => 'major', 'label' => 'Major'],
+                ['value' => 'elective', 'label' => 'Elective'],
+            ],
             'semesterOptions' => collect(range(1, 12))->map(fn($n) => ['value' => $n, 'label' => "Semester {$n}"]),
         ]);
     }
@@ -211,9 +225,10 @@ class CurriculumUnitController extends Controller
         $validated = $request->validate([
             'curriculum_version_id' => 'required|exists:curriculum_versions,id',
             'unit_id' => 'required|exists:units,id',
-            'unit_type_id' => 'required|exists:curriculum_unit_types,id',
-            'year_level' => 'required|integer|min:1|max:5',
-            'semester_number' => 'required|integer|min:1|max:3',
+            'semester_id' => 'required|exists:semesters,id',
+            'type' => 'required|in:core,major,elective',
+            'semester_number' => 'required|integer|min:1|max:12',
+            'is_compulsory' => 'required|boolean',
             'note' => 'nullable|string|max:1000',
         ]);
 
@@ -227,7 +242,7 @@ class CurriculumUnitController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Curriculum unit created successfully.',
-                'data' => $curriculumUnit->load(['unit', 'unitType'])
+                'data' => $curriculumUnit->load(['unit', 'semester'])
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -245,9 +260,10 @@ class CurriculumUnitController extends Controller
         $validated = $request->validate([
             'curriculum_version_id' => 'required|exists:curriculum_versions,id',
             'unit_id' => 'required|exists:units,id',
-            'unit_type_id' => 'required|exists:curriculum_unit_types,id',
-            'year_level' => 'required|integer|min:1|max:5',
-            'semester_number' => 'required|integer|min:1|max:3',
+            'semester_id' => 'required|exists:semesters,id',
+            'type' => 'required|in:core,major,elective',
+            'semester_number' => 'required|integer|min:1|max:12',
+            'is_compulsory' => 'required|boolean',
             'note' => 'nullable|string|max:1000',
         ]);
 
@@ -261,7 +277,7 @@ class CurriculumUnitController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Curriculum unit updated successfully.',
-                'data' => $curriculumUnit->load(['unit', 'unitType'])
+                'data' => $curriculumUnit->load(['unit', 'semester'])
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -280,9 +296,8 @@ class CurriculumUnitController extends Controller
             'curriculum_version_id' => 'required|exists:curriculum_versions,id',
         ]);
 
-        $units = CurriculumUnit::with(['unit', 'unitType'])
+        $units = CurriculumUnit::with(['unit', 'semester'])
             ->where('curriculum_version_id', $validated['curriculum_version_id'])
-            ->orderBy('year_level')
             ->orderBy('semester_number')
             ->orderBy('created_at')
             ->get();

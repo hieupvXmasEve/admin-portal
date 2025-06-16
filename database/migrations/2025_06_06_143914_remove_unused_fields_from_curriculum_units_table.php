@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::table('curriculum_units', function (Blueprint $table) {
             // Drop indexes that reference columns to be dropped
-            $table->dropIndex(['semester_order', 'is_compulsory']);
+            $table->dropIndex(['semester_number', 'is_compulsory']);
 
             // Drop foreign key constraint first
             $table->dropForeign(['semester_id']);
@@ -39,7 +39,7 @@ return new class extends Migration
             $table->boolean('is_compulsory')->default(true);
 
             // Recreate the indexes
-            $table->index(['semester_order', 'is_compulsory']);
+            $table->index(['semester_number', 'is_compulsory']);
         });
     }
 };

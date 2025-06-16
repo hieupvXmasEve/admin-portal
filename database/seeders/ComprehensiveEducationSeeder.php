@@ -8,7 +8,6 @@ use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\Semester;
 use App\Models\CurriculumVersion;
-use App\Models\CurriculumUnitType;
 use App\Models\CurriculumUnit;
 use App\Models\Unit;
 use Illuminate\Database\Seeder;
@@ -32,7 +31,6 @@ class ComprehensiveEducationSeeder extends Seeder
         // Seed the structure in order
         $this->seedSemesters();
         $this->seedUnits();
-        $this->seedCurriculumUnitTypes();
         $this->seedPrograms();
         $this->seedSpecializations();
         $this->seedCurriculumVersions();
@@ -61,7 +59,6 @@ class ComprehensiveEducationSeeder extends Seeder
         Specialization::truncate();
         Program::truncate();
         Unit::truncate();
-        CurriculumUnitType::truncate();
 
         // Re-enable foreign key checks
         if ($databaseType === 'mysql') {
@@ -219,26 +216,6 @@ class ComprehensiveEducationSeeder extends Seeder
     }
 
     /**
-     * Seed curriculum unit types.
-     */
-    private function seedCurriculumUnitTypes(): void
-    {
-        $this->command->info('Seeding curriculum unit types...');
-
-        $types = [
-            ['name' => 'core'],
-            ['name' => 'elective'],
-            ['name' => 'major'],
-        ];
-
-        foreach ($types as $type) {
-            CurriculumUnitType::create($type);
-        }
-
-        $this->command->info('Curriculum unit types seeded.');
-    }
-
-    /**
      * Seed programs.
      */
     private function seedPrograms(): void
@@ -350,11 +327,6 @@ class ComprehensiveEducationSeeder extends Seeder
         $specializations = Specialization::all();
         $semesters = Semester::all();
         $units = Unit::all();
-        $unitTypes = CurriculumUnitType::all();
-
-        $coreType = $unitTypes->where('name', 'core')->first();
-        $electiveType = $unitTypes->where('name', 'elective')->first();
-        $majorType = $unitTypes->where('name', 'major')->first();
 
         foreach ($specializations as $specialization) {
             for ($version = 1; $version <= 5; $version++) {
@@ -371,7 +343,7 @@ class ComprehensiveEducationSeeder extends Seeder
                 ]);
 
                 // Add 27 curriculum units to each version (9 semesters × 3 units)
-                $this->seedCurriculumUnits($curriculumVersion, $units, $semesters, $coreType, $electiveType, $majorType);
+                $this->seedCurriculumUnits($curriculumVersion, $units, $semesters);
             }
         }
 
@@ -387,23 +359,16 @@ class ComprehensiveEducationSeeder extends Seeder
     private function seedCurriculumUnits(
         CurriculumVersion $curriculumVersion,
         $units,
-        $semesters,
-        $coreType,
-        $electiveType,
-        $majorType
+        $semesters
     ): void {
         $availableUnits = $units->shuffle();
         $unitIndex = 0;
 
         // Distribute 27 units across 9 semesters (3 units per semester)
         for ($semesterNumber = 1; $semesterNumber <= 9; $semesterNumber++) {
-            // Calculate year level (1-3) from semester number (1-9)
-            $yearLevel = ceil($semesterNumber / 3);
-
-            // Calculate semester within year (1-3)
-            $semesterInYear = (($semesterNumber - 1) % 3) + 1;
-
             for ($unitInSemester = 1; $unitInSemester <= 3; $unitInSemester++) {
+                // Calculate year level (1-3) from semester number (1-9)
+                $yearLevel = ceil($semesterNumber / 3);
                 // Ensure we don't exceed available units
                 if ($unitIndex >= $units->count()) {
                     $unitIndex = 0;
@@ -412,34 +377,27 @@ class ComprehensiveEducationSeeder extends Seeder
 
                 // Determine unit type: first 2 units are mandatory (core/major), 3rd is elective
                 if ($unitInSemester <= 2) {
-                    $unitType = rand(0, 1) ? $coreType : $majorType;
-                    $groupType = $unitType === $coreType ? 'core' : 'major';
-                    $isOptional = false;
+                    $type = rand(0, 1) ? 'core' : 'major';
                     $typeLabel = 'Mandatory';
                 } else {
-                    $unitType = $electiveType;
-                    $groupType = 'elective';
-                    $isOptional = true;
+                    $type = 'elective';
                     $typeLabel = 'Elective (Can choose from any available unit)';
                 }
 
                 $note = sprintf(
-                    'Semester %d (Year %d, Semester %d) - Unit %d (%s)%s',
-                    $semesterNumber,
+                    'Year %d, Semester %d - Unit %d (%s)%s',
                     $yearLevel,
-                    $semesterInYear,
+                    (($semesterNumber - 1) % 3) + 1,
                     $unitInSemester,
                     $typeLabel,
-                    $isOptional ? ' - ELECTIVE SLOT: Student can choose any unit from other specializations or programs' : ''
+                    $type === 'elective' ? ' - ELECTIVE SLOT: Student can choose any unit from other specializations or programs' : ''
                 );
 
                 CurriculumUnit::create([
                     'curriculum_version_id' => $curriculumVersion->id,
                     'unit_id' => $availableUnits[$unitIndex]->id,
-                    'unit_type_id' => $unitType->id,
+                    'type' => $type,
                     'year_level' => $yearLevel,
-                    'semester_number' => $semesterInYear,
-                    'group_type' => $groupType,
                     'note' => $note,
                 ]);
 

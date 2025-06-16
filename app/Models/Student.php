@@ -146,6 +146,11 @@ class Student extends Authenticatable
         return $this->hasMany(AcademicHold::class);
     }
 
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(Enrollment::class);
+    }
+
     public function hasActiveHolds(): bool
     {
         return $this->academicHolds()->where('status', 'active')->exists();

@@ -42,14 +42,19 @@ class Semester extends Model
         return $this->hasMany(CurriculumVersion::class, 'semester_id');
     }
 
-    public function enrollments(): HasMany
+    public function courseRegistrations(): HasMany
     {
-        return $this->hasMany(StudentEnrollment::class);
+        return $this->hasMany(CourseRegistration::class);
     }
 
-    public function semesterOfferings(): HasMany
+    public function courseOfferings(): HasMany
     {
-        return $this->hasMany(SemesterUnitOffering::class);
+        return $this->hasMany(CourseOffering::class);
+    }
+
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(Enrollment::class);
     }
 
     public function isArchived(): bool

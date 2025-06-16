@@ -6,8 +6,8 @@ namespace App\Services;
 
 use App\Models\Semester;
 use App\Models\Campus;
-use App\Models\StudentEnrollment;
-use App\Models\SemesterUnitOffering;
+use App\Models\CourseRegistration;
+use App\Models\CourseOffering;
 use App\Models\Unit;
 use App\Models\User;
 use Carbon\Carbon;
@@ -246,13 +246,13 @@ class SemesterManagementService
     /**
      * Create unit offerings for a semester
      */
-    public function createUnitOfferings(Semester $semester, array $offerings): Collection
+    public function createCourseOfferings(Semester $semester, array $offerings): Collection
     {
         $createdOfferings = collect();
 
         DB::transaction(function () use ($semester, $offerings, &$createdOfferings) {
             foreach ($offerings as $offeringData) {
-                $offering = SemesterUnitOffering::create([
+                $offering = CourseOffering::create([
                     'semester_id' => $semester->id,
                     'unit_id' => $offeringData['unit_id'],
                     'instructor_id' => $offeringData['instructor_id'] ?? null,
@@ -271,71 +271,56 @@ class SemesterManagementService
             }
         });
 
-        Log::info("Created {$createdOfferings->count()} unit offerings for semester: {$semester->name}");
+        Log::info("Created {$createdOfferings->count()} course offerings for semester: {$semester->name}");
 
         return $createdOfferings;
     }
 
-    /**
-     * Enroll a student in a semester
-     */
-    public function enrollStudent(User $student, Semester $semester, array $data): StudentEnrollment
-    {
-        if (!$semester->isEnrollmentOpen()) {
-            throw new \Exception('Enrollment is not open for this semester');
-        }
-
-        // Check if student is already enrolled
-        $existingEnrollment = StudentEnrollment::where('user_id', $student->id)
-            ->where('semester_id', $semester->id)
-            ->first();
-
-        if ($existingEnrollment) {
-            throw new \Exception('Student is already enrolled in this semester');
-        }
-
-        return DB::transaction(function () use ($student, $semester, $data) {
-            $enrollment = StudentEnrollment::create([
-                'user_id' => $student->id,
-                'semester_id' => $semester->id,
-                'program_id' => $data['program_id'],
-                'specialization_id' => $data['specialization_id'] ?? null,
-                'enrollment_date' => Carbon::now(),
-                'is_full_time' => $data['is_full_time'] ?? true,
-            ]);
-
-            Log::info("Enrolled student {$student->email} in semester {$semester->name}");
-
-            return $enrollment;
-        });
-    }
+    // Note: Student enrollment is now handled through CourseRegistration
 
     /**
      * Get semester statistics for a campus
      */
     public function getSemesterStatistics(Semester $semester): array
     {
-        $totalEnrollments = $semester->enrollments()->count();
-        $activeEnrollments = $semester->enrollments()->active()->count();
-        $fullTimeStudents = $semester->enrollments()->fullTime()->count();
-        $partTimeStudents = $semester->enrollments()->partTime()->count();
+        $totalRegistrations = $semester->courseRegistrations()->count();
+        $activeRegistrations = $semester->courseRegistrations()->active()->count();
 
-        $unitOfferings = $semester->semesterOfferings()->count();
-        $activeOfferings = $semester->semesterOfferings()->active()->count();
+        // Calculate full-time vs part-time based on credit hours
+        $registrations = $semester->courseRegistrations()
+            ->active()
+            ->with('courseOffering.unit')
+            ->get()
+            ->groupBy('student_id');
 
-        $totalCapacity = $semester->semesterOfferings()->sum('max_capacity');
-        $totalEnrolled = $semester->semesterOfferings()->sum('current_enrollment');
+        $fullTimeStudents = 0;
+        $partTimeStudents = 0;
+
+        foreach ($registrations as $studentRegistrations) {
+            $totalCredits = $studentRegistrations->sum('credit_hours');
+            if ($totalCredits >= 12) {
+                $fullTimeStudents++;
+            } else {
+                $partTimeStudents++;
+            }
+        }
+
+        $courseOfferings = $semester->courseOfferings()->count();
+        $activeOfferings = $semester->courseOfferings()->active()->count();
+
+        $totalCapacity = $semester->courseOfferings()->sum('max_capacity');
+        $totalEnrolled = $semester->courseOfferings()->sum('current_enrollment');
         $utilizationRate = $totalCapacity > 0 ? ($totalEnrolled / $totalCapacity) * 100 : 0;
 
         return [
             'enrollments' => [
-                'total' => $totalEnrollments,
-                'active' => $activeEnrollments,
+                'total' => $totalRegistrations,
+                'active' => $activeRegistrations,
                 'full_time' => $fullTimeStudents,
                 'part_time' => $partTimeStudents,
             ],
             'offerings' => [
-                'total' => $unitOfferings,
+                'total' => $courseOfferings,
                 'active' => $activeOfferings,
                 'capacity_utilization' => round($utilizationRate, 2),
             ],
@@ -486,16 +471,16 @@ class SemesterManagementService
     }
 
     /**
-     * Copy unit offerings from previous semester
+     * Copy course offerings from previous semester
      */
     public function copyOfferingsFromPreviousSemester(Semester $targetSemester, Semester $sourceSemester): Collection
     {
-        $sourceOfferings = $sourceSemester->semesterOfferings()->with('unit')->get();
+        $sourceOfferings = $sourceSemester->courseOfferings()->with('unit')->get();
         $copiedOfferings = collect();
 
         DB::transaction(function () use ($targetSemester, $sourceOfferings, &$copiedOfferings) {
             foreach ($sourceOfferings as $sourceOffering) {
-                $newOffering = SemesterUnitOffering::create([
+                $newOffering = CourseOffering::create([
                     'semester_id' => $targetSemester->id,
                     'unit_id' => $sourceOffering->unit_id,
                     'instructor_id' => $sourceOffering->instructor_id,

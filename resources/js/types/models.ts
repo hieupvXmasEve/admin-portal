@@ -68,14 +68,15 @@ export interface CurriculumUnit {
   id: number;
   curriculum_version_id: number;
   unit_id: number;
-  unit_type_id?: number;
-  year_level?: number;
+  semester_id: number;
+  type: 'core' | 'major' | 'elective';
   semester_number?: number;
+  is_compulsory: boolean;
   note?: string;
   created_at: string;
   updated_at: string;
   unit?: Unit;
-  unit_type?: UnitType;
+  semester?: Semester;
   curriculum_version?: CurriculumVersion;
 }
 
@@ -134,6 +135,21 @@ export interface Student {
   updated_at: string;
 }
 
+export interface Enrollment {
+  id: number;
+  student_id: number;
+  semester_id: number;
+  curriculum_version_id: number;
+  semester_number: number;
+  status: 'in_progress' | 'completed' | 'withdrawn';
+  notes?: string;
+  student?: Student;
+  semester?: Semester;
+  curriculum_version?: CurriculumVersion;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CourseRegistration {
   id: number;
   student_id: number;
@@ -147,42 +163,94 @@ export interface CourseRegistration {
   grade_points?: number;
   attempt_number: number;
   is_retake: boolean;
+  drop_date?: string;
+  withdrawal_date?: string;
+  completion_date?: string;
   tuition_amount: number;
   fees_amount: number;
   payment_status: 'pending' | 'paid' | 'overdue' | 'waived';
+  notes?: string;
+  student?: Student;
   course_offering?: CourseOffering;
   semester?: Semester;
   created_at: string;
   updated_at: string;
 }
 
+// Form data type for course registration validation
+export interface CourseRegistrationFormData {
+  student_id: string;
+  course_offering_id: string;
+  payment_status?: 'pending' | 'paid' | 'overdue' | 'waived';
+  notes?: string;
+}
+
 export interface CourseOffering {
   id: number;
   semester_id: number;
   unit_id: number;
-  campus_id: number;
-  course_code: string;
-  section_code: string;
-  course_title: string;
-  credit_hours: number;
-  max_enrollment: number;
+  instructor_id?: number;
+  section_code?: string;
+  max_capacity: number;
   current_enrollment: number;
   waitlist_capacity: number;
   current_waitlist: number;
-  delivery_mode: 'in_person' | 'online' | 'hybrid';
-  schedule?: any;
+  delivery_mode: 'in_person' | 'online' | 'hybrid' | 'blended';
+  schedule_days?: string[];
+  schedule_time_start?: string;
+  schedule_time_end?: string;
   location?: string;
-  instructor_id?: number;
-  prerequisites?: string[];
-  status: 'active' | 'cancelled' | 'full' | 'closed';
-  tuition_per_credit: number;
-  additional_fees: number;
+  is_active: boolean;
+  enrollment_status: 'open' | 'closed' | 'waitlist_only' | 'cancelled';
+  registration_start_date?: string;
+  registration_end_date?: string;
+  special_requirements?: string;
+  notes?: string;
   unit?: Unit;
   instructor?: User;
   semester?: Semester;
   campus?: Campus;
   created_at: string;
   updated_at: string;
+  // Computed properties from model accessors
+  course_code?: string;
+  course_title?: string;
+  credit_hours?: number;
+  status: string;
+  max_enrollment: number;
+  tuition_per_credit: number;
+  additional_fees: number;
+  drop_deadline?: string;
+  withdrawal_deadline?: string;
+}
+
+// Form data types for strict validation
+export interface EnrollmentFormData {
+  student_id: string;
+  semester_id: string;
+  curriculum_version_id: string;
+  semester_number: number;
+  status?: 'in_progress' | 'completed' | 'withdrawn';
+  notes?: string;
+}
+
+export interface CourseOfferingFormData {
+  semester_id: string;
+  unit_id: string;
+  instructor_id?: string;
+  section_code?: string;
+  max_capacity: number;
+  waitlist_capacity?: number;
+  delivery_mode: 'in_person' | 'online' | 'hybrid' | 'blended';
+  schedule_days?: string[];
+  schedule_time_start?: string;
+  schedule_time_end?: string;
+  location?: string;
+  enrollment_status?: 'open' | 'closed' | 'waitlist_only' | 'cancelled';
+  registration_start_date?: string;
+  registration_end_date?: string;
+  special_requirements?: string;
+  notes?: string;
 }
 
 export interface AcademicHold {
