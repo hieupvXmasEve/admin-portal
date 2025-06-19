@@ -46,14 +46,14 @@ class CourseController extends Controller
                 ->where('start_date', '<=', now())
                 ->where('end_date', '>=', now())
                 ->first();
-            
+
             if (!$currentSemester) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No active semester found'
                 ], 404);
             }
-            
+
             $semesterId = $currentSemester->id;
         }
 
@@ -74,7 +74,7 @@ class CourseController extends Controller
                 $search = strtolower($request->search);
                 $availableCourses = array_filter($availableCourses, function ($course) use ($search) {
                     return str_contains(strtolower($course['offering']['course_code']), $search) ||
-                           str_contains(strtolower($course['offering']['course_title']), $search);
+                        str_contains(strtolower($course['offering']['course_title']), $search);
                 });
             }
 
@@ -92,9 +92,9 @@ class CourseController extends Controller
                     'max_enrollment' => $course['offering']['max_enrollment'],
                     'current_enrollment' => $course['offering']['current_enrollment'],
                     'available_spots' => $course['available_spots'],
-                    'instructor' => $course['offering']['instructor'] ? [
-                        'name' => $course['offering']['instructor']['name'],
-                        'email' => $course['offering']['instructor']['email'],
+                    'instructor' => $course['offering']['lecture'] ? [
+                        'name' => $course['offering']['lecture']['display_name'],
+                        'email' => $course['offering']['lecture']['email'],
                     ] : null,
                     'unit' => $course['offering']['unit'] ? [
                         'code' => $course['offering']['unit']['code'],
@@ -139,7 +139,7 @@ class CourseController extends Controller
      */
     public function show(CourseOffering $courseOffering): JsonResponse
     {
-        $courseOffering->load(['unit', 'instructor', 'semester', 'campus']);
+        $courseOffering->load(['unit', 'lecture', 'semester']);
 
         return response()->json([
             'success' => true,
@@ -179,10 +179,10 @@ class CourseController extends Controller
                         'description' => $courseOffering->unit->description,
                         'credit_points' => $courseOffering->unit->credit_points,
                     ] : null,
-                    'instructor' => $courseOffering->instructor ? [
-                        'id' => $courseOffering->instructor->id,
-                        'name' => $courseOffering->instructor->name,
-                        'email' => $courseOffering->instructor->email,
+                    'instructor' => $courseOffering->lecture ? [
+                        'id' => $courseOffering->lecture->id,
+                        'name' => $courseOffering->lecture->display_name,
+                        'email' => $courseOffering->lecture->email,
                     ] : null,
                     'semester' => [
                         'id' => $courseOffering->semester->id,
@@ -242,8 +242,8 @@ class CourseController extends Controller
                     'enrollment_start_date' => $semester->enrollment_start_date?->format('Y-m-d'),
                     'enrollment_end_date' => $semester->enrollment_end_date?->format('Y-m-d'),
                     'is_current' => $semester->start_date <= now() && $semester->end_date >= now(),
-                    'is_enrollment_open' => $semester->enrollment_start_date <= now() && 
-                                          $semester->enrollment_end_date >= now(),
+                    'is_enrollment_open' => $semester->enrollment_start_date <= now() &&
+                        $semester->enrollment_end_date >= now(),
                 ];
             });
 
@@ -277,7 +277,7 @@ class CourseController extends Controller
             ], 422);
         }
 
-        $query = CourseOffering::with(['unit', 'instructor'])
+        $query = CourseOffering::with(['unit', 'lecture'])
             ->forSemester($semester->id)
             ->forCampus($student->campus_id);
 
@@ -293,7 +293,7 @@ class CourseController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('course_code', 'like', "%{$search}%")
-                  ->orWhere('course_title', 'like', "%{$search}%");
+                    ->orWhere('course_title', 'like', "%{$search}%");
             });
         }
 
@@ -314,9 +314,9 @@ class CourseController extends Controller
                 'available_spots' => $course->getAvailableSpots(),
                 'status' => $course->status,
                 'total_cost' => $course->getTotalTuition(),
-                'instructor' => $course->instructor ? [
-                    'name' => $course->instructor->name,
-                    'email' => $course->instructor->email,
+                'instructor' => $course->lecture ? [
+                    'name' => $course->lecture->display_name,
+                    'email' => $course->lecture->email,
                 ] : null,
                 'unit' => $course->unit ? [
                     'code' => $course->unit->code,

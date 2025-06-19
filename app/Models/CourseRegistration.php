@@ -28,9 +28,8 @@ class CourseRegistration extends Model
         'drop_date',
         'withdrawal_date',
         'completion_date',
-        'tuition_amount',
-        'fees_amount',
-        'payment_status',
+        'retake_fee',
+        'is_retake_paid',
         'notes',
     ];
 
@@ -41,8 +40,7 @@ class CourseRegistration extends Model
         'completion_date' => 'datetime',
         'credit_hours' => 'decimal:2',
         'grade_points' => 'decimal:2',
-        'tuition_amount' => 'decimal:2',
-        'fees_amount' => 'decimal:2',
+        'retake_fee' => 'decimal:2',
         'is_retake' => 'boolean',
     ];
 
@@ -60,9 +58,8 @@ class CourseRegistration extends Model
             'grade_points' => ['nullable', 'numeric', 'min:0', 'max:4'],
             'attempt_number' => ['nullable', 'integer', 'min:1'],
             'is_retake' => ['nullable', 'boolean'],
-            'tuition_amount' => ['nullable', 'numeric', 'min:0'],
-            'fees_amount' => ['nullable', 'numeric', 'min:0'],
-            'payment_status' => ['nullable', 'in:pending,paid,overdue,waived'],
+            'retake_fee' => ['nullable', 'numeric', 'min:0'],
+            'is_retake_paid' => ['nullable', 'in:yes,no'],
             'notes' => ['nullable', 'string'],
         ];
     }
@@ -139,16 +136,16 @@ class CourseRegistration extends Model
 
     public function canDrop(): bool
     {
-        return $this->isActive() && 
-               $this->courseOffering->semester->isAddDropPeriod() &&
-               !$this->drop_date;
+        return $this->isActive() &&
+            $this->courseOffering->semester->isAddDropPeriod() &&
+            !$this->drop_date;
     }
 
     public function canWithdraw(): bool
     {
-        return $this->isActive() && 
-               $this->courseOffering->semester->isWithdrawalPeriod() &&
-               !$this->withdrawal_date;
+        return $this->isActive() &&
+            $this->courseOffering->semester->isWithdrawalPeriod() &&
+            !$this->withdrawal_date;
     }
 
     // Scopes

@@ -39,6 +39,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/{courseOffering}/toggle-status', [CourseOfferingController::class, 'toggleStatus'])
             ->middleware('can:edit_course')
             ->name('toggle-status');
+
+        // Split into sections routes
+        Route::get('/{courseOffering}/split', [CourseOfferingController::class, 'showSplit'])
+            ->middleware('can:edit_course')
+            ->name('split.show');
+
+        Route::post('/{courseOffering}/split', [CourseOfferingController::class, 'performSplit'])
+            ->middleware('can:edit_course')
+            ->name('split.perform');
     });
 
     // API routes for bulk operations and statistics
@@ -49,4 +58,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/api/course-offerings/statistics', [CourseOfferingController::class, 'statistics'])
         ->middleware('can:view_course')
         ->name('api.course-offerings.statistics');
+
+    // Instructor assignment routes
+    Route::get('/api/course-offerings/check-instructor-assignments', [CourseOfferingController::class, 'checkInstructorAssignments'])
+        ->middleware('can:view_course')
+        ->name('api.course-offerings.check-instructor-assignments');
+
+    Route::post('/api/course-offerings/bulk-assign-lectures', [CourseOfferingController::class, 'bulkAssignLectures'])
+        ->middleware('can:edit_course')
+        ->name('api.course-offerings.bulk-assign-lectures');
+
+    // Registration status management
+    Route::post('/api/course-offerings/{courseOffering}/bulk-update-status', [CourseOfferingController::class, 'bulkUpdateRegistrationStatus'])
+        ->middleware('can:edit_course')
+        ->name('api.course-offerings.bulk-update-status');
 });

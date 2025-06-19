@@ -35,6 +35,7 @@ class CourseRegistrationController extends Controller
     {
         $query = CourseRegistration::with([
             'student',
+            'semester',
             'courseOffering.unit',
             'courseOffering.semester',
         ])->orderBy('created_at', 'desc');
@@ -62,31 +63,81 @@ class CourseRegistrationController extends Controller
             $query->where('registration_status', $request->status);
         }
 
-        if ($request->filled('payment_status') && $request->payment_status !== 'all') {
-            $query->where('payment_status', $request->payment_status);
+        if ($request->filled('course_offering_id') && $request->course_offering_id !== 'all') {
+            $query->where('course_offering_id', $request->course_offering_id);
         }
 
         $registrations = $query->paginate(15)->withQueryString();
 
+        // Calculate statistics across all records (not just current page)
+        $statsQuery = CourseRegistration::query();
+
+        // Apply same filters to stats query (except pagination)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $statsQuery->whereHas('student', function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('student_id', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            })->orWhereHas('courseOffering', function ($q) use ($search) {
+                $q->whereHas('unit', function ($unitQuery) use ($search) {
+                    $unitQuery->where('code', 'like', "%{$search}%")
+                        ->orWhere('title', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        if ($request->filled('semester_id') && $request->semester_id !== 'all') {
+            $statsQuery->where('semester_id', $request->semester_id);
+        }
+
+        if ($request->filled('status') && $request->status !== 'all') {
+            $statsQuery->where('registration_status', $request->status);
+        }
+
+        if ($request->filled('course_offering_id') && $request->course_offering_id !== 'all') {
+            $statsQuery->where('course_offering_id', $request->course_offering_id);
+        }
+
+        $statistics = [
+            'total_registrations' => $statsQuery->count(),
+            'active_registrations' => (clone $statsQuery)->whereIn('registration_status', ['registered', 'confirmed'])->count(),
+            'pending_registrations' => (clone $statsQuery)->where('registration_status', 'registered')->count(),
+        ];
+
         // Get filter options
         $semesters = Semester::orderBy('start_date', 'desc')->get(['id', 'name', 'code']);
 
+        // Get course offerings for the selected semester
+        $courseOfferings = collect();
+        if ($request->filled('semester_id') && $request->semester_id !== 'all') {
+            $courseOfferings = CourseOffering::with(['unit'])
+                ->where('semester_id', $request->semester_id)
+                ->where('is_active', true)
+                ->join('units', 'course_offerings.unit_id', '=', 'units.id')
+                ->orderBy('units.code')
+                ->orderBy('course_offerings.section_code')
+                ->select('course_offerings.*')
+                ->get()
+                ->map(fn ($offering) => [
+                    'value' => $offering->id,
+                    'label' => "{$offering->course_code} - {$offering->course_title}" .
+                              ($offering->section_code ? " (Section {$offering->section_code})" : ''),
+                ]);
+        }
+
         return Inertia::render('course-registrations/Index', [
             'registrations' => $registrations,
-            'filters' => $request->only(['search', 'semester_id', 'status', 'payment_status']),
+            'statistics' => $statistics,
+            'filters' => $request->only(['search', 'semester_id', 'status', 'course_offering_id']),
             'semesters' => $semesters,
+            'courseOfferings' => $courseOfferings,
             'statusOptions' => [
                 ['value' => 'registered', 'label' => 'Registered'],
                 ['value' => 'confirmed', 'label' => 'Confirmed'],
                 ['value' => 'dropped', 'label' => 'Dropped'],
                 ['value' => 'withdrawn', 'label' => 'Withdrawn'],
                 ['value' => 'completed', 'label' => 'Completed'],
-            ],
-            'paymentStatusOptions' => [
-                ['value' => 'pending', 'label' => 'Pending'],
-                ['value' => 'paid', 'label' => 'Paid'],
-                ['value' => 'overdue', 'label' => 'Overdue'],
-                ['value' => 'waived', 'label' => 'Waived'],
             ],
         ]);
     }
@@ -106,7 +157,7 @@ class CourseRegistrationController extends Controller
         if ($request->filled('semester_id')) {
             $selectedSemester = Semester::find($request->semester_id);
 
-            $courseOfferings = CourseOffering::with(['unit', 'instructor'])
+            $courseOfferings = CourseOffering::with(['unit', 'lecture'])
                 ->where('semester_id', $request->semester_id)
                 ->where('is_active', true)
                 ->join('units', 'course_offerings.unit_id', '=', 'units.id')
@@ -131,7 +182,6 @@ class CourseRegistrationController extends Controller
         $request->validate([
             'student_id' => 'required|exists:students,id',
             'course_offering_id' => 'required|exists:course_offerings,id',
-            'payment_status' => 'nullable|in:pending,paid,overdue,waived',
             'notes' => 'nullable|string',
         ]);
 
@@ -152,9 +202,6 @@ class CourseRegistrationController extends Controller
                     'registration_date' => now(),
                     'registration_method' => 'admin_override',
                     'credit_hours' => $courseOffering->credit_hours,
-                    'tuition_amount' => $courseOffering->getTotalTuition(),
-                    'fees_amount' => $courseOffering->additional_fees ?? 0,
-                    'payment_status' => $request->payment_status ?? 'pending',
                     'notes' => $request->notes,
                 ]);
 
@@ -181,7 +228,7 @@ class CourseRegistrationController extends Controller
             'student',
             'courseOffering.unit',
             'courseOffering.semester',
-            'courseOffering.instructor',
+            'courseOffering.lecture',
         ]);
 
         return Inertia::render('course-registrations/Show', [
@@ -198,7 +245,7 @@ class CourseRegistrationController extends Controller
             'student',
             'courseOffering.unit',
             'courseOffering.semester',
-            'courseOffering.instructor',
+            'courseOffering.lecture',
         ]);
 
         return Inertia::render('course-registrations/Edit', [
@@ -212,13 +259,11 @@ class CourseRegistrationController extends Controller
     public function update(Request $request, CourseRegistration $adminCourseRegistration): RedirectResponse
     {
         $request->validate([
-            'payment_status' => 'nullable|in:pending,paid,overdue,waived',
             'notes' => 'nullable|string|max:1000',
         ]);
 
         try {
             $adminCourseRegistration->update([
-                'payment_status' => $request->payment_status ?? $adminCourseRegistration->payment_status,
                 'notes' => $request->notes,
             ]);
 

@@ -16,7 +16,6 @@ return new class extends Migration
             $table->foreignId('unit_id')->constrained('units')->onDelete('cascade');
             $table->foreignId('equivalent_unit_id')->constrained('units')->onDelete('cascade');
             $table->string('reason')->nullable();
-            $table->foreignId('valid_from_semester_id')->nullable()->constrained('semesters')->onDelete('set null');
             $table->timestamps();
 
             $table->unique(['unit_id', 'equivalent_unit_id']);

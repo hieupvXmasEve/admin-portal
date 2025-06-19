@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\Semester;
 use App\Models\CourseOffering;
 use App\Models\CurriculumUnit;
+use App\Models\CourseRegistration;
 use App\Models\Unit;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -72,7 +73,7 @@ class SemesterEnrollmentController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'No eligible students found for enrollment',
-                ], 400);
+                ], 200);
             }
 
             $enrollmentsCreated = 0;
@@ -243,7 +244,7 @@ class SemesterEnrollmentController extends Controller
         $request->validate([
             'unit_ids' => 'required|array|min:1',
             'unit_ids.*' => 'required|integer|exists:units,id',
-            'default_capacity' => 'nullable|integer|min:1|max:500',
+            'default_capacity' => 'nullable|integer|min:1|max:10000',
             'delivery_mode' => 'nullable|in:in_person,online,hybrid,blended',
         ]);
 
@@ -320,7 +321,7 @@ class SemesterEnrollmentController extends Controller
     {
         $validated = $request->validate([
             'unit_id' => 'required|integer|exists:units,id',
-            'instructor_id' => 'nullable|integer|exists:users,id',
+            'lecture_id' => 'nullable|integer|exists:lectures,id',
             'section_code' => 'nullable|string|max:10',
             'max_capacity' => 'required|integer|min:1|max:500',
             'waitlist_capacity' => 'nullable|integer|min:0|max:100',
@@ -351,7 +352,7 @@ class SemesterEnrollmentController extends Controller
             $courseOffering = CourseOffering::create([
                 'semester_id' => $semester->id,
                 'unit_id' => $validated['unit_id'],
-                'instructor_id' => $validated['instructor_id'] ?? null,
+                'lecture_id' => $validated['lecture_id'] ?? null,
                 'section_code' => $validated['section_code'] ?? null,
                 'max_capacity' => $validated['max_capacity'],
                 'current_enrollment' => 0,
@@ -371,7 +372,7 @@ class SemesterEnrollmentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Course offering created successfully',
-                'course_offering' => $courseOffering->load(['unit', 'instructor', 'semester']),
+                'course_offering' => $courseOffering->load(['unit', 'lecture', 'semester']),
             ]);
         } catch (\Exception $e) {
             Log::error('Open single course failed', [
@@ -394,15 +395,15 @@ class SemesterEnrollmentController extends Controller
     {
         try {
             $query = CourseOffering::where('semester_id', $semester->id)
-                ->with(['unit', 'instructor', 'courseRegistrations.student']);
+                ->with(['unit', 'lecture', 'courseRegistrations.student']);
 
             // Apply filters
             if ($request->filled('unit_id')) {
                 $query->where('unit_id', $request->unit_id);
             }
 
-            if ($request->filled('instructor_id')) {
-                $query->where('instructor_id', $request->instructor_id);
+            if ($request->filled('lecture_id')) {
+                $query->where('lecture_id', $request->lecture_id);
             }
 
             if ($request->filled('enrollment_status')) {
@@ -426,7 +427,7 @@ class SemesterEnrollmentController extends Controller
                         'unit_code' => $offering->unit?->code,
                         'unit_name' => $offering->unit?->name,
                         'section_code' => $offering->section_code,
-                        'instructor_name' => $offering->instructor?->name,
+                        'instructor_name' => $offering->lecture?->display_name,
                         'max_capacity' => $offering->max_capacity,
                         'current_enrollment' => $offering->current_enrollment,
                         'waitlist_capacity' => $offering->waitlist_capacity,
@@ -461,6 +462,288 @@ class SemesterEnrollmentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to get registration statistics: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Step 5: Bulk register enrolled students for available course offerings
+     */
+    public function bulkRegisterStudents(Semester $semester, Request $request): JsonResponse
+    {
+        $request->validate([
+            'registration_method' => 'nullable|in:online,advisor,admin_override',
+            'force_registration' => 'nullable|boolean',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $registrationMethod = $request->registration_method ?? 'admin_override';
+            $forceRegistration = $request->force_registration ?? false;
+
+            // Get all enrollments for this semester that are in progress
+            $enrollments = Enrollment::where('semester_id', $semester->id)
+                ->where('status', 'in_progress')
+                ->with(['student', 'curriculumVersion'])
+                ->get();
+
+            if ($enrollments->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No active enrollments found for this semester',
+                ], 200);
+            }
+
+            $registrationsCreated = 0;
+            $errors = [];
+            $warnings = [];
+            $skipped = 0;
+
+            foreach ($enrollments as $enrollment) {
+                try {
+                    $student = $enrollment->student;
+
+                    // Skip inactive students
+                    if ($student->status !== 'active') {
+                        $warnings[] = "Skipped student {$student->student_id} - not active";
+                        $skipped++;
+                        continue;
+                    }
+
+                    // Get curriculum units for this enrollment
+                    $curriculumUnits = CurriculumUnit::where('curriculum_version_id', $enrollment->curriculum_version_id)
+                        ->where('semester_number', $enrollment->semester_number)
+                        ->with('unit')
+                        ->get();
+
+                    if ($curriculumUnits->isEmpty()) {
+                        $warnings[] = "No curriculum units found for student {$student->student_id} in semester {$enrollment->semester_number}";
+                        $skipped++;
+                        continue;
+                    }
+
+                    $studentRegistrations = 0;
+
+                    foreach ($curriculumUnits as $curriculumUnit) {
+                        try {
+                            // Find available course offering for this unit
+                            $courseOffering = CourseOffering::where('semester_id', $semester->id)
+                                ->where('unit_id', $curriculumUnit->unit_id)
+                                ->where('is_active', true)
+                                ->where('enrollment_status', 'open')
+                                ->first();
+
+                            if (!$courseOffering) {
+                                $warnings[] = "No course offering found for unit {$curriculumUnit->unit->code} (Student: {$student->student_id})";
+                                continue;
+                            }
+
+                            // Check if student is already registered
+                            $existingRegistration = \App\Models\CourseRegistration::where('student_id', $student->id)
+                                ->where('course_offering_id', $courseOffering->id)
+                                ->where('semester_id', $semester->id)
+                                ->whereIn('registration_status', ['registered', 'confirmed'])
+                                ->exists();
+
+                            if ($existingRegistration) {
+                                $warnings[] = "Student {$student->student_id} already registered for {$curriculumUnit->unit->code}";
+                                continue;
+                            }
+
+                            // Check capacity (unless forced)
+                            if (!$forceRegistration && $courseOffering->current_enrollment >= $courseOffering->max_capacity) {
+                                $warnings[] = "Course {$curriculumUnit->unit->code} is at capacity (Student: {$student->student_id})";
+                                continue;
+                            }
+
+                            // Create registration
+                            \App\Models\CourseRegistration::create([
+                                'student_id' => $student->id,
+                                'course_offering_id' => $courseOffering->id,
+                                'semester_id' => $semester->id,
+                                'registration_status' => 'confirmed',
+                                'registration_date' => now(),
+                                'registration_method' => $registrationMethod,
+                                'credit_hours' => $curriculumUnit->unit->credit_points ?? 3,
+                                'notes' => "Bulk registration via admin",
+                            ]);
+
+                            // Update course offering enrollment count
+                            $courseOffering->increment('current_enrollment');
+
+                            // Update status if at capacity
+                            if ($courseOffering->current_enrollment >= $courseOffering->max_capacity) {
+                                $courseOffering->update(['enrollment_status' => 'closed']);
+                            }
+
+                            $registrationsCreated++;
+                            $studentRegistrations++;
+                        } catch (\Exception $e) {
+                            $errors[] = "Failed to register student {$student->student_id} for {$curriculumUnit->unit->code}: {$e->getMessage()}";
+                            Log::error('Course registration failed', [
+                                'student_id' => $student->id,
+                                'course_offering_id' => $courseOffering->id ?? 'unknown',
+                                'unit_code' => $curriculumUnit->unit->code,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+
+                    if ($studentRegistrations === 0) {
+                        $warnings[] = "No registrations created for student {$student->student_id}";
+                        $skipped++;
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Failed to process enrollment for student {$student->student_id}: {$e->getMessage()}";
+                    $skipped++;
+                    Log::error('Student enrollment processing failed', [
+                        'student_id' => $student->id,
+                        'enrollment_id' => $enrollment->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            $message = "Bulk registration completed. Created {$registrationsCreated} registrations.";
+            if ($skipped > 0) {
+                $message .= " Skipped {$skipped} students.";
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'registrations_created' => $registrationsCreated,
+                'students_processed' => $enrollments->count(),
+                'students_skipped' => $skipped,
+                'warnings' => array_slice($warnings, 0, 10), // Limit warnings to avoid huge response
+                'errors' => array_slice($errors, 0, 10), // Limit errors to avoid huge response
+                'total_warnings' => count($warnings),
+                'total_errors' => count($errors),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Bulk register students failed', [
+                'semester_id' => $semester->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to bulk register students: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get registrable students and their available courses
+     */
+    public function getRegistrableStudents(Semester $semester, Request $request): JsonResponse
+    {
+        try {
+            // Get all enrollments for this semester that are in progress
+            $enrollments = Enrollment::where('semester_id', $semester->id)
+                ->where('status', 'in_progress')
+                ->with(['student', 'curriculumVersion'])
+                ->get();
+
+            $studentsWithCourses = [];
+            $totalAvailableRegistrations = 0;
+
+            foreach ($enrollments as $enrollment) {
+                $student = $enrollment->student;
+
+                // Skip inactive students
+                if ($student->status !== 'active') {
+                    continue;
+                }
+
+                // Get curriculum units for this enrollment
+                $curriculumUnits = CurriculumUnit::where('curriculum_version_id', $enrollment->curriculum_version_id)
+                    ->where('semester_number', $enrollment->semester_number)
+                    ->with('unit')
+                    ->get();
+
+                $availableCourses = [];
+
+                foreach ($curriculumUnits as $curriculumUnit) {
+                    // Find available course offering for this unit
+                    $courseOffering = CourseOffering::where('semester_id', $semester->id)
+                        ->where('unit_id', $curriculumUnit->unit_id)
+                        ->where('is_active', true)
+                        ->where('enrollment_status', 'open')
+                        ->first();
+
+                    if (!$courseOffering) {
+                        continue;
+                    }
+
+                    // Check if student is already registered
+                    $alreadyRegistered = \App\Models\CourseRegistration::where('student_id', $student->id)
+                        ->where('course_offering_id', $courseOffering->id)
+                        ->where('semester_id', $semester->id)
+                        ->whereIn('registration_status', ['registered', 'confirmed'])
+                        ->exists();
+
+                    if ($alreadyRegistered) {
+                        continue;
+                    }
+
+                    $hasCapacity = $courseOffering->current_enrollment < $courseOffering->max_capacity;
+
+                    $availableCourses[] = [
+                        'unit_code' => $curriculumUnit->unit->code,
+                        'unit_name' => $curriculumUnit->unit->name,
+                        'course_offering_id' => $courseOffering->id,
+                        'is_required' => $curriculumUnit->is_required ?? true,
+                        'has_capacity' => $hasCapacity,
+                        'current_enrollment' => $courseOffering->current_enrollment,
+                        'max_capacity' => $courseOffering->max_capacity,
+                    ];
+
+                    if ($hasCapacity) {
+                        $totalAvailableRegistrations++;
+                    }
+                }
+
+                if (!empty($availableCourses)) {
+                    $studentsWithCourses[] = [
+                        'student_id' => $student->student_id,
+                        'student_name' => $student->full_name,
+                        'semester_number' => $enrollment->semester_number,
+                        'available_courses' => $availableCourses,
+                        'total_courses' => count($availableCourses),
+                        'available_with_capacity' => count(array_filter($availableCourses, fn($course) => $course['has_capacity'])),
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Registrable students loaded successfully',
+                'data' => [
+                    'students' => $studentsWithCourses,
+                    'summary' => [
+                        'total_students' => count($studentsWithCourses),
+                        'total_enrollments' => $enrollments->count(),
+                        'total_available_registrations' => $totalAvailableRegistrations,
+                        'avg_courses_per_student' => count($studentsWithCourses) > 0
+                            ? round(array_sum(array_column($studentsWithCourses, 'total_courses')) / count($studentsWithCourses), 2)
+                            : 0,
+                    ],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Get registrable students failed', [
+                'semester_id' => $semester->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get registrable students: ' . $e->getMessage(),
             ], 500);
         }
     }

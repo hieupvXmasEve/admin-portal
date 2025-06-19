@@ -16,7 +16,7 @@ academic models with complex relationships and validation requirements:
 
 - **units**: Core academic unit information (id, code, name, credit_points)
 - **unit_prerequisites**: Prerequisite relationships (unit_id, required_unit_id, type)
-- **equivalent_units**: Unit equivalencies (unit_id, equivalent_unit_id, reason, valid_from_semester_id)
+- **equivalent_units**: Unit equivalencies (unit_id, equivalent_unit_id, reason)
 - **semesters**: Semester reference data for equivalency validity
 
 ### Relationship Considerations

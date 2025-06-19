@@ -43,7 +43,7 @@ class RegistrationController extends Controller
 
         $query = CourseRegistration::with([
             'courseOffering.unit',
-            'courseOffering.instructor',
+            'courseOffering.lecture',
             'semester'
         ])->where('student_id', $student->id);
 
@@ -72,9 +72,9 @@ class RegistrationController extends Controller
                             'delivery_mode' => $registration->courseOffering->delivery_mode,
                             'schedule' => $registration->courseOffering->schedule,
                             'location' => $registration->courseOffering->location,
-                            'instructor' => $registration->courseOffering->instructor ? [
-                                'name' => $registration->courseOffering->instructor->name,
-                                'email' => $registration->courseOffering->instructor->email,
+                            'instructor' => $registration->courseOffering->lecture ? [
+                                'name' => $registration->courseOffering->lecture->display_name,
+                                'email' => $registration->courseOffering->lecture->email,
                             ] : null,
                         ],
                         'semester' => [
@@ -88,9 +88,7 @@ class RegistrationController extends Controller
                         'credit_hours' => $registration->credit_hours,
                         'final_grade' => $registration->final_grade,
                         'grade_points' => $registration->grade_points,
-                        'tuition_amount' => $registration->tuition_amount,
-                        'fees_amount' => $registration->fees_amount,
-                        'payment_status' => $registration->payment_status,
+
                         'can_drop' => $registration->canDrop(),
                         'can_withdraw' => $registration->canWithdraw(),
                     ];
@@ -182,7 +180,7 @@ class RegistrationController extends Controller
                         'course_title' => $registration->courseOffering->course_title,
                         'credit_hours' => $registration->credit_hours,
                         'registration_date' => $registration->registration_date->format('Y-m-d H:i:s'),
-                        'tuition_amount' => $registration->tuition_amount,
+
                     ]
                 ]
             ], 201);
@@ -322,7 +320,7 @@ class RegistrationController extends Controller
             // TODO: Implement actual schedule conflict checking
             // This would compare time slots, days of week, etc.
             // For now, we'll return a simple structure
-            
+
             if ($this->hasTimeConflict($courseOffering->schedule, $registration->courseOffering->schedule)) {
                 $conflicts[] = [
                     'course_code' => $registration->courseOffering->course_code,

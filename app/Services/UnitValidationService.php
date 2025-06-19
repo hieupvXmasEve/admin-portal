@@ -191,7 +191,7 @@ class UnitValidationService
         return ['valid' => true, 'errors' => []];
     }
 
-    public function validateEquivalencyRelationship(int $unitId, int $equivalentUnitId, int $semesterId): array
+    public function validateEquivalencyRelationship(int $unitId, int $equivalentUnitId): array
     {
         // Self-reference check
         if ($unitId === $equivalentUnitId) {
@@ -222,15 +222,6 @@ class UnitValidationService
             return [
                 'valid' => false,
                 'errors' => ['Reverse equivalency relationship already exists'],
-            ];
-        }
-
-        // Basic semester validity check
-        $semester = \App\Models\Semester::find($semesterId);
-        if (!$semester) {
-            return [
-                'valid' => false,
-                'errors' => ['Invalid semester selected'],
             ];
         }
 

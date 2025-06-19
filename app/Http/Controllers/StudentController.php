@@ -32,7 +32,7 @@ class StudentController extends Controller
             'search' => 'nullable|string|max:255',
             'campus_id' => 'nullable|integer|exists:campuses,id',
             'program_id' => 'nullable|integer|exists:programs,id',
-            'enrollment_status' => 'nullable|string|in:admitted,enrolled,active,on_leave,suspended,graduated,dropped_out',
+            'status' => 'nullable|string|in:active,inactive,suspended',
             'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
@@ -53,8 +53,8 @@ class StudentController extends Controller
             ->when($validated['program_id'] ?? null, function ($query, $programId) {
                 $query->where('program_id', $programId);
             })
-            ->when($validated['enrollment_status'] ?? null, function ($query, $status) {
-                $query->where('enrollment_status', $status);
+            ->when($validated['status'] ?? null, function ($query, $status) {
+                $query->where('status', $status);
             })
             ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
                 $direction = $validated['direction'] ?? 'asc';
@@ -77,7 +77,7 @@ class StudentController extends Controller
                 'search' => $validated['search'] ?? null,
                 'campus_id' => $validated['campus_id'] ?? null,
                 'program_id' => $validated['program_id'] ?? null,
-                'enrollment_status' => $validated['enrollment_status'] ?? null,
+                'status' => $validated['status'] ?? null,
                 'sort' => $validated['sort'] ?? null,
                 'direction' => $validated['direction'] ?? null,
                 'per_page' => $validated['per_page'] ?? 15,

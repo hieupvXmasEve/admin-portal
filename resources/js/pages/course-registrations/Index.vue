@@ -10,21 +10,25 @@ import type { PaginatedResponse } from '@/types';
 import type { CourseRegistration, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { BookOpen, CreditCard, Plus, Users } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 interface Props {
     registrations: PaginatedResponse<CourseRegistration>;
+    statistics: {
+        total_registrations: number;
+        active_registrations: number;
+        pending_registrations: number;
+    };
     filters: {
         search?: string;
         semester_id?: string;
         status?: string;
-        payment_status?: string;
+        course_offering_id?: string;
     };
     semesters: Semester[];
+    courseOfferings: { value: number; label: string }[];
     statusOptions: { value: string; label: string }[];
-    paymentStatusOptions: { value: string; label: string }[];
 }
-
 const props = defineProps<Props>();
 const breadcrumbs = ref([
     {
@@ -37,7 +41,7 @@ const filters = ref({
     search: props.filters.search || '',
     semester_id: props.filters.semester_id || 'all',
     status: props.filters.status || 'all',
-    payment_status: props.filters.payment_status || 'all',
+    course_offering_id: props.filters.course_offering_id || 'all',
 });
 
 const updateFilters = () => {
@@ -45,7 +49,7 @@ const updateFilters = () => {
         search: filters.value.search || undefined,
         semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
         status: filters.value.status === 'all' ? undefined : filters.value.status,
-        payment_status: filters.value.payment_status === 'all' ? undefined : filters.value.payment_status,
+        course_offering_id: filters.value.course_offering_id === 'all' ? undefined : filters.value.course_offering_id,
     };
 
     router.get('/course-registrations', filterParams, {
@@ -85,21 +89,6 @@ const getStatusVariant = (status: string) => {
     }
 };
 
-const getPaymentStatusVariant = (status: string) => {
-    switch (status) {
-        case 'paid':
-            return 'default';
-        case 'pending':
-            return 'secondary';
-        case 'overdue':
-            return 'destructive';
-        case 'waived':
-            return 'outline';
-        default:
-            return 'outline';
-    }
-};
-
 const deleteRegistration = (registration: CourseRegistration) => {
     if (confirm('Are you sure you want to delete this registration?')) {
         router.delete(`/course-registrations/${registration.id}`, {
@@ -109,6 +98,16 @@ const deleteRegistration = (registration: CourseRegistration) => {
         });
     }
 };
+
+// Reset course offering filter when semester changes
+watch(() => filters.value.semester_id, (newSemesterId) => {
+    if (newSemesterId === 'all') {
+        filters.value.course_offering_id = 'all';
+    } else {
+        // Reset to 'all' when semester changes to load new course offerings
+        filters.value.course_offering_id = 'all';
+    }
+});
 </script>
 
 <template>
@@ -130,14 +129,14 @@ const deleteRegistration = (registration: CourseRegistration) => {
             </div>
 
             <!-- Quick Stats -->
-            <div class="grid gap-4 md:grid-cols-4">
+            <div class="grid gap-4 md:grid-cols-3">
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Total Registrations</CardTitle>
                         <Users class="text-muted-foreground h-4 w-4" />
                     </CardHeader>
                     <CardContent>
-                        <div class="text-2xl font-bold">{{ registrations.total }}</div>
+                        <div class="text-2xl font-bold">{{ statistics.total_registrations }}</div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -147,31 +146,19 @@ const deleteRegistration = (registration: CourseRegistration) => {
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold text-green-600">
-                            {{
-                                registrations.data.filter((r: CourseRegistration) => ['registered', 'confirmed'].includes(r.registration_status))
-                                    .length
-                            }}
+                            {{ statistics.active_registrations }}
                         </div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Pending Payments</CardTitle>
+                        <CardTitle class="text-sm font-medium">Pending Registrations</CardTitle>
                         <CreditCard class="text-muted-foreground h-4 w-4" />
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold text-orange-600">
-                            {{ registrations.data.filter((r: CourseRegistration) => r.payment_status === 'pending').length }}
+                            {{ statistics.pending_registrations }}
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">This Page</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ registrations.data.length }}</div>
-                        <p class="text-muted-foreground text-xs">of {{ registrations.total }} total</p>
                     </CardContent>
                 </Card>
             </div>
@@ -209,6 +196,29 @@ const deleteRegistration = (registration: CourseRegistration) => {
                         </div>
 
                         <div class="space-y-2">
+                            <label class="text-sm font-medium">Course Offering</label>
+                            <Select
+                                v-model="filters.course_offering_id"
+                                @update:model-value="updateFilters"
+                                :disabled="filters.semester_id === 'all'"
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All Course Offerings" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Course Offerings</SelectItem>
+                                    <SelectItem
+                                        v-for="offering in courseOfferings"
+                                        :key="offering.value"
+                                        :value="offering.value.toString()"
+                                    >
+                                        {{ offering.label }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="space-y-2">
                             <label class="text-sm font-medium">Registration Status</label>
                             <Select v-model="filters.status" @update:model-value="updateFilters">
                                 <SelectTrigger>
@@ -217,21 +227,6 @@ const deleteRegistration = (registration: CourseRegistration) => {
                                 <SelectContent>
                                     <SelectItem value="all">All Statuses</SelectItem>
                                     <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">
-                                        {{ option.label }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium">Payment Status</label>
-                            <Select v-model="filters.payment_status" @update:model-value="updateFilters">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Payment Statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Payment Statuses</SelectItem>
-                                    <SelectItem v-for="option in paymentStatusOptions" :key="option.value" :value="option.value">
                                         {{ option.label }}
                                     </SelectItem>
                                 </SelectContent>
@@ -257,8 +252,6 @@ const deleteRegistration = (registration: CourseRegistration) => {
                                 <div class="flex items-center gap-2 text-sm">
                                     <span>{{ registration.semester?.name }}</span>
                                     <span>•</span>
-                                    <span>{{ registration.course_offering?.campus?.name }}</span>
-                                    <span>•</span>
                                     <span>{{ registration.credit_hours }} credits</span>
                                     <span>•</span>
                                     <span>Registered: {{ new Date(registration.registration_date).toLocaleDateString() }}</span>
@@ -267,16 +260,14 @@ const deleteRegistration = (registration: CourseRegistration) => {
                                     <Badge :variant="getStatusVariant(registration.registration_status)">
                                         {{ registration.registration_status }}
                                     </Badge>
-                                    <Badge :variant="getPaymentStatusVariant(registration.payment_status)">
-                                        {{ registration.payment_status }}
-                                    </Badge>
+
                                     <Badge variant="outline">{{ registration.registration_method }}</Badge>
                                 </div>
                             </div>
                             <div class="space-y-2 text-right">
                                 <div>
-                                    <p class="text-lg font-bold">${{ registration.tuition_amount.toFixed(2) }}</p>
-                                    <p class="text-muted-foreground text-sm">Total Amount</p>
+                                    <p class="text-lg font-bold">{{ registration.credit_hours }} Credits</p>
+                                    <p class="text-muted-foreground text-sm">Credit Hours</p>
                                 </div>
                                 <div class="flex gap-2">
                                     <Link :href="`/course-registrations/${registration.id}`">

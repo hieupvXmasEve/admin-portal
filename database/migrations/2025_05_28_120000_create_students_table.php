@@ -38,17 +38,6 @@ return new class extends Migration
             $table->date('admission_date');
             $table->date('expected_graduation_date')->nullable();
 
-            // Academic Status
-            $table->enum('enrollment_status', [
-                'admitted',
-                'enrolled',
-                'active',
-                'on_leave',
-                'suspended',
-                'graduated',
-                'dropped_out'
-            ])->default('admitted');
-
             // Contact Information
             $table->string('parent_guardian_name', 255)->nullable();
             $table->string('parent_guardian_phone', 20)->nullable();
@@ -77,7 +66,6 @@ return new class extends Migration
             $table->index(['oauth_provider', 'oauth_provider_id']);
             $table->index('campus_id');
             $table->index(['program_id', 'specialization_id']);
-            $table->index('enrollment_status');
         });
     }
 

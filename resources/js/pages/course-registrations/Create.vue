@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import DebouncedInput from '@/components/DebouncedInput.vue';
 import StudentCombobox from '@/components/StudentCombobox.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -192,11 +191,6 @@ const onSubmit = () => {
                                     <div class="space-y-2">
                                         <label class="text-sm font-medium">Course Offering *</label>
                                         <div class="space-y-3">
-                                            <DebouncedInput
-                                                v-model="courseSearch"
-                                                placeholder="Search courses by code, title, or section..."
-                                                class="w-full"
-                                            />
                                             <Select :model-value="form.course_offering_id" @update:model-value="handleCourseSelect">
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select course offering" />

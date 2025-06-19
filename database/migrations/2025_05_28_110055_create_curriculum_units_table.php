@@ -17,20 +17,23 @@ return new class extends Migration
             $table->id();
             $table->foreignId('curriculum_version_id')->constrained('curriculum_versions')->onDelete('cascade');
             $table->foreignId('unit_id')->constrained('units')->onDelete('cascade');
-            $table->foreignId('semester_id')->constrained('semesters')->onDelete('cascade');
+            $table->foreignId('semester_id')->nullable()->constrained('semesters')->onDelete('cascade');
 
             $table->enum('type', ['core', 'major', 'elective'])->notNull();
-            $table->unsignedTinyInteger('semester_number')->nullable()->comment('Suggested semester (1-12)');
-            $table->boolean('is_compulsory')->default(true);
+            $table->string('unit_scope')->default('program')->comment('Scope of the unit: program, common, specialization_specific, cross_program');
+            $table->unsignedTinyInteger('year_level')->nullable()->comment('Academic year level (1-4)');
+            $table->unsignedTinyInteger('semester_number')->nullable()->comment('Suggested semester number within the course (1-12)');
+            $table->boolean('is_required')->default(true);
+            $table->decimal('minimum_grade', 4, 2)->nullable()->comment('Minimum grade required for completion (optional)');
             $table->text('note')->nullable();
             $table->timestamps();
 
-            // Unique constraint to prevent duplicate units in same curriculum version
+            // Unique constraint to prevent duplicate units in the same curriculum
             $table->unique(['curriculum_version_id', 'unit_id'], 'curriculum_unit_unique');
 
-            // Add indexes for better query performance
+            // Indexes for query performance
             $table->index(['curriculum_version_id', 'type']);
-            $table->index(['semester_number', 'is_compulsory']);
+            $table->index(['year_level', 'semester_number']);
         });
     }
 

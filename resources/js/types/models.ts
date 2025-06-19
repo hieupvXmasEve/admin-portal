@@ -68,15 +68,13 @@ export interface CurriculumUnit {
   id: number;
   curriculum_version_id: number;
   unit_id: number;
-  semester_id: number;
   type: 'core' | 'major' | 'elective';
+  year_level?: number;
   semester_number?: number;
-  is_compulsory: boolean;
   note?: string;
   created_at: string;
   updated_at: string;
   unit?: Unit;
-  semester?: Semester;
   curriculum_version?: CurriculumVersion;
 }
 
@@ -87,6 +85,59 @@ export interface User {
   email_verified_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Lecture {
+  id: number;
+  employee_id: string;
+  title?: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  mobile_phone?: string;
+  campus_id: number;
+  department?: string;
+  faculty?: string;
+  specialization?: string;
+  expertise_areas?: string[];
+  academic_rank: 'lecturer' | 'senior_lecturer' | 'associate_professor' | 'professor' | 'emeritus_professor' | 'visiting_lecturer' | 'adjunct_professor';
+  highest_degree?: string;
+  degree_field?: string;
+  alma_mater?: string;
+  graduation_year?: number;
+  hire_date: string;
+  contract_start_date?: string;
+  contract_end_date?: string;
+  employment_type: 'full_time' | 'part_time' | 'contract' | 'visiting' | 'emeritus';
+  employment_status: 'active' | 'on_leave' | 'sabbatical' | 'retired' | 'terminated' | 'suspended';
+  preferred_teaching_days?: string[];
+  preferred_start_time?: string;
+  preferred_end_time?: string;
+  max_teaching_hours_per_week: number;
+  teaching_modalities?: ('in_person' | 'online' | 'hybrid')[];
+  office_address?: string;
+  office_phone?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_relationship?: string;
+  biography?: string;
+  certifications?: string[];
+  languages?: string[];
+  hourly_rate?: number;
+  salary?: number;
+  is_active: boolean;
+  can_teach_online: boolean;
+  is_available_for_assignment: boolean;
+  notes?: string;
+  campus?: Campus;
+  created_at: string;
+  updated_at: string;
+  // Computed properties from model accessors
+  full_name: string;
+  display_name: string;
+  years_of_service: number;
+  is_contract_active: boolean;
 }
 
 export interface Campus {
@@ -116,7 +167,6 @@ export interface Student {
   curriculum_version_id: number;
   admission_date: string;
   expected_graduation_date?: string;
-  enrollment_status: 'admitted' | 'enrolled' | 'active' | 'on_leave' | 'suspended' | 'graduated' | 'dropped_out';
   parent_guardian_name?: string;
   parent_guardian_phone?: string;
   parent_guardian_email?: string;
@@ -166,9 +216,8 @@ export interface CourseRegistration {
   drop_date?: string;
   withdrawal_date?: string;
   completion_date?: string;
-  tuition_amount: number;
-  fees_amount: number;
-  payment_status: 'pending' | 'paid' | 'overdue' | 'waived';
+  retake_fee: number;
+  is_retake_paid: 'yes' | 'no';
   notes?: string;
   student?: Student;
   course_offering?: CourseOffering;
@@ -181,7 +230,6 @@ export interface CourseRegistration {
 export interface CourseRegistrationFormData {
   student_id: string;
   course_offering_id: string;
-  payment_status?: 'pending' | 'paid' | 'overdue' | 'waived';
   notes?: string;
 }
 
@@ -189,7 +237,7 @@ export interface CourseOffering {
   id: number;
   semester_id: number;
   unit_id: number;
-  instructor_id?: number;
+  lecture_id?: number;
   section_code?: string;
   max_capacity: number;
   current_enrollment: number;
@@ -207,9 +255,10 @@ export interface CourseOffering {
   special_requirements?: string;
   notes?: string;
   unit?: Unit;
-  instructor?: User;
+  lecture?: Lecture;
   semester?: Semester;
   campus?: Campus;
+  courseRegistrations?: CourseRegistration[];
   created_at: string;
   updated_at: string;
   // Computed properties from model accessors
@@ -237,7 +286,7 @@ export interface EnrollmentFormData {
 export interface CourseOfferingFormData {
   semester_id: string;
   unit_id: string;
-  instructor_id?: string;
+  lecture_id?: string;
   section_code?: string;
   max_capacity: number;
   waitlist_capacity?: number;
@@ -250,6 +299,50 @@ export interface CourseOfferingFormData {
   registration_start_date?: string;
   registration_end_date?: string;
   special_requirements?: string;
+  notes?: string;
+}
+
+export interface LectureFormData {
+  employee_id: string;
+  title?: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  mobile_phone?: string;
+  campus_id: string;
+  department?: string;
+  faculty?: string;
+  specialization?: string;
+  expertise_areas?: string[];
+  academic_rank: 'lecturer' | 'senior_lecturer' | 'associate_professor' | 'professor' | 'emeritus_professor' | 'visiting_lecturer' | 'adjunct_professor';
+  highest_degree?: string;
+  degree_field?: string;
+  alma_mater?: string;
+  graduation_year?: number;
+  hire_date: string;
+  contract_start_date?: string;
+  contract_end_date?: string;
+  employment_type: 'full_time' | 'part_time' | 'contract' | 'visiting' | 'emeritus';
+  employment_status: 'active' | 'on_leave' | 'sabbatical' | 'retired' | 'terminated' | 'suspended';
+  preferred_teaching_days?: string[];
+  preferred_start_time?: string;
+  preferred_end_time?: string;
+  max_teaching_hours_per_week?: number;
+  teaching_modalities?: ('in_person' | 'online' | 'hybrid')[];
+  office_address?: string;
+  office_phone?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_relationship?: string;
+  biography?: string;
+  certifications?: string[];
+  languages?: string[];
+  hourly_rate?: number;
+  salary?: number;
+  is_active?: boolean;
+  can_teach_online?: boolean;
+  is_available_for_assignment?: boolean;
   notes?: string;
 }
 

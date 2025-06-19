@@ -40,12 +40,11 @@ class RegistrationService
                 'student_id' => $student->id,
                 'course_offering_id' => $courseOfferingId,
                 'semester_id' => $courseOffering->semester_id,
-                'registration_status' => 'confirmed',
+                'registration_status' => 'registered',
                 'registration_date' => now(),
                 'registration_method' => $method,
                 'credit_hours' => $courseOffering->credit_hours,
-                'tuition_amount' => $courseOffering->getTotalTuition(),
-                'payment_status' => 'pending',
+
             ]);
 
             // Update course offering enrollment count
@@ -112,9 +111,9 @@ class RegistrationService
     public function getAvailableCoursesForStudent(Student $student, int $semesterId): array
     {
         $semester = Semester::findOrFail($semesterId);
-        
+
         // Get course offerings for the semester and campus
-        $courseOfferings = CourseOffering::with(['unit', 'instructor'])
+        $courseOfferings = CourseOffering::with(['unit', 'lecture'])
             ->forSemester($semesterId)
             ->forCampus($student->campus_id)
             ->availableForRegistration()
@@ -134,7 +133,7 @@ class RegistrationService
         // Check prerequisites and add eligibility information
         return $availableCourses->map(function ($offering) use ($student) {
             $eligibility = $this->checkCourseEligibility($student, $offering);
-            
+
             return [
                 'offering' => $offering,
                 'eligible' => $eligibility['eligible'],
@@ -150,7 +149,7 @@ class RegistrationService
      */
     public function getStudentRegistrations(Student $student, int $semesterId): array
     {
-        return CourseRegistration::with(['courseOffering.unit', 'courseOffering.instructor'])
+        return CourseRegistration::with(['courseOffering.unit', 'courseOffering.lecture'])
             ->where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->orderBy('registration_date', 'desc')
@@ -214,7 +213,7 @@ class RegistrationService
         // Check prerequisites if defined
         if ($courseOffering->prerequisites) {
             $completedCourses = $this->getCompletedCourses($student);
-            
+
             foreach ($courseOffering->prerequisites as $prerequisite) {
                 if (!$this->hasCompletedPrerequisite($completedCourses, $prerequisite)) {
                     $eligible = false;
@@ -328,7 +327,7 @@ class RegistrationService
         foreach ($registrations as $registration) {
             $gradePoints = $registration->getGradePoints();
             $credits = $registration->credit_hours;
-            
+
             $totalPoints += $gradePoints * $credits;
             $totalCredits += $credits;
         }

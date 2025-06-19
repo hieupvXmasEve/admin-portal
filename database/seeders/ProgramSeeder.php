@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\Program;
+use App\Models\Specialization;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,36 +16,24 @@ class ProgramSeeder extends Seeder
      */
     public function run(): void
     {
-        $programs = [
-            [
-                'name' => 'Information Technology',
-                'code' => 'IT',
-                'description' => 'Comprehensive program covering computer science, software engineering, and information systems.',
-            ],
-            [
-                'name' => 'Business Administration',
-                'code' => 'BUS',
-                'description' => 'Strategic business management with focus on leadership, finance, and operations.',
-            ],
-            [
-                'name' => 'Global Citizenship Studies',
-                'code' => 'GCS',
-                'description' => 'Interdisciplinary program exploring global issues, cultural awareness, and social responsibility.',
-            ],
-            [
-                'name' => 'Vovinam Martial Arts',
-                'code' => 'VMA',
-                'description' => 'Traditional Vietnamese martial arts program focusing on philosophy, technique, and cultural heritage.',
-            ],
-            [
-                'name' => 'Media Communications',
-                'code' => 'MC',
-                'description' => 'Modern communication strategies across digital, print, and broadcast media platforms.',
-            ],
-        ];
+        // Clear existing programs and specializations
+        Specialization::query()->delete();
+        Program::query()->delete();
 
-        foreach ($programs as $program) {
-            Program::create($program);
-        }
+        // Create Bachelor of Business Administration program (BA)
+        $program = Program::create([
+            'name' => 'Bachelor of Business Administration',
+            'code' => 'BA',
+            'description' => 'Comprehensive business administration program covering business administration topics and advanced business administration systems.',
+        ]);
+
+        // Create Business Administration specialization (BA)
+        Specialization::create([
+            'program_id' => $program->id,
+            'name' => 'Business Administration',
+            'code' => 'BA',
+            'description' => 'Specialization focusing on core business administration topics and advanced business administration systems.',
+            'is_active' => true,
+        ]);
     }
 }

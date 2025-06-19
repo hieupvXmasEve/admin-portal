@@ -20,7 +20,7 @@ class CourseOffering extends Model
     protected $fillable = [
         'semester_id',
         'unit_id',
-        'instructor_id',
+        'lecture_id',
         'section_code',
         'max_capacity',
         'current_enrollment',
@@ -70,7 +70,7 @@ class CourseOffering extends Model
         return [
             'semester_id' => ['required', 'exists:semesters,id'],
             'unit_id' => ['required', 'exists:units,id'],
-            'instructor_id' => ['nullable', 'exists:users,id'],
+            'lecture_id' => ['nullable', 'exists:lectures,id'],
             'section_code' => ['nullable', 'string', 'max:10'],
             'max_capacity' => ['required', 'integer', 'min:1', 'max:500'],
             'current_enrollment' => ['nullable', 'integer', 'min:0'],
@@ -98,7 +98,7 @@ class CourseOffering extends Model
             'semester_id.exists' => 'Selected semester does not exist',
             'unit_id.required' => 'Unit is required',
             'unit_id.exists' => 'Selected unit does not exist',
-            'instructor_id.exists' => 'Selected instructor does not exist',
+            'lecture_id.exists' => 'Selected lecture does not exist',
             'section_code.max' => 'Section code cannot exceed 10 characters',
             'max_capacity.required' => 'Maximum capacity is required',
             'max_capacity.integer' => 'Maximum capacity must be a number',
@@ -133,9 +133,9 @@ class CourseOffering extends Model
         return $this->belongsTo(Unit::class);
     }
 
-    public function instructor(): BelongsTo
+    public function lecture(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'instructor_id');
+        return $this->belongsTo(Lecture::class);
     }
 
     public function courseRegistrations(): HasMany
@@ -281,9 +281,9 @@ class CourseOffering extends Model
         $query->where('unit_id', $unitId);
     }
 
-    public function scopeByInstructor(Builder $query, int $instructorId): void
+    public function scopeByLecture(Builder $query, int $lectureId): void
     {
-        $query->where('instructor_id', $instructorId);
+        $query->where('lecture_id', $lectureId);
     }
 
     public function scopeAvailable(Builder $query): void
@@ -326,5 +326,68 @@ class CourseOffering extends Model
             ->where('enrollment_status', 'open')
             ->registrationOpen()
             ->whereRaw('current_enrollment < max_capacity');
+    }
+
+    public function scopeWithoutInstructor(Builder $query): void
+    {
+        $query->whereNull('lecture_id');
+    }
+
+    public function scopeReadyForClasses(Builder $query): void
+    {
+        $query->whereNotNull('lecture_id');
+    }
+
+    // Helper methods for instructor assignment
+    public function hasInstructor(): bool
+    {
+        return !is_null($this->lecture_id);
+    }
+
+    public function needsInstructorBeforeClasses(): bool
+    {
+        if ($this->hasInstructor()) {
+            return false;
+        }
+
+        // Check if semester has started
+        if (!$this->semester) {
+            return true; // Default to needing instructor if no semester info
+        }
+
+        return $this->semester->start_date <= now();
+    }
+
+    public function getInstructorAssignmentStatus(): string
+    {
+        if ($this->hasInstructor()) {
+            return 'assigned';
+        }
+
+        if ($this->needsInstructorBeforeClasses()) {
+            return 'urgent'; // Classes started but no instructor
+        }
+
+        return 'pending'; // No instructor but classes haven't started
+    }
+
+    public function getInstructorAssignmentStatusLabel(): string
+    {
+        return match ($this->getInstructorAssignmentStatus()) {
+            'assigned' => 'Instructor Assigned',
+            'urgent' => 'Urgent: No Instructor',
+            'pending' => 'Pending Assignment',
+            default => 'Unknown Status'
+        };
+    }
+
+    public function getAssignedInstructorName(): ?string
+    {
+        return $this->lecture?->display_name;
+    }
+
+    public function getAssignedInstructorEmail(): ?string
+    {
+        return $this->lecture?->email;
     }
 }

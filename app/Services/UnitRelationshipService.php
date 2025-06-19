@@ -182,7 +182,6 @@ class UnitRelationshipService
                 $validation = $this->validationService->validateEquivalencyRelationship(
                     $equivalency['unit_id'],
                     $equivalency['equivalent_unit_id'],
-                    $equivalency['valid_from_semester_id']
                 );
 
                 if ($validation['valid']) {

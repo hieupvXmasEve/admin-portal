@@ -284,7 +284,7 @@ const getAssessmentTypeColor = (type: string) => {
                                                 <TableBody>
                                                     <TableRow v-for="detail in component.details" :key="detail.id">
                                                         <TableCell class="text-sm">{{ detail.name }}</TableCell>
-                                                        <TableCell class="text-sm">{{ detail.weight?.toFixed(2) || '-' }}</TableCell>
+                                                        <TableCell class="text-sm">{{ detail.weight || '-' }}</TableCell>
                                                     </TableRow>
                                                 </TableBody>
                                             </Table>

@@ -20,8 +20,8 @@ class UpdateCurriculumUnitRequest extends FormRequest
             'unit_id' => ['required', 'exists:units,id'],
             'semester_id' => ['required', 'exists:semesters,id'],
             'type' => ['required', 'in:core,major,elective'],
-            'semester_number' => ['required', 'integer', 'min:1', 'max:12'],
-            'is_compulsory' => ['required', 'boolean'],
+            'year_level' => ['required', 'integer', 'min:1', 'max:6'],
+            'semester_number' => ['required', 'integer', 'min:1', 'max:9'],
             'note' => ['nullable', 'string', 'max:1000'],
         ];
     }
@@ -37,12 +37,14 @@ class UpdateCurriculumUnitRequest extends FormRequest
             'semester_id.exists' => 'Selected semester does not exist.',
             'type.required' => 'Unit type is required.',
             'type.in' => 'Unit type must be core, major, or elective.',
+            'year_level.required' => 'Year level is required.',
+            'year_level.integer' => 'Year level must be a number.',
+            'year_level.min' => 'Year level must be at least 1.',
+            'year_level.max' => 'Year level must not exceed 6.',
             'semester_number.required' => 'Semester number is required.',
             'semester_number.integer' => 'Semester number must be a number.',
             'semester_number.min' => 'Semester number must be at least 1.',
-            'semester_number.max' => 'Semester number must not exceed 12.',
-            'is_compulsory.required' => 'Compulsory status is required.',
-            'is_compulsory.boolean' => 'Compulsory status must be true or false.',
+            'semester_number.max' => 'Semester number must not exceed 9.',
             'note.max' => 'Note must not exceed 1000 characters.',
         ];
     }

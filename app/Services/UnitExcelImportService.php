@@ -349,17 +349,11 @@ class UnitExcelImportService
             return;
         }
 
-        // Get current semester for valid_from_semester_id
-        $currentSemester = Semester::orderBy('year', 'desc')
-            ->orderBy('term', 'desc')
-            ->first();
-
         // Create equivalent relationship
         EquivalentUnit::create([
             'unit_id' => $unit->id,
             'equivalent_unit_id' => $equivalentUnit->id,
             'reason' => $reason,
-            'valid_from_semester_id' => $currentSemester?->id,
         ]);
     }
 
@@ -1258,7 +1252,6 @@ class UnitExcelImportService
                 $unitCode = trim($row[0] ?? '');
                 $equivalentUnitCode = trim($row[1] ?? '');
                 $reason = trim($row[2] ?? '');
-                $validFromSemester = trim($row[3] ?? '');
 
                 if (empty($unitCode) || empty($equivalentUnitCode)) {
                     $results['errors'][] = "Row {$actualRow}: Unit code and equivalent unit code are required";
@@ -1279,17 +1272,6 @@ class UnitExcelImportService
                     continue;
                 }
 
-                // Find semester if specified
-                $semesterId = null;
-                if (!empty($validFromSemester)) {
-                    $semester = \App\Models\Semester::where('name', $validFromSemester)->first();
-                    if ($semester) {
-                        $semesterId = $semester->id;
-                    } else {
-                        $results['warnings'][] = "Row {$actualRow}: Semester '{$validFromSemester}' not found";
-                    }
-                }
-
                 // Check for existing equivalent relationship
                 $existingEquivalent = \App\Models\EquivalentUnit::where('unit_id', $unit->id)
                     ->where('equivalent_unit_id', $equivalentUnit->id)
@@ -1305,7 +1287,6 @@ class UnitExcelImportService
                     'unit_id' => $unit->id,
                     'equivalent_unit_id' => $equivalentUnit->id,
                     'reason' => $reason,
-                    'valid_from_semester_id' => $semesterId,
                 ]);
                 $results['equivalents']['created']++;
             } catch (\Exception $e) {

@@ -38,7 +38,6 @@ const formSchema = toTypedSchema(
         specialization_id: z.string().min(1, 'Specialization is required'),
         curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
         admission_date: z.string().min(1, 'Admission date is required'),
-        enrollment_status: z.enum(['admitted', 'enrolled', 'active', 'on_leave', 'suspended', 'graduated', 'dropped_out']).default('admitted'),
         parent_guardian_name: z.string().min(1, 'Parent/Guardian name is required').max(255, 'Parent/Guardian name too long'),
         parent_guardian_phone: z.string().min(1, 'Parent/Guardian phone is required').max(20, 'Parent/Guardian phone too long'),
         parent_guardian_email: z
@@ -77,7 +76,6 @@ const { handleSubmit, isSubmitting, values, setFieldValue } = useForm({
         specialization_id: '',
         curriculum_version_id: '',
         admission_date: new Date().toISOString().split('T')[0],
-        enrollment_status: 'admitted' as const,
         parent_guardian_name: 'parent',
         parent_guardian_phone: '0901234567',
         parent_guardian_email: 'parent@gmail.com',
@@ -412,29 +410,6 @@ const graduationYears = computed(() => {
                                     <FormControl>
                                         <Input v-bind="componentField" type="date" />
                                     </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="enrollment_status">
-                                <FormItem>
-                                    <FormLabel>Enrollment Status</FormLabel>
-                                    <Select v-bind="componentField">
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select status" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="admitted">Admitted</SelectItem>
-                                            <SelectItem value="enrolled">Enrolled</SelectItem>
-                                            <SelectItem value="active">Active</SelectItem>
-                                            <SelectItem value="on_leave">On Leave</SelectItem>
-                                            <SelectItem value="suspended">Suspended</SelectItem>
-                                            <SelectItem value="graduated">Graduated</SelectItem>
-                                            <SelectItem value="dropped_out">Dropped Out</SelectItem>
-                                        </SelectContent>
-                                    </Select>
                                     <FormMessage />
                                 </FormItem>
                             </FormField>

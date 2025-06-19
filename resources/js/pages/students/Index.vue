@@ -39,7 +39,7 @@ interface Props {
         search?: string;
         campus_id?: number;
         program_id?: number;
-        enrollment_status?: string;
+        status?: string;
         sort?: string;
         direction?: string;
         per_page?: number;
@@ -75,7 +75,7 @@ const filters = ref({
     search: props.filters.search || '',
     campus_id: props.filters.campus_id ? props.filters.campus_id.toString() : 'all',
     program_id: props.filters.program_id ? props.filters.program_id.toString() : 'all',
-    enrollment_status: props.filters.enrollment_status || 'all',
+    status: props.filters.status || 'all',
 });
 
 // Column definitions with h function
@@ -138,19 +138,15 @@ const columns: ColumnDef<Student>[] = [
         },
     },
     {
-        accessorKey: 'enrollment_status',
+        accessorKey: 'status',
         header: 'Status',
         enableSorting: false,
         cell: ({ row }) => {
-            const status = row.original.enrollment_status;
+            const status = row.original.status;
             const statusColors = {
-                admitted: 'bg-gray-100 text-gray-800',
-                enrolled: 'bg-blue-100 text-blue-800',
                 active: 'bg-green-100 text-green-800',
-                on_leave: 'bg-yellow-100 text-yellow-800',
+                inactive: 'bg-gray-100 text-gray-800',
                 suspended: 'bg-red-100 text-red-800',
-                graduated: 'bg-purple-100 text-purple-800',
-                dropped_out: 'bg-gray-100 text-gray-800',
             };
             const colorClass = statusColors[status] || 'bg-gray-100 text-gray-800';
             const displayText = status ? status.replace('_', ' ').toUpperCase() : 'Unknown';
@@ -188,7 +184,7 @@ const clearFilters = () => {
         search: '',
         campus_id: 'all',
         program_id: 'all',
-        enrollment_status: 'all',
+        status: 'all',
     };
     router.visit('/students', {
         preserveState: true,
@@ -198,9 +194,7 @@ const clearFilters = () => {
 };
 
 const hasActiveFilters = computed(() => {
-    return (
-        filters.value.search || filters.value.campus_id !== 'all' || filters.value.program_id !== 'all' || filters.value.enrollment_status !== 'all'
-    );
+    return filters.value.search || filters.value.campus_id !== 'all' || filters.value.program_id !== 'all';
 });
 
 // View and edit functions
@@ -258,7 +252,7 @@ const getFilterParams = () => {
         search: filters.value.search,
         campus_id: filters.value.campus_id === 'all' ? '' : filters.value.campus_id,
         program_id: filters.value.program_id === 'all' ? '' : filters.value.program_id,
-        enrollment_status: filters.value.enrollment_status === 'all' ? '' : filters.value.enrollment_status,
+        status: filters.value.status === 'all' ? '' : filters.value.status,
     };
 };
 
@@ -389,19 +383,15 @@ const updateFilters = () => {
                 </div>
 
                 <div class="min-w-[150px]">
-                    <Select v-model="filters.enrollment_status" @update:model-value="handleFilter">
+                    <Select v-model="filters.status" @update:model-value="handleFilter">
                         <SelectTrigger>
                             <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem value="admitted">Admitted</SelectItem>
-                            <SelectItem value="enrolled">Enrolled</SelectItem>
                             <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="on_leave">On Leave</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
                             <SelectItem value="suspended">Suspended</SelectItem>
-                            <SelectItem value="graduated">Graduated</SelectItem>
-                            <SelectItem value="dropped_out">Dropped Out</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

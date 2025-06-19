@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Models\CurriculumVersion;
 use App\Models\CurriculumUnit;
 use App\Models\Unit;
-use App\Models\CurriculumUnitType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

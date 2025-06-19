@@ -76,7 +76,6 @@ CREATE TABLE students (
     admission_date DATE NOT NULL,
     expected_graduation_date DATE,
     student_type ENUM('full_time', 'part_time', 'exchange', 'visiting') DEFAULT 'full_time',
-    enrollment_status ENUM('enrolled', 'active', 'on_leave', 'suspended', 'graduated', 'dropped_out') DEFAULT 'enrolled',
     
     -- Academic Progress
     current_year INTEGER DEFAULT 1,
@@ -112,7 +111,6 @@ CREATE TABLE students (
     INDEX idx_students_email (email),
     INDEX idx_students_campus (campus_id),
     INDEX idx_students_program (program_id),
-    INDEX idx_students_status (enrollment_status, status),
     INDEX idx_students_migration (migrated_from_user_id)
 );
 ```
@@ -402,7 +400,7 @@ class Student extends Authenticatable
     protected $fillable = [
         'student_id', 'full_name', 'email',
         'phone', 'password', 'migrated_from_user_id', 'campus_id', 'program_id',
-        'specialization_id', 'current_year', 'current_semester', 'enrollment_status',
+        'specialization_id', 'current_year', 'current_semester',
         'student_type', 'advisor_lecturer_id'
     ];
     
