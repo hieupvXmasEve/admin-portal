@@ -82,7 +82,6 @@ Defines equivalence mapping between units.
 - unit_id (foreign key to units)
 - equivalent_unit_id (foreign key to units)
 - reason (string, optional)
-- valid_from_semester_id (foreign key to semesters — assume the table exists)
 - timestamps
 
 ---

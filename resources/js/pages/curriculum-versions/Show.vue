@@ -16,12 +16,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { createColumns } from '@/lib/table-utils';
 import type { BreadcrumbItem } from '@/types';
 import type { CurriculumUnit, CurriculumVersion, Program, Semester, Specialization, Unit, UnitType } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
@@ -29,7 +30,7 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Book, Edit, GraduationCap, Info, Plus, School, Target, Trash2 } from 'lucide-vue-next';
-import { useForm } from 'vee-validate';
+import { Form } from 'vee-validate';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { z } from 'zod';
@@ -82,57 +83,64 @@ const can = (permission: string) => {
 };
 
 // Form schemas following standards
+// TypeScript interfaces for form data
+interface AddUnitFormData {
+    unit_id: string;
+    type: 'core' | 'major' | 'elective';
+    semester_number: string;
+    note?: string;
+}
+
+type EditUnitFormData = AddUnitFormData;
+
 const addUnitFormSchema = toTypedSchema(
     z.object({
         unit_id: z.string().min(1, 'Unit is required'),
-        semester_id: z.string().min(1, 'Semester is required'),
         type: z.enum(['core', 'major', 'elective'], { errorMap: () => ({ message: 'Unit type is required' }) }),
         semester_number: z
             .string()
             .min(1, 'Semester number is required')
             .refine((val) => {
                 const num = parseInt(val);
-                return num >= 1 && num <= 12;
-            }, 'Semester number must be between 1 and 12'),
-        is_compulsory: z.boolean(),
+                return num >= 1 && num <= 9;
+            }, 'Semester number must be between 1 and 9'),
         note: z.string().max(1000, 'Note cannot exceed 1000 characters').optional(),
     }),
 );
 
 const editUnitFormSchema = addUnitFormSchema;
 
-// Form setups following standards
-const { isSubmitting: isAddSubmitting, resetForm: resetAddForm } = useForm({
-    validationSchema: addUnitFormSchema,
-    initialValues: {
-        unit_id: '',
-        semester_id: '',
-        type: 'core' as const,
-        semester_number: '',
-        is_compulsory: true,
-        note: '',
-    },
-});
+// Helper function to calculate year level from semester number
+const calculateYearLevel = (semesterNumber: number): number => {
+    return Math.ceil(semesterNumber / 2);
+};
 
-const editFormInitialValues = computed(() => {
-    if (!curriculumUnitToEdit.value) return {};
-
-    return {
-        unit_id: curriculumUnitToEdit.value.unit_id?.toString() || '',
-        semester_id: curriculumUnitToEdit.value.semester_id?.toString() || '',
-        type: curriculumUnitToEdit.value.type || 'core',
-        semester_number: curriculumUnitToEdit.value.semester_number?.toString() || '',
-        is_compulsory: curriculumUnitToEdit.value.is_compulsory ?? true,
-        note: curriculumUnitToEdit.value.note || '',
-    };
-});
-
-const { isSubmitting: isEditSubmitting } = useForm({
-    validationSchema: editUnitFormSchema,
-});
+// Form submission handlers (Form component handles validation automatically)
+const isAddSubmitting = ref(false);
+const isEditSubmitting = ref(false);
 
 // Computed data
 const curriculumUnits = computed(() => props.curriculumVersion.curriculum_units || []);
+
+// Filter available units - only show units that haven't been added yet
+const availableUnits = computed(() => {
+    if (!props.units) return [];
+
+    const existingUnitIds = curriculumUnits.value.map((cu) => cu.unit_id);
+    return props.units.filter((unit) => !existingUnitIds.includes(unit.id));
+});
+
+// For edit form - include current unit and other available units
+const editableUnits = computed(() => {
+    if (!props.units || !curriculumUnitToEdit.value) return [];
+
+    const currentUnitId = curriculumUnitToEdit.value.unit_id;
+    const existingUnitIds = curriculumUnits.value
+        .filter((cu) => cu.unit_id !== currentUnitId) // Exclude current unit from existing
+        .map((cu) => cu.unit_id);
+
+    return props.units.filter((unit) => !existingUnitIds.includes(unit.id));
+});
 
 const filteredUnits = computed(() => {
     let units = curriculumUnits.value;
@@ -146,7 +154,7 @@ const filteredUnits = computed(() => {
     }
 
     if (filters.value.unitType && filters.value.unitType !== 'all') {
-        units = units.filter((unit) => unit.unit_type_id?.toString() === filters.value.unitType);
+        units = units.filter((unit) => unit.type === filters.value.unitType);
     }
 
     if (filters.value.yearLevel && filters.value.yearLevel !== 'all') {
@@ -197,7 +205,7 @@ const stats = computed(() => {
 
     const byUnitType = units.reduce(
         (acc, unit) => {
-            const type = unit.unit_type?.name || 'Unspecified';
+            const type = unit.type || 'Unspecified';
             acc[type] = (acc[type] || 0) + 1;
             return acc;
         },
@@ -234,7 +242,7 @@ const organizedUnits = computed(() => {
 });
 
 // Column definitions following standards
-const columns: ColumnDef<CurriculumUnit>[] = [
+const baseColumns: ColumnDef<CurriculumUnit>[] = [
     {
         header: 'Unit',
         accessorKey: 'unit.code',
@@ -259,8 +267,8 @@ const columns: ColumnDef<CurriculumUnit>[] = [
             const curriculumUnit = row.original;
 
             return h('div', { class: 'space-y-2' }, [
-                curriculumUnit.unit_type?.name
-                    ? h(Badge, { variant: 'outline', class: 'text-xs' }, () => curriculumUnit.unit_type?.name)
+                curriculumUnit.type
+                    ? h(Badge, { variant: 'outline', class: 'text-xs' }, () => curriculumUnit.type.toUpperCase())
                     : h(Badge, { variant: 'secondary', class: 'text-xs' }, () => 'Unspecified'),
                 h(
                     'div',
@@ -271,7 +279,7 @@ const columns: ColumnDef<CurriculumUnit>[] = [
                             : h('div', { class: 'text-sm text-gray-500' }, 'Unspecified Year'),
                         curriculumUnit.semester_number
                             ? h('div', { class: 'text-xs text-gray-600' }, `Semester ${curriculumUnit.semester_number}`)
-                            : null,
+                            : h('div', { class: 'text-xs text-gray-400' }, 'No semester'),
                     ].filter(Boolean),
                 ),
             ]);
@@ -324,6 +332,19 @@ const columns: ColumnDef<CurriculumUnit>[] = [
     },
 ];
 
+// Columns with selection support
+const columns = createColumns(baseColumns, {
+    enableSelection: true,
+});
+
+// Selection handling
+const selectedUnits = ref<Set<number>>(new Set());
+
+const handleSelectionChange = (selectedRows: CurriculumUnit[]) => {
+    selectedUnits.value.clear();
+    selectedRows.forEach((row) => selectedUnits.value.add(row.id));
+};
+
 // Event handlers following standards
 const handleSearch = (value: string | number) => {
     filters.value.search = String(value);
@@ -337,31 +358,42 @@ const handlePageChange = (url: string) => {
 };
 
 const handleAddUnitClick = () => {
-    resetAddForm();
     showAddUnitModal.value = true;
 };
 
 const onAddUnitSubmit = async (values: any) => {
+    // Type assertion for better TypeScript experience
+    const formData = values as AddUnitFormData;
+    console.log('Add form submitted with values:', formData);
+    isAddSubmitting.value = true;
+
     const submitData = {
         curriculum_version_id: props.curriculumVersion.id,
-        unit_id: parseInt(values.unit_id),
-        unit_type_id: parseInt(values.unit_type_id),
-        year_level: parseInt(values.year_level),
-        semester_number: parseInt(values.semester_number),
-        note: values.note || null,
+        unit_id: parseInt(formData.unit_id),
+        semester_id: props.curriculumVersion.semester_id,
+        type: formData.type,
+        year_level: calculateYearLevel(parseInt(formData.semester_number)),
+        semester_number: parseInt(formData.semester_number),
+        note: formData.note || null,
     };
 
+    console.log('Submitting add data:', submitData);
+
     const { data, error, statusCode } = await api.post('/api/curriculum-units', submitData);
+
+    console.log('Add API response:', { data: data.value, error: error.value, statusCode: statusCode.value });
 
     if (statusCode.value === 201 && data.value?.success) {
         toast.success('Curriculum unit added successfully');
         showAddUnitModal.value = false;
-        resetAddForm();
         router.reload({ only: ['curriculumVersion'] });
     } else {
         const errorMessage = data.value?.message || error.value || 'Failed to add curriculum unit';
         toast.error(errorMessage);
+        console.error('Add unit error:', errorMessage);
     }
+
+    isAddSubmitting.value = false;
 };
 
 const editCurriculumUnit = (curriculumUnit: CurriculumUnit) => {
@@ -370,27 +402,32 @@ const editCurriculumUnit = (curriculumUnit: CurriculumUnit) => {
 };
 
 const onEditUnitSubmit = async (values: any) => {
-    console.log('Edit form submitted with values:', values);
+    // Type assertion for better TypeScript experience
+    const formData = values as EditUnitFormData;
+    console.log('Edit form submitted with values:', formData);
+    isEditSubmitting.value = true;
 
     if (!curriculumUnitToEdit.value) {
         console.error('No curriculum unit to edit');
+        isEditSubmitting.value = false;
         return;
     }
 
     const submitData = {
         curriculum_version_id: props.curriculumVersion.id,
-        unit_id: parseInt(values.unit_id),
-        unit_type_id: parseInt(values.unit_type_id),
-        year_level: parseInt(values.year_level),
-        semester_number: parseInt(values.semester_number),
-        note: values.note || null,
+        unit_id: parseInt(formData.unit_id),
+        semester_id: props.curriculumVersion.semester_id,
+        type: formData.type,
+        year_level: calculateYearLevel(parseInt(formData.semester_number)),
+        semester_number: parseInt(formData.semester_number),
+        note: formData.note || null,
     };
 
-    console.log('Submitting data:', submitData);
+    console.log('Submitting edit data:', submitData);
 
     const { data, error, statusCode } = await api.put(`/api/curriculum-units/${curriculumUnitToEdit.value.id}`, submitData);
 
-    console.log('API response:', { data: data.value, error: error.value, statusCode: statusCode.value });
+    console.log('Edit API response:', { data: data.value, error: error.value, statusCode: statusCode.value });
 
     if (statusCode.value === 200 && data.value?.success) {
         toast.success('Curriculum unit updated successfully');
@@ -400,7 +437,10 @@ const onEditUnitSubmit = async (values: any) => {
     } else {
         const errorMessage = data.value?.message || error.value || 'Failed to update curriculum unit';
         toast.error(errorMessage);
+        console.error('Edit unit error:', errorMessage);
     }
+
+    isEditSubmitting.value = false;
 };
 
 const deleteCurriculumUnit = (curriculumUnit: CurriculumUnit) => {
@@ -566,8 +606,8 @@ const getUnitTypeColor = (type: string) => {
                                                             <p class="text-sm font-medium">{{ unit.unit?.code }}</p>
                                                             <p class="text-xs text-gray-600">{{ unit.unit?.name }}</p>
                                                         </div>
-                                                        <Badge :class="getUnitTypeColor(unit.unit_type?.name || 'unknown')" class="text-xs">
-                                                            {{ unit.unit_type?.name?.toUpperCase() || 'UNKNOWN' }}
+                                                        <Badge :class="getUnitTypeColor(unit.type || 'unknown')" class="text-xs">
+                                                            {{ unit.type?.toUpperCase() || 'UNKNOWN' }}
                                                         </Badge>
                                                     </div>
                                                     <div class="flex items-center justify-between text-xs">
@@ -602,10 +642,13 @@ const getUnitTypeColor = (type: string) => {
                                     <Badge variant="secondary" class="ml-2">{{ paginatedUnits.data.length }}/{{ paginatedUnits.total }}</Badge>
                                 </CardTitle>
 
-                                <Button v-if="can('create_curriculum_unit')" variant="outline" size="sm" @click="handleAddUnitClick">
-                                    <Plus class="mr-2 h-4 w-4" />
-                                    Add Unit
-                                </Button>
+                                <div v-if="can('create_curriculum_unit')" class="flex items-center gap-2">
+                                    <Button variant="outline" size="sm" :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
+                                        <Plus class="mr-2 h-4 w-4" />
+                                        Add Unit
+                                    </Button>
+                                    <span v-if="availableUnits.length === 0" class="text-muted-foreground text-xs"> All units have been added </span>
+                                </div>
                             </div>
 
                             <!-- Filters -->
@@ -618,9 +661,9 @@ const getUnitTypeColor = (type: string) => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All types</SelectItem>
-                                        <SelectItem v-for="unitType in unitTypes" :key="unitType.id" :value="unitType.id.toString()">
-                                            {{ unitType.name }}
-                                        </SelectItem>
+                                        <SelectItem value="core">Core</SelectItem>
+                                        <SelectItem value="major">Major</SelectItem>
+                                        <SelectItem value="elective">Elective</SelectItem>
                                     </SelectContent>
                                 </Select>
 
@@ -642,8 +685,8 @@ const getUnitTypeColor = (type: string) => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All semesters</SelectItem>
-                                        <SelectItem v-for="semester in [1, 2, 3]" :key="semester" :value="semester.toString()">
-                                            Semester {{ semester }}
+                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="semester" :value="semester.toString()">
+                                            Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }})
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -673,15 +716,25 @@ const getUnitTypeColor = (type: string) => {
                                         can('create_curriculum_unit')
                                     "
                                 >
-                                    <Button @click="handleAddUnitClick">
+                                    <Button :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
                                         <Plus class="mr-2 h-4 w-4" />
                                         Add First Unit
                                     </Button>
+                                    <p v-if="availableUnits.length === 0" class="text-muted-foreground mt-2 text-xs">
+                                        All available units have been added to this curriculum version.
+                                    </p>
                                 </div>
                             </div>
 
                             <div v-else>
-                                <DataTable :data="paginatedUnits.data" :columns="columns" :loading="false" class="border-0" />
+                                <DataTable
+                                    :data="paginatedUnits.data"
+                                    :columns="columns"
+                                    :loading="false"
+                                    :enable-row-selection="true"
+                                    @selection-change="handleSelectionChange"
+                                    class="border-0"
+                                />
                                 <div class="border-t p-4" v-if="paginatedUnits.total > 10">
                                     <DataPagination :pagination-data="paginationData" @navigate="handlePageChange" />
                                 </div>
@@ -749,20 +802,16 @@ const getUnitTypeColor = (type: string) => {
         <DialogContent class="max-w-2xl">
             <DialogHeader>
                 <DialogTitle>Add Curriculum Unit</DialogTitle>
-                <DialogDescription>Add a new unit to this curriculum version.</DialogDescription>
+                <DialogDescription>
+                    Add a new unit to this curriculum version.
+                    <span v-if="availableUnits.length > 0" class="mt-1 block text-sm text-green-600">
+                        {{ availableUnits.length }} unit(s) available to add
+                    </span>
+                    <span v-else class="mt-1 block text-sm text-amber-600"> No units available to add </span>
+                </DialogDescription>
             </DialogHeader>
 
-            <Form
-                :validation-schema="addUnitFormSchema"
-                :initial-values="{
-                    unit_id: '',
-                    unit_type_id: '',
-                    year_level: '',
-                    semester_number: '',
-                    note: '',
-                }"
-                @submit="onAddUnitSubmit"
-            >
+            <Form :validation-schema="addUnitFormSchema" @submit="onAddUnitSubmit" class="space-y-4">
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <FormField v-slot="{ componentField }" name="unit_id">
                         <FormItem>
@@ -773,7 +822,8 @@ const getUnitTypeColor = (type: string) => {
                                         <SelectValue placeholder="Select a unit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="unit in units" :key="unit.id" :value="unit.id.toString()">
+                                        <SelectItem v-if="availableUnits.length === 0" value="none" disabled> No available units to add </SelectItem>
+                                        <SelectItem v-for="unit in availableUnits" :key="unit.id" :value="unit.id.toString()">
                                             {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP)
                                         </SelectItem>
                                     </SelectContent>
@@ -783,7 +833,7 @@ const getUnitTypeColor = (type: string) => {
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="unit_type_id">
+                    <FormField v-slot="{ componentField }" name="type">
                         <FormItem>
                             <FormLabel>Unit Type *</FormLabel>
                             <FormControl>
@@ -792,28 +842,9 @@ const getUnitTypeColor = (type: string) => {
                                         <SelectValue placeholder="Select type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="unitType in unitTypes" :key="unitType.id" :value="unitType.id.toString()">
-                                            {{ unitType.name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField v-slot="{ componentField }" name="year_level">
-                        <FormItem>
-                            <FormLabel>Year Level *</FormLabel>
-                            <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select year" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="year in [1, 2, 3, 4, 5]" :key="year" :value="year.toString()">
-                                            Year {{ year }}
-                                        </SelectItem>
+                                        <SelectItem value="core">Core</SelectItem>
+                                        <SelectItem value="major">Major</SelectItem>
+                                        <SelectItem value="elective">Elective</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -830,8 +861,8 @@ const getUnitTypeColor = (type: string) => {
                                         <SelectValue placeholder="Select semester" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="semester in [1, 2, 3]" :key="semester" :value="semester.toString()">
-                                            Semester {{ semester }}
+                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="semester" :value="semester.toString()">
+                                            Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }})
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -858,7 +889,7 @@ const getUnitTypeColor = (type: string) => {
 
                 <DialogFooter>
                     <Button type="button" variant="outline" @click="showAddUnitModal = false">Cancel</Button>
-                    <Button type="submit" :disabled="isAddSubmitting">
+                    <Button type="submit" :disabled="isAddSubmitting || availableUnits.length === 0">
                         {{ isAddSubmitting ? 'Adding...' : 'Add Unit' }}
                     </Button>
                 </DialogFooter>
@@ -878,7 +909,12 @@ const getUnitTypeColor = (type: string) => {
                 v-if="curriculumUnitToEdit"
                 :key="curriculumUnitToEdit.id"
                 :validation-schema="editUnitFormSchema"
-                :initial-values="editFormInitialValues"
+                :initial-values="{
+                    unit_id: curriculumUnitToEdit.unit_id?.toString() || '',
+                    type: curriculumUnitToEdit.type || 'core',
+                    semester_number: curriculumUnitToEdit.semester_number?.toString() || '',
+                    note: curriculumUnitToEdit.note || '',
+                }"
                 @submit="onEditUnitSubmit"
                 class="space-y-4"
             >
@@ -892,7 +928,7 @@ const getUnitTypeColor = (type: string) => {
                                         <SelectValue placeholder="Select a unit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="unit in units" :key="unit.id" :value="unit.id.toString()">
+                                        <SelectItem v-for="unit in editableUnits" :key="unit.id" :value="unit.id.toString()">
                                             {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP)
                                         </SelectItem>
                                     </SelectContent>
@@ -902,7 +938,7 @@ const getUnitTypeColor = (type: string) => {
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="unit_type_id">
+                    <FormField v-slot="{ componentField }" name="type">
                         <FormItem>
                             <FormLabel>Unit Type *</FormLabel>
                             <FormControl>
@@ -911,28 +947,9 @@ const getUnitTypeColor = (type: string) => {
                                         <SelectValue placeholder="Select type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="unitType in unitTypes" :key="unitType.id" :value="unitType.id.toString()">
-                                            {{ unitType.name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField v-slot="{ componentField }" name="year_level">
-                        <FormItem>
-                            <FormLabel>Year Level *</FormLabel>
-                            <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select year" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="year in [1, 2, 3, 4, 5]" :key="year" :value="year.toString()">
-                                            Year {{ year }}
-                                        </SelectItem>
+                                        <SelectItem value="core">Core</SelectItem>
+                                        <SelectItem value="major">Major</SelectItem>
+                                        <SelectItem value="elective">Elective</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -949,8 +966,8 @@ const getUnitTypeColor = (type: string) => {
                                         <SelectValue placeholder="Select semester" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="semester in [1, 2, 3]" :key="semester" :value="semester.toString()">
-                                            Semester {{ semester }}
+                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="semester" :value="semester.toString()">
+                                            Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }})
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>

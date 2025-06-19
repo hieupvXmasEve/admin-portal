@@ -1,0 +1,226 @@
+{
+    "major": "Business Administration",
+    "semesters": [
+        {
+            "semester": "Semester 1 - May 2024",
+            "units": [
+                {
+                    "code": "ACC10007",
+                    "name": "Financial Information for Decision Making",
+                    "type": "Core unit",
+                    "prerequisite_groups": [],
+                    "equivalent_group": [{ "unit_code": "ECO10004" }]
+                },
+                {
+                    "code": "MKT10009",
+                    "name": "Marketing and the Consumer Experience",
+                    "type": "Core unit",
+                    "prerequisite_groups": [
+                        {
+                            "logic_operator": "AND",
+                            "description": "Anti-requisite to MKT10008",
+                            "conditions": [
+                                {
+                                    "type": "anti_requisite",
+                                    "unit_code": "MKT10008"
+                                }
+                            ]
+                        }
+                    ],
+                    "equivalent_group": []
+                }
+            ]
+        },
+        {
+            "semester": "Semester 2 - September 2024",
+            "units": [
+                {
+                    "code": "MGT10009",
+                    "name": "Contemporary Management Principles",
+                    "type": "Core unit",
+                    "prerequisite_groups": [
+                        {
+                            "logic_operator": "AND",
+                            "description": "Prerequisite to ACC10007",
+                            "conditions": [
+                                {
+                                    "type": "prerequisite",
+                                    "unit_code": "ACC10007"
+                                }
+                            ]
+                        }
+                    ],
+                    "equivalent_group": []
+                },
+                {
+                    "code": "BUS10015",
+                    "name": "Design Thinking and Teamwork",
+                    "type": "Core unit",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "type": "Elective",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                }
+            ]
+        },
+        {
+            "semester": "Semester 3 - January 2025",
+            "units": [
+                {
+                    "code": "ECO10005",
+                    "name": "Economics for Business Decision Making",
+                    "type": "Core unit",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "code": "INF10024",
+                    "name": "Business Digitalisation",
+                    "type": "Core unit",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "type": "Elective",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                }
+            ]
+        },
+        {
+            "semester": "Semester 4 - May 2025",
+            "units": [
+                {
+                    "code": "MGT20008",
+                    "name": "Business, Society and Sustainability",
+                    "type": "Major BA",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "code": "INF20016",
+                    "name": "Big Data Management",
+                    "type": "Major BA",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "type": "Elective",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                }
+            ]
+        },
+        {
+            "semester": "Semester 5 - September 2025",
+            "units": [
+                {
+                    "code": "MGT20007",
+                    "name": "Organisational Behaviour",
+                    "type": "Major BA",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "code": "PRM30001",
+                    "name": "Project Management Essentials",
+                    "type": "Major BA",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "type": "Elective",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                }
+            ]
+        },
+        {
+            "semester": "Semester 6 - January 2026",
+            "units": [
+                {
+                    "code": "HRM20017",
+                    "name": "Managing Workplace Relations",
+                    "type": "Major BA",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "code": "LAW20019",
+                    "name": "Law of Commerce",
+                    "type": "Major BA",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "type": "Elective",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                }
+            ]
+        },
+        {
+            "semester": "Semester 7 - May 2026",
+            "units": [
+                {
+                    "code": "BUS20015",
+                    "name": "Work Integrated Learning Placement (Business)",
+                    "type": "Elective",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "type": "Elective",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                }
+            ]
+        },
+        {
+            "semester": "Semester 8 - September 2026",
+            "units": [
+                {
+                    "code": "BUS30031",
+                    "name": "Sustainable Business Practice",
+                    "type": "Core unit",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "code": "INF30015",
+                    "name": "Knowledge Management and Analytics",
+                    "type": "Major BA",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "type": "Elective",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                }
+            ]
+        },
+        {
+            "semester": "Semester 9 - January 2027",
+            "units": [
+                {
+                    "code": "BUS30032",
+                    "name": "Business Consulting Project",
+                    "type": "Core unit",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                },
+                {
+                    "code": "MGT30005",
+                    "name": "Strategic Planning",
+                    "type": "Major BA",
+                    "prerequisite_groups": [],
+                    "equivalent_group": []
+                }
+            ]
+        }
+    ]
+}

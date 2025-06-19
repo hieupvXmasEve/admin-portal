@@ -33,7 +33,6 @@ Accept: application/json
       "student_id": "SW25001",
       "full_name": "John Doe",
       "email": "john.doe@student.edu",
-      "enrollment_status": "active",
       "campus": "Main Campus",
       "program": "Computer Science"
     },

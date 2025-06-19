@@ -255,7 +255,7 @@ class SemesterManagementService
                 $offering = CourseOffering::create([
                     'semester_id' => $semester->id,
                     'unit_id' => $offeringData['unit_id'],
-                    'instructor_id' => $offeringData['instructor_id'] ?? null,
+                    'lecture_id' => $offeringData['lecture_id'] ?? null,
                     'section_code' => $offeringData['section_code'] ?? null,
                     'max_capacity' => $offeringData['max_capacity'] ?? 30,
                     'waitlist_capacity' => $offeringData['waitlist_capacity'] ?? 10,
@@ -483,7 +483,7 @@ class SemesterManagementService
                 $newOffering = CourseOffering::create([
                     'semester_id' => $targetSemester->id,
                     'unit_id' => $sourceOffering->unit_id,
-                    'instructor_id' => $sourceOffering->instructor_id,
+                    'lecture_id' => $sourceOffering->lecture_id,
                     'section_code' => $sourceOffering->section_code,
                     'max_capacity' => $sourceOffering->max_capacity,
                     'waitlist_capacity' => $sourceOffering->waitlist_capacity,

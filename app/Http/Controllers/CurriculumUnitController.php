@@ -227,10 +227,23 @@ class CurriculumUnitController extends Controller
             'unit_id' => 'required|exists:units,id',
             'semester_id' => 'required|exists:semesters,id',
             'type' => 'required|in:core,major,elective',
-            'semester_number' => 'required|integer|min:1|max:12',
-            'is_compulsory' => 'required|boolean',
+            'year_level' => 'required|integer|min:1|max:6',
+            'semester_number' => 'required|integer|min:1|max:9',
             'note' => 'nullable|string|max:1000',
         ]);
+
+        // Check for duplicate unit in curriculum
+        $existingUnit = CurriculumUnit::where('curriculum_version_id', $validated['curriculum_version_id'])
+            ->where('unit_id', $validated['unit_id'])
+            ->first();
+
+        if ($existingUnit) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This unit is already added to the curriculum version.',
+                'error' => 'duplicate_unit'
+            ], 422);
+        }
 
         try {
             DB::beginTransaction();
@@ -262,8 +275,8 @@ class CurriculumUnitController extends Controller
             'unit_id' => 'required|exists:units,id',
             'semester_id' => 'required|exists:semesters,id',
             'type' => 'required|in:core,major,elective',
-            'semester_number' => 'required|integer|min:1|max:12',
-            'is_compulsory' => 'required|boolean',
+            'year_level' => 'required|integer|min:1|max:6',
+            'semester_number' => 'required|integer|min:1|max:9',
             'note' => 'nullable|string|max:1000',
         ]);
 

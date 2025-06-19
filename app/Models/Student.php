@@ -39,7 +39,6 @@ class Student extends Authenticatable
         'curriculum_version_id',
         'admission_date',
         'expected_graduation_date',
-        'enrollment_status',
         'parent_guardian_name',
         'parent_guardian_phone',
         'parent_guardian_email',
@@ -85,7 +84,6 @@ class Student extends Authenticatable
             'specialization_id' => ['nullable', 'exists:specializations,id'],
             'curriculum_version_id' => ['required', 'exists:curriculum_versions,id'],
             'admission_date' => ['required', 'date'],
-            'enrollment_status' => ['nullable', 'in:admitted,enrolled,active,on_leave,suspended,graduated,dropped_out'],
             'parent_guardian_name' => ['nullable', 'string', 'max:255'],
             'parent_guardian_phone' => ['nullable', 'string', 'max:20'],
             'parent_guardian_email' => ['nullable', 'email', 'max:255'],
@@ -158,8 +156,7 @@ class Student extends Authenticatable
 
     public function canRegisterForCourses(): bool
     {
-        return $this->enrollment_status === 'active' &&
-            $this->status === 'active' &&
+        return $this->status === 'active' &&
             !$this->hasActiveHolds();
     }
 

@@ -12,6 +12,7 @@ import {
     ComboboxItemIndicator,
     ComboboxList,
     ComboboxTrigger,
+    ComboboxViewport,
 } from '@/components/ui/combobox';
 import { useApi } from '@/composables';
 import { cn } from '@/lib/utils';
@@ -77,8 +78,19 @@ const showMinimumCharactersMessage = computed(() => {
     return searchQuery.value.length > 0 && searchQuery.value.length < 2;
 });
 
+const showInitialMessage = computed(() => {
+    return searchQuery.value.length === 0 && students.value.length === 0;
+});
+
 // API functions
-const fetchStudents = async (query = '') => {
+const fetchStudents = async (query: string) => {
+    // Only fetch if query has at least 2 characters
+    if (query.length < 2) {
+        students.value = [];
+        apiError.value = null;
+        return;
+    }
+
     // Clear previous results and error
     students.value = [];
     apiError.value = null;
@@ -89,11 +101,8 @@ const fetchStudents = async (query = '') => {
             page: '1',
             limit: '20',
             status: props.status,
+            query: query.trim(),
         };
-
-        if (query.trim()) {
-            params.query = query.trim();
-        }
 
         const response = await api.get<StudentSearchData>('/api/students/search', params);
         const responseData = response.data.value;
@@ -129,14 +138,7 @@ const fetchStudentById = async (id: string | number) => {
 
 // Debounced search function with minimum character requirement
 const debouncedSearch = useDebounceFn((query: string) => {
-    // Only search if query has at least 2 characters or is empty (for initial load)
-    if (query.length >= 2 || query.length === 0) {
-        fetchStudents(query);
-    } else {
-        // Clear results if query is too short
-        students.value = [];
-        apiError.value = null;
-    }
+    fetchStudents(query);
 }, 300);
 
 // Event handlers
@@ -201,13 +203,6 @@ watch(
     { immediate: true },
 );
 
-watch(open, (isOpen) => {
-    if (isOpen && students.value.length === 0 && searchQuery.value.length === 0) {
-        // Load initial students when opening (without query)
-        fetchStudents('');
-    }
-});
-
 // Lifecycle
 onMounted(() => {
     if (props.modelValue) {
@@ -258,7 +253,7 @@ onMounted(() => {
                 <!-- Search Input -->
                 <div class="relative w-full items-center">
                     <ComboboxInput
-                        class="h-10 rounded-none border-0 border-b pl-9 focus-visible:ring-0"
+                        class="h-10 rounded-none border-0 border-b pl-4 focus-visible:ring-0"
                         placeholder="Search students..."
                         @update:model-value="debouncedSearch"
                     />
@@ -267,67 +262,75 @@ onMounted(() => {
                     </span>
                 </div>
 
-                <!-- Loading state -->
-                <div v-if="loading" class="flex items-center justify-center py-6">
-                    <Loader2 class="size-4 animate-spin" />
-                    <span class="text-muted-foreground ml-2 text-sm">Loading students...</span>
-                </div>
+                <!-- Content with proper height and scrolling -->
+                <ComboboxViewport class="max-h-[300px] overflow-y-auto">
+                    <!-- Loading state -->
+                    <div v-if="loading" class="flex items-center justify-center py-6">
+                        <Loader2 class="size-4 animate-spin" />
+                        <span class="text-muted-foreground ml-2 text-sm">Loading students...</span>
+                    </div>
 
-                <!-- Error state -->
-                <div v-else-if="apiError" class="flex items-center justify-center py-6">
-                    <AlertCircle class="text-destructive size-4" />
-                    <span class="text-destructive ml-2 text-sm">{{ apiError }}</span>
-                </div>
+                    <!-- Error state -->
+                    <div v-else-if="apiError" class="flex items-center justify-center py-6">
+                        <AlertCircle class="text-destructive size-4" />
+                        <span class="text-destructive ml-2 text-sm">{{ apiError }}</span>
+                    </div>
 
-                <!-- Minimum characters message -->
-                <div v-else-if="showMinimumCharactersMessage" class="flex items-center justify-center py-6">
-                    <span class="text-muted-foreground text-sm">Type at least 2 characters to search students</span>
-                </div>
+                    <!-- Minimum characters message -->
+                    <div v-else-if="showMinimumCharactersMessage" class="flex items-center justify-center py-6">
+                        <span class="text-muted-foreground text-sm">Type at least 2 characters to search students</span>
+                    </div>
 
-                <!-- Empty states -->
-                <ComboboxEmpty v-else-if="students.length === 0 && searchQuery.length >= 2">
-                    No students found for "{{ searchQuery }}".
-                </ComboboxEmpty>
+                    <!-- Initial message when no search query -->
+                    <div v-else-if="showInitialMessage" class="flex items-center justify-center py-6">
+                        <span class="text-muted-foreground text-sm">Start typing to search for students...</span>
+                    </div>
 
-                <ComboboxEmpty v-else-if="students.length === 0 && searchQuery.length === 0"> Start typing to search for students... </ComboboxEmpty>
+                    <!-- Empty states -->
+                    <ComboboxEmpty v-else-if="students.length === 0 && searchQuery.length >= 2">
+                        No students found for "{{ searchQuery }}".
+                    </ComboboxEmpty>
 
-                <!-- Student list -->
-                <ComboboxGroup v-else>
-                    <ComboboxItem v-for="student in students" :key="student.id" :value="student">
-                        <div class="flex w-full items-center gap-3">
-                            <Avatar class="size-8 shrink-0">
-                                <AvatarFallback class="text-xs">
-                                    {{ getStudentInitials(student) }}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2">
-                                    <p class="truncate text-sm font-medium">{{ student.full_name }}</p>
-                                    <Badge variant="outline" :class="getEnrollmentStatusColor(student.enrollment_status)" class="shrink-0 text-xs">
-                                        {{ student.enrollment_status.replace('_', ' ') }}
-                                    </Badge>
-                                </div>
-                                <div class="text-muted-foreground flex items-center gap-2 text-xs">
-                                    <span>{{ student.student_id }}</span>
-                                    <span>•</span>
-                                    <span class="truncate">{{ student.email }}</span>
-                                </div>
-                                <div v-if="student.program" class="text-muted-foreground mt-1 text-xs">
-                                    {{ student.program.name }}
+                    <!-- Student list -->
+                    <ComboboxGroup v-else-if="students.length > 0">
+                        <ComboboxItem v-for="student in students" :key="student.id" :value="student">
+                            <div class="flex w-full items-center gap-3">
+                                <Avatar class="size-8 shrink-0">
+                                    <AvatarFallback class="text-xs">
+                                        {{ getStudentInitials(student) }}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <p class="truncate text-sm font-medium">{{ student.full_name }}</p>
+                                        <Badge variant="outline" :class="getEnrollmentStatusColor(student.status)" class="shrink-0 text-xs">
+                                            {{ student.status }}
+                                        </Badge>
+                                    </div>
+                                    <div class="text-muted-foreground flex items-center gap-2 text-xs">
+                                        <span>{{ student.student_id }}</span>
+                                        <span>•</span>
+                                        <span class="truncate">{{ student.email }}</span>
+                                    </div>
+                                    <div v-if="student.program" class="text-muted-foreground mt-1 text-xs">
+                                        {{ student.program.name }}
+                                    </div>
                                 </div>
                             </div>
+
+                            <ComboboxItemIndicator>
+                                <Check class="ml-auto size-4" />
+                            </ComboboxItemIndicator>
+                        </ComboboxItem>
+
+                        <!-- Results count indicator -->
+                        <div v-if="students.length === 20" class="border-t p-2 text-center">
+                            <span class="text-muted-foreground text-xs">
+                                Showing first 20 results. Refine your search for more specific results.
+                            </span>
                         </div>
-
-                        <ComboboxItemIndicator>
-                            <Check class="ml-auto size-4" />
-                        </ComboboxItemIndicator>
-                    </ComboboxItem>
-
-                    <!-- Results count indicator -->
-                    <div v-if="students.length === 20" class="border-t p-2 text-center">
-                        <span class="text-muted-foreground text-xs"> Showing first 20 results. Refine your search for more specific results. </span>
-                    </div>
-                </ComboboxGroup>
+                    </ComboboxGroup>
+                </ComboboxViewport>
             </ComboboxList>
         </Combobox>
 

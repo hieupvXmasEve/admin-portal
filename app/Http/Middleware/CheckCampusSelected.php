@@ -19,7 +19,10 @@ class CheckCampusSelected
         if (!auth()->check()) {
             return $next($request);
         }
-
+        if (session()->has('current_campus_id') && $request->routeIs('select-campus.index')) {
+            // go to dashboard
+            return redirect()->route('dashboard');
+        }
         // Skip kiểm tra cho các route select-campus, email verification, và password confirmation
         if ($request->routeIs([
             'select-campus.index',

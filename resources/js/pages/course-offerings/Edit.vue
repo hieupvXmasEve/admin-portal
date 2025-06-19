@@ -32,7 +32,7 @@ const formSchema = toTypedSchema(
     z.object({
         semester_id: z.string().min(1, 'Semester is required'),
         unit_id: z.string().min(1, 'Unit is required'),
-        instructor_id: z.string().optional(),
+        lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(500, 'Max capacity cannot exceed 500'),
         waitlist_capacity: z.number().int().min(0, 'Waitlist capacity must be 0 or greater').max(100, 'Waitlist capacity cannot exceed 100'),

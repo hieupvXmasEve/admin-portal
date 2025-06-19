@@ -17,7 +17,6 @@ class EquivalentUnit extends Model
         'unit_id',
         'equivalent_unit_id',
         'reason',
-        'valid_from_semester_id',
     ];
 
     /**
@@ -34,13 +33,5 @@ class EquivalentUnit extends Model
     public function equivalentUnit(): BelongsTo
     {
         return $this->belongsTo(Unit::class, 'equivalent_unit_id');
-    }
-
-    /**
-     * Get the semester from which this equivalence is valid.
-     */
-    public function validFromSemester(): BelongsTo
-    {
-        return $this->belongsTo(Semester::class, 'valid_from_semester_id');
     }
 }

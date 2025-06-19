@@ -93,9 +93,6 @@ CREATE TABLE students (
     admission_date DATE NOT NULL,
     expected_graduation_date DATE,
     
-    -- Academic Status
-    enrollment_status ENUM('admitted', 'enrolled', 'active', 'on_leave', 'suspended', 'graduated', 'dropped_out') DEFAULT 'admitted',
-    
     -- Contact Information
     parent_guardian_name VARCHAR(255),
     parent_guardian_phone VARCHAR(20),
@@ -131,7 +128,6 @@ CREATE TABLE students (
     INDEX idx_students_oauth (oauth_provider, oauth_provider_id),
     INDEX idx_students_campus (campus_id),
     INDEX idx_students_program (program_id, specialization_id),
-    INDEX idx_students_status (enrollment_status)
 );
 ```
 

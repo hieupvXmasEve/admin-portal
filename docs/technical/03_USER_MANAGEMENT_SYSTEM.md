@@ -112,7 +112,6 @@ CREATE TABLE students (
     admission_date DATE NOT NULL,
     expected_graduation_date DATE,
     student_type ENUM('full_time', 'part_time', 'exchange', 'visiting') DEFAULT 'full_time',
-    enrollment_status ENUM('enrolled', 'active', 'on_leave', 'suspended', 'graduated', 'dropped_out') DEFAULT 'enrolled',
     current_year INTEGER DEFAULT 1,
     current_semester INTEGER DEFAULT 1,
     total_credits_earned DECIMAL(5,2) DEFAULT 0.00,

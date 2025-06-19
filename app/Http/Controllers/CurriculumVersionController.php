@@ -9,7 +9,6 @@ use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\Semester;
 use App\Models\Unit;
-use App\Models\CurriculumUnitType;
 use App\Http\Requests\StoreCurriculumVersionRequest;
 use App\Http\Requests\UpdateCurriculumVersionRequest;
 use Illuminate\Http\Request;
@@ -305,8 +304,7 @@ class CurriculumVersionController extends Controller
             'program',
             'specialization',
             'effectiveFromSemester',
-            'curriculumUnits.unit',
-            'curriculumUnits.unitType'
+            'curriculumUnits.unit'
         ]);
 
         return Inertia::render('curriculum-versions/Show', [
@@ -315,7 +313,11 @@ class CurriculumVersionController extends Controller
             'specializations' => Specialization::select('id', 'name', 'code', 'program_id')->get(),
             'semesters' => Semester::select('id', 'name', 'code')->get(),
             'units' => Unit::select('id', 'code', 'name', 'credit_points')->orderBy('code')->get(),
-            'unitTypes' => CurriculumUnitType::select('id', 'name')->orderBy('name')->get(),
+            'unitTypes' => [
+                ['id' => 'core', 'name' => 'Core'],
+                ['id' => 'major', 'name' => 'Major'],
+                ['id' => 'elective', 'name' => 'Elective'],
+            ],
         ]);
     }
 

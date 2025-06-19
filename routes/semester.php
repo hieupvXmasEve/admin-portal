@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\SemesterController;
-use App\Http\Controllers\Admin\SemesterEnrollmentController;
+use App\Http\Controllers\SemesterEnrollmentController;
 use App\Helpers\RoutePermissionHelper;
 use Illuminate\Support\Facades\Route;
 
@@ -51,5 +51,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/enrollment/stats', [SemesterEnrollmentController::class, 'getRegistrationStats'])
             ->middleware('can:view_semester')
             ->name('enrollment.stats');
+
+        Route::get('/enrollment/registrable-students', [SemesterEnrollmentController::class, 'getRegistrableStudents'])
+            ->middleware('can:view_semester')
+            ->name('enrollment.registrable-students');
+
+        Route::post('/enrollment/bulk-register', [SemesterEnrollmentController::class, 'bulkRegisterStudents'])
+            ->middleware('can:edit_semester')
+            ->name('enrollment.bulk-register');
     });
 });

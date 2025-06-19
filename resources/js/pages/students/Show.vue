@@ -161,11 +161,11 @@ console.log('props', props.student);
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-muted-foreground text-sm">Status</p>
-                                <Badge :variant="getStatusBadgeVariant(student.enrollment_status) as any" class="mt-1">
-                                    {{ formatStatus(student.enrollment_status) }}
+                                <Badge :variant="getStatusBadgeVariant(student.status) as any" class="mt-1">
+                                    {{ formatStatus(student.status) }}
                                 </Badge>
                             </div>
-                            <CheckCircle :class="getStatusColor(student.enrollment_status)" class="h-8 w-8" />
+                            <CheckCircle :class="getStatusColor(student.status)" class="h-8 w-8" />
                         </div>
                     </CardContent>
                 </Card>

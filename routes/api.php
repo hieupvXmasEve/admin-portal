@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\StudentController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\CourseController;
+use App\Http\Controllers\Api\Admin\StudentController as AdminStudentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -69,10 +70,10 @@ Route::prefix('v1')->name('api.v1.')->middleware(['auth:sanctum', 'student'])->g
 Route::prefix('v1')->name('api.v1.admin.')->middleware(['auth:sanctum', 'admin'])->group(function () {
     // Student Management
     Route::get('/students', [StudentController::class, 'index'])->name('students.index');
-    Route::get('/students/search', [\App\Http\Controllers\Api\StudentController::class, 'search'])->name('students.search');
-    Route::post('/students/by-ids', [\App\Http\Controllers\Api\StudentController::class, 'getByIds'])->name('students.by-ids');
+    Route::get('/students/search', [AdminStudentController::class, 'search'])->name('students.search');
+    Route::post('/students/by-ids', [AdminStudentController::class, 'getByIds'])->name('students.by-ids');
     Route::post('/students', [StudentController::class, 'store'])->name('students.store');
-    Route::get('/students/{student}', [\App\Http\Controllers\Api\StudentController::class, 'show'])->name('students.show');
+    Route::get('/students/{student}', [AdminStudentController::class, 'show'])->name('students.show');
     Route::put('/students/{student}', [StudentController::class, 'update'])->name('students.update');
     Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
 

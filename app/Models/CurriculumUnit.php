@@ -17,13 +17,16 @@ class CurriculumUnit extends Model
     protected $fillable = [
         'curriculum_version_id',
         'unit_id',
+        'semester_id',
         'type',
         'year_level',
+        'semester_number',
         'note',
     ];
 
     protected $casts = [
         'year_level' => 'integer',
+        'semester_number' => 'integer',
     ];
 
     /**
@@ -40,6 +43,14 @@ class CurriculumUnit extends Model
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    /**
+     * Get the semester for this curriculum unit.
+     */
+    public function semester(): BelongsTo
+    {
+        return $this->belongsTo(Semester::class);
     }
 
 

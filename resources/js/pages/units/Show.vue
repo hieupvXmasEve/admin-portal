@@ -92,7 +92,7 @@ const props = defineProps<{
     canEdit: boolean;
     canDelete: boolean;
 }>();
-console.log(props.unit);
+console.log(props.canEdit);
 const breadcrumbItems: BreadcrumbItem[] = [
     {
         title: 'Units',
@@ -527,8 +527,8 @@ const hasRelationships = () => {
                                         {{ curriculumUnit.semester.term }} {{ curriculumUnit.semester.year }}
                                     </p>
                                 </div>
-                                <Badge :class="getUnitTypeColor(curriculumUnit.unit_type?.code || 'unknown')" class="text-xs">
-                                    {{ curriculumUnit.unit_type?.name?.toUpperCase() || 'UNKNOWN TYPE' }}
+                                <Badge :class="getUnitTypeColor(curriculumUnit.type)" class="text-xs">
+                                    {{ curriculumUnit.type.toUpperCase() }}
                                 </Badge>
                             </div>
 

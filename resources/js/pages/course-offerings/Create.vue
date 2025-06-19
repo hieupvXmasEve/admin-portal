@@ -7,18 +7,18 @@ import { NumberInput } from '@/components/ui/number-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/AppLayout.vue';
-import type { Semester, Unit, User, CourseOfferingFormData } from '@/types/models';
+import type { CourseOfferingFormData, Lecture, Semester, Unit } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
-import { z } from 'zod';
 import { ref } from 'vue';
+import { z } from 'zod';
 
 interface Props {
     semesters: Semester[];
     units: Unit[];
-    instructors: User[];
+    lectures: Lecture[];
 }
 
 const props = defineProps<Props>();
@@ -33,10 +33,15 @@ const formSchema = toTypedSchema(
     z.object({
         semester_id: z.string().min(1, 'Semester is required'),
         unit_id: z.string().min(1, 'Unit is required'),
-        instructor_id: z.string().optional(),
+        lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(500, 'Max capacity cannot exceed 500'),
-        waitlist_capacity: z.number().int().min(0, 'Waitlist capacity must be 0 or greater').max(100, 'Waitlist capacity cannot exceed 100').default(10),
+        waitlist_capacity: z
+            .number()
+            .int()
+            .min(0, 'Waitlist capacity must be 0 or greater')
+            .max(100, 'Waitlist capacity cannot exceed 100')
+            .default(10),
         delivery_mode: z.enum(['in_person', 'online', 'hybrid', 'blended'], {
             errorMap: () => ({ message: 'Please select a delivery mode' }),
         }),
@@ -50,14 +55,14 @@ const formSchema = toTypedSchema(
         special_requirements: z.string().max(1000, 'Special requirements too long').optional(),
         notes: z.string().max(1000, 'Notes too long').optional(),
     }),
-) satisfies z.ZodType<CourseOfferingFormData>;
+);
 
-const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
+const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
         semester_id: '',
         unit_id: '',
-        instructor_id: '',
+        lecture_id: '',
         section_code: '',
         max_capacity: 30,
         waitlist_capacity: 10,
@@ -83,7 +88,7 @@ const onSubmit = handleSubmit((values) => {
     const formData = {
         semester_id: values.semester_id,
         unit_id: values.unit_id,
-        instructor_id: values.instructor_id === 'none' || values.instructor_id === '' ? null : values.instructor_id,
+        lecture_id: values.lecture_id === 'none' || values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
         max_capacity: Number(values.max_capacity),
         waitlist_capacity: Number(values.waitlist_capacity) || 10,
@@ -220,18 +225,18 @@ const dayOptions = [
                                 </FormItem>
                             </FormField>
 
-                            <FormField v-slot="{ componentField }" name="instructor_id">
+                            <FormField v-slot="{ componentField }" name="lecture_id">
                                 <FormItem>
-                                    <FormLabel>Instructor</FormLabel>
+                                    <FormLabel>Lecture</FormLabel>
                                     <FormControl>
                                         <Select v-bind="componentField">
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Select instructor (optional)" />
+                                                <SelectValue placeholder="Select lecture (optional)" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="none">No instructor assigned</SelectItem>
-                                                <SelectItem v-for="instructor in props.instructors" :key="instructor.id" :value="instructor.id.toString()">
-                                                    {{ instructor.name }}
+                                                <SelectItem value="none">No lecture assigned</SelectItem>
+                                                <SelectItem v-for="lecture in props.lectures" :key="lecture.id" :value="lecture.id.toString()">
+                                                    {{ lecture.first_name }} {{ lecture.last_name }} ({{ lecture.academic_rank }})
                                                 </SelectItem>
                                             </SelectContent>
                                         </Select>
@@ -389,8 +394,6 @@ const dayOptions = [
                                     </FormItem>
                                 </FormField>
                             </div>
-
-
                         </CardContent>
                     </Card>
 
@@ -427,9 +430,7 @@ const dayOptions = [
                 <div v-if="submitError" class="rounded-md bg-red-50 p-4">
                     <div class="flex">
                         <div class="ml-3">
-                            <h3 class="text-sm font-medium text-red-800">
-                                Error creating course offering
-                            </h3>
+                            <h3 class="text-sm font-medium text-red-800">Error creating course offering</h3>
                             <div class="mt-2 text-sm text-red-700">
                                 {{ submitError }}
                             </div>

@@ -18,7 +18,7 @@ class SyllabusSeeder extends Seeder
     public function run(): void
     {
         // Get some existing units and semesters
-        $units = Unit::limit(5)->get();
+        $units = Unit::all();
         $semesters = Semester::limit(3)->get();
 
         if ($units->isEmpty() || $semesters->isEmpty()) {

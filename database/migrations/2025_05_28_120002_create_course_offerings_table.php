@@ -14,10 +14,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('semester_id')->constrained()->onDelete('cascade');
             $table->foreignId('unit_id')->constrained()->onDelete('cascade');
-            $table->foreignId('instructor_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignId('lecture_id')->nullable()->constrained('lectures')->onDelete('set null');
 
             $table->string('section_code', 10)->nullable(); // e.g., "A", "B", "01", "02"
-            $table->integer('max_capacity')->default(30);
+            $table->integer('max_capacity')->default(1000);
             $table->integer('current_enrollment')->default(0);
             $table->integer('waitlist_capacity')->default(10);
             $table->integer('current_waitlist')->default(0);
@@ -54,7 +54,7 @@ return new class extends Migration
 
             // Indexes
             $table->index(['semester_id', 'unit_id']);
-            $table->index(['instructor_id', 'semester_id']);
+            $table->index(['lecture_id', 'semester_id']);
             $table->index(['is_active', 'enrollment_status']);
             $table->index(['delivery_mode']);
             $table->index(['current_enrollment', 'max_capacity']);

@@ -151,19 +151,12 @@ class UnitController extends Controller
             // Handle equivalent units if provided
             if ($request->has('equivalent_units') && is_array($request->equivalent_units)) {
                 foreach ($request->equivalent_units as $equivalent) {
-                    // For equivalent units, we need a semester - use current or latest semester
-                    $currentSemester = \App\Models\Semester::orderBy('year', 'desc')
-                        ->orderBy('term', 'desc')
-                        ->first();
 
-                    if ($currentSemester) {
-                        \App\Models\EquivalentUnit::create([
-                            'unit_id' => $unit->id,
-                            'equivalent_unit_id' => $equivalent['equivalent_unit_id'],
-                            'reason' => $equivalent['reason'],
-                            'valid_from_semester_id' => $currentSemester->id,
-                        ]);
-                    }
+                    \App\Models\EquivalentUnit::create([
+                        'unit_id' => $unit->id,
+                        'equivalent_unit_id' => $equivalent['equivalent_unit_id'],
+                        'reason' => $equivalent['reason'],
+                    ]);
                 }
             }
 
@@ -184,7 +177,6 @@ class UnitController extends Controller
         $unit->load([
             'curriculumUnits.curriculumVersion.program',
             'curriculumUnits.curriculumVersion.specialization',
-            'curriculumUnits.unitType',
             'curriculumUnits.semester',
             'prerequisiteGroups.conditions.requiredUnit',
             'syllabus.effectiveFromSemester',
@@ -348,19 +340,11 @@ class UnitController extends Controller
             // Handle equivalent units if provided
             if ($request->has('equivalent_units') && is_array($request->equivalent_units)) {
                 foreach ($request->equivalent_units as $equivalent) {
-                    // For equivalent units, we need a semester - use current or latest semester
-                    $currentSemester = \App\Models\Semester::orderBy('year', 'desc')
-                        ->orderBy('term', 'desc')
-                        ->first();
-
-                    if ($currentSemester) {
-                        \App\Models\EquivalentUnit::create([
-                            'unit_id' => $unit->id,
-                            'equivalent_unit_id' => $equivalent['equivalent_unit_id'],
-                            'reason' => $equivalent['reason'],
-                            'valid_from_semester_id' => $currentSemester->id,
-                        ]);
-                    }
+                    \App\Models\EquivalentUnit::create([
+                        'unit_id' => $unit->id,
+                        'equivalent_unit_id' => $equivalent['equivalent_unit_id'],
+                        'reason' => $equivalent['reason'],
+                    ]);
                 }
             }
 

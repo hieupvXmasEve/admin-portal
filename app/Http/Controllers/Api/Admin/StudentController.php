@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
@@ -32,7 +32,6 @@ class StudentController extends Controller
                 'email',
                 'campus_id',
                 'program_id',
-                'enrollment_status',
                 'status'
             ]);
 
@@ -106,7 +105,6 @@ class StudentController extends Controller
                 'email',
                 'campus_id',
                 'program_id',
-                'enrollment_status',
                 'status'
             ])
             ->get();

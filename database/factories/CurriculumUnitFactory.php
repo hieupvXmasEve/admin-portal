@@ -6,7 +6,6 @@ namespace Database\Factories;
 
 use App\Models\CurriculumUnit;
 use App\Models\CurriculumVersion;
-use App\Models\CurriculumUnitType;
 use App\Models\Unit;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -30,11 +29,9 @@ class CurriculumUnitFactory extends Factory
         return [
             'curriculum_version_id' => CurriculumVersion::factory(),
             'unit_id' => Unit::factory(),
-            'unit_type_id' => $this->faker->optional()->randomElement(
-                CurriculumUnitType::pluck('id')->toArray() ?: [null]
-            ),
-            'year_level' => $this->faker->optional()->numberBetween(1, 4),
-            'semester_number' => $this->faker->optional()->numberBetween(1, 2),
+            'type' => $this->faker->randomElement(['core', 'major', 'elective']),
+            'semester_number' => $this->faker->optional()->numberBetween(1, 8),
+            'is_compulsory' => $this->faker->boolean(70), // 70% chance of being compulsory
             'note' => $this->faker->optional()->text(200),
         ];
     }
@@ -45,6 +42,8 @@ class CurriculumUnitFactory extends Factory
     public function core(): static
     {
         return $this->state(fn(array $attributes) => [
+            'type' => 'core',
+            'is_compulsory' => true,
             'note' => 'Core curriculum unit',
         ]);
     }
@@ -55,6 +54,8 @@ class CurriculumUnitFactory extends Factory
     public function elective(): static
     {
         return $this->state(fn(array $attributes) => [
+            'type' => 'elective',
+            'is_compulsory' => false,
             'note' => 'Elective curriculum unit',
         ]);
     }
@@ -65,17 +66,18 @@ class CurriculumUnitFactory extends Factory
     public function major(): static
     {
         return $this->state(fn(array $attributes) => [
+            'type' => 'major',
+            'is_compulsory' => true,
             'note' => 'Major curriculum unit',
         ]);
     }
 
     /**
-     * Create a curriculum unit for a specific year and semester.
+     * Create a curriculum unit for a specific semester.
      */
-    public function forYearAndSemester(int $year, int $semester): static
+    public function forSemester(int $semester): static
     {
         return $this->state(fn(array $attributes) => [
-            'year_level' => $year,
             'semester_number' => $semester,
         ]);
     }
