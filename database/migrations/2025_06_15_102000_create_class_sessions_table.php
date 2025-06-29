@@ -107,7 +107,7 @@ return new class extends Migration
             $table->index(['session_type', 'status']);
             $table->index(['delivery_mode', 'session_date']);
             $table->index(['is_assessment', 'session_date']);
-            $table->index(['attendance_required', 'attendance_tracking_enabled']);
+            $table->index(['attendance_required', 'attendance_tracking_enabled'], 'attendance_config_idx');
             $table->index(['is_recurring', 'parent_session_id']);
             $table->index(['sequence_number']);
 

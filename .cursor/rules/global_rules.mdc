@@ -23,7 +23,6 @@ alwaysApply: true
 ```
 app/
 ├── Http/Controllers/
-│   ├── Admin/           # Administrative functions
 │   ├── Api/            # API endpoints
 │   ├── Auth/           # Authentication
 │   ├── Settings/       # System settings
@@ -57,413 +56,145 @@ resources/js/
 
 ### 1. Type-First Development
 **ALWAYS** define TypeScript interfaces first, then implement:
-
-```typescript
-// resources/js/types/models.ts
-export interface Student {
-  id: number;
-  student_id: string;
-  full_name: string;
-  email: string;
-  campus_id: number;
-  program_id: number;
-  specialization_id?: number;
-  curriculum_version_id: number;
-  enrollment_status: 'admitted' | 'enrolled' | 'active' | 'on_leave' | 'suspended' | 'graduated' | 'dropped_out';
-  status: 'active' | 'inactive' | 'suspended';
-  campus?: Campus;
-  program?: Program;
-  specialization?: Specialization;
-  curriculum_version?: CurriculumVersion;
-  created_at: string;
-  updated_at: string;
-}
-
-// Form data type for validation
-export interface StudentFormData {
-  student_id: string;
-  full_name: string;
-  email: string;
-  campus_id: string;
-  program_id: string;
-  specialization_id?: string;
-  curriculum_version_id: string;
-  enrollment_status: 'admitted' | 'enrolled' | 'active' | 'on_leave' | 'suspended' | 'graduated' | 'dropped_out';
-}
-```
+- Define main model interfaces in `resources/js/types/models.ts`
+- Create separate form data interfaces for validation (string fields for form inputs)
+- Include optional relationship properties with `?` operator
+- Use union types for enums (e.g., `'active' | 'inactive' | 'suspended'`)
 
 ### 2. Database Migration Standards
 
 **Field Naming Consistency:**
-```php
-// ✅ Use descriptive, consistent field names
-$table->foreignId('curriculum_version_id')->constrained()->onDelete('cascade');
-$table->enum('enrollment_status', ['admitted', 'enrolled', 'active', 'on_leave', 'suspended', 'graduated', 'dropped_out']);
-$table->integer('max_capacity')->default(30);
-$table->decimal('tuition_per_credit', 10, 2)->default(0);
-
-// ❌ Avoid inconsistent naming
-$table->foreignId('curriculum_id');    // Should be curriculum_version_id
-$table->string('status');              // Should be enrollment_status
-$table->integer('max_enrollment');     // Should be max_capacity
-```
+- Use descriptive, consistent field names: `curriculum_version_id` not `curriculum_id`
+- Use specific enum names: `enrollment_status` not just `status`
+- Use consistent capacity naming: `max_capacity` not `max_enrollment`
+- Add proper constraints: `->constrained()->onDelete('cascade')`
 
 **Migration Dependencies:**
-```php
-// Order matters - parent tables first
-2025_05_27_154915_create_programs_table.php
-2025_05_28_110044_create_specializations_table.php
-2025_05_28_110050_create_curriculum_versions_table.php
-2025_05_28_120000_create_students_table.php
-2025_05_28_120002_create_course_offerings_table.php
-2025_05_28_120005_create_course_registrations_table.php
-```
+- Order matters - create parent tables first
+- Follow naming pattern: `YYYY_MM_DD_HHMMSS_create_table_name.php`
+- Programs → Specializations → Curriculum Versions → Students → Course Offerings → Registrations
 
 ### 3. Model Relationship Patterns
 
-**Complete Relationship Definition:**
-```php
-// Student.php
-class Student extends Model
-{
-    protected $fillable = [
-        'student_id', 'full_name', 'email', 'campus_id', 'program_id',
-        'specialization_id', 'curriculum_version_id', 'enrollment_status',
-        'admission_date', 'status'
-    ];
-
-    protected $casts = [
-        'admission_date' => 'date',
-        'expected_graduation_date' => 'date',
-        'enrollment_status' => StudentEnrollmentStatus::class,
-        'status' => StudentStatus::class,
-    ];
-
-    // Relationships
-    public function campus(): BelongsTo
-    {
-        return $this->belongsTo(Campus::class);
-    }
-
-    public function program(): BelongsTo
-    {
-        return $this->belongsTo(Program::class);
-    }
-
-    public function specialization(): BelongsTo
-    {
-        return $this->belongsTo(Specialization::class);
-    }
-
-    public function curriculumVersion(): BelongsTo
-    {
-        return $this->belongsTo(CurriculumVersion::class);
-    }
-
-    public function courseRegistrations(): HasMany
-    {
-        return $this->hasMany(CourseRegistration::class);
-    }
-
-    public function academicHolds(): HasMany
-    {
-        return $this->hasMany(AcademicHold::class);
-    }
-
-    // Model validation rules
-    public static function validationRules(): array
-    {
-        return [
-            'student_id' => ['required', 'string', 'unique:students,student_id'],
-            'full_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:students,email'],
-            'campus_id' => ['required', 'exists:campuses,id'],
-            'program_id' => ['required', 'exists:programs,id'],
-            'specialization_id' => ['nullable', 'exists:specializations,id'],
-            'curriculum_version_id' => ['required', 'exists:curriculum_versions,id'],
-            'enrollment_status' => ['required', 'in:admitted,enrolled,active,on_leave,suspended,graduated,dropped_out'],
-            'admission_date' => ['required', 'date'],
-        ];
-    }
-}
-```
+**Complete Model Definition:**
+- Define `$fillable` array with all mass-assignable fields
+- Use `$casts` for date fields and enum casting
+- Define all `BelongsTo` relationships for parent models
+- Define all `HasMany` relationships for child models
+- Create static `validationRules()` method returning Laravel validation array
+- Use proper validation rules: `required`, `exists:table,column`, `unique:table,field`
 
 ## 🎨 Vue.js Component Standards
 
 ### 1. Form Components with Validation
 
-**Always use vee-validate + Zod + reka-ui:**
-```vue
-<script setup lang="ts">
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
-import { z } from 'zod'
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
-import type { StudentFormData } from '@/types/models'
-
-interface Props {
-  student?: Student
-  campuses: Campus[]
-  programs: Program[]
-  specializations: Specialization[]
-  curriculumVersions: CurriculumVersion[]
-}
-
-const props = defineProps<Props>()
-
-// Define validation schema
-const formSchema = toTypedSchema(
-  z.object({
-    student_id: z.string().min(1, 'Student ID is required'),
-    full_name: z.string().min(1, 'Full name is required'),
-    email: z.string().email('Valid email is required'),
-    campus_id: z.string().min(1, 'Campus is required'),
-    program_id: z.string().min(1, 'Program is required'),
-    specialization_id: z.string().optional(),
-    curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
-    enrollment_status: z.enum(['admitted', 'enrolled', 'active', 'on_leave', 'suspended', 'graduated', 'dropped_out']),
-  }),
-) satisfies z.ZodType<StudentFormData>
-
-const { handleSubmit, isSubmitting } = useForm({
-  validationSchema: formSchema,
-  initialValues: {
-    student_id: props.student?.student_id ?? '',
-    full_name: props.student?.full_name ?? '',
-    email: props.student?.email ?? '',
-    campus_id: props.student?.campus_id?.toString() ?? '',
-    program_id: props.student?.program_id?.toString() ?? '',
-    specialization_id: props.student?.specialization_id?.toString() ?? 'none',
-    curriculum_version_id: props.student?.curriculum_version_id?.toString() ?? '',
-    enrollment_status: props.student?.enrollment_status ?? 'admitted',
-  } satisfies StudentFormData,
-})
-
-const onSubmit = handleSubmit((values) => {
-  const formData = {
-    student_id: values.student_id,
-    full_name: values.full_name,
-    email: values.email,
-    campus_id: Number(values.campus_id),
-    program_id: Number(values.program_id),
-    specialization_id: values.specialization_id === 'none' ? null : Number(values.specialization_id),
-    curriculum_version_id: Number(values.curriculum_version_id),
-    enrollment_status: values.enrollment_status,
-  };
-
-  const method = props.student ? 'put' : 'post';
-  const url = props.student
-    ? route('students.update', props.student.id)
-    : route('students.store');
-
-  router[method](url, formData, {
-    onSuccess: () => {
-      console.log('Student saved successfully');
-    },
-    onError: (errors) => {
-      console.error('Validation errors:', errors);
-      Object.entries(errors).forEach(([field, messages]) => {
-        console.error(`Field "${field}":`, messages);
-      });
-    },
-  });
-});
-</script>
-
-<template>
-  <form @submit="onSubmit" class="space-y-6">
-    <FormField v-slot="{ componentField }" name="student_id">
-      <FormItem>
-        <FormLabel>Student ID</FormLabel>
-        <FormControl>
-          <Input v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ componentField }" name="campus_id">
-      <FormItem>
-        <FormLabel>Campus</FormLabel>
-        <FormControl>
-          <Select v-bind="componentField">
-            <SelectTrigger>
-              <SelectValue placeholder="Select campus" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">
-                {{ campus.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <!-- Additional fields... -->
-
-    <Button type="submit" :disabled="isSubmitting">
-      {{ isSubmitting ? 'Saving...' : (student ? 'Update Student' : 'Create Student') }}
-    </Button>
-  </form>
-</template>
-```
+**Always use vee-validate + Zod + reka-ui pattern:**
+- Import: `useForm` from vee-validate, `toTypedSchema` from @vee-validate/zod, `z` from zod
+- Create Zod schema with `toTypedSchema()` wrapper
+- Use `useForm()` with `validationSchema` and `initialValues`
+- Transform form data before submission (convert strings to numbers, handle null values)
+- Use `router[method]()` for submission with proper success/error handling
+- Template: Use `<Form>` wrapper with `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage`
+- **CRITICAL**: Never use empty string `value=""` in SelectItem - use `value="none"` instead
 
 ### 2. Data Table Components
 
-**Always use DataTable + DataPagination:**
+**Always use DataTable + DataPagination + DebouncedInput pattern:**
 ```vue
 <script setup lang="ts">
 import DataTable from '@/components/DataTable.vue'
 import DataPagination from '@/components/DataPagination.vue'
 import DebouncedInput from '@/components/DebouncedInput.vue'
-import { Badge } from '@/components/ui/badge'
 import type { ColumnDef } from '@tanstack/vue-table'
-import type { Student } from '@/types/models'
+import type { PaginatedResponse } from '@/types'
 
 interface Props {
-  students: {
-    data: Student[]
-    meta: {
-      current_page: number
-      per_page: number
-      total: number
-      last_page: number
-    }
-  }
-  campuses: Campus[]
-  programs: Program[]
+  items: PaginatedResponse<YourModel>
+  filters?: { search?: string }
 }
 
 const props = defineProps<Props>()
+const data = computed(() => props.items.data)
 
+// Filters state
 const filters = ref({
-  search: '',
-  campus_id: 'all',
-  program_id: 'all',
-  enrollment_status: 'all',
+  search: props.filters?.search || '',
 })
 
-const columns: ColumnDef<Student>[] = [
+// Column definitions with actions slot
+const columns: ColumnDef<YourModel>[] = [
   {
-    accessorKey: 'student_id',
-    header: 'Student ID',
-  },
-  {
-    accessorKey: 'full_name',
-    header: 'Full Name',
+    header: 'No',
+    id: 'no',
+    enableSorting: false,
     cell: ({ row }) => {
-      const student = row.original;
-      return h('div', { class: 'space-y-1' }, [
-        h('div', { class: 'font-medium' }, student.full_name),
-        h('div', { class: 'text-sm text-muted-foreground' }, student.email),
-      ]);
+      const currentPage = props.items.current_page
+      const perPage = props.items.per_page
+      return (currentPage - 1) * perPage + row.index + 1
     },
   },
   {
-    accessorKey: 'program',
-    header: 'Program',
-    cell: ({ row }) => {
-      const student = row.original;
-      return h('div', { class: 'space-y-1' }, [
-        h('div', { class: 'font-medium' }, student.program?.name || 'N/A'),
-        student.specialization && h('div', { class: 'text-sm text-muted-foreground' }, student.specialization.name),
-      ]);
-    },
-  },
-  {
-    accessorKey: 'enrollment_status',
-    header: 'Status',
-    cell: ({ row }) => {
-      const status = row.original.enrollment_status;
-      return h(Badge, { variant: getEnrollmentStatusVariant(status) }, () =>
-        status.replace('_', ' ').toUpperCase()
-      );
-    },
-  },
-  {
-    accessorKey: 'campus',
-    header: 'Campus',
-    cell: ({ row }) => row.original.campus?.name || 'N/A',
+    header: 'Name',
+    accessorKey: 'name',
+    enableSorting: true,
+    cell: ({ row }) => h('div', { class: 'font-medium' }, row.original.name),
   },
   {
     id: 'actions',
     header: 'Actions',
-    cell: ({ row }) => h(StudentActions, { student: row.original }),
+    enableSorting: false,
+    cell: 'actions', // Use template slot
   },
-];
+]
 
-const getEnrollmentStatusVariant = (status: string) => {
-  switch (status) {
-    case 'active':
-    case 'enrolled':
-      return 'default';
-    case 'admitted':
-      return 'secondary';
-    case 'on_leave':
-      return 'outline';
-    case 'suspended':
-    case 'dropped_out':
-      return 'destructive';
-    case 'graduated':
-      return 'success';
-    default:
-      return 'outline';
-  }
-};
-
+// Search and pagination handlers
 const handleSearch = (value: string) => {
-  filters.value.search = value;
-  updateFilters();
-};
-
-const updateFilters = () => {
-  router.get('/students', filters.value, {
+  filters.value.search = String(value)
+  router.visit('/your-route', filters.value, {
     preserveState: true,
     preserveScroll: true,
-  });
-};
+  })
+}
 
-const handlePageChange = (page: number) => {
-  router.get('/students', { ...filters.value, page }, {
+const handlePaginationNavigate = (url: string) => {
+  router.visit(url, {
     preserveState: true,
     preserveScroll: true,
-  });
-};
+    only: ['items'],
+  })
+}
 </script>
 
 <template>
   <div class="space-y-4">
     <!-- Filters -->
-    <div class="flex space-x-4">
+    <div class="flex items-center gap-4 rounded-lg border p-4">
       <DebouncedInput
         v-model="filters.search"
         @debounced="handleSearch"
-        placeholder="Search students..."
-        class="max-w-sm"
+        placeholder="Search..."
+        class="min-w-[200px] flex-1"
       />
-
-      <!-- Additional filter selects... -->
     </div>
 
-    <!-- Table -->
-    <DataTable
-      :data="students.data"
-      :columns="columns"
-      :loading="false"
-    />
+    <!-- Table with actions slot -->
+    <DataTable :data="data" :columns="columns">
+      <template #cell-actions="{ row }">
+        <div class="flex items-center gap-2">
+          <Button variant="ghost" size="sm" @click="editItem(row.original)">
+            <Edit class="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" @click="deleteItem(row.original)">
+            <Trash2 class="h-4 w-4" />
+          </Button>
+        </div>
+      </template>
+    </DataTable>
 
     <!-- Pagination -->
     <DataPagination
-      :current-page="students.meta.current_page"
-      :per-page="students.meta.per_page"
-      :total="students.meta.total"
-      :last-page="students.meta.last_page"
-      @page-change="handlePageChange"
+      :pagination-data="items"
+      @navigate="handlePaginationNavigate"
     />
   </div>
 </template>
@@ -471,273 +202,22 @@ const handlePageChange = (page: number) => {
 
 ### 3. reka-ui Component Usage
 
-**CRITICAL**: Never use empty string values in SelectItem:
-```vue
-<!-- ❌ WRONG - Will cause runtime errors -->
-<SelectItem value="">No selection</SelectItem>
-
-<!-- ✅ CORRECT - Use meaningful non-empty values -->
-<SelectItem value="none">No selection</SelectItem>
-<SelectItem value="all">All items</SelectItem>
-```
+**CRITICAL SelectItem Rule**: Never use empty string `value=""` - causes runtime errors. Use meaningful values like `"none"`, `"all"`, or specific identifiers.
 
 ## 🚀 Controller Patterns
 
-### 1. Resource Controllers with Proper Structure
+### 1. Resource Controllers Structure
 
-```php
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Models\Student;
-use App\Models\Campus;
-use App\Models\Program;
-use App\Models\Specialization;
-use App\Models\CurriculumVersion;
-use App\Http\Requests\StoreStudentRequest;
-use App\Http\Requests\UpdateStudentRequest;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
-use Illuminate\Http\RedirectResponse;
-
-class StudentController extends Controller
-{
-    public function index(Request $request): Response
-    {
-        $query = Student::query()
-            ->with(['campus', 'program', 'specialization', 'curriculumVersion']);
-
-        // Apply filters
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('student_id', 'like', "%{$search}%")
-                  ->orWhere('full_name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('campus_id') && $request->campus_id !== 'all') {
-            $query->where('campus_id', $request->campus_id);
-        }
-
-        if ($request->filled('program_id') && $request->program_id !== 'all') {
-            $query->where('program_id', $request->program_id);
-        }
-
-        if ($request->filled('enrollment_status') && $request->enrollment_status !== 'all') {
-            $query->where('enrollment_status', $request->enrollment_status);
-        }
-
-        $students = $query->paginate(15);
-
-        return Inertia::render('Students/Index', [
-            'students' => $students,
-            'campuses' => Campus::select('id', 'name')->get(),
-            'programs' => Program::select('id', 'name')->get(),
-            'filters' => $request->only(['search', 'campus_id', 'program_id', 'enrollment_status']),
-        ]);
-    }
-
-    public function create(): Response
-    {
-        return Inertia::render('Students/Create', [
-            'campuses' => Campus::select('id', 'name')->get(),
-            'programs' => Program::with('specializations')->get(),
-            'curriculumVersions' => CurriculumVersion::with(['program', 'specialization'])->get(),
-        ]);
-    }
-
-    public function store(StoreStudentRequest $request): RedirectResponse
-    {
-        $validated = $request->validated();
-
-        $student = Student::create($validated);
-
-        return redirect()->route('students.index')
-            ->with('success', 'Student created successfully.');
-    }
-
-    public function show(Student $student): Response
-    {
-        $student->load([
-            'campus',
-            'program',
-            'specialization',
-            'curriculumVersion',
-            'courseRegistrations.courseOffering.unit',
-            'academicHolds'
-        ]);
-
-        return Inertia::render('Students/Show', [
-            'student' => $student,
-        ]);
-    }
-
-    public function edit(Student $student): Response
-    {
-        return Inertia::render('Students/Edit', [
-            'student' => $student,
-            'campuses' => Campus::select('id', 'name')->get(),
-            'programs' => Program::with('specializations')->get(),
-            'curriculumVersions' => CurriculumVersion::with(['program', 'specialization'])->get(),
-        ]);
-    }
-
-    public function update(UpdateStudentRequest $request, Student $student): RedirectResponse
-    {
-        $validated = $request->validated();
-
-        $student->update($validated);
-
-        return redirect()->route('students.index')
-            ->with('success', 'Student updated successfully.');
-    }
-
-    public function destroy(Student $student): RedirectResponse
-    {
-        // Check for related records
-        if ($student->courseRegistrations()->count() > 0) {
-            return redirect()->back()
-                ->with('error', 'Cannot delete student with existing course registrations.');
-        }
-
-        $student->delete();
-
-        return redirect()->route('students.index')
-            ->with('success', 'Student deleted successfully.');
-    }
-}
-```
-
-### 2. API Controllers for AJAX Operations
-
-```php
-<?php
-
-namespace App\Http\Controllers\Api;
-
-use App\Http\Controllers\Controller;
-use App\Models\Student;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-
-class StudentController extends Controller
-{
-    public function search(Request $request): JsonResponse
-    {
-        $request->validate([
-            'query' => 'required|string|min:2',
-            'limit' => 'integer|min:1|max:50',
-        ]);
-
-        $students = Student::query()
-            ->with(['campus', 'program'])
-            ->where('student_id', 'like', "%{$request->query}%")
-            ->orWhere('full_name', 'like', "%{$request->query}%")
-            ->orWhere('email', 'like', "%{$request->query}%")
-            ->limit($request->get('limit', 10))
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $students,
-            'message' => 'Students retrieved successfully',
-        ]);
-    }
-
-    public function statistics(Request $request): JsonResponse
-    {
-        $campusId = $request->campus_id;
-        $programId = $request->program_id;
-
-        $query = Student::query();
-
-        if ($campusId && $campusId !== 'all') {
-            $query->where('campus_id', $campusId);
-        }
-
-        if ($programId && $programId !== 'all') {
-            $query->where('program_id', $programId);
-        }
-
-        $stats = [
-            'total_students' => $query->count(),
-            'active_students' => (clone $query)->where('enrollment_status', 'active')->count(),
-            'enrolled_students' => (clone $query)->where('enrollment_status', 'enrolled')->count(),
-            'graduated_students' => (clone $query)->where('enrollment_status', 'graduated')->count(),
-            'on_leave_students' => (clone $query)->where('enrollment_status', 'on_leave')->count(),
-            'suspended_students' => (clone $query)->where('enrollment_status', 'suspended')->count(),
-        ];
-
-        return response()->json([
-            'success' => true,
-            'data' => $stats,
-            'message' => 'Statistics retrieved successfully',
-        ]);
-    }
-}
-```
-
-## 🔧 Development Workflow
-
-### 1. Code Quality Standards
-
-**Laravel Pint (PHP CS Fixer):**
-```bash
-./vendor/bin/pint           # Format PHP code
-./vendor/bin/pint --test    # Check formatting
-```
-
-**ESLint + Prettier (Frontend):**
-```bash
-npm run lint               # Fix JavaScript/TypeScript issues
-npm run format            # Format frontend code
-npm run format:check      # Check formatting
-npm run type-check        # TypeScript validation
-```
-
-**Testing:**
-```bash
-php artisan test          # Run PHP tests
-npm run test:local        # Run comprehensive tests
-./scripts/pre-push.sh     # Pre-push validation
-```
-
-### 2. Docker Development
-
-**Development Environment:**
-```bash
-./dev.sh start           # Start development with hot reload
-./dev.sh stop            # Stop development
-./dev.sh logs            # View logs
-```
-
-**Local Production Testing:**
-```bash
-./local-prod.sh start    # Test production-like environment
-./local-prod.sh deploy   # Deploy changes
-```
-
-### 3. Git Workflow
-
-**Pre-push Hooks:**
-```bash
-./scripts/pre-push.sh           # Quick validation
-./scripts/pre-push.sh --docker  # Full Docker tests
-```
-
-**Commit Standards:**
-```bash
-feat: add student enrollment management
-fix: resolve course registration validation
-docs: update API documentation
-refactor: optimize query performance
-test: add student controller tests
-```
-
+**Standard Pattern:**
+- Use proper type hints: `Request $request`, `Response`, `RedirectResponse`
+- Always use `->with()` for eager loading to prevent N+1 queries
+- Apply filters with `$request->filled()` and check for `!== 'all'`
+- Use `->paginate(15)` for index methods
+- Use `->select('id', 'name')` for dropdown data
+- Pass `$request->only([...])` for filters to maintain state
+- Use Form Request classes for validation: `StoreXRequest`, `UpdateXRequest`
+- Check for related records before deletion
+- Return proper success/error messages with redirects
 ## 🚨 Common Pitfalls to Avoid
 
 ### 1. Frontend Issues
@@ -761,97 +241,39 @@ test: add student controller tests
 ## 📊 Performance Best Practices
 
 ### 1. Database Optimization
-```php
-// Use eager loading to prevent N+1 queries
-$students = Student::with(['campus', 'program', 'specialization'])->get();
-
-// Use specific selects for large datasets
-$campuses = Campus::select('id', 'name')->get();
-
-// Add proper indexes
-$table->index(['campus_id', 'program_id']);
-$table->index(['enrollment_status', 'created_at']);
-```
+- Use eager loading: `->with(['relation1', 'relation2'])` to prevent N+1 queries
+- Use specific selects: `->select('id', 'name')` for large datasets
+- Add proper indexes on foreign keys and frequently filtered columns
+- Use compound indexes for multi-column filters
 
 ### 2. Frontend Optimization
-```typescript
-// Use computed properties for expensive calculations
-const formattedStudents = computed(() =>
-  students.value.map(student => ({
-    ...student,
-    displayName: `${student.student_id} - ${student.full_name}`,
-  }))
-);
-
-// Debounce search inputs
-const handleSearch = useDebounceFn((value: string) => {
-  // API call
-}, 300);
-```
+- Use `computed()` properties for expensive calculations
+- Debounce search inputs with DebouncedInput component
+- Use `router.visit()` with `preserveState: true, preserveScroll: true`
 
 ### 3. Caching Strategy
-```php
-// Cache frequently accessed data
-$programs = Cache::remember('programs.all', 3600, function () {
-    return Program::with('specializations')->get();
-});
-
-// Use Redis for session storage
-'SESSION_DRIVER' => 'redis',
-'CACHE_DRIVER' => 'redis',
-```
+- Cache frequently accessed data with `Cache::remember()`
+- Use Redis for session and cache storage
+- Cache dropdown data that doesn't change often
 
 ## 🔒 Security Guidelines
 
 ### 1. Authorization
-```php
-// Always check permissions in controllers
-public function index()
-{
-    $this->authorize('viewAny', Student::class);
-    // Controller logic
-}
-
-// Use policies for complex authorization
-Gate::define('manage-student-records', function (User $user, Student $student) {
-    return $user->campus_id === $student->campus_id
-        && $user->hasPermission('manage_students');
-});
-```
+- Always use `$this->authorize()` in controller methods
+- Create policies for complex authorization logic
+- Use Gates for system-wide permissions
 
 ### 2. Input Validation
-```php
-// Always use Form Request validation
-class StoreStudentRequest extends FormRequest
-{
-    public function rules()
-    {
-        return Student::validationRules();
-    }
-
-    public function authorize()
-    {
-        return $this->user()->can('create', Student::class);
-    }
-}
-```
+- Always use Form Request classes for validation
+- Reference model validation rules: `Student::validationRules()`
+- Include authorization in Form Request `authorize()` method
 
 ### 3. Data Protection
-```php
-// Use fillable instead of guarded
-protected $fillable = [
-    'student_id', 'full_name', 'email', 'campus_id',
-    'program_id', 'specialization_id', 'curriculum_version_id'
-];
-
-// Hide sensitive fields from JSON
-protected $hidden = [
-    'national_id', 'parent_guardian_phone'
-];
-```
+- Use `$fillable` instead of `$guarded` for mass assignment protection
+- Use `$hidden` array to hide sensitive fields from JSON output
+- Never expose sensitive data in API responses
 
 ---
-
 ## 📝 Summary
 
 This development standards document reflects the actual architecture and patterns used in the Swinburne Education Management System. Following these guidelines ensures:
@@ -871,3 +293,4 @@ This development standards document reflects the actual architecture and pattern
 5. **Error Handling** - Comprehensive logging and user feedback
 
 Follow these standards to maintain code quality and team productivity! 🚀
+

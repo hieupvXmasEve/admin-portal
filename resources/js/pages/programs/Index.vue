@@ -18,7 +18,6 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem, PaginatedResponse } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -336,222 +335,208 @@ const handlePageSizeChange = (pageSize: number) => {
 </script>
 <template>
     <Head title="Programs" />
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <!-- Header with Add Program Button -->
-            <div class="flex items-center justify-between">
-                <h1 class="text-2xl font-semibold">Programs</h1>
-                <div class="flex items-center gap-2">
-                    <Button size="sm" @click="openCreateModal">
-                        <Plus class="mr-2 h-4 w-4" />
-                        Add Program
-                    </Button>
-                </div>
-            </div>
-
-            <!-- Filters Section -->
-            <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
-                <div class="min-w-[200px] flex-1">
-                    <DebouncedInput placeholder="Search programs..." v-model="filters.search" @debounced="handleSearch" />
-                </div>
-
-                <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
-                    <X class="mr-2 h-4 w-4" />
-                    Clear Filters
-                </Button>
-            </div>
-
-            <!-- Data Table -->
-            <DataTable :data="data" :columns="columns">
-                <template #cell-actions="{ row }">
-                    <div class="flex items-center gap-2">
-                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="viewProgram(row.original)" title="View program">
-                                        <Eye class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>View program</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="openEditModal(row.original)" title="Edit program">
-                                        <Edit class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Edit program</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="openDeleteModal(row.original)" title="Delete program">
-                                        <Trash2 class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Delete program</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    </div>
-                </template>
-            </DataTable>
-
-            <!-- Pagination -->
-            <DataPagination :pagination-data="programs" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
-
-            <!-- Create Modal -->
-            <Dialog v-model:open="showCreateModal">
-                <DialogContent class="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Add New Program</DialogTitle>
-                        <DialogDescription>Create a new academic program.</DialogDescription>
-                    </DialogHeader>
-
-                    <Form :validation-schema="programSchema" @submit="onCreateSubmit">
-                        <div class="grid grid-cols-2 gap-4">
-                            <FormField v-slot="{ componentField }" name="code">
-                                <FormItem>
-                                    <FormLabel for="create-code">Program Code *</FormLabel>
-                                    <FormControl>
-                                        <Input id="create-code" placeholder="e.g., CS, ENG, BUS" v-bind="componentField" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="name">
-                                <FormItem>
-                                    <FormLabel for="create-name">Program Name *</FormLabel>
-                                    <FormControl>
-                                        <Input id="create-name" placeholder="e.g., Computer Science" v-bind="componentField" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <div class="col-span-2">
-                                <FormField v-slot="{ componentField }" name="description">
-                                    <FormItem>
-                                        <FormLabel for="create-description">Description</FormLabel>
-                                        <FormControl>
-                                            <Textarea
-                                                id="create-description"
-                                                placeholder="Program description (optional)"
-                                                rows="3"
-                                                v-bind="componentField"
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-                            </div>
-                        </div>
-
-                        <DialogFooter>
-                            <Button type="button" variant="outline" @click="closeModals">Cancel</Button>
-                            <Button type="submit" :disabled="createInertiaForm.processing">
-                                {{ createInertiaForm.processing ? 'Creating...' : 'Create Program' }}
-                            </Button>
-                        </DialogFooter>
-                    </Form>
-                </DialogContent>
-            </Dialog>
-
-            <!-- Edit Modal -->
-            <Dialog v-model:open="showEditModal">
-                <DialogContent class="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Edit Program</DialogTitle>
-                        <DialogDescription>Update program information.</DialogDescription>
-                    </DialogHeader>
-
-                    <Form
-                        :validation-schema="programSchema"
-                        :initial-values="{
-                            name: selectedProgram?.name || '',
-                            code: selectedProgram?.code || '',
-                            description: selectedProgram?.description || '',
-                        }"
-                        @submit="onEditSubmit"
-                    >
-                        <div class="grid grid-cols-2 gap-4">
-                            <FormField v-slot="{ componentField }" name="code">
-                                <FormItem>
-                                    <FormLabel for="edit-code">Program Code *</FormLabel>
-                                    <FormControl>
-                                        <Input id="edit-code" placeholder="e.g., CS, ENG, BUS" v-bind="componentField" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="name">
-                                <FormItem>
-                                    <FormLabel for="edit-name">Program Name *</FormLabel>
-                                    <FormControl>
-                                        <Input id="edit-name" placeholder="e.g., Computer Science" v-bind="componentField" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <div class="col-span-2">
-                                <FormField v-slot="{ componentField }" name="description">
-                                    <FormItem>
-                                        <FormLabel for="edit-description">Description</FormLabel>
-                                        <FormControl>
-                                            <Textarea
-                                                id="edit-description"
-                                                placeholder="Program description (optional)"
-                                                rows="3"
-                                                v-bind="componentField"
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-                            </div>
-                        </div>
-
-                        <DialogFooter class="mt-4">
-                            <Button type="button" variant="outline" @click="closeModals">Cancel</Button>
-                            <Button type="submit" :disabled="editInertiaForm.processing">
-                                {{ editInertiaForm.processing ? 'Updating...' : 'Update Program' }}
-                            </Button>
-                        </DialogFooter>
-                    </Form>
-                </DialogContent>
-            </Dialog>
-
-            <!-- Delete Confirmation Dialog -->
-            <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Program</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete program <strong>{{ selectedProgram?.name }}</strong
-                            >? This action cannot be undone and will permanently remove the program from the system.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel @click="closeModals">Cancel</AlertDialogCancel>
-                        <AlertDialogAction @click="submitDelete" :disabled="deleteForm.processing" class="bg-red-600 hover:bg-red-700">
-                            {{ deleteForm.processing ? 'Deleting...' : 'Delete Program' }}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+    <!-- Header with Add Program Button -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Programs</h1>
+        <div class="flex items-center gap-2">
+            <Button size="sm" @click="openCreateModal">
+                <Plus class="mr-2 h-4 w-4" />
+                Add Program
+            </Button>
         </div>
-    </AppLayout>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
+        <div class="min-w-[200px] flex-1">
+            <DebouncedInput placeholder="Search programs..." v-model="filters.search" @debounced="handleSearch" />
+        </div>
+
+        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
+            <X class="mr-2 h-4 w-4" />
+            Clear Filters
+        </Button>
+    </div>
+
+    <!-- Data Table -->
+    <DataTable :data="data" :columns="columns">
+        <template #cell-actions="{ row }">
+            <div class="flex items-center gap-2">
+                <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <Button variant="ghost" size="sm" @click="viewProgram(row.original)" title="View program">
+                                <Eye class="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>View program</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <Button variant="ghost" size="sm" @click="openEditModal(row.original)" title="Edit program">
+                                <Edit class="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Edit program</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <Button variant="ghost" size="sm" @click="openDeleteModal(row.original)" title="Delete program">
+                                <Trash2 class="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Delete program</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
+        </template>
+    </DataTable>
+
+    <!-- Pagination -->
+    <DataPagination :pagination-data="programs" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+
+    <!-- Create Modal -->
+    <Dialog v-model:open="showCreateModal">
+        <DialogContent class="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Add New Program</DialogTitle>
+                <DialogDescription>Create a new academic program.</DialogDescription>
+            </DialogHeader>
+
+            <Form :validation-schema="programSchema" @submit="onCreateSubmit">
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField v-slot="{ componentField }" name="code">
+                        <FormItem>
+                            <FormLabel for="create-code">Program Code *</FormLabel>
+                            <FormControl>
+                                <Input id="create-code" placeholder="e.g., CS, ENG, BUS" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="name">
+                        <FormItem>
+                            <FormLabel for="create-name">Program Name *</FormLabel>
+                            <FormControl>
+                                <Input id="create-name" placeholder="e.g., Computer Science" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <div class="col-span-2">
+                        <FormField v-slot="{ componentField }" name="description">
+                            <FormItem>
+                                <FormLabel for="create-description">Description</FormLabel>
+                                <FormControl>
+                                    <Textarea id="create-description" placeholder="Program description (optional)" rows="3" v-bind="componentField" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button type="button" variant="outline" @click="closeModals">Cancel</Button>
+                    <Button type="submit" :disabled="createInertiaForm.processing">
+                        {{ createInertiaForm.processing ? 'Creating...' : 'Create Program' }}
+                    </Button>
+                </DialogFooter>
+            </Form>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Edit Modal -->
+    <Dialog v-model:open="showEditModal">
+        <DialogContent class="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Edit Program</DialogTitle>
+                <DialogDescription>Update program information.</DialogDescription>
+            </DialogHeader>
+
+            <Form
+                :validation-schema="programSchema"
+                :initial-values="{
+                    name: selectedProgram?.name || '',
+                    code: selectedProgram?.code || '',
+                    description: selectedProgram?.description || '',
+                }"
+                @submit="onEditSubmit"
+            >
+                <div class="grid grid-cols-2 gap-4">
+                    <FormField v-slot="{ componentField }" name="code">
+                        <FormItem>
+                            <FormLabel for="edit-code">Program Code *</FormLabel>
+                            <FormControl>
+                                <Input id="edit-code" placeholder="e.g., CS, ENG, BUS" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="name">
+                        <FormItem>
+                            <FormLabel for="edit-name">Program Name *</FormLabel>
+                            <FormControl>
+                                <Input id="edit-name" placeholder="e.g., Computer Science" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <div class="col-span-2">
+                        <FormField v-slot="{ componentField }" name="description">
+                            <FormItem>
+                                <FormLabel for="edit-description">Description</FormLabel>
+                                <FormControl>
+                                    <Textarea id="edit-description" placeholder="Program description (optional)" rows="3" v-bind="componentField" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
+                </div>
+
+                <DialogFooter class="mt-4">
+                    <Button type="button" variant="outline" @click="closeModals">Cancel</Button>
+                    <Button type="submit" :disabled="editInertiaForm.processing">
+                        {{ editInertiaForm.processing ? 'Updating...' : 'Update Program' }}
+                    </Button>
+                </DialogFooter>
+            </Form>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Delete Confirmation Dialog -->
+    <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Delete Program</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to delete program <strong>{{ selectedProgram?.name }}</strong
+                    >? This action cannot be undone and will permanently remove the program from the system.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel @click="closeModals">Cancel</AlertDialogCancel>
+                <AlertDialogAction @click="submitDelete" :disabled="deleteForm.processing" class="bg-red-600 hover:bg-red-700">
+                    {{ deleteForm.processing ? 'Deleting...' : 'Delete Program' }}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
 </template>

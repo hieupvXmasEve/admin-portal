@@ -5,8 +5,6 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem } from '@/types';
 import type { Program, Semester, Specialization } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -27,17 +25,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Curriculum Versions',
-        href: '/curriculum-versions',
-    },
-    {
-        title: 'Create',
-        href: '/curriculum-versions/create',
-    },
-];
 
 // Get parameters from URL query
 const urlParams = new URLSearchParams(window.location.search);
@@ -159,142 +146,138 @@ const onSubmit = handleSubmit((values) => {
 <template>
     <Head title="Create Curriculum Version" />
 
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex flex-col gap-6 p-4">
-            <!-- Header Section -->
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div class="space-y-1">
-                    <h1 class="text-3xl font-bold tracking-tight">Create Curriculum Version</h1>
-                    <p class="text-muted-foreground text-lg">Add a new curriculum version to the system</p>
-                </div>
-
-                <div class="flex flex-wrap gap-2">
-                    <Link href="/curriculum-versions">
-                        <Button variant="outline">
-                            <ArrowLeft class="mr-2 h-4 w-4" />
-                            Back to Curriculum Versions
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-
-            <!-- Create Form -->
-            <Card class="mx-auto w-full max-w-2xl">
-                <CardHeader>
-                    <CardTitle class="flex items-center gap-2">
-                        <Plus class="h-5 w-5" />
-                        Curriculum Version Details
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form @submit="onSubmit" class="space-y-6">
-                        <FormField v-slot="{ componentField }" name="program_id">
-                            <FormItem>
-                                <FormLabel>Program *</FormLabel>
-                                <FormControl>
-                                    <Select v-bind="componentField">
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a program" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
-                                                {{ program.name }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="specialization_id">
-                            <FormItem>
-                                <FormLabel>Specialization *</FormLabel>
-                                <FormControl>
-                                    <Select v-bind="componentField">
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a specialization" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem
-                                                v-for="specialization in filteredSpecializations"
-                                                :key="specialization.id"
-                                                :value="specialization.id.toString()"
-                                            >
-                                                {{ specialization.name }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="version_code">
-                            <FormItem>
-                                <FormLabel>Version Code *</FormLabel>
-                                <FormControl>
-                                    <Input
-                                        v-bind="componentField"
-                                        placeholder="e.g., v2025.1, Spring2025, CV-2025-01"
-                                        :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength"
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="semester_id">
-                            <FormItem>
-                                <FormLabel>Implementation Period *</FormLabel>
-                                <FormControl>
-                                    <Select v-bind="componentField">
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select when this curriculum becomes effective" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                                <div class="space-y-1">
-                                                    <div class="font-medium">{{ formatSemesterDisplay(semester) }}</div>
-                                                    <div class="text-muted-foreground text-xs">Code: {{ semester.code }}</div>
-                                                </div>
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormControl>
-                                <div class="text-muted-foreground mt-1 text-xs">
-                                    This selects when the curriculum version becomes effective for new students entering the program.
-                                </div>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="notes">
-                            <FormItem>
-                                <FormLabel>Notes</FormLabel>
-                                <FormControl>
-                                    <Textarea
-                                        v-bind="componentField"
-                                        placeholder="Enter any additional notes..."
-                                        rows="4"
-                                        :maxlength="ValidationRules.curriculumVersion.notes.maxLength"
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <div class="flex justify-end gap-3">
-                            <Link href="/curriculum-versions">
-                                <Button type="button" variant="outline"> Cancel </Button>
-                            </Link>
-                            <Button type="submit" :disabled="isSubmitting">
-                                {{ isSubmitting ? 'Creating...' : 'Create Curriculum Version' }}
-                            </Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
+    <!-- Header Section -->
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div class="space-y-1">
+            <h1 class="text-3xl font-bold tracking-tight">Create Curriculum Version</h1>
+            <p class="text-muted-foreground text-lg">Add a new curriculum version to the system</p>
         </div>
-    </AppLayout>
+
+        <div class="flex flex-wrap gap-2">
+            <Link href="/curriculum-versions">
+                <Button variant="outline">
+                    <ArrowLeft class="mr-2 h-4 w-4" />
+                    Back to Curriculum Versions
+                </Button>
+            </Link>
+        </div>
+    </div>
+
+    <!-- Create Form -->
+    <Card class="mx-auto w-full max-w-2xl">
+        <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+                <Plus class="h-5 w-5" />
+                Curriculum Version Details
+            </CardTitle>
+        </CardHeader>
+        <CardContent>
+            <form @submit="onSubmit" class="space-y-6">
+                <FormField v-slot="{ componentField }" name="program_id">
+                    <FormItem>
+                        <FormLabel>Program *</FormLabel>
+                        <FormControl>
+                            <Select v-bind="componentField">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a program" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
+                                        {{ program.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="specialization_id">
+                    <FormItem>
+                        <FormLabel>Specialization *</FormLabel>
+                        <FormControl>
+                            <Select v-bind="componentField">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a specialization" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="specialization in filteredSpecializations"
+                                        :key="specialization.id"
+                                        :value="specialization.id.toString()"
+                                    >
+                                        {{ specialization.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="version_code">
+                    <FormItem>
+                        <FormLabel>Version Code *</FormLabel>
+                        <FormControl>
+                            <Input
+                                v-bind="componentField"
+                                placeholder="e.g., v2025.1, Spring2025, CV-2025-01"
+                                :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength"
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="semester_id">
+                    <FormItem>
+                        <FormLabel>Implementation Period *</FormLabel>
+                        <FormControl>
+                            <Select v-bind="componentField">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select when this curriculum becomes effective" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                                        <div class="space-y-1">
+                                            <div class="font-medium">{{ formatSemesterDisplay(semester) }}</div>
+                                            <div class="text-muted-foreground text-xs">Code: {{ semester.code }}</div>
+                                        </div>
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </FormControl>
+                        <div class="text-muted-foreground mt-1 text-xs">
+                            This selects when the curriculum version becomes effective for new students entering the program.
+                        </div>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="notes">
+                    <FormItem>
+                        <FormLabel>Notes</FormLabel>
+                        <FormControl>
+                            <Textarea
+                                v-bind="componentField"
+                                placeholder="Enter any additional notes..."
+                                rows="4"
+                                :maxlength="ValidationRules.curriculumVersion.notes.maxLength"
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <div class="flex justify-end gap-3">
+                    <Link href="/curriculum-versions">
+                        <Button type="button" variant="outline"> Cancel </Button>
+                    </Link>
+                    <Button type="submit" :disabled="isSubmitting">
+                        {{ isSubmitting ? 'Creating...' : 'Create Curriculum Version' }}
+                    </Button>
+                </div>
+            </form>
+        </CardContent>
+    </Card>
 </template>

@@ -6,7 +6,6 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import type { Program, Specialization } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
@@ -102,127 +101,119 @@ const onSubmit = handleSubmit((values) => {
 <template>
     <Head :title="`Edit ${specialization.name}`" />
 
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex flex-col gap-6 p-4">
-            <!-- Header Section -->
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div class="space-y-1">
-                    <h1 class="text-3xl font-bold tracking-tight">Edit Specialization</h1>
-                    <p class="text-muted-foreground text-lg">Modify specialization details</p>
-                </div>
-
-                <div class="flex flex-wrap gap-2">
-                    <Link :href="route('specializations.show', { specialization: specialization.id })">
-                        <Button variant="outline">
-                            <Eye class="mr-2 h-4 w-4" />
-                            View Specialization
-                        </Button>
-                    </Link>
-                    <Link :href="route('specializations.index')">
-                        <Button variant="outline">
-                            <ArrowLeft class="mr-2 h-4 w-4" />
-                            Back to Specializations
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-
-            <!-- Edit Form -->
-            <Card class="mx-auto w-full max-w-2xl">
-                <CardHeader>
-                    <CardTitle class="flex items-center gap-2">
-                        <Edit class="h-5 w-5" />
-                        Edit Specialization Details
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form @submit="onSubmit" class="space-y-6">
-                        <FormField v-slot="{ componentField }" name="program_id">
-                            <FormItem>
-                                <FormLabel>Program *</FormLabel>
-                                <FormControl>
-                                    <Select v-bind="componentField">
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a program" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
-                                                {{ program.name }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="name">
-                            <FormItem>
-                                <FormLabel>Name *</FormLabel>
-                                <FormControl>
-                                    <Input
-                                        v-bind="componentField"
-                                        placeholder="e.g., Software Development"
-                                        :maxlength="ValidationRules.specialization.name.maxLength"
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="code">
-                            <FormItem>
-                                <FormLabel>Code *</FormLabel>
-                                <FormControl>
-                                    <Input
-                                        v-bind="componentField"
-                                        placeholder="e.g., IT-SD"
-                                        :maxlength="ValidationRules.specialization.code.maxLength"
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="description">
-                            <FormItem>
-                                <FormLabel>Description</FormLabel>
-                                <FormControl>
-                                    <Textarea
-                                        v-bind="componentField"
-                                        placeholder="Enter specialization description..."
-                                        rows="4"
-                                        :maxlength="ValidationRules.specialization.description.maxLength"
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="is_active">
-                            <FormItem class="flex items-center space-y-0 space-x-3">
-                                <FormControl>
-                                    <Checkbox
-                                        :model-value="componentField.modelValue"
-                                        @update:model-value="(value) => componentField['onUpdate:modelValue']?.(!!value)"
-                                    />
-                                </FormControl>
-                                <FormLabel class="text-sm font-normal"> Active (specialization will be available for enrollment) </FormLabel>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <div class="flex justify-end gap-3">
-                            <Link :href="route('specializations.show', { specialization: specialization.id })">
-                                <Button type="button" variant="outline"> Cancel </Button>
-                            </Link>
-                            <Button type="submit" :disabled="isSubmitting">
-                                {{ isSubmitting ? 'Updating...' : 'Update Specialization' }}
-                            </Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
+    <!-- Header Section -->
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div class="space-y-1">
+            <h1 class="text-3xl font-bold tracking-tight">Edit Specialization</h1>
+            <p class="text-muted-foreground text-lg">Modify specialization details</p>
         </div>
-    </AppLayout>
+
+        <div class="flex flex-wrap gap-2">
+            <Link :href="route('specializations.show', { specialization: specialization.id })">
+                <Button variant="outline">
+                    <Eye class="mr-2 h-4 w-4" />
+                    View Specialization
+                </Button>
+            </Link>
+            <Link :href="route('specializations.index')">
+                <Button variant="outline">
+                    <ArrowLeft class="mr-2 h-4 w-4" />
+                    Back to Specializations
+                </Button>
+            </Link>
+        </div>
+    </div>
+
+    <!-- Edit Form -->
+    <Card class="mx-auto w-full max-w-2xl">
+        <CardHeader>
+            <CardTitle class="flex items-center gap-2">
+                <Edit class="h-5 w-5" />
+                Edit Specialization Details
+            </CardTitle>
+        </CardHeader>
+        <CardContent>
+            <form @submit="onSubmit" class="space-y-6">
+                <FormField v-slot="{ componentField }" name="program_id">
+                    <FormItem>
+                        <FormLabel>Program *</FormLabel>
+                        <FormControl>
+                            <Select v-bind="componentField">
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a program" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
+                                        {{ program.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="name">
+                    <FormItem>
+                        <FormLabel>Name *</FormLabel>
+                        <FormControl>
+                            <Input
+                                v-bind="componentField"
+                                placeholder="e.g., Software Development"
+                                :maxlength="ValidationRules.specialization.name.maxLength"
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="code">
+                    <FormItem>
+                        <FormLabel>Code *</FormLabel>
+                        <FormControl>
+                            <Input v-bind="componentField" placeholder="e.g., IT-SD" :maxlength="ValidationRules.specialization.code.maxLength" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="description">
+                    <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                            <Textarea
+                                v-bind="componentField"
+                                placeholder="Enter specialization description..."
+                                rows="4"
+                                :maxlength="ValidationRules.specialization.description.maxLength"
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="is_active">
+                    <FormItem class="flex items-center space-y-0 space-x-3">
+                        <FormControl>
+                            <Checkbox
+                                :model-value="componentField.modelValue"
+                                @update:model-value="(value) => componentField['onUpdate:modelValue']?.(!!value)"
+                            />
+                        </FormControl>
+                        <FormLabel class="text-sm font-normal"> Active (specialization will be available for enrollment) </FormLabel>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <div class="flex justify-end gap-3">
+                    <Link :href="route('specializations.show', { specialization: specialization.id })">
+                        <Button type="button" variant="outline"> Cancel </Button>
+                    </Link>
+                    <Button type="submit" :disabled="isSubmitting">
+                        {{ isSubmitting ? 'Updating...' : 'Update Specialization' }}
+                    </Button>
+                </div>
+            </form>
+        </CardContent>
+    </Card>
 </template>

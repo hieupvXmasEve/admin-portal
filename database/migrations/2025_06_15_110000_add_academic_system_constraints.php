@@ -20,20 +20,20 @@ return new class extends Migration
 
         // Room bookings constraints
         DB::statement('ALTER TABLE room_bookings ADD CONSTRAINT check_booking_times CHECK (start_time < end_time)');
-        DB::statement('ALTER TABLE room_bookings ADD CONSTRAINT check_expected_attendees CHECK (expected_attendees IS NULL OR expected_attendees > 0)');
+        // DB::statement('ALTER TABLE room_bookings ADD CONSTRAINT check_expected_attendees CHECK (expected_attendees IS NULL OR expected_attendees > 0)'); // Column doesn't exist
         DB::statement('ALTER TABLE room_bookings ADD CONSTRAINT check_recurrence_end_date CHECK (recurrence_end_date IS NULL OR recurrence_end_date >= booking_date)');
 
         // Class sessions constraints
-        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_session_times CHECK (start_time < end_time)');
-        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_expected_attendees_positive CHECK (expected_attendees IS NULL OR expected_attendees > 0)');
-        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_actual_attendees_valid CHECK (actual_attendees IS NULL OR actual_attendees >= 0)');
-        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_attendance_percentage CHECK (attendance_percentage IS NULL OR (attendance_percentage >= 0 AND attendance_percentage <= 100))');
-        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_assessment_weight CHECK (assessment_weight IS NULL OR (assessment_weight >= 0 AND assessment_weight <= 100))');
+        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_sessions_times CHECK (start_time < end_time)');
+        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_sessions_expected_attendees_positive CHECK (expected_attendees IS NULL OR expected_attendees > 0)');
+        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_sessions_actual_attendees_valid CHECK (actual_attendees IS NULL OR actual_attendees >= 0)');
+        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_sessions_attendance_percentage CHECK (attendance_percentage IS NULL OR (attendance_percentage >= 0 AND attendance_percentage <= 100))');
+        DB::statement('ALTER TABLE class_sessions ADD CONSTRAINT check_sessions_assessment_weight CHECK (assessment_weight IS NULL OR (assessment_weight >= 0 AND assessment_weight <= 100))');
 
         // Attendances constraints
-        DB::statement('ALTER TABLE attendances ADD CONSTRAINT check_minutes_late_positive CHECK (minutes_late >= 0)');
-        DB::statement('ALTER TABLE attendances ADD CONSTRAINT check_minutes_present_positive CHECK (minutes_present IS NULL OR minutes_present >= 0)');
-        DB::statement('ALTER TABLE attendances ADD CONSTRAINT check_participation_score CHECK (participation_score IS NULL OR (participation_score >= 0 AND participation_score <= 10))');
+        DB::statement('ALTER TABLE attendances ADD CONSTRAINT check_attendances_minutes_late_positive CHECK (minutes_late >= 0)');
+        DB::statement('ALTER TABLE attendances ADD CONSTRAINT check_attendances_minutes_present_positive CHECK (minutes_present IS NULL OR minutes_present >= 0)');
+        DB::statement('ALTER TABLE attendances ADD CONSTRAINT check_attendances_participation_score CHECK (participation_score IS NULL OR (participation_score >= 0 AND participation_score <= 10))');
 
         // Assessment components constraints
         DB::statement('ALTER TABLE assessment_components ADD CONSTRAINT check_weight_percentage CHECK (weight >= 0 AND weight <= 100)');
@@ -47,12 +47,12 @@ return new class extends Migration
         )');
 
         // Assessment component detail scores constraints
-        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_percentage_score CHECK (percentage_score IS NULL OR (percentage_score >= 0 AND percentage_score <= 100))');
-        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_gpa_points CHECK (gpa_points IS NULL OR (gpa_points >= 0 AND gpa_points <= 4))');
-        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_submission_attempt_positive CHECK (submission_attempt >= 1)');
-        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_minutes_late_positive CHECK (minutes_late >= 0)');
-        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_late_penalty_applied CHECK (late_penalty_applied >= 0 AND late_penalty_applied <= 100)');
-        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_plagiarism_score CHECK (plagiarism_score IS NULL OR (plagiarism_score >= 0 AND plagiarism_score <= 100))');
+        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_scores_percentage_score CHECK (percentage_score IS NULL OR (percentage_score >= 0 AND percentage_score <= 100))');
+        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_scores_gpa_points CHECK (gpa_points IS NULL OR (gpa_points >= 0 AND gpa_points <= 4))');
+        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_scores_submission_attempt_positive CHECK (submission_attempt >= 1)');
+        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_scores_minutes_late_positive CHECK (minutes_late >= 0)');
+        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_scores_late_penalty_applied CHECK (late_penalty_applied >= 0 AND late_penalty_applied <= 100)');
+        DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_scores_plagiarism_score CHECK (plagiarism_score IS NULL OR (plagiarism_score >= 0 AND plagiarism_score <= 100))');
 
         // Student groups constraints
         DB::statement('ALTER TABLE student_groups ADD CONSTRAINT check_group_member_counts CHECK (
@@ -64,14 +64,14 @@ return new class extends Migration
         )');
 
         // Academic records constraints
-        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_final_percentage CHECK (final_percentage IS NULL OR (final_percentage >= 0 AND final_percentage <= 100))');
-        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_grade_points CHECK (grade_points IS NULL OR (grade_points >= 0 AND grade_points <= 4))');
-        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_credit_hours_positive CHECK (credit_hours > 0)');
-        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_credit_hours_earned CHECK (credit_hours_earned >= 0 AND credit_hours_earned <= credit_hours)');
-        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_quality_points CHECK (quality_points IS NULL OR quality_points >= 0)');
-        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_attendance_percentage CHECK (attendance_percentage IS NULL OR (attendance_percentage >= 0 AND attendance_percentage <= 100))');
-        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_attempt_number_positive CHECK (attempt_number >= 1)');
-        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_curve_adjustment CHECK (curve_adjustment >= -100 AND curve_adjustment <= 100)');
+        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_final_percentage CHECK (final_percentage IS NULL OR (final_percentage >= 0 AND final_percentage <= 100))');
+        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_grade_points CHECK (grade_points IS NULL OR (grade_points >= 0 AND grade_points <= 4))');
+        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_credit_hours_positive CHECK (credit_hours > 0)');
+        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_credit_hours_earned CHECK (credit_hours_earned >= 0 AND credit_hours_earned <= credit_hours)');
+        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_quality_points CHECK (quality_points IS NULL OR quality_points >= 0)');
+        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_attendance_percentage CHECK (attendance_percentage IS NULL OR (attendance_percentage >= 0 AND attendance_percentage <= 100))');
+        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_attempt_number_positive CHECK (attempt_number >= 1)');
+        DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_curve_adjustment CHECK (curve_adjustment >= -100 AND curve_adjustment <= 100)');
 
         // GPA calculations constraints
         DB::statement('ALTER TABLE gpa_calculations ADD CONSTRAINT check_gpa_valid CHECK (gpa IS NULL OR (gpa >= 0 AND gpa <= 4))');
@@ -137,20 +137,20 @@ return new class extends Migration
             ],
             'room_bookings' => [
                 'check_booking_times',
-                'check_expected_attendees',
+                // 'check_expected_attendees', // Column doesn't exist
                 'check_recurrence_end_date'
             ],
             'class_sessions' => [
-                'check_session_times',
-                'check_expected_attendees_positive',
-                'check_actual_attendees_valid',
-                'check_attendance_percentage',
-                'check_assessment_weight'
+                'check_sessions_times',
+                'check_sessions_expected_attendees_positive',
+                'check_sessions_actual_attendees_valid',
+                'check_sessions_attendance_percentage',
+                'check_sessions_assessment_weight'
             ],
             'attendances' => [
-                'check_minutes_late_positive',
-                'check_minutes_present_positive',
-                'check_participation_score'
+                'check_attendances_minutes_late_positive',
+                'check_attendances_minutes_present_positive',
+                'check_attendances_participation_score'
             ],
             'assessment_components' => [
                 'check_weight_percentage',
@@ -160,25 +160,25 @@ return new class extends Migration
                 'check_group_size_valid'
             ],
             'assessment_component_detail_scores' => [
-                'check_percentage_score',
-                'check_gpa_points',
-                'check_submission_attempt_positive',
-                'check_minutes_late_positive',
-                'check_late_penalty_applied',
-                'check_plagiarism_score'
+                'check_scores_percentage_score',
+                'check_scores_gpa_points',
+                'check_scores_submission_attempt_positive',
+                'check_scores_minutes_late_positive',
+                'check_scores_late_penalty_applied',
+                'check_scores_plagiarism_score'
             ],
             'student_groups' => [
                 'check_group_member_counts'
             ],
             'academic_records' => [
-                'check_final_percentage',
-                'check_grade_points',
-                'check_credit_hours_positive',
-                'check_credit_hours_earned',
-                'check_quality_points',
-                'check_attendance_percentage',
-                'check_attempt_number_positive',
-                'check_curve_adjustment'
+                'check_records_final_percentage',
+                'check_records_grade_points',
+                'check_records_credit_hours_positive',
+                'check_records_credit_hours_earned',
+                'check_records_quality_points',
+                'check_records_attendance_percentage',
+                'check_records_attempt_number_positive',
+                'check_records_curve_adjustment'
             ],
             'gpa_calculations' => [
                 'check_gpa_valid',

@@ -17,8 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem, PaginatedResponse } from '@/types';
+import type { PaginatedResponse } from '@/types';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
@@ -97,13 +96,6 @@ const props = defineProps<{
 }>();
 
 const page = usePage();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Curriculum Units',
-        href: '/curriculum-units',
-    },
-];
 
 // Reactive data
 const data = computed(() => props.curriculumUnits.data);
@@ -454,266 +446,240 @@ const handlePageSizeChange = (pageSize: number) => {
 
 <template>
     <Head title="Curriculum Units" />
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <!-- Statistics Cards -->
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Units</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.total_curriculum_units }}</div>
-                    </CardContent>
-                </Card>
+    <!-- Statistics Cards -->
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Total Units</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ statistics.total_curriculum_units }}</div>
+            </CardContent>
+        </Card>
 
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Core Units</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold text-blue-600">{{ statistics.core_units }}</div>
-                    </CardContent>
-                </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Core Units</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold text-blue-600">{{ statistics.core_units }}</div>
+            </CardContent>
+        </Card>
 
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Elective Units</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold text-green-600">{{ statistics.elective_units }}</div>
-                    </CardContent>
-                </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Elective Units</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold text-green-600">{{ statistics.elective_units }}</div>
+            </CardContent>
+        </Card>
 
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Credit Points</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.total_credit_points }}</div>
-                    </CardContent>
-                </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Total Credit Points</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ statistics.total_credit_points }}</div>
+            </CardContent>
+        </Card>
+    </div>
+
+    <!-- Header with Add Button -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Curriculum Units</h1>
+        <div class="flex items-center gap-2">
+            <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
+                <FileSpreadsheet class="h-4 w-4" />
+                {{ isExporting ? 'Exporting...' : 'Export Excel' }}
+            </Button>
+            <Button @click="router.visit('/curriculum-units/import')" variant="outline" class="flex items-center gap-2">
+                <Upload class="h-4 w-4" />
+                Import Excel
+            </Button>
+
+            <Button v-if="can('create_curriculum_unit')" size="sm" @click="router.visit('/curriculum-units/create')">
+                <Plus class="mr-2 h-4 w-4" />
+                Add Curriculum Unit
+            </Button>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
+        <div class="min-w-[200px] flex-1">
+            <div class="relative">
+                <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input placeholder="Search curriculum units..." :model-value="filters.search" @update:model-value="updateSearchFilter" class="pl-9" />
             </div>
-
-            <!-- Header with Add Button -->
-            <div class="flex items-center justify-between">
-                <h1 class="text-2xl font-semibold">Curriculum Units</h1>
-                <div class="flex items-center gap-2">
-                    <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
-                        <FileSpreadsheet class="h-4 w-4" />
-                        {{ isExporting ? 'Exporting...' : 'Export Excel' }}
-                    </Button>
-                    <Button @click="router.visit('/curriculum-units/import')" variant="outline" class="flex items-center gap-2">
-                        <Upload class="h-4 w-4" />
-                        Import Excel
-                    </Button>
-
-                    <Button v-if="can('create_curriculum_unit')" size="sm" @click="router.visit('/curriculum-units/create')">
-                        <Plus class="mr-2 h-4 w-4" />
-                        Add Curriculum Unit
-                    </Button>
-                </div>
-            </div>
-
-            <!-- Filters Section -->
-            <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
-                <div class="min-w-[200px] flex-1">
-                    <div class="relative">
-                        <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                        <Input
-                            placeholder="Search curriculum units..."
-                            :model-value="filters.search"
-                            @update:model-value="updateSearchFilter"
-                            class="pl-9"
-                        />
-                    </div>
-                </div>
-
-                <div class="min-w-[180px]">
-                    <Select :model-value="displayCurriculumVersionId" @update:model-value="updateCurriculumVersionFilter">
-                        <SelectTrigger>
-                            <SelectValue placeholder="All curricula" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All curricula</SelectItem>
-                            <SelectItem v-for="curriculum in curriculumVersions" :key="curriculum.id" :value="curriculum.id.toString()">
-                                {{ curriculum.name }} ({{ curriculum.version }})
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div class="min-w-[150px]">
-                    <Select :model-value="displaySemesterId" @update:model-value="updateSemesterFilter">
-                        <SelectTrigger>
-                            <SelectValue placeholder="All semesters" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All semesters</SelectItem>
-                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                {{ semester.name }} ({{ semester.number }})
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div class="min-w-[120px]">
-                    <Select :model-value="displayYearLevel" @update:model-value="updateYearLevelFilter">
-                        <SelectTrigger>
-                            <SelectValue placeholder="All years" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All years</SelectItem>
-                            <SelectItem v-for="year in yearLevels" :key="year" :value="year.toString()">
-                                {{ year }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div class="min-w-[120px]">
-                    <Select :model-value="displayIsCore" @update:model-value="updateCoreFilter">
-                        <SelectTrigger>
-                            <SelectValue placeholder="All types" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All types</SelectItem>
-                            <SelectItem value="1">Core units</SelectItem>
-                            <SelectItem value="0">Elective units</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
-                    <X class="mr-2 h-4 w-4" />
-                    Clear Filters
-                </Button>
-            </div>
-
-            <!-- Data Table -->
-            <div class="rounded-md border">
-                <DataTable :data="data" :columns="columns" :loading="false">
-                    <template #cell-actions="{ row }">
-                        <div class="flex items-center gap-2">
-                            <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button variant="ghost" size="sm" @click="viewCurriculumUnit(row.original)" title="View curriculum unit">
-                                            <Eye class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>View curriculum unit</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider
-                                v-if="can('edit_curriculum_unit')"
-                                :delay-duration="0"
-                                ignore-non-keyboard-focus
-                                disable-hoverable-content
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button variant="ghost" size="sm" @click="editCurriculumUnit(row.original)" title="Edit curriculum unit">
-                                            <Edit class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Edit curriculum unit</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider
-                                v-if="can('manage_curriculum_unit')"
-                                :delay-duration="0"
-                                ignore-non-keyboard-focus
-                                disable-hoverable-content
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            @click="toggleCoreStatus(row.original)"
-                                            :title="row.original.is_core ? 'Mark as Elective' : 'Mark as Core'"
-                                            :class="
-                                                row.original.is_core ? 'text-blue-600 hover:text-blue-700' : 'text-green-600 hover:text-green-700'
-                                            "
-                                        >
-                                            <Badge :variant="row.original.is_core ? 'default' : 'secondary'" class="text-xs">
-                                                {{ row.original.is_core ? 'Core' : 'Elective' }}
-                                            </Badge>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>{{ row.original.is_core ? 'Mark as Elective' : 'Mark as Core' }}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider
-                                v-if="can('delete_curriculum_unit')"
-                                :delay-duration="0"
-                                ignore-non-keyboard-focus
-                                disable-hoverable-content
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button variant="ghost" size="sm" @click="deleteCurriculumUnit(row.original)" title="Delete curriculum unit">
-                                            <Trash2 class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Delete curriculum unit</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-                    </template>
-                </DataTable>
-            </div>
-
-            <!-- Pagination -->
-            <DataPagination :pagination-data="curriculumUnits" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
         </div>
 
-        <!-- Delete Confirmation Dialog -->
-        <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Curriculum Unit</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete this curriculum unit assignment? This action cannot be undone and will remove the unit from
-                        the curriculum version.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="confirmDelete" class="bg-red-600 hover:bg-red-700">Delete Curriculum Unit</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <div class="min-w-[180px]">
+            <Select :model-value="displayCurriculumVersionId" @update:model-value="updateCurriculumVersionFilter">
+                <SelectTrigger>
+                    <SelectValue placeholder="All curricula" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All curricula</SelectItem>
+                    <SelectItem v-for="curriculum in curriculumVersions" :key="curriculum.id" :value="curriculum.id.toString()">
+                        {{ curriculum.name }} ({{ curriculum.version }})
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
 
-        <!-- Bulk Delete Confirmation Dialog -->
-        <AlertDialog :open="bulkDeleteDialogOpen" @update:open="bulkDeleteDialogOpen = $event">
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Multiple Curriculum Units</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected curriculum units? This action cannot be
-                        undone and will remove all selected units from their curriculum versions.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="bulkDeleteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="confirmBulkDelete" :disabled="isBulkDeleting" class="bg-red-600 hover:bg-red-700">
-                        {{ isBulkDeleting ? 'Deleting...' : 'Delete Curriculum Units' }}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    </AppLayout>
+        <div class="min-w-[150px]">
+            <Select :model-value="displaySemesterId" @update:model-value="updateSemesterFilter">
+                <SelectTrigger>
+                    <SelectValue placeholder="All semesters" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All semesters</SelectItem>
+                    <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                        {{ semester.name }} ({{ semester.number }})
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+
+        <div class="min-w-[120px]">
+            <Select :model-value="displayYearLevel" @update:model-value="updateYearLevelFilter">
+                <SelectTrigger>
+                    <SelectValue placeholder="All years" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All years</SelectItem>
+                    <SelectItem v-for="year in yearLevels" :key="year" :value="year.toString()">
+                        {{ year }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+
+        <div class="min-w-[120px]">
+            <Select :model-value="displayIsCore" @update:model-value="updateCoreFilter">
+                <SelectTrigger>
+                    <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    <SelectItem value="1">Core units</SelectItem>
+                    <SelectItem value="0">Elective units</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+
+        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
+            <X class="mr-2 h-4 w-4" />
+            Clear Filters
+        </Button>
+    </div>
+
+    <!-- Data Table -->
+    <div class="rounded-md border">
+        <DataTable :data="data" :columns="columns" :loading="false">
+            <template #cell-actions="{ row }">
+                <div class="flex items-center gap-2">
+                    <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="sm" @click="viewCurriculumUnit(row.original)" title="View curriculum unit">
+                                    <Eye class="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>View curriculum unit</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider v-if="can('edit_curriculum_unit')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="sm" @click="editCurriculumUnit(row.original)" title="Edit curriculum unit">
+                                    <Edit class="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Edit curriculum unit</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider v-if="can('manage_curriculum_unit')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="toggleCoreStatus(row.original)"
+                                    :title="row.original.is_core ? 'Mark as Elective' : 'Mark as Core'"
+                                    :class="row.original.is_core ? 'text-blue-600 hover:text-blue-700' : 'text-green-600 hover:text-green-700'"
+                                >
+                                    <Badge :variant="row.original.is_core ? 'default' : 'secondary'" class="text-xs">
+                                        {{ row.original.is_core ? 'Core' : 'Elective' }}
+                                    </Badge>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{{ row.original.is_core ? 'Mark as Elective' : 'Mark as Core' }}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider v-if="can('delete_curriculum_unit')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="sm" @click="deleteCurriculumUnit(row.original)" title="Delete curriculum unit">
+                                    <Trash2 class="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Delete curriculum unit</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
+            </template>
+        </DataTable>
+    </div>
+
+    <!-- Pagination -->
+    <DataPagination :pagination-data="curriculumUnits" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+
+    <!-- Delete Confirmation Dialog -->
+    <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Delete Curriculum Unit</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to delete this curriculum unit assignment? This action cannot be undone and will remove the unit from the
+                    curriculum version.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
+                <AlertDialogAction @click="confirmDelete" class="bg-red-600 hover:bg-red-700">Delete Curriculum Unit</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    <!-- Bulk Delete Confirmation Dialog -->
+    <AlertDialog :open="bulkDeleteDialogOpen" @update:open="bulkDeleteDialogOpen = $event">
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Delete Multiple Curriculum Units</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected curriculum units? This action cannot be undone
+                    and will remove all selected units from their curriculum versions.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel @click="bulkDeleteDialogOpen = false">Cancel</AlertDialogCancel>
+                <AlertDialogAction @click="confirmBulkDelete" :disabled="isBulkDeleting" class="bg-red-600 hover:bg-red-700">
+                    {{ isBulkDeleting ? 'Deleting...' : 'Delete Curriculum Units' }}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
 </template>

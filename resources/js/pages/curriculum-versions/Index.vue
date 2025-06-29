@@ -21,8 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem, PaginatedResponse } from '@/types';
+import type { PaginatedResponse } from '@/types';
 import { ValidationRules } from '@/types/validation';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -86,13 +85,6 @@ const props = defineProps<{
 }>();
 
 const page = usePage();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Curriculum Versions',
-        href: '/curriculum-versions',
-    },
-];
 
 // Reactive data
 const data = computed(() => props.curriculumVersions.data);
@@ -550,224 +542,187 @@ const navigateToCreate = () => {
 
 <template>
     <Head title="Curriculum Versions" />
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <!-- Statistics Cards -->
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Versions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.total_curriculum_versions }}</div>
-                    </CardContent>
-                </Card>
+    <!-- Statistics Cards -->
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Total Versions</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ statistics.total_curriculum_versions }}</div>
+            </CardContent>
+        </Card>
 
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Active Versions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold text-green-600">{{ statistics.active_versions }}</div>
-                    </CardContent>
-                </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Active Versions</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold text-green-600">{{ statistics.active_versions }}</div>
+            </CardContent>
+        </Card>
 
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Inactive Versions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold text-gray-500">{{ statistics.inactive_versions }}</div>
-                    </CardContent>
-                </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Inactive Versions</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold text-gray-500">{{ statistics.inactive_versions }}</div>
+            </CardContent>
+        </Card>
+    </div>
+
+    <!-- Header with Add Button -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Curriculum Versions</h1>
+        <div class="flex items-center gap-2">
+            <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
+                <FileSpreadsheet class="h-4 w-4" />
+                {{ isExporting ? 'Exporting...' : 'Export Excel' }}
+            </Button>
+            <Button @click="router.visit('/curriculum-versions/import')" variant="outline" class="flex items-center gap-2">
+                <Upload class="h-4 w-4" />
+                Import Excel
+            </Button>
+
+            <Button v-if="can('create_curriculum_version')" size="sm" @click="navigateToCreate">
+                <Plus class="mr-2 h-4 w-4" />
+                Add Curriculum Version
+            </Button>
+        </div>
+    </div>
+
+    <!-- Enhanced Filters Section -->
+    <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
+        <!-- Search Input using DebouncedInput (following development standards) -->
+        <div class="min-w-[200px] flex-1">
+            <div class="relative">
+                <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <DebouncedInput
+                    v-model="filtersState.search"
+                    @debounced="handleSearch"
+                    placeholder="Search curriculum versions..."
+                    class="pl-9"
+                    :debounce="300"
+                />
             </div>
-
-            <!-- Header with Add Button -->
-            <div class="flex items-center justify-between">
-                <h1 class="text-2xl font-semibold">Curriculum Versions</h1>
-                <div class="flex items-center gap-2">
-                    <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
-                        <FileSpreadsheet class="h-4 w-4" />
-                        {{ isExporting ? 'Exporting...' : 'Export Excel' }}
-                    </Button>
-                    <Button @click="router.visit('/curriculum-versions/import')" variant="outline" class="flex items-center gap-2">
-                        <Upload class="h-4 w-4" />
-                        Import Excel
-                    </Button>
-
-                    <Button v-if="can('create_curriculum_version')" size="sm" @click="navigateToCreate">
-                        <Plus class="mr-2 h-4 w-4" />
-                        Add Curriculum Version
-                    </Button>
-                </div>
-            </div>
-
-            <!-- Enhanced Filters Section -->
-            <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
-                <!-- Search Input using DebouncedInput (following development standards) -->
-                <div class="min-w-[200px] flex-1">
-                    <div class="relative">
-                        <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                        <DebouncedInput
-                            v-model="filtersState.search"
-                            @debounced="handleSearch"
-                            placeholder="Search curriculum versions..."
-                            class="pl-9"
-                            :debounce="300"
-                        />
-                    </div>
-                </div>
-
-                <!-- Program Filter -->
-                <div class="min-w-[180px]">
-                    <Select :model-value="displayProgramId" @update:model-value="updateProgramFilter">
-                        <SelectTrigger>
-                            <SelectValue placeholder="All programs" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All programs</SelectItem>
-                            <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-medium">{{ program.name }}</span>
-                                    <Badge variant="outline" class="text-xs">{{ program.code }}</Badge>
-                                </div>
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <!-- Specialization Filter - Enhanced with better UX -->
-                <div class="min-w-[200px]">
-                    <Select
-                        :model-value="displaySpecializationId"
-                        @update:model-value="updateSpecializationFilter"
-                        :disabled="!filtersState.program_id"
-                    >
-                        <SelectTrigger :class="{ 'opacity-50': !filtersState.program_id }">
-                            <SelectValue :placeholder="filtersState.program_id ? 'All specializations' : 'Select program first'" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All specializations</SelectItem>
-                            <SelectItem
-                                v-for="specialization in filteredSpecializations"
-                                :key="specialization.id"
-                                :value="specialization.id.toString()"
-                            >
-                                <div class="flex items-center gap-2">
-                                    <Badge variant="outline" class="font-mono text-xs">{{ specialization.code }}</Badge>
-                                    <span>{{ specialization.name }}</span>
-                                </div>
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <!-- Clear Filters Button -->
-                <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
-                    <X class="mr-2 h-4 w-4" />
-                    Clear Filters
-                </Button>
-
-                <!-- Active Filters Indicator -->
-                <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">
-                    {{ Object.values(filtersState).filter(Boolean).length }} filter(s) active
-                </div>
-            </div>
-
-            <!-- Data Table -->
-            <div class="rounded-md border">
-                <DataTable :data="data" :columns="columns">
-                    <template #cell-actions="{ row }">
-                        <div class="flex items-center gap-2">
-                            <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            @click="viewCurriculumVersion(row.original)"
-                                            title="View curriculum version"
-                                        >
-                                            <Eye class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>View curriculum version</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider
-                                v-if="can('edit_curriculum_version')"
-                                :delay-duration="0"
-                                ignore-non-keyboard-focus
-                                disable-hoverable-content
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            @click="editCurriculumVersion(row.original)"
-                                            title="Edit curriculum version"
-                                        >
-                                            <Edit class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Edit curriculum version</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider
-                                v-if="can('delete_curriculum_version')"
-                                :delay-duration="0"
-                                ignore-non-keyboard-focus
-                                disable-hoverable-content
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger as-child>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            @click="deleteCurriculumVersion(row.original)"
-                                            title="Delete curriculum version"
-                                        >
-                                            <Trash2 class="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Delete curriculum version</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-                    </template>
-                </DataTable>
-            </div>
-
-            <!-- Pagination -->
-            <DataPagination :pagination-data="curriculumVersions" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
         </div>
 
-        <!-- Delete Confirmation Dialog -->
-        <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Curriculum Version</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete curriculum version <strong>{{ curriculumVersionToDelete?.version_code }}</strong
-                        >? This action cannot be undone and will permanently remove the curriculum version and all its associated units.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="confirmDelete" class="bg-red-600 hover:bg-red-700">Delete Curriculum Version</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    </AppLayout>
+        <!-- Program Filter -->
+        <div class="min-w-[180px]">
+            <Select :model-value="displayProgramId" @update:model-value="updateProgramFilter">
+                <SelectTrigger>
+                    <SelectValue placeholder="All programs" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All programs</SelectItem>
+                    <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium">{{ program.name }}</span>
+                            <Badge variant="outline" class="text-xs">{{ program.code }}</Badge>
+                        </div>
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+
+        <!-- Specialization Filter - Enhanced with better UX -->
+        <div class="min-w-[200px]">
+            <Select :model-value="displaySpecializationId" @update:model-value="updateSpecializationFilter" :disabled="!filtersState.program_id">
+                <SelectTrigger :class="{ 'opacity-50': !filtersState.program_id }">
+                    <SelectValue :placeholder="filtersState.program_id ? 'All specializations' : 'Select program first'" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All specializations</SelectItem>
+                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">
+                        <div class="flex items-center gap-2">
+                            <Badge variant="outline" class="font-mono text-xs">{{ specialization.code }}</Badge>
+                            <span>{{ specialization.name }}</span>
+                        </div>
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+
+        <!-- Clear Filters Button -->
+        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
+            <X class="mr-2 h-4 w-4" />
+            Clear Filters
+        </Button>
+
+        <!-- Active Filters Indicator -->
+        <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">
+            {{ Object.values(filtersState).filter(Boolean).length }} filter(s) active
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="rounded-md border">
+        <DataTable :data="data" :columns="columns">
+            <template #cell-actions="{ row }">
+                <div class="flex items-center gap-2">
+                    <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="sm" @click="viewCurriculumVersion(row.original)" title="View curriculum version">
+                                    <Eye class="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>View curriculum version</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider v-if="can('edit_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="sm" @click="editCurriculumVersion(row.original)" title="Edit curriculum version">
+                                    <Edit class="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Edit curriculum version</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider v-if="can('delete_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="sm" @click="deleteCurriculumVersion(row.original)" title="Delete curriculum version">
+                                    <Trash2 class="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Delete curriculum version</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
+            </template>
+        </DataTable>
+    </div>
+
+    <!-- Pagination -->
+    <DataPagination :pagination-data="curriculumVersions" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+
+    <!-- Delete Confirmation Dialog -->
+    <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Delete Curriculum Version</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to delete curriculum version <strong>{{ curriculumVersionToDelete?.version_code }}</strong
+                    >? This action cannot be undone and will permanently remove the curriculum version and all its associated units.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
+                <AlertDialogAction @click="confirmDelete" class="bg-red-600 hover:bg-red-700">Delete Curriculum Version</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
 
     <!-- Edit Modal -->
     <Dialog v-model:open="showEditModal">

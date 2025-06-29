@@ -21,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables';
-import AppLayout from '@/layouts/AppLayout.vue';
 import { createColumns } from '@/lib/table-utils';
 import type { BreadcrumbItem } from '@/types';
 import type { CurriculumUnit, CurriculumVersion, Program, Semester, Specialization, Unit, UnitType } from '@/types/models';
@@ -494,308 +493,299 @@ const getUnitTypeColor = (type: string) => {
 <template>
     <Head :title="`${curriculumVersion.version_code || 'Curriculum Version'}`" />
 
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex flex-col gap-6 p-4">
-            <!-- Header Section -->
-            <div class="flex flex-col gap-4">
-                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-3">
-                            <h1 class="text-3xl font-bold tracking-tight">
-                                {{ curriculumVersion.version_code || `Version #${curriculumVersion.id}` }}
-                            </h1>
-                            <Badge variant="secondary" class="text-xs">
-                                {{ curriculumVersion.specialization ? 'Specialization Level' : 'Program Level' }}
-                            </Badge>
-                        </div>
-                        <div class="text-muted-foreground flex flex-wrap gap-4 text-sm">
-                            <span>Program: {{ curriculumVersion.program?.name }}</span>
-                            <span v-if="curriculumVersion.specialization">Specialization: {{ curriculumVersion.specialization.name }}</span>
-                            <span v-if="curriculumVersion.effective_from_semester">
-                                Effective From: {{ curriculumVersion.effective_from_semester.name }}
-                            </span>
-                            <span>Created: {{ formatDate(curriculumVersion.created_at) }}</span>
-                        </div>
-                        <p v-if="curriculumVersion.notes" class="text-muted-foreground text-sm">{{ curriculumVersion.notes }}</p>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2">
-                        <Link :href="'/curriculum-versions'">
-                            <Button variant="outline">
-                                <ArrowLeft class="mr-2 h-4 w-4" />
-                                Back to List
-                            </Button>
-                        </Link>
-                    </div>
+    <!-- Header Section -->
+    <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="space-y-2">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-3xl font-bold tracking-tight">
+                        {{ curriculumVersion.version_code || `Version #${curriculumVersion.id}` }}
+                    </h1>
+                    <Badge variant="secondary" class="text-xs">
+                        {{ curriculumVersion.specialization ? 'Specialization Level' : 'Program Level' }}
+                    </Badge>
                 </div>
-
-                <!-- Statistics Cards -->
-                <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <Card>
-                        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle class="text-sm font-medium">Total Units</CardTitle>
-                            <Book class="text-muted-foreground h-4 w-4" />
-                        </CardHeader>
-                        <CardContent>
-                            <div class="text-2xl font-bold">{{ stats.totalUnits }}</div>
-                            <p class="text-muted-foreground text-xs">Academic units</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle class="text-sm font-medium">Credit Points</CardTitle>
-                            <Target class="h-4 w-4 text-blue-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div class="text-2xl font-bold text-blue-600">{{ stats.totalCreditPoints }}</div>
-                            <p class="text-muted-foreground text-xs">Total credits</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle class="text-sm font-medium">Year Levels</CardTitle>
-                            <School class="h-4 w-4 text-green-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div class="text-2xl font-bold text-green-600">{{ Object.keys(stats.byYearLevel).length }}</div>
-                            <p class="text-muted-foreground text-xs">Academic years</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle class="text-sm font-medium">Unit Types</CardTitle>
-                            <Info class="h-4 w-4 text-purple-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div class="text-2xl font-bold text-purple-600">{{ Object.keys(stats.byUnitType).length }}</div>
-                            <p class="text-muted-foreground text-xs">Different types</p>
-                        </CardContent>
-                    </Card>
+                <div class="text-muted-foreground flex flex-wrap gap-4 text-sm">
+                    <span>Program: {{ curriculumVersion.program?.name }}</span>
+                    <span v-if="curriculumVersion.specialization">Specialization: {{ curriculumVersion.specialization.name }}</span>
+                    <span v-if="curriculumVersion.effective_from_semester">
+                        Effective From: {{ curriculumVersion.effective_from_semester.name }}
+                    </span>
+                    <span>Created: {{ formatDate(curriculumVersion.created_at) }}</span>
                 </div>
+                <p v-if="curriculumVersion.notes" class="text-muted-foreground text-sm">{{ curriculumVersion.notes }}</p>
             </div>
 
-            <!-- Main Content Tabs -->
-            <Tabs default-value="structure" class="w-full">
-                <TabsList class="grid w-full grid-cols-3">
-                    <TabsTrigger value="structure">Academic Structure</TabsTrigger>
-                    <TabsTrigger value="units">Unit List</TabsTrigger>
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                </TabsList>
-
-                <!-- Academic Structure Tab -->
-                <TabsContent value="structure">
-                    <Card>
-                        <CardContent class="space-y-4">
-                            <div v-for="(yearData, year) in organizedUnits" :key="year" class="space-y-4">
-                                <h3 class="text-lg font-semibold">
-                                    {{ String(year) === '0' ? 'Unspecified Year' : `Year ${year}` }}
-                                </h3>
-                                <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                    <div v-for="(semesterUnits, semester) in yearData" :key="semester" class="space-y-3">
-                                        <h4 class="text-sm font-medium text-gray-700">
-                                            {{ String(semester) === '0' ? 'Unspecified Semester' : `Semester ${semester}` }}
-                                        </h4>
-                                        <div class="space-y-2">
-                                            <Card v-for="unit in semesterUnits" :key="unit.id" class="p-3">
-                                                <div class="space-y-2">
-                                                    <div class="flex items-start justify-between">
-                                                        <div>
-                                                            <p class="text-sm font-medium">{{ unit.unit?.code }}</p>
-                                                            <p class="text-xs text-gray-600">{{ unit.unit?.name }}</p>
-                                                        </div>
-                                                        <Badge :class="getUnitTypeColor(unit.type || 'unknown')" class="text-xs">
-                                                            {{ unit.type?.toUpperCase() || 'UNKNOWN' }}
-                                                        </Badge>
-                                                    </div>
-                                                    <div class="flex items-center justify-between text-xs">
-                                                        <span class="text-gray-500">{{ unit.unit?.credit_points }} CP</span>
-                                                        <Button
-                                                            v-if="can('edit_curriculum_unit')"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            @click="editCurriculumUnit(unit)"
-                                                        >
-                                                            <Edit class="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </Card>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <!-- Unit List Tab -->
-                <TabsContent value="units" class="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <div class="flex items-center justify-between">
-                                <CardTitle class="flex items-center gap-2">
-                                    <Book class="h-5 w-5" />
-                                    Curriculum Units
-                                    <Badge variant="secondary" class="ml-2">{{ paginatedUnits.data.length }}/{{ paginatedUnits.total }}</Badge>
-                                </CardTitle>
-
-                                <div v-if="can('create_curriculum_unit')" class="flex items-center gap-2">
-                                    <Button variant="outline" size="sm" :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
-                                        <Plus class="mr-2 h-4 w-4" />
-                                        Add Unit
-                                    </Button>
-                                    <span v-if="availableUnits.length === 0" class="text-muted-foreground text-xs"> All units have been added </span>
-                                </div>
-                            </div>
-
-                            <!-- Filters -->
-                            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
-                                <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search units..." class="w-full" />
-
-                                <Select v-model="filters.unitType">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="All types" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All types</SelectItem>
-                                        <SelectItem value="core">Core</SelectItem>
-                                        <SelectItem value="major">Major</SelectItem>
-                                        <SelectItem value="elective">Elective</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Select v-model="filters.yearLevel">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="All years" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All years</SelectItem>
-                                        <SelectItem v-for="year in [1, 2, 3, 4, 5]" :key="year" :value="year.toString()">
-                                            Year {{ year }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Select v-model="filters.semesterNumber">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="All semesters" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All semesters</SelectItem>
-                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="semester" :value="semester.toString()">
-                                            Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }})
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div v-if="paginatedUnits.data.length === 0" class="py-8 text-center">
-                                <Book class="mx-auto h-12 w-12 text-gray-400" />
-                                <h3 class="mt-4 text-sm font-medium">No curriculum units found</h3>
-                                <p class="text-muted-foreground mt-2 text-sm">
-                                    {{
-                                        filters.search ||
-                                        filters.unitType !== 'all' ||
-                                        filters.yearLevel !== 'all' ||
-                                        filters.semesterNumber !== 'all'
-                                            ? 'Try adjusting your search filters.'
-                                            : 'Get started by adding curriculum units to this version.'
-                                    }}
-                                </p>
-                                <div
-                                    class="mt-6"
-                                    v-if="
-                                        !filters.search &&
-                                        filters.unitType === 'all' &&
-                                        filters.yearLevel === 'all' &&
-                                        filters.semesterNumber === 'all' &&
-                                        can('create_curriculum_unit')
-                                    "
-                                >
-                                    <Button :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
-                                        <Plus class="mr-2 h-4 w-4" />
-                                        Add First Unit
-                                    </Button>
-                                    <p v-if="availableUnits.length === 0" class="text-muted-foreground mt-2 text-xs">
-                                        All available units have been added to this curriculum version.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div v-else>
-                                <DataTable
-                                    :data="paginatedUnits.data"
-                                    :columns="columns"
-                                    :loading="false"
-                                    :enable-row-selection="true"
-                                    @selection-change="handleSelectionChange"
-                                    class="border-0"
-                                />
-                                <div class="border-t p-4" v-if="paginatedUnits.total > 10">
-                                    <DataPagination :pagination-data="paginationData" @navigate="handlePageChange" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <!-- Overview Tab -->
-                <TabsContent value="overview" class="space-y-4">
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <!-- Year Level Distribution -->
-                        <Card>
-                            <CardHeader>
-                                <CardTitle class="flex items-center gap-2">
-                                    <GraduationCap class="h-5 w-5" />
-                                    Year Level Distribution
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div class="space-y-3">
-                                    <div v-for="(count, year) in stats.byYearLevel" :key="year" class="flex items-center justify-between">
-                                        <span class="text-sm font-medium">{{ year }}</span>
-                                        <div class="flex items-center gap-2">
-                                            <div class="h-2 w-16 overflow-hidden rounded-full bg-gray-200">
-                                                <div class="h-full bg-blue-500" :style="{ width: `${(count / stats.totalUnits) * 100}%` }"></div>
-                                            </div>
-                                            <span class="text-sm text-gray-600">{{ count }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <!-- Unit Type Distribution -->
-                        <Card>
-                            <CardHeader>
-                                <CardTitle class="flex items-center gap-2">
-                                    <Target class="h-5 w-5" />
-                                    Unit Type Distribution
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div class="space-y-3">
-                                    <div v-for="(count, type) in stats.byUnitType" :key="type" class="flex items-center justify-between">
-                                        <span class="text-sm font-medium">{{ type }}</span>
-                                        <div class="flex items-center gap-2">
-                                            <div class="h-2 w-16 overflow-hidden rounded-full bg-gray-200">
-                                                <div class="h-full bg-green-500" :style="{ width: `${(count / stats.totalUnits) * 100}%` }"></div>
-                                            </div>
-                                            <span class="text-sm text-gray-600">{{ count }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
-            </Tabs>
+            <div class="flex flex-wrap gap-2">
+                <Link :href="'/curriculum-versions'">
+                    <Button variant="outline">
+                        <ArrowLeft class="mr-2 h-4 w-4" />
+                        Back to List
+                    </Button>
+                </Link>
+            </div>
         </div>
-    </AppLayout>
+
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <Card>
+                <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle class="text-sm font-medium">Total Units</CardTitle>
+                    <Book class="text-muted-foreground h-4 w-4" />
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-bold">{{ stats.totalUnits }}</div>
+                    <p class="text-muted-foreground text-xs">Academic units</p>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle class="text-sm font-medium">Credit Points</CardTitle>
+                    <Target class="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-bold text-blue-600">{{ stats.totalCreditPoints }}</div>
+                    <p class="text-muted-foreground text-xs">Total credits</p>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle class="text-sm font-medium">Year Levels</CardTitle>
+                    <School class="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-bold text-green-600">{{ Object.keys(stats.byYearLevel).length }}</div>
+                    <p class="text-muted-foreground text-xs">Academic years</p>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle class="text-sm font-medium">Unit Types</CardTitle>
+                    <Info class="h-4 w-4 text-purple-500" />
+                </CardHeader>
+                <CardContent>
+                    <div class="text-2xl font-bold text-purple-600">{{ Object.keys(stats.byUnitType).length }}</div>
+                    <p class="text-muted-foreground text-xs">Different types</p>
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+
+    <!-- Main Content Tabs -->
+    <Tabs default-value="structure" class="w-full">
+        <TabsList class="grid w-full grid-cols-3">
+            <TabsTrigger value="structure">Academic Structure</TabsTrigger>
+            <TabsTrigger value="units">Unit List</TabsTrigger>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+        </TabsList>
+
+        <!-- Academic Structure Tab -->
+        <TabsContent value="structure">
+            <Card>
+                <CardContent class="space-y-4">
+                    <div v-for="(yearData, year) in organizedUnits" :key="year" class="space-y-4">
+                        <h3 class="text-lg font-semibold">
+                            {{ String(year) === '0' ? 'Unspecified Year' : `Year ${year}` }}
+                        </h3>
+                        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            <div v-for="(semesterUnits, semester) in yearData" :key="semester" class="space-y-3">
+                                <h4 class="text-sm font-medium text-gray-700">
+                                    {{ String(semester) === '0' ? 'Unspecified Semester' : `Semester ${semester}` }}
+                                </h4>
+                                <div class="space-y-2">
+                                    <Card v-for="unit in semesterUnits" :key="unit.id" class="p-3">
+                                        <div class="space-y-2">
+                                            <div class="flex items-start justify-between">
+                                                <div>
+                                                    <p class="text-sm font-medium">{{ unit.unit?.code }}</p>
+                                                    <p class="text-xs text-gray-600">{{ unit.unit?.name }}</p>
+                                                </div>
+                                                <Badge :class="getUnitTypeColor(unit.type || 'unknown')" class="text-xs">
+                                                    {{ unit.type?.toUpperCase() || 'UNKNOWN' }}
+                                                </Badge>
+                                            </div>
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="text-gray-500">{{ unit.unit?.credit_points }} CP</span>
+                                                <Button
+                                                    v-if="can('edit_curriculum_unit')"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    @click="editCurriculumUnit(unit)"
+                                                >
+                                                    <Edit class="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Unit List Tab -->
+        <TabsContent value="units" class="space-y-4">
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <CardTitle class="flex items-center gap-2">
+                            <Book class="h-5 w-5" />
+                            Curriculum Units
+                            <Badge variant="secondary" class="ml-2">{{ paginatedUnits.data.length }}/{{ paginatedUnits.total }}</Badge>
+                        </CardTitle>
+
+                        <div v-if="can('create_curriculum_unit')" class="flex items-center gap-2">
+                            <Button variant="outline" size="sm" :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
+                                <Plus class="mr-2 h-4 w-4" />
+                                Add Unit
+                            </Button>
+                            <span v-if="availableUnits.length === 0" class="text-muted-foreground text-xs"> All units have been added </span>
+                        </div>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
+                        <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search units..." class="w-full" />
+
+                        <Select v-model="filters.unitType">
+                            <SelectTrigger>
+                                <SelectValue placeholder="All types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All types</SelectItem>
+                                <SelectItem value="core">Core</SelectItem>
+                                <SelectItem value="major">Major</SelectItem>
+                                <SelectItem value="elective">Elective</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select v-model="filters.yearLevel">
+                            <SelectTrigger>
+                                <SelectValue placeholder="All years" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All years</SelectItem>
+                                <SelectItem v-for="year in [1, 2, 3, 4, 5]" :key="year" :value="year.toString()"> Year {{ year }} </SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select v-model="filters.semesterNumber">
+                            <SelectTrigger>
+                                <SelectValue placeholder="All semesters" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All semesters</SelectItem>
+                                <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="semester" :value="semester.toString()">
+                                    Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }})
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div v-if="paginatedUnits.data.length === 0" class="py-8 text-center">
+                        <Book class="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 class="mt-4 text-sm font-medium">No curriculum units found</h3>
+                        <p class="text-muted-foreground mt-2 text-sm">
+                            {{
+                                filters.search || filters.unitType !== 'all' || filters.yearLevel !== 'all' || filters.semesterNumber !== 'all'
+                                    ? 'Try adjusting your search filters.'
+                                    : 'Get started by adding curriculum units to this version.'
+                            }}
+                        </p>
+                        <div
+                            class="mt-6"
+                            v-if="
+                                !filters.search &&
+                                filters.unitType === 'all' &&
+                                filters.yearLevel === 'all' &&
+                                filters.semesterNumber === 'all' &&
+                                can('create_curriculum_unit')
+                            "
+                        >
+                            <Button :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
+                                <Plus class="mr-2 h-4 w-4" />
+                                Add First Unit
+                            </Button>
+                            <p v-if="availableUnits.length === 0" class="text-muted-foreground mt-2 text-xs">
+                                All available units have been added to this curriculum version.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div v-else>
+                        <DataTable
+                            :data="paginatedUnits.data"
+                            :columns="columns"
+                            :loading="false"
+                            :enable-row-selection="true"
+                            @selection-change="handleSelectionChange"
+                            class="border-0"
+                        />
+                        <div class="border-t p-4" v-if="paginatedUnits.total > 10">
+                            <DataPagination :pagination-data="paginationData" @navigate="handlePageChange" />
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Overview Tab -->
+        <TabsContent value="overview" class="space-y-4">
+            <div class="grid gap-4 md:grid-cols-2">
+                <!-- Year Level Distribution -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="flex items-center gap-2">
+                            <GraduationCap class="h-5 w-5" />
+                            Year Level Distribution
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="space-y-3">
+                            <div v-for="(count, year) in stats.byYearLevel" :key="year" class="flex items-center justify-between">
+                                <span class="text-sm font-medium">{{ year }}</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="h-2 w-16 overflow-hidden rounded-full bg-gray-200">
+                                        <div class="h-full bg-blue-500" :style="{ width: `${(count / stats.totalUnits) * 100}%` }"></div>
+                                    </div>
+                                    <span class="text-sm text-gray-600">{{ count }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- Unit Type Distribution -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="flex items-center gap-2">
+                            <Target class="h-5 w-5" />
+                            Unit Type Distribution
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="space-y-3">
+                            <div v-for="(count, type) in stats.byUnitType" :key="type" class="flex items-center justify-between">
+                                <span class="text-sm font-medium">{{ type }}</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="h-2 w-16 overflow-hidden rounded-full bg-gray-200">
+                                        <div class="h-full bg-green-500" :style="{ width: `${(count / stats.totalUnits) * 100}%` }"></div>
+                                    </div>
+                                    <span class="text-sm text-gray-600">{{ count }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </TabsContent>
+    </Tabs>
 
     <!-- Add Unit Modal -->
     <Dialog v-model:open="showAddUnitModal">

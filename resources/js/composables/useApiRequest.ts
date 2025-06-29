@@ -4,7 +4,7 @@ import { createFetch } from '@vueuse/core';
  * Custom fetch instance configured for Laravel API requests
  * Automatically includes CSRF token and proper headers
  */
-export const useApiRequest = createFetch({
+const useApiRequest = createFetch({
     baseUrl: '',
     options: {
         beforeFetch({ options }) {
@@ -13,7 +13,7 @@ export const useApiRequest = createFetch({
             options.headers = {
                 ...options.headers,
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                Accept: 'application/json',
                 'X-CSRF-TOKEN': token || '',
             };
 
@@ -51,7 +51,9 @@ export function useApi() {
     const post = async <T = any>(url: string, data: Record<string, any>) => {
         return useApiRequest(url, {
             method: 'POST',
-        }).post(data).json<ApiResponse<T>>();
+        })
+            .post(data)
+            .json<ApiResponse<T>>();
     };
 
     /**
@@ -63,7 +65,9 @@ export function useApi() {
     const put = async <T = any>(url: string, data: Record<string, any>) => {
         return useApiRequest(url, {
             method: 'PUT',
-        }).put(data).json<ApiResponse<T>>();
+        })
+            .put(data)
+            .json<ApiResponse<T>>();
     };
 
     /**
@@ -74,7 +78,9 @@ export function useApi() {
     const del = async <T = any>(url: string) => {
         return useApiRequest(url, {
             method: 'DELETE',
-        }).delete().json<ApiResponse<T>>();
+        })
+            .delete()
+            .json<ApiResponse<T>>();
     };
 
     /**
@@ -87,7 +93,9 @@ export function useApi() {
         const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
         return useApiRequest(url + queryString, {
             method: 'GET',
-        }).get().json<ApiResponse<T>>();
+        })
+            .get()
+            .json<ApiResponse<T>>();
     };
 
     return {
