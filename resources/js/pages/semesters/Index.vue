@@ -9,8 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { fromDate } from '@internationalized/date';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -57,12 +55,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'List Semesters',
-        href: '/semesters',
-    },
-];
 
 // Reactive filters
 const search = ref(props.filters.search || '');
@@ -420,254 +412,243 @@ const handlePageSizeChange = (pageSize: number) => {
 <template>
     <Head title="Semesters" />
 
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <Heading title="Semesters" />
-                <Button @click="openCreateModal" size="sm">
-                    <Plus class="mr-2 h-4 w-4" />
-                    Add Semester
-                    <p>{{ console.log(errors) }}</p>
-                </Button>
-            </div>
+    <div class="flex items-center justify-between">
+        <Heading title="Semesters" />
+        <Button @click="openCreateModal" size="sm">
+            <Plus class="mr-2 h-4 w-4" />
+            Add Semester
+            <p>{{ console.log(errors) }}</p>
+        </Button>
+    </div>
 
-            <!-- Filters -->
-            <div class="flex flex-wrap items-center gap-4">
-                <div class="flex flex-col gap-1">
-                    <Label for="search">Search</Label>
-                    <Input id="search" v-model="search" placeholder="Search semesters..." />
-                </div>
-                <div class="flex flex-col gap-1">
-                    <Label for="name-filter">Name</Label>
-                    <Input id="name-filter" v-model="nameFilter" placeholder="Filter by name..." />
-                </div>
-                <div class="flex flex-col gap-1">
-                    <Label for="year-filter">Year</Label>
-                    <Input id="year-filter" v-model="yearFilter" placeholder="e.g., 2025" />
-                </div>
-                <div class="flex flex-col gap-1">
-                    <Label for="active-filter">Active Status</Label>
-                    <Select v-model="isActiveFilterString">
-                        <SelectTrigger class="w-full">
-                            <SelectValue placeholder="Select active status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="null">All</SelectItem>
-                            <SelectItem value="true">Active</SelectItem>
-                            <SelectItem value="false">Inactive</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div class="flex flex-col gap-1">
-                    <Label for="archived-filter">Archived Status</Label>
-                    <Select v-model="isArchivedFilterString">
-                        <SelectTrigger class="w-full">
-                            <SelectValue placeholder="Select archived status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="null">All</SelectItem>
-                            <SelectItem value="true">Archived</SelectItem>
-                            <SelectItem value="false">Not Archived</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div class="flex h-full items-end">
-                    <Button variant="outline" @click="clearFilters" :disabled="!hasActiveFilters">
-                        <X class="h-4 w-4" />
-                        Clear
-                    </Button>
-                </div>
-            </div>
-
-            <!-- Table -->
-            <DataTable :data="semesters.data" :columns="columns" :empty-message="'No semesters found.'" />
-
-            <!-- Pagination -->
-            <DataPagination
-                :pagination-data="semesters"
-                item-name="semesters"
-                @navigate="handlePaginationNavigate"
-                @page-size-change="handlePageSizeChange"
-                class="mt-4"
-            />
-
-            <!-- Create Modal -->
-            <Dialog v-model:open="showCreateModal">
-                <DialogContent class="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Add New Semester</DialogTitle>
-                        <DialogDescription>Create a new semester.</DialogDescription>
-                    </DialogHeader>
-
-                    <div class="grid grid-cols-2 gap-4 py-4">
-                        <div>
-                            <Label for="create-code">Code *</Label>
-                            <Input
-                                id="create-code"
-                                v-model="createForm.code"
-                                placeholder="e.g., SPR2025"
-                                :class="{ 'border-red-500': createForm.errors.code }"
-                            />
-                            <p v-if="createForm.errors.code" class="mt-1 text-sm text-red-500">{{ createForm.errors.code }}</p>
-                        </div>
-
-                        <div>
-                            <Label for="create-name">Name *</Label>
-                            <Input
-                                id="create-name"
-                                v-model="createForm.name"
-                                placeholder="e.g., Spring 2025"
-                                :class="{ 'border-red-500': createForm.errors.name }"
-                            />
-                            <p v-if="createForm.errors.name" class="mt-1 text-sm text-red-500">{{ createForm.errors.name }}</p>
-                        </div>
-
-                        <div class="col-span-2">
-                            <Label for="create-date-range">Semester Date Range *</Label>
-                            <DateRangePicker v-model="createForm.date_range" placeholder="Select semester date range" />
-                            <p v-if="(createForm.errors as any).start_date" class="mt-1 text-sm text-red-500">
-                                Start Date: {{ (createForm.errors as any).start_date }}
-                            </p>
-                            <p v-if="(createForm.errors as any).end_date" class="mt-1 text-sm text-red-500">
-                                End Date: {{ (createForm.errors as any).end_date }}
-                            </p>
-                        </div>
-
-                        <div class="col-span-2">
-                            <Label for="create-enrollment-date-range">Enrollment Period (Optional)</Label>
-                            <DateRangePicker v-model="createForm.enrollment_date_range" placeholder="Select enrollment period" />
-                            <p v-if="(createForm.errors as any).enrollment_start_date" class="mt-1 text-sm text-red-500">
-                                Enrollment Start Date: {{ (createForm.errors as any).enrollment_start_date }}
-                            </p>
-                            <p v-if="(createForm.errors as any).enrollment_end_date" class="mt-1 text-sm text-red-500">
-                                Enrollment End Date: {{ (createForm.errors as any).enrollment_end_date }}
-                            </p>
-                        </div>
-
-                        <div class="col-span-2 space-y-4">
-                            <div class="flex items-center space-x-2">
-                                <Switch id="create-is-active" v-model:checked="createForm.is_active" />
-                                <Label for="create-is-active">Is Active (Current Semester)</Label>
-                            </div>
-
-                            <div class="flex items-center space-x-2">
-                                <Switch id="create-is-archived" v-model:checked="createForm.is_archived" />
-                                <Label for="create-is-archived">Is Archived</Label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" @click="closeModals">Cancel</Button>
-                        <Button @click="submitCreate" :disabled="createForm.processing">
-                            {{ createForm.processing ? 'Creating...' : 'Create Semester' }}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <!-- Edit Modal -->
-            <Dialog v-model:open="showEditModal">
-                <DialogContent class="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Edit Semester</DialogTitle>
-                        <DialogDescription>Update semester information.</DialogDescription>
-                    </DialogHeader>
-
-                    <div class="grid grid-cols-2 gap-4 py-4">
-                        <div>
-                            <Label for="edit-code">Code</Label>
-                            <Input
-                                id="edit-code"
-                                v-model="editForm.code"
-                                placeholder="e.g., SPR2025"
-                                :class="{ 'border-red-500': editForm.errors.code }"
-                            />
-                            <p v-if="editForm.errors.code" class="mt-1 text-sm text-red-500">{{ editForm.errors.code }}</p>
-                        </div>
-
-                        <div>
-                            <Label for="edit-name">Name *</Label>
-                            <Input
-                                id="edit-name"
-                                v-model="editForm.name"
-                                placeholder="e.g., Spring 2025"
-                                :class="{ 'border-red-500': editForm.errors.name }"
-                            />
-                            <p v-if="editForm.errors.name" class="mt-1 text-sm text-red-500">{{ editForm.errors.name }}</p>
-                        </div>
-
-                        <div class="col-span-2">
-                            <Label for="edit-date-range">Semester Date Range *</Label>
-                            <DateRangePicker v-model="editForm.date_range" placeholder="Select semester date range" />
-                            <p v-if="(editForm.errors as any).start_date" class="mt-1 text-sm text-red-500">
-                                Start Date: {{ (editForm.errors as any).start_date }}
-                            </p>
-                            <p v-if="(editForm.errors as any).end_date" class="mt-1 text-sm text-red-500">
-                                End Date: {{ (editForm.errors as any).end_date }}
-                            </p>
-                        </div>
-
-                        <div class="col-span-2">
-                            <Label for="edit-enrollment-date-range">Enrollment Period (Optional)</Label>
-                            <DateRangePicker v-model="editForm.enrollment_date_range" placeholder="Select enrollment period" />
-                            <p v-if="(editForm.errors as any).enrollment_start_date" class="mt-1 text-sm text-red-500">
-                                Enrollment Start Date: {{ (editForm.errors as any).enrollment_start_date }}
-                            </p>
-                            <p v-if="(editForm.errors as any).enrollment_end_date" class="mt-1 text-sm text-red-500">
-                                Enrollment End Date: {{ (editForm.errors as any).enrollment_end_date }}
-                            </p>
-                        </div>
-
-                        <div class="col-span-2 space-y-4">
-                            <div class="flex items-center space-x-2">
-                                <Switch
-                                    id="edit-is-active"
-                                    v-model="editForm.is_active"
-                                    :disabled="selectedSemester ? isSemesterRunning(selectedSemester) : false"
-                                />
-                                <div class="flex flex-col">
-                                    <Label for="edit-is-active">Is Active (Current Semester)</Label>
-                                    <p v-if="selectedSemester && isSemesterRunning(selectedSemester)" class="text-muted-foreground text-xs">
-                                        Cannot change active status during semester period
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center space-x-2">
-                                <Switch id="edit-is-archived" v-model="editForm.is_archived" />
-                                <Label for="edit-is-archived">Is Archived</Label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" @click="closeModals">Cancel</Button>
-                        <Button @click="submitEdit" :disabled="editForm.processing">
-                            {{ editForm.processing ? 'Updating...' : 'Update Semester' }}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <!-- Delete Modal -->
-            <Dialog v-model:open="showDeleteModal">
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Delete Semester</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete "{{ selectedSemester?.name }}"? This action cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <DialogFooter>
-                        <Button variant="outline" @click="closeModals">Cancel</Button>
-                        <Button variant="destructive" @click="submitDelete" :disabled="deleteForm.processing">
-                            {{ deleteForm.processing ? 'Deleting...' : 'Delete' }}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+    <!-- Filters -->
+    <div class="flex flex-wrap items-center gap-4">
+        <div class="flex flex-col gap-1">
+            <Label for="search">Search</Label>
+            <Input id="search" v-model="search" placeholder="Search semesters..." />
         </div>
-    </AppLayout>
+        <div class="flex flex-col gap-1">
+            <Label for="name-filter">Name</Label>
+            <Input id="name-filter" v-model="nameFilter" placeholder="Filter by name..." />
+        </div>
+        <div class="flex flex-col gap-1">
+            <Label for="year-filter">Year</Label>
+            <Input id="year-filter" v-model="yearFilter" placeholder="e.g., 2025" />
+        </div>
+        <div class="flex flex-col gap-1">
+            <Label for="active-filter">Active Status</Label>
+            <Select v-model="isActiveFilterString">
+                <SelectTrigger class="w-full">
+                    <SelectValue placeholder="Select active status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="null">All</SelectItem>
+                    <SelectItem value="true">Active</SelectItem>
+                    <SelectItem value="false">Inactive</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+        <div class="flex flex-col gap-1">
+            <Label for="archived-filter">Archived Status</Label>
+            <Select v-model="isArchivedFilterString">
+                <SelectTrigger class="w-full">
+                    <SelectValue placeholder="Select archived status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="null">All</SelectItem>
+                    <SelectItem value="true">Archived</SelectItem>
+                    <SelectItem value="false">Not Archived</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+        <div class="flex h-full items-end">
+            <Button variant="outline" @click="clearFilters" :disabled="!hasActiveFilters">
+                <X class="h-4 w-4" />
+                Clear
+            </Button>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <DataTable :data="semesters.data" :columns="columns" :empty-message="'No semesters found.'" />
+
+    <!-- Pagination -->
+    <DataPagination
+        :pagination-data="semesters"
+        item-name="semesters"
+        @navigate="handlePaginationNavigate"
+        @page-size-change="handlePageSizeChange"
+        class="mt-4"
+    />
+
+    <!-- Create Modal -->
+    <Dialog v-model:open="showCreateModal">
+        <DialogContent class="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Add New Semester</DialogTitle>
+                <DialogDescription>Create a new semester.</DialogDescription>
+            </DialogHeader>
+
+            <div class="grid grid-cols-2 gap-4 py-4">
+                <div>
+                    <Label for="create-code">Code *</Label>
+                    <Input
+                        id="create-code"
+                        v-model="createForm.code"
+                        placeholder="e.g., SPR2025"
+                        :class="{ 'border-red-500': createForm.errors.code }"
+                    />
+                    <p v-if="createForm.errors.code" class="mt-1 text-sm text-red-500">{{ createForm.errors.code }}</p>
+                </div>
+
+                <div>
+                    <Label for="create-name">Name *</Label>
+                    <Input
+                        id="create-name"
+                        v-model="createForm.name"
+                        placeholder="e.g., Spring 2025"
+                        :class="{ 'border-red-500': createForm.errors.name }"
+                    />
+                    <p v-if="createForm.errors.name" class="mt-1 text-sm text-red-500">{{ createForm.errors.name }}</p>
+                </div>
+
+                <div class="col-span-2">
+                    <Label for="create-date-range">Semester Date Range *</Label>
+                    <DateRangePicker v-model="createForm.date_range" placeholder="Select semester date range" />
+                    <p v-if="(createForm.errors as any).start_date" class="mt-1 text-sm text-red-500">
+                        Start Date: {{ (createForm.errors as any).start_date }}
+                    </p>
+                    <p v-if="(createForm.errors as any).end_date" class="mt-1 text-sm text-red-500">
+                        End Date: {{ (createForm.errors as any).end_date }}
+                    </p>
+                </div>
+
+                <div class="col-span-2">
+                    <Label for="create-enrollment-date-range">Enrollment Period (Optional)</Label>
+                    <DateRangePicker v-model="createForm.enrollment_date_range" placeholder="Select enrollment period" />
+                    <p v-if="(createForm.errors as any).enrollment_start_date" class="mt-1 text-sm text-red-500">
+                        Enrollment Start Date: {{ (createForm.errors as any).enrollment_start_date }}
+                    </p>
+                    <p v-if="(createForm.errors as any).enrollment_end_date" class="mt-1 text-sm text-red-500">
+                        Enrollment End Date: {{ (createForm.errors as any).enrollment_end_date }}
+                    </p>
+                </div>
+
+                <div class="col-span-2 space-y-4">
+                    <div class="flex items-center space-x-2">
+                        <Switch id="create-is-active" v-model:checked="createForm.is_active" />
+                        <Label for="create-is-active">Is Active (Current Semester)</Label>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <Switch id="create-is-archived" v-model:checked="createForm.is_archived" />
+                        <Label for="create-is-archived">Is Archived</Label>
+                    </div>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="closeModals">Cancel</Button>
+                <Button @click="submitCreate" :disabled="createForm.processing">
+                    {{ createForm.processing ? 'Creating...' : 'Create Semester' }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Edit Modal -->
+    <Dialog v-model:open="showEditModal">
+        <DialogContent class="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Edit Semester</DialogTitle>
+                <DialogDescription>Update semester information.</DialogDescription>
+            </DialogHeader>
+
+            <div class="grid grid-cols-2 gap-4 py-4">
+                <div>
+                    <Label for="edit-code">Code</Label>
+                    <Input id="edit-code" v-model="editForm.code" placeholder="e.g., SPR2025" :class="{ 'border-red-500': editForm.errors.code }" />
+                    <p v-if="editForm.errors.code" class="mt-1 text-sm text-red-500">{{ editForm.errors.code }}</p>
+                </div>
+
+                <div>
+                    <Label for="edit-name">Name *</Label>
+                    <Input
+                        id="edit-name"
+                        v-model="editForm.name"
+                        placeholder="e.g., Spring 2025"
+                        :class="{ 'border-red-500': editForm.errors.name }"
+                    />
+                    <p v-if="editForm.errors.name" class="mt-1 text-sm text-red-500">{{ editForm.errors.name }}</p>
+                </div>
+
+                <div class="col-span-2">
+                    <Label for="edit-date-range">Semester Date Range *</Label>
+                    <DateRangePicker v-model="editForm.date_range" placeholder="Select semester date range" />
+                    <p v-if="(editForm.errors as any).start_date" class="mt-1 text-sm text-red-500">
+                        Start Date: {{ (editForm.errors as any).start_date }}
+                    </p>
+                    <p v-if="(editForm.errors as any).end_date" class="mt-1 text-sm text-red-500">
+                        End Date: {{ (editForm.errors as any).end_date }}
+                    </p>
+                </div>
+
+                <div class="col-span-2">
+                    <Label for="edit-enrollment-date-range">Enrollment Period (Optional)</Label>
+                    <DateRangePicker v-model="editForm.enrollment_date_range" placeholder="Select enrollment period" />
+                    <p v-if="(editForm.errors as any).enrollment_start_date" class="mt-1 text-sm text-red-500">
+                        Enrollment Start Date: {{ (editForm.errors as any).enrollment_start_date }}
+                    </p>
+                    <p v-if="(editForm.errors as any).enrollment_end_date" class="mt-1 text-sm text-red-500">
+                        Enrollment End Date: {{ (editForm.errors as any).enrollment_end_date }}
+                    </p>
+                </div>
+
+                <div class="col-span-2 space-y-4">
+                    <div class="flex items-center space-x-2">
+                        <Switch
+                            id="edit-is-active"
+                            v-model="editForm.is_active"
+                            :disabled="selectedSemester ? isSemesterRunning(selectedSemester) : false"
+                        />
+                        <div class="flex flex-col">
+                            <Label for="edit-is-active">Is Active (Current Semester)</Label>
+                            <p v-if="selectedSemester && isSemesterRunning(selectedSemester)" class="text-muted-foreground text-xs">
+                                Cannot change active status during semester period
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <Switch id="edit-is-archived" v-model="editForm.is_archived" />
+                        <Label for="edit-is-archived">Is Archived</Label>
+                    </div>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="closeModals">Cancel</Button>
+                <Button @click="submitEdit" :disabled="editForm.processing">
+                    {{ editForm.processing ? 'Updating...' : 'Update Semester' }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Delete Modal -->
+    <Dialog v-model:open="showDeleteModal">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Delete Semester</DialogTitle>
+                <DialogDescription> Are you sure you want to delete "{{ selectedSemester?.name }}"? This action cannot be undone. </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter>
+                <Button variant="outline" @click="closeModals">Cancel</Button>
+                <Button variant="destructive" @click="submitDelete" :disabled="deleteForm.processing">
+                    {{ deleteForm.processing ? 'Deleting...' : 'Delete' }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

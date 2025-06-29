@@ -72,7 +72,8 @@ return new class extends Migration
             $table->string('batch_id', 50)->nullable(); // For grouping bulk attendance updates
             $table->json('device_info')->nullable(); // Information about device used for check-in
             $table->string('ip_address', 45)->nullable(); // IP address for digital check-ins
-            $table->point('location')->nullable(); // GPS coordinates for mobile check-ins
+            $table->decimal('latitude', 10, 8)->nullable(); // GPS latitude for mobile check-ins
+            $table->decimal('longitude', 11, 8)->nullable(); // GPS longitude for mobile check-ins
 
             $table->timestamps();
             $table->softDeletes();

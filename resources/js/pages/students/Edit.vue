@@ -6,8 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem } from '@/types';
 import type { Campus, CurriculumVersion, Program, Specialization, Student } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
 import { Head, router } from '@inertiajs/vue3';
@@ -26,20 +24,6 @@ interface Props {
 
 const props = defineProps<Props>();
 console.log('Props', props.student);
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Students',
-        href: '/students',
-    },
-    {
-        title: props.student.full_name,
-        href: `/students/${props.student.id}`,
-    },
-    {
-        title: 'Edit',
-        href: `/students/${props.student.id}/edit`,
-    },
-];
 
 // Form validation schema
 const formSchema = toTypedSchema(
@@ -228,417 +212,409 @@ const handleCancel = () => {
 
 <template>
     <Head title="Edit Student" />
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
-            <!-- Header -->
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <div class="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full">
-                        <User class="text-primary h-8 w-8" />
-                    </div>
-                    <div>
-                        <h1 class="text-3xl font-bold">Edit Student</h1>
-                        <p class="text-muted-foreground text-lg">{{ student.full_name }}</p>
-                    </div>
-                </div>
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full">
+                <User class="text-primary h-8 w-8" />
             </div>
-
-            <form @submit="onSubmit" class="space-y-6">
-                <!-- Personal Information -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle class="flex items-center gap-2">
-                            <User class="h-5 w-5" />
-                            Personal Information
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent class="space-y-4">
-                        <div class="grid grid-cols-1">
-                            <FormField v-slot="{ componentField }" name="full_name">
-                                <FormItem>
-                                    <FormLabel>Full Name *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter full name" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="email">
-                                <FormItem>
-                                    <FormLabel class="flex items-center gap-2">
-                                        <Mail class="h-4 w-4" />
-                                        Email *
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" type="email" placeholder="Enter email address" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="phone">
-                                <FormItem>
-                                    <FormLabel class="flex items-center gap-2">
-                                        <Phone class="h-4 w-4" />
-                                        Phone
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter phone number" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <FormField v-slot="{ componentField }" name="date_of_birth">
-                                <FormItem>
-                                    <FormLabel>Date of Birth</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" type="date" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="gender">
-                                <FormItem>
-                                    <FormLabel>Gender</FormLabel>
-                                    <Select v-bind="componentField">
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select gender" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="male">Male</SelectItem>
-                                            <SelectItem value="female">Female</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="nationality">
-                                <FormItem>
-                                    <FormLabel>Nationality</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter nationality" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="national_id">
-                                <FormItem>
-                                    <FormLabel>National ID</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter national ID" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="status">
-                                <FormItem>
-                                    <FormLabel>Status *</FormLabel>
-                                    <Select v-bind="componentField">
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select status" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="active">Active</SelectItem>
-                                            <SelectItem value="inactive">Inactive</SelectItem>
-                                            <SelectItem value="suspended">Suspended</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <FormField v-slot="{ componentField }" name="address">
-                            <FormItem>
-                                <FormLabel>Address</FormLabel>
-                                <FormControl>
-                                    <Textarea v-bind="componentField" placeholder="Enter full address" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-                    </CardContent>
-                </Card>
-
-                <!-- Academic Information -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle class="flex items-center gap-2">
-                            <GraduationCap class="h-5 w-5" />
-                            Academic Information
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent class="space-y-4">
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="campus_id">
-                                <FormItem>
-                                    <FormLabel class="flex items-center gap-2">
-                                        <Building class="h-4 w-4" />
-                                        Campus *
-                                    </FormLabel>
-                                    <Select v-bind="componentField">
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select campus" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">
-                                                {{ campus.name }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="program_id">
-                                <FormItem>
-                                    <FormLabel>Program *</FormLabel>
-                                    <Select v-bind="componentField">
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select program" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
-                                                {{ program.name }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="specialization_id">
-                                <FormItem>
-                                    <FormLabel>Specialization</FormLabel>
-                                    <Select v-bind="componentField" :disabled="!values.program_id">
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select specialization" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="none">No specialization</SelectItem>
-                                            <SelectItem
-                                                v-for="specialization in filteredSpecializations"
-                                                :key="specialization.id"
-                                                :value="specialization.id.toString()"
-                                            >
-                                                {{ specialization.name }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="curriculum_version_id">
-                                <FormItem>
-                                    <FormLabel>Curriculum Version *</FormLabel>
-                                    <Select v-bind="componentField" :disabled="!values.specialization_id || loadingCurriculumVersions">
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select curriculum version" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem
-                                                v-for="version in availableCurriculumVersions"
-                                                :key="version.id"
-                                                :value="version.id.toString()"
-                                            >
-                                                {{ version.version_code }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <FormField v-slot="{ componentField }" name="admission_date">
-                                <FormItem>
-                                    <FormLabel>Admission Date *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" type="date" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="expected_graduation_date">
-                                <FormItem>
-                                    <FormLabel>Expected Graduation Date</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" type="date" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <!-- Emergency Contacts -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle class="flex items-center gap-2">
-                            <Phone class="h-5 w-5" />
-                            Emergency Contacts
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent class="space-y-6">
-                        <!-- Parent/Guardian -->
-                        <div>
-                            <h4 class="mb-4 font-medium">Parent/Guardian Information</h4>
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                <FormField v-slot="{ componentField }" name="parent_guardian_name">
-                                    <FormItem>
-                                        <FormLabel>Name</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" placeholder="Enter parent/guardian name" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-
-                                <FormField v-slot="{ componentField }" name="parent_guardian_phone">
-                                    <FormItem>
-                                        <FormLabel>Phone</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" placeholder="Enter phone number" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-
-                                <FormField v-slot="{ componentField }" name="parent_guardian_email">
-                                    <FormItem>
-                                        <FormLabel>Email</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" type="email" placeholder="Enter email address" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        <!-- Emergency Contact -->
-                        <div>
-                            <h4 class="mb-4 font-medium">Emergency Contact</h4>
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <FormField v-slot="{ componentField }" name="emergency_contact_name">
-                                    <FormItem>
-                                        <FormLabel>Name</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" placeholder="Enter emergency contact name" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-
-                                <FormField v-slot="{ componentField }" name="emergency_contact_phone">
-                                    <FormItem>
-                                        <FormLabel>Phone</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" placeholder="Enter phone number" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <!-- Additional Information -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Additional Information</CardTitle>
-                    </CardHeader>
-                    <CardContent class="space-y-4">
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="high_school_name">
-                                <FormItem>
-                                    <FormLabel>High School Name</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter high school name" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="high_school_graduation_year">
-                                <FormItem>
-                                    <FormLabel>High School Graduation Year</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" type="number" placeholder="Enter graduation year" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <FormField v-slot="{ componentField }" name="entrance_exam_score">
-                            <FormItem>
-                                <FormLabel>Entrance Exam Score (%)</FormLabel>
-                                <FormControl>
-                                    <Input v-bind="componentField" type="number" step="0.01" min="0" max="100" placeholder="Enter exam score" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="admission_notes">
-                            <FormItem>
-                                <FormLabel>Admission Notes</FormLabel>
-                                <FormControl>
-                                    <Textarea v-bind="componentField" placeholder="Enter any additional notes" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-                    </CardContent>
-                </Card>
-
-                <!-- Form Actions -->
-                <div class="flex items-center justify-end gap-4">
-                    <Button type="button" variant="outline" @click="handleCancel">
-                        <X class="mr-2 h-4 w-4" />
-                        Cancel
-                    </Button>
-                    <Button type="submit" :disabled="isSubmitting">
-                        <Save class="mr-2 h-4 w-4" />
-                        {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
-                    </Button>
-                </div>
-            </form>
+            <div>
+                <h1 class="text-3xl font-bold">Edit Student</h1>
+                <p class="text-muted-foreground text-lg">{{ student.full_name }}</p>
+            </div>
         </div>
-    </AppLayout>
+    </div>
+
+    <form @submit="onSubmit" class="space-y-6">
+        <!-- Personal Information -->
+        <Card>
+            <CardHeader>
+                <CardTitle class="flex items-center gap-2">
+                    <User class="h-5 w-5" />
+                    Personal Information
+                </CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="grid grid-cols-1">
+                    <FormField v-slot="{ componentField }" name="full_name">
+                        <FormItem>
+                            <FormLabel>Full Name *</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="Enter full name" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="email">
+                        <FormItem>
+                            <FormLabel class="flex items-center gap-2">
+                                <Mail class="h-4 w-4" />
+                                Email *
+                            </FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" type="email" placeholder="Enter email address" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="phone">
+                        <FormItem>
+                            <FormLabel class="flex items-center gap-2">
+                                <Phone class="h-4 w-4" />
+                                Phone
+                            </FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="Enter phone number" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <FormField v-slot="{ componentField }" name="date_of_birth">
+                        <FormItem>
+                            <FormLabel>Date of Birth</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" type="date" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="gender">
+                        <FormItem>
+                            <FormLabel>Gender</FormLabel>
+                            <Select v-bind="componentField">
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select gender" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="male">Male</SelectItem>
+                                    <SelectItem value="female">Female</SelectItem>
+                                    <SelectItem value="other">Other</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="nationality">
+                        <FormItem>
+                            <FormLabel>Nationality</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="Enter nationality" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="national_id">
+                        <FormItem>
+                            <FormLabel>National ID</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="Enter national ID" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="status">
+                        <FormItem>
+                            <FormLabel>Status *</FormLabel>
+                            <Select v-bind="componentField">
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="inactive">Inactive</SelectItem>
+                                    <SelectItem value="suspended">Suspended</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <FormField v-slot="{ componentField }" name="address">
+                    <FormItem>
+                        <FormLabel>Address</FormLabel>
+                        <FormControl>
+                            <Textarea v-bind="componentField" placeholder="Enter full address" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+            </CardContent>
+        </Card>
+
+        <!-- Academic Information -->
+        <Card>
+            <CardHeader>
+                <CardTitle class="flex items-center gap-2">
+                    <GraduationCap class="h-5 w-5" />
+                    Academic Information
+                </CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="campus_id">
+                        <FormItem>
+                            <FormLabel class="flex items-center gap-2">
+                                <Building class="h-4 w-4" />
+                                Campus *
+                            </FormLabel>
+                            <Select v-bind="componentField">
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select campus" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">
+                                        {{ campus.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="program_id">
+                        <FormItem>
+                            <FormLabel>Program *</FormLabel>
+                            <Select v-bind="componentField">
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select program" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
+                                        {{ program.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="specialization_id">
+                        <FormItem>
+                            <FormLabel>Specialization</FormLabel>
+                            <Select v-bind="componentField" :disabled="!values.program_id">
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select specialization" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="none">No specialization</SelectItem>
+                                    <SelectItem
+                                        v-for="specialization in filteredSpecializations"
+                                        :key="specialization.id"
+                                        :value="specialization.id.toString()"
+                                    >
+                                        {{ specialization.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="curriculum_version_id">
+                        <FormItem>
+                            <FormLabel>Curriculum Version *</FormLabel>
+                            <Select v-bind="componentField" :disabled="!values.specialization_id || loadingCurriculumVersions">
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select curriculum version" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem v-for="version in availableCurriculumVersions" :key="version.id" :value="version.id.toString()">
+                                        {{ version.version_code }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <FormField v-slot="{ componentField }" name="admission_date">
+                        <FormItem>
+                            <FormLabel>Admission Date *</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" type="date" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="expected_graduation_date">
+                        <FormItem>
+                            <FormLabel>Expected Graduation Date</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" type="date" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Emergency Contacts -->
+        <Card>
+            <CardHeader>
+                <CardTitle class="flex items-center gap-2">
+                    <Phone class="h-5 w-5" />
+                    Emergency Contacts
+                </CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-6">
+                <!-- Parent/Guardian -->
+                <div>
+                    <h4 class="mb-4 font-medium">Parent/Guardian Information</h4>
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <FormField v-slot="{ componentField }" name="parent_guardian_name">
+                            <FormItem>
+                                <FormLabel>Name</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter parent/guardian name" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="parent_guardian_phone">
+                            <FormItem>
+                                <FormLabel>Phone</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter phone number" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="parent_guardian_email">
+                            <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" type="email" placeholder="Enter email address" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
+                </div>
+
+                <Separator />
+
+                <!-- Emergency Contact -->
+                <div>
+                    <h4 class="mb-4 font-medium">Emergency Contact</h4>
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FormField v-slot="{ componentField }" name="emergency_contact_name">
+                            <FormItem>
+                                <FormLabel>Name</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter emergency contact name" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="emergency_contact_phone">
+                            <FormItem>
+                                <FormLabel>Phone</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter phone number" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Additional Information -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Additional Information</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="high_school_name">
+                        <FormItem>
+                            <FormLabel>High School Name</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="Enter high school name" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="high_school_graduation_year">
+                        <FormItem>
+                            <FormLabel>High School Graduation Year</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" type="number" placeholder="Enter graduation year" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <FormField v-slot="{ componentField }" name="entrance_exam_score">
+                    <FormItem>
+                        <FormLabel>Entrance Exam Score (%)</FormLabel>
+                        <FormControl>
+                            <Input v-bind="componentField" type="number" step="0.01" min="0" max="100" placeholder="Enter exam score" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="admission_notes">
+                    <FormItem>
+                        <FormLabel>Admission Notes</FormLabel>
+                        <FormControl>
+                            <Textarea v-bind="componentField" placeholder="Enter any additional notes" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+            </CardContent>
+        </Card>
+
+        <!-- Form Actions -->
+        <div class="flex items-center justify-end gap-4">
+            <Button type="button" variant="outline" @click="handleCancel">
+                <X class="mr-2 h-4 w-4" />
+                Cancel
+            </Button>
+            <Button type="submit" :disabled="isSubmitting">
+                <Save class="mr-2 h-4 w-4" />
+                {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
+            </Button>
+        </div>
+    </form>
 </template>

@@ -5,8 +5,7 @@ import TableActions from '@/components/TableActions.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem, PaginatedResponse } from '@/types';
+import type { PaginatedResponse } from '@/types';
 import type { User } from '@/types/User';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -22,13 +21,6 @@ const props = defineProps<{
         search?: string;
     };
 }>();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'List Users',
-        href: '/users',
-    },
-];
 
 // Reactive data
 const data = computed(() => props.users.data);
@@ -191,104 +183,90 @@ const handlePageSizeChange = (pageSize: number) => {
 
 <template>
     <Head title="List Users" />
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <!-- Header with Add User Button -->
-            <div class="flex items-center justify-between">
-                <h1 class="text-2xl font-semibold">Users</h1>
-                <div class="flex items-center gap-2">
-                    <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
-                        <FileSpreadsheet class="h-4 w-4" />
-                        {{ isExporting ? 'Exporting...' : 'Export Excel' }}
-                    </Button>
-                    <Button @click="router.visit('/users/import')" variant="outline" class="flex items-center gap-2">
-                        <Upload class="h-4 w-4" />
-                        Import Excel
-                    </Button>
-                    <Button @click="router.visit('/users/create')" class="flex items-center gap-2">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Add User
-                    </Button>
-                </div>
-            </div>
-
-            <!-- Filters Section -->
-            <div class="space-y-4">
-                <!-- Column Filters -->
-                <div class="flex flex-wrap items-center gap-2">
-                    <!-- Global Search -->
-                    <div class="flex flex-col gap-1">
-                        <Label class="text-muted-foreground text-xs">Search</Label>
-                        <Input
-                            :model-value="filters.search"
-                            @update:model-value="updateSearchFilter"
-                            placeholder="Search all columns..."
-                            class="max-w-sm"
-                        />
-                    </div>
-                    <div class="flex flex-col gap-1">
-                        <Label class="text-muted-foreground text-xs">Name</Label>
-                        <Input :model-value="filters.name" @update:model-value="updateNameFilter" placeholder="Filter by name..." class="w-48" />
-                    </div>
-
-                    <div class="flex flex-col gap-1">
-                        <Label class="text-muted-foreground text-xs">Email</Label>
-                        <Input :model-value="filters.email" @update:model-value="updateEmailFilter" placeholder="Filter by email..." class="w-48" />
-                    </div>
-
-                    <!-- Clear Filters Button -->
-                    <div class="flex flex-col gap-1">
-                        <Label class="text-xs text-transparent">Clear</Label>
-                        <Button variant="outline" size="default" @click="clearFilters" :disabled="!hasActiveFilters" class="flex items-center gap-2">
-                            <X class="h-4 w-4" />
-                            Clear
-                        </Button>
-                    </div>
-                </div>
-
-                <!-- Active Filters Display -->
-                <div v-if="hasActiveFilters" class="flex flex-wrap items-center gap-2">
-                    <span class="text-muted-foreground text-sm">Active filters:</span>
-
-                    <div v-if="filters.search" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
-                        <span>Search: "{{ filters.search }}"</span>
-                        <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="updateSearchFilter('')">
-                            <X class="h-3 w-3" />
-                        </Button>
-                    </div>
-
-                    <div v-if="filters.name" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
-                        <span>Name: "{{ filters.name }}"</span>
-                        <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="updateNameFilter('')">
-                            <X class="h-3 w-3" />
-                        </Button>
-                    </div>
-
-                    <div v-if="filters.email" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
-                        <span>Email: "{{ filters.email }}"</span>
-                        <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="updateEmailFilter('')">
-                            <X class="h-3 w-3" />
-                        </Button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Data Table -->
-            <DataTable :data="data" :columns="columns" :show-column-toggle="false">
-                <template #cell-actions="{ row }">
-                    <TableActions @edit="editUser(row.original)" />
-                </template>
-            </DataTable>
-
-            <!-- Pagination -->
-            <DataPagination
-                :pagination-data="users"
-                item-name="users"
-                @navigate="handlePaginationNavigate"
-                @page-size-change="handlePageSizeChange"
-            />
+    <!-- Header with Add User Button -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Users</h1>
+        <div class="flex items-center gap-2">
+            <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
+                <FileSpreadsheet class="h-4 w-4" />
+                {{ isExporting ? 'Exporting...' : 'Export Excel' }}
+            </Button>
+            <Button @click="router.visit('/users/import')" variant="outline" class="flex items-center gap-2">
+                <Upload class="h-4 w-4" />
+                Import Excel
+            </Button>
+            <Button @click="router.visit('/users/create')" class="flex items-center gap-2">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Add User
+            </Button>
         </div>
-    </AppLayout>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="space-y-4">
+        <!-- Column Filters -->
+        <div class="flex flex-wrap items-center gap-2">
+            <!-- Global Search -->
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Search</Label>
+                <Input :model-value="filters.search" @update:model-value="updateSearchFilter" placeholder="Search all columns..." class="max-w-sm" />
+            </div>
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Name</Label>
+                <Input :model-value="filters.name" @update:model-value="updateNameFilter" placeholder="Filter by name..." class="w-48" />
+            </div>
+
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Email</Label>
+                <Input :model-value="filters.email" @update:model-value="updateEmailFilter" placeholder="Filter by email..." class="w-48" />
+            </div>
+
+            <!-- Clear Filters Button -->
+            <div class="flex flex-col gap-1">
+                <Label class="text-xs text-transparent">Clear</Label>
+                <Button variant="outline" size="default" @click="clearFilters" :disabled="!hasActiveFilters" class="flex items-center gap-2">
+                    <X class="h-4 w-4" />
+                    Clear
+                </Button>
+            </div>
+        </div>
+
+        <!-- Active Filters Display -->
+        <div v-if="hasActiveFilters" class="flex flex-wrap items-center gap-2">
+            <span class="text-muted-foreground text-sm">Active filters:</span>
+
+            <div v-if="filters.search" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
+                <span>Search: "{{ filters.search }}"</span>
+                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="updateSearchFilter('')">
+                    <X class="h-3 w-3" />
+                </Button>
+            </div>
+
+            <div v-if="filters.name" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
+                <span>Name: "{{ filters.name }}"</span>
+                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="updateNameFilter('')">
+                    <X class="h-3 w-3" />
+                </Button>
+            </div>
+
+            <div v-if="filters.email" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
+                <span>Email: "{{ filters.email }}"</span>
+                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="updateEmailFilter('')">
+                    <X class="h-3 w-3" />
+                </Button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <DataTable :data="data" :columns="columns" :show-column-toggle="false">
+        <template #cell-actions="{ row }">
+            <TableActions @edit="editUser(row.original)" />
+        </template>
+    </DataTable>
+
+    <!-- Pagination -->
+    <DataPagination :pagination-data="users" item-name="users" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 </template>

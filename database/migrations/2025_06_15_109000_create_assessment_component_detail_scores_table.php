@@ -12,10 +12,12 @@ return new class extends Migration
     {
         Schema::create('assessment_component_detail_scores', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('assessment_component_detail_id')->constrained('assessment_component_details')->onDelete('cascade');
+            $table->unsignedBigInteger('assessment_component_detail_id');
+            $table->foreign('assessment_component_detail_id', 'detail_scores_detail_id_fk')->references('id')->on('assessment_component_details')->onDelete('cascade');
             $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
             $table->foreignId('course_offering_id')->constrained('course_offerings')->onDelete('cascade');
-            $table->foreignId('graded_by_lecture_id')->nullable()->constrained('lectures')->nullOnDelete();
+            $table->unsignedBigInteger('graded_by_lecture_id')->nullable();
+            $table->foreign('graded_by_lecture_id', 'detail_scores_graded_by_fk')->references('id')->on('lectures')->nullOnDelete();
 
             // Score values
             $table->decimal('points_earned', 8, 2)->nullable(); // Actual points earned
@@ -86,7 +88,8 @@ return new class extends Migration
             // Score history and auditing
             $table->json('score_history')->nullable(); // Track all score changes
             $table->timestamp('last_modified_at')->nullable();
-            $table->foreignId('last_modified_by_lecture_id')->nullable()->constrained('lectures')->nullOnDelete();
+            $table->unsignedBigInteger('last_modified_by_lecture_id')->nullable();
+            $table->foreign('last_modified_by_lecture_id', 'detail_scores_modified_by_fk')->references('id')->on('lectures')->nullOnDelete();
 
             // Special circumstances
             $table->boolean('is_extra_credit')->default(false);
@@ -116,13 +119,13 @@ return new class extends Migration
             $table->index(['student_id', 'status'], 'student_status_idx');
             $table->index(['student_id', 'score_status'], 'student_score_status_idx');
             $table->index(['course_offering_id', 'status'], 'course_status_idx');
-            $table->index(['graded_by_lecture_id', 'graded_at']);
-            $table->index(['submitted_at', 'status']);
-            $table->index(['is_late', 'late_penalty_applied']);
-            $table->index(['plagiarism_suspected', 'integrity_status']);
-            $table->index(['appeal_requested', 'appeal_status']);
-            $table->index(['student_group_id', 'individual_score_override']);
-            $table->index(['score_excluded', 'is_extra_credit']);
+            $table->index(['graded_by_lecture_id', 'graded_at'], 'graded_by_date_idx');
+            $table->index(['submitted_at', 'status'], 'submitted_status_idx');
+            $table->index(['is_late', 'late_penalty_applied'], 'late_penalty_idx');
+            $table->index(['plagiarism_suspected', 'integrity_status'], 'plagiarism_integrity_idx');
+            $table->index(['appeal_requested', 'appeal_status'], 'appeal_status_idx');
+            $table->index(['student_group_id', 'individual_score_override'], 'group_override_idx');
+            $table->index(['score_excluded', 'is_extra_credit'], 'excluded_extra_idx');
 
             // Unique constraint to prevent duplicate scores
             $table->unique(['assessment_component_detail_id', 'student_id', 'course_offering_id', 'submission_attempt'], 'unique_detail_student_course_attempt');

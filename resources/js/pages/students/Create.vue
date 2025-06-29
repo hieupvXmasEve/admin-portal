@@ -187,8 +187,6 @@ const graduationYears = computed(() => {
 <template>
     <Head title="Create Student" />
 
-    <AppLayout>
-        <div class="space-y-6 p-4">
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
@@ -592,6 +590,4 @@ const graduationYears = computed(() => {
                     </Button>
                 </div>
             </form>
-        </div>
-    </AppLayout>
 </template>

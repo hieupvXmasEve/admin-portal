@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Settings, Shield } from 'lucide-vue-next';
@@ -114,144 +113,134 @@ const goBack = () => {
 
 <template>
     <Head title="Add Role" />
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
-            <!-- Header -->
-            <div class="flex items-center gap-4">
-                <Button variant="ghost" size="icon" @click="goBack" class="h-8 w-8">
-                    <ArrowLeft class="h-4 w-4" />
-                </Button>
-                <div>
-                    <h1 class="text-2xl font-semibold">Add New Role</h1>
-                    <p class="text-muted-foreground">Create a new role and assign permissions</p>
-                </div>
-            </div>
+    <!-- Header -->
+    <div class="flex items-center gap-4">
+        <Button variant="ghost" size="icon" @click="goBack" class="h-8 w-8">
+            <ArrowLeft class="h-4 w-4" />
+        </Button>
+        <div>
+            <h1 class="text-2xl font-semibold">Add New Role</h1>
+            <p class="text-muted-foreground">Create a new role and assign permissions</p>
+        </div>
+    </div>
 
-            <form @submit.prevent="handleSubmit" class="space-y-6">
-                <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <!-- Role Information Card -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle class="flex items-center gap-2">
-                                <Settings class="h-5 w-5" />
-                                Role Information
-                            </CardTitle>
-                            <CardDescription> Enter the basic information for the new role </CardDescription>
-                        </CardHeader>
-                        <CardContent class="space-y-4">
-                            <div class="space-y-2">
-                                <Label for="name">Role Name</Label>
-                                <Input
-                                    id="name"
-                                    v-model="form.name"
-                                    placeholder="Enter role name"
-                                    required
-                                    :class="{ 'border-red-500': form.errors.name }"
-                                />
-                                <p v-if="form.errors.name" class="text-sm text-red-500">
-                                    {{ form.errors.name }}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
+    <form @submit.prevent="handleSubmit" class="space-y-6">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <!-- Role Information Card -->
+            <Card>
+                <CardHeader>
+                    <CardTitle class="flex items-center gap-2">
+                        <Settings class="h-5 w-5" />
+                        Role Information
+                    </CardTitle>
+                    <CardDescription> Enter the basic information for the new role </CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div class="space-y-2">
+                        <Label for="name">Role Name</Label>
+                        <Input id="name" v-model="form.name" placeholder="Enter role name" required :class="{ 'border-red-500': form.errors.name }" />
+                        <p v-if="form.errors.name" class="text-sm text-red-500">
+                            {{ form.errors.name }}
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
 
-                    <!-- Selected Permissions Summary -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle class="flex items-center gap-2">
-                                <Shield class="h-5 w-5" />
-                                Selected Permissions Summary
-                            </CardTitle>
-                            <CardDescription> Overview of selected permissions </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div v-if="selectedPermissionsCount === 0" class="text-muted-foreground py-8 text-center">
-                                <Shield class="mx-auto mb-2 h-12 w-12 opacity-50" />
-                                <p>No permissions selected</p>
-                                <p class="text-sm">Select permissions from the groups below</p>
-                            </div>
+            <!-- Selected Permissions Summary -->
+            <Card>
+                <CardHeader>
+                    <CardTitle class="flex items-center gap-2">
+                        <Shield class="h-5 w-5" />
+                        Selected Permissions Summary
+                    </CardTitle>
+                    <CardDescription> Overview of selected permissions </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div v-if="selectedPermissionsCount === 0" class="text-muted-foreground py-8 text-center">
+                        <Shield class="mx-auto mb-2 h-12 w-12 opacity-50" />
+                        <p>No permissions selected</p>
+                        <p class="text-sm">Select permissions from the groups below</p>
+                    </div>
 
-                            <div v-else class="space-y-4">
-                                <div>
-                                    <h4 class="mb-2 font-medium">Total Permissions ({{ selectedPermissionsCount }})</h4>
-                                    <div class="max-h-32 overflow-y-auto">
-                                        <div class="flex flex-wrap gap-1">
-                                            <span
-                                                v-for="permissionId in form.selectedPermissions"
-                                                :key="permissionId"
-                                                class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
-                                            >
-                                                {{ permissions.flatMap((p) => p.children || []).find((child) => child.id === permissionId)?.name }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <!-- Permissions Selection -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Permission Assignment</CardTitle>
-                        <CardDescription> Select permissions for this role. Permissions are grouped by category. </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="space-y-6">
-                            <div v-for="parentPermission in permissions" :key="parentPermission.id" class="space-y-3">
-                                <!-- Parent Permission Group Header -->
-                                <div class="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
-                                    <Checkbox
-                                        :model-value="isParentPermissionSelected(parentPermission)"
-                                        :indeterminate="isParentPermissionPartiallySelected(parentPermission)"
-                                        @update:model-value="toggleParentPermissionSelection(parentPermission)"
-                                    />
-                                    <div class="flex-1">
-                                        <h3 class="text-sm font-medium">{{ parentPermission.name }}</h3>
-                                        <p v-if="parentPermission.description" class="text-muted-foreground text-xs">
-                                            {{ parentPermission.description }}
-                                        </p>
-                                    </div>
-                                    <span class="text-muted-foreground text-xs"> {{ parentPermission.children?.length || 0 }} permissions </span>
-                                </div>
-
-                                <!-- Child Permissions -->
-                                <div v-if="parentPermission.children && parentPermission.children.length > 0" class="ml-6 space-y-2">
-                                    <div
-                                        v-for="childPermission in parentPermission.children"
-                                        :key="childPermission.id"
-                                        class="hover:bg-muted/30 flex items-center gap-3 rounded p-2"
+                    <div v-else class="space-y-4">
+                        <div>
+                            <h4 class="mb-2 font-medium">Total Permissions ({{ selectedPermissionsCount }})</h4>
+                            <div class="max-h-32 overflow-y-auto">
+                                <div class="flex flex-wrap gap-1">
+                                    <span
+                                        v-for="permissionId in form.selectedPermissions"
+                                        :key="permissionId"
+                                        class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
                                     >
-                                        <Checkbox
-                                            :model-value="isPermissionSelected(childPermission.id)"
-                                            @update:model-value="togglePermissionSelection(childPermission.id)"
-                                        />
-                                        <div class="flex-1">
-                                            <span class="text-sm font-medium">{{ childPermission.name }}</span>
-                                            <p v-if="childPermission.description" class="text-muted-foreground text-xs">
-                                                {{ childPermission.description }}
-                                            </p>
-                                        </div>
-                                    </div>
+                                        {{ permissions.flatMap((p) => p.children || []).find((child) => child.id === permissionId)?.name }}
+                                    </span>
                                 </div>
-
-                                <!-- No child permissions message -->
-                                <div v-else class="text-muted-foreground ml-6 text-sm">No specific permissions in this category</div>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
-
-                <!-- Form Actions -->
-                <div class="flex items-center justify-end gap-4">
-                    <Button type="button" variant="outline" @click="goBack"> Cancel </Button>
-                    <Button type="submit" :disabled="form.processing || !form.name" class="min-w-[120px]">
-                        <span v-if="form.processing">Creating...</span>
-                        <span v-else>Create Role</span>
-                    </Button>
-                </div>
-            </form>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
-    </AppLayout>
+
+        <!-- Permissions Selection -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Permission Assignment</CardTitle>
+                <CardDescription> Select permissions for this role. Permissions are grouped by category. </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div class="space-y-6">
+                    <div v-for="parentPermission in permissions" :key="parentPermission.id" class="space-y-3">
+                        <!-- Parent Permission Group Header -->
+                        <div class="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
+                            <Checkbox
+                                :model-value="isParentPermissionSelected(parentPermission)"
+                                :indeterminate="isParentPermissionPartiallySelected(parentPermission)"
+                                @update:model-value="toggleParentPermissionSelection(parentPermission)"
+                            />
+                            <div class="flex-1">
+                                <h3 class="text-sm font-medium">{{ parentPermission.name }}</h3>
+                                <p v-if="parentPermission.description" class="text-muted-foreground text-xs">
+                                    {{ parentPermission.description }}
+                                </p>
+                            </div>
+                            <span class="text-muted-foreground text-xs"> {{ parentPermission.children?.length || 0 }} permissions </span>
+                        </div>
+
+                        <!-- Child Permissions -->
+                        <div v-if="parentPermission.children && parentPermission.children.length > 0" class="ml-6 space-y-2">
+                            <div
+                                v-for="childPermission in parentPermission.children"
+                                :key="childPermission.id"
+                                class="hover:bg-muted/30 flex items-center gap-3 rounded p-2"
+                            >
+                                <Checkbox
+                                    :model-value="isPermissionSelected(childPermission.id)"
+                                    @update:model-value="togglePermissionSelection(childPermission.id)"
+                                />
+                                <div class="flex-1">
+                                    <span class="text-sm font-medium">{{ childPermission.name }}</span>
+                                    <p v-if="childPermission.description" class="text-muted-foreground text-xs">
+                                        {{ childPermission.description }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- No child permissions message -->
+                        <div v-else class="text-muted-foreground ml-6 text-sm">No specific permissions in this category</div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Form Actions -->
+        <div class="flex items-center justify-end gap-4">
+            <Button type="button" variant="outline" @click="goBack"> Cancel </Button>
+            <Button type="submit" :disabled="form.processing || !form.name" class="min-w-[120px]">
+                <span v-if="form.processing">Creating...</span>
+                <span v-else>Create Role</span>
+            </Button>
+        </div>
+    </form>
 </template>

@@ -11,7 +11,6 @@ import HeadlessToastWithProps from '@/components/ui/sonner/HeadlessToastWithProp
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables/useApiRequest';
-import AppLayout from '@/layouts/AppLayout.vue';
 import { createColumns } from '@/lib/table-utils';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
@@ -553,413 +552,402 @@ onMounted(() => {
 <template>
     <Head :title="`${semester.name} - Enrollment Management`" />
 
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" @click="router.get(route('semester.index'))">
-                        <ChevronLeft class="h-4 w-4" />
-                        Back to Semesters
-                    </Button>
-                </div>
-                <Heading :title="`${semester.name} - Enrollment Management`" />
-            </div>
-
-            <!-- Overview Cards -->
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Enrolled</CardTitle>
-                        <Users class="text-muted-foreground h-4 w-4" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ enrollmentStats.total_enrolled }}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">In Progress</CardTitle>
-                        <FileCheck class="text-muted-foreground h-4 w-4" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ enrollmentStats.by_status.in_progress || 0 }}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Course Offerings</CardTitle>
-                        <BookOpen class="text-muted-foreground h-4 w-4" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ semester.course_offerings?.length || 0 }}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Enrollment Rate</CardTitle>
-                        <BarChart3 class="text-muted-foreground h-4 w-4" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ registrationStats?.enrollment_summary.enrollment_rate || 0 }}%</div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <!-- Tabs -->
-            <Tabs default-value="enrollments" class="space-y-4">
-                <TabsList>
-                    <TabsTrigger value="enrollments">Manage Enrollments</TabsTrigger>
-                    <TabsTrigger value="courses">Suggest Courses</TabsTrigger>
-                    <TabsTrigger value="registrations">Course Registrations</TabsTrigger>
-                    <TabsTrigger value="statistics">Registration Statistics</TabsTrigger>
-                </TabsList>
-
-                <!-- Step 1: Manage Enrollments -->
-                <TabsContent value="enrollments" class="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Generate Student Enrollments</CardTitle>
-                            <CardDescription> Create enrollments for all active students based on their curriculum progress. </CardDescription>
-                        </CardHeader>
-                        <CardContent class="space-y-4">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-muted-foreground text-sm">
-                                        This will create enrollment records for students who don't already have one for this semester.
-                                    </p>
-                                </div>
-                                <Button @click="generateEnrollments" :disabled="loading.generate">
-                                    <Loader2 v-if="loading.generate" class="mr-2 h-4 w-4 animate-spin" />
-                                    Generate Enrollments
-                                </Button>
-                            </div>
-
-                            <!-- Enrollment Stats -->
-                            <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-                                <div v-for="(count, status) in enrollmentStats.by_status" :key="status" class="rounded bg-gray-50 p-3 text-center">
-                                    <div class="text-lg font-semibold">{{ count }}</div>
-                                    <div class="text-muted-foreground text-sm capitalize">{{ status.replace('_', ' ') }}</div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <!-- Step 2: Suggest Courses -->
-                <TabsContent value="courses" class="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <CardTitle>Suggested Courses to Open</CardTitle>
-                                    <CardDescription> Based on student enrollments and curriculum requirements. </CardDescription>
-                                </div>
-                                <div class="flex gap-2">
-                                    <Button variant="outline" @click="loadSuggestedCourses" :disabled="loading.suggested">
-                                        <Loader2 v-if="loading.suggested" class="mr-2 h-4 w-4 animate-spin" />
-                                        Refresh Suggestions
-                                    </Button>
-                                    <Button @click="openBulkOpenModal" :disabled="selectedCourses.size === 0">
-                                        <Plus class="mr-2 h-4 w-4" />
-                                        Open Selected ({{ selectedCourses.size }})
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <DataTable
-                                :data="suggestedCourses"
-                                :columns="suggestedCoursesColumns"
-                                :loading="loading.suggested"
-                                :enable-row-selection="true"
-                                empty-message="No course suggestions available. Please generate enrollments first."
-                                @selection-change="handleSuggestedCoursesSelection"
-                            />
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <!-- Step 3: Course Registrations -->
-                <TabsContent value="registrations" class="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <CardTitle>Course Registrations</CardTitle>
-                                    <CardDescription> Bulk register enrolled students for available course offerings. </CardDescription>
-                                </div>
-                                <div class="flex gap-2">
-                                    <Button variant="outline" @click="loadRegistrableStudents" :disabled="loading.registrable">
-                                        <Loader2 v-if="loading.registrable" class="mr-2 h-4 w-4 animate-spin" />
-                                        Refresh Students
-                                    </Button>
-                                    <Button @click="openBulkRegisterModal" :disabled="!registrableStudents?.summary?.total_available_registrations">
-                                        <Plus class="mr-2 h-4 w-4" />
-                                        Bulk Register Students
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div v-if="registrableStudents" class="space-y-4">
-                                <!-- Summary Stats -->
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-                                    <div class="rounded bg-gray-50 p-3 text-center">
-                                        <div class="text-lg font-semibold">{{ registrableStudents.summary.total_students }}</div>
-                                        <div class="text-muted-foreground text-sm">Students with Courses</div>
-                                    </div>
-                                    <div class="rounded bg-gray-50 p-3 text-center">
-                                        <div class="text-lg font-semibold">{{ registrableStudents.summary.total_available_registrations }}</div>
-                                        <div class="text-muted-foreground text-sm">Available Registrations</div>
-                                    </div>
-                                    <div class="rounded bg-gray-50 p-3 text-center">
-                                        <div class="text-lg font-semibold">{{ registrableStudents.summary.avg_courses_per_student }}</div>
-                                        <div class="text-muted-foreground text-sm">Avg Courses/Student</div>
-                                    </div>
-                                    <div class="rounded bg-gray-50 p-3 text-center">
-                                        <div class="text-lg font-semibold">{{ registrableStudents.summary.total_enrollments }}</div>
-                                        <div class="text-muted-foreground text-sm">Total Enrollments</div>
-                                    </div>
-                                </div>
-
-                                <!-- Students Table -->
-                                <DataTable
-                                    :data="registrableStudents.students"
-                                    :columns="registrableStudentsColumns"
-                                    :loading="loading.registrable"
-                                    empty-message="No students with available course registrations."
-                                />
-                            </div>
-                            <div v-else class="text-muted-foreground py-8 text-center">
-                                <div v-if="loading.registrable">Loading registrable students...</div>
-                                <div v-else>No registrable students data available.</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <!-- Step 4: Registration Statistics -->
-                <TabsContent value="statistics" class="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <CardTitle>Registration Statistics</CardTitle>
-                                    <CardDescription> Track student registration progress for opened courses. </CardDescription>
-                                </div>
-                                <Button variant="outline" @click="loadRegistrationStats" :disabled="loading.stats">
-                                    <Loader2 v-if="loading.stats" class="mr-2 h-4 w-4 animate-spin" />
-                                    Refresh Stats
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div v-if="registrationStats" class="space-y-4">
-                                <!-- Summary Stats -->
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-                                    <div class="rounded bg-gray-50 p-3 text-center">
-                                        <div class="text-lg font-semibold">{{ registrationStats.enrollment_summary.total_capacity }}</div>
-                                        <div class="text-muted-foreground text-sm">Total Capacity</div>
-                                    </div>
-                                    <div class="rounded bg-gray-50 p-3 text-center">
-                                        <div class="text-lg font-semibold">{{ registrationStats.enrollment_summary.total_enrolled }}</div>
-                                        <div class="text-muted-foreground text-sm">Total Enrolled</div>
-                                    </div>
-                                    <div class="rounded bg-gray-50 p-3 text-center">
-                                        <div class="text-lg font-semibold">{{ registrationStats.enrollment_summary.total_waitlisted }}</div>
-                                        <div class="text-muted-foreground text-sm">Total Waitlisted</div>
-                                    </div>
-                                    <div class="rounded bg-gray-50 p-3 text-center">
-                                        <div class="text-lg font-semibold">{{ registrationStats.enrollment_summary.enrollment_rate }}%</div>
-                                        <div class="text-muted-foreground text-sm">Enrollment Rate</div>
-                                    </div>
-                                </div>
-
-                                <!-- Course Offerings Table -->
-                                <DataTable
-                                    :data="registrationStats.offerings"
-                                    :columns="registrationStatsColumns"
-                                    empty-message="No course offerings found."
-                                />
-                            </div>
-                            <div v-else class="text-muted-foreground py-8 text-center">No registration statistics available.</div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
-
-            <!-- Bulk Open Modal -->
-            <Dialog v-model:open="showBulkOpenModal">
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Bulk Open Course Offerings</DialogTitle>
-                        <DialogDescription> Create course offerings for {{ selectedCourses.size }} selected units. </DialogDescription>
-                    </DialogHeader>
-
-                    <div class="grid gap-4 py-4">
-                        <div class="grid grid-cols-4 items-center gap-4">
-                            <Label for="default-capacity" class="text-right">Default Capacity</Label>
-                            <Input
-                                id="default-capacity"
-                                v-model.number="bulkOpenForm.default_capacity"
-                                type="number"
-                                min="1"
-                                max="500"
-                                class="col-span-3"
-                            />
-                        </div>
-                        <div class="grid grid-cols-4 items-center gap-4">
-                            <Label for="delivery-mode" class="text-right">Delivery Mode</Label>
-                            <Select v-model="bulkOpenForm.delivery_mode">
-                                <SelectTrigger class="col-span-3">
-                                    <SelectValue placeholder="Select delivery mode" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="in_person">In Person</SelectItem>
-                                    <SelectItem value="online">Online</SelectItem>
-                                    <SelectItem value="hybrid">Hybrid</SelectItem>
-                                    <SelectItem value="blended">Blended</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" @click="showBulkOpenModal = false">Cancel</Button>
-                        <Button @click="submitBulkOpen"> Create Offerings </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <!-- Single Open Modal -->
-            <Dialog v-model:open="showSingleOpenModal">
-                <DialogContent class="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Open Course Offering</DialogTitle>
-                        <DialogDescription v-if="selectedUnit">
-                            Create a detailed course offering for {{ selectedUnit.code }} - {{ selectedUnit.name }}.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div class="grid gap-4 py-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label for="section-code">Section Code</Label>
-                                <Input id="section-code" v-model="singleOpenForm.section_code" placeholder="e.g., A01" />
-                            </div>
-                            <div>
-                                <Label for="instructor">Instructor</Label>
-                                <Input id="instructor" v-model="singleOpenForm.instructor_id" placeholder="Select instructor" />
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label for="max-capacity">Max Capacity</Label>
-                                <Input id="max-capacity" v-model.number="singleOpenForm.max_capacity" type="number" min="1" max="500" />
-                            </div>
-                            <div>
-                                <Label for="waitlist-capacity">Waitlist Capacity</Label>
-                                <Input id="waitlist-capacity" v-model.number="singleOpenForm.waitlist_capacity" type="number" min="0" max="100" />
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label for="delivery-mode-single">Delivery Mode</Label>
-                                <Select v-model="singleOpenForm.delivery_mode">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select delivery mode" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="in_person">In Person</SelectItem>
-                                        <SelectItem value="online">Online</SelectItem>
-                                        <SelectItem value="hybrid">Hybrid</SelectItem>
-                                        <SelectItem value="blended">Blended</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label for="location">Location</Label>
-                                <Input id="location" v-model="singleOpenForm.location" placeholder="Room/Building" />
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label for="start-time">Start Time</Label>
-                                <Input id="start-time" v-model="singleOpenForm.schedule_time_start" type="time" />
-                            </div>
-                            <div>
-                                <Label for="end-time">End Time</Label>
-                                <Input id="end-time" v-model="singleOpenForm.schedule_time_end" type="time" />
-                            </div>
-                        </div>
-                        <div>
-                            <Label for="notes">Notes</Label>
-                            <Textarea id="notes" v-model="singleOpenForm.notes" placeholder="Additional notes..." />
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" @click="showSingleOpenModal = false">Cancel</Button>
-                        <Button @click="submitSingleOpen"> Create Offering </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <!-- Bulk Registration Modal -->
-            <Dialog v-model:open="showBulkRegisterModal">
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Bulk Register Students</DialogTitle>
-                        <DialogDescription>
-                            Register all eligible students for their available course offerings based on their curriculum.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div class="grid gap-4 py-4">
-                        <div class="grid grid-cols-4 items-center gap-4">
-                            <Label for="registration-method" class="text-right">Registration Method</Label>
-                            <Select v-model="bulkRegisterForm.registration_method">
-                                <SelectTrigger class="col-span-3">
-                                    <SelectValue placeholder="Select method" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="admin_override">Admin Override</SelectItem>
-                                    <SelectItem value="online">Online</SelectItem>
-                                    <SelectItem value="advisor">Advisor</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div class="grid grid-cols-4 items-center gap-4">
-                            <Label for="force-registration" class="text-right">Force Registration</Label>
-                            <div class="col-span-3 flex items-center space-x-2">
-                                <input
-                                    id="force-registration"
-                                    v-model="bulkRegisterForm.force_registration"
-                                    type="checkbox"
-                                    class="h-4 w-4 rounded border-gray-300"
-                                />
-                                <Label for="force-registration" class="text-muted-foreground text-sm">
-                                    Register students even if courses are at capacity
-                                </Label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div v-if="registrableStudents" class="rounded bg-gray-50 p-4">
-                        <div class="mb-2 text-sm font-medium">Registration Summary:</div>
-                        <div class="text-muted-foreground space-y-1 text-sm">
-                            <div>• {{ registrableStudents.summary.total_students }} students eligible</div>
-                            <div>• {{ registrableStudents.summary.total_available_registrations }} available registrations</div>
-                            <div>• {{ registrableStudents.summary.avg_courses_per_student }} average courses per student</div>
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" @click="showBulkRegisterModal = false">Cancel</Button>
-                        <Button @click="submitBulkRegister">Register Students</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <Button variant="ghost" size="sm" @click="router.get(route('semester.index'))">
+                <ChevronLeft class="h-4 w-4" />
+                Back to Semesters
+            </Button>
         </div>
-    </AppLayout>
+        <Heading :title="`${semester.name} - Enrollment Management`" />
+    </div>
+
+    <!-- Overview Cards -->
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Total Enrolled</CardTitle>
+                <Users class="text-muted-foreground h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ enrollmentStats.total_enrolled }}</div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">In Progress</CardTitle>
+                <FileCheck class="text-muted-foreground h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ enrollmentStats.by_status.in_progress || 0 }}</div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Course Offerings</CardTitle>
+                <BookOpen class="text-muted-foreground h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ semester.course_offerings?.length || 0 }}</div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Enrollment Rate</CardTitle>
+                <BarChart3 class="text-muted-foreground h-4 w-4" />
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ registrationStats?.enrollment_summary.enrollment_rate || 0 }}%</div>
+            </CardContent>
+        </Card>
+    </div>
+
+    <!-- Tabs -->
+    <Tabs default-value="enrollments" class="space-y-4">
+        <TabsList>
+            <TabsTrigger value="enrollments">Manage Enrollments</TabsTrigger>
+            <TabsTrigger value="courses">Suggest Courses</TabsTrigger>
+            <TabsTrigger value="registrations">Course Registrations</TabsTrigger>
+            <TabsTrigger value="statistics">Registration Statistics</TabsTrigger>
+        </TabsList>
+
+        <!-- Step 1: Manage Enrollments -->
+        <TabsContent value="enrollments" class="space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Generate Student Enrollments</CardTitle>
+                    <CardDescription> Create enrollments for all active students based on their curriculum progress. </CardDescription>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-muted-foreground text-sm">
+                                This will create enrollment records for students who don't already have one for this semester.
+                            </p>
+                        </div>
+                        <Button @click="generateEnrollments" :disabled="loading.generate">
+                            <Loader2 v-if="loading.generate" class="mr-2 h-4 w-4 animate-spin" />
+                            Generate Enrollments
+                        </Button>
+                    </div>
+
+                    <!-- Enrollment Stats -->
+                    <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+                        <div v-for="(count, status) in enrollmentStats.by_status" :key="status" class="rounded bg-gray-50 p-3 text-center">
+                            <div class="text-lg font-semibold">{{ count }}</div>
+                            <div class="text-muted-foreground text-sm capitalize">{{ status.replace('_', ' ') }}</div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Step 2: Suggest Courses -->
+        <TabsContent value="courses" class="space-y-4">
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Suggested Courses to Open</CardTitle>
+                            <CardDescription> Based on student enrollments and curriculum requirements. </CardDescription>
+                        </div>
+                        <div class="flex gap-2">
+                            <Button variant="outline" @click="loadSuggestedCourses" :disabled="loading.suggested">
+                                <Loader2 v-if="loading.suggested" class="mr-2 h-4 w-4 animate-spin" />
+                                Refresh Suggestions
+                            </Button>
+                            <Button @click="openBulkOpenModal" :disabled="selectedCourses.size === 0">
+                                <Plus class="mr-2 h-4 w-4" />
+                                Open Selected ({{ selectedCourses.size }})
+                            </Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <DataTable
+                        :data="suggestedCourses"
+                        :columns="suggestedCoursesColumns"
+                        :loading="loading.suggested"
+                        :enable-row-selection="true"
+                        empty-message="No course suggestions available. Please generate enrollments first."
+                        @selection-change="handleSuggestedCoursesSelection"
+                    />
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Step 3: Course Registrations -->
+        <TabsContent value="registrations" class="space-y-4">
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Course Registrations</CardTitle>
+                            <CardDescription> Bulk register enrolled students for available course offerings. </CardDescription>
+                        </div>
+                        <div class="flex gap-2">
+                            <Button variant="outline" @click="loadRegistrableStudents" :disabled="loading.registrable">
+                                <Loader2 v-if="loading.registrable" class="mr-2 h-4 w-4 animate-spin" />
+                                Refresh Students
+                            </Button>
+                            <Button @click="openBulkRegisterModal" :disabled="!registrableStudents?.summary?.total_available_registrations">
+                                <Plus class="mr-2 h-4 w-4" />
+                                Bulk Register Students
+                            </Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div v-if="registrableStudents" class="space-y-4">
+                        <!-- Summary Stats -->
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                            <div class="rounded bg-gray-50 p-3 text-center">
+                                <div class="text-lg font-semibold">{{ registrableStudents.summary.total_students }}</div>
+                                <div class="text-muted-foreground text-sm">Students with Courses</div>
+                            </div>
+                            <div class="rounded bg-gray-50 p-3 text-center">
+                                <div class="text-lg font-semibold">{{ registrableStudents.summary.total_available_registrations }}</div>
+                                <div class="text-muted-foreground text-sm">Available Registrations</div>
+                            </div>
+                            <div class="rounded bg-gray-50 p-3 text-center">
+                                <div class="text-lg font-semibold">{{ registrableStudents.summary.avg_courses_per_student }}</div>
+                                <div class="text-muted-foreground text-sm">Avg Courses/Student</div>
+                            </div>
+                            <div class="rounded bg-gray-50 p-3 text-center">
+                                <div class="text-lg font-semibold">{{ registrableStudents.summary.total_enrollments }}</div>
+                                <div class="text-muted-foreground text-sm">Total Enrollments</div>
+                            </div>
+                        </div>
+
+                        <!-- Students Table -->
+                        <DataTable
+                            :data="registrableStudents.students"
+                            :columns="registrableStudentsColumns"
+                            :loading="loading.registrable"
+                            empty-message="No students with available course registrations."
+                        />
+                    </div>
+                    <div v-else class="text-muted-foreground py-8 text-center">
+                        <div v-if="loading.registrable">Loading registrable students...</div>
+                        <div v-else>No registrable students data available.</div>
+                    </div>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Step 4: Registration Statistics -->
+        <TabsContent value="statistics" class="space-y-4">
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Registration Statistics</CardTitle>
+                            <CardDescription> Track student registration progress for opened courses. </CardDescription>
+                        </div>
+                        <Button variant="outline" @click="loadRegistrationStats" :disabled="loading.stats">
+                            <Loader2 v-if="loading.stats" class="mr-2 h-4 w-4 animate-spin" />
+                            Refresh Stats
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div v-if="registrationStats" class="space-y-4">
+                        <!-- Summary Stats -->
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                            <div class="rounded bg-gray-50 p-3 text-center">
+                                <div class="text-lg font-semibold">{{ registrationStats.enrollment_summary.total_capacity }}</div>
+                                <div class="text-muted-foreground text-sm">Total Capacity</div>
+                            </div>
+                            <div class="rounded bg-gray-50 p-3 text-center">
+                                <div class="text-lg font-semibold">{{ registrationStats.enrollment_summary.total_enrolled }}</div>
+                                <div class="text-muted-foreground text-sm">Total Enrolled</div>
+                            </div>
+                            <div class="rounded bg-gray-50 p-3 text-center">
+                                <div class="text-lg font-semibold">{{ registrationStats.enrollment_summary.total_waitlisted }}</div>
+                                <div class="text-muted-foreground text-sm">Total Waitlisted</div>
+                            </div>
+                            <div class="rounded bg-gray-50 p-3 text-center">
+                                <div class="text-lg font-semibold">{{ registrationStats.enrollment_summary.enrollment_rate }}%</div>
+                                <div class="text-muted-foreground text-sm">Enrollment Rate</div>
+                            </div>
+                        </div>
+
+                        <!-- Course Offerings Table -->
+                        <DataTable
+                            :data="registrationStats.offerings"
+                            :columns="registrationStatsColumns"
+                            empty-message="No course offerings found."
+                        />
+                    </div>
+                    <div v-else class="text-muted-foreground py-8 text-center">No registration statistics available.</div>
+                </CardContent>
+            </Card>
+        </TabsContent>
+    </Tabs>
+
+    <!-- Bulk Open Modal -->
+    <Dialog v-model:open="showBulkOpenModal">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Bulk Open Course Offerings</DialogTitle>
+                <DialogDescription> Create course offerings for {{ selectedCourses.size }} selected units. </DialogDescription>
+            </DialogHeader>
+
+            <div class="grid gap-4 py-4">
+                <div class="grid grid-cols-4 items-center gap-4">
+                    <Label for="default-capacity" class="text-right">Default Capacity</Label>
+                    <Input id="default-capacity" v-model.number="bulkOpenForm.default_capacity" type="number" min="1" max="500" class="col-span-3" />
+                </div>
+                <div class="grid grid-cols-4 items-center gap-4">
+                    <Label for="delivery-mode" class="text-right">Delivery Mode</Label>
+                    <Select v-model="bulkOpenForm.delivery_mode">
+                        <SelectTrigger class="col-span-3">
+                            <SelectValue placeholder="Select delivery mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="in_person">In Person</SelectItem>
+                            <SelectItem value="online">Online</SelectItem>
+                            <SelectItem value="hybrid">Hybrid</SelectItem>
+                            <SelectItem value="blended">Blended</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="showBulkOpenModal = false">Cancel</Button>
+                <Button @click="submitBulkOpen"> Create Offerings </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Single Open Modal -->
+    <Dialog v-model:open="showSingleOpenModal">
+        <DialogContent class="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Open Course Offering</DialogTitle>
+                <DialogDescription v-if="selectedUnit">
+                    Create a detailed course offering for {{ selectedUnit.code }} - {{ selectedUnit.name }}.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div class="grid gap-4 py-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <Label for="section-code">Section Code</Label>
+                        <Input id="section-code" v-model="singleOpenForm.section_code" placeholder="e.g., A01" />
+                    </div>
+                    <div>
+                        <Label for="instructor">Instructor</Label>
+                        <Input id="instructor" v-model="singleOpenForm.instructor_id" placeholder="Select instructor" />
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <Label for="max-capacity">Max Capacity</Label>
+                        <Input id="max-capacity" v-model.number="singleOpenForm.max_capacity" type="number" min="1" max="500" />
+                    </div>
+                    <div>
+                        <Label for="waitlist-capacity">Waitlist Capacity</Label>
+                        <Input id="waitlist-capacity" v-model.number="singleOpenForm.waitlist_capacity" type="number" min="0" max="100" />
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <Label for="delivery-mode-single">Delivery Mode</Label>
+                        <Select v-model="singleOpenForm.delivery_mode">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select delivery mode" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="in_person">In Person</SelectItem>
+                                <SelectItem value="online">Online</SelectItem>
+                                <SelectItem value="hybrid">Hybrid</SelectItem>
+                                <SelectItem value="blended">Blended</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label for="location">Location</Label>
+                        <Input id="location" v-model="singleOpenForm.location" placeholder="Room/Building" />
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <Label for="start-time">Start Time</Label>
+                        <Input id="start-time" v-model="singleOpenForm.schedule_time_start" type="time" />
+                    </div>
+                    <div>
+                        <Label for="end-time">End Time</Label>
+                        <Input id="end-time" v-model="singleOpenForm.schedule_time_end" type="time" />
+                    </div>
+                </div>
+                <div>
+                    <Label for="notes">Notes</Label>
+                    <Textarea id="notes" v-model="singleOpenForm.notes" placeholder="Additional notes..." />
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="showSingleOpenModal = false">Cancel</Button>
+                <Button @click="submitSingleOpen"> Create Offering </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Bulk Registration Modal -->
+    <Dialog v-model:open="showBulkRegisterModal">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Bulk Register Students</DialogTitle>
+                <DialogDescription>
+                    Register all eligible students for their available course offerings based on their curriculum.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div class="grid gap-4 py-4">
+                <div class="grid grid-cols-4 items-center gap-4">
+                    <Label for="registration-method" class="text-right">Registration Method</Label>
+                    <Select v-model="bulkRegisterForm.registration_method">
+                        <SelectTrigger class="col-span-3">
+                            <SelectValue placeholder="Select method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="admin_override">Admin Override</SelectItem>
+                            <SelectItem value="online">Online</SelectItem>
+                            <SelectItem value="advisor">Advisor</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div class="grid grid-cols-4 items-center gap-4">
+                    <Label for="force-registration" class="text-right">Force Registration</Label>
+                    <div class="col-span-3 flex items-center space-x-2">
+                        <input
+                            id="force-registration"
+                            v-model="bulkRegisterForm.force_registration"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label for="force-registration" class="text-muted-foreground text-sm">
+                            Register students even if courses are at capacity
+                        </Label>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="registrableStudents" class="rounded bg-gray-50 p-4">
+                <div class="mb-2 text-sm font-medium">Registration Summary:</div>
+                <div class="text-muted-foreground space-y-1 text-sm">
+                    <div>• {{ registrableStudents.summary.total_students }} students eligible</div>
+                    <div>• {{ registrableStudents.summary.total_available_registrations }} available registrations</div>
+                    <div>• {{ registrableStudents.summary.avg_courses_per_student }} average courses per student</div>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="showBulkRegisterModal = false">Cancel</Button>
+                <Button @click="submitBulkRegister">Register Students</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

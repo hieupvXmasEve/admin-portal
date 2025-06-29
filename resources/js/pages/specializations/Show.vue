@@ -21,7 +21,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables';
-import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import type { CurriculumVersion, Program, Semester, Specialization } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
@@ -357,229 +356,219 @@ const formatDate = (dateString: string): string => {
 <template>
     <Head :title="`${specialization.name} Specialization`" />
 
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex flex-col gap-6 p-4">
-            <!-- Compact Header with Stats -->
-            <div class="flex flex-col gap-4">
-                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-3">
-                            <h1 class="text-3xl font-bold tracking-tight">{{ specialization.name }}</h1>
-                            <Badge v-if="specialization.is_active" variant="secondary" class="border-green-200 bg-green-100 text-green-700">
-                                Active
-                            </Badge>
-                            <Badge v-else variant="outline">Inactive</Badge>
-                        </div>
-                        <div class="text-muted-foreground flex flex-wrap gap-4 text-sm">
-                            <span v-if="specialization.code">Code: {{ specialization.code }}</span>
-                            <span>Program: {{ specialization.program?.name }}</span>
-                            <span>Created: {{ formatDate(specialization.created_at) }}</span>
-                            <span>Updated: {{ formatDate(specialization.updated_at) }}</span>
-                        </div>
-                        <p v-if="specialization.description" class="text-muted-foreground text-sm">{{ specialization.description }}</p>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2">
-                        <Link :href="route('specializations.edit', { specialization: specialization.id })">
-                            <Button variant="outline">
-                                <Edit class="mr-2 h-4 w-4" />
-                                Edit
-                            </Button>
-                        </Link>
-                        <Link :href="route('specializations.index')">
-                            <Button variant="outline">
-                                <ArrowLeft class="mr-2 h-4 w-4" />
-                                Back to Specializations
-                            </Button>
-                        </Link>
-                    </div>
+    <!-- Compact Header with Stats -->
+    <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="space-y-2">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-3xl font-bold tracking-tight">{{ specialization.name }}</h1>
+                    <Badge v-if="specialization.is_active" variant="secondary" class="border-green-200 bg-green-100 text-green-700"> Active </Badge>
+                    <Badge v-else variant="outline">Inactive</Badge>
                 </div>
+                <div class="text-muted-foreground flex flex-wrap gap-4 text-sm">
+                    <span v-if="specialization.code">Code: {{ specialization.code }}</span>
+                    <span>Program: {{ specialization.program?.name }}</span>
+                    <span>Created: {{ formatDate(specialization.created_at) }}</span>
+                    <span>Updated: {{ formatDate(specialization.updated_at) }}</span>
+                </div>
+                <p v-if="specialization.description" class="text-muted-foreground text-sm">{{ specialization.description }}</p>
+            </div>
 
-                <!-- Compact Stats Row -->
-                <div class="grid grid-cols-2 gap-4 md:grid-cols-3">
-                    <div class="bg-card rounded-lg border p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-2xl font-bold">{{ statistics.curriculum_versions_count }}</p>
-                                <p class="text-muted-foreground text-xs">Total Versions</p>
-                            </div>
-                            <BookOpen class="text-muted-foreground h-4 w-4" />
-                        </div>
+            <div class="flex flex-wrap gap-2">
+                <Link :href="route('specializations.edit', { specialization: specialization.id })">
+                    <Button variant="outline">
+                        <Edit class="mr-2 h-4 w-4" />
+                        Edit
+                    </Button>
+                </Link>
+                <Link :href="route('specializations.index')">
+                    <Button variant="outline">
+                        <ArrowLeft class="mr-2 h-4 w-4" />
+                        Back to Specializations
+                    </Button>
+                </Link>
+            </div>
+        </div>
+
+        <!-- Compact Stats Row -->
+        <div class="grid grid-cols-2 gap-4 md:grid-cols-3">
+            <div class="bg-card rounded-lg border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold">{{ statistics.curriculum_versions_count }}</p>
+                        <p class="text-muted-foreground text-xs">Total Versions</p>
                     </div>
-                    <div class="bg-card rounded-lg border p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-2xl font-bold">{{ statistics.program_level_versions }}</p>
-                                <p class="text-muted-foreground text-xs">Program Level</p>
-                            </div>
-                            <Settings class="text-muted-foreground h-4 w-4" />
-                        </div>
+                    <BookOpen class="text-muted-foreground h-4 w-4" />
+                </div>
+            </div>
+            <div class="bg-card rounded-lg border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold">{{ statistics.program_level_versions }}</p>
+                        <p class="text-muted-foreground text-xs">Program Level</p>
                     </div>
-                    <div class="bg-card rounded-lg border p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-2xl font-bold">{{ statistics.specialization_level_versions }}</p>
-                                <p class="text-muted-foreground text-xs">Specialization Level</p>
-                            </div>
-                            <Target class="text-muted-foreground h-4 w-4" />
-                        </div>
+                    <Settings class="text-muted-foreground h-4 w-4" />
+                </div>
+            </div>
+            <div class="bg-card rounded-lg border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold">{{ statistics.specialization_level_versions }}</p>
+                        <p class="text-muted-foreground text-xs">Specialization Level</p>
                     </div>
+                    <Target class="text-muted-foreground h-4 w-4" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Curriculum Versions Table -->
+    <Card>
+        <CardHeader class="pb-4">
+            <div class="flex items-center justify-between">
+                <CardTitle class="flex items-center gap-2">
+                    <BookOpen class="h-5 w-5" />
+                    Curriculum Versions
+                    <Badge variant="secondary" class="ml-2">{{ paginatedCurriculumVersions.data.length }}</Badge>
+                </CardTitle>
+
+                <!-- Dialog for Add Version -->
+                <Dialog :open="isDialogOpen" @update:open="isDialogOpen = $event">
+                    <DialogTrigger as-child>
+                        <Button variant="outline" size="sm" @click="openCreateDialog">
+                            <Plus class="mr-2 h-4 w-4" />
+                            Add Version
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent class="sm:max-w-[600px]">
+                        <DialogHeader>
+                            <DialogTitle>Create Curriculum Version</DialogTitle>
+                            <DialogDescription> Add a new curriculum version for {{ specialization.name }} specialization. </DialogDescription>
+                        </DialogHeader>
+
+                        <form @submit="onSubmit" class="space-y-4">
+                            <FormField v-slot="{ componentField }" name="version_code">
+                                <FormItem>
+                                    <FormLabel>Version Code *</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            v-bind="componentField"
+                                            placeholder="e.g., v1.0, 2023-S1"
+                                            :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength"
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            </FormField>
+
+                            <FormField v-slot="{ componentField }" name="semester_id">
+                                <FormItem>
+                                    <FormLabel>Effective From Semester *</FormLabel>
+                                    <FormControl>
+                                        <Select v-bind="componentField">
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select semester" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                                                    {{ semester.name }} ({{ semester.code }})
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            </FormField>
+
+                            <FormField v-slot="{ componentField }" name="notes">
+                                <FormItem>
+                                    <FormLabel>Notes</FormLabel>
+                                    <FormControl>
+                                        <Textarea
+                                            v-bind="componentField"
+                                            placeholder="Enter any additional notes..."
+                                            rows="3"
+                                            :maxlength="ValidationRules.curriculumVersion.notes.maxLength"
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            </FormField>
+
+                            <DialogFooter>
+                                <Button type="button" variant="outline" @click="isDialogOpen = false"> Cancel </Button>
+                                <Button type="submit" :disabled="isSubmitting">
+                                    {{ isSubmitting ? 'Creating...' : 'Create Version' }}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+            </div>
+
+            <!-- Search Filter -->
+            <div class="mt-4">
+                <DebouncedInput
+                    v-model="curriculumFilters.search"
+                    @debounced="handleCurriculumSearch"
+                    placeholder="Search curriculum versions..."
+                    class="max-w-sm"
+                />
+            </div>
+        </CardHeader>
+        <CardContent class="px-4">
+            <div v-if="paginatedCurriculumVersions.data.length === 0" class="py-8 text-center">
+                <BookOpen class="mx-auto h-12 w-12 text-gray-400" />
+                <h3 class="mt-4 text-sm font-medium">No curriculum versions found</h3>
+                <p class="text-muted-foreground mt-2 text-sm">
+                    {{ curriculumFilters.search ? 'Try adjusting your search terms.' : 'Create curriculum versions to define the structure.' }}
+                </p>
+                <div class="mt-6" v-if="!curriculumFilters.search">
+                    <Button @click="openCreateDialog">
+                        <Plus class="mr-2 h-4 w-4" />
+                        Add Curriculum Version
+                    </Button>
                 </div>
             </div>
 
-            <!-- Curriculum Versions Table -->
-            <Card>
-                <CardHeader class="pb-4">
-                    <div class="flex items-center justify-between">
-                        <CardTitle class="flex items-center gap-2">
-                            <BookOpen class="h-5 w-5" />
-                            Curriculum Versions
-                            <Badge variant="secondary" class="ml-2">{{ paginatedCurriculumVersions.data.length }}</Badge>
-                        </CardTitle>
+            <div v-else>
+                <DataTable :data="paginatedCurriculumVersions.data" :columns="curriculumVersionColumns" :loading="false" class="border-0" />
+                <div class="border-t p-4" v-if="paginatedCurriculumVersions.total > 10">
+                    <DataPagination :pagination-data="curriculumPaginationData" @navigate="handleCurriculumPageChange" />
+                </div>
+            </div>
+        </CardContent>
+    </Card>
 
-                        <!-- Dialog for Add Version -->
-                        <Dialog :open="isDialogOpen" @update:open="isDialogOpen = $event">
-                            <DialogTrigger as-child>
-                                <Button variant="outline" size="sm" @click="openCreateDialog">
-                                    <Plus class="mr-2 h-4 w-4" />
-                                    Add Version
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent class="sm:max-w-[600px]">
-                                <DialogHeader>
-                                    <DialogTitle>Create Curriculum Version</DialogTitle>
-                                    <DialogDescription>
-                                        Add a new curriculum version for {{ specialization.name }} specialization.
-                                    </DialogDescription>
-                                </DialogHeader>
-
-                                <form @submit="onSubmit" class="space-y-4">
-                                    <FormField v-slot="{ componentField }" name="version_code">
-                                        <FormItem>
-                                            <FormLabel>Version Code *</FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    v-bind="componentField"
-                                                    placeholder="e.g., v1.0, 2023-S1"
-                                                    :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength"
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    </FormField>
-
-                                    <FormField v-slot="{ componentField }" name="semester_id">
-                                        <FormItem>
-                                            <FormLabel>Effective From Semester *</FormLabel>
-                                            <FormControl>
-                                                <Select v-bind="componentField">
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select semester" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                                            {{ semester.name }} ({{ semester.code }})
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    </FormField>
-
-                                    <FormField v-slot="{ componentField }" name="notes">
-                                        <FormItem>
-                                            <FormLabel>Notes</FormLabel>
-                                            <FormControl>
-                                                <Textarea
-                                                    v-bind="componentField"
-                                                    placeholder="Enter any additional notes..."
-                                                    rows="3"
-                                                    :maxlength="ValidationRules.curriculumVersion.notes.maxLength"
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    </FormField>
-
-                                    <DialogFooter>
-                                        <Button type="button" variant="outline" @click="isDialogOpen = false"> Cancel </Button>
-                                        <Button type="submit" :disabled="isSubmitting">
-                                            {{ isSubmitting ? 'Creating...' : 'Create Version' }}
-                                        </Button>
-                                    </DialogFooter>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
-
-                    <!-- Search Filter -->
-                    <div class="mt-4">
-                        <DebouncedInput
-                            v-model="curriculumFilters.search"
-                            @debounced="handleCurriculumSearch"
-                            placeholder="Search curriculum versions..."
-                            class="max-w-sm"
-                        />
-                    </div>
-                </CardHeader>
-                <CardContent class="px-4">
-                    <div v-if="paginatedCurriculumVersions.data.length === 0" class="py-8 text-center">
-                        <BookOpen class="mx-auto h-12 w-12 text-gray-400" />
-                        <h3 class="mt-4 text-sm font-medium">No curriculum versions found</h3>
-                        <p class="text-muted-foreground mt-2 text-sm">
-                            {{
-                                curriculumFilters.search ? 'Try adjusting your search terms.' : 'Create curriculum versions to define the structure.'
-                            }}
-                        </p>
-                        <div class="mt-6" v-if="!curriculumFilters.search">
-                            <Button @click="openCreateDialog">
-                                <Plus class="mr-2 h-4 w-4" />
-                                Add Curriculum Version
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div v-else>
-                        <DataTable :data="paginatedCurriculumVersions.data" :columns="curriculumVersionColumns" :loading="false" class="border-0" />
-                        <div class="border-t p-4" v-if="paginatedCurriculumVersions.total > 10">
-                            <DataPagination :pagination-data="curriculumPaginationData" @navigate="handleCurriculumPageChange" />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-
-        <!-- Delete Confirmation Dialog -->
-        <AlertDialog :open="isDeleteDialogOpen" @update:open="isDeleteDialogOpen = $event">
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Curriculum Version</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete curriculum version
-                        <strong>{{ versionToDelete?.version_code }}</strong
-                        >? <br /><br />
-                        This action cannot be undone and will permanently remove this curriculum version from the system.
-                        <span v-if="versionToDelete?.curriculum_units_count && versionToDelete.curriculum_units_count > 0" class="text-destructive">
-                            <br /><br />
-                            <strong>Warning:</strong> This version has {{ versionToDelete.curriculum_units_count }} curriculum units that will also be
-                            affected.
-                        </span>
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel :disabled="isDeleting" class="cursor-pointer">Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                        @click="confirmDelete"
-                        :disabled="isDeleting"
-                        class="bg-destructive hover:bg-destructive/90 cursor-pointer text-white"
-                    >
-                        {{ isDeleting ? 'Deleting...' : 'Delete' }}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    </AppLayout>
+    <!-- Delete Confirmation Dialog -->
+    <AlertDialog :open="isDeleteDialogOpen" @update:open="isDeleteDialogOpen = $event">
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Delete Curriculum Version</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to delete curriculum version
+                    <strong>{{ versionToDelete?.version_code }}</strong
+                    >? <br /><br />
+                    This action cannot be undone and will permanently remove this curriculum version from the system.
+                    <span v-if="versionToDelete?.curriculum_units_count && versionToDelete.curriculum_units_count > 0" class="text-destructive">
+                        <br /><br />
+                        <strong>Warning:</strong> This version has {{ versionToDelete.curriculum_units_count }} curriculum units that will also be
+                        affected.
+                    </span>
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel :disabled="isDeleting" class="cursor-pointer">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                    @click="confirmDelete"
+                    :disabled="isDeleting"
+                    class="bg-destructive hover:bg-destructive/90 cursor-pointer text-white"
+                >
+                    {{ isDeleting ? 'Deleting...' : 'Delete' }}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
 
     <!-- Edit Modal -->
     <Dialog v-model:open="showEditModal">

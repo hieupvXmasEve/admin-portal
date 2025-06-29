@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import AppLayout from '@/layouts/AppLayout.vue';
 import type { CourseOfferingFormData, Lecture, Semester, Unit } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -23,10 +22,6 @@ interface Props {
 
 const props = defineProps<Props>();
 const submitError = ref<string | null>(null);
-const breadcrumbItems = [
-    { title: 'Course Offerings', href: '/course-offerings' },
-    { title: 'Create Course Offering', href: '/course-offerings/create' },
-];
 
 // Define validation schema that exactly matches backend CourseOffering validation rules
 const formSchema = toTypedSchema(
@@ -152,303 +147,298 @@ const dayOptions = [
 
 <template>
     <Head title="Create Course Offering" />
+    <!-- Header -->
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight">Create Course Offering</h1>
+            <p class="text-muted-foreground">Set up a new course offering for student registration</p>
+        </div>
+        <Link href="/course-offerings">
+            <Button variant="outline" size="sm">
+                <ArrowLeft class="mr-2 h-4 w-4" />
+                Back to Course Offerings
+            </Button>
+        </Link>
+    </div>
 
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="h-full space-y-4 p-4">
-            <!-- Header -->
-            <div class="flex items-center justify-between gap-4">
-                <div>
-                    <h1 class="text-3xl font-bold tracking-tight">Create Course Offering</h1>
-                    <p class="text-muted-foreground">Set up a new course offering for student registration</p>
-                </div>
-                <Link href="/course-offerings">
-                    <Button variant="outline" size="sm">
-                        <ArrowLeft class="mr-2 h-4 w-4" />
-                        Back to Course Offerings
-                    </Button>
-                </Link>
-            </div>
+    <form @submit="onSubmit" class="space-y-6">
+        <div class="grid gap-6 lg:grid-cols-2">
+            <!-- Basic Information -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>Basic Information</CardTitle>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <FormField v-slot="{ componentField }" name="semester_id">
+                        <FormItem>
+                            <FormLabel>Semester</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select semester" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                                            {{ semester.name }} ({{ semester.code }})
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
-            <form @submit="onSubmit" class="space-y-6">
-                <div class="grid gap-6 lg:grid-cols-2">
-                    <!-- Basic Information -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Basic Information</CardTitle>
-                        </CardHeader>
-                        <CardContent class="space-y-4">
-                            <FormField v-slot="{ componentField }" name="semester_id">
-                                <FormItem>
-                                    <FormLabel>Semester</FormLabel>
-                                    <FormControl>
-                                        <Select v-bind="componentField">
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select semester" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                                    {{ semester.name }} ({{ semester.code }})
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                    <FormField v-slot="{ componentField }" name="unit_id">
+                        <FormItem>
+                            <FormLabel>Unit</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select unit" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="unit in props.units" :key="unit.id" :value="unit.id.toString()">
+                                            {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} credits)
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
-                            <FormField v-slot="{ componentField }" name="unit_id">
-                                <FormItem>
-                                    <FormLabel>Unit</FormLabel>
-                                    <FormControl>
-                                        <Select v-bind="componentField">
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select unit" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem v-for="unit in props.units" :key="unit.id" :value="unit.id.toString()">
-                                                    {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} credits)
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                    <FormField v-slot="{ componentField }" name="section_code">
+                        <FormItem>
+                            <FormLabel>Section Code</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="e.g., A, B1, 01" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
-                            <FormField v-slot="{ componentField }" name="section_code">
-                                <FormItem>
-                                    <FormLabel>Section Code</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="e.g., A, B1, 01" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                    <FormField v-slot="{ componentField }" name="lecture_id">
+                        <FormItem>
+                            <FormLabel>Lecture</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select lecture (optional)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No lecture assigned</SelectItem>
+                                        <SelectItem v-for="lecture in props.lectures" :key="lecture.id" :value="lecture.id.toString()">
+                                            {{ lecture.first_name }} {{ lecture.last_name }} ({{ lecture.academic_rank }})
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </CardContent>
+            </Card>
 
-                            <FormField v-slot="{ componentField }" name="lecture_id">
-                                <FormItem>
-                                    <FormLabel>Lecture</FormLabel>
-                                    <FormControl>
-                                        <Select v-bind="componentField">
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select lecture (optional)" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">No lecture assigned</SelectItem>
-                                                <SelectItem v-for="lecture in props.lectures" :key="lecture.id" :value="lecture.id.toString()">
-                                                    {{ lecture.first_name }} {{ lecture.last_name }} ({{ lecture.academic_rank }})
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </CardContent>
-                    </Card>
+            <!-- Enrollment & Delivery -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>Enrollment & Delivery</CardTitle>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <FormField v-slot="{ componentField }" name="max_capacity">
+                            <FormItem>
+                                <FormLabel>Max Capacity *</FormLabel>
+                                <FormControl>
+                                    <NumberInput
+                                        :model-value="componentField.modelValue"
+                                        @update:model-value="componentField['onUpdate:modelValue']"
+                                        :min="1"
+                                        :max="500"
+                                        :allow-decimal="false"
+                                        :allow-negative="false"
+                                        placeholder="30"
+                                        :name="componentField.name"
+                                        @blur="componentField.onBlur"
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                    <!-- Enrollment & Delivery -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Enrollment & Delivery</CardTitle>
-                        </CardHeader>
-                        <CardContent class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <FormField v-slot="{ componentField }" name="max_capacity">
-                                    <FormItem>
-                                        <FormLabel>Max Capacity *</FormLabel>
-                                        <FormControl>
-                                            <NumberInput
-                                                :model-value="componentField.modelValue"
-                                                @update:model-value="componentField['onUpdate:modelValue']"
-                                                :min="1"
-                                                :max="500"
-                                                :allow-decimal="false"
-                                                :allow-negative="false"
-                                                placeholder="30"
-                                                :name="componentField.name"
-                                                @blur="componentField.onBlur"
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
+                        <FormField v-slot="{ componentField }" name="waitlist_capacity">
+                            <FormItem>
+                                <FormLabel>Wait list Capacity</FormLabel>
+                                <FormControl>
+                                    <NumberInput
+                                        :model-value="componentField.modelValue"
+                                        @update:model-value="componentField['onUpdate:modelValue']"
+                                        :min="0"
+                                        :max="100"
+                                        :allow-decimal="false"
+                                        :allow-negative="false"
+                                        placeholder="10"
+                                        :name="componentField.name"
+                                        @blur="componentField.onBlur"
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
 
-                                <FormField v-slot="{ componentField }" name="waitlist_capacity">
-                                    <FormItem>
-                                        <FormLabel>Wait list Capacity</FormLabel>
-                                        <FormControl>
-                                            <NumberInput
-                                                :model-value="componentField.modelValue"
-                                                @update:model-value="componentField['onUpdate:modelValue']"
-                                                :min="0"
-                                                :max="100"
-                                                :allow-decimal="false"
-                                                :allow-negative="false"
-                                                placeholder="10"
-                                                :name="componentField.name"
-                                                @blur="componentField.onBlur"
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-                            </div>
+                    <FormField v-slot="{ componentField }" name="delivery_mode">
+                        <FormItem>
+                            <FormLabel>Delivery Mode</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select delivery mode" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="option in deliveryModeOptions" :key="option.value" :value="option.value">
+                                            {{ option.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
-                            <FormField v-slot="{ componentField }" name="delivery_mode">
-                                <FormItem>
-                                    <FormLabel>Delivery Mode</FormLabel>
-                                    <FormControl>
-                                        <Select v-bind="componentField">
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select delivery mode" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem v-for="option in deliveryModeOptions" :key="option.value" :value="option.value">
-                                                    {{ option.label }}
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                    <div class="grid grid-cols-2 gap-4">
+                        <FormField v-slot="{ componentField }" name="schedule_time_start">
+                            <FormItem>
+                                <FormLabel>Start Time</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" type="time" placeholder="09:00" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                            <div class="grid grid-cols-2 gap-4">
-                                <FormField v-slot="{ componentField }" name="schedule_time_start">
-                                    <FormItem>
-                                        <FormLabel>Start Time</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" type="time" placeholder="09:00" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
+                        <FormField v-slot="{ componentField }" name="schedule_time_end">
+                            <FormItem>
+                                <FormLabel>End Time</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" type="time" placeholder="10:30" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
 
-                                <FormField v-slot="{ componentField }" name="schedule_time_end">
-                                    <FormItem>
-                                        <FormLabel>End Time</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" type="time" placeholder="10:30" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-                            </div>
+                    <FormField v-slot="{ componentField }" name="location">
+                        <FormItem>
+                            <FormLabel>Location</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="e.g., Room 101, Building A" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
-                            <FormField v-slot="{ componentField }" name="location">
-                                <FormItem>
-                                    <FormLabel>Location</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="e.g., Room 101, Building A" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                    <FormField v-slot="{ componentField }" name="enrollment_status">
+                        <FormItem>
+                            <FormLabel>Enrollment Status</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select enrollment status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem v-for="option in enrollmentStatusOptions" :key="option.value" :value="option.value">
+                                            {{ option.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </CardContent>
+            </Card>
 
-                            <FormField v-slot="{ componentField }" name="enrollment_status">
-                                <FormItem>
-                                    <FormLabel>Enrollment Status</FormLabel>
-                                    <FormControl>
-                                        <Select v-bind="componentField">
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select enrollment status" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem v-for="option in enrollmentStatusOptions" :key="option.value" :value="option.value">
-                                                    {{ option.label }}
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </CardContent>
-                    </Card>
+            <!-- Registration Dates -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>Registration Dates</CardTitle>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <FormField v-slot="{ componentField }" name="registration_start_date">
+                            <FormItem>
+                                <FormLabel>Registration Start Date</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" type="date" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                    <!-- Registration Dates -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Registration Dates</CardTitle>
-                        </CardHeader>
-                        <CardContent class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <FormField v-slot="{ componentField }" name="registration_start_date">
-                                    <FormItem>
-                                        <FormLabel>Registration Start Date</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" type="date" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
+                        <FormField v-slot="{ componentField }" name="registration_end_date">
+                            <FormItem>
+                                <FormLabel>Registration End Date</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" type="date" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
+                </CardContent>
+            </Card>
 
-                                <FormField v-slot="{ componentField }" name="registration_end_date">
-                                    <FormItem>
-                                        <FormLabel>Registration End Date</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" type="date" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-                            </div>
-                        </CardContent>
-                    </Card>
+            <!-- Additional Information -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>Additional Information</CardTitle>
+                </CardHeader>
+                <CardContent class="space-y-4">
+                    <FormField v-slot="{ componentField }" name="special_requirements">
+                        <FormItem>
+                            <FormLabel>Special Requirements</FormLabel>
+                            <FormControl>
+                                <Textarea v-bind="componentField" placeholder="Any special requirements for this course..." rows="3" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
-                    <!-- Additional Information -->
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Additional Information</CardTitle>
-                        </CardHeader>
-                        <CardContent class="space-y-4">
-                            <FormField v-slot="{ componentField }" name="special_requirements">
-                                <FormItem>
-                                    <FormLabel>Special Requirements</FormLabel>
-                                    <FormControl>
-                                        <Textarea v-bind="componentField" placeholder="Any special requirements for this course..." rows="3" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                    <FormField v-slot="{ componentField }" name="notes">
+                        <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                                <Textarea v-bind="componentField" placeholder="Additional notes..." rows="3" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </CardContent>
+            </Card>
+        </div>
 
-                            <FormField v-slot="{ componentField }" name="notes">
-                                <FormItem>
-                                    <FormLabel>Notes</FormLabel>
-                                    <FormControl>
-                                        <Textarea v-bind="componentField" placeholder="Additional notes..." rows="3" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <!-- Error Display -->
-                <div v-if="submitError" class="rounded-md bg-red-50 p-4">
-                    <div class="flex">
-                        <div class="ml-3">
-                            <h3 class="text-sm font-medium text-red-800">Error creating course offering</h3>
-                            <div class="mt-2 text-sm text-red-700">
-                                {{ submitError }}
-                            </div>
-                        </div>
+        <!-- Error Display -->
+        <div v-if="submitError" class="rounded-md bg-red-50 p-4">
+            <div class="flex">
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">Error creating course offering</h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        {{ submitError }}
                     </div>
                 </div>
-
-                <!-- Actions -->
-                <div class="flex justify-end gap-4">
-                    <Link href="/course-offerings">
-                        <Button type="button" variant="outline">Cancel</Button>
-                    </Link>
-                    <Button type="submit" :disabled="isSubmitting">
-                        <Save class="mr-2 h-4 w-4" />
-                        {{ isSubmitting ? 'Creating...' : 'Create Course Offering' }}
-                    </Button>
-                </div>
-            </form>
+            </div>
         </div>
-    </AppLayout>
+
+        <!-- Actions -->
+        <div class="flex justify-end gap-4">
+            <Link href="/course-offerings">
+                <Button type="button" variant="outline">Cancel</Button>
+            </Link>
+            <Button type="submit" :disabled="isSubmitting">
+                <Save class="mr-2 h-4 w-4" />
+                {{ isSubmitting ? 'Creating...' : 'Create Course Offering' }}
+            </Button>
+        </div>
+    </form>
 </template>

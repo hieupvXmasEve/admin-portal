@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useApi } from '@/composables/useApi';
+import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
 import type { CourseOffering, CourseRegistration } from '@/types/models';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -33,7 +33,7 @@ const emit = defineEmits<{
     updated: [];
 }>();
 
-const { call: apiCall, loading } = useApi();
+const { post: apiCall, loading } = useApi();
 
 // Available registration statuses
 const registrationStatuses = [

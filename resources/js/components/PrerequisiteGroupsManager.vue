@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import axios from 'axios';
+import { useApi } from '@/composables/useApiRequest';
 import { Plus, Search, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 import PrerequisiteGroupCard from './PrerequisiteGroupCard.vue';
@@ -40,7 +40,7 @@ const emit = defineEmits<{
 
 // Normalize groups to ensure all required properties are arrays
 function normalizeGroups(inputGroups: PrerequisiteGroup[]): PrerequisiteGroup[] {
-    return inputGroups.map(group => normalizeGroup(group));
+    return inputGroups.map((group) => normalizeGroup(group));
 }
 
 function normalizeGroup(group: PrerequisiteGroup): PrerequisiteGroup {
@@ -57,6 +57,9 @@ const unitSearchResults = ref<Unit[]>([]);
 const isSearchingUnits = ref(false);
 const showUnitSearch = ref(false);
 const currentConditionIndex = ref<{ groupIndex: number; conditionIndex: number } | null>(null);
+
+// API instance
+const api = useApi();
 
 // Unit search functionality
 let unitSearchTimeout: number;
@@ -76,15 +79,20 @@ const searchUnits = async (query: string) => {
             ...groups.value.flatMap((g: PrerequisiteGroup) => g.conditions.map((c) => c.required_unit_id)),
         ].filter(Boolean);
 
-        const response = await axios.get('/api/units/search', {
-            params: {
-                q: query,
-                exclude: excludeIds.join(','),
-                limit: 10,
-            },
-        });
+        const params = {
+            q: query,
+            exclude: excludeIds.join(','),
+            limit: '10',
+        };
 
-        unitSearchResults.value = response.data;
+        const result = await api.get('/api/units/search', params);
+
+        if (result.data.value?.success) {
+            unitSearchResults.value = result.data.value.data;
+        } else {
+            console.error('Unit search failed:', result.data.value?.message || 'Unknown error');
+            unitSearchResults.value = [];
+        }
     } catch (error: any) {
         console.error('Unit search failed:', error);
         unitSearchResults.value = [];
@@ -232,25 +240,34 @@ if (groups.value.length === 0) {
     <div class="space-y-6">
         <!-- Examples Section -->
         <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <h4 class="text-sm font-semibold text-blue-800 mb-3 flex items-center">
-                <svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+            <h4 class="mb-3 flex items-center text-sm font-semibold text-blue-800">
+                <svg class="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                        fill-rule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                        clip-rule="evenodd"
+                    />
                 </svg>
                 Prerequisite Type Examples
             </h4>
-            <div class="text-sm text-blue-700 space-y-2">
+            <div class="space-y-2 text-sm text-blue-700">
                 <div class="flex items-center space-x-2">
-                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-mono bg-purple-100 text-purple-800 border-purple-200">AK</span>
+                    <span class="inline-flex items-center rounded border-purple-200 bg-purple-100 px-2 py-1 font-mono text-xs text-purple-800"
+                        >AK</span
+                    >
                     <span>Familiarity with boolean algebra and number systems</span>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-mono bg-yellow-100 text-yellow-800 border-yellow-200">Concurrent-req</span>
+                    <span class="inline-flex items-center rounded border-yellow-200 bg-yellow-100 px-2 py-1 font-mono text-xs text-yellow-800"
+                        >Concurrent-req</span
+                    >
                     <span>COS10009 OR</span>
-                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-mono bg-blue-100 text-blue-800 border-blue-200">P</span>
+                    <span class="inline-flex items-center rounded border-blue-200 bg-blue-100 px-2 py-1 font-mono text-xs text-blue-800">P</span>
                     <span>ICT10001</span>
                 </div>
-                <div class="text-xs text-blue-600 mt-2">
-                    <strong>Types:</strong> P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A (Anti-requisite), AK (Assumed Knowledge)
+                <div class="mt-2 text-xs text-blue-600">
+                    <strong>Types:</strong> P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A (Anti-requisite), AK (Assumed
+                    Knowledge)
                 </div>
             </div>
         </div>

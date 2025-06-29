@@ -16,7 +16,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem, PaginatedResponse } from '@/types';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -346,186 +345,177 @@ const handlePageSizeChange = (pageSize: number) => {
 
 <template>
     <Head title="Specializations" />
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <!-- Statistics Cards -->
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Specializations</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.total_specializations }}</div>
-                    </CardContent>
-                </Card>
+    <!-- Statistics Cards -->
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Total Specializations</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ statistics.total_specializations }}</div>
+            </CardContent>
+        </Card>
 
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Active Specializations</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.active_specializations }}</div>
-                    </CardContent>
-                </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Active Specializations</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ statistics.active_specializations }}</div>
+            </CardContent>
+        </Card>
 
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Inactive Specializations</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.inactive_specializations }}</div>
-                    </CardContent>
-                </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Inactive Specializations</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ statistics.inactive_specializations }}</div>
+            </CardContent>
+        </Card>
 
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Programs Coverage</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ Object.keys(statistics.by_program).length }}</div>
-                        <p class="text-muted-foreground text-xs">Programs with specializations</p>
-                    </CardContent>
-                </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Programs Coverage</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ Object.keys(statistics.by_program).length }}</div>
+                <p class="text-muted-foreground text-xs">Programs with specializations</p>
+            </CardContent>
+        </Card>
+    </div>
+
+    <!-- Header with Add Button -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Specializations</h1>
+        <div class="flex items-center gap-2">
+            <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
+                <FileSpreadsheet class="h-4 w-4" />
+                {{ isExporting ? 'Exporting...' : 'Export Excel' }}
+            </Button>
+            <Button @click="router.visit('/specializations/import')" variant="outline" class="flex items-center gap-2">
+                <Upload class="h-4 w-4" />
+                Import Excel
+            </Button>
+
+            <Button v-if="can('create_specialization')" size="sm" @click="navigateToCreate">
+                <Plus class="mr-2 h-4 w-4" />
+                Add Specialization
+            </Button>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
+        <div class="min-w-[200px] flex-1">
+            <div class="relative">
+                <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input placeholder="Search specializations..." :model-value="filters.search" @update:model-value="updateSearchFilter" class="pl-9" />
             </div>
-
-            <!-- Header with Add Button -->
-            <div class="flex items-center justify-between">
-                <h1 class="text-2xl font-semibold">Specializations</h1>
-                <div class="flex items-center gap-2">
-                    <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
-                        <FileSpreadsheet class="h-4 w-4" />
-                        {{ isExporting ? 'Exporting...' : 'Export Excel' }}
-                    </Button>
-                    <Button @click="router.visit('/specializations/import')" variant="outline" class="flex items-center gap-2">
-                        <Upload class="h-4 w-4" />
-                        Import Excel
-                    </Button>
-
-                    <Button v-if="can('create_specialization')" size="sm" @click="navigateToCreate">
-                        <Plus class="mr-2 h-4 w-4" />
-                        Add Specialization
-                    </Button>
-                </div>
-            </div>
-
-            <!-- Filters Section -->
-            <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
-                <div class="min-w-[200px] flex-1">
-                    <div class="relative">
-                        <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                        <Input
-                            placeholder="Search specializations..."
-                            :model-value="filters.search"
-                            @update:model-value="updateSearchFilter"
-                            class="pl-9"
-                        />
-                    </div>
-                </div>
-
-                <div class="min-w-[180px]">
-                    <Select :model-value="filters.program_id || 'all'" @update:model-value="updateProgramFilter">
-                        <SelectTrigger>
-                            <SelectValue placeholder="All programs" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All programs</SelectItem>
-                            <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
-                                {{ program.name }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
-                    <X class="mr-2 h-4 w-4" />
-                    Clear Filters
-                </Button>
-            </div>
-
-            <!-- Data Table -->
-            <DataTable :data="data" :columns="columns" :loading="false">
-                <template #cell-actions="{ row }">
-                    <div class="flex items-center gap-2">
-                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="viewSpecialization(row.original)" title="View specialization">
-                                        <Eye class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>View specialization</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-                        <TooltipProvider v-if="can('edit_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="editSpecialization(row.original)" title="Edit specialization">
-                                        <Edit class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Edit specialization</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-                        <TooltipProvider v-if="can('delete_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="deleteSpecialization(row.original)" title="Delete specialization">
-                                        <Trash2 class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Delete specialization</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    </div>
-                </template>
-            </DataTable>
-
-            <!-- Pagination -->
-            <DataPagination :pagination-data="specializations" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
         </div>
 
-        <!-- Delete Confirmation Dialog -->
-        <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Specialization</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete specialization <strong>{{ specializationToDelete?.name }}</strong
-                        >? This action cannot be undone and will permanently remove the specialization from the system.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="confirmDelete" class="bg-red-600 hover:bg-red-700">Delete Specialization</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <div class="min-w-[180px]">
+            <Select :model-value="filters.program_id || 'all'" @update:model-value="updateProgramFilter">
+                <SelectTrigger>
+                    <SelectValue placeholder="All programs" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All programs</SelectItem>
+                    <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
+                        {{ program.name }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
 
-        <!-- Bulk Delete Confirmation Dialog -->
-        <AlertDialog :open="bulkDeleteDialogOpen" @update:open="bulkDeleteDialogOpen = $event">
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Multiple Specializations</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected specializations? This action cannot be
-                        undone and will permanently remove all selected specializations from the system.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel @click="bulkDeleteDialogOpen = false">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="confirmBulkDelete" :disabled="isBulkDeleting" class="bg-red-600 hover:bg-red-700">
-                        {{ isBulkDeleting ? 'Deleting...' : 'Delete Specializations' }}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    </AppLayout>
+        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
+            <X class="mr-2 h-4 w-4" />
+            Clear Filters
+        </Button>
+    </div>
+
+    <!-- Data Table -->
+    <DataTable :data="data" :columns="columns" :loading="false">
+        <template #cell-actions="{ row }">
+            <div class="flex items-center gap-2">
+                <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <Button variant="ghost" size="sm" @click="viewSpecialization(row.original)" title="View specialization">
+                                <Eye class="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>View specialization</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider v-if="can('edit_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <Button variant="ghost" size="sm" @click="editSpecialization(row.original)" title="Edit specialization">
+                                <Edit class="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Edit specialization</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider v-if="can('delete_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <Tooltip>
+                        <TooltipTrigger as-child>
+                            <Button variant="ghost" size="sm" @click="deleteSpecialization(row.original)" title="Delete specialization">
+                                <Trash2 class="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Delete specialization</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
+        </template>
+    </DataTable>
+
+    <!-- Pagination -->
+    <DataPagination :pagination-data="specializations" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+
+    <!-- Delete Confirmation Dialog -->
+    <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Delete Specialization</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to delete specialization <strong>{{ specializationToDelete?.name }}</strong
+                    >? This action cannot be undone and will permanently remove the specialization from the system.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
+                <AlertDialogAction @click="confirmDelete" class="bg-red-600 hover:bg-red-700">Delete Specialization</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    <!-- Bulk Delete Confirmation Dialog -->
+    <AlertDialog :open="bulkDeleteDialogOpen" @update:open="bulkDeleteDialogOpen = $event">
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Delete Multiple Specializations</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected specializations? This action cannot be undone
+                    and will permanently remove all selected specializations from the system.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel @click="bulkDeleteDialogOpen = false">Cancel</AlertDialogCancel>
+                <AlertDialogAction @click="confirmBulkDelete" :disabled="isBulkDeleting" class="bg-red-600 hover:bg-red-700">
+                    {{ isBulkDeleting ? 'Deleting...' : 'Delete Specializations' }}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
 </template>

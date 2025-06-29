@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem, PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -337,144 +336,140 @@ const columns: ColumnDef<CourseOffering>[] = [
 
 <template>
     <Head title="Course Offerings" />
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="h-full space-y-4 p-4">
-            <!-- Header -->
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold tracking-tight">Course Offerings</h1>
-                    <p class="text-muted-foreground">Manage course opening periods and registration settings</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <Button variant="outline" size="sm" @click="loadStatistics">
-                        <BarChart3 class="mr-2 h-4 w-4" />
-                        Refresh Stats
-                    </Button>
-                    <Link href="/course-offerings/create">
-                        <Button>
-                            <Plus class="mr-2 h-4 w-4" />
-                            Create Course Offering
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-
-            <!-- Statistics -->
-            <div v-if="statistics" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Offerings</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.total_offerings }}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Active Offerings</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold text-green-600">{{ statistics.active_offerings }}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Enrollment</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.total_enrollment }}</div>
-                        <p class="text-muted-foreground text-xs">of {{ statistics.total_capacity }} capacity</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Enrollment Rate</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="text-2xl font-bold">{{ statistics.enrollment_rate }}%</div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <!-- Filters -->
-            <Card>
-                <CardHeader>
-                    <CardTitle>Filters</CardTitle>
-                    <CardDescription>Filter course offerings by various criteria</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium">Search</label>
-                            <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search courses..." :debounce="300" />
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium">Semester</label>
-                            <Select v-model="filters.semester_id" @update:model-value="updateFilters">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Semesters" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Semesters</SelectItem>
-                                    <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                        {{ semester.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium">Status</label>
-                            <Select v-model="filters.enrollment_status" @update:model-value="updateFilters">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
-                                    <SelectItem v-for="option in enrollmentStatusOptions" :key="option.value" :value="option.value">
-                                        {{ option.label }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium">Delivery Mode</label>
-                            <Select v-model="filters.delivery_mode" @update:model-value="updateFilters">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Modes" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Modes</SelectItem>
-                                    <SelectItem v-for="option in deliveryModeOptions" :key="option.value" :value="option.value">
-                                        {{ option.label }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <!-- Actions -->
-            <div v-if="selectedItems.length > 0" class="bg-muted flex items-center justify-between rounded-lg p-4">
-                <span class="text-sm font-medium">{{ selectedItems.length }} item(s) selected</span>
-                <Button variant="destructive" size="sm" @click="bulkDelete">
-                    <Trash2 class="mr-2 h-4 w-4" />
-                    Delete Selected
-                </Button>
-            </div>
-
-            <!-- Data Table -->
-            <Card>
-                <CardContent class="px-4">
-                    <DataTable :data="courseOfferings.data" :columns="columns" :loading="isLoading" v-model:selected="selectedItems" row-key="id" />
-                </CardContent>
-            </Card>
-
-            <!-- Pagination -->
-            <DataPagination :pagination-data="courseOfferings" @navigate="handlePageChange" />
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight">Course Offerings</h1>
+            <p class="text-muted-foreground">Manage course opening periods and registration settings</p>
         </div>
-    </AppLayout>
+        <div class="flex items-center gap-2">
+            <Button variant="outline" size="sm" @click="loadStatistics">
+                <BarChart3 class="mr-2 h-4 w-4" />
+                Refresh Stats
+            </Button>
+            <Link href="/course-offerings/create">
+                <Button>
+                    <Plus class="mr-2 h-4 w-4" />
+                    Create Course Offering
+                </Button>
+            </Link>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div v-if="statistics" class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Total Offerings</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ statistics.total_offerings }}</div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Active Offerings</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold text-green-600">{{ statistics.active_offerings }}</div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Total Enrollment</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ statistics.total_enrollment }}</div>
+                <p class="text-muted-foreground text-xs">of {{ statistics.total_capacity }} capacity</p>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle class="text-sm font-medium">Enrollment Rate</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">{{ statistics.enrollment_rate }}%</div>
+            </CardContent>
+        </Card>
+    </div>
+
+    <!-- Filters -->
+    <Card>
+        <CardHeader>
+            <CardTitle>Filters</CardTitle>
+            <CardDescription>Filter course offerings by various criteria</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">Search</label>
+                    <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search courses..." :debounce="300" />
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">Semester</label>
+                    <Select v-model="filters.semester_id" @update:model-value="updateFilters">
+                        <SelectTrigger>
+                            <SelectValue placeholder="All Semesters" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Semesters</SelectItem>
+                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                                {{ semester.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">Status</label>
+                    <Select v-model="filters.enrollment_status" @update:model-value="updateFilters">
+                        <SelectTrigger>
+                            <SelectValue placeholder="All Statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem v-for="option in enrollmentStatusOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">Delivery Mode</label>
+                    <Select v-model="filters.delivery_mode" @update:model-value="updateFilters">
+                        <SelectTrigger>
+                            <SelectValue placeholder="All Modes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Modes</SelectItem>
+                            <SelectItem v-for="option in deliveryModeOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+        </CardContent>
+    </Card>
+
+    <!-- Actions -->
+    <div v-if="selectedItems.length > 0" class="bg-muted flex items-center justify-between rounded-lg p-4">
+        <span class="text-sm font-medium">{{ selectedItems.length }} item(s) selected</span>
+        <Button variant="destructive" size="sm" @click="bulkDelete">
+            <Trash2 class="mr-2 h-4 w-4" />
+            Delete Selected
+        </Button>
+    </div>
+
+    <!-- Data Table -->
+    <Card>
+        <CardContent class="px-4">
+            <DataTable :data="courseOfferings.data" :columns="columns" :loading="isLoading" v-model:selected="selectedItems" row-key="id" />
+        </CardContent>
+    </Card>
+
+    <!-- Pagination -->
+    <DataPagination :pagination-data="courseOfferings" @navigate="handlePageChange" />
 </template>

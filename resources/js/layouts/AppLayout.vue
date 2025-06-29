@@ -16,6 +16,8 @@ withDefaults(defineProps<Props>(), {
 <template>
     <Toaster position="top-center" rich-colors />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <slot />
+        <div class="space-y-4 p-4">
+            <slot />
+        </div>
     </AppLayout>
 </template>

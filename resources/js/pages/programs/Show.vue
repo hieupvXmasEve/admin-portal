@@ -21,7 +21,6 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables';
-import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -392,113 +391,109 @@ const confirmDelete = async () => {
 <template>
     <Head :title="`${program.name} Program`" />
 
-    <AppLayout :breadcrumbs="breadcrumbItems">
-        <div class="flex flex-col gap-6 p-4">
-            <!-- Compact Header with Stats -->
-            <div class="flex flex-col gap-4">
-                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-3">
-                            <h1 class="text-3xl font-bold tracking-tight">{{ program.name }}</h1>
-                        </div>
-                        <div class="text-muted-foreground flex flex-wrap gap-4 text-sm">
-                            <span>Created: {{ formatDate(program.created_at) }}</span>
-                            <span>Updated: {{ formatDate(program.updated_at) }}</span>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2">
-                        <Link :href="route('programs.index')">
-                            <Button variant="outline">
-                                <ArrowLeft class="mr-2 h-4 w-4" />
-                                Back to Programs
-                            </Button>
-                        </Link>
-                    </div>
+    <!-- Compact Header with Stats -->
+    <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="space-y-2">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-3xl font-bold tracking-tight">{{ program.name }}</h1>
                 </div>
-
-                <!-- Compact Stats Row -->
-                <div class="grid grid-cols-2 gap-4 md:grid-cols-3">
-                    <div class="bg-card rounded-lg border p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-2xl font-bold">{{ stats.totalSpecializations }}</p>
-                                <p class="text-muted-foreground text-xs">Total Specializations</p>
-                            </div>
-                            <Users class="text-muted-foreground h-4 w-4" />
-                        </div>
-                    </div>
-                    <div class="bg-card rounded-lg border p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-2xl font-bold">{{ stats.activeSpecializations }}</p>
-                                <p class="text-muted-foreground text-xs">Active</p>
-                            </div>
-                            <CheckCircle class="h-4 w-4 text-green-600" />
-                        </div>
-                    </div>
-                    <div class="bg-card rounded-lg border p-4">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-2xl font-bold">{{ program.specializations.length }}</p>
-                                <p class="text-muted-foreground text-xs">Total Items</p>
-                            </div>
-                            <Info class="text-muted-foreground h-4 w-4" />
-                        </div>
-                    </div>
+                <div class="text-muted-foreground flex flex-wrap gap-4 text-sm">
+                    <span>Created: {{ formatDate(program.created_at) }}</span>
+                    <span>Updated: {{ formatDate(program.updated_at) }}</span>
                 </div>
             </div>
 
-            <!-- Specializations Table -->
-            <Card>
-                <CardHeader>
-                    <div class="flex items-center justify-between">
-                        <CardTitle class="flex items-center gap-2">
-                            <Users class="h-5 w-5" />
-                            Specializations
-                            <Badge variant="secondary" class="ml-2">{{ paginatedSpecializations.data.length }}</Badge>
-                        </CardTitle>
-                        <Button variant="outline" size="sm" @click="openCreateModal">
-                            <Plus class="mr-2 h-4 w-4" />
-                            Add Specialization
-                        </Button>
-                    </div>
-
-                    <!-- Search Filter -->
-                    <div class="mt-2">
-                        <DebouncedInput
-                            v-model="specializationFilters.search"
-                            @debounced="handleSpecializationSearch"
-                            placeholder="Search specializations..."
-                            class="max-w-sm"
-                        />
-                    </div>
-                </CardHeader>
-                <CardContent class="px-6">
-                    <div v-if="paginatedSpecializations.data.length === 0" class="py-8 text-center">
-                        <Users class="mx-auto h-12 w-12 text-gray-400" />
-                        <h3 class="mt-4 text-sm font-medium">No specializations found</h3>
-                        <p class="text-muted-foreground mt-2 text-sm">
-                            {{ specializationFilters.search ? 'Try adjusting your search terms.' : 'Get started by creating a new specialization.' }}
-                        </p>
-                        <div class="mt-6" v-if="!specializationFilters.search">
-                            <Button @click="openCreateModal">
-                                <Plus class="mr-2 h-4 w-4" />
-                                Add Specialization
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div v-else>
-                        <DataTable :data="paginatedSpecializations.data" :columns="specializationColumns" :loading="false" class="border-0" />
-                        <div class="border-t p-4" v-if="paginatedSpecializations.total > 10">
-                            <DataPagination :pagination-data="specializationPaginationData" @navigate="handleSpecializationPageChange" />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            <div class="flex flex-wrap gap-2">
+                <Link :href="route('programs.index')">
+                    <Button variant="outline">
+                        <ArrowLeft class="mr-2 h-4 w-4" />
+                        Back to Programs
+                    </Button>
+                </Link>
+            </div>
         </div>
-    </AppLayout>
+
+        <!-- Compact Stats Row -->
+        <div class="grid grid-cols-2 gap-4 md:grid-cols-3">
+            <div class="bg-card rounded-lg border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold">{{ stats.totalSpecializations }}</p>
+                        <p class="text-muted-foreground text-xs">Total Specializations</p>
+                    </div>
+                    <Users class="text-muted-foreground h-4 w-4" />
+                </div>
+            </div>
+            <div class="bg-card rounded-lg border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold">{{ stats.activeSpecializations }}</p>
+                        <p class="text-muted-foreground text-xs">Active</p>
+                    </div>
+                    <CheckCircle class="h-4 w-4 text-green-600" />
+                </div>
+            </div>
+            <div class="bg-card rounded-lg border p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-2xl font-bold">{{ program.specializations.length }}</p>
+                        <p class="text-muted-foreground text-xs">Total Items</p>
+                    </div>
+                    <Info class="text-muted-foreground h-4 w-4" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Specializations Table -->
+    <Card>
+        <CardHeader>
+            <div class="flex items-center justify-between">
+                <CardTitle class="flex items-center gap-2">
+                    <Users class="h-5 w-5" />
+                    Specializations
+                    <Badge variant="secondary" class="ml-2">{{ paginatedSpecializations.data.length }}</Badge>
+                </CardTitle>
+                <Button variant="outline" size="sm" @click="openCreateModal">
+                    <Plus class="mr-2 h-4 w-4" />
+                    Add Specialization
+                </Button>
+            </div>
+
+            <!-- Search Filter -->
+            <div class="mt-2">
+                <DebouncedInput
+                    v-model="specializationFilters.search"
+                    @debounced="handleSpecializationSearch"
+                    placeholder="Search specializations..."
+                    class="max-w-sm"
+                />
+            </div>
+        </CardHeader>
+        <CardContent class="px-6">
+            <div v-if="paginatedSpecializations.data.length === 0" class="py-8 text-center">
+                <Users class="mx-auto h-12 w-12 text-gray-400" />
+                <h3 class="mt-4 text-sm font-medium">No specializations found</h3>
+                <p class="text-muted-foreground mt-2 text-sm">
+                    {{ specializationFilters.search ? 'Try adjusting your search terms.' : 'Get started by creating a new specialization.' }}
+                </p>
+                <div class="mt-6" v-if="!specializationFilters.search">
+                    <Button @click="openCreateModal">
+                        <Plus class="mr-2 h-4 w-4" />
+                        Add Specialization
+                    </Button>
+                </div>
+            </div>
+
+            <div v-else>
+                <DataTable :data="paginatedSpecializations.data" :columns="specializationColumns" :loading="false" class="border-0" />
+                <div class="border-t p-4" v-if="paginatedSpecializations.total > 10">
+                    <DataPagination :pagination-data="specializationPaginationData" @navigate="handleSpecializationPageChange" />
+                </div>
+            </div>
+        </CardContent>
+    </Card>
 
     <!-- Create Specialization Modal -->
     <Dialog v-model:open="showCreateModal">
