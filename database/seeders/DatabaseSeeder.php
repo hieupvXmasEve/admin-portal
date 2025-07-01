@@ -12,13 +12,23 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UserSeeder::class,          // Creates campuses and users first
-            LectureSeeder::class,       // Creates lecturers
-            ProgramSeeder::class,       // Creates Bachelor of Computer Science program and AI specialization
-            SemesterSeeder::class,      // Creates Summer 2025 semester
-            UnitSeeder::class,          // Creates Bachelor of Computer Science units
-            CurriculumSeeder::class,    // Creates curriculum version for Summer 2025,
-            SyllabusSeeder::class,      // Creates syllabi for the units
+            // Phase 1: Core & Campus (Foundation data)
+            UserSeeder::class,              // Creates campuses, roles, permissions, users (includes CorePermissionSeeder functionality)
+            CampusBuildingSeeder::class,    // Creates buildings for campuses (combines CampusSeeder functionality)
+            LectureSeeder::class,           // Creates lecturers
+
+            // Phase 2: Academic & Curriculum (Educational structure)
+            ProgramSeeder::class,           // Creates programs and specializations
+            UnitSeeder::class,              // Creates units with prerequisite relationships and credit requirements
+            SpecializationSeeder::class,    // Creates additional specializations
+            CurriculumSeeder::class,        // Creates curriculum versions and assigns students
+
+            // Phase 3: Semester & Offering (Academic scheduling)
+            SemesterSeeder::class,          // Creates semesters (FALL2024, SPRING2025, SUMMER2025)
+            AcademicOfferingSeeder::class,  // Creates course offerings with syllabi and assessments
+
+            // Phase 4: Student Lifecycle & Scenarios (Complex academic scenarios)
+            StudentLifecycleSeeder::class,  // Creates registrations, records, attendances, scores with scenarios
         ]);
     }
 }
