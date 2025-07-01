@@ -3,6 +3,7 @@
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\CheckCampusSelected;
+use App\Http\Middleware\CheckPermissions;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,6 +23,11 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             CheckCampusSelected::class
+        ]);
+
+        // Register route middleware aliases
+        $middleware->alias([
+            'permissions' => CheckPermissions::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { fromDate } from '@internationalized/date';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -113,7 +114,7 @@ const applyFilters = () => {
     if (isActiveFilter.value !== null) filters['filter[is_active]'] = isActiveFilter.value;
     if (isArchivedFilter.value !== null) filters['filter[is_archived]'] = isArchivedFilter.value;
 
-    router.get(route('semester.index'), filters, {
+    router.get(systemRoutes.semesters.index(), filters, {
         preserveState: true,
         replace: true,
     });
@@ -307,7 +308,7 @@ const closeModals = () => {
 // Form submissions
 const submitCreate = () => {
     // Transform date ranges to individual date fields for backend
-    const formData: any = {
+    const formData = {
         code: createForm.code,
         name: createForm.name,
         start_date: createForm.date_range.start,
@@ -320,7 +321,7 @@ const submitCreate = () => {
 
     createForm
         .transform(() => formData)
-        .post(route('semester.store'), {
+        .post(systemRoutes.semesters.create(), {
             onSuccess: () => {
                 closeModals();
             },
@@ -328,10 +329,8 @@ const submitCreate = () => {
 };
 
 const submitEdit = () => {
-    if (!selectedSemester.value) return;
-
     // Transform date ranges to individual date fields for backend
-    const formData: any = {
+    const formData = {
         code: editForm.code,
         name: editForm.name,
         start_date: editForm.date_range.start,
@@ -344,7 +343,7 @@ const submitEdit = () => {
 
     editForm
         .transform(() => formData)
-        .put(route('semester.update', selectedSemester.value!.id), {
+        .put(systemRoutes.semesters.edit(selectedSemester.value!.id), {
             onSuccess: () => {
                 closeModals();
             },
@@ -354,7 +353,7 @@ const submitEdit = () => {
 const submitDelete = () => {
     if (!selectedSemester.value) return;
 
-    deleteForm.delete(route('semester.destroy', selectedSemester.value.id), {
+    deleteForm.delete(systemRoutes.semesters.edit(selectedSemester.value.id), {
         onSuccess: () => {
             closeModals();
         },
@@ -372,7 +371,7 @@ const clearFilters = () => {
 };
 
 const navigateToEnrollment = (semester: Semester) => {
-    router.get(route('semesters.enrollment.show', semester.id));
+    router.get(systemRoutes.semesters.enrollment(semester.id));
 };
 const hasActiveFilters = computed(
     () => search.value || nameFilter.value || yearFilter.value || isActiveFilter.value !== null || isArchivedFilter.value !== null,
@@ -417,7 +416,6 @@ const handlePageSizeChange = (pageSize: number) => {
         <Button @click="openCreateModal" size="sm">
             <Plus class="mr-2 h-4 w-4" />
             Add Semester
-            <p>{{ console.log(errors) }}</p>
         </Button>
     </div>
 

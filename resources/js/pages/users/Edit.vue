@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 // Badge component inline since it doesn't exist in UI components
 import type { User } from '@/types/User';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, ChevronDown, ChevronRight, Shield, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -100,14 +101,14 @@ const handleSubmit = () => {
     console.log('Form data being sent:', form.data());
     form.put(`/users/${props.user.id}`, {
         onSuccess: () => {
-            router.visit('/users');
+            router.visit(systemRoutes.users.index());
         },
     });
 };
 
 // Go back to users list
 const goBack = () => {
-    router.visit('/users');
+    router.visit(systemRoutes.users.index());
 };
 </script>
 

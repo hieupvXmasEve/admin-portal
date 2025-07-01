@@ -26,24 +26,21 @@ class Student extends Authenticatable
         'phone',
         'oauth_provider',
         'oauth_provider_id',
-        'oauth_avatar_url',
+        'avatar_url',
         'date_of_birth',
         'gender',
         'nationality',
         'national_id',
         'address',
-        'avatar_url',
         'campus_id',
         'program_id',
         'specialization_id',
         'curriculum_version_id',
         'admission_date',
         'expected_graduation_date',
-        'parent_guardian_name',
-        'parent_guardian_phone',
-        'parent_guardian_email',
         'emergency_contact_name',
         'emergency_contact_phone',
+        'emergency_contact_relationship',
         'high_school_name',
         'high_school_graduation_year',
         'entrance_exam_score',
@@ -51,7 +48,6 @@ class Student extends Authenticatable
         'status',
         'last_login_at',
         'email_verified_at',
-        'google_id',
     ];
 
     protected $hidden = [
@@ -84,16 +80,15 @@ class Student extends Authenticatable
             'specialization_id' => ['nullable', 'exists:specializations,id'],
             'curriculum_version_id' => ['required', 'exists:curriculum_versions,id'],
             'admission_date' => ['required', 'date'],
-            'parent_guardian_name' => ['nullable', 'string', 'max:255'],
-            'parent_guardian_phone' => ['nullable', 'string', 'max:20'],
-            'parent_guardian_email' => ['nullable', 'email', 'max:255'],
+            'expected_graduation_date' => ['nullable', 'date', 'after:admission_date'],
             'emergency_contact_name' => ['nullable', 'string', 'max:255'],
             'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
+            'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
             'high_school_name' => ['nullable', 'string', 'max:255'],
             'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:active,inactive,suspended'],
+            'status' => ['nullable', 'in:active,inactive,suspended,graduated'],
         ];
     }
 
@@ -109,7 +104,9 @@ class Student extends Authenticatable
             'program_id.required' => 'Program is required',
             'program_id.exists' => 'Selected program does not exist',
             'curriculum_version_id.required' => 'Curriculum version is required',
+            'curriculum_version_id.exists' => 'Selected curriculum version does not exist',
             'admission_date.required' => 'Admission date is required',
+            'expected_graduation_date.after' => 'Expected graduation date must be after admission date',
         ];
     }
 

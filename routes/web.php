@@ -71,3 +71,4 @@ require __DIR__ . '/curriculum.php';
 require __DIR__ . '/students.php';
 require __DIR__ . '/course-offerings.php';
 require __DIR__ . '/course-registrations.php';
+require __DIR__ . '/campuses.php';

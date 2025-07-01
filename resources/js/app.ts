@@ -4,8 +4,8 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { createPinia } from 'pinia';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
-import GlobalDeleteDialog from './components/GlobalDeleteDialog.vue';
 import { initializeTheme } from './composables/useAppearance';
+import { vCan, vCanAny } from './directives/permission';
 import AppLayout from './layouts/AppLayout.vue';
 
 // Extend ImportMeta interface for Vite...
@@ -21,7 +21,7 @@ declare module 'vite/client' {
     }
 }
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'Swinx';
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
@@ -29,23 +29,19 @@ createInertiaApp({
         const pages = import.meta.glob('./pages/**/*.vue', { eager: true });
         const page = pages[`./pages/${name}.vue`] as any;
         if (page?.default) {
-            page.default.layout = name.startsWith('Public/') ? undefined : AppLayout;
+            page.default.layout = name.startsWith('auth/Login') || name.startsWith('SelectCampus') ? undefined : AppLayout;
         }
         return page;
     },
     setup({ el, App, props, plugin }) {
+        const app = createApp({ render: () => h(App, props) });
         const pinia = createPinia();
 
-        const app = createApp({
-            render: () => h('div', [h(App, props), h(GlobalDeleteDialog)]),
-        });
+        initializeTheme();
 
-        app.use(plugin).use(ZiggyVue).use(pinia).mount(el);
+        app.use(plugin).use(ZiggyVue).use(pinia).directive('can', vCan).directive('can-any', vCanAny).mount(el);
     },
     progress: {
         color: '#4B5563',
     },
 });
-
-// This will set light / dark mode on page load...
-initializeTheme();

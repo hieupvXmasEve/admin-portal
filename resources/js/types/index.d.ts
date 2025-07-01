@@ -4,6 +4,8 @@ import type { Config } from 'ziggy-js';
 
 export interface Auth {
     user: User;
+    permissions: string[];
+    current_campus_id: number;
 }
 
 export interface BreadcrumbItem {
@@ -60,4 +62,8 @@ export interface PaginatedResponse<T> {
     prev_page_url: string | null;
     to: number | null;
     total: number;
+}
+
+export interface PageProps<T extends Record<string, unknown> = Record<string, unknown>> extends T {
+    auth: Auth | null;
 }

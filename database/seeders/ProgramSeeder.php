@@ -16,10 +16,6 @@ class ProgramSeeder extends Seeder
      */
     public function run(): void
     {
-        // Clear existing programs and specializations
-        Specialization::query()->delete();
-        Program::query()->delete();
-
         // Create Bachelor of Business Administration program (BA)
         $baProgram = Program::create([
             'name' => 'Bachelor of Business Administration',

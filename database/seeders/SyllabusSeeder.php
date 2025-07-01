@@ -26,19 +26,32 @@ class SyllabusSeeder extends Seeder
             return;
         }
 
+        $usedCombinations = [];
+
         foreach ($units as $unit) {
             // Create 1-2 syllabus per unit
             $syllabusCount = rand(1, 2);
 
             for ($i = 0; $i < $syllabusCount; $i++) {
+                $semester = $semesters->random();
+                $isActive = $i === 0;
+
+                // Ensure unique combination of unit, semester, and active status
+                if ($isActive) {
+                    if (isset($usedCombinations[$unit->id][$semester->id])) {
+                        continue; // Skip if this combination has been used for an active syllabus
+                    }
+                    $usedCombinations[$unit->id][$semester->id] = true;
+                }
+
                 $syllabus = Syllabus::create([
                     'unit_id' => $unit->id,
                     'version' => 'v' . ($i + 1) . '.0',
                     'description' => "Course syllabus for {$unit->code} covering fundamental concepts and practical applications.",
                     'total_hours' => rand(60, 150),
                     'hours_per_session' => rand(2, 4),
-                    'semester_id' => $semesters->random()->id,
-                    'is_active' => $i === 0, // First syllabus is active
+                    'semester_id' => $semester->id,
+                    'is_active' => $isActive,
                 ]);
 
                 // Create assessment components

@@ -9,11 +9,27 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth')->group(function () {
 
     // Curriculum Versions routes
-    RoutePermissionHelper::resourceWithPermissions(
-        prefix: 'curriculum-versions',
-        controller: CurriculumVersionController::class,
-        module: 'curriculum_versions'
-    );
+    Route::get('curriculum-versions', [CurriculumVersionController::class, 'index'])
+        ->middleware('can:view_curriculum_version')
+        ->name('curriculum_version.index');
+    Route::get('curriculum-versions/create', [CurriculumVersionController::class, 'create'])
+        ->middleware('can:create_curriculum_version')
+        ->name('curriculum_version.create');
+    Route::post('curriculum-versions', [CurriculumVersionController::class, 'store'])
+        ->middleware('can:create_curriculum_version')
+        ->name('curriculum_version.store');
+    Route::get('curriculum-versions/{curriculum_version}', [CurriculumVersionController::class, 'show'])
+        ->middleware('can:view_curriculum_version')
+        ->name('curriculum_version.show');
+    Route::get('curriculum-versions/{curriculum_version}/edit', [CurriculumVersionController::class, 'edit'])
+        ->middleware('can:edit_curriculum_version')
+        ->name('curriculum_version.edit');
+    Route::put('curriculum-versions/{curriculum_version}', [CurriculumVersionController::class, 'update'])
+        ->middleware('can:edit_curriculum_version')
+        ->name('curriculum_version.update');
+    Route::delete('curriculum-versions/{curriculum_version}', [CurriculumVersionController::class, 'destroy'])
+        ->middleware('can:delete_curriculum_version')
+        ->name('curriculum_version.destroy');
 
     // Global management routes for curriculum versions
     Route::prefix('curriculum-versions')->name('curriculum_version.')->group(function () {
@@ -23,11 +39,27 @@ Route::middleware('auth')->group(function () {
     });
 
     // Curriculum Units routes
-    RoutePermissionHelper::resourceWithPermissions(
-        prefix: 'curriculum-units',
-        controller: CurriculumUnitController::class,
-        module: 'curriculum_units'
-    );
+    Route::get('curriculum-units', [CurriculumUnitController::class, 'index'])
+        ->middleware('can:view_curriculum_unit')
+        ->name('curriculum_unit.index');
+    Route::get('curriculum-units/create', [CurriculumUnitController::class, 'create'])
+        ->middleware('can:create_curriculum_unit')
+        ->name('curriculum_unit.create');
+    Route::post('curriculum-units', [CurriculumUnitController::class, 'store'])
+        ->middleware('can:create_curriculum_unit')
+        ->name('curriculum_unit.store');
+    Route::get('curriculum-units/{curriculum_unit}', [CurriculumUnitController::class, 'show'])
+        ->middleware('can:view_curriculum_unit')
+        ->name('curriculum_unit.show');
+    Route::get('curriculum-units/{curriculum_unit}/edit', [CurriculumUnitController::class, 'edit'])
+        ->middleware('can:edit_curriculum_unit')
+        ->name('curriculum_unit.edit');
+    Route::put('curriculum-units/{curriculum_unit}', [CurriculumUnitController::class, 'update'])
+        ->middleware('can:edit_curriculum_unit')
+        ->name('curriculum_unit.update');
+    Route::delete('curriculum-units/{curriculum_unit}', [CurriculumUnitController::class, 'destroy'])
+        ->middleware('can:delete_curriculum_unit')
+        ->name('curriculum_unit.destroy');
 });
 
 // API routes for AJAX calls

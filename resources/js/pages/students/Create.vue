@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import AppLayout from '@/layouts/AppLayout.vue';
 import type { Campus, CurriculumVersion, Program, Specialization } from '@/types/models';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { studentRoutes } from '@/utils/routes';
+import { Head, router, useForm as useInertiaForm } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
-import { ArrowLeft, Save, User } from 'lucide-vue-next';
+import { ArrowLeft, GraduationCap, Phone, Save, User } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { computed, ref, watch } from 'vue';
-import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
 interface Props {
@@ -22,72 +21,89 @@ interface Props {
 
 const props = defineProps<Props>();
 
-// Define validation schema following Laravel validation rules
-const formSchema = toTypedSchema(
+// Form validation schema
+const createStudentSchema = toTypedSchema(
     z.object({
-        full_name: z.string().min(1, 'Full name is required').max(100, 'Full name too long'),
-        email: z.string().min(1, 'Email is required').email('Invalid email format').max(255, 'Email too long'),
-        phone: z.string().min(1, 'Phone is required').max(20, 'Phone number too long'),
-        date_of_birth: z.string().min(1, 'Date of birth is required'),
-        gender: z.enum(['male', 'female', 'other'], { required_error: 'Gender is required' }),
-        nationality: z.string().min(1, 'Nationality is required').max(100, 'Nationality too long'),
-        national_id: z.string().min(1, 'National ID is required').max(20, 'National ID too long'),
-        address: z.string().min(1, 'Address is required'),
+        full_name: z.string().min(1, 'Full name is required').max(100, 'Full name is too long'),
+        email: z.string().email('Invalid email format').max(255, 'Email is too long'),
+        phone: z.string().max(20, 'Phone number is too long').optional(),
+        date_of_birth: z.string().optional(),
+        gender: z.enum(['male', 'female', 'other']).optional(),
+        nationality: z.string().max(100, 'Nationality is too long').optional(),
+        national_id: z.string().max(20, 'National ID is too long').optional(),
+        address: z.string().optional(),
         campus_id: z.string().min(1, 'Campus is required'),
         program_id: z.string().min(1, 'Program is required'),
-        specialization_id: z.string().min(1, 'Specialization is required'),
+        specialization_id: z.string().optional(),
         curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
         admission_date: z.string().min(1, 'Admission date is required'),
-        parent_guardian_name: z.string().min(1, 'Parent/Guardian name is required').max(255, 'Parent/Guardian name too long'),
-        parent_guardian_phone: z.string().min(1, 'Parent/Guardian phone is required').max(20, 'Parent/Guardian phone too long'),
-        parent_guardian_email: z
-            .string()
-            .min(1, 'Parent/Guardian email is required')
-            .email('Invalid parent/guardian email')
-            .max(255, 'Parent/Guardian email too long'),
-        emergency_contact_name: z.string().min(1, 'Emergency contact name is required').max(255, 'Emergency contact name too long'),
-        emergency_contact_phone: z.string().min(1, 'Emergency contact phone is required').max(20, 'Emergency contact phone too long'),
-        high_school_name: z.string().min(1, 'High school name is required').max(255, 'High school name too long'),
-        high_school_graduation_year: z.string().min(1, 'High school graduation year is required'),
-        // entrance_exam_score: z.string().min(1, 'Entrance exam score is required'),
+        expected_graduation_date: z.string().optional(),
+        emergency_contact_name: z.string().max(255, 'Emergency contact name is too long').optional(),
+        emergency_contact_phone: z.string().max(20, 'Emergency contact phone is too long').optional(),
+        emergency_contact_relationship: z.string().max(100, 'Emergency contact relationship is too long').optional(),
+        high_school_name: z.string().max(255, 'High school name is too long').optional(),
+        high_school_graduation_year: z.string().optional(),
+        entrance_exam_score: z.string().optional(),
         admission_notes: z.string().optional(),
-        status: z.enum(['active', 'inactive', 'suspended']).default('active'),
     }),
 );
 
-// Reactive states for dependent selects
-const curriculumVersions = ref<CurriculumVersion[]>([]);
-const loadingCurriculumVersions = ref(false);
+// Inertia form for submission
+const createInertiaForm = useInertiaForm({
+    full_name: '',
+    email: '',
+    phone: '',
+    date_of_birth: '',
+    gender: undefined,
+    nationality: 'Vietnamese',
+    national_id: '',
+    address: '',
+    campus_id: '',
+    program_id: '',
+    specialization_id: '',
+    curriculum_version_id: '',
+    admission_date: '',
+    expected_graduation_date: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    emergency_contact_relationship: '',
+    high_school_name: '',
+    high_school_graduation_year: '',
+    entrance_exam_score: '',
+    admission_notes: '',
+});
 
-// Form setup following development standards
-const { handleSubmit, isSubmitting, values, setFieldValue } = useForm({
-    validationSchema: formSchema,
+// Form validation
+const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
+    validationSchema: createStudentSchema,
     initialValues: {
-        full_name: 'hieu pham',
-        email: 'hieupham@gmail.com',
-        phone: '0901234567',
-        date_of_birth: '2000-01-01',
-        gender: 'male',
-        nationality: 'Việt Nam',
-        national_id: '1234567890',
-        address: '1234567890',
+        full_name: '',
+        email: '',
+        phone: '',
+        date_of_birth: '',
+        gender: undefined,
+        nationality: 'Vietnamese',
+        national_id: '',
+        address: '',
         campus_id: '',
         program_id: '',
         specialization_id: '',
         curriculum_version_id: '',
-        admission_date: new Date().toISOString().split('T')[0],
-        parent_guardian_name: 'parent',
-        parent_guardian_phone: '0901234567',
-        parent_guardian_email: 'parent@gmail.com',
-        emergency_contact_name: 'emergency',
-        emergency_contact_phone: '0901234567',
-        high_school_name: 'high school',
-        high_school_graduation_year: '2020',
-        // entrance_exam_score: '',
+        admission_date: '',
+        expected_graduation_date: '',
+        emergency_contact_name: '',
+        emergency_contact_phone: '',
+        emergency_contact_relationship: '',
+        high_school_name: '',
+        high_school_graduation_year: '',
+        entrance_exam_score: '',
         admission_notes: '',
-        status: 'active' as const,
     },
 });
+
+// Reactive data for dependent dropdowns
+const availableCurriculumVersions = ref<CurriculumVersion[]>([]);
+const loadingCurriculumVersions = ref(false);
 
 // Computed specializations filtered by selected program
 const filteredSpecializations = computed(() => {
@@ -96,33 +112,10 @@ const filteredSpecializations = computed(() => {
     return selectedProgram?.specializations || [];
 });
 
-// Watch for program changes to reset dependent fields
-watch(
-    () => values.program_id,
-    (newProgramId, oldProgramId) => {
-        if (newProgramId !== oldProgramId) {
-            setFieldValue('specialization_id', '');
-            setFieldValue('curriculum_version_id', '');
-            curriculumVersions.value = [];
-        }
-    },
-);
-
-// Watch for specialization changes to fetch curriculum versions
-watch(
-    () => values.specialization_id,
-    (newSpecializationId, oldSpecializationId) => {
-        if (newSpecializationId !== oldSpecializationId) {
-            setFieldValue('curriculum_version_id', '');
-            fetchCurriculumVersions();
-        }
-    },
-);
-
 // Fetch curriculum versions based on program and specialization
 const fetchCurriculumVersions = async () => {
-    if (!values.program_id || !values.specialization_id) {
-        curriculumVersions.value = [];
+    if (!values.program_id) {
+        availableCurriculumVersions.value = [];
         return;
     }
 
@@ -131,12 +124,12 @@ const fetchCurriculumVersions = async () => {
     try {
         const params = new URLSearchParams({
             program_id: values.program_id,
-            specialization_id: values.specialization_id,
+            ...(values.specialization_id && { specialization_id: values.specialization_id }),
         });
 
         const response = await fetch(`/api/curriculum-versions/by-program-specialization?${params}`);
         const data = await response.json();
-        curriculumVersions.value = data;
+        availableCurriculumVersions.value = data;
 
         // Auto-select curriculum version if only one exists
         if (data.length === 1) {
@@ -144,180 +137,213 @@ const fetchCurriculumVersions = async () => {
         }
     } catch (error) {
         console.error('Error fetching curriculum versions:', error);
-        toast.error('Failed to load curriculum versions');
     } finally {
         loadingCurriculumVersions.value = false;
     }
 };
 
-// Submit form
-const onSubmit = handleSubmit((values) => {
-    const formData = {
-        ...values,
-        campus_id: parseInt(values.campus_id),
-        program_id: parseInt(values.program_id),
-        specialization_id: parseInt(values.specialization_id),
-        curriculum_version_id: parseInt(values.curriculum_version_id),
-        high_school_graduation_year: values.high_school_graduation_year ? parseInt(values.high_school_graduation_year) : null,
-        // entrance_exam_score: values.entrance_exam_score ? parseFloat(values.entrance_exam_score) : null,
+// Watch for program changes to reset dependent fields
+watch(
+    () => values.program_id,
+    (newProgramId, oldProgramId) => {
+        if (newProgramId !== oldProgramId) {
+            setFieldValue('specialization_id', '');
+            setFieldValue('curriculum_version_id', '');
+            availableCurriculumVersions.value = [];
+            if (newProgramId) {
+                fetchCurriculumVersions();
+            }
+        }
+    },
+);
+
+// Watch for specialization changes to fetch curriculum versions
+watch(
+    () => values.specialization_id,
+    () => {
+        setFieldValue('curriculum_version_id', '');
+        fetchCurriculumVersions();
+    },
+);
+
+const onCreateSubmit = handleSubmit((formData) => {
+    // Convert string values back to appropriate types
+    const submitData = {
+        ...formData,
+        campus_id: parseInt(formData.campus_id),
+        program_id: parseInt(formData.program_id),
+        specialization_id: formData.specialization_id ? parseInt(formData.specialization_id) : null,
+        curriculum_version_id: parseInt(formData.curriculum_version_id),
+        high_school_graduation_year: formData.high_school_graduation_year ? parseInt(formData.high_school_graduation_year) : null,
+        entrance_exam_score: formData.entrance_exam_score ? parseFloat(formData.entrance_exam_score) : null,
+        // Remove empty strings
+        phone: formData.phone || null,
+        date_of_birth: formData.date_of_birth || null,
+        gender: formData.gender || null,
+        nationality: formData.nationality || null,
+        national_id: formData.national_id || null,
+        address: formData.address || null,
+        expected_graduation_date: formData.expected_graduation_date || null,
+        emergency_contact_name: formData.emergency_contact_name || null,
+        emergency_contact_phone: formData.emergency_contact_phone || null,
+        emergency_contact_relationship: formData.emergency_contact_relationship || null,
+        high_school_name: formData.high_school_name || null,
+        admission_notes: formData.admission_notes || null,
     };
 
-    router.post('/students', formData, {
+    // Update Inertia form data
+    Object.assign(createInertiaForm, submitData);
+
+    createInertiaForm.post(route('students.store'), {
         onSuccess: () => {
-            toast.success('Student created successfully');
+            router.visit(studentRoutes.list());
         },
         onError: (errors) => {
-            toast.error('Failed to create student');
-            console.error('Validation errors:', errors);
+            console.error('Form submission errors:', errors);
         },
     });
-});
-
-// Generate years for high school graduation
-const graduationYears = computed(() => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let year = currentYear + 1; year >= 1990; year--) {
-        years.push(year);
-    }
-    return years;
 });
 </script>
 
 <template>
     <Head title="Create Student" />
 
-            <!-- Header -->
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <Button as-child variant="outline" size="icon">
-                        <Link :href="route('students.index')">
-                            <ArrowLeft class="h-4 w-4" />
-                        </Link>
-                    </Button>
-                    <div>
-                        <h1 class="flex items-center space-x-2 text-2xl font-semibold text-gray-900">
-                            <User class="h-6 w-6" />
-                            <span>Create Student</span>
-                        </h1>
-                        <p class="mt-1 text-sm text-gray-600">Add a new student to the system</p>
-                    </div>
-                </div>
+    <div class="space-y-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Create New Student</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Add a new student to the system</p>
             </div>
+            <Button variant="outline" @click="router.visit(studentRoutes.list())">
+                <ArrowLeft class="mr-2 h-4 w-4" />
+                Back to Students
+            </Button>
+        </div>
 
-            <form @submit="onSubmit" class="space-y-6">
-                <!-- Personal Information -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Personal Information</CardTitle>
-                    </CardHeader>
-                    <CardContent class="space-y-6">
-                        <div class="grid grid-cols-1">
-                            <FormField v-slot="{ componentField }" name="full_name">
-                                <FormItem>
-                                    <FormLabel>Full Name *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter full name" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="email">
-                                <FormItem>
-                                    <FormLabel>Email *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" type="email" placeholder="student@university.edu" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="phone">
-                                <FormItem>
-                                    <FormLabel>Phone *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="+84901234567" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <FormField v-slot="{ componentField }" name="date_of_birth">
-                                <FormItem>
-                                    <FormLabel>Date of Birth *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" type="date" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="gender">
-                                <FormItem>
-                                    <FormLabel>Gender *</FormLabel>
-                                    <Select v-bind="componentField">
+        <!-- Main Form -->
+        <Form :validation-schema="createStudentSchema" @submit="onCreateSubmit">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <!-- Basic Information -->
+                <div class="lg:col-span-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle class="flex items-center">
+                                <User class="mr-2 h-5 w-5" />
+                                Basic Information
+                            </CardTitle>
+                            <CardDescription>Student's personal details</CardDescription>
+                        </CardHeader>
+                        <CardContent class="space-y-4">
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <FormField v-slot="{ componentField }" name="full_name">
+                                    <FormItem>
+                                        <FormLabel>Full Name *</FormLabel>
                                         <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select gender" />
-                                            </SelectTrigger>
+                                            <Input v-bind="componentField" placeholder="Enter full name" />
                                         </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="male">Male</SelectItem>
-                                            <SelectItem value="female">Female</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
 
-                            <FormField v-slot="{ componentField }" name="nationality">
+                                <FormField v-slot="{ componentField }" name="email">
+                                    <FormItem>
+                                        <FormLabel>Email *</FormLabel>
+                                        <FormControl>
+                                            <Input v-bind="componentField" type="email" placeholder="Enter email" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <FormField v-slot="{ componentField }" name="phone">
+                                    <FormItem>
+                                        <FormLabel>Phone</FormLabel>
+                                        <FormControl>
+                                            <Input v-bind="componentField" placeholder="Enter phone number" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
+
+                                <FormField v-slot="{ componentField }" name="date_of_birth">
+                                    <FormItem>
+                                        <FormLabel>Date of Birth</FormLabel>
+                                        <FormControl>
+                                            <Input v-bind="componentField" type="date" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                <FormField v-slot="{ componentField }" name="gender">
+                                    <FormItem>
+                                        <FormLabel>Gender</FormLabel>
+                                        <Select v-bind="componentField">
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select gender" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="male">Male</SelectItem>
+                                                <SelectItem value="female">Female</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
+
+                                <FormField v-slot="{ componentField }" name="nationality">
+                                    <FormItem>
+                                        <FormLabel>Nationality</FormLabel>
+                                        <FormControl>
+                                            <Input v-bind="componentField" placeholder="Enter nationality" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
+
+                                <FormField v-slot="{ componentField }" name="national_id">
+                                    <FormItem>
+                                        <FormLabel>National ID</FormLabel>
+                                        <FormControl>
+                                            <Input v-bind="componentField" placeholder="Enter national ID" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
+                            </div>
+
+                            <FormField v-slot="{ componentField }" name="address">
                                 <FormItem>
-                                    <FormLabel>Nationality *</FormLabel>
+                                    <FormLabel>Address</FormLabel>
                                     <FormControl>
-                                        <Input v-bind="componentField" placeholder="e.g., Việt Nam" disabled />
+                                        <Textarea v-bind="componentField" placeholder="Enter address" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             </FormField>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="national_id">
-                                <FormItem>
-                                    <FormLabel>National ID *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter national ID" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <FormField v-slot="{ componentField }" name="address">
-                            <FormItem>
-                                <FormLabel>Address *</FormLabel>
-                                <FormControl>
-                                    <Textarea v-bind="componentField" placeholder="Enter full address" rows="3" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                </div>
 
                 <!-- Academic Information -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Academic Information</CardTitle>
-                    </CardHeader>
-                    <CardContent class="space-y-6">
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle class="flex items-center">
+                                <GraduationCap class="mr-2 h-5 w-5" />
+                                Academic Assignment
+                            </CardTitle>
+                            <CardDescription>Program and campus details</CardDescription>
+                        </CardHeader>
+                        <CardContent class="space-y-4">
                             <FormField v-slot="{ componentField }" name="campus_id">
                                 <FormItem>
                                     <FormLabel>Campus *</FormLabel>
@@ -329,7 +355,7 @@ const graduationYears = computed(() => {
                                         </FormControl>
                                         <SelectContent>
                                             <SelectItem v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">
-                                                {{ campus.name }}
+                                                {{ campus.name }} ({{ campus.code }})
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -355,19 +381,18 @@ const graduationYears = computed(() => {
                                     <FormMessage />
                                 </FormItem>
                             </FormField>
-                        </div>
 
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <FormField v-slot="{ componentField }" name="specialization_id">
                                 <FormItem>
-                                    <FormLabel>Specialization *</FormLabel>
-                                    <Select v-bind="componentField" :disabled="!values.program_id">
+                                    <FormLabel>Specialization</FormLabel>
+                                    <Select v-bind="componentField" :disabled="!filteredSpecializations.length">
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select specialization" />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
+                                            <SelectItem value="">No specialization</SelectItem>
                                             <SelectItem
                                                 v-for="specialization in filteredSpecializations"
                                                 :key="specialization.id"
@@ -384,14 +409,18 @@ const graduationYears = computed(() => {
                             <FormField v-slot="{ componentField }" name="curriculum_version_id">
                                 <FormItem>
                                     <FormLabel>Curriculum Version *</FormLabel>
-                                    <Select v-bind="componentField" :disabled="!values.specialization_id || loadingCurriculumVersions">
+                                    <Select v-bind="componentField" :disabled="loadingCurriculumVersions || !availableCurriculumVersions.length">
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select curriculum version" />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem v-for="version in curriculumVersions" :key="version.id" :value="version.id.toString()">
+                                            <SelectItem
+                                                v-for="version in availableCurriculumVersions"
+                                                :key="version.id"
+                                                :value="version.id.toString()"
+                                            >
                                                 {{ version.version_code }}
                                             </SelectItem>
                                         </SelectContent>
@@ -399,141 +428,71 @@ const graduationYears = computed(() => {
                                     <FormMessage />
                                 </FormItem>
                             </FormField>
-                        </div>
 
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="admission_date">
-                                <FormItem>
-                                    <FormLabel>Admission Date *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" type="date" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-                    </CardContent>
-                </Card>
+                            <div class="grid grid-cols-1 gap-4">
+                                <FormField v-slot="{ componentField }" name="admission_date">
+                                    <FormItem>
+                                        <FormLabel>Admission Date *</FormLabel>
+                                        <FormControl>
+                                            <Input v-bind="componentField" type="date" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
 
-                <!-- Background Information -->
+                                <FormField v-slot="{ componentField }" name="expected_graduation_date">
+                                    <FormItem>
+                                        <FormLabel>Expected Graduation Date</FormLabel>
+                                        <FormControl>
+                                            <Input v-bind="componentField" type="date" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+            <!-- Additional Information -->
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <!-- Emergency Contact -->
                 <Card>
                     <CardHeader>
-                        <CardTitle>Background Information</CardTitle>
+                        <CardTitle class="flex items-center">
+                            <Phone class="mr-2 h-5 w-5" />
+                            Emergency Contact
+                        </CardTitle>
+                        <CardDescription>Emergency contact information</CardDescription>
                     </CardHeader>
-                    <CardContent class="space-y-6">
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="high_school_name">
-                                <FormItem>
-                                    <FormLabel>High School Name *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter high school name" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="high_school_graduation_year">
-                                <FormItem>
-                                    <FormLabel>High School Graduation Year *</FormLabel>
-                                    <Select v-bind="componentField">
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select year" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem v-for="year in graduationYears" :key="year" :value="year.toString()">
-                                                {{ year }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <!-- <FormField v-slot="{ componentField }" name="entrance_exam_score">
+                    <CardContent class="space-y-4">
+                        <FormField v-slot="{ componentField }" name="emergency_contact_name">
                             <FormItem>
-                                <FormLabel>Entrance Exam Score (0-100) *</FormLabel>
+                                <FormLabel>Contact Name</FormLabel>
                                 <FormControl>
-                                    <NumberField
-                                        :model-value="
-                                            typeof componentField.modelValue === 'string'
-                                                ? parseFloat(componentField.modelValue) || 0
-                                                : componentField.modelValue
-                                        "
-                                        @update:model-value="componentField['onUpdate:modelValue']"
-                                        :step="0.1"
-                                        :format-options="{
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                        }"
-                                    >
-                                        <NumberFieldContent>
-                                            <NumberFieldInput />
-                                        </NumberFieldContent>
-                                    </NumberField>
+                                    <Input v-bind="componentField" placeholder="Enter contact name" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
-                        </FormField> -->
-                    </CardContent>
-                </Card>
-
-                <!-- Contact Information -->
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Emergency & Parent Contact</CardTitle>
-                    </CardHeader>
-                    <CardContent class="space-y-6">
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <FormField v-slot="{ componentField }" name="parent_guardian_name">
-                                <FormItem>
-                                    <FormLabel>Parent/Guardian Name *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter parent/guardian name" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="parent_guardian_phone">
-                                <FormItem>
-                                    <FormLabel>Parent/Guardian Phone *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" placeholder="+84901234567" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="parent_guardian_email">
-                                <FormItem>
-                                    <FormLabel>Parent/Guardian Email *</FormLabel>
-                                    <FormControl>
-                                        <Input v-bind="componentField" type="email" placeholder="parent@example.com" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-                        </div>
+                        </FormField>
 
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField v-slot="{ componentField }" name="emergency_contact_name">
+                            <FormField v-slot="{ componentField }" name="emergency_contact_phone">
                                 <FormItem>
-                                    <FormLabel>Emergency Contact Name *</FormLabel>
+                                    <FormLabel>Contact Phone</FormLabel>
                                     <FormControl>
-                                        <Input v-bind="componentField" placeholder="Enter emergency contact name" />
+                                        <Input v-bind="componentField" placeholder="Enter contact phone" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             </FormField>
 
-                            <FormField v-slot="{ componentField }" name="emergency_contact_phone">
+                            <FormField v-slot="{ componentField }" name="emergency_contact_relationship">
                                 <FormItem>
-                                    <FormLabel>Emergency Contact Phone *</FormLabel>
+                                    <FormLabel>Relationship</FormLabel>
                                     <FormControl>
-                                        <Input v-bind="componentField" placeholder="+84901234567" />
+                                        <Input v-bind="componentField" placeholder="e.g., Parent, Guardian" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -542,52 +501,75 @@ const graduationYears = computed(() => {
                     </CardContent>
                 </Card>
 
-                <!-- Additional Notes -->
+                <!-- Academic Background -->
                 <Card>
                     <CardHeader>
-                        <CardTitle>Additional Information</CardTitle>
+                        <CardTitle class="flex items-center">
+                            <GraduationCap class="mr-2 h-5 w-5" />
+                            Academic Background
+                        </CardTitle>
+                        <CardDescription>Previous education details</CardDescription>
                     </CardHeader>
-                    <CardContent class="space-y-6">
+                    <CardContent class="space-y-4">
+                        <FormField v-slot="{ componentField }" name="high_school_name">
+                            <FormItem>
+                                <FormLabel>High School Name</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter high school name" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <FormField v-slot="{ componentField }" name="high_school_graduation_year">
+                                <FormItem>
+                                    <FormLabel>Graduation Year</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            v-bind="componentField"
+                                            type="number"
+                                            placeholder="Enter year"
+                                            min="1900"
+                                            :max="new Date().getFullYear() + 1"
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            </FormField>
+
+                            <FormField v-slot="{ componentField }" name="entrance_exam_score">
+                                <FormItem>
+                                    <FormLabel>Entrance Exam Score</FormLabel>
+                                    <FormControl>
+                                        <Input v-bind="componentField" type="number" placeholder="Enter score" min="0" max="100" step="0.01" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            </FormField>
+                        </div>
+
                         <FormField v-slot="{ componentField }" name="admission_notes">
                             <FormItem>
                                 <FormLabel>Admission Notes</FormLabel>
                                 <FormControl>
-                                    <Textarea v-bind="componentField" placeholder="Any additional notes about the student's admission..." rows="4" />
+                                    <Textarea v-bind="componentField" placeholder="Enter any additional notes" />
                                 </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="status">
-                            <FormItem>
-                                <FormLabel>Student Status</FormLabel>
-                                <Select v-bind="componentField">
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select status" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="active">Active</SelectItem>
-                                        <SelectItem value="inactive">Inactive</SelectItem>
-                                        <SelectItem value="suspended">Suspended</SelectItem>
-                                    </SelectContent>
-                                </Select>
                                 <FormMessage />
                             </FormItem>
                         </FormField>
                     </CardContent>
                 </Card>
+            </div>
 
-                <!-- Actions -->
-                <div class="flex justify-end space-x-4">
-                    <Button as-child type="button" variant="outline">
-                        <Link :href="route('students.index')"> Cancel </Link>
-                    </Button>
-                    <Button type="submit" :disabled="isSubmitting" class="min-w-32">
-                        <Save class="mr-2 h-4 w-4" />
-                        {{ isSubmitting ? 'Creating...' : 'Create Student' }}
-                    </Button>
-                </div>
-            </form>
+            <!-- Form Actions -->
+            <div class="flex justify-end space-x-4">
+                <Button type="button" variant="outline" @click="router.visit(studentRoutes.list())"> Cancel </Button>
+                <Button type="submit" :disabled="isSubmitting || createInertiaForm.processing">
+                    <Save class="mr-2 h-4 w-4" />
+                    Create Student
+                </Button>
+            </div>
+        </Form>
+    </div>
 </template>

@@ -3,20 +3,23 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Traits\LazyPermissions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, LazyPermissions;
 
     /**
      * The attributes that are mass assignable.
      *
-     * @var list<string>
+     * @var array<int, string>
      */
     protected $fillable = [
         'name',
@@ -29,7 +32,7 @@ class User extends Authenticatable
     /**
      * The attributes that should be hidden for serialization.
      *
-     * @var list<string>
+     * @var array<int, string>
      */
     protected $hidden = [
         'password',
@@ -41,17 +44,25 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
-    protected function casts(): array
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+    ];
+
+    public function getInitialsAttribute()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return Str::of($this->name)
+            ->split('/[\s,]+/')
+            ->map(fn($word) => Str::substr($word, 0, 1))
+            ->slice(0, 2)
+            ->join('');
     }
 
-    public function campusRoles(): HasMany
+    public function campusRoles()
     {
-        return $this->hasMany(CampusUserRole::class);
+        return $this->belongsToMany(Role::class, 'campus_user_roles', 'user_id', 'role_id')
+            ->withPivot('campus_id')
+            ->withTimestamps();
     }
 
     public function campuses()
@@ -59,35 +70,18 @@ class User extends Authenticatable
         return $this->belongsToMany(Campus::class, 'campus_user_roles')->withPivot('role_id')->withTimestamps();
     }
 
-    public function hasPermission($permission_code, $campusId)
+    /**
+     * Lấy danh sách vai trò của người dùng tại một campus
+     */
+    public function rolesAtCampus(int $campusId)
     {
-        return $this->getAllPermissions($campusId)->contains($permission_code);
+        return $this->belongsToMany(Role::class, 'campus_user_roles')
+            ->wherePivot('campus_id', $campusId);
     }
 
-    public function getAllPermissions($campusId = null)
+    public function hasRole($roleCode, $campusId = null)
     {
         $campusId = $campusId ?? session('current_campus_id');
-
-        // Lấy tất cả role_id của user trong campus hiện tại
-        $roleIds = $this->campusRoles()
-            ->where('campus_id', $campusId)
-            ->pluck('role_id');
-        if ($roleIds->isEmpty()) return collect();
-
-        // Lấy tất cả permissions từ các roles (kèm children nếu cần)
-        $roles = Role::with('permissions.children')->whereIn('id', $roleIds)->get();
-
-        $permissions = collect();
-        foreach ($roles as $role) {
-            foreach ($role->permissions as $perm) {
-                $permissions->push($perm); // permission cha
-                foreach ($perm->children as $child) {
-                    $permissions->push($child); // permission con
-                }
-            }
-        }
-
-        // Trả về unique theo code (hoặc id nếu bạn muốn)
-        return $permissions->unique('code')->pluck('code')->values();
+        return $this->campusRoles()->where('campus_id', $campusId)->where('code', $roleCode)->exists();
     }
 }

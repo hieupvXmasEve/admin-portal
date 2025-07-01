@@ -2,26 +2,41 @@
 
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\SemesterEnrollmentController;
-use App\Helpers\RoutePermissionHelper;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
-    RoutePermissionHelper::resourceWithPermissions(
-        prefix: 'semesters',
-        controller: SemesterController::class,
-        module: 'semesters'
-    );
+    Route::get('semesters', [SemesterController::class, 'index'])
+        ->middleware('can:view_semester')
+        ->name('semester.index');
+    Route::get('semesters/create', [SemesterController::class, 'create'])
+        ->middleware('can:create_semester')
+        ->name('semester.create');
+    Route::post('semesters', [SemesterController::class, 'store'])
+        ->middleware('can:create_semester')
+        ->name('semester.store');
+    Route::get('semesters/{semester}', [SemesterController::class, 'show'])
+        ->middleware('can:view_semester')
+        ->name('semester.show');
+    Route::get('semesters/{semester}/edit', [SemesterController::class, 'edit'])
+        ->middleware('can:edit_semester')
+        ->name('semester.edit');
+    Route::put('semesters/{semester}', [SemesterController::class, 'update'])
+        ->middleware('can:edit_semester')
+        ->name('semester.update');
+    Route::delete('semesters/{semester}', [SemesterController::class, 'destroy'])
+        ->middleware('can:delete_semester')
+        ->name('semester.destroy');
 
     // API routes for semester activation (using edit permission for safety)
     Route::post('semesters/{semester}/activate', [SemesterController::class, 'activate'])
         ->middleware('can:edit_semester')
-        ->name('semesters.activate');
+        ->name('semester.activate');
     Route::post('semesters/{semester}/deactivate', [SemesterController::class, 'deactivate'])
         ->middleware('can:edit_semester')
-        ->name('semesters.deactivate');
+        ->name('semester.deactivate');
     Route::get('semesters/activation-statuses', [SemesterController::class, 'activationStatuses'])
         ->middleware('can:view_semester')
-        ->name('semesters.activation-statuses');
+        ->name('semester.activation-statuses');
 
     // Admin enrollment management routes
     Route::prefix('semesters/{semester}')->name('semesters.')->group(function () {

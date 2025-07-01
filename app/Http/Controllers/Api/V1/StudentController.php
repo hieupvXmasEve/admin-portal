@@ -40,7 +40,7 @@ class StudentController extends Controller
                     'nationality' => $student->nationality,
                     'address' => $student->address,
                     'avatar_url' => $student->avatar_url,
-                    'enrollment_status' => $student->enrollment_status,
+                    'status' => $student->status,
                     'admission_date' => $student->admission_date?->format('Y-m-d'),
                     'expected_graduation_date' => $student->expected_graduation_date?->format('Y-m-d'),
                     'campus' => $student->campus ? [
@@ -66,11 +66,9 @@ class StudentController extends Controller
                         'is_active' => $student->curriculumVersion->is_active,
                     ] : null,
                     'contact_info' => [
-                        'parent_guardian_name' => $student->parent_guardian_name,
-                        'parent_guardian_phone' => $student->parent_guardian_phone,
-                        'parent_guardian_email' => $student->parent_guardian_email,
                         'emergency_contact_name' => $student->emergency_contact_name,
                         'emergency_contact_phone' => $student->emergency_contact_phone,
+                        'emergency_contact_relationship' => $student->emergency_contact_relationship,
                     ],
                     'admission_info' => [
                         'high_school_name' => $student->high_school_name,
@@ -93,11 +91,9 @@ class StudentController extends Controller
         $validator = Validator::make($request->all(), [
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
-            'parent_guardian_name' => 'nullable|string|max:255',
-            'parent_guardian_phone' => 'nullable|string|max:20',
-            'parent_guardian_email' => 'nullable|email|max:255',
             'emergency_contact_name' => 'nullable|string|max:255',
             'emergency_contact_phone' => 'nullable|string|max:20',
+            'emergency_contact_relationship' => 'nullable|string|max:100',
         ]);
 
         if ($validator->fails()) {

@@ -1,6 +1,5 @@
 <?php
 
-use App\Helpers\RoutePermissionHelper;
 use App\Http\Controllers\Units\UnitController;
 use App\Http\Controllers\Units\UnitExportController;
 use App\Http\Controllers\Units\UnitImportController;
@@ -22,11 +21,28 @@ Route::middleware('auth')->group(function () {
         Route::get('import/template/{format}', [UnitImportController::class, 'downloadTemplate'])->name('units.import.template');
         Route::get('import/history', [UnitImportController::class, 'getImportHistory'])->name('units.import.history');
     });
-    RoutePermissionHelper::resourceWithPermissions(
-        prefix: 'units',
-        controller: UnitController::class,
-        module: 'units'
-    );
+
+    Route::get('units', [UnitController::class, 'index'])
+        ->middleware('can:view_unit')
+        ->name('unit.index');
+    Route::get('units/create', [UnitController::class, 'create'])
+        ->middleware('can:create_unit')
+        ->name('unit.create');
+    Route::post('units', [UnitController::class, 'store'])
+        ->middleware('can:create_unit')
+        ->name('unit.store');
+    Route::get('units/{unit}', [UnitController::class, 'show'])
+        ->middleware('can:view_unit')
+        ->name('unit.show');
+    Route::get('units/{unit}/edit', [UnitController::class, 'edit'])
+        ->middleware('can:edit_unit')
+        ->name('unit.edit');
+    Route::put('units/{unit}', [UnitController::class, 'update'])
+        ->middleware('can:edit_unit')
+        ->name('unit.update');
+    Route::delete('units/{unit}', [UnitController::class, 'destroy'])
+        ->middleware('can:delete_unit')
+        ->name('unit.destroy');
 });
 
 // API routes for AJAX calls

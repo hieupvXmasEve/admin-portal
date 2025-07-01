@@ -11,7 +11,7 @@ import {
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import { ChevronRight } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = defineProps<{
     items: NavItem[];
@@ -21,60 +21,93 @@ const page = usePage<SharedData>();
 // State để lưu menu đang mở
 const openItems = ref<Record<string, boolean>>({});
 
-// Helper function to get base URL without query parameters
-function getBaseUrl(url: string): string {
-    return url.split('?')[0];
+// Helper function to get path from a full URL or a path string
+function getPathname(href: string): string {
+    try {
+        // This will only succeed for full URLs like http://...
+        const url = new URL(href);
+        return url.pathname;
+    } catch {
+        // This will handle relative paths like '/users'
+        return href.split('?')[0];
+    }
+}
+
+// Inertia.js official way to check active links using $page.url
+function isActive(item: NavItem): boolean {
+    if (!item.href || item.href === '#') return false;
+
+    const currentPath = getPathname(page.url);
+    const itemPath = getPathname(item.href);
+
+    // Exact URL match - most precise
+    if (currentPath === itemPath) {
+        return true;
+    }
+
+    // URL starts with pattern - for parent/child routes
+    // This matches /users with /users/create, /users/edit/51, etc.
+    if (currentPath.startsWith(itemPath) && itemPath !== '/') {
+        // Ensure we're not matching partial segments like /users-old matching /users
+        const nextChar = currentPath[itemPath.length];
+        const isMatch = nextChar === '/' || nextChar === '?' || nextChar === undefined;
+        return isMatch;
+    }
+
+    return false;
+}
+
+// Enhanced function to check if any child is active
+function hasActiveChild(item: NavItem): boolean {
+    if (!item.children) return false;
+
+    return item.children.some((child) => {
+        // Check if this child is active
+        const childIsActive = isActive(child);
+        if (childIsActive) {
+            return true;
+        }
+
+        // Recursively check nested children
+        if (child.children) {
+            const nestedHasActive = hasActiveChild(child);
+            if (nestedHasActive) {
+                return true;
+            }
+        }
+
+        return false;
+    });
 }
 
 function toggle(item: NavItem) {
     openItems.value[item.title] = !openItems.value[item.title];
 }
 
-function hasActiveChild(item: NavItem): boolean {
-    if (!item.children) return false;
-    return item.children.some((child) => {
-        if (child.href && child.href !== '#') {
-            const childBaseUrl = getBaseUrl(child.href);
-            const currentBaseUrl = getBaseUrl(page.url);
-            // Check if current URL starts with the child URL (prefix match)
-            if (currentBaseUrl.startsWith(childBaseUrl)) return true;
-        }
-        return hasActiveChild(child);
-    });
-}
-
 function isOpen(item: NavItem) {
-    // Chỉ mở nếu đã được toggle mở (true)
     return !!openItems.value[item.title];
 }
 
-function isActive(item: NavItem): boolean {
-    if (!item.href || item.href === '#') return false;
-    const itemBaseUrl = getBaseUrl(item.href);
-    const currentBaseUrl = getBaseUrl(page.url);
-    // Check for exact match or prefix match
-    return currentBaseUrl === itemBaseUrl || currentBaseUrl.startsWith(itemBaseUrl + '/');
-}
-
-// Tự động mở menu cha khi route thay đổi
-import { watch } from 'vue';
-
+// Auto-open menu parents when route changes - Inertia.js reactive approach
 watch(
     () => page.url,
     () => {
-        // Reset trạng thái open
-        openItems.value = {};
-
-        function autoOpen(items: NavItem[]) {
+        // Recursively check and open parent menus that have active children
+        function autoOpenParents(items: NavItem[]) {
             items.forEach((item) => {
-                if (item.children && hasActiveChild(item)) {
-                    openItems.value[item.title] = true;
-                    autoOpen(item.children);
+                if (item.children) {
+                    const shouldOpen = hasActiveChild(item);
+                    if (shouldOpen) {
+                        openItems.value[item.title] = true;
+
+                        // Recursively check nested menus
+                        autoOpenParents(item.children);
+                    }
                 }
             });
         }
 
-        autoOpen(props.items);
+        autoOpenParents(props.items);
     },
     { immediate: true },
 );
@@ -171,7 +204,7 @@ watch(
                                         }"
                                         @click="toggle(subItem)"
                                     >
-                                        <div class="flex w-full items-center py-2 pr-3 pl-3">
+                                        <div class="flex w-full items-center py-2 pl-3">
                                             <span class="flex-1 text-sm">{{ subItem.title }}</span>
                                             <ChevronRight
                                                 class="size-4 shrink-0 transition-transform duration-200"

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, CalendarDays, Save } from 'lucide-vue-next';
 const form = useForm({
@@ -20,13 +21,13 @@ const form = useForm({
 const submit = () => {
     form.post(route('semester.store'), {
         onSuccess: () => {
-            router.visit(route('semester.index'));
+            router.visit(systemRoutes.semesters.index());
         },
     });
 };
 
 const cancel = () => {
-    router.visit(route('semester.index'));
+    router.visit(systemRoutes.semesters.index());
 };
 </script>
 

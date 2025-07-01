@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { PaginatedResponse } from '@/types';
 import type { User } from '@/types/User';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
@@ -21,6 +22,7 @@ const props = defineProps<{
         search?: string;
     };
 }>();
+console.log(props.users);
 
 // Reactive data
 const data = computed(() => props.users.data);
@@ -34,7 +36,7 @@ const filters = ref({
 
 // Edit user function
 const editUser = (user: User) => {
-    router.visit(`/users/edit/${user.id}`);
+    router.visit(systemRoutes.users.edit(user.id));
 };
 
 // Server-side filtering functions
@@ -46,7 +48,7 @@ const applyFilters = (newFilters: typeof filters.value) => {
     if (newFilters.email) params.set('filter[email]', newFilters.email);
     if (newFilters.search) params.set('search', newFilters.search);
 
-    const url = `/users${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `${systemRoutes.users.index()}${params.toString() ? '?' + params.toString() : ''}`;
 
     router.visit(url, {
         preserveState: true,
@@ -81,7 +83,7 @@ const clearFilters = () => {
         email: '',
         search: '',
     };
-    router.visit('/users', {
+    router.visit(systemRoutes.users.index(), {
         preserveState: true,
         preserveScroll: true,
         only: ['users', 'filters'],
@@ -108,7 +110,7 @@ const exportToExcel = async () => {
         if (filters.value.email) params.set('filter[email]', filters.value.email);
         if (filters.value.search) params.set('search', filters.value.search);
 
-        const exportUrl = `/users/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
+        const exportUrl = `${systemRoutes.users.export()}${params.toString() ? '?' + params.toString() : ''}`;
 
         // Create a temporary link to trigger download
         const link = document.createElement('a');
@@ -172,7 +174,7 @@ const handlePageSizeChange = (pageSize: number) => {
     params.set('per_page', pageSize.toString());
     params.delete('page'); // Reset to first page when changing page size
 
-    const url = `/users?${params.toString()}`;
+    const url = `${systemRoutes.users.index()}?${params.toString()}`;
     router.visit(url, {
         preserveState: true,
         preserveScroll: true,
@@ -191,11 +193,11 @@ const handlePageSizeChange = (pageSize: number) => {
                 <FileSpreadsheet class="h-4 w-4" />
                 {{ isExporting ? 'Exporting...' : 'Export Excel' }}
             </Button>
-            <Button @click="router.visit('/users/import')" variant="outline" class="flex items-center gap-2">
+            <Button @click="router.visit(systemRoutes.users.import())" variant="outline" class="flex items-center gap-2">
                 <Upload class="h-4 w-4" />
                 Import Excel
             </Button>
-            <Button @click="router.visit('/users/create')" class="flex items-center gap-2">
+            <Button @click="router.visit(systemRoutes.users.create())" class="flex items-center gap-2">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>

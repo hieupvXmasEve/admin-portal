@@ -87,21 +87,15 @@ class UserSeeder extends Seeder
         $permissionId = 1;
 
         foreach ($permissionConfig as $module => $actions) {
-            // Create parent permission for module
-            $parentPermission = Permission::create([
-                'id' => $permissionId++,
-                'name' => ucfirst(str_replace('_', ' ', $module)),
-                'parent_id' => null,
-                'code' => $module,
-            ]);
-
-            // Create child permissions for each action
-            foreach ($actions as $action => $code) {
+            // Create permissions for each action directly (skip parent permissions)
+            foreach ($actions as $actionName => $code) {
                 Permission::create([
                     'id' => $permissionId++,
-                    'name' => ucfirst(str_replace('_', ' ', $action)),
-                    'parent_id' => $parentPermission->id,
-                    'code' => $code,
+                    'name' => $code, // Use the code as name for consistency
+                    'code' => $code, // The actual permission code
+                    'display_name' => ucfirst(str_replace('_', ' ', $actionName)),
+                    'module' => $module,
+                    'description' => "Permission to {$actionName} in {$module} module",
                 ]);
             }
         }
@@ -110,7 +104,7 @@ class UserSeeder extends Seeder
     private function assignPermissionsToSuperAdmin(): void
     {
         $superAdminRole = Role::where('code', 'super_admin')->first();
-        $permissions = Permission::whereNotNull('parent_id')->get();
+        $permissions = Permission::all(); // Get all permissions since we removed parent/child structure
 
         foreach ($permissions as $permission) {
             RolePermission::create([

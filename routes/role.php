@@ -1,13 +1,28 @@
 <?php
 
 use App\Http\Controllers\RoleController;
-use App\Helpers\RoutePermissionHelper;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
-    RoutePermissionHelper::resourceWithPermissions(
-        prefix: 'roles',
-        controller: RoleController::class,
-        module: 'roles'
-    );
+    Route::get('roles', [RoleController::class, 'index'])
+        ->middleware('can:view_role')
+        ->name('role.index');
+    Route::get('roles/create', [RoleController::class, 'create'])
+        ->middleware('can:create_role')
+        ->name('role.create');
+    Route::post('roles', [RoleController::class, 'store'])
+        ->middleware('can:create_role')
+        ->name('role.store');
+    Route::get('roles/{role}', [RoleController::class, 'show'])
+        ->middleware('can:view_role')
+        ->name('role.show');
+    Route::get('roles/{role}/edit', [RoleController::class, 'edit'])
+        ->middleware('can:edit_role')
+        ->name('role.edit');
+    Route::put('roles/{role}', [RoleController::class, 'update'])
+        ->middleware('can:edit_role')
+        ->name('role.update');
+    Route::delete('roles/{role}', [RoleController::class, 'destroy'])
+        ->middleware('can:delete_role')
+        ->name('role.destroy');
 });

@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Services\PermissionService;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Auth;
 
 class PermissionServiceProvider extends ServiceProvider
 {
@@ -13,7 +15,9 @@ class PermissionServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(PermissionService::class, function ($app) {
+            return new PermissionService();
+        });
     }
 
     /**
@@ -35,7 +39,14 @@ class PermissionServiceProvider extends ServiceProvider
         foreach ($permissions as $module => $modulePermissions) {
             foreach ($modulePermissions as $permission) {
                 Gate::define($permission, function ($user) use ($permission) {
-                    return session('permissions', collect())->contains($permission);
+                    // Lấy campus_id hiện tại từ session
+                    $currentCampusId = session('current_campus_id');
+
+                    // Sử dụng service để lấy quyền từ cache
+                    $permissionService = app(PermissionService::class);
+                    $permissions = $permissionService->getUserPermissions($user, $currentCampusId);
+
+                    return in_array($permission, $permissions);
                 });
             }
         }
@@ -57,7 +68,8 @@ class PermissionServiceProvider extends ServiceProvider
 
         // @hasPermission('permission_code')
         Blade::directive('hasPermission', function ($expression) {
-            return "<?php if(session('permissions', collect())->contains({$expression})): ?>";
+            $expression = trim($expression, "'\"");
+            return "<?php if(auth()->check() && auth()->user()->hasPermission('{$expression}')): ?>";
         });
 
         Blade::directive('endhasPermission', function () {

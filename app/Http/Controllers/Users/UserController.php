@@ -49,7 +49,7 @@ class UserController extends Controller
             ->withQueryString();
 
         return Inertia::render('users/Index', [
-            'users' => Inertia::deepMerge($users),
+            'users' => $users,
             'filters' => [
                 'search' => $validated['search'] ?? null,
                 'name' => $validated['filter']['name'] ?? null,

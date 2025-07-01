@@ -95,7 +95,7 @@ class SemesterController extends Controller
             ->withQueryString();
 
         return Inertia::render('semesters/Index', [
-            'semesters' => Inertia::deepMerge($semesters),
+            'semesters' => $semesters,
             'filters' => [
                 'search' => $validated['search'] ?? null,
                 'name' => $validated['filter']['name'] ?? null,

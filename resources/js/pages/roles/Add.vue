@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Settings, Shield } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -14,24 +13,19 @@ interface Permission {
     name: string;
     code: string;
     description: string;
-    parent_id: number | null;
-    children?: Permission[];
+    display_name?: string;
+    module: string;
+}
+
+interface PermissionGroup {
+    module: string;
+    display_name: string;
+    permissions: Permission[];
 }
 
 defineProps<{
-    permissions: Permission[];
+    permissions: PermissionGroup[];
 }>();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'List Roles',
-        href: '/roles',
-    },
-    {
-        title: 'Add Role',
-        href: '/roles/add',
-    },
-];
 
 // Form data
 const form = useForm({
@@ -51,19 +45,19 @@ const togglePermissionSelection = (permissionId: number) => {
     form.selectedPermissions = currentPermissions;
 };
 
-// Handle parent permission selection (group checkbox)
-const toggleParentPermissionSelection = (parentPermission: Permission) => {
-    const childIds = parentPermission.children?.map((child) => child.id) || [];
-    const allChildrenSelected = childIds.every((id) => form.selectedPermissions.includes(id));
+// Handle module permission selection (group checkbox)
+const toggleModulePermissionSelection = (permissionGroup: PermissionGroup) => {
+    const modulePermissionIds = permissionGroup.permissions.map((permission) => permission.id);
+    const allModulePermissionsSelected = modulePermissionIds.every((id) => form.selectedPermissions.includes(id));
 
-    if (allChildrenSelected) {
-        // Unselect all children
-        const currentPermissions = form.selectedPermissions.filter((id) => !childIds.includes(id));
+    if (allModulePermissionsSelected) {
+        // Unselect all permissions in this module
+        const currentPermissions = form.selectedPermissions.filter((id) => !modulePermissionIds.includes(id));
         form.selectedPermissions = currentPermissions;
     } else {
-        // Select all children
+        // Select all permissions in this module
         const currentPermissions = [...form.selectedPermissions];
-        childIds.forEach((id) => {
+        modulePermissionIds.forEach((id) => {
             if (!currentPermissions.includes(id)) {
                 currentPermissions.push(id);
             }
@@ -77,17 +71,17 @@ const isPermissionSelected = (permissionId: number) => {
     return form.selectedPermissions.includes(permissionId);
 };
 
-// Check if parent permission (group) is selected
-const isParentPermissionSelected = (parentPermission: Permission) => {
-    const childIds = parentPermission.children?.map((child) => child.id) || [];
-    return childIds.length > 0 && childIds.every((id) => form.selectedPermissions.includes(id));
+// Check if module (group) permissions are all selected
+const isModulePermissionSelected = (permissionGroup: PermissionGroup) => {
+    const modulePermissionIds = permissionGroup.permissions.map((permission) => permission.id);
+    return modulePermissionIds.length > 0 && modulePermissionIds.every((id) => form.selectedPermissions.includes(id));
 };
 
-// Check if parent permission is partially selected
-const isParentPermissionPartiallySelected = (parentPermission: Permission) => {
-    const childIds = parentPermission.children?.map((child) => child.id) || [];
-    const selectedChildIds = childIds.filter((id) => form.selectedPermissions.includes(id));
-    return selectedChildIds.length > 0 && selectedChildIds.length < childIds.length;
+// Check if module permissions are partially selected
+const isModulePermissionPartiallySelected = (permissionGroup: PermissionGroup) => {
+    const modulePermissionIds = permissionGroup.permissions.map((permission) => permission.id);
+    const selectedModulePermissionIds = modulePermissionIds.filter((id) => form.selectedPermissions.includes(id));
+    return selectedModulePermissionIds.length > 0 && selectedModulePermissionIds.length < modulePermissionIds.length;
 };
 
 // Get selected permissions count
@@ -172,7 +166,10 @@ const goBack = () => {
                                         :key="permissionId"
                                         class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
                                     >
-                                        {{ permissions.flatMap((p) => p.children || []).find((child) => child.id === permissionId)?.name }}
+                                        {{
+                                            permissions.flatMap((group) => group.permissions).find((permission) => permission.id === permissionId)
+                                                ?.display_name
+                                        }}
                                     </span>
                                 </div>
                             </div>
@@ -186,49 +183,47 @@ const goBack = () => {
         <Card>
             <CardHeader>
                 <CardTitle>Permission Assignment</CardTitle>
-                <CardDescription> Select permissions for this role. Permissions are grouped by category. </CardDescription>
+                <CardDescription> Select permissions for this role. Permissions are grouped by module. </CardDescription>
             </CardHeader>
             <CardContent>
                 <div class="space-y-6">
-                    <div v-for="parentPermission in permissions" :key="parentPermission.id" class="space-y-3">
-                        <!-- Parent Permission Group Header -->
+                    <div v-for="permissionGroup in permissions" :key="permissionGroup.module" class="space-y-3">
+                        <!-- Module Permission Group Header -->
                         <div class="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
                             <Checkbox
-                                :model-value="isParentPermissionSelected(parentPermission)"
-                                :indeterminate="isParentPermissionPartiallySelected(parentPermission)"
-                                @update:model-value="toggleParentPermissionSelection(parentPermission)"
+                                :model-value="isModulePermissionSelected(permissionGroup)"
+                                :indeterminate="isModulePermissionPartiallySelected(permissionGroup)"
+                                @update:model-value="toggleModulePermissionSelection(permissionGroup)"
                             />
                             <div class="flex-1">
-                                <h3 class="text-sm font-medium">{{ parentPermission.name }}</h3>
-                                <p v-if="parentPermission.description" class="text-muted-foreground text-xs">
-                                    {{ parentPermission.description }}
-                                </p>
+                                <h3 class="text-sm font-medium">{{ permissionGroup.display_name }}</h3>
+                                <p class="text-muted-foreground text-xs">Permissions for {{ permissionGroup.module }} module</p>
                             </div>
-                            <span class="text-muted-foreground text-xs"> {{ parentPermission.children?.length || 0 }} permissions </span>
+                            <span class="text-muted-foreground text-xs"> {{ permissionGroup.permissions.length }} permissions </span>
                         </div>
 
-                        <!-- Child Permissions -->
-                        <div v-if="parentPermission.children && parentPermission.children.length > 0" class="ml-6 space-y-2">
+                        <!-- Module Permissions -->
+                        <div v-if="permissionGroup.permissions && permissionGroup.permissions.length > 0" class="ml-6 space-y-2">
                             <div
-                                v-for="childPermission in parentPermission.children"
-                                :key="childPermission.id"
+                                v-for="permission in permissionGroup.permissions"
+                                :key="permission.id"
                                 class="hover:bg-muted/30 flex items-center gap-3 rounded p-2"
                             >
                                 <Checkbox
-                                    :model-value="isPermissionSelected(childPermission.id)"
-                                    @update:model-value="togglePermissionSelection(childPermission.id)"
+                                    :model-value="isPermissionSelected(permission.id)"
+                                    @update:model-value="togglePermissionSelection(permission.id)"
                                 />
                                 <div class="flex-1">
-                                    <span class="text-sm font-medium">{{ childPermission.name }}</span>
-                                    <p v-if="childPermission.description" class="text-muted-foreground text-xs">
-                                        {{ childPermission.description }}
+                                    <span class="text-sm font-medium">{{ permission.display_name || permission.name }}</span>
+                                    <p v-if="permission.description" class="text-muted-foreground text-xs">
+                                        {{ permission.description }}
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- No child permissions message -->
-                        <div v-else class="text-muted-foreground ml-6 text-sm">No specific permissions in this category</div>
+                        <!-- No permissions message -->
+                        <div v-else class="text-muted-foreground ml-6 text-sm">No permissions in this module</div>
                     </div>
                 </div>
             </CardContent>
