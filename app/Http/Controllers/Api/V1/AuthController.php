@@ -69,7 +69,7 @@ class AuthController extends Controller
                     'student_id' => $student->student_id,
                     'full_name' => $student->full_name,
                     'email' => $student->email,
-                    'enrollment_status' => $student->enrollment_status,
+                    'status' => $student->status,
                     'campus' => $student->campus->name ?? null,
                     'program' => $student->program->name ?? null,
                 ],
@@ -132,9 +132,9 @@ class AuthController extends Controller
                 $student = Student::create([
                     'full_name' => $googleUserData['name'] ?? $googleUserData['email'],
                     'email' => $googleUserData['email'],
-                    'google_id' => $googleUserData['id'],
+                    'oauth_provider' => 'google',
+                    'oauth_provider_id' => $googleUserData['id'],
                     'avatar_url' => $googleUserData['picture'] ?? null,
-                    'enrollment_status' => 'admitted',
                     'status' => 'inactive', // Requires admin activation
                     'email_verified_at' => now(), // Google emails are already verified
                 ]);
@@ -153,10 +153,11 @@ class AuthController extends Controller
                 ], 201);
             }
 
-            // Update Google ID and avatar if not set
-            if (!$student->google_id) {
+            // Update OAuth provider data if not set
+            if (!$student->oauth_provider_id) {
                 $student->update([
-                    'google_id' => $googleUserData['id'],
+                    'oauth_provider' => 'google',
+                    'oauth_provider_id' => $googleUserData['id'],
                     'avatar_url' => $student->avatar_url ?: ($googleUserData['picture'] ?? null),
                     'email_verified_at' => $student->email_verified_at ?: now(),
                 ]);
@@ -186,7 +187,7 @@ class AuthController extends Controller
                         'student_id' => $student->student_id,
                         'full_name' => $student->full_name,
                         'email' => $student->email,
-                        'enrollment_status' => $student->enrollment_status,
+                        'status' => $student->status,
                         'campus' => $student->campus->name ?? null,
                         'program' => $student->program->name ?? null,
                     ],
@@ -236,7 +237,7 @@ class AuthController extends Controller
                     'nationality' => $student->nationality,
                     'address' => $student->address,
                     'avatar_url' => $student->avatar_url,
-                    'enrollment_status' => $student->enrollment_status,
+                    'status' => $student->status,
                     'admission_date' => $student->admission_date?->format('Y-m-d'),
                     'expected_graduation_date' => $student->expected_graduation_date?->format('Y-m-d'),
                     'campus' => $student->campus ? [
@@ -323,7 +324,6 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
             'date_of_birth' => $request->date_of_birth,
-            'enrollment_status' => 'admitted',
             'status' => 'inactive', // Requires admin activation
         ]);
 

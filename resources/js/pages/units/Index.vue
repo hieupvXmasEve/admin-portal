@@ -15,7 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { BreadcrumbItem, PaginatedResponse } from '@/types';
+import type { PaginatedResponse } from '@/types';
+import { curriculumRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
@@ -54,13 +55,6 @@ const props = defineProps<{
     };
     statistics: Statistics;
 }>();
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Units',
-        href: '/units',
-    },
-];
-console.log(props.units);
 
 // Reactive data
 const data = computed(() => props.units.data);
@@ -85,12 +79,12 @@ const bulkDeleteDialogOpen = ref(false);
 
 // Edit unit function
 const editUnit = (unit: Unit) => {
-    router.visit(`/units/edit/${unit.id}`);
+    router.visit(curriculumRoutes.units.edit(unit.id));
 };
 
 // View unit function
 const viewUnit = (unit: Unit) => {
-    router.visit(`/units/${unit.id}`);
+    router.visit(curriculumRoutes.units.show(unit.id));
 };
 
 // Delete unit function
@@ -125,7 +119,7 @@ const applyFilters = (newFilters: typeof filters.value) => {
     if (newFilters.direction) params.set('direction', newFilters.direction);
     if (newFilters.per_page) params.set('per_page', newFilters.per_page.toString());
 
-    const url = `/units${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `${curriculumRoutes.units.index()}${params.toString() ? '?' + params.toString() : ''}`;
 
     router.visit(url, {
         preserveState: true,
@@ -151,7 +145,7 @@ const clearFilters = () => {
         direction: 'asc',
         per_page: 15,
     };
-    router.visit('/units', {
+    router.visit(curriculumRoutes.units.index(), {
         preserveState: true,
         preserveScroll: true,
         only: ['units', 'filters'],
@@ -385,7 +379,7 @@ const handlePageSizeChange = (pageSize: number) => {
                 @click="
                     () => {
                         console.log('Attempting to navigate to /units/import');
-                        router.visit('/units/import', {
+                        router.visit(curriculumRoutes.units.import(), {
                             onError: (errors) => {
                                 console.error('Navigation error:', errors);
                                 toast.error('Failed to navigate to import page');
@@ -403,7 +397,7 @@ const handlePageSizeChange = (pageSize: number) => {
                 Import Excel
             </Button>
 
-            <Button size="sm" @click="router.visit('/units/create')">
+            <Button size="sm" @click="router.visit(curriculumRoutes.units.create())">
                 <Plus class="mr-2 h-4 w-4" />
                 Add Unit
             </Button>

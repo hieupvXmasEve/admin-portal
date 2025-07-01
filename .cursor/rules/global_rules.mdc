@@ -1,7 +1,7 @@
 ---
 description:
 globs:
-alwaysApply: true
+alwaysApply: false
 ---
 # 🎓 Swinburne Education Management System - Development Standards
 

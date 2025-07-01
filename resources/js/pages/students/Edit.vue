@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import type { Campus, CurriculumVersion, Program, Specialization, Student } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
+import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { Building, GraduationCap, Mail, Phone, Save, User, X } from 'lucide-vue-next';
@@ -45,14 +45,6 @@ const formSchema = toTypedSchema(
         curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
         admission_date: z.string().min(1, 'Admission date is required'),
         expected_graduation_date: z.string().optional(),
-        parent_guardian_name: z.string().max(ValidationRules.student.parentGuardianName.maxLength, 'Parent/Guardian name is too long').optional(),
-        parent_guardian_phone: z.string().max(ValidationRules.student.parentGuardianPhone.maxLength, 'Parent/Guardian phone is too long').optional(),
-        parent_guardian_email: z
-            .string()
-            .email('Invalid email format')
-            .max(ValidationRules.student.parentGuardianEmail.maxLength, 'Parent/Guardian email is too long')
-            .optional()
-            .or(z.literal('')),
         emergency_contact_name: z
             .string()
             .max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long')
@@ -61,11 +53,12 @@ const formSchema = toTypedSchema(
             .string()
             .max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long')
             .optional(),
+        emergency_contact_relationship: z.string().max(100, 'Emergency contact relationship is too long').optional(),
         high_school_name: z.string().max(ValidationRules.student.highSchoolName.maxLength, 'High school name is too long').optional(),
         high_school_graduation_year: z.string().optional(),
         entrance_exam_score: z.string().optional(),
         admission_notes: z.string().optional(),
-        status: z.enum(['active', 'inactive', 'suspended']),
+        status: z.enum(['active', 'inactive', 'suspended', 'graduated']),
     }),
 );
 
@@ -86,11 +79,9 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         curriculum_version_id: props.student.curriculum_version_id.toString(),
         admission_date: props.student.admission_date || '',
         expected_graduation_date: props.student.expected_graduation_date || '',
-        parent_guardian_name: props.student.parent_guardian_name || '',
-        parent_guardian_phone: props.student.parent_guardian_phone || '',
-        parent_guardian_email: props.student.parent_guardian_email || '',
         emergency_contact_name: props.student.emergency_contact_name || '',
         emergency_contact_phone: props.student.emergency_contact_phone || '',
+        emergency_contact_relationship: props.student.emergency_contact_relationship || '',
         high_school_name: props.student.high_school_name || '',
         high_school_graduation_year: props.student.high_school_graduation_year?.toString() || '',
         entrance_exam_score: props.student.entrance_exam_score?.toString() || '',
@@ -186,18 +177,16 @@ const onSubmit = handleSubmit((formData) => {
         national_id: formData.national_id || null,
         address: formData.address || null,
         expected_graduation_date: formData.expected_graduation_date || null,
-        parent_guardian_name: formData.parent_guardian_name || null,
-        parent_guardian_phone: formData.parent_guardian_phone || null,
-        parent_guardian_email: formData.parent_guardian_email || null,
         emergency_contact_name: formData.emergency_contact_name || null,
         emergency_contact_phone: formData.emergency_contact_phone || null,
+        emergency_contact_relationship: formData.emergency_contact_relationship || null,
         high_school_name: formData.high_school_name || null,
         admission_notes: formData.admission_notes || null,
     };
 
     router.put(route('students.update', props.student.id), submitData, {
         onSuccess: () => {
-            router.visit(route('students.show', props.student.id));
+            router.visit(studentRoutes.show(props.student.id));
         },
         onError: (errors) => {
             console.error('Validation errors:', errors);
@@ -206,7 +195,7 @@ const onSubmit = handleSubmit((formData) => {
 });
 
 const handleCancel = () => {
-    router.visit(route('students.show', props.student.id));
+    router.visit(studentRoutes.show(props.student.id));
 };
 </script>
 
@@ -340,6 +329,7 @@ const handleCancel = () => {
                                     <SelectItem value="active">Active</SelectItem>
                                     <SelectItem value="inactive">Inactive</SelectItem>
                                     <SelectItem value="suspended">Suspended</SelectItem>
+                                    <SelectItem value="graduated">Graduated</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -415,14 +405,14 @@ const handleCancel = () => {
                     <FormField v-slot="{ componentField }" name="specialization_id">
                         <FormItem>
                             <FormLabel>Specialization</FormLabel>
-                            <Select v-bind="componentField" :disabled="!values.program_id">
+                            <Select v-bind="componentField" :disabled="!filteredSpecializations.length">
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select specialization" />
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    <SelectItem value="none">No specialization</SelectItem>
+                                    <SelectItem value="">No specialization</SelectItem>
                                     <SelectItem
                                         v-for="specialization in filteredSpecializations"
                                         :key="specialization.id"
@@ -439,7 +429,7 @@ const handleCancel = () => {
                     <FormField v-slot="{ componentField }" name="curriculum_version_id">
                         <FormItem>
                             <FormLabel>Curriculum Version *</FormLabel>
-                            <Select v-bind="componentField" :disabled="!values.specialization_id || loadingCurriculumVersions">
+                            <Select v-bind="componentField" :disabled="loadingCurriculumVersions || !availableCurriculumVersions.length">
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select curriculum version" />
@@ -456,7 +446,7 @@ const handleCancel = () => {
                     </FormField>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <FormField v-slot="{ componentField }" name="admission_date">
                         <FormItem>
                             <FormLabel>Admission Date *</FormLabel>
@@ -480,118 +470,95 @@ const handleCancel = () => {
             </CardContent>
         </Card>
 
-        <!-- Emergency Contacts -->
+        <!-- Emergency Contact Information -->
         <Card>
             <CardHeader>
                 <CardTitle class="flex items-center gap-2">
                     <Phone class="h-5 w-5" />
-                    Emergency Contacts
+                    Emergency Contact
                 </CardTitle>
             </CardHeader>
-            <CardContent class="space-y-6">
-                <!-- Parent/Guardian -->
-                <div>
-                    <h4 class="mb-4 font-medium">Parent/Guardian Information</h4>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <FormField v-slot="{ componentField }" name="parent_guardian_name">
-                            <FormItem>
-                                <FormLabel>Name</FormLabel>
-                                <FormControl>
-                                    <Input v-bind="componentField" placeholder="Enter parent/guardian name" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="parent_guardian_phone">
-                            <FormItem>
-                                <FormLabel>Phone</FormLabel>
-                                <FormControl>
-                                    <Input v-bind="componentField" placeholder="Enter phone number" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="parent_guardian_email">
-                            <FormItem>
-                                <FormLabel>Email</FormLabel>
-                                <FormControl>
-                                    <Input v-bind="componentField" type="email" placeholder="Enter email address" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-                    </div>
-                </div>
-
-                <Separator />
-
-                <!-- Emergency Contact -->
-                <div>
-                    <h4 class="mb-4 font-medium">Emergency Contact</h4>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <FormField v-slot="{ componentField }" name="emergency_contact_name">
-                            <FormItem>
-                                <FormLabel>Name</FormLabel>
-                                <FormControl>
-                                    <Input v-bind="componentField" placeholder="Enter emergency contact name" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="emergency_contact_phone">
-                            <FormItem>
-                                <FormLabel>Phone</FormLabel>
-                                <FormControl>
-                                    <Input v-bind="componentField" placeholder="Enter phone number" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <!-- Additional Information -->
-        <Card>
-            <CardHeader>
-                <CardTitle>Additional Information</CardTitle>
-            </CardHeader>
             <CardContent class="space-y-4">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField v-slot="{ componentField }" name="high_school_name">
-                        <FormItem>
-                            <FormLabel>High School Name</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="Enter high school name" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField v-slot="{ componentField }" name="high_school_graduation_year">
-                        <FormItem>
-                            <FormLabel>High School Graduation Year</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" type="number" placeholder="Enter graduation year" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-                </div>
-
-                <FormField v-slot="{ componentField }" name="entrance_exam_score">
+                <FormField v-slot="{ componentField }" name="emergency_contact_name">
                     <FormItem>
-                        <FormLabel>Entrance Exam Score (%)</FormLabel>
+                        <FormLabel>Contact Name</FormLabel>
                         <FormControl>
-                            <Input v-bind="componentField" type="number" step="0.01" min="0" max="100" placeholder="Enter exam score" />
+                            <Input v-bind="componentField" placeholder="Enter emergency contact name" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
                 </FormField>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="emergency_contact_phone">
+                        <FormItem>
+                            <FormLabel>Contact Phone</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="Enter emergency contact phone" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="emergency_contact_relationship">
+                        <FormItem>
+                            <FormLabel>Relationship</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="e.g., Parent, Guardian, Spouse" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Academic Background -->
+        <Card>
+            <CardHeader>
+                <CardTitle class="flex items-center gap-2">
+                    <GraduationCap class="h-5 w-5" />
+                    Academic Background
+                </CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <FormField v-slot="{ componentField }" name="high_school_name">
+                    <FormItem>
+                        <FormLabel>High School Name</FormLabel>
+                        <FormControl>
+                            <Input v-bind="componentField" placeholder="Enter high school name" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="high_school_graduation_year">
+                        <FormItem>
+                            <FormLabel>Graduation Year</FormLabel>
+                            <FormControl>
+                                <Input
+                                    v-bind="componentField"
+                                    type="number"
+                                    placeholder="Enter graduation year"
+                                    min="1900"
+                                    :max="new Date().getFullYear() + 1"
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="entrance_exam_score">
+                        <FormItem>
+                            <FormLabel>Entrance Exam Score</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" type="number" placeholder="Enter exam score" min="0" max="100" step="0.01" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
 
                 <FormField v-slot="{ componentField }" name="admission_notes">
                     <FormItem>
@@ -606,14 +573,14 @@ const handleCancel = () => {
         </Card>
 
         <!-- Form Actions -->
-        <div class="flex items-center justify-end gap-4">
+        <div class="flex justify-end space-x-4">
             <Button type="button" variant="outline" @click="handleCancel">
                 <X class="mr-2 h-4 w-4" />
                 Cancel
             </Button>
             <Button type="submit" :disabled="isSubmitting">
                 <Save class="mr-2 h-4 w-4" />
-                {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
+                Update Student
             </Button>
         </div>
     </form>

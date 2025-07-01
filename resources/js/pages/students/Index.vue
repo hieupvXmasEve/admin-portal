@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useGlobalDeleteDialog } from '@/composables';
 import type { Campus, Program, Student } from '@/types/models';
+import { studentRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Edit, Eye, Plus, Trash2, X } from 'lucide-vue-next';
@@ -138,6 +139,7 @@ const columns: ColumnDef<Student>[] = [
                 active: 'bg-green-100 text-green-800',
                 inactive: 'bg-gray-100 text-gray-800',
                 suspended: 'bg-red-100 text-red-800',
+                graduated: 'bg-blue-100 text-blue-800',
             };
             const colorClass = statusColors[status] || 'bg-gray-100 text-gray-800';
             const displayText = status ? status.replace('_', ' ').toUpperCase() : 'Unknown';
@@ -177,7 +179,7 @@ const clearFilters = () => {
         program_id: 'all',
         status: 'all',
     };
-    router.visit('/students', {
+    router.visit(studentRoutes.list(), {
         preserveState: true,
         preserveScroll: true,
         only: ['students', 'filters'],
@@ -190,11 +192,11 @@ const hasActiveFilters = computed(() => {
 
 // View and edit functions
 const viewStudent = (student: Student) => {
-    router.visit(route('students.show', student.id));
+    router.visit(studentRoutes.show(student.id));
 };
 
 const editStudent = (student: Student) => {
-    router.visit(route('students.edit', student.id));
+    router.visit(studentRoutes.edit(student.id));
 };
 
 const deleteStudent = (student: Student) => {
@@ -229,7 +231,7 @@ const handlePageSizeChange = (pageSize: number) => {
         if (value) searchParams.set(key, value);
     });
 
-    const url = `/students${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    const url = `${studentRoutes.list()}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
 
     router.visit(url, {
         preserveState: true,
@@ -255,7 +257,7 @@ const updateFilters = () => {
         if (value) searchParams.set(key, value);
     });
 
-    const url = `/students${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    const url = `${studentRoutes.list()}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
 
     router.visit(url, {
         preserveState: true,
@@ -272,7 +274,7 @@ const updateFilters = () => {
         <h1 class="text-2xl font-semibold">Students</h1>
         <div class="flex items-center gap-2">
             <Button size="sm" as-child>
-                <Link :href="route('students.create')">
+                <Link :href="studentRoutes.create()">
                     <Plus class="mr-2 h-4 w-4" />
                     Add Student
                 </Link>
@@ -371,65 +373,66 @@ const updateFilters = () => {
             </Select>
         </div>
 
-        <div class="min-w-[150px]">
+        <div class="min-w-[130px]">
             <Select v-model="filters.status" @update:model-value="handleFilter">
                 <SelectTrigger>
-                    <SelectValue placeholder="All Statuses" />
+                    <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
                     <SelectItem value="suspended">Suspended</SelectItem>
+                    <SelectItem value="graduated">Graduated</SelectItem>
                 </SelectContent>
             </Select>
         </div>
 
-        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
+        <Button v-if="hasActiveFilters" variant="outline" size="sm" @click="clearFilters">
             <X class="mr-2 h-4 w-4" />
             Clear Filters
         </Button>
     </div>
 
     <!-- Data Table -->
-    <DataTable :data="data" :columns="columns">
+    <DataTable :columns="columns" :data="data" :loading="false" class="border">
         <template #cell-actions="{ row }">
             <div class="flex items-center gap-2">
-                <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger as-child>
-                            <Button variant="ghost" size="sm" @click="viewStudent(row.original)" title="View student">
+                            <Button variant="ghost" size="sm" @click="viewStudent(row.original)">
                                 <Eye class="h-4 w-4" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>View student</p>
+                            <p>View</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
 
-                <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger as-child>
-                            <Button variant="ghost" size="sm" @click="editStudent(row.original)" title="Edit student">
+                            <Button variant="ghost" size="sm" @click="editStudent(row.original)">
                                 <Edit class="h-4 w-4" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>Edit student</p>
+                            <p>Edit</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
 
-                <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger as-child>
-                            <Button variant="ghost" size="sm" @click="deleteStudent(row.original)" title="Delete student">
+                            <Button variant="ghost" size="sm" @click="deleteStudent(row.original)">
                                 <Trash2 class="h-4 w-4" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>Delete student</p>
+                            <p>Delete</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>

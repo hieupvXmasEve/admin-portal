@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useApi } from '@/composables/useApiRequest';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { AlertCircle, CheckCircle, Download, FileSpreadsheet, Upload, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -194,7 +195,7 @@ const clearAll = () => {
 
 // Go back to users list
 const goBackToUsers = () => {
-    router.visit('/users');
+    router.visit(systemRoutes.users.index());
 };
 </script>
 

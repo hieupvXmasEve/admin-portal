@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useApi } from '@/composables/useApiRequest';
 import type { EquivalentUnit, FormDefaults, PrerequisiteGroup, Unit } from '@/types/Unit';
+import { curriculumRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, Plus, Save, Search, X } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
@@ -221,7 +222,7 @@ const selectUnit = (unit: Unit) => {
     <!-- Header -->
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Create Unit</h1>
-        <Button variant="outline" size="sm" @click="router.visit('/units')">
+        <Button variant="outline" size="sm" @click="router.visit(curriculumRoutes.units.index())">
             <ArrowLeft class="mr-2 h-4 w-4" />
             Back to Units
         </Button>
@@ -438,7 +439,9 @@ const selectUnit = (unit: Unit) => {
 
             <!-- Form Actions -->
             <div class="flex items-center justify-end space-x-4 pt-6">
-                <Button type="button" variant="outline" @click="router.visit('/units')" :disabled="form.processing"> Cancel </Button>
+                <Button type="button" variant="outline" @click="router.visit(curriculumRoutes.units.index())" :disabled="form.processing">
+                    Cancel
+                </Button>
                 <Button type="submit" :disabled="form.processing || codeValidation?.valid === false">
                     <Save class="mr-2 h-4 w-4" />
                     {{ form.processing ? 'Creating...' : 'Create Unit' }}

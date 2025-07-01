@@ -1,6 +1,5 @@
 <?php
 
-use App\Helpers\RoutePermissionHelper;
 use App\Http\Controllers\Users\UserController;
 use App\Http\Controllers\Users\UserExportController;
 use App\Http\Controllers\Users\UserImportController;
@@ -56,17 +55,33 @@ Route::middleware('auth')->group(function () {
         // Export data
         Route::get('/export/excel', [UserExportController::class, 'exportExcel'])
             ->middleware('can:view_user')
-            ->name('users.export.excel');
+            ->name('user.export.excel');
 
         Route::get('/export/excel/filtered', [UserExportController::class, 'exportExcelWithCurrentFilters'])
             ->middleware('can:view_user')
-            ->name('users.export.excel.filtered');
+            ->name('user.export.excel.filtered');
     });
 
     // Resource routes come AFTER specific routes
-    RoutePermissionHelper::resourceWithPermissions(
-        prefix: 'users',
-        controller: UserController::class,
-        module: 'users'
-    );
+    Route::get('users', [UserController::class, 'index'])
+        ->middleware('can:view_user')
+        ->name('user.index');
+    Route::get('users/create', [UserController::class, 'create'])
+        ->middleware('can:create_user')
+        ->name('user.create');
+    Route::post('users', [UserController::class, 'store'])
+        ->middleware('can:create_user')
+        ->name('user.store');
+    Route::get('users/{user}', [UserController::class, 'show'])
+        ->middleware('can:view_user')
+        ->name('user.show');
+    Route::get('users/{user}/edit', [UserController::class, 'edit'])
+        ->middleware('can:edit_user')
+        ->name('user.edit');
+    Route::put('users/{user}', [UserController::class, 'update'])
+        ->middleware('can:edit_user')
+        ->name('user.update');
+    Route::delete('users/{user}', [UserController::class, 'destroy'])
+        ->middleware('can:delete_user')
+        ->name('user.destroy');
 });

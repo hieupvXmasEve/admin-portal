@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import type { BreadcrumbItem } from '@/types';
 import type { UnitData as Unit } from '@/types/Unit';
+import { curriculumRoutes, syllabusRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, BookOpen, CheckCircle, Clock, Edit, FileText, GitBranch, GraduationCap, Network, Shield, Target, Trash2 } from 'lucide-vue-next';
 import { ref } from 'vue';
@@ -227,11 +228,11 @@ const hasRelationships = () => {
             <p class="text-xl text-gray-700">{{ unit.name }}</p>
         </div>
         <div class="flex items-center gap-3">
-            <Button variant="outline" @click="router.visit('/units')">
+            <Button variant="outline" @click="router.visit(curriculumRoutes.units.index())">
                 <ArrowLeft class="mr-2 h-4 w-4" />
                 Back to Units
             </Button>
-            <Button v-if="canEdit" variant="outline" @click="router.visit(`/units/edit/${unit.id}`)">
+            <Button v-if="canEdit" variant="outline" @click="router.visit(curriculumRoutes.units.edit(unit.id))">
                 <Edit class="mr-2 h-4 w-4" />
                 Edit
             </Button>
@@ -402,7 +403,7 @@ const hasRelationships = () => {
                                     :key="condition.id"
                                     class="rounded-lg border bg-white p-3 transition-colors hover:bg-gray-50"
                                     :class="condition.required_unit ? 'cursor-pointer' : ''"
-                                    @click="condition.required_unit ? router.visit(`/units/${condition.required_unit.id}`) : null"
+                                    @click="condition.required_unit ? router.visit(curriculumRoutes.units.show(condition.required_unit.id)) : null"
                                 >
                                     <div class="flex items-start justify-between">
                                         <div class="flex-1">
@@ -461,7 +462,7 @@ const hasRelationships = () => {
                     v-for="equivalent in equivalentUnits"
                     :key="equivalent.id"
                     class="cursor-pointer rounded-lg border p-3 transition-colors hover:bg-gray-50"
-                    @click="router.visit(`/units/${equivalent.unit.id}`)"
+                    @click="router.visit(curriculumRoutes.units.show(equivalent.unit.id))"
                 >
                     <div class="mb-2 flex items-start justify-between">
                         <div>
@@ -548,7 +549,7 @@ const hasRelationships = () => {
                     </CardTitle>
                     <CardDescription>Course syllabus and assessment structures for {{ unit.code }} </CardDescription>
                 </div>
-                <Button v-if="canEdit" variant="outline" @click="router.visit(`/units/${unit.id}/syllabus`)">
+                <Button v-if="canEdit" variant="outline" @click="router.visit(syllabusRoutes.management(unit.id))">
                     <FileText class="mr-2 h-4 w-4" />
                     Manage syllabus
                 </Button>
@@ -597,9 +598,7 @@ const hasRelationships = () => {
                                 <div class="text-xs text-gray-500">{{ syllabus.total_assessment_weight || 0 }}% Total Weight</div>
                                 <div v-if="syllabus.total_assessment_weight !== 100" class="text-xs text-orange-600">⚠️ Incomplete</div>
                             </div>
-                            <Button variant="ghost" size="sm" @click="router.visit(`/units/${unit.id}/syllabus/${syllabus.id}`)">
-                                View Details
-                            </Button>
+                            <Button variant="ghost" size="sm" @click="router.visit(syllabusRoutes.show(unit.id, syllabus.id))"> View Details </Button>
                         </div>
                     </div>
 

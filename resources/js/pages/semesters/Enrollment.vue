@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
 import type { BreadcrumbItem } from '@/types';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { BarChart3, BookOpen, ChevronLeft, FileCheck, Loader2, Plus, Users } from 'lucide-vue-next';
@@ -554,7 +555,7 @@ onMounted(() => {
 
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-            <Button variant="ghost" size="sm" @click="router.get(route('semester.index'))">
+            <Button variant="ghost" size="sm" @click="router.get(systemRoutes.semesters.index())">
                 <ChevronLeft class="h-4 w-4" />
                 Back to Semesters
             </Button>

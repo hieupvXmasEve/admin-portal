@@ -25,7 +25,7 @@ class RoleController extends Controller
             ->withQueryString();
 
         return Inertia::render('roles/Index', [
-            'roles' => Inertia::deepMerge($roles),
+            'roles' => $roles,
         ]);
     }
 
@@ -72,10 +72,17 @@ class RoleController extends Controller
 
     public function create()
     {
-        $permissions = \App\Models\Permission::with('children')
-            ->whereNull('parent_id')
-            ->orderBy('name')
-            ->get();
+        // Group permissions by module
+        $permissions = \App\Models\Permission::all()
+            ->groupBy('module')
+            ->map(function ($modulePermissions, $module) {
+                return [
+                    'module' => $module,
+                    'display_name' => ucfirst(str_replace('_', ' ', $module)),
+                    'permissions' => $modulePermissions->values()
+                ];
+            })
+            ->values();
 
         return Inertia::render('roles/Add', [
             'permissions' => $permissions
@@ -105,10 +112,17 @@ class RoleController extends Controller
 
     public function edit(Role $role)
     {
-        $permissions = \App\Models\Permission::with('children')
-            ->whereNull('parent_id')
-            ->orderBy('name')
-            ->get();
+        // Group permissions by module
+        $permissions = \App\Models\Permission::all()
+            ->groupBy('module')
+            ->map(function ($modulePermissions, $module) {
+                return [
+                    'module' => $module,
+                    'display_name' => ucfirst(str_replace('_', ' ', $module)),
+                    'permissions' => $modulePermissions->values()
+                ];
+            })
+            ->values();
 
         // Get role's current permissions
         $rolePermissionIds = $role->permissions()->pluck('permissions.id')->toArray();

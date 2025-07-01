@@ -51,9 +51,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:edit_student')
             ->name('assign-program');
 
-        Route::post('/{student}/update-enrollment-status', [StudentController::class, 'updateEnrollmentStatus'])
+        Route::post('/{student}/update-status', [StudentController::class, 'updateStatus'])
             ->middleware('can:edit_student')
-            ->name('update-enrollment-status');
+            ->name('update-status');
     });
 
     // AJAX endpoints for student management

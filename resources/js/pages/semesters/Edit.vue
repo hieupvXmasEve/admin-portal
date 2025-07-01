@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import type { BreadcrumbItem } from '@/types';
+import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, CalendarDays, Save } from 'lucide-vue-next';
 
@@ -25,11 +25,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    { title: 'Semesters', href: '/semesters' },
-    { title: 'Edit Semester', href: `/semesters/${props.semester.id}/edit` },
-];
 
 // Format datetime strings to the format expected by datetime-local inputs
 const formatDateTimeLocal = (dateTime: string | null): string => {
@@ -57,13 +52,13 @@ const form = useForm({
 const submit = () => {
     form.put(route('semester.update', props.semester.id), {
         onSuccess: () => {
-            router.visit(route('semester.index'));
+            router.visit(systemRoutes.semesters.index());
         },
     });
 };
 
 const cancel = () => {
-    router.visit(route('semester.index'));
+    router.visit(systemRoutes.semesters.index());
 };
 </script>
 

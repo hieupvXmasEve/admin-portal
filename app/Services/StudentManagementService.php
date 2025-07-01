@@ -11,6 +11,7 @@ use App\Models\Specialization;
 use App\Models\CurriculumVersion;
 use App\Models\GraduationRequirement;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -19,35 +20,53 @@ use Exception;
 class StudentManagementService
 {
     /**
-     * Create a new student account
+     * Create a new student
      */
     public function createStudent(array $data): Student
     {
         return DB::transaction(function () use ($data) {
-            // Validate required relationships exist
+            // Validate data
             $this->validateStudentData($data);
 
-            // Generate student ID
+            // Get campus to generate student ID
             $campus = Campus::findOrFail($data['campus_id']);
-            $year = date('y'); // 2-digit year
+            $year = date('Y');
             $studentId = $this->generateStudentId($campus->code, $year);
 
-            // Prepare student data
-            $studentData = array_merge($data, [
+            // Create student
+            $student = Student::create([
                 'student_id' => $studentId,
-                'enrollment_status' => 'admitted',
+                'full_name' => $data['full_name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'] ?? null,
+                'date_of_birth' => $data['date_of_birth'] ?? null,
+                'gender' => $data['gender'] ?? null,
+                'nationality' => $data['nationality'] ?? 'Vietnamese',
+                'national_id' => $data['national_id'] ?? null,
+                'address' => $data['address'] ?? null,
+                'campus_id' => $data['campus_id'],
+                'program_id' => $data['program_id'],
+                'specialization_id' => $data['specialization_id'] ?? null,
+                'curriculum_version_id' => $data['curriculum_version_id'],
+                'admission_date' => $data['admission_date'],
+                'expected_graduation_date' => $data['expected_graduation_date'] ?? null,
+                'emergency_contact_name' => $data['emergency_contact_name'] ?? null,
+                'emergency_contact_phone' => $data['emergency_contact_phone'] ?? null,
+                'emergency_contact_relationship' => $data['emergency_contact_relationship'] ?? null,
+                'high_school_name' => $data['high_school_name'] ?? null,
+                'high_school_graduation_year' => $data['high_school_graduation_year'] ?? null,
+                'entrance_exam_score' => $data['entrance_exam_score'] ?? null,
+                'admission_notes' => $data['admission_notes'] ?? null,
                 'status' => 'active',
-                'admission_date' => $data['admission_date'] ?? now()->toDateString(),
             ]);
 
-            // Create student
-            $student = Student::create($studentData);
-
-            // Set up graduation requirements
+            // Assign graduation requirements
             $this->assignGraduationRequirements($student);
 
-            // Calculate expected graduation date
-            $this->calculateExpectedGraduationDate($student);
+            // Calculate expected graduation date if not provided
+            if (!$data['expected_graduation_date']) {
+                $this->calculateExpectedGraduationDate($student);
+            }
 
             // Send welcome email
             $this->sendWelcomeEmail($student);
@@ -57,41 +76,24 @@ class StudentManagementService
     }
 
     /**
-     * Update student information
+     * Update an existing student
      */
     public function updateStudent(Student $student, array $data): Student
     {
         return DB::transaction(function () use ($student, $data) {
-            // If program/specialization changed, update graduation requirements
-            $programChanged = isset($data['program_id']) && $data['program_id'] !== $student->program_id;
-            $specializationChanged = isset($data['specialization_id']) && $data['specialization_id'] !== $student->specialization_id;
-
+            // Update student data
             $student->update($data);
-
-            if ($programChanged || $specializationChanged) {
-                $this->assignGraduationRequirements($student);
-                $this->calculateExpectedGraduationDate($student);
-            }
 
             return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion']);
         });
     }
 
     /**
-     * Assign program and specialization to student
+     * Assign program to student
      */
     public function assignProgram(Student $student, int $programId, int $specializationId = null, int $curriculumVersionId = null): Student
     {
         return DB::transaction(function () use ($student, $programId, $specializationId, $curriculumVersionId) {
-            // Validate program and specialization
-            $program = Program::findOrFail($programId);
-            
-            if ($specializationId) {
-                $specialization = Specialization::where('id', $specializationId)
-                    ->where('program_id', $programId)
-                    ->firstOrFail();
-            }
-
             // Find appropriate curriculum version if not provided
             if (!$curriculumVersionId) {
                 $curriculumVersionId = $this->findCurrentCurriculumVersion($programId, $specializationId);
@@ -102,7 +104,7 @@ class StudentManagementService
                 'program_id' => $programId,
                 'specialization_id' => $specializationId,
                 'curriculum_version_id' => $curriculumVersionId,
-                'enrollment_status' => 'enrolled',
+                'status' => 'active',
             ]);
 
             // Assign graduation requirements
@@ -119,7 +121,7 @@ class StudentManagementService
     private function generateStudentId(string $campusCode, string $year): string
     {
         $prefix = strtoupper($campusCode) . $year;
-        
+
         // Find the last student ID with this prefix
         $lastStudent = Student::where('student_id', 'like', $prefix . '%')
             ->orderBy('student_id', 'desc')
@@ -155,7 +157,7 @@ class StudentManagementService
             $specialization = Specialization::where('id', $data['specialization_id'])
                 ->where('program_id', $data['program_id'])
                 ->first();
-            
+
             if (!$specialization) {
                 throw new Exception('Selected specialization does not exist or does not belong to the program');
             }
@@ -187,7 +189,6 @@ class StudentManagementService
     private function findCurrentCurriculumVersion(int $programId, int $specializationId = null): int
     {
         $query = CurriculumVersion::where('program_id', $programId)
-            ->where('is_active', true)
             ->orderBy('created_at', 'desc');
 
         if ($specializationId) {
@@ -199,7 +200,7 @@ class StudentManagementService
         $curriculumVersion = $query->first();
 
         if (!$curriculumVersion) {
-            throw new Exception('No active curriculum version found for the selected program/specialization');
+            throw new Exception('No curriculum version found for the selected program/specialization');
         }
 
         return $curriculumVersion->id;
@@ -210,21 +211,31 @@ class StudentManagementService
      */
     private function assignGraduationRequirements(Student $student): void
     {
-        $requirement = GraduationRequirement::where('program_id', $student->program_id)
-            ->where('specialization_id', $student->specialization_id)
-            ->currentlyEffective()
-            ->first();
+        // Check if GraduationRequirement model/table exists
+        if (!class_exists(GraduationRequirement::class)) {
+            return; // Skip if graduation requirements not implemented yet
+        }
 
-        if (!$requirement) {
-            // Create default graduation requirement if none exists
-            GraduationRequirement::create([
-                'program_id' => $student->program_id,
-                'specialization_id' => $student->specialization_id,
-                'total_credits_required' => 120, // Default value
-                'minimum_gpa' => 2.0,
-                'effective_from' => now()->toDateString(),
-                'is_active' => true,
-            ]);
+        try {
+            $requirement = GraduationRequirement::where('program_id', $student->program_id)
+                ->where('specialization_id', $student->specialization_id)
+                ->where('is_active', true)
+                ->first();
+
+            if (!$requirement) {
+                // Create default graduation requirement if none exists
+                GraduationRequirement::create([
+                    'program_id' => $student->program_id,
+                    'specialization_id' => $student->specialization_id,
+                    'total_credits_required' => 120, // Default value
+                    'minimum_gpa' => 2.0,
+                    'effective_from' => now()->toDateString(),
+                    'is_active' => true,
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Silently skip if graduation requirements table doesn't exist yet
+            \Illuminate\Support\Facades\Log::info('Graduation requirements not available: ' . $e->getMessage());
         }
     }
 
@@ -233,15 +244,25 @@ class StudentManagementService
      */
     private function calculateExpectedGraduationDate(Student $student): void
     {
-        $requirement = GraduationRequirement::where('program_id', $student->program_id)
-            ->where('specialization_id', $student->specialization_id)
-            ->currentlyEffective()
-            ->first();
+        try {
+            $requirement = GraduationRequirement::where('program_id', $student->program_id)
+                ->where('specialization_id', $student->specialization_id)
+                ->where('is_active', true)
+                ->first();
 
-        if ($requirement) {
-            $yearsToGraduate = $requirement->maximum_study_years ?? 4;
-            $expectedDate = $student->admission_date->addYears($yearsToGraduate);
-            
+            if ($requirement && isset($requirement->maximum_study_years)) {
+                $yearsToGraduate = $requirement->maximum_study_years;
+                $expectedDate = $student->admission_date->addYears($yearsToGraduate);
+
+                $student->update(['expected_graduation_date' => $expectedDate]);
+            } else {
+                // Default to 4 years if no requirement found
+                $expectedDate = $student->admission_date->addYears(4);
+                $student->update(['expected_graduation_date' => $expectedDate]);
+            }
+        } catch (\Exception $e) {
+            // Default calculation if graduation requirements not available
+            $expectedDate = $student->admission_date->addYears(4);
             $student->update(['expected_graduation_date' => $expectedDate]);
         }
     }
@@ -257,17 +278,17 @@ class StudentManagementService
     }
 
     /**
-     * Update student enrollment status
+     * Update student status
      */
-    public function updateEnrollmentStatus(Student $student, string $status): Student
+    public function updateStudentStatus(Student $student, string $status): Student
     {
-        $validStatuses = ['admitted', 'enrolled', 'active', 'on_leave', 'suspended', 'graduated', 'dropped_out'];
-        
+        $validStatuses = ['active', 'inactive', 'suspended', 'graduated'];
+
         if (!in_array($status, $validStatuses)) {
-            throw new Exception('Invalid enrollment status');
+            throw new Exception('Invalid student status');
         }
 
-        $student->update(['enrollment_status' => $status]);
+        $student->update(['status' => $status]);
 
         return $student;
     }
@@ -278,18 +299,18 @@ class StudentManagementService
     public function getStudentStatistics(int $campusId = null): array
     {
         $query = Student::query();
-        
+
         if ($campusId) {
             $query->where('campus_id', $campusId);
         }
 
         return [
             'total_students' => $query->count(),
-            'active_students' => $query->where('enrollment_status', 'active')->count(),
-            'enrolled_students' => $query->where('enrollment_status', 'enrolled')->count(),
-            'graduated_students' => $query->where('enrollment_status', 'graduated')->count(),
-            'suspended_students' => $query->where('enrollment_status', 'suspended')->count(),
-            'on_leave_students' => $query->where('enrollment_status', 'on_leave')->count(),
+            'active_students' => $query->where('status', 'active')->count(),
+            'enrolled_students' => $query->where('status', 'active')->count(), // Active students are enrolled
+            'graduated_students' => $query->where('status', 'graduated')->count(),
+            'suspended_students' => $query->where('status', 'suspended')->count(),
+            'on_leave_students' => $query->where('status', 'inactive')->count(), // Inactive can be on leave
         ];
     }
 }

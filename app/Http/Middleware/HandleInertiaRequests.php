@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\PermissionService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -39,19 +40,32 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
+        $user = $request->user();
+        $currentCampusId = session('current_campus_id');
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
-            'auth' => [
-                'user' => $request->user(),
-            ],
+            'auth' => function () use ($request, $user, $currentCampusId) {
+                if (!$user) {
+                    return null;
+                }
+
+                $permissionService = app(PermissionService::class);
+
+                return [
+                    'user' => $user->only('id', 'name', 'email'),
+                    'permissions' => $permissionService->getUserPermissions($user, $currentCampusId),
+                    'current_campus_id' => $currentCampusId,
+                ];
+            },
             'ziggy' => [
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
             'sidebarOpen' => !$request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-            'permissions' => fn() => session('permissions', []),
+            'permissions' => fn() => $user ? app(PermissionService::class)->getUserPermissions($user, $currentCampusId) : [],
         ];
     }
 }

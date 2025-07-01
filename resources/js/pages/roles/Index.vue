@@ -18,7 +18,7 @@ const data = computed(() => props.roles.data);
 
 // Edit role function
 const editRole = (role: Role) => {
-    router.visit(`/roles/edit/${role.id}`);
+    router.visit(`/roles/${role.id}/edit`);
 };
 
 // Column definitions

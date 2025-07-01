@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\BitwisePermissionService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,12 +15,14 @@ class Role extends Model
 
     protected $table = 'roles';
 
-    protected $fillable = ['name', 'code'];
+    protected $fillable = ['name', 'code', 'bitwise_permissions'];
 
-    protected static function boot()
+    protected $casts = [
+        'bitwise_permissions' => 'array',
+    ];
+
+    protected static function booted()
     {
-        parent::boot();
-
         static::creating(function ($role) {
             if (empty($role->code)) {
                 $role->code = static::generateRoleCode($role->name);
@@ -29,6 +32,14 @@ class Role extends Model
         static::updating(function ($role) {
             if ($role->isDirty('name') && empty($role->code)) {
                 $role->code = static::generateRoleCode($role->name);
+            }
+        });
+
+        static::saved(function ($role) {
+            // Nếu permissions đã được load hoặc thay đổi, cập nhật bitwise_permissions
+            if ($role->relationLoaded('permissions') || $role->wasChanged('permissions')) {
+                $bitwiseService = app(BitwisePermissionService::class);
+                $bitwiseService->updateRoleBitwisePermissions($role);
             }
         });
     }
@@ -61,5 +72,24 @@ class Role extends Model
     public function permissions(): BelongsToMany
     {
         return $this->belongsToMany(Permission::class, 'role_permissions');
+    }
+
+    /**
+     * Kiểm tra vai trò có quyền cụ thể không
+     */
+    public function hasPermission($permissionName)
+    {
+        // Nếu có bitwise_permissions, sử dụng nó để kiểm tra nhanh
+        if (!empty($this->bitwise_permissions)) {
+            $permission = Permission::where('name', $permissionName)->first();
+
+            if ($permission) {
+                $bitwiseService = app(BitwisePermissionService::class);
+                return $bitwiseService->checkBitwisePermission($this->bitwise_permissions, $permission->id);
+            }
+        }
+
+        // Fallback: kiểm tra qua relationship
+        return $this->permissions()->where('name', $permissionName)->exists();
     }
 }

@@ -32,7 +32,7 @@ class StudentController extends Controller
             'search' => 'nullable|string|max:255',
             'campus_id' => 'nullable|integer|exists:campuses,id',
             'program_id' => 'nullable|integer|exists:programs,id',
-            'status' => 'nullable|string|in:active,inactive,suspended',
+            'status' => 'nullable|string|in:active,inactive,suspended,graduated',
             'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
@@ -222,6 +222,35 @@ class StudentController extends Controller
     }
 
     /**
+     * Update student status
+     */
+    public function updateStatus(Request $request, Student $student): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:active,inactive,suspended,graduated',
+        ]);
+
+        try {
+            $updatedStudent = $this->studentService->updateStudentStatus(
+                $student,
+                $validated['status']
+            );
+
+            return redirect()
+                ->route('students.show', $updatedStudent)
+                ->with('success', 'Student status updated successfully');
+        } catch (\Exception $e) {
+            Log::error('Failed to update student status', [
+                'student_id' => $student->id,
+                'error' => $e->getMessage(),
+                'status' => $validated['status']
+            ]);
+
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * Assign program to student
      */
     public function assignProgram(Request $request, Student $student): RedirectResponse
@@ -248,35 +277,6 @@ class StudentController extends Controller
                 'student_id' => $student->id,
                 'error' => $e->getMessage(),
                 'data' => $validated
-            ]);
-
-            return back()->withErrors(['error' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Update enrollment status
-     */
-    public function updateEnrollmentStatus(Request $request, Student $student): RedirectResponse
-    {
-        $validated = $request->validate([
-            'enrollment_status' => 'required|in:admitted,enrolled,active,on_leave,suspended,graduated,dropped_out',
-        ]);
-
-        try {
-            $updatedStudent = $this->studentService->updateEnrollmentStatus(
-                $student,
-                $validated['enrollment_status']
-            );
-
-            return redirect()
-                ->route('students.show', $updatedStudent)
-                ->with('success', 'Enrollment status updated successfully');
-        } catch (\Exception $e) {
-            Log::error('Failed to update student enrollment status', [
-                'student_id' => $student->id,
-                'error' => $e->getMessage(),
-                'status' => $validated['enrollment_status']
             ]);
 
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -334,7 +334,7 @@ class StudentController extends Controller
     {
         $validated = $request->validate([
             'query' => 'nullable|string|max:255',
-            'status' => 'nullable|string|in:active,inactive,suspended',
+            'status' => 'nullable|string|in:active,inactive,suspended,graduated',
             'page' => 'nullable|integer|min:1',
             'limit' => 'nullable|integer|min:1|max:50',
         ]);
@@ -373,7 +373,6 @@ class StudentController extends Controller
                         'student_id' => $student->student_id,
                         'full_name' => $student->full_name,
                         'email' => $student->email,
-                        'enrollment_status' => $student->enrollment_status,
                         'status' => $student->status,
                         'program' => $student->program ? [
                             'id' => $student->program->id,
@@ -411,7 +410,6 @@ class StudentController extends Controller
                 'student_id' => $student->student_id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
-                'enrollment_status' => $student->enrollment_status,
                 'status' => $student->status,
                 'program' => $student->program ? [
                     'id' => $student->program->id,

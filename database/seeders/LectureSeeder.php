@@ -8,6 +8,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Lecture;
 use App\Models\Campus;
+use Illuminate\Support\Facades\DB;
 
 class LectureSeeder extends Seeder
 {

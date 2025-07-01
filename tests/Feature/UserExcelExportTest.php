@@ -39,7 +39,7 @@ class UserExcelExportTest extends TestCase
         ]);
 
         // Make export request
-        $response = $this->get(route('users.export.excel'));
+        $response = $this->get(route('user.export.excel'));
 
         // Debug the response if it's not 200
         if ($response->getStatusCode() !== 200) {
@@ -56,7 +56,7 @@ class UserExcelExportTest extends TestCase
     public function test_unauthenticated_user_cannot_export_excel(): void
     {
         // Make export request without authentication
-        $response = $this->get(route('users.export.excel'));
+        $response = $this->get(route('user.export.excel'));
 
         // Assert redirect to login
         $response->assertRedirect(route('login'));
@@ -85,7 +85,7 @@ class UserExcelExportTest extends TestCase
         ]);
 
         // Make export request with filters
-        $response = $this->get(route('users.export.excel.filtered', [
+        $response = $this->get(route('user.export.excel.filtered', [
             'search' => 'John'
         ]));
 
