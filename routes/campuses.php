@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\BuildingController;
-use App\Http\Controllers\CampusController;
+use App\Http\Controllers\Web\BuildingController;
+use App\Http\Controllers\Web\CampusController;
 use App\Helpers\RoutePermissionHelper;
 use Illuminate\Support\Facades\Route;
 

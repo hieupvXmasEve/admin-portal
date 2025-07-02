@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\SyllabusController;
+use App\Http\Controllers\Web\SyllabusController;
 use Illuminate\Support\Facades\Route;
 
 // syllabus routes nested under units

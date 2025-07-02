@@ -2,9 +2,9 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\SelectCampus;
-use App\Http\Controllers\CurriculumVersionController;
-use App\Http\Controllers\Api\Admin\ElectiveController;
+use App\Http\Controllers\Web\SelectCampus;
+use App\Http\Controllers\Web\CurriculumVersionController;
+use App\Http\Controllers\Api\ElectiveController;
 
 
 Route::get('/', function () {

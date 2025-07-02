@@ -1,8 +1,7 @@
 <?php
 
-use App\Helpers\RoutePermissionHelper;
-use App\Http\Controllers\CurriculumVersionController;
-use App\Http\Controllers\CurriculumUnitController;
+use App\Http\Controllers\Web\CurriculumVersionController;
+use App\Http\Controllers\Web\CurriculumUnitController;
 use Illuminate\Support\Facades\Route;
 
 // Web routes for Inertia.js pages

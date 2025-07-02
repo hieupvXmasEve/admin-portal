@@ -26,6 +26,7 @@ class SpecializationSeeder extends Seeder
         $this->seedCurriculumWithSpecializations();
         $this->demonstrateCrossSpecializationUnits();
         $this->seedComplexPrerequisites();
+        $this->seedStudents();
     }
 
     private function seedSpecializations(): void
@@ -124,12 +125,12 @@ class SpecializationSeeder extends Seeder
             // Create program-level curriculum (common units)
             $programCurriculum = CurriculumVersion::create([
                 'program_id' => $program->id,
-                'version_code' => $program->name . '_Common_V1.0',
+                'version_code' => $program->code . '_COM_V1.0',
                 'semester_id' => $semester?->id,
                 'notes' => 'Common curriculum for all ' . $program->name . ' specializations',
             ]);
 
-            $this->addCommonUnits($programCurriculum, $program->name);
+            $this->addCommonUnits($programCurriculum, $program->code);
 
             // Create specialization-specific curricula
             foreach ($program->specializations as $specialization) {
@@ -146,7 +147,7 @@ class SpecializationSeeder extends Seeder
         }
     }
 
-    private function addCommonUnits(CurriculumVersion $curriculum, string $programName): void
+    private function addCommonUnits(CurriculumVersion $curriculum, string $programCode): void
     {
         $commonUnits = [
             'IT' => [
@@ -155,15 +156,15 @@ class SpecializationSeeder extends Seeder
                 ['code' => 'CS201', 'type' => 'core', 'year_level' => 2, 'semester_number' => 1],
                 ['code' => 'IT301', 'type' => 'core', 'year_level' => 3, 'semester_number' => 1], // Database - core for all IT
             ],
-            'Business' => [
+            'BUS' => [
                 ['code' => 'BUS101', 'type' => 'core', 'year_level' => 1, 'semester_number' => 1],
                 ['code' => 'BUS201', 'type' => 'core', 'year_level' => 2, 'semester_number' => 1],
                 ['code' => 'BUS301', 'type' => 'core', 'year_level' => 3, 'semester_number' => 1],
             ],
         ];
 
-        if (isset($commonUnits[$programName])) {
-            foreach ($commonUnits[$programName] as $unitData) {
+        if (isset($commonUnits[$programCode])) {
+            foreach ($commonUnits[$programCode] as $unitData) {
                 $unit = Unit::where('code', $unitData['code'])->first();
                 if ($unit) {
                     CurriculumUnit::create([
@@ -240,7 +241,10 @@ class SpecializationSeeder extends Seeder
     private function demonstrateCrossSpecializationUnits(): void
     {
         // Add units that are electives in some specializations but core in others
-        $itSpecializations = Specialization::where('program_id', Program::where('name', 'IT')->first()->id)->get();
+        $itProgram = Program::where('name', 'IT')->first();
+        if (!$itProgram) return;
+
+        $itSpecializations = Specialization::where('program_id', $itProgram->id)->get();
 
         foreach ($itSpecializations as $specialization) {
             $curriculum = $specialization->curriculumVersions()->first();
@@ -349,5 +353,61 @@ class SpecializationSeeder extends Seeder
                 ]);
             }
         }
+    }
+
+    private function seedStudents(): void
+    {
+        // Clear existing students
+        \App\Models\Student::query()->delete();
+
+        // Get required data
+        $campus = \App\Models\Campus::first();
+        if (!$campus) {
+            throw new \Exception('No campus found. Please run campus seeder first.');
+        }
+
+        // Create students for each specialization's curriculum
+        foreach (\App\Models\CurriculumVersion::with(['program', 'specialization'])->get() as $curriculum) {
+            if (!$curriculum->specialization) continue; // Skip program-level curricula
+
+            // Create 20 students per specialization
+            for ($i = 1; $i <= 20; $i++) {
+                $specializationCode = strtoupper(str_replace('-', '', $curriculum->specialization->code));
+                $studentNumber = str_pad((string) $i, 3, '0', STR_PAD_LEFT);
+                $studentId = "SWU{$specializationCode}25{$studentNumber}";
+
+                \App\Models\Student::create([
+                    'student_id' => $studentId,
+                    'full_name' => "Student {$curriculum->specialization->name} {$i}",
+                    'email' => strtolower("student.{$specializationCode}.{$i}@swinburne.edu.au"),
+                    'phone' => '0' . str_pad((string) (900000000 + $i + ($curriculum->id * 100)), 9, '0', STR_PAD_LEFT),
+                    'date_of_birth' => fake()->dateTimeBetween('-25 years', '-18 years')->format('Y-m-d'),
+                    'gender' => fake()->randomElement(['male', 'female']),
+                    'nationality' => 'Vietnamese',
+                    'address' => fake()->address,
+                    'campus_id' => $campus->id,
+                    'program_id' => $curriculum->program_id,
+                    'specialization_id' => $curriculum->specialization_id,
+                    'curriculum_version_id' => $curriculum->id,
+                    'admission_date' => '2025-01-15',
+                    'expected_graduation_date' => '2028-06-30',
+                    'high_school_name' => fake()->randomElement([
+                        'Nguyen Hue High School',
+                        'Le Loi High School',
+                        'Tran Phu High School',
+                        'Vo Thi Sau High School',
+                        'Hung Vuong High School'
+                    ]),
+                    'high_school_graduation_year' => fake()->numberBetween(2020, 2024),
+                    'entrance_exam_score' => fake()->randomFloat(2, 6.0, 10.0),
+                    'status' => 'active',
+                    'oauth_provider' => 'google',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        $this->command->info('Created students for all specialization curricula');
     }
 }

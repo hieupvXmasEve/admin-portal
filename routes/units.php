@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\Units\UnitController;
-use App\Http\Controllers\Units\UnitExportController;
-use App\Http\Controllers\Units\UnitImportController;
+use App\Http\Controllers\Web\UnitController;
+use App\Http\Controllers\Web\Units\UnitExportController;
+use App\Http\Controllers\Web\Units\UnitImportController;
 use Illuminate\Support\Facades\Route;
 
 // Web routes for Inertia.js pages

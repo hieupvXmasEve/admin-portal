@@ -54,10 +54,10 @@ class AcademicOfferingSeeder extends Seeder
         foreach ($selectedUnits as $unit) {
             // Create 1-2 sections per unit
             $sectionCount = rand(1, 2);
-            
+
             for ($i = 1; $i <= $sectionCount; $i++) {
                 $lecturer = $lecturers->random();
-                
+
                 $courseOffering = CourseOffering::create([
                     'semester_id' => $semester->id,
                     'unit_id' => $unit->id,
@@ -87,6 +87,17 @@ class AcademicOfferingSeeder extends Seeder
 
     private function createSyllabusForOffering(CourseOffering $courseOffering): void
     {
+        // Check if syllabus already exists for this unit and semester
+        $existingSyllabus = Syllabus::where('unit_id', $courseOffering->unit_id)
+            ->where('semester_id', $courseOffering->semester_id)
+            ->where('is_active', true)
+            ->first();
+
+        if ($existingSyllabus) {
+            // Syllabus already exists, no need to create another
+            return;
+        }
+
         $syllabus = Syllabus::create([
             'unit_id' => $courseOffering->unit_id,
             'version' => 'v1.0',
@@ -185,12 +196,12 @@ class AcademicOfferingSeeder extends Seeder
     private function getRandomDeliveryMode(Lecture $lecturer): string
     {
         $modes = ['in_person'];
-        
+
         if ($lecturer->can_teach_online) {
             $modes[] = 'online';
             $modes[] = 'hybrid';
         }
-        
+
         return collect($modes)->random();
     }
 
@@ -198,7 +209,7 @@ class AcademicOfferingSeeder extends Seeder
     {
         $allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
         $dayCount = rand(1, 3);
-        
+
         return collect($allDays)->random($dayCount)->values()->toArray();
     }
 
@@ -212,7 +223,7 @@ class AcademicOfferingSeeder extends Seeder
             ['start' => '16:00', 'end' => '18:00'],
             ['start' => '18:00', 'end' => '20:00'],
         ];
-        
+
         return collect($timeSlots)->random();
     }
 
@@ -221,7 +232,7 @@ class AcademicOfferingSeeder extends Seeder
         $buildings = ['Building A', 'Building B', 'Engineering Block', 'Computer Science Center'];
         $building = collect($buildings)->random();
         $room = rand(101, 599);
-        
+
         return "{$building}, Room {$room}";
     }
 }

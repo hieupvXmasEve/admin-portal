@@ -24,7 +24,6 @@ import {
     Repeat,
     School,
     Settings,
-    Shield,
     ShieldCheck,
     Star,
     Target,
@@ -434,25 +433,6 @@ export const mainNavItems: NavItem[] = [
                 href: syllabusRoutes.assessmentRubrics(),
                 icon: CheckSquare,
                 requiredPermissions: ['view_syllabus'], // Will be implemented later
-            },
-        ],
-    },
-    {
-        title: 'Access Control',
-        href: '#',
-        icon: Shield,
-        children: [
-            {
-                title: 'Roles',
-                href: '#',
-                icon: ShieldCheck,
-                children: [
-                    {
-                        title: 'All Roles',
-                        href: systemRoutes.roles.index(),
-                        requiredPermissions: ['view_role'],
-                    },
-                ],
             },
         ],
     },

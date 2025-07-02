@@ -46,16 +46,16 @@ class StudentLifecycleSeeder extends Seeder
     private function processStudentGroups($students, $fallSemester, $springSemester): void
     {
         $totalStudents = $students->count();
-        
+
         // Group 1: Excellent students (20 students - 1/3 of 60)
         $excellentStudents = $students->take(20);
-        
+
         // Group 2: Students who failed due to low scores (10 students)
         $lowScoreFailedStudents = $students->skip(20)->take(10);
-        
+
         // Group 3: Students who failed due to attendance (10 students)
         $attendanceFailedStudents = $students->skip(30)->take(10);
-        
+
         // Group 4: Regular students with mixed results (20 students)
         $regularStudents = $students->skip(40)->take(20);
 
@@ -75,15 +75,15 @@ class StudentLifecycleSeeder extends Seeder
     private function processPastSemester($students, $fallSemester, string $studentType): void
     {
         $courseOfferings = CourseOffering::where('semester_id', $fallSemester->id)->get();
-        
+
         foreach ($students as $student) {
             // Each student enrolls in 3-4 courses
             $courseCount = rand(3, 4);
             $selectedCourses = $courseOfferings->random($courseCount);
-            
+
             foreach ($selectedCourses as $courseOffering) {
                 $registration = $this->createCourseRegistration($student, $courseOffering, $fallSemester);
-                
+
                 // Create academic records, attendances, and scores based on student type
                 $this->createStudentData($student, $registration, $courseOffering, $studentType, true);
             }
@@ -93,7 +93,7 @@ class StudentLifecycleSeeder extends Seeder
     private function processCurrentSemester($students, $springSemester, string $studentType): void
     {
         $courseOfferings = CourseOffering::where('semester_id', $springSemester->id)->get();
-        
+
         foreach ($students as $student) {
             if ($studentType === 'prerequisite_failed') {
                 // Try to register for advanced courses without prerequisites
@@ -102,16 +102,16 @@ class StudentLifecycleSeeder extends Seeder
                 // Regular enrollment for eligible students
                 $courseCount = rand(2, 4);
                 $selectedCourses = $courseOfferings->random($courseCount);
-                
+
                 foreach ($selectedCourses as $courseOffering) {
                     $registration = $this->createCourseRegistration($student, $courseOffering, $springSemester);
-                    
+
                     // Create partial data for current semester (no final grades yet)
                     $this->createStudentData($student, $registration, $courseOffering, $studentType, false);
                 }
             }
         }
-        
+
         // Create credit requirement scenarios
         $this->createCreditRequirementScenarios($students->take(10), $springSemester);
     }
@@ -136,10 +136,10 @@ class StudentLifecycleSeeder extends Seeder
         if ($isCompleted) {
             // Create academic record for completed semester
             $this->createAcademicRecord($student, $registration, $courseOffering, $studentType);
-            
+
             // Create attendance records
             $this->createAttendanceRecords($student, $registration, $studentType);
-            
+
             // Create assessment scores
             $this->createAssessmentScores($student, $registration, $courseOffering, $studentType);
         } else {
@@ -152,7 +152,7 @@ class StudentLifecycleSeeder extends Seeder
     {
         $gradeData = $this->getGradeByStudentType($studentType);
         $attendanceData = $this->getAttendanceByStudentType($studentType);
-        
+
         DB::table('academic_records')->insert([
             'student_id' => $student->id,
             'course_offering_id' => $courseOffering->id,
@@ -196,16 +196,16 @@ class StudentLifecycleSeeder extends Seeder
         $totalSessions = 24; // Typical semester
         $attendanceData = $this->getAttendanceByStudentType($studentType);
         $attendedSessions = round($totalSessions * $attendanceData['percentage'] / 100);
-        
+
         for ($session = 1; $session <= $totalSessions; $session++) {
             $status = $session <= $attendedSessions ? 'present' : 'absent';
-            
+
             DB::table('attendances')->insert([
                 'class_session_id' => $this->getOrCreateClassSession($registration->course_offering_id, $session),
                 'student_id' => $student->id,
                 'recorded_by_lecture_id' => $registration->courseOffering->lecture_id,
                 'status' => $status,
-                'check_in_time' => $status === 'present' ? 
+                'check_in_time' => $status === 'present' ?
                     Carbon::parse('2024-08-01')->addWeeks($session)->setTime(8, rand(0, 30)) : null,
                 'recording_method' => 'manual',
                 'is_verified' => true,
@@ -218,14 +218,14 @@ class StudentLifecycleSeeder extends Seeder
 
     private function createAssessmentScores($student, $registration, $courseOffering, string $studentType): void
     {
-        $components = AssessmentComponent::whereHas('syllabus', function($query) use ($courseOffering) {
+        $components = AssessmentComponent::whereHas('syllabus', function ($query) use ($courseOffering) {
             $query->where('unit_id', $courseOffering->unit_id)
-                  ->where('semester_id', $courseOffering->semester_id);
+                ->where('semester_id', $courseOffering->semester_id);
         })->get();
 
         foreach ($components as $component) {
             $details = AssessmentComponentDetail::where('component_id', $component->id)->get();
-            
+
             if ($details->isNotEmpty()) {
                 foreach ($details as $detail) {
                     $this->createDetailScore($student, $detail, $courseOffering, $studentType);
@@ -240,7 +240,7 @@ class StudentLifecycleSeeder extends Seeder
     private function createDetailScore($student, $detail, $courseOffering, string $studentType): void
     {
         $scoreData = $this->getScoreByStudentType($studentType, $detail->name);
-        
+
         DB::table('assessment_component_detail_scores')->insert([
             'assessment_component_detail_id' => $detail->id,
             'student_id' => $student->id,
@@ -263,12 +263,12 @@ class StudentLifecycleSeeder extends Seeder
     {
         // Try to register for advanced units that require prerequisites
         $advancedUnits = Unit::whereIn('code', ['COS20007', 'COS30019', 'SWE30003'])->get();
-        
+
         foreach ($advancedUnits->take(2) as $unit) {
             $courseOffering = CourseOffering::where('semester_id', $springSemester->id)
-                                          ->where('unit_id', $unit->id)
-                                          ->first();
-            
+                ->where('unit_id', $unit->id)
+                ->first();
+
             if ($courseOffering) {
                 // This would normally be blocked by validation, but we create the scenario for testing
                 $registration = CourseRegistration::create([
@@ -288,15 +288,15 @@ class StudentLifecycleSeeder extends Seeder
     private function createCreditRequirementScenarios($students, $springSemester): void
     {
         $specialUnits = Unit::whereIn('code', ['CAPSTONE_PROJECT', 'INTERNSHIP', 'ADVANCED_RESEARCH'])->get();
-        
+
         foreach ($students->take(3) as $index => $student) {
             $unit = $specialUnits->get($index);
             if (!$unit) continue;
-            
+
             $courseOffering = CourseOffering::where('semester_id', $springSemester->id)
-                                          ->where('unit_id', $unit->id)
-                                          ->first();
-            
+                ->where('unit_id', $unit->id)
+                ->first();
+
             if ($courseOffering) {
                 // This would be blocked by credit requirement validation
                 CourseRegistration::create([
@@ -315,7 +315,7 @@ class StudentLifecycleSeeder extends Seeder
 
     private function getGradeByStudentType(string $studentType): array
     {
-        return match($studentType) {
+        return match ($studentType) {
             'excellent' => [
                 'percentage' => rand(85, 100),
                 'letter' => collect(['A+', 'A', 'A-'])->random(),
@@ -351,7 +351,7 @@ class StudentLifecycleSeeder extends Seeder
 
     private function getAttendanceByStudentType(string $studentType): array
     {
-        return match($studentType) {
+        return match ($studentType) {
             'excellent' => [
                 'percentage' => rand(95, 100),
                 'absences' => rand(0, 1),
@@ -385,7 +385,7 @@ class StudentLifecycleSeeder extends Seeder
         $baseScore = $this->getGradeByStudentType($studentType)['percentage'];
         $variation = rand(-5, 5); // Small variation per assessment
         $percentage = max(0, min(100, $baseScore + $variation));
-        
+
         return [
             'points' => $percentage,
             'percentage' => $percentage,
@@ -396,7 +396,7 @@ class StudentLifecycleSeeder extends Seeder
 
     private function percentageToLetterGrade(float $percentage): string
     {
-        return match(true) {
+        return match (true) {
             $percentage >= 97 => 'A+',
             $percentage >= 93 => 'A',
             $percentage >= 90 => 'A-',
@@ -414,7 +414,7 @@ class StudentLifecycleSeeder extends Seeder
 
     private function percentageToGPA(float $percentage): float
     {
-        return match(true) {
+        return match (true) {
             $percentage >= 97 => 4.0,
             $percentage >= 93 => 4.0,
             $percentage >= 90 => 3.7,
@@ -434,7 +434,7 @@ class StudentLifecycleSeeder extends Seeder
     {
         // Create attendance for current semester (partial)
         $sessionsCompleted = rand(5, 10); // Out of expected ~15 sessions
-        
+
         for ($session = 1; $session <= $sessionsCompleted; $session++) {
             DB::table('attendances')->insert([
                 'class_session_id' => $this->getOrCreateClassSession($registration->course_offering_id, $session),
@@ -453,15 +453,51 @@ class StudentLifecycleSeeder extends Seeder
 
     private function getOrCreateClassSession($courseOfferingId, $sessionNumber): int
     {
-        // For simplicity, return a calculated ID (in real implementation, create class_sessions table entries)
-        return $courseOfferingId * 1000 + $sessionNumber;
+        // Check if class session already exists
+        $existingSession = DB::table('class_sessions')
+            ->where('course_offering_id', $courseOfferingId)
+            ->where('sequence_number', $sessionNumber)
+            ->first();
+
+        if ($existingSession) {
+            return $existingSession->id;
+        }
+
+        // Create new class session
+        $courseOffering = \App\Models\CourseOffering::find($courseOfferingId);
+        $sessionDate = \Carbon\Carbon::parse('2024-08-01')->addWeeks($sessionNumber - 1);
+
+        $startTime = $courseOffering->schedule_time_start ?? '08:00:00';
+        $endTime = $courseOffering->schedule_time_end ?? '10:00:00';
+
+        // Ensure end time is after start time
+        if ($startTime >= $endTime) {
+            $endTime = \Carbon\Carbon::parse($startTime)->addHours(2)->format('H:i:s');
+        }
+
+        return DB::table('class_sessions')->insertGetId([
+            'course_offering_id' => $courseOfferingId,
+            'sequence_number' => $sessionNumber,
+            'session_title' => "Session {$sessionNumber}",
+            'session_date' => $sessionDate->format('Y-m-d'),
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'session_type' => 'lecture',
+            'delivery_mode' => $courseOffering->delivery_mode ?? 'in_person',
+            'status' => 'completed',
+            'attendance_required' => true,
+            'attendance_tracking_enabled' => true,
+            'expected_attendees' => $courseOffering->max_capacity,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function createComponentScore($student, $component, $courseOffering, string $studentType): void
     {
         // Fallback for components without details
         $scoreData = $this->getScoreByStudentType($studentType, $component->name);
-        
+
         // This would go to a direct component scores table if it existed
         // For now, we'll skip or adapt to the detail scores table structure
     }

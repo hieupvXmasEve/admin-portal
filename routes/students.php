@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\StudentController;
+use App\Http\Controllers\Web\StudentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,8 +56,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('update-status');
     });
 
-    // AJAX endpoints for student management
-    Route::prefix('api/students')->name('api.students.')->group(function () {
+    // AJAX endpoints for student management (for web interface)
+    Route::prefix('ajax/students')->name('ajax.students.')->group(function () {
         Route::get('/search', [StudentController::class, 'apiSearch'])
             ->middleware('can:view_student')
             ->name('search');
@@ -73,5 +73,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/curriculum-versions', [StudentController::class, 'getCurriculumVersions'])
             ->middleware('can:view_student')
             ->name('curriculum-versions');
+
+        Route::post('/by-ids', [StudentController::class, 'getByIds'])
+            ->middleware('can:view_student')
+            ->name('by-ids');
     });
 });
