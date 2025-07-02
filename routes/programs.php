@@ -1,10 +1,10 @@
 <?php
 
-use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\Web\ProgramController;
 use Illuminate\Support\Facades\Route;
 
 // Web routes for Inertia.js pages
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'web'])->group(function () {
 
     // Programs routes with consistent naming
     Route::prefix('programs')->name('programs.')->group(function () {

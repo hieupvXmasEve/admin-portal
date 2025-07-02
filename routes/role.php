@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\RoleController;
+use App\Http\Controllers\Web\RoleController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'web'])->group(function () {
     Route::get('roles', [RoleController::class, 'index'])
         ->middleware('can:view_role')
         ->name('role.index');

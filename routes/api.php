@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\V1\AuthController;
-use App\Http\Controllers\Api\V1\StudentController;
-use App\Http\Controllers\Api\V1\RegistrationController;
-use App\Http\Controllers\Api\V1\CourseController;
-use App\Http\Controllers\Api\Admin\StudentController as AdminStudentController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\StudentController;
+use App\Http\Controllers\Api\RegistrationController;
+use App\Http\Controllers\Api\CourseController;
+use App\Http\Controllers\Web\StudentController as WebStudentController;
+use App\Http\Controllers\Api\CampusController;
+use App\Http\Controllers\Api\BuildingController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\UnitController;
+use App\Http\Controllers\Api\ProgramController;
 
 /*
 |--------------------------------------------------------------------------
@@ -22,7 +28,7 @@ use App\Http\Controllers\Api\Admin\StudentController as AdminStudentController;
 */
 
 // Public authentication routes
-Route::prefix('v1')->name('api.v1.')->group(function () {
+Route::name('api.')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])->name('auth.login');
     Route::post('/auth/login/google', [AuthController::class, 'loginWithGoogle'])->name('auth.login.google');
     Route::post('/auth/register', [AuthController::class, 'register'])->name('auth.register');
@@ -31,7 +37,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 });
 
 // Protected API routes for students
-Route::prefix('v1')->name('api.v1.')->middleware(['auth:sanctum', 'student'])->group(function () {
+Route::name('api.')->middleware(['auth:sanctum', 'student'])->group(function () {
     // Authentication
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
     Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
@@ -67,19 +73,34 @@ Route::prefix('v1')->name('api.v1.')->middleware(['auth:sanctum', 'student'])->g
 });
 
 // Admin API routes (for internal use)
-Route::prefix('v1')->name('api.v1.admin.')->middleware(['auth:sanctum', 'admin'])->group(function () {
-    // Student Management
-    Route::get('/students', [StudentController::class, 'index'])->name('students.index');
-    Route::get('/students/search', [AdminStudentController::class, 'search'])->name('students.search');
-    Route::post('/students/by-ids', [AdminStudentController::class, 'getByIds'])->name('students.by-ids');
-    Route::post('/students', [StudentController::class, 'store'])->name('students.store');
-    Route::get('/students/{student}', [AdminStudentController::class, 'show'])->name('students.show');
-    Route::put('/students/{student}', [StudentController::class, 'update'])->name('students.update');
-    Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
+Route::name('api.admin.')->middleware(['auth:sanctum', 'admin'])->group(function () {
+    // Campus Management
+    Route::apiResource('campuses', CampusController::class);
 
-    // Bulk operations
-    Route::post('/students/bulk-import', [StudentController::class, 'bulkImport'])->name('students.bulk-import');
-    Route::post('/students/bulk-update', [StudentController::class, 'bulkUpdate'])->name('students.bulk-update');
+    // Building Management
+    Route::apiResource('buildings', BuildingController::class);
+
+    // User Management
+    Route::apiResource('users', UserController::class);
+
+    // Role Management
+    Route::apiResource('roles', RoleController::class);
+
+    // Unit Management
+    Route::apiResource('units', UnitController::class);
+
+    // Program Management
+    Route::apiResource('programs', ProgramController::class);
+
+    // Student Management
+    Route::get('/students/search', [WebStudentController::class, 'apiSearch'])->name('students.search');
+    Route::post('/students/by-ids', [WebStudentController::class, 'getByIds'])->name('students.by-ids');
+    Route::get('/students', [WebStudentController::class, 'apiIndex'])->name('students.index');
+    Route::post('/students', [WebStudentController::class, 'store'])->name('students.store');
+    Route::get('/students/{student}', [WebStudentController::class, 'show'])->name('students.show');
+    Route::put('/students/{student}', [WebStudentController::class, 'update'])->name('students.update');
+    Route::patch('/students/{student}', [WebStudentController::class, 'update'])->name('students.patch');
+    Route::delete('/students/{student}', [WebStudentController::class, 'destroy'])->name('students.destroy');
 
     // Registration Management
     Route::get('/registrations', [RegistrationController::class, 'adminIndex'])->name('registrations.index');
@@ -95,3 +116,7 @@ Route::get('/health', function () {
         'version' => '1.0.0'
     ]);
 })->name('api.health');
+
+// require __DIR__.'/api/public.php';
+require __DIR__ . '/api/admin.php';
+require __DIR__ . '/api/student.php';

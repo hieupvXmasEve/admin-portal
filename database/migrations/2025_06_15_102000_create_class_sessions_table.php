@@ -24,7 +24,7 @@ return new class extends Migration
             $table->date('session_date');
             $table->time('start_time');
             $table->time('end_time');
-            $table->integer('duration_minutes')->storedAs('TIMESTAMPDIFF(MINUTE, start_time, end_time)'); // Calculated field
+            $table->integer('duration_minutes')->nullable(); // Calculated on the fly
 
             $table->enum('session_type', [
                 'lecture',
