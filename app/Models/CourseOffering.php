@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
@@ -141,6 +142,13 @@ class CourseOffering extends Model
     public function courseRegistrations(): HasMany
     {
         return $this->hasMany(CourseRegistration::class, 'course_offering_id');
+    }
+
+    public function syllabus(): HasOne
+    {
+        return $this->hasOne(Syllabus::class, 'unit_id', 'unit_id')
+            ->whereColumn('syllabus.semester_id', 'course_offerings.semester_id')
+            ->where('syllabus.is_active', true);
     }
 
     // Computed Properties / Accessors

@@ -6,7 +6,10 @@ import { ChevronDown } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface DataPaginationProps {
-    paginationData: Pick<PaginatedResponse<any>, 'from' | 'to' | 'total' | 'current_page' | 'last_page' | 'prev_page_url' | 'next_page_url' | 'links' | 'per_page'>;
+    paginationData: Pick<
+        PaginatedResponse<any>,
+        'from' | 'to' | 'total' | 'current_page' | 'last_page' | 'prev_page_url' | 'next_page_url' | 'links' | 'per_page'
+    >;
     itemName?: string;
     pageSizeOptions?: number[];
     showPageSizeSelector?: boolean;
@@ -114,7 +117,7 @@ const paginationItems = computed(() => {
 });
 
 const goToPageNumber = (pageNumber: number) => {
-    // Construct URL for specific page number
+    // Just emit the page number, let the parent handle URL construction
     const baseUrl = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
     params.set('page', pageNumber.toString());
@@ -128,7 +131,7 @@ const goToPageNumber = (pageNumber: number) => {
         <div class="flex items-center space-x-4">
             <!-- Page Size Selector -->
             <div v-if="showPageSizeSelector" class="flex items-center space-x-2">
-                <span class="text-sm text-muted-foreground">Show</span>
+                <span class="text-muted-foreground text-sm">Show</span>
                 <DropdownMenu>
                     <DropdownMenuTrigger as-child>
                         <Button variant="outline" size="sm" class="w-20 justify-between">
@@ -157,14 +160,7 @@ const goToPageNumber = (pageNumber: number) => {
 
         <!-- Pagination Controls -->
         <div class="flex space-x-2">
-            <Button
-                variant="outline"
-                size="sm"
-                :disabled="!paginationData.prev_page_url"
-                @click="goToPreviousPage"
-            >
-                Previous
-            </Button>
+            <Button variant="outline" size="sm" :disabled="!paginationData.prev_page_url" @click="goToPreviousPage"> Previous </Button>
 
             <div class="flex space-x-1">
                 <template v-for="item in paginationItems" :key="`${item.type}-${item.value}`">
@@ -180,14 +176,7 @@ const goToPageNumber = (pageNumber: number) => {
                 </template>
             </div>
 
-            <Button
-                variant="outline"
-                size="sm"
-                :disabled="!paginationData.next_page_url"
-                @click="goToNextPage"
-            >
-                Next
-            </Button>
+            <Button variant="outline" size="sm" :disabled="!paginationData.next_page_url" @click="goToNextPage"> Next </Button>
         </div>
     </div>
 </template>

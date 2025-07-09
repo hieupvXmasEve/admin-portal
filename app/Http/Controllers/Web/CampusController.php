@@ -9,6 +9,7 @@ use App\Http\Requests\Campus\StoreCampusRequest;
 use App\Http\Requests\Campus\UpdateCampusRequest;
 use App\Models\Campus;
 use App\Services\CampusService;
+use App\Constants\CampusRoutes;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -74,7 +75,7 @@ class CampusController extends Controller
     public function store(StoreCampusRequest $request): RedirectResponse
     {
         $this->campusService->createCampus($request->validated());
-        return redirect()->route('campuses.index')->with('success', 'Campus created successfully.');
+        return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus created successfully.');
     }
 
     /**
@@ -134,7 +135,7 @@ class CampusController extends Controller
     public function update(UpdateCampusRequest $request, Campus $campus): RedirectResponse
     {
         $this->campusService->updateCampus($campus, $request->validated());
-        return redirect()->route('campuses.index')->with('success', 'Campus updated successfully.');
+        return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus updated successfully.');
     }
 
     /**
@@ -143,7 +144,7 @@ class CampusController extends Controller
     public function destroy(Campus $campus): RedirectResponse
     {
         $this->campusService->deleteCampus($campus);
-        return redirect()->route('campuses.index')->with('success', 'Campus deleted successfully.');
+        return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus deleted successfully.');
     }
 
     /**

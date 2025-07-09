@@ -13,6 +13,7 @@ const props = defineProps<{
     allowedExtensions: string[];
     availableFormats: Record<string, string>;
 }>();
+console.log(props.availableFormats);
 
 // State management
 const selectedFile = ref<File | null>(null);

@@ -17,9 +17,94 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Validator;
 
+
 class StudentController extends Controller
 {
     public function __construct(protected StudentService $studentService) {}
+    /**
+     * Display a listing of students for current campus
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $campusId = session()->get('current_campus_id');
+
+        if (!$campusId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No campus selected',
+            ], 400);
+        }
+
+        $filters = $request->only(['search', 'status', 'program_id']);
+        $students = $this->studentService->getStudentsByCampus($campusId, $filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'students' => StudentResource::collection($students->items()),
+                'pagination' => [
+                    'current_page' => $students->currentPage(),
+                    'last_page' => $students->lastPage(),
+                    'per_page' => $students->perPage(),
+                    'total' => $students->total(),
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Store a newly created and admitted student
+     */
+    public function store(StoreStudentRequest $request): JsonResponse
+    {
+        try {
+            $student = $this->studentService->createAdmittedStudent($request->validated());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Student created and admitted successfully',
+                'data' => [
+                    'student' => new StudentResource($student),
+                ]
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create student: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get students count by status for current campus
+     */
+    public function stats(): JsonResponse
+    {
+        $campusId = session()->get('current_campus_id');
+
+        if (!$campusId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No campus selected',
+            ], 400);
+        }
+
+        $stats = Student::where('campus_id', $campusId)
+            ->selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total' => array_sum($stats),
+                'by_status' => $stats,
+            ],
+        ]);
+    }
+
+    // Admission is now part of student creation
 
     /**
      * Get student profile

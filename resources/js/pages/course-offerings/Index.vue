@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { BreadcrumbItem, PaginatedResponse } from '@/types';
+import type { PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
@@ -27,15 +27,8 @@ interface Props {
     enrollmentStatusOptions: { value: string; label: string }[];
     deliveryModeOptions: { value: string; label: string }[];
 }
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Course Offerings',
-        href: '/course-offerings',
-    },
-];
-
 const props = defineProps<Props>();
-
+console.log(props.courseOfferings);
 const filters = ref({
     search: props.filters.search || '',
     semester_id: props.filters.semester_id || 'all',
@@ -50,7 +43,8 @@ const statistics = ref<any>(null);
 // Load statistics
 const loadStatistics = async () => {
     try {
-        const response = await fetch(`/api/course-offerings/statistics?semester_id=${filters.value.semester_id}`);
+        const semesterId = filters.value.semester_id === 'all' ? '' : filters.value.semester_id;
+        const response = await fetch(`/api/course-offerings/statistics?semester_id=${semesterId}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -96,15 +90,45 @@ const handleSearch = (value: string | number) => {
     updateFilters();
 };
 
-const handlePageChange = (page: string) => {
-    router.get(
-        '/course-offerings',
-        { ...filters.value, page },
-        {
+const handlePageChange = (pageOrUrl: string) => {
+    // If it's a full URL, extract the page number from it
+    if (pageOrUrl.includes('http') || pageOrUrl.includes('?')) {
+        try {
+            const url = new URL(pageOrUrl, window.location.origin);
+            const page = url.searchParams.get('page') || '1';
+
+            const filterParams = {
+                search: filters.value.search || undefined,
+                semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
+                enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
+                delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
+                page: page,
+            };
+
+            router.get('/course-offerings', filterParams, {
+                preserveState: true,
+                preserveScroll: true,
+                onFinish: () => loadStatistics(),
+            });
+        } catch (error) {
+            console.error('Error parsing URL:', error);
+        }
+    } else {
+        // If it's just a page number, construct the request with current filters
+        const filterParams = {
+            search: filters.value.search || undefined,
+            semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
+            enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
+            delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
+            page: pageOrUrl,
+        };
+
+        router.get('/course-offerings', filterParams, {
             preserveState: true,
             preserveScroll: true,
-        },
-    );
+            onFinish: () => loadStatistics(),
+        });
+    }
 };
 
 const toggleStatus = (courseOffering: CourseOffering) => {
@@ -205,6 +229,14 @@ const getDeliveryModeBadge = (mode: string) => {
 
 // Table columns definition
 const columns: ColumnDef<CourseOffering>[] = [
+    // No number
+    {
+        id: 'number',
+        header: 'No.',
+        cell: ({ row }) => {
+            return h('div', { class: 'text-center' }, row.index + 1 + (props.courseOfferings.current_page - 1) * props.courseOfferings.per_page);
+        },
+    },
     {
         accessorKey: 'unit',
         header: 'Unit',
@@ -270,11 +302,11 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
-        accessorKey: 'instructor',
-        header: 'Instructor',
+        accessorKey: 'lecture',
+        header: 'Lecturer',
         cell: ({ row }) => {
-            const instructor = row.original.instructor;
-            return instructor ? instructor.name : 'Not Assigned';
+            const lecture = row.original.lecture;
+            return lecture ? lecture.first_name + ' ' + lecture.last_name : 'Not Assigned';
         },
     },
     {

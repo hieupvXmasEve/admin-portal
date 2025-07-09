@@ -193,7 +193,7 @@ class Lecture extends Model
 
     public function getYearsOfServiceAttribute(): int
     {
-        return $this->hire_date ? $this->hire_date->diffInYears(now()) : 0;
+        return (int) ($this->hire_date ? $this->hire_date->diffInYears(now()) : 0);
     }
 
     public function getIsContractActiveAttribute(): bool

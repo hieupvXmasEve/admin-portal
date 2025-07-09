@@ -15,9 +15,7 @@ class SelectCampus extends Controller
     public function index()
     {
         $user = Auth::user();
-        $campuses = Campus::whereHas('users', function ($query) use ($user) {
-            $query->where('user_id', $user->id);
-        })->get();
+        $campuses = $user->campuses;
 
         return Inertia::render('SelectCampus', [
             'campuses' => $campuses

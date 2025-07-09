@@ -4,8 +4,6 @@ import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Building, Hash, Library, List, School, Text } from 'lucide-vue-next';
-import { useForm as useVeeForm } from 'vee-validate';
-import { computed } from 'vue';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -16,8 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 
 const props = defineProps<{
-    campuses: Campus[];
+    campus: Campus;
 }>();
+console.log(props.campus);
 
 // Validation schema
 const createBuildingSchema = toTypedSchema(
@@ -34,24 +33,10 @@ const createBuildingSchema = toTypedSchema(
 const inertiaForm = useForm({
     name: '',
     code: '',
-    campus_id: null,
+    campus_id: String(props.campus.id),
     type: '',
     description: '',
 });
-
-// vee-validate form for validation
-const { meta } = useVeeForm({
-    validationSchema: createBuildingSchema,
-    initialValues: {
-        name: '',
-        code: '',
-        campus_id: undefined,
-        type: undefined,
-        description: '',
-    },
-});
-
-const isFormValid = computed(() => meta.value.valid);
 
 const onSubmit = (values: any) => {
     // Copy form data to Inertia form
@@ -61,7 +46,7 @@ const onSubmit = (values: any) => {
     };
     Object.assign(inertiaForm, formData);
 
-    inertiaForm.post(route('buildings.store'), {
+    inertiaForm.post(systemRoutes.campuses.buildings.store(props.campus.id), {
         onSuccess: () => {
             // Success handled by redirect in controller
         },
@@ -72,7 +57,7 @@ const onSubmit = (values: any) => {
 };
 
 const goBack = () => {
-    router.visit(systemRoutes.buildings.index());
+    router.visit(systemRoutes.campuses.show(props.campus.id));
 };
 </script>
 
@@ -99,7 +84,12 @@ const goBack = () => {
                 <CardDescription> Enter the details for the new building. All fields marked with * are required. </CardDescription>
             </CardHeader>
             <CardContent>
-                <Form @submit="onSubmit" class="space-y-6">
+                <Form
+                    :validation-schema="createBuildingSchema"
+                    :initial-values="{ campus_id: String(props.campus.id) }"
+                    @submit="onSubmit"
+                    class="space-y-6"
+                >
                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                         <!-- Building Name -->
                         <FormField v-slot="{ componentField }" name="name">
@@ -145,13 +135,13 @@ const goBack = () => {
                                 </FormLabel>
                                 <Select v-bind="componentField">
                                     <FormControl>
-                                        <SelectTrigger :disabled="inertiaForm.processing">
+                                        <SelectTrigger :disabled="true">
                                             <SelectValue placeholder="Select a campus" />
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                        <SelectItem v-for="campus in props.campuses" :key="campus.id" :value="String(campus.id)">
-                                            {{ campus.name }}
+                                        <SelectItem :value="String(props.campus.id)">
+                                            {{ props.campus.name }}
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -207,7 +197,7 @@ const goBack = () => {
 
                     <div class="flex items-center justify-end gap-4">
                         <Button type="button" variant="outline" @click="goBack" :disabled="inertiaForm.processing"> Cancel </Button>
-                        <Button type="submit" :disabled="!isFormValid || inertiaForm.processing" class="gap-2">
+                        <Button type="submit" :disabled="inertiaForm.processing" class="gap-2">
                             <Building class="h-4 w-4" />
                             {{ inertiaForm.processing ? 'Creating...' : 'Create Building' }}
                         </Button>

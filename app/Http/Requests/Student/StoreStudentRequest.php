@@ -11,44 +11,103 @@ class StoreStudentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // TODO: Add proper authorization check
+        // TODO: Add proper permission check for student creation
+        return true; // For now, allow all authenticated users
     }
 
     public function rules(): array
     {
-        return Student::validationRules();
+        return [
+            'full_name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'unique:students,email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'date_of_birth' => ['nullable', 'date'],
+            'gender' => ['nullable', 'string', 'in:male,female,other'],
+            'nationality' => ['nullable', 'string', 'max:100'],
+            'national_id' => ['nullable', 'string', 'max:20'],
+            'address' => ['nullable', 'string'],
+            'campus_id' => ['nullable', 'exists:campuses,id'], // Optional if taken from session
+            'program_id' => ['required', 'exists:programs,id'],
+            'specialization_id' => ['nullable', 'exists:specializations,id'],
+            'curriculum_version_id' => ['required', 'exists:curriculum_versions,id'],
+            'admission_date' => ['required', 'date', 'before_or_equal:today'],
+            'expected_graduation_date' => ['nullable', 'date', 'after:admission_date'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
+            'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
+            'high_school_name' => ['nullable', 'string', 'max:255'],
+            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
+            'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'admission_notes' => ['nullable', 'string'],
+        ];
     }
 
     public function messages(): array
     {
-        return Student::validationMessages();
+        return [
+            'full_name.required' => 'Full name is required',
+            'full_name.max' => 'Full name cannot exceed 100 characters',
+            'email.required' => 'Email is required',
+            'email.email' => 'Please provide a valid email address',
+            'email.unique' => 'This email is already registered',
+            'email.max' => 'Email cannot exceed 255 characters',
+            'phone.max' => 'Phone number cannot exceed 20 characters',
+            'gender.in' => 'Gender must be male, female, or other',
+            'nationality.max' => 'Nationality cannot exceed 100 characters',
+            'national_id.max' => 'National ID cannot exceed 20 characters',
+            'program_id.required' => 'Program selection is required',
+            'program_id.exists' => 'Selected program is invalid',
+            'curriculum_version_id.required' => 'Curriculum version is required',
+            'curriculum_version_id.exists' => 'Selected curriculum version is invalid',
+            'admission_date.required' => 'Admission date is required',
+            'admission_date.date' => 'Please provide a valid admission date',
+            'admission_date.before_or_equal' => 'Admission date cannot be in the future',
+            'expected_graduation_date.date' => 'Please provide a valid expected graduation date',
+            'expected_graduation_date.after' => 'Expected graduation date must be after admission date',
+            'emergency_contact_name.max' => 'Emergency contact name cannot exceed 255 characters',
+            'emergency_contact_phone.max' => 'Emergency contact phone cannot exceed 20 characters',
+            'emergency_contact_relationship.max' => 'Emergency contact relationship cannot exceed 100 characters',
+            'high_school_name.max' => 'High school name cannot exceed 255 characters',
+            'high_school_graduation_year.min' => 'High school graduation year must be after 1900',
+            'high_school_graduation_year.max' => 'High school graduation year cannot be in the distant future',
+            'entrance_exam_score.numeric' => 'Entrance exam score must be a number',
+            'entrance_exam_score.min' => 'Entrance exam score cannot be negative',
+            'entrance_exam_score.max' => 'Entrance exam score cannot exceed 100',
+        ];
     }
 
     protected function prepareForValidation(): void
     {
-        // Clean and format data before validation
-        if ($this->has('phone')) {
+        // Format dates
+        if ($this->has('admission_date') && $this->admission_date) {
             $this->merge([
-                'phone' => preg_replace('/[^0-9+]/', '', $this->phone)
+                'admission_date' => date('Y-m-d', strtotime($this->admission_date))
             ]);
         }
 
-        if ($this->has('national_id')) {
+        if ($this->has('expected_graduation_date') && $this->expected_graduation_date) {
             $this->merge([
-                'national_id' => preg_replace('/[^0-9]/', '', $this->national_id)
+                'expected_graduation_date' => date('Y-m-d', strtotime($this->expected_graduation_date))
             ]);
         }
 
-        // Ensure proper date format
         if ($this->has('date_of_birth') && $this->date_of_birth) {
             $this->merge([
                 'date_of_birth' => date('Y-m-d', strtotime($this->date_of_birth))
             ]);
         }
 
-        if ($this->has('admission_date') && $this->admission_date) {
+        // Handle specialization_id when "none" is selected
+        if ($this->has('specialization_id') && $this->specialization_id === 'none') {
             $this->merge([
-                'admission_date' => date('Y-m-d', strtotime($this->admission_date))
+                'specialization_id' => null
+            ]);
+        }
+
+        // Use session campus_id if not provided
+        if (!$this->has('campus_id') || !$this->campus_id) {
+            $this->merge([
+                'campus_id' => session()->get('current_campus_id')
             ]);
         }
     }

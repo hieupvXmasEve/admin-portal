@@ -13,6 +13,7 @@ use App\Models\CourseRegistration;
 use App\Models\Lecture;
 use App\Models\Semester;
 use App\Models\Unit;
+use App\Constants\CourseOfferingRoutes;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,10 +25,11 @@ class CourseOfferingController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('can:view_course')->only(['index', 'show']);
-        $this->middleware('can:create_course')->only(['create', 'store']);
-        $this->middleware('can:edit_course')->only(['edit', 'update', 'bulkUpdateRegistrationStatus']);
-        $this->middleware('can:delete_course')->only(['destroy', 'bulkDelete']);
+        $this->middleware('can:view_course_offering')->only(['index', 'show']);
+        $this->middleware('can:create_course_offering')->only(['create', 'store']);
+        $this->middleware('can:edit_course_offering')->only(['edit', 'update']);
+        $this->middleware('can:delete_course_offering')->only(['destroy']);
+        $this->middleware('can:manage_course_offering')->only(['bulkDelete', 'toggleStatus', 'showSplit', 'performSplit']);
     }
 
     /**
@@ -118,7 +120,7 @@ class CourseOfferingController extends Controller
     {
         $courseOffering = CourseOffering::create($request->validated());
 
-        return Redirect::route('course-offerings.index')
+        return Redirect::route(CourseOfferingRoutes::INDEX)
             ->with('success', 'Course offering created successfully.');
     }
 
@@ -171,7 +173,7 @@ class CourseOfferingController extends Controller
     {
         $courseOffering->update($request->validated());
 
-        return Redirect::route('course-offerings.index')
+        return Redirect::route(CourseOfferingRoutes::INDEX)
             ->with('success', 'Course offering updated successfully.');
     }
 
@@ -188,7 +190,7 @@ class CourseOfferingController extends Controller
 
         $courseOffering->delete();
 
-        return Redirect::route('course-offerings.index')
+        return Redirect::route(CourseOfferingRoutes::INDEX)
             ->with('success', 'Course offering deleted successfully.');
     }
 
@@ -213,7 +215,7 @@ class CourseOfferingController extends Controller
 
         CourseOffering::whereIn('id', $request->ids)->delete();
 
-        return Redirect::route('course-offerings.index')
+        return Redirect::route(CourseOfferingRoutes::INDEX)
             ->with('success', 'Selected course offerings deleted successfully.');
     }
 
@@ -419,7 +421,7 @@ class CourseOfferingController extends Controller
 
             DB::commit();
 
-            return Redirect::route('course-offerings.index')
+            return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering successfully split into ' . count($sections) . ' sections. The original course offering has been deleted.');
         } catch (\Exception $e) {
             DB::rollBack();

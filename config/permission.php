@@ -19,6 +19,13 @@ return [
             'edit_campus' => 'edit_campus',
             'delete_campus' => 'delete_campus',
         ],
+        // Building Management
+        'buildings' => [
+            'view_building' => 'view_building',
+            'create_building' => 'create_building',
+            'edit_building' => 'edit_building',
+            'delete_building' => 'delete_building',
+        ],
 
         // Role & Permission Management
         'roles' => [

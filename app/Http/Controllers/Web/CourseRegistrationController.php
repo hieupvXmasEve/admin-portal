@@ -9,7 +9,9 @@ use App\Models\CourseRegistration;
 use App\Models\CourseOffering;
 use App\Models\Student;
 use App\Models\Semester;
+use App\Models\Unit;
 use App\Services\RegistrationService;
+use App\Constants\CourseRegistrationRoutes;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,10 +25,11 @@ class CourseRegistrationController extends Controller
     public function __construct(
         private RegistrationService $registrationService
     ) {
-        $this->middleware('can:view_course')->only(['index', 'show']);
-        $this->middleware('can:create_course')->only(['create', 'store']);
-        $this->middleware('can:edit_course')->only(['edit', 'update']);
-        $this->middleware('can:delete_course')->only(['destroy', 'bulkDestroy']);
+        $this->middleware('can:view_course_registration')->only(['index', 'show']);
+        $this->middleware('can:create_course_registration')->only(['create', 'store']);
+        $this->middleware('can:edit_course_registration')->only(['edit', 'update']);
+        $this->middleware('can:delete_course_registration')->only(['destroy', 'bulkDestroy']);
+        $this->middleware('can:manage_course_registration')->only(['drop', 'withdraw']);
     }
 
     /**
@@ -183,26 +186,24 @@ class CourseRegistrationController extends Controller
         $request->validate([
             'student_id' => 'required|exists:students,id',
             'course_offering_id' => 'required|exists:course_offerings,id',
-            'notes' => 'nullable|string',
+            'registration_date' => 'required|date',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         try {
-            DB::transaction(function () use ($request) {
-                $student = Student::findOrFail($request->student_id);
-                $courseOffering = CourseOffering::findOrFail($request->course_offering_id);
+            $student = Student::findOrFail($request->student_id);
+            $courseOffering = CourseOffering::findOrFail($request->course_offering_id);
 
-                // Validate registration eligibility
-                $this->validateAdminRegistration($student, $courseOffering);
+            // Validate registration
+            $this->validateAdminRegistration($student, $courseOffering);
 
+            DB::transaction(function () use ($request, $student, $courseOffering) {
                 // Create registration
                 CourseRegistration::create([
                     'student_id' => $student->id,
                     'course_offering_id' => $courseOffering->id,
-                    'semester_id' => $courseOffering->semester_id,
-                    'registration_status' => 'registered',
-                    'registration_date' => now(),
-                    'registration_method' => 'admin_override',
-                    'credit_hours' => $courseOffering->credit_hours,
+                    'registration_date' => $request->registration_date,
+                    'registration_status' => 'confirmed',
                     'notes' => $request->notes,
                 ]);
 
@@ -211,7 +212,7 @@ class CourseRegistrationController extends Controller
                 $courseOffering->updateStatus();
             });
 
-            return Redirect::route('course-registrations.index')
+            return Redirect::route(CourseRegistrationRoutes::INDEX)
                 ->with('success', 'Student registered for course successfully.');
         } catch (\Exception $e) {
             return Redirect::back()
@@ -268,7 +269,7 @@ class CourseRegistrationController extends Controller
                 'notes' => $request->notes,
             ]);
 
-            return Redirect::route('course-registrations.show', $adminCourseRegistration)
+            return Redirect::route(CourseRegistrationRoutes::SHOW, $adminCourseRegistration)
                 ->with('success', 'Course registration updated successfully.');
         } catch (\Exception $e) {
             return Redirect::back()
@@ -292,7 +293,7 @@ class CourseRegistrationController extends Controller
                 $adminCourseRegistration->delete();
             });
 
-            return Redirect::route('course-registrations.index')
+            return Redirect::route(CourseRegistrationRoutes::INDEX)
                 ->with('success', 'Course registration deleted successfully.');
         } catch (\Exception $e) {
             return Redirect::back()
@@ -326,7 +327,7 @@ class CourseRegistrationController extends Controller
                 }
             });
 
-            return Redirect::route('course-registrations.index')
+            return Redirect::route(CourseRegistrationRoutes::INDEX)
                 ->with('success', 'Selected course registrations deleted successfully.');
         } catch (\Exception $e) {
             return Redirect::back()

@@ -33,7 +33,10 @@ const emit = defineEmits<{
     updated: [];
 }>();
 
-const { post: apiCall, loading } = useApi();
+const { post: apiCall } = useApi();
+
+// Loading state
+const loading = ref(false);
 
 // Available registration statuses
 const registrationStatuses = [
@@ -69,7 +72,9 @@ const selectedStudentsCount = ref(0);
 const filteredStudents = computed(() => {
     if (!values.fromStatus) return [];
 
-    return props.courseOffering.course_registrations.filter((registration) => registration.registration_status === values.fromStatus);
+    return props.courseOffering.course_registrations.filter(
+        (registration: CourseRegistration) => registration.registration_status === values.fromStatus,
+    );
 });
 
 // DataTable columns
@@ -154,21 +159,27 @@ const getRegistrationStatusVariant = (status: string) => {
 
 const onSubmit = handleSubmit(async (values) => {
     try {
-        const response = await apiCall(`/api/course-offerings/${props.courseOffering.id}/bulk-update-status`, {
-            method: 'POST',
-            body: {
-                from_status: values.fromStatus,
-                to_status: values.toStatus,
-                student_ids: values.studentIds,
-            },
+        loading.value = true;
+
+        const { data: response, error } = await apiCall(`/api/course-offerings/${props.courseOffering.id}/bulk-update-status`, {
+            from_status: values.fromStatus,
+            to_status: values.toStatus,
+            student_ids: values.studentIds,
         });
 
-        if (response?.success) {
+        if (error.value) {
+            console.error('API Error:', error.value);
+            throw new Error('Failed to update registration status');
+        }
+
+        if (response.value?.success) {
             emit('updated');
             emit('close');
         }
     } catch (error) {
         console.error('Failed to update registration status:', error);
+    } finally {
+        loading.value = false;
     }
 });
 

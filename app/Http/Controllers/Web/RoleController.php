@@ -8,6 +8,7 @@ use App\Http\Requests\Role\UpdateRoleRequest;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Services\RoleService;
+use App\Constants\RoleRoutes;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -25,34 +26,39 @@ class RoleController extends Controller
     public function create()
     {
         return Inertia::render('roles/Add', [
-            'permissions' => Permission::all()->groupBy('group'),
+            'permissions' => Permission::all()->groupBy('module'),
         ]);
     }
 
     public function store(StoreRoleRequest $request)
     {
         $this->roleService->createRole($request->validated());
-        return redirect()->route('role.index')->with('success', 'Role created successfully.');
+        return redirect()->route(RoleRoutes::INDEX)->with('success', 'Role created successfully.');
     }
 
     public function edit(Role $role)
     {
+        $rolePermissionIds = $role->permissions()
+            ->pluck('permission_id')
+            ->toArray();
+
         return Inertia::render('roles/Edit', [
             'role' => $role->load('permissions'),
-            'permissions' => Permission::all()->groupBy('group'),
+            'permissions' => Permission::all()->groupBy('module'),
+            'rolePermissionIds' => $rolePermissionIds,
         ]);
     }
 
     public function update(UpdateRoleRequest $request, Role $role)
     {
         $this->roleService->updateRole($role, $request->validated());
-        return redirect()->route('role.index')->with('success', 'Role updated successfully.');
+        return redirect()->route(RoleRoutes::INDEX)->with('success', 'Role updated successfully.');
     }
 
     public function destroy(Role $role)
     {
         $this->roleService->deleteRole($role);
-        return redirect()->route('role.index')->with('success', 'Role deleted successfully.');
+        return redirect()->route(RoleRoutes::INDEX)->with('success', 'Role deleted successfully.');
     }
 
     public function getRolesWithPermissions()

@@ -56,7 +56,6 @@ const isRoleExpanded = (roleId: number) => {
 
 // Handle role selection
 const toggleRoleSelection = (roleId: number) => {
-    console.log('toggleRoleSelection', roleId);
     const currentRoles = [...form.selectedRoles];
     const index = currentRoles.indexOf(roleId);
     if (index > -1) {
@@ -65,7 +64,6 @@ const toggleRoleSelection = (roleId: number) => {
         currentRoles.push(roleId);
     }
     form.selectedRoles = currentRoles;
-    console.log('Form data being sent:', form.data());
 };
 
 // Check if role is selected
@@ -99,7 +97,6 @@ const allSelectedPermissions = computed(() => {
 
 // Submit form
 const handleSubmit = () => {
-    console.log('Form data being sent:', form.data());
     form.post('/users', {
         onSuccess: () => {
             router.visit(systemRoutes.users.index());

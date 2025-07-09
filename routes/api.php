@@ -95,8 +95,9 @@ Route::name('api.admin.')->middleware(['auth:sanctum', 'admin'])->group(function
     // Student Management
     Route::get('/students/search', [WebStudentController::class, 'apiSearch'])->name('students.search');
     Route::post('/students/by-ids', [WebStudentController::class, 'getByIds'])->name('students.by-ids');
-    Route::get('/students', [WebStudentController::class, 'apiIndex'])->name('students.index');
-    Route::post('/students', [WebStudentController::class, 'store'])->name('students.store');
+    Route::get('/students', [StudentController::class, 'index'])->name('students.index');
+    Route::post('/students', [StudentController::class, 'store'])->name('students.store');
+    Route::get('/students/stats', [StudentController::class, 'stats'])->name('students.stats');
     Route::get('/students/{student}', [WebStudentController::class, 'show'])->name('students.show');
     Route::put('/students/{student}', [WebStudentController::class, 'update'])->name('students.update');
     Route::patch('/students/{student}', [WebStudentController::class, 'update'])->name('students.patch');

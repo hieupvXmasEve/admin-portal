@@ -9,6 +9,7 @@ use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -100,8 +101,10 @@ class AuthController extends Controller
         try {
             // Validate Google access token by calling Google's API directly
             $response = @file_get_contents("https://www.googleapis.com/oauth2/v1/userinfo?access_token=" . $request->access_token);
+            $response = Http::withToken($request->access_token)
+                ->get('https://www.googleapis.com/oauth2/v1/userinfo');
 
-            if ($response === false) {
+            if ($response->failed()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid Google access token'

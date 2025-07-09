@@ -60,8 +60,10 @@ const props = defineProps<Props>();
 // Global delete dialog composable
 const deleteDialog = useGlobalDeleteDialog();
 
+const studentsRef = ref(props.students.data);
+
 // Reactive data
-const data = computed(() => props.students.data);
+const data = computed(() => studentsRef.value);
 
 const filters = ref({
     search: props.filters.search || '',
@@ -135,11 +137,13 @@ const columns: ColumnDef<Student>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const status = row.original.status;
-            const statusColors = {
+            const statusColors: Record<string, string> = {
                 active: 'bg-green-100 text-green-800',
+                admitted: 'bg-yellow-100 text-yellow-800',
                 inactive: 'bg-gray-100 text-gray-800',
                 suspended: 'bg-red-100 text-red-800',
                 graduated: 'bg-blue-100 text-blue-800',
+                dropped_out: 'bg-red-100 text-red-800',
             };
             const colorClass = statusColors[status] || 'bg-gray-100 text-gray-800';
             const displayText = status ? status.replace('_', ' ').toUpperCase() : 'Unknown';
@@ -158,7 +162,6 @@ const columns: ColumnDef<Student>[] = [
         header: 'Actions',
         enableHiding: false,
         enableSorting: false,
-        cell: 'actions',
     },
 ];
 
@@ -268,178 +271,116 @@ const updateFilters = () => {
 </script>
 
 <template>
-    <Head title="Students" />
-    <!-- Header with Add Student Button -->
-    <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-semibold">Students</h1>
-        <div class="flex items-center gap-2">
-            <Button size="sm" as-child>
-                <Link :href="studentRoutes.create()">
-                    <Plus class="mr-2 h-4 w-4" />
-                    Add Student
-                </Link>
-            </Button>
-        </div>
-    </div>
+    <Head title="Students Management" />
 
-    <!-- Statistics Cards -->
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
-        <Card>
-            <CardContent class="p-4">
-                <div class="flex flex-col">
-                    <div class="text-2xl font-bold text-blue-600">{{ statistics.total_students }}</div>
-                    <div class="text-sm text-gray-600">Total Students</div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card>
-            <CardContent class="p-4">
-                <div class="flex flex-col">
-                    <div class="text-2xl font-bold text-green-600">{{ statistics.active_students }}</div>
-                    <div class="text-sm text-gray-600">Active</div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card>
-            <CardContent class="p-4">
-                <div class="flex flex-col">
-                    <div class="text-2xl font-bold text-blue-600">{{ statistics.enrolled_students }}</div>
-                    <div class="text-sm text-gray-600">Enrolled</div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card>
-            <CardContent class="p-4">
-                <div class="flex flex-col">
-                    <div class="text-2xl font-bold text-purple-600">{{ statistics.graduated_students }}</div>
-                    <div class="text-sm text-gray-600">Graduated</div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card>
-            <CardContent class="p-4">
-                <div class="flex flex-col">
-                    <div class="text-2xl font-bold text-red-600">{{ statistics.suspended_students }}</div>
-                    <div class="text-sm text-gray-600">Suspended</div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card>
-            <CardContent class="p-4">
-                <div class="flex flex-col">
-                    <div class="text-2xl font-bold text-yellow-600">{{ statistics.on_leave_students }}</div>
-                    <div class="text-sm text-gray-600">On Leave</div>
-                </div>
-            </CardContent>
-        </Card>
-    </div>
-
-    <!-- Filters Section -->
-    <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
-        <div class="min-w-[200px] flex-1">
-            <DebouncedInput placeholder="Search students..." v-model="filters.search" @debounced="handleSearch" />
-        </div>
-
-        <div class="min-w-[150px]">
-            <Select v-model="filters.campus_id" @update:model-value="handleFilter">
-                <SelectTrigger>
-                    <SelectValue placeholder="All Campuses" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Campuses</SelectItem>
-                    <SelectItem v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">
-                        {{ campus.name }}
-                    </SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-
-        <div class="min-w-[150px]">
-            <Select v-model="filters.program_id" @update:model-value="handleFilter">
-                <SelectTrigger>
-                    <SelectValue placeholder="All Programs" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Programs</SelectItem>
-                    <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
-                        {{ program.name }}
-                    </SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-
-        <div class="min-w-[130px]">
-            <Select v-model="filters.status" @update:model-value="handleFilter">
-                <SelectTrigger>
-                    <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                    <SelectItem value="graduated">Graduated</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-
-        <Button v-if="hasActiveFilters" variant="outline" size="sm" @click="clearFilters">
-            <X class="mr-2 h-4 w-4" />
-            Clear Filters
-        </Button>
-    </div>
-
-    <!-- Data Table -->
-    <DataTable :columns="columns" :data="data" :loading="false" class="border">
-        <template #cell-actions="{ row }">
-            <div class="flex items-center gap-2">
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger as-child>
-                            <Button variant="ghost" size="sm" @click="viewStudent(row.original)">
-                                <Eye class="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>View</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger as-child>
-                            <Button variant="ghost" size="sm" @click="editStudent(row.original)">
-                                <Edit class="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Edit</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger as-child>
-                            <Button variant="ghost" size="sm" @click="deleteStudent(row.original)">
-                                <Trash2 class="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Delete</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
+    <div class="space-y-4">
+        <div class="flex items-center justify-between">
+            <div class="space-y-1">
+                <h1 class="text-2xl font-semibold">Students Management</h1>
+                <p class="text-sm text-gray-500">Manage all students in the system</p>
             </div>
-        </template>
-    </DataTable>
+            <Link :href="studentRoutes.create()">
+                <Button> <Plus class="mr-2 h-4 w-4" /> Add Student </Button>
+            </Link>
+        </div>
 
-    <!-- Pagination -->
-    <DataPagination :pagination-data="students" @navigate="handlePageChange" @page-size-change="handlePageSizeChange" />
+        <!-- Statistics -->
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card>
+                <CardContent class="p-4">
+                    <h3 class="text-sm font-medium text-gray-500">Total Students</h3>
+                    <p class="text-2xl font-semibold">{{ statistics.total_students }}</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardContent class="p-4">
+                    <h3 class="text-sm font-medium text-gray-500">Active Students</h3>
+                    <p class="text-2xl font-semibold">{{ statistics.active_students }}</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardContent class="p-4">
+                    <h3 class="text-sm font-medium text-gray-500">Graduated Students</h3>
+                    <p class="text-2xl font-semibold">{{ statistics.graduated_students }}</p>
+                </CardContent>
+            </Card>
+        </div>
+
+        <Card class="mt-4">
+            <CardContent class="p-4">
+                <div class="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
+                    <div class="flex w-full items-center gap-2 md:w-auto">
+                        <DebouncedInput
+                            v-model="filters.search"
+                            placeholder="Search by name, email or student ID..."
+                            class="w-full md:w-64"
+                            @update:model-value="handleSearch"
+                        />
+                        <Select v-model="filters.campus_id" @update:model-value="handleFilter">
+                            <SelectTrigger class="w-full md:w-48">
+                                <SelectValue placeholder="Filter by campus..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Campuses</SelectItem>
+                                <SelectItem v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">
+                                    {{ campus.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select v-model="filters.program_id" @update:model-value="handleFilter">
+                            <SelectTrigger class="w-full md:w-48">
+                                <SelectValue placeholder="Filter by program..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Programs</SelectItem>
+                                <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
+                                    {{ program.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Button v-if="hasActiveFilters" variant="ghost" @click="clearFilters">
+                            <X class="mr-2 h-4 w-4" />
+                            Clear
+                        </Button>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <DataTable :columns="columns" :data="data" :total="students.total" @page-changed="handlePageChange">
+                        <template #cell-actions="{ row }">
+                            <div class="flex items-center space-x-2">
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger as-child>
+                                            <Button variant="ghost" size="icon" @click="viewStudent(row.original)">
+                                                <Eye class="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent> View </TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger as-child>
+                                            <Button variant="ghost" size="icon" @click="editStudent(row.original)">
+                                                <Edit class="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent> Edit </TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger as-child>
+                                            <Button variant="ghost" size="icon" @click="deleteStudent(row.original)">
+                                                <Trash2 class="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent> Delete </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+                        </template>
+                    </DataTable>
+                </div>
+            </CardContent>
+        </Card>
+
+        <DataPagination :pagination-data="students" @page-changed="handlePageChange" @page-size-changed="handlePageSizeChange" />
+    </div>
 </template>

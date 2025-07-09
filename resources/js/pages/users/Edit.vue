@@ -11,6 +11,7 @@ import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, ChevronDown, ChevronRight, Shield, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
 
 interface Permission {
     id: number;
@@ -98,9 +99,9 @@ const allSelectedPermissions = computed(() => {
 
 // Submit form
 const handleSubmit = () => {
-    console.log('Form data being sent:', form.data());
     form.put(`/users/${props.user.id}`, {
         onSuccess: () => {
+            toast.success('User updated successfully');
             router.visit(systemRoutes.users.index());
         },
     });

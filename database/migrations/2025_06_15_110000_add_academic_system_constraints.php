@@ -54,15 +54,6 @@ return new class extends Migration
         DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_scores_late_penalty_applied CHECK (late_penalty_applied >= 0 AND late_penalty_applied <= 100)');
         DB::statement('ALTER TABLE assessment_component_detail_scores ADD CONSTRAINT check_scores_plagiarism_score CHECK (plagiarism_score IS NULL OR (plagiarism_score >= 0 AND plagiarism_score <= 100))');
 
-        // Student groups constraints
-        DB::statement('ALTER TABLE student_groups ADD CONSTRAINT check_group_member_counts CHECK (
-            min_members >= 1 AND
-            max_members >= 1 AND
-            min_members <= max_members AND
-            current_members >= 0 AND
-            current_members <= max_members
-        )');
-
         // Academic records constraints
         DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_final_percentage CHECK (final_percentage IS NULL OR (final_percentage >= 0 AND final_percentage <= 100))');
         DB::statement('ALTER TABLE academic_records ADD CONSTRAINT check_records_grade_points CHECK (grade_points IS NULL OR (grade_points >= 0 AND grade_points <= 4))');
@@ -166,9 +157,6 @@ return new class extends Migration
                 'check_scores_minutes_late_positive',
                 'check_scores_late_penalty_applied',
                 'check_scores_plagiarism_score'
-            ],
-            'student_groups' => [
-                'check_group_member_counts'
             ],
             'academic_records' => [
                 'check_records_final_percentage',
