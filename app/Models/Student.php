@@ -88,7 +88,7 @@ class Student extends Authenticatable
             'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:active,inactive,suspended,graduated'],
+            'status' => ['nullable', 'in:admitted,active,inactive,suspended,graduated,dropped_out'],
         ];
     }
 
@@ -144,6 +144,16 @@ class Student extends Authenticatable
     public function enrollments(): HasMany
     {
         return $this->hasMany(Enrollment::class);
+    }
+
+    public function academicRecords(): HasMany
+    {
+        return $this->hasMany(AcademicRecord::class);
+    }
+
+    public function gpaCalculations(): HasMany
+    {
+        return $this->hasMany(GpaCalculation::class);
     }
 
     public function hasActiveHolds(): bool

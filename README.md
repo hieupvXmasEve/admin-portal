@@ -128,7 +128,7 @@ npm run type-check          # TypeScript checking
 
 - ✅ **User Management System**: Complete with import/export
 - ✅ **Role-based Access Control**: Multi-campus support
-- ✅ **Modern UI**: Vue.js 3 + TailwindCSS + shadcn/ui
+- ✅ **Modern UI**: Vue.js 3 + TailwindCSS + Reka-ui Vue
 - ✅ **Docker Integration**: Development, testing, and production
 - ✅ **API Integration**: RESTful API with authentication
 - ✅ **Comprehensive Documentation**: Bilingual support

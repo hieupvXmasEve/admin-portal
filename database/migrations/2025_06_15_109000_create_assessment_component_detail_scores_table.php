@@ -68,11 +68,6 @@ return new class extends Migration
             $table->decimal('bonus_points', 8, 2)->default(0.00);
             $table->text('bonus_reason')->nullable();
 
-            // Group work tracking
-            $table->foreignId('student_group_id')->nullable()->constrained('student_groups')->nullOnDelete();
-            $table->boolean('individual_score_override')->default(false); // Override group score for this student
-            $table->text('individual_override_reason')->nullable();
-
             // Academic integrity and plagiarism
             $table->boolean('plagiarism_suspected')->default(false);
             $table->decimal('plagiarism_score', 5, 2)->nullable(); // Similarity percentage from plagiarism checker
@@ -124,7 +119,6 @@ return new class extends Migration
             $table->index(['is_late', 'late_penalty_applied'], 'late_penalty_idx');
             $table->index(['plagiarism_suspected', 'integrity_status'], 'plagiarism_integrity_idx');
             $table->index(['appeal_requested', 'appeal_status'], 'appeal_status_idx');
-            $table->index(['student_group_id', 'individual_score_override'], 'group_override_idx');
             $table->index(['score_excluded', 'is_extra_credit'], 'excluded_extra_idx');
 
             // Unique constraint to prevent duplicate scores

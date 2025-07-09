@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Constants\CurriculumRoutes;
 
 class CurriculumUnitController extends Controller
 {
@@ -98,7 +99,7 @@ class CurriculumUnitController extends Controller
             DB::commit();
 
             return redirect()
-                ->route('curriculum-units.index')
+                ->route(CurriculumRoutes::UNIT_INDEX)
                 ->with('success', 'Curriculum unit created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -154,7 +155,7 @@ class CurriculumUnitController extends Controller
             DB::commit();
 
             return redirect()
-                ->route('curriculum-units.index')
+                ->route(CurriculumRoutes::UNIT_INDEX)
                 ->with('success', 'Curriculum unit updated successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -176,7 +177,7 @@ class CurriculumUnitController extends Controller
             DB::commit();
 
             return redirect()
-                ->route('curriculum-units.index')
+                ->route(CurriculumRoutes::UNIT_INDEX)
                 ->with('success', 'Curriculum unit deleted successfully.');
         } catch (\Exception $e) {
             DB::rollBack();

@@ -23,9 +23,24 @@ interface PermissionGroup {
     permissions: Permission[];
 }
 
-defineProps<{
-    permissions: PermissionGroup[];
+const props = defineProps<{
+    permissions: Record<string, Permission[]>; // Object grouped by module
 }>();
+
+// Transform permissions object into array format expected by the component
+const permissionGroups = computed(() => {
+    const groups: PermissionGroup[] = [];
+
+    for (const [module, permissions] of Object.entries(props.permissions)) {
+        groups.push({
+            module,
+            display_name: module.charAt(0).toUpperCase() + module.slice(1).replace(/_/g, ' '),
+            permissions,
+        });
+    }
+
+    return groups;
+});
 
 // Form data
 const form = useForm({
@@ -167,8 +182,9 @@ const goBack = () => {
                                         class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
                                     >
                                         {{
-                                            permissions.flatMap((group) => group.permissions).find((permission) => permission.id === permissionId)
-                                                ?.display_name
+                                            permissionGroups
+                                                .find((group) => group.permissions.some((permission) => permission.id === permissionId))
+                                                ?.permissions.find((permission) => permission.id === permissionId)?.display_name
                                         }}
                                     </span>
                                 </div>
@@ -187,7 +203,7 @@ const goBack = () => {
             </CardHeader>
             <CardContent>
                 <div class="space-y-6">
-                    <div v-for="permissionGroup in permissions" :key="permissionGroup.module" class="space-y-3">
+                    <div v-for="permissionGroup in permissionGroups" :key="permissionGroup.module" class="space-y-3">
                         <!-- Module Permission Group Header -->
                         <div class="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
                             <Checkbox

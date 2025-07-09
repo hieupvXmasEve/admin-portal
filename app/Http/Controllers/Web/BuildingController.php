@@ -10,6 +10,7 @@ use App\Http\Requests\Building\UpdateBuildingRequest;
 use App\Models\Building;
 use App\Models\Campus;
 use App\Services\BuildingService;
+use App\Constants\CampusRoutes;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -99,7 +100,7 @@ class BuildingController extends Controller
         $validatedData['campus_id'] = $campus->id;
         $this->buildingService->createBuilding($validatedData);
 
-        return redirect()->route('campuses.show', $campus)->with('success', 'Building created successfully.');
+        return redirect()->route(CampusRoutes::SHOW, $campus)->with('success', 'Building created successfully.');
     }
 
     /**
@@ -152,7 +153,7 @@ class BuildingController extends Controller
 
         $this->buildingService->updateBuilding($building, $request->validated());
 
-        return redirect()->route('campuses.show', $campus)->with('success', 'Building updated successfully.');
+        return redirect()->route(CampusRoutes::SHOW, $campus)->with('success', 'Building updated successfully.');
     }
 
     /**
@@ -166,7 +167,7 @@ class BuildingController extends Controller
 
         $this->buildingService->deleteBuilding($building);
 
-        return redirect()->route('campuses.show', $campus)->with('success', 'Building deleted successfully.');
+        return redirect()->route(CampusRoutes::SHOW, $campus)->with('success', 'Building deleted successfully.');
     }
 
     /**

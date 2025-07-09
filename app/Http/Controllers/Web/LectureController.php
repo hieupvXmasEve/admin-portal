@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Lecture;
 use App\Models\Campus;
+use App\Constants\LectureRoutes;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -139,7 +140,7 @@ class LectureController extends Controller
 
         $lecture = Lecture::create($request->all());
 
-        return Redirect::route('lectures.index')
+        return Redirect::route(LectureRoutes::INDEX)
             ->with('success', 'Lecture created successfully.');
     }
 
@@ -187,7 +188,7 @@ class LectureController extends Controller
 
         $lecture->update($request->all());
 
-        return Redirect::route('lectures.index')
+        return Redirect::route(LectureRoutes::INDEX)
             ->with('success', 'Lecture updated successfully.');
     }
 
@@ -204,7 +205,7 @@ class LectureController extends Controller
 
         $lecture->delete();
 
-        return Redirect::route('lectures.index')
+        return Redirect::route(LectureRoutes::INDEX)
             ->with('success', 'Lecture deleted successfully.');
     }
 

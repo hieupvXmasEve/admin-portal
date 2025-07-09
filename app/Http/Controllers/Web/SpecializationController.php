@@ -10,6 +10,10 @@ use App\Http\Requests\UpdateSpecializationRequest;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Specialization;
+use App\Models\CurriculumVersion;
+use App\Services\SpecializationService;
+use App\Constants\SpecializationRoutes;
+use App\Constants\ProgramRoutes;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +23,8 @@ use Inertia\Response;
 
 class SpecializationController extends Controller
 {
+    public function __construct(protected SpecializationService $specializationService) {}
+
     public function index(Request $request): Response
     {
         $validated = $request->validate([
@@ -105,7 +111,7 @@ class SpecializationController extends Controller
         try {
             DB::beginTransaction();
 
-            $specialization = Specialization::create($request->validated());
+            $specialization = $this->specializationService->createSpecialization($request->validated());
 
             DB::commit();
 
@@ -115,15 +121,15 @@ class SpecializationController extends Controller
 
             if ($source === 'program-show') {
                 return redirect()
-                    ->route('programs.show', ['program' => $programId])
+                    ->route(ProgramRoutes::SHOW, ['program' => $programId])
                     ->with('success', 'Specialization created successfully.');
             } elseif ($programId) {
                 return redirect()
-                    ->route('specializations.index', ['program_id' => $programId])
+                    ->route(SpecializationRoutes::INDEX, ['program_id' => $programId])
                     ->with('success', 'Specialization created successfully.');
             } else {
                 return redirect()
-                    ->route('specializations.index')
+                    ->route(SpecializationRoutes::INDEX)
                     ->with('success', 'Specialization created successfully.');
             }
         } catch (\Exception $e) {
@@ -191,15 +197,15 @@ class SpecializationController extends Controller
 
             if ($source === 'program-show') {
                 return redirect()
-                    ->route('programs.show', ['program' => $programId])
+                    ->route(ProgramRoutes::SHOW, ['program' => $programId])
                     ->with('success', 'Specialization updated successfully.');
             } elseif ($programId) {
                 return redirect()
-                    ->route('specializations.index', ['program_id' => $programId])
+                    ->route(SpecializationRoutes::INDEX, ['program_id' => $programId])
                     ->with('success', 'Specialization updated successfully.');
             } else {
                 return redirect()
-                    ->route('specializations.index')
+                    ->route(SpecializationRoutes::INDEX)
                     ->with('success', 'Specialization updated successfully.');
             }
         } catch (\Exception $e) {
@@ -228,7 +234,7 @@ class SpecializationController extends Controller
             DB::commit();
 
             return redirect()
-                ->route('specializations.index')
+                ->route(SpecializationRoutes::INDEX)
                 ->with('success', "Specialization '{$specializationName}' deleted successfully.");
         } catch (\Exception $e) {
             DB::rollBack();

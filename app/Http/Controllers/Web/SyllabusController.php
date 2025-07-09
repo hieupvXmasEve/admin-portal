@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Constants\SyllabusRoutes;
 
 class SyllabusController extends Controller
 {
@@ -143,7 +144,7 @@ class SyllabusController extends Controller
 
             DB::commit();
 
-            return redirect()->route('syllabus.index', $unit)
+            return redirect()->route(SyllabusRoutes::INDEX, $unit)
                 ->with('success', 'Syllabus created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -380,7 +381,7 @@ class SyllabusController extends Controller
 
             DB::commit();
 
-            return redirect()->route('syllabus.index', $unit)
+            return redirect()->route(SyllabusRoutes::INDEX, $unit)
                 ->with('success', 'Syllabus updated successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -400,7 +401,7 @@ class SyllabusController extends Controller
         try {
             $syllabus->delete();
 
-            return redirect()->route('syllabus.index', $unit)
+            return redirect()->route(SyllabusRoutes::INDEX, $unit)
                 ->with('success', 'Syllabus deleted successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
@@ -479,7 +480,7 @@ class SyllabusController extends Controller
 
             DB::commit();
 
-            return redirect()->route('syllabus.index', $unit)
+            return redirect()->route(SyllabusRoutes::INDEX, $unit)
                 ->with('success', "Syllabus cloned successfully as version {$newVersion}.");
         } catch (\Exception $e) {
             DB::rollBack();

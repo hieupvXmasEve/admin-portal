@@ -7,6 +7,7 @@ use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\User;
 use App\Services\UserService;
+use App\Constants\UserRoutes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -76,7 +77,7 @@ class UserController extends Controller
     public function store(StoreUserRequest $request)
     {
         $this->userService->createUser($request->validated());
-        return redirect()->route('users.index')->with('success', 'User created successfully!');
+        return redirect()->route(UserRoutes::INDEX)->with('success', 'User created successfully!');
     }
 
     public function edit(User $user)
@@ -103,13 +104,13 @@ class UserController extends Controller
     public function update(UpdateUserRequest $request, User $user)
     {
         $this->userService->updateUser($user, $request->validated());
-        return redirect()->route('users.index')->with('success', 'User updated successfully!');
+        return redirect()->route(UserRoutes::INDEX)->with('success', 'User updated successfully!');
     }
 
 
     public function destroy(User $user)
     {
         $this->userService->deleteUser($user);
-        return redirect()->route('users.index')->with('success', 'User removed or deleted successfully!');
+        return redirect()->route(UserRoutes::INDEX)->with('success', 'User removed or deleted successfully!');
     }
 }

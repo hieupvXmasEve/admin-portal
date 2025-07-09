@@ -16,11 +16,13 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Exception;
+use App\Models\Role;
+use App\Models\CampusUserRole;
 
 class StudentService
 {
     /**
-     * Create a new student
+     * Create a new student (legacy method - use createAdmittedStudent for new implementations)
      */
     public function createStudent(array $data): Student
     {
@@ -33,7 +35,7 @@ class StudentService
             $year = date('Y');
             $studentId = $this->generateStudentId($campus->code, $year);
 
-            // Create student
+            // Create student with admitted status by default
             $student = Student::create([
                 'student_id' => $studentId,
                 'full_name' => $data['full_name'],
@@ -57,8 +59,11 @@ class StudentService
                 'high_school_graduation_year' => $data['high_school_graduation_year'] ?? null,
                 'entrance_exam_score' => $data['entrance_exam_score'] ?? null,
                 'admission_notes' => $data['admission_notes'] ?? null,
-                'status' => 'active',
+                'status' => 'admitted', // Default to admitted instead of active
             ]);
+
+            // Assign student role to the campus
+            $this->assignStudentRole($student);
 
             // Assign graduation requirements
             $this->assignGraduationRequirements($student);
@@ -89,6 +94,139 @@ class StudentService
     }
 
     /**
+     * Create and admit a student in one step
+     * Combined creation and admission process
+     */
+    public function createAdmittedStudent(array $data): Student
+    {
+        return DB::transaction(function () use ($data) {
+            // Ensure campus_id from session if not provided
+            $campusId = $data['campus_id'] ?? session()->get('current_campus_id');
+
+            if (!$campusId) {
+                throw new \InvalidArgumentException('Campus ID is required either in data or session');
+            }
+
+            // Validate data with the campus ID
+            $this->validateStudentData(array_merge($data, ['campus_id' => $campusId]));
+
+            // Generate unique student ID
+            $campus = Campus::findOrFail($campusId);
+            $studentId = $this->generateStudentId($campus->code, date('Y'));
+
+            // Create student with admitted status by default
+            $student = Student::create([
+                'student_id' => $studentId,
+                'full_name' => $data['full_name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'] ?? null,
+                'campus_id' => $campusId,
+                'program_id' => $data['program_id'],
+                'specialization_id' => $data['specialization_id'] ?? null,
+                'curriculum_version_id' => $data['curriculum_version_id'],
+                'status' => 'admitted', // Always admitted upon creation
+                'admission_date' => $data['admission_date'],
+                'admission_notes' => $data['notes'] ?? null,
+                'expected_graduation_date' => $data['expected_graduation_date'] ?? null,
+            ]);
+
+            // Assign student role to the campus
+            $this->assignStudentRole($student);
+
+            // Assign graduation requirements
+            $this->assignGraduationRequirements($student);
+
+            // Calculate expected graduation date if not provided
+            if (!$data['expected_graduation_date']) {
+                $this->calculateExpectedGraduationDate($student);
+            }
+
+            // Log the creation and admission
+            Log::info('Student created and admitted', [
+                'student_id' => $student->id,
+                'student_code' => $student->student_id,
+                'campus_id' => $campusId,
+                'admission_date' => $data['admission_date'],
+            ]);
+
+            return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion']);
+        });
+    }
+
+    /**
+     * Get students filtered by campus
+     */
+    public function getStudentsByCampus(int $campusId, array $filters = []): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        $query = Student::with(['campus', 'program', 'specialization'])
+            ->where('campus_id', $campusId);
+
+        // Apply additional filters
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('student_id', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['program_id'])) {
+            $query->where('program_id', $filters['program_id']);
+        }
+
+        return $query->orderBy('created_at', 'desc')->paginate(15);
+    }
+
+    /**
+     * Admit a student (change status from applicant to active)
+     */
+    public function admitStudent(Student $student, array $data): Student
+    {
+        return DB::transaction(function () use ($student, $data) {
+            // Update student status and admission details
+            $student->update([
+                'status' => 'active',
+                'admission_date' => $data['admission_date'],
+                'admission_notes' => $data['admission_notes'] ?? null,
+            ]);
+
+            // Assign student role to the campus
+            $this->assignStudentRole($student);
+
+            // Log the admission
+            Log::info('Student admitted', [
+                'student_id' => $student->id,
+                'student_code' => $student->student_id,
+                'admission_date' => $data['admission_date'],
+            ]);
+
+            return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion']);
+        });
+    }
+
+    /**
+     * Assign student role in campus
+     */
+    private function assignStudentRole(Student $student): void
+    {
+        $studentRole = Role::where('code', 'sinh_vien')->first();
+
+        if ($studentRole) {
+            CampusUserRole::create([
+                'user_id' => $student->id,
+                'role_id' => $studentRole->id,
+                'campus_id' => $student->campus_id,
+                'assigned_at' => now(),
+            ]);
+        }
+    }
+
+    /**
      * Assign program to student
      */
     public function assignProgram(Student $student, int $programId, int $specializationId = null, int $curriculumVersionId = null): Student
@@ -116,7 +254,7 @@ class StudentService
     }
 
     /**
-     * Generate unique student ID
+     * Generate unique student ID for campus
      */
     private function generateStudentId(string $campusCode, string $year): string
     {
@@ -128,13 +266,13 @@ class StudentService
             ->first();
 
         if ($lastStudent) {
-            $lastNumber = (int) substr($lastStudent->student_id, -3);
+            $lastNumber = (int) substr($lastStudent->student_id, -4);
             $newNumber = $lastNumber + 1;
         } else {
             $newNumber = 1;
         }
 
-        return $prefix . str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
+        return $prefix . str_pad((string) $newNumber, 4, '0', STR_PAD_LEFT);
     }
 
     /**

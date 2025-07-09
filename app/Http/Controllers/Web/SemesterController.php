@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Semester;
 use App\Services\SemesterManagementService;
+use App\Constants\SemesterRoutes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -152,7 +153,7 @@ class SemesterController extends Controller
                 $message = 'Semester created successfully!';
             }
 
-            return redirect()->route('semester.index')->with('success', $message);
+            return redirect()->route(SemesterRoutes::INDEX)->with('success', $message);
         } catch (\Exception $e) {
             Log::error('Error creating semester: ' . $e->getMessage());
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
@@ -234,7 +235,7 @@ class SemesterController extends Controller
                 $message = 'Semester updated successfully!';
             }
 
-            return redirect()->route('semester.index')->with('success', $message);
+            return redirect()->route(SemesterRoutes::INDEX)->with('success', $message);
         } catch (\Exception $e) {
             Log::error('Error updating semester: ' . $e->getMessage());
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
@@ -255,7 +256,7 @@ class SemesterController extends Controller
 
         $semester->delete();
 
-        return redirect()->route('semester.index')->with('success', 'Semester deleted successfully!');
+        return redirect()->route(SemesterRoutes::INDEX)->with('success', 'Semester deleted successfully!');
     }
 
     /**

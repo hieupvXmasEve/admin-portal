@@ -9,24 +9,24 @@ import { route } from 'ziggy-js';
 // System Management Routes
 export const systemRoutes = {
     users: {
-        index: () => route('user.index'),
-        create: () => route('user.create'),
-        edit: (id: number) => route('user.edit', { user: id }),
-        show: (id: number) => route('user.show', { user: id }),
+        index: () => route('users.index'),
+        create: () => route('users.create'),
+        edit: (id: number) => route('users.edit', { user: id }),
+        show: (id: number) => route('users.show', { user: id }),
         import: () => route('users.import.form'),
-        export: () => route('user.export.excel'),
+        exportFiltered: () => route('users.export.excel.filtered'),
     },
     roles: {
-        index: () => route('role.index'),
-        create: () => route('role.create'),
-        edit: (id: number) => route('role.edit', { role: id }),
-        show: (id: number) => route('role.show', { role: id }),
+        index: () => route('roles.index'),
+        create: () => route('roles.create'),
+        edit: (id: number) => route('roles.edit', { role: id }),
+        show: (id: number) => route('roles.show', { role: id }),
     },
     semesters: {
-        index: () => route('semester.index'),
-        create: () => route('semester.create'),
-        edit: (id: number) => route('semester.edit', { semester: id }),
-        show: (id: number) => route('semester.show', { semester: id }),
+        index: () => route('semesters.index'),
+        create: () => route('semesters.create'),
+        edit: (id: number) => route('semesters.edit', { semester: id }),
+        show: (id: number) => route('semesters.show', { semester: id }),
         enrollment: (id: number) => route('semesters.enrollment.show', { semester: id }),
     },
     // Campus Management Routes
@@ -35,21 +35,31 @@ export const systemRoutes = {
         create: () => route('campuses.create'),
         edit: (id: number) => route('campuses.edit', { campus: id }),
         show: (id: number) => route('campuses.show', { campus: id }),
-    },
-    buildings: {
-        index: () => route('buildings.index'),
-        create: () => route('buildings.create'),
-        edit: (id: number) => route('buildings.edit', { building: id }),
-        show: (id: number) => route('buildings.show', { building: id }),
+        buildings: {
+            create: (campusId: number) => route('campuses.buildings.create', { campus: campusId }),
+            store: (campusId: number) => route('campuses.buildings.store', { campus: campusId }),
+            edit: (campusId: number, buildingId: number) => route('campuses.buildings.edit', { campus: campusId, building: buildingId }),
+            update: (campusId: number, buildingId: number) => route('campuses.buildings.update', { campus: campusId, building: buildingId }),
+            destroy: (campusId: number, buildingId: number) => route('campuses.buildings.destroy', { campus: campusId, building: buildingId }),
+        },
     },
 } as const;
 
 // Student Management Routes
 export const studentRoutes = {
+    // Web routes
     list: () => route('students.index'),
     create: () => route('students.create'),
     edit: (id: number) => route('students.edit', { student: id }),
     show: (id: number) => route('students.show', { student: id }),
+
+    // API routes
+    index: () => route('api.admin.students.index'),
+    store: () => route('api.admin.students.store'),
+    stats: () => route('api.admin.students.stats'),
+    update: (studentId: number) => route('api.admin.students.update', { student: studentId }),
+    destroy: (studentId: number) => route('api.admin.students.destroy', { student: studentId }),
+
     // Placeholder for future student management features
     academicRecords: (/* id: number */) => '#', // Will be implemented later
     programChange: (/* id: number */) => '#',
@@ -81,25 +91,25 @@ export const curriculumRoutes = {
         show: (id: number) => route('specializations.show', { specialization: id }),
     },
     curriculumVersions: {
-        index: () => route('curriculum_version.index'),
-        create: () => route('curriculum_version.create'),
-        edit: (id: number) => route('curriculum_version.edit', { curriculum_version: id }),
-        show: (id: number) => route('curriculum_version.show', { curriculum_version: id }),
-        electives: (id: number) => route('curriculum_version.electives', { curriculumVersion: id }),
+        index: () => route('curriculum_versions.index'),
+        create: () => route('curriculum_versions.create'),
+        edit: (id: number) => route('curriculum_versions.edit', { curriculum_version: id }),
+        show: (id: number) => route('curriculum_versions.show', { curriculum_version: id }),
+        electives: (id: number) => route('curriculum_versions.electives', { curriculumVersion: id }),
     },
     units: {
-        index: () => route('unit.index'),
-        create: () => route('unit.create'),
-        edit: (id: number) => route('unit.edit', { unit: id }),
-        show: (id: number) => route('unit.show', { unit: id }),
+        index: () => route('units.index'),
+        create: () => route('units.create'),
+        edit: (id: number) => route('units.edit', { unit: id }),
+        show: (id: number) => route('units.show', { unit: id }),
         import: () => route('units.import'),
         export: () => route('units.export.excel'),
         syllabus: (unitId: number) => route('syllabus.index', { unit: unitId }),
     },
     curriculumUnits: {
-        index: () => route('curriculum_unit.index'),
-        create: () => route('curriculum_unit.create'),
-        edit: (id: number) => route('curriculum_unit.edit', { curriculum_unit: id }),
+        index: () => route('curriculum_units.index'),
+        create: () => route('curriculum_units.create'),
+        edit: (id: number) => route('curriculum_units.edit', { curriculum_unit: id }),
     },
     // Placeholder for future features
     equivalentCourses: () => '#', // Will be implemented later

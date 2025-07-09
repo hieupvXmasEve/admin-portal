@@ -14,6 +14,7 @@ use App\Services\StudentService;
 use App\Http\Requests\Student\StoreStudentRequest;
 use App\Http\Requests\Student\UpdateStudentRequest;
 use App\Http\Resources\Student\StudentResource;
+use App\Constants\StudentRoutes;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -29,29 +30,34 @@ class StudentController extends Controller
         private StudentService $studentService
     ) {}
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
+        $campusId = session()->get('current_campus_id');
+
+        if (!$campusId) {
+            return redirect()->route('select-campus.index')
+                ->with('error', 'Please select a campus first');
+        }
+
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
-            'campus_id' => 'nullable|integer|exists:campuses,id',
             'program_id' => 'nullable|integer|exists:programs,id',
-            'status' => 'nullable|string|in:active,inactive,suspended,graduated',
+            'status' => 'nullable|string|in:admitted,active,inactive,graduated,dropped_out',
             'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
+        // Always filter by current campus
         $students = Student::query()
             ->with(['campus', 'program', 'specialization'])
+            ->where('campus_id', $campusId)
             ->when($validated['search'] ?? null, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('student_id', 'like', "%{$search}%")
                         ->orWhere('full_name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
                 });
-            })
-            ->when($validated['campus_id'] ?? null, function ($query, $campusId) {
-                $query->where('campus_id', $campusId);
             })
             ->when($validated['program_id'] ?? null, function ($query, $programId) {
                 $query->where('program_id', $programId);
@@ -67,27 +73,25 @@ class StudentController extends Controller
             ->paginate($validated['per_page'] ?? 15)
             ->withQueryString();
 
-        // Get filter options
-        $campuses = Campus::orderBy('name')->get(['id', 'name']);
+        // Get all programs since they are not campus-specific
         $programs = Program::orderBy('name')->get(['id', 'name']);
 
-        // Get statistics
-        $statistics = $this->studentService->getStudentStatistics($validated['campus_id'] ?? null);
+        // Get statistics for current campus
+        $statistics = $this->studentService->getStudentStatistics($campusId);
 
         return Inertia::render('students/Index', [
             'students' => $students,
             'filters' => [
                 'search' => $validated['search'] ?? null,
-                'campus_id' => $validated['campus_id'] ?? null,
                 'program_id' => $validated['program_id'] ?? null,
                 'status' => $validated['status'] ?? null,
                 'sort' => $validated['sort'] ?? null,
                 'direction' => $validated['direction'] ?? null,
                 'per_page' => $validated['per_page'] ?? 15,
             ],
-            'campuses' => $campuses,
             'programs' => $programs,
             'statistics' => $statistics,
+            'current_campus_id' => $campusId,
         ]);
     }
 
@@ -112,21 +116,44 @@ class StudentController extends Controller
         return StudentResource::collection($students);
     }
 
-    public function create(): Response
+    public function create(): Response|RedirectResponse
     {
-        $campuses = Campus::orderBy('name')->get(['id', 'name', 'code']);
-        $programs = Program::with('specializations')->orderBy('name')->get();
+        $campusId = session()->get('current_campus_id');
+
+        if (!$campusId) {
+            return redirect()->route('select-campus.index')
+                ->with('error', 'Please select a campus first');
+        }
+
+        // Get all programs since they are not campus-specific
+        $programs = Program::with('specializations')
+            ->orderBy('name')
+            ->get();
+
+        // Get specializations for these programs
+        $programIds = $programs->pluck('id')->toArray();
+        $specializations = Specialization::whereIn('program_id', $programIds)
+            ->orderBy('name')
+            ->get();
+
+        // Get curriculum versions for these programs
+        $curriculumVersions = CurriculumVersion::whereIn('program_id', $programIds)
+            ->orderBy('version_code', 'desc')
+            ->get();
 
         return Inertia::render('students/Create', [
-            'campuses' => $campuses,
             'programs' => $programs,
+            'specializations' => $specializations,
+            'curriculumVersions' => $curriculumVersions,
+            'current_campus_id' => $campusId,
         ]);
     }
 
     public function store(StoreStudentRequest $request): RedirectResponse|StudentResource|JsonResponse
     {
         try {
-            $student = $this->studentService->createStudent($request->validated());
+            // Use the new createAdmittedStudent method
+            $student = $this->studentService->createAdmittedStudent($request->validated());
 
             // Return JSON response for API requests
             if ($request->expectsJson()) {
@@ -135,8 +162,8 @@ class StudentController extends Controller
 
             // Return redirect for web requests
             return redirect()
-                ->route('students.show', $student)
-                ->with('success', 'Student created successfully');
+                ->route(StudentRoutes::SHOW, $student)
+                ->with('success', 'Student created and admitted successfully');
         } catch (\Exception $e) {
             Log::error('Failed to create student', [
                 'error' => $e->getMessage(),
@@ -226,7 +253,7 @@ class StudentController extends Controller
 
             // Return redirect for web requests
             return redirect()
-                ->route('students.show', $updatedStudent)
+                ->route(StudentRoutes::SHOW, $updatedStudent)
                 ->with('success', 'Student updated successfully');
         } catch (\Exception $e) {
             Log::error('Failed to update student', [
@@ -268,7 +295,7 @@ class StudentController extends Controller
 
             // Return redirect for web requests
             return redirect()
-                ->route('students.index')
+                ->route(StudentRoutes::INDEX)
                 ->with('success', 'Student deleted successfully');
         } catch (\Exception $e) {
             Log::error('Failed to delete student', [
@@ -309,26 +336,29 @@ class StudentController extends Controller
     public function updateStatus(Request $request, Student $student): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => 'required|in:active,inactive,suspended,graduated',
+            'status' => 'required|string|in:admitted,active,inactive,graduated,dropped_out',
+            'reason' => 'nullable|string|max:500',
         ]);
 
         try {
             $updatedStudent = $this->studentService->updateStudentStatus(
                 $student,
-                $validated['status']
+                $validated['status'],
+                $validated['reason'] ?? null
             );
 
             return redirect()
-                ->route('students.show', $updatedStudent)
+                ->route(StudentRoutes::SHOW, $updatedStudent)
                 ->with('success', 'Student status updated successfully');
         } catch (\Exception $e) {
             Log::error('Failed to update student status', [
                 'student_id' => $student->id,
                 'error' => $e->getMessage(),
-                'status' => $validated['status']
+                'data' => $validated
             ]);
 
-            return back()->withErrors(['error' => $e->getMessage()]);
+            return back()
+                ->withErrors(['error' => $e->getMessage()]);
         }
     }
 
@@ -338,22 +368,22 @@ class StudentController extends Controller
     public function assignProgram(Request $request, Student $student): RedirectResponse
     {
         $validated = $request->validate([
-            'program_id' => 'required|exists:programs,id',
-            'specialization_id' => 'nullable|exists:specializations,id',
-            'curriculum_version_id' => 'nullable|exists:curriculum_versions,id',
+            'program_id' => 'required|integer|exists:programs,id',
+            'specialization_id' => 'nullable|integer|exists:specializations,id',
+            'curriculum_version_id' => 'required|integer|exists:curriculum_versions,id',
         ]);
 
         try {
             $updatedStudent = $this->studentService->assignProgram(
                 $student,
                 $validated['program_id'],
-                $validated['specialization_id'] ?? null,
-                $validated['curriculum_version_id'] ?? null
+                $validated['specialization_id'],
+                $validated['curriculum_version_id']
             );
 
             return redirect()
-                ->route('students.show', $updatedStudent)
-                ->with('success', 'Program assigned successfully');
+                ->route(StudentRoutes::SHOW, $updatedStudent)
+                ->with('success', 'Student program assigned successfully');
         } catch (\Exception $e) {
             Log::error('Failed to assign program to student', [
                 'student_id' => $student->id,
@@ -361,7 +391,8 @@ class StudentController extends Controller
                 'data' => $validated
             ]);
 
-            return back()->withErrors(['error' => $e->getMessage()]);
+            return back()
+                ->withErrors(['error' => $e->getMessage()]);
         }
     }
 

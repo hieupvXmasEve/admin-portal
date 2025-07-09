@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Constants\CurriculumRoutes;
 
 class CurriculumVersionController extends Controller
 {
@@ -292,7 +293,7 @@ class CurriculumVersionController extends Controller
     {
         $curriculumVersion = CurriculumVersion::create($request->validated());
 
-        return redirect()->route('curriculum_version.show', $curriculumVersion)
+        return redirect()->route(CurriculumRoutes::VERSION_SHOW, $curriculumVersion)
             ->with('success', 'Curriculum version created successfully');
     }
 
@@ -344,7 +345,7 @@ class CurriculumVersionController extends Controller
     {
         $curriculumVersion->update($request->validated());
 
-        return redirect()->route('curriculum_version.index', $curriculumVersion)
+        return redirect()->route(CurriculumRoutes::VERSION_INDEX, $curriculumVersion)
             ->with('success', 'Curriculum version updated successfully');
     }
 
@@ -355,7 +356,7 @@ class CurriculumVersionController extends Controller
     {
         $curriculumVersion->delete();
 
-        return redirect()->route('curriculum_version.index')
+        return redirect()->route(CurriculumRoutes::VERSION_INDEX)
             ->with('success', 'Curriculum version deleted successfully');
     }
 

@@ -23,14 +23,15 @@ class CheckCampusSelected
             // go to dashboard
             return redirect()->route('dashboard');
         }
-        // Skip kiểm tra cho các route select-campus, email verification, và password confirmation
+        // Skip kiểm tra cho các route select-campus, email verification, password confirmation, và logout
         if ($request->routeIs([
             'select-campus.index',
             'select-campus.set-current',
             'verification.notice',
             'verification.verify',
             'verification.send',
-            'password.confirm'
+            'password.confirm',
+            'logout'
         ])) {
             return $next($request);
         }

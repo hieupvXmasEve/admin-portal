@@ -22,7 +22,6 @@ const props = defineProps<{
         search?: string;
     };
 }>();
-console.log(props.users);
 
 // Reactive data
 const data = computed(() => props.users.data);
@@ -110,7 +109,7 @@ const exportToExcel = async () => {
         if (filters.value.email) params.set('filter[email]', filters.value.email);
         if (filters.value.search) params.set('search', filters.value.search);
 
-        const exportUrl = `${systemRoutes.users.export()}${params.toString() ? '?' + params.toString() : ''}`;
+        const exportUrl = `${systemRoutes.users.exportFiltered()}${params.toString() ? '?' + params.toString() : ''}`;
 
         // Create a temporary link to trigger download
         const link = document.createElement('a');
@@ -162,6 +161,8 @@ const columns: ColumnDef<User>[] = [
 
 // Pagination navigation
 const handlePaginationNavigate = (url: string) => {
+    console.log(url);
+
     router.visit(url, {
         preserveState: true,
         preserveScroll: true,
@@ -175,6 +176,7 @@ const handlePageSizeChange = (pageSize: number) => {
     params.delete('page'); // Reset to first page when changing page size
 
     const url = `${systemRoutes.users.index()}?${params.toString()}`;
+
     router.visit(url, {
         preserveState: true,
         preserveScroll: true,

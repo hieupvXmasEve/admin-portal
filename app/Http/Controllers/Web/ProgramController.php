@@ -9,6 +9,7 @@ use App\Models\Program;
 use App\Http\Requests\Program\StoreProgramRequest;
 use App\Http\Requests\Program\UpdateProgramRequest;
 use App\Services\ProgramService;
+use App\Constants\ProgramRoutes;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -55,7 +56,7 @@ class ProgramController extends Controller
         try {
             $this->programService->createProgram($request->validated());
             return redirect()
-                ->route('programs.index')
+                ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program created successfully.');
         } catch (\Exception $e) {
             Log::error('Program creation failed: ' . $e->getMessage());
@@ -98,7 +99,7 @@ class ProgramController extends Controller
         try {
             $this->programService->updateProgram($program, $request->validated());
             return redirect()
-                ->route('programs.index')
+                ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program updated successfully.');
         } catch (\Exception $e) {
             Log::error('Program update failed: ' . $e->getMessage());
@@ -114,7 +115,7 @@ class ProgramController extends Controller
         try {
             $this->programService->deleteProgram($program);
             return redirect()
-                ->route('programs.index')
+                ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program deleted successfully.');
         } catch (\Exception $e) {
             Log::error('Program deletion failed: ' . $e->getMessage());

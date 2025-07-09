@@ -12,6 +12,7 @@ use App\Services\PrerequisiteLogicService;
 use App\Services\UnitRelationshipService;
 use App\Services\UnitService;
 use App\Services\UnitValidationService;
+use App\Constants\UnitRoutes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -83,7 +84,7 @@ class UnitController extends Controller
     {
         try {
             $this->unitService->createUnit($request->validated());
-            return redirect()->route('unit.index')->with('success', 'Unit created successfully.');
+            return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit created successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
                 ->withErrors(['error' => 'Failed to create unit: ' . $e->getMessage()])
@@ -143,7 +144,7 @@ class UnitController extends Controller
     {
         // Check if unit can be edited
         if (!$this->validationService->canEditUnit($unit)) {
-            return redirect()->route('unit.show', $unit)
+            return redirect()->route(UnitRoutes::SHOW, $unit)
                 ->with('error', 'Unit cannot be edited due to active relationships.');
         }
 
@@ -207,7 +208,7 @@ class UnitController extends Controller
     {
         try {
             $this->unitService->updateUnit($unit, $request->validated());
-            return redirect()->route('unit.index')->with('success', 'Unit updated successfully.');
+            return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
                 ->withErrors(['error' => 'Failed to update unit: ' . $e->getMessage()])
@@ -220,15 +221,15 @@ class UnitController extends Controller
         $canDelete = $this->validationService->canDeleteUnit($unit);
 
         if (!$canDelete['allowed']) {
-            return redirect()->route('unit.index')
+            return redirect()->route(UnitRoutes::INDEX)
                 ->with('error', $canDelete['reason']);
         }
 
         try {
             $this->unitService->deleteUnit($unit);
-            return redirect()->route('unit.index')->with('success', 'Unit deleted successfully.');
+            return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit deleted successfully.');
         } catch (\Exception $e) {
-            return redirect()->route('unit.index')
+            return redirect()->route(UnitRoutes::INDEX)
                 ->with('error', 'Failed to delete unit: ' . $e->getMessage());
         }
     }

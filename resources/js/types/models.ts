@@ -179,34 +179,69 @@ export interface Student {
     full_name: string;
     email: string;
     phone?: string;
-    oauth_provider?: 'google' | 'microsoft' | 'manual';
-    oauth_provider_id?: string;
-    avatar_url?: string;
-    date_of_birth?: string;
-    gender?: 'male' | 'female' | 'other';
-    nationality?: string;
-    national_id?: string;
-    address?: string;
+    status: 'admitted' | 'active' | 'inactive' | 'graduated' | 'dropped_out';
+    admission_date?: string; // ISO date string
+    admission_notes?: string;
+    expected_graduation_date?: string;
+
+    // Relationships
     campus_id: number;
     program_id: number;
     specialization_id?: number;
     curriculum_version_id: number;
-    admission_date: string;
-    expected_graduation_date?: string;
-    emergency_contact_name?: string;
-    emergency_contact_phone?: string;
-    emergency_contact_relationship?: string;
-    high_school_name?: string;
-    high_school_graduation_year?: number;
-    entrance_exam_score?: number;
-    admission_notes?: string;
-    status: 'active' | 'inactive' | 'suspended' | 'graduated';
+
     campus?: Campus;
     program?: Program;
     specialization?: Specialization;
     curriculum_version?: CurriculumVersion;
+
+    // Computed fields
+    display_name?: string;
+    status_label?: string;
+
+    // Timestamps
     created_at: string;
     updated_at: string;
+}
+
+// New interface for admission form
+export interface StudentCreateForm {
+    full_name: string;
+    email: string;
+    phone?: string;
+    program_id: number;
+    specialization_id?: number;
+    curriculum_version_id: number;
+    admission_date: string;
+    notes?: string;
+    expected_graduation_date?: string;
+}
+
+// For API responses
+export interface StudentResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        student: Student;
+    };
+}
+
+export interface StudentsListResponse {
+    success: boolean;
+    data: {
+        students: Student[];
+        pagination: {
+            current_page: number;
+            last_page: number;
+            per_page: number;
+            total: number;
+        };
+    };
+}
+
+export interface StudentStats {
+    total: number;
+    by_status: Record<string, number>;
 }
 
 export interface Enrollment {

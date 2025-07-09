@@ -17,6 +17,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+console.log(props.courseOffering);
 const showStatusModal = ref(false);
 
 const getStatusVariant = (status: string) => {
