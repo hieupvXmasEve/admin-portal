@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Constants\StudentRoutes;
 use App\Http\Controllers\Controller;
-use App\Models\Student;
-use App\Models\Campus;
-use App\Models\Program;
-use App\Models\Specialization;
-use App\Models\CurriculumVersion;
-use App\Services\StudentService;
 use App\Http\Requests\Student\StoreStudentRequest;
 use App\Http\Requests\Student\UpdateStudentRequest;
 use App\Http\Resources\Student\StudentResource;
-use App\Constants\StudentRoutes;
-use Illuminate\Http\Request;
-use Illuminate\Http\RedirectResponse;
+use App\Models\Campus;
+use App\Models\CurriculumVersion;
+use App\Models\Program;
+use App\Models\Semester;
+use App\Models\Specialization;
+use App\Models\Student;
+use App\Services\StudentService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,7 +35,7 @@ class StudentController extends Controller
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
         }
@@ -42,12 +43,14 @@ class StudentController extends Controller
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
             'program_id' => 'nullable|integer|exists:programs,id',
-            'status' => 'nullable|string|in:admitted,active,inactive,graduated,dropped_out',
+            'status' => 'nullable|string|in:active,inactive,suspended,graduated',
             'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
+            'page' => 'nullable|integer|min:1',
         ]);
-
+        $page = $validated['page'] ?? 1;
+        $per_page = $validated['per_page'] ?? 10;
         // Always filter by current campus
         $students = Student::query()
             ->with(['campus', 'program', 'specialization'])
@@ -70,7 +73,7 @@ class StudentController extends Controller
                 $query->orderBy($sort, $direction);
             })
             ->orderBy('created_at', 'desc')
-            ->paginate($validated['per_page'] ?? 15)
+            ->paginate($per_page, ['*'], 'page', $page)
             ->withQueryString();
 
         // Get all programs since they are not campus-specific
@@ -120,7 +123,7 @@ class StudentController extends Controller
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
         }
@@ -155,11 +158,6 @@ class StudentController extends Controller
             // Use the new createAdmittedStudent method
             $student = $this->studentService->createAdmittedStudent($request->validated());
 
-            // Return JSON response for API requests
-            if ($request->expectsJson()) {
-                return new StudentResource($student);
-            }
-
             // Return redirect for web requests
             return redirect()
                 ->route(StudentRoutes::SHOW, $student)
@@ -167,12 +165,12 @@ class StudentController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to create student', [
                 'error' => $e->getMessage(),
-                'data' => $request->validated()
+                'data' => $request->validated(),
             ]);
 
             if ($request->expectsJson()) {
                 return response()->json([
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ], 422);
             }
 
@@ -189,10 +187,10 @@ class StudentController extends Controller
             'program',
             'specialization',
             'curriculumVersion',
-            'courseRegistrations.courseOffering.unit',
+            'courseRegistrations.courseOffering.curriculumUnit.unit',
             'academicHolds' => function ($query) {
                 $query->orderBy('placed_date', 'desc');
-            }
+            },
         ]);
 
         // Return JSON response for API requests
@@ -259,12 +257,12 @@ class StudentController extends Controller
             Log::error('Failed to update student', [
                 'student_id' => $student->id,
                 'error' => $e->getMessage(),
-                'data' => $request->validated()
+                'data' => $request->validated(),
             ]);
 
             if ($request->expectsJson()) {
                 return response()->json([
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ], 422);
             }
 
@@ -300,12 +298,12 @@ class StudentController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to delete student', [
                 'student_id' => $student->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             if ($request->expectsJson()) {
                 return response()->json([
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ], 422);
             }
 
@@ -336,7 +334,7 @@ class StudentController extends Controller
     public function updateStatus(Request $request, Student $student): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => 'required|string|in:admitted,active,inactive,graduated,dropped_out',
+            'status' => 'required|string|in:active,inactive,suspended,graduated',
             'reason' => 'nullable|string|max:500',
         ]);
 
@@ -354,7 +352,7 @@ class StudentController extends Controller
             Log::error('Failed to update student status', [
                 'student_id' => $student->id,
                 'error' => $e->getMessage(),
-                'data' => $validated
+                'data' => $validated,
             ]);
 
             return back()
@@ -388,7 +386,7 @@ class StudentController extends Controller
             Log::error('Failed to assign program to student', [
                 'student_id' => $student->id,
                 'error' => $e->getMessage(),
-                'data' => $validated
+                'data' => $validated,
             ]);
 
             return back()
@@ -534,5 +532,185 @@ class StudentController extends Controller
                 ] : null,
             ],
         ]);
+    }
+
+    /**
+     * Show new students (first-semester students) with filtering and bulk operations
+     */
+    public function newStudents(Request $request): Response|RedirectResponse
+    {
+        $campusId = session()->get('current_campus_id');
+        // get current semester
+        $currentSemester = Semester::where('is_active', true)->first();
+
+        if (! $campusId) {
+            return redirect()->route('select-campus.index')
+                ->with('error', 'Please select a campus first');
+        }
+
+        $validated = $request->validate([
+            'search' => 'nullable|string|max:255',
+            'program_id' => 'nullable|integer|exists:programs,id',
+            'specialization_id' => 'nullable|integer|exists:specializations,id',
+            'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at',
+            'direction' => 'nullable|string|in:asc,desc',
+            'per_page' => 'nullable|integer|min:5|max:100',
+            'page' => 'nullable|integer|min:1',
+        ]);
+
+        // Query for new students (recently admitted active students)
+        // For demo purposes, showing active students who can be considered "new"
+        $students = Student::query()
+            ->with(['campus', 'program', 'specialization'])
+            ->where('campus_id', $campusId)
+            ->where('status', 'active') // Only active students
+            ->whereDate('created_at', '>=', now()->subMonths(6)) // Students created in last 6 months
+            ->when($validated['search'] ?? null, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('student_id', 'like', "%{$search}%")
+                        ->orWhere('full_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->when($validated['program_id'] ?? null, function ($query, $programId) {
+                $query->where('program_id', $programId);
+            })
+            ->when($validated['specialization_id'] ?? null, function ($query, $specializationId) {
+                $query->where('specialization_id', $specializationId);
+            })
+            ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
+                $direction = $validated['direction'] ?? 'asc';
+                $query->orderBy($sort, $direction);
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate($validated['per_page'] ?? 15)
+            ->withQueryString();
+
+        // Get all programs and specializations for filters
+        $programs = Program::orderBy('name')->get(['id', 'name']);
+        $specializations = Specialization::orderBy('name')->get(['id', 'name', 'program_id']);
+
+        return Inertia::render('students/NewStudents', [
+            'students' => $students,
+            'filters' => [
+                'search' => $validated['search'] ?? null,
+                'program_id' => $validated['program_id'] ?? null,
+                'specialization_id' => $validated['specialization_id'] ?? null,
+                'sort' => $validated['sort'] ?? null,
+                'direction' => $validated['direction'] ?? null,
+                'per_page' => $validated['per_page'] ?? 15,
+            ],
+            'programs' => $programs,
+            'specializations' => $specializations,
+            'current_campus_id' => $campusId,
+            'current_semester' => $currentSemester,
+        ]);
+    }
+
+    /**
+     * Complete bulk student onboarding - creates enrollments, course offerings, and registrations
+     */
+    public function bulkStudentOnboarding(Request $request): RedirectResponse|JsonResponse
+    {
+        $validated = $request->validate([
+            'filters' => 'required|array',
+            'filters.search' => 'nullable|string|max:255',
+            'filters.program_id' => 'nullable|integer|exists:programs,id',
+            'filters.specialization_id' => 'nullable|integer|exists:specializations,id',
+            'semester_id' => 'required|integer|exists:semesters,id',
+        ]);
+
+        $campusId = session()->get('current_campus_id');
+
+        if (! $campusId) {
+            return back()->withErrors(['error' => 'Please select a campus first']);
+        }
+
+        try {
+            // Query for new students matching the filters
+            $students = Student::query()
+                ->where('campus_id', $campusId)
+                ->where('status', 'active')
+                ->whereDate('created_at', '>=', now()->subMonths(6))
+                ->when($validated['filters']['search'] ?? null, function ($query, $search) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('student_id', 'like', "%{$search}%")
+                            ->orWhere('full_name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+                })
+                ->when($validated['filters']['program_id'] ?? null, function ($query, $programId) {
+                    $query->where('program_id', $programId);
+                })
+                ->when($validated['filters']['specialization_id'] ?? null, function ($query, $specializationId) {
+                    $query->where('specialization_id', $specializationId);
+                })
+                ->pluck('id')
+                ->toArray();
+
+            if (empty($students)) {
+                $message = 'No students found matching the current filters';
+
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $message,
+                    ], 422);
+                }
+
+                return back()->withErrors(['error' => $message]);
+            }
+            Log::info('Complete student onboarding', [
+                'students' => $students,
+                'semester_id' => $validated['semester_id'],
+            ]);
+
+            // Complete student onboarding process
+            $result = $this->studentService->completeStudentOnboarding(
+                $students,
+                $validated['semester_id']
+            );
+
+            // Enhanced message with detailed breakdown
+            $summary = $result['summary'] ?? [];
+
+            $message = "Automated enrollment completed successfully!\n";
+            $message .= "• Students processed: " . count($students) . "\n";
+            $message .= "• Enrollments created: {$result['enrollments']['created']}\n";
+            $message .= "• Course offerings created: {$result['course_offerings']['created']}\n";
+            $message .= "• Course registrations created: {$result['course_registrations']['created']}\n";
+
+            if (!empty($summary)) {
+                $message .= "• Success rate: {$summary['success_rate']}%\n";
+                if ($summary['total_errors'] > 0) {
+                    $message .= "• Total errors: {$summary['total_errors']}";
+                }
+            }
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $message,
+                    'data' => $result,
+                    'summary' => $summary,
+                ]);
+            }
+
+            return back()->with('success', $message);
+        } catch (\Exception $e) {
+            Log::error('Failed to complete bulk student onboarding', [
+                'error' => $e->getMessage(),
+                'data' => $validated,
+            ]);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 500);
+            }
+
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
     }
 }

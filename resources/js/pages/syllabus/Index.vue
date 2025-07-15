@@ -32,6 +32,25 @@ interface Semester {
     year: number;
 }
 
+interface CurriculumVersion {
+    id: number;
+    version: string;
+    specialization: {
+        id: number;
+        name: string;
+    };
+    program: {
+        id: number;
+        name: string;
+    };
+}
+
+interface CurriculumUnit {
+    id: number;
+    semester: Semester;
+    curriculum_version: CurriculumVersion;
+}
+
 interface AssessmentComponent {
     id: number;
     name: string;
@@ -49,12 +68,13 @@ interface AssessmentComponentDetail {
 
 interface Syllabus {
     id: number;
+    curriculum_unit_id: number;
     version: string | null;
     description: string | null;
     total_hours: number | null;
     hours_per_session: number | null;
     is_active: boolean;
-    effective_from_semester: Semester | null;
+    curriculum_unit: CurriculumUnit;
     assessment_components: AssessmentComponent[];
     total_assessment_weight: number;
     created_at: string;
@@ -81,7 +101,7 @@ const filteredSyllabi = computed(() => {
             !searchVersion.value || (syllabus.version && syllabus.version.toLowerCase().includes(searchVersion.value.toLowerCase()));
 
         const matchesSemester =
-            !filterSemester.value || (syllabus.effective_from_semester && syllabus.effective_from_semester.id.toString() === filterSemester.value);
+            !filterSemester.value || (syllabus.curriculum_unit?.semester && syllabus.curriculum_unit.semester.id.toString() === filterSemester.value);
 
         const matchesActive =
             !filterActive.value ||
@@ -183,7 +203,7 @@ const getCurrentSemesterStatus = (syllabus: Syllabus) => {
                 <TableHeader>
                     <TableRow>
                         <TableHead>Version</TableHead>
-                        <TableHead>Semester</TableHead>
+                        <TableHead>Semester & Specialization</TableHead>
                         <TableHead>Active?</TableHead>
                         <TableHead>Total Hours</TableHead>
                         <TableHead>Hours/Session</TableHead>
@@ -203,7 +223,12 @@ const getCurrentSemesterStatus = (syllabus: Syllabus) => {
                         </TableCell>
 
                         <TableCell>
-                            {{ syllabus.effective_from_semester?.name || '-' }}
+                            <div class="text-sm">
+                                <div class="font-medium">{{ syllabus.curriculum_unit?.semester?.name || '-' }}</div>
+                                <div class="text-xs text-gray-500">
+                                    {{ syllabus.curriculum_unit?.curriculum_version?.specialization?.name || '' }}
+                                </div>
+                            </div>
                         </TableCell>
 
                         <TableCell>

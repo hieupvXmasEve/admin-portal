@@ -60,8 +60,19 @@ class SemesterEnrollmentController extends Controller
         try {
             DB::beginTransaction();
 
-            // Get active students with valid curriculum_version_id
+            // Get current campus ID from session
+            $currentCampusId = session()->get('current_campus_id');
+
+            if (!$currentCampusId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No campus selected. Please select a campus first.',
+                ], 400);
+            }
+
+            // Get active students with valid curriculum_version_id for current campus
             $eligibleStudents = Student::where('status', 'active')
+                ->where('campus_id', $currentCampusId)
                 ->whereNotNull('curriculum_version_id')
                 ->whereDoesntHave('enrollments', function ($query) use ($semester) {
                     $query->where('semester_id', $semester->id);
@@ -72,7 +83,7 @@ class SemesterEnrollmentController extends Controller
             if ($eligibleStudents->isEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No eligible students found for enrollment',
+                    'message' => 'No eligible students found for enrollment in the selected campus',
                 ], 200);
             }
 
@@ -142,16 +153,29 @@ class SemesterEnrollmentController extends Controller
     {
 
         try {
-            // Get all enrollments for this semester
+            // Get current campus ID from session
+            $currentCampusId = session()->get('current_campus_id');
+
+            if (!$currentCampusId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No campus selected. Please select a campus first.',
+                ], 400);
+            }
+
+            // Get all enrollments for this semester filtered by campus
             $enrollments = Enrollment::where('semester_id', $semester->id)
                 ->where('status', 'in_progress')
+                ->whereHas('student', function ($query) use ($currentCampusId) {
+                    $query->where('campus_id', $currentCampusId);
+                })
                 ->with(['student.curriculumVersion', 'curriculumVersion'])
                 ->get();
 
             if ($enrollments->isEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No enrollments found for this semester. Please generate enrollments first.',
+                    'message' => 'No enrollments found for this semester in the selected campus. Please generate enrollments first.',
                 ], 200);
             }
 
@@ -160,7 +184,7 @@ class SemesterEnrollmentController extends Controller
                 return $enrollment->curriculum_version_id . '_' . $enrollment->semester_number;
             });
 
-            Log::info('Enrollment Groups', ['enrollment_groups' => $enrollmentGroups->toArray()]);
+            // Log::info('Enrollment Groups', ['enrollment_groups' => $enrollmentGroups->toArray()]);
 
             $unitDemand = [];
 
@@ -200,10 +224,11 @@ class SemesterEnrollmentController extends Controller
             }
 
             // Get existing course offerings for this semester
-            $existingOfferings = CourseOffering::where('semester_id', $semester->id)
-                ->groupBy('unit_id')
-                ->selectRaw('unit_id, count(*) as offering_count')
-                ->pluck('offering_count', 'unit_id')
+            $existingOfferings = CourseOffering::where('course_offerings.semester_id', $semester->id)
+                ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
+                ->groupBy('curriculum_units.unit_id')
+                ->selectRaw('curriculum_units.unit_id, count(*) as offering_count')
+                ->pluck('offering_count', 'curriculum_units.unit_id')
                 ->toArray();
 
             // Update existing offerings count
@@ -259,9 +284,17 @@ class SemesterEnrollmentController extends Controller
 
             foreach ($unitIds as $unitId) {
                 try {
+                    // Find curriculum unit for this unit
+                    $curriculumUnit = CurriculumUnit::where('unit_id', $unitId)->first();
+
+                    if (!$curriculumUnit) {
+                        $errors[] = "No curriculum unit found for unit ID {$unitId}";
+                        continue;
+                    }
+
                     // Check if offering already exists
                     $existingOffering = CourseOffering::where('semester_id', $semester->id)
-                        ->where('unit_id', $unitId)
+                        ->where('curriculum_unit_id', $curriculumUnit->id)
                         ->first();
 
                     if ($existingOffering) {
@@ -271,7 +304,7 @@ class SemesterEnrollmentController extends Controller
 
                     CourseOffering::create([
                         'semester_id' => $semester->id,
-                        'unit_id' => $unitId,
+                        'curriculum_unit_id' => $curriculumUnit->id,
                         'max_capacity' => $defaultCapacity,
                         'current_enrollment' => 0,
                         'waitlist_capacity' => 10,
@@ -336,9 +369,19 @@ class SemesterEnrollmentController extends Controller
         ]);
 
         try {
+            // Find curriculum unit for this unit
+            $curriculumUnit = CurriculumUnit::where('unit_id', $validated['unit_id'])->first();
+
+            if (!$curriculumUnit) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No curriculum unit found for this unit',
+                ], 400);
+            }
+
             // Check if offering already exists
             $existingOffering = CourseOffering::where('semester_id', $semester->id)
-                ->where('unit_id', $validated['unit_id'])
+                ->where('curriculum_unit_id', $curriculumUnit->id)
                 ->where('section_code', $validated['section_code'] ?? null)
                 ->first();
 
@@ -351,7 +394,7 @@ class SemesterEnrollmentController extends Controller
 
             $courseOffering = CourseOffering::create([
                 'semester_id' => $semester->id,
-                'unit_id' => $validated['unit_id'],
+                'curriculum_unit_id' => $curriculumUnit->id,
                 'lecture_id' => $validated['lecture_id'] ?? null,
                 'section_code' => $validated['section_code'] ?? null,
                 'max_capacity' => $validated['max_capacity'],
@@ -399,7 +442,9 @@ class SemesterEnrollmentController extends Controller
 
             // Apply filters
             if ($request->filled('unit_id')) {
-                $query->where('unit_id', $request->unit_id);
+                $query->whereHas('curriculumUnit', function ($q) use ($request) {
+                    $q->where('unit_id', $request->unit_id);
+                });
             }
 
             if ($request->filled('lecture_id')) {
@@ -479,19 +524,32 @@ class SemesterEnrollmentController extends Controller
         try {
             DB::beginTransaction();
 
+            // Get current campus ID from session
+            $currentCampusId = session()->get('current_campus_id');
+
+            if (!$currentCampusId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No campus selected. Please select a campus first.',
+                ], 400);
+            }
+
             $registrationMethod = $request->registration_method ?? 'admin_override';
             $forceRegistration = $request->force_registration ?? false;
 
-            // Get all enrollments for this semester that are in progress
+            // Get all enrollments for this semester that are in progress filtered by campus
             $enrollments = Enrollment::where('semester_id', $semester->id)
                 ->where('status', 'in_progress')
+                ->whereHas('student', function ($query) use ($currentCampusId) {
+                    $query->where('campus_id', $currentCampusId);
+                })
                 ->with(['student', 'curriculumVersion'])
                 ->get();
 
             if ($enrollments->isEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No active enrollments found for this semester',
+                    'message' => 'No active enrollments found for this semester in the selected campus',
                 ], 200);
             }
 
@@ -529,7 +587,7 @@ class SemesterEnrollmentController extends Controller
                         try {
                             // Find available course offering for this unit
                             $courseOffering = CourseOffering::where('semester_id', $semester->id)
-                                ->where('unit_id', $curriculumUnit->unit_id)
+                                ->where('curriculum_unit_id', $curriculumUnit->id)
                                 ->where('is_active', true)
                                 ->where('enrollment_status', 'open')
                                 ->first();
@@ -643,15 +701,27 @@ class SemesterEnrollmentController extends Controller
     public function getRegistrableStudents(Semester $semester, Request $request): JsonResponse
     {
         try {
-            // Get all enrollments for this semester that are in progress
+            // Get current campus ID from session
+            $currentCampusId = session()->get('current_campus_id');
+
+            if (!$currentCampusId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No campus selected. Please select a campus first.',
+                ], 400);
+            }
+
+            // Get all enrollments for this semester that are in progress filtered by campus
             $enrollments = Enrollment::where('semester_id', $semester->id)
                 ->where('status', 'in_progress')
+                ->whereHas('student', function ($query) use ($currentCampusId) {
+                    $query->where('campus_id', $currentCampusId);
+                })
                 ->with(['student', 'curriculumVersion'])
                 ->get();
 
             $studentsWithCourses = [];
             $totalAvailableRegistrations = 0;
-
             foreach ($enrollments as $enrollment) {
                 $student = $enrollment->student;
 
@@ -671,7 +741,7 @@ class SemesterEnrollmentController extends Controller
                 foreach ($curriculumUnits as $curriculumUnit) {
                     // Find available course offering for this unit
                     $courseOffering = CourseOffering::where('semester_id', $semester->id)
-                        ->where('unit_id', $curriculumUnit->unit_id)
+                        ->where('curriculum_unit_id', $curriculumUnit->id)
                         ->where('is_active', true)
                         ->where('enrollment_status', 'open')
                         ->first();
@@ -707,7 +777,7 @@ class SemesterEnrollmentController extends Controller
                         $totalAvailableRegistrations++;
                     }
                 }
-
+                Log::info('Available Courses', ['available_courses' => $availableCourses]);
                 if (!empty($availableCourses)) {
                     $studentsWithCourses[] = [
                         'student_id' => $student->student_id,

@@ -39,8 +39,12 @@ class AcademicRecordSeeder extends Seeder
             throw new \Exception('No course registrations found for FALL2024.');
         }
 
-        // Clean existing academic records for this semester
-        AcademicRecord::where('semester_id', $semester->id)->delete();
+        // Check if academic records already exist for this semester
+        $existingRecords = AcademicRecord::where('semester_id', $semester->id)->count();
+        if ($existingRecords > 0) {
+            $this->command->info("✅ Academic records already exist for FALL2024 ({$existingRecords} found). Skipping creation.");
+            return;
+        }
 
         $recordCount = 0;
 
@@ -122,8 +126,9 @@ class AcademicRecordSeeder extends Seeder
     private function calculateFinalGrade(CourseRegistration $registration): array
     {
         // Manually fetch syllabus for this course offering
-        $syllabus = Syllabus::where('unit_id', $registration->courseOffering->unit_id)
-            ->where('semester_id', $registration->semester_id)
+        $syllabus = Syllabus::whereHas('curriculumUnit', function ($query) use ($registration) {
+            $query->where('unit_id', $registration->courseOffering->unit_id);
+        })
             ->where('is_active', true)
             ->with('assessmentComponents.details.scores')
             ->first();

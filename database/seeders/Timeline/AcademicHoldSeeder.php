@@ -46,10 +46,15 @@ class AcademicHoldSeeder extends Seeder
 
         $this->command->info("  Found {$students->count()} students with academic records...");
 
-        // Clean existing holds for this semester
-        AcademicHold::whereHas('student', function ($query) use ($students) {
+        // Check if academic holds already exist for this semester
+        $existingHolds = AcademicHold::whereHas('student', function ($query) use ($students) {
             $query->whereIn('id', $students->pluck('id'));
-        })->where('placed_date', '>=', $semester->end_date)->delete();
+        })->where('placed_date', '>=', $semester->start_date)->count();
+
+        if ($existingHolds > 0) {
+            $this->command->info("✅ Academic holds already exist for FALL2024 ({$existingHolds} found). Skipping creation.");
+            return;
+        }
 
         $holdCount = 0;
 

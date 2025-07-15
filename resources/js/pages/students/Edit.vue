@@ -58,7 +58,7 @@ const formSchema = toTypedSchema(
         high_school_graduation_year: z.string().optional(),
         entrance_exam_score: z.string().optional(),
         admission_notes: z.string().optional(),
-        status: z.enum(['active', 'inactive', 'suspended', 'graduated']),
+        status: z.enum(['active', 'inactive', 'suspended', 'graduated', 'admitted', 'dropped_out']),
     }),
 );
 
@@ -69,7 +69,7 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         email: props.student.email,
         phone: props.student.phone || '',
         date_of_birth: props.student.date_of_birth || '',
-        gender: props.student.gender || undefined,
+        gender: props.student.gender,
         nationality: props.student.nationality || '',
         national_id: props.student.national_id || '',
         address: props.student.address || '',
@@ -78,7 +78,6 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         specialization_id: props.student.specialization_id?.toString() || '',
         curriculum_version_id: props.student.curriculum_version_id.toString(),
         admission_date: props.student.admission_date || '',
-        expected_graduation_date: props.student.expected_graduation_date || '',
         emergency_contact_name: props.student.emergency_contact_name || '',
         emergency_contact_phone: props.student.emergency_contact_phone || '',
         emergency_contact_relationship: props.student.emergency_contact_relationship || '',
@@ -412,7 +411,6 @@ const handleCancel = () => {
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    <SelectItem value="">No specialization</SelectItem>
                                     <SelectItem
                                         v-for="specialization in filteredSpecializations"
                                         :key="specialization.id"

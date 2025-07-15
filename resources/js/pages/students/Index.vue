@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useGlobalDeleteDialog } from '@/composables';
-import type { Campus, Program, Student } from '@/types/models';
+import type { Program, Student } from '@/types/models';
 import { studentRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -43,7 +43,7 @@ interface Props {
         direction?: string;
         per_page?: number;
     };
-    campuses: Campus[];
+    // campuses: Campus[];
     programs: Program[];
     statistics: {
         total_students: number;
@@ -56,14 +56,13 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+console.log(props.students);
 
 // Global delete dialog composable
 const deleteDialog = useGlobalDeleteDialog();
 
-const studentsRef = ref(props.students.data);
-
 // Reactive data
-const data = computed(() => studentsRef.value);
+const data = computed(() => props.students.data);
 
 const filters = ref({
     search: props.filters.search || '',
@@ -268,6 +267,16 @@ const updateFilters = () => {
         only: ['students', 'filters'],
     });
 };
+
+const handlePaginationNavigate = (url: string) => {
+    console.log(url);
+
+    router.visit(url, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['students'],
+    });
+};
 </script>
 
 <template>
@@ -316,7 +325,7 @@ const updateFilters = () => {
                             class="w-full md:w-64"
                             @update:model-value="handleSearch"
                         />
-                        <Select v-model="filters.campus_id" @update:model-value="handleFilter">
+                        <!-- <Select v-model="filters.campus_id" @update:model-value="handleFilter">
                             <SelectTrigger class="w-full md:w-48">
                                 <SelectValue placeholder="Filter by campus..." />
                             </SelectTrigger>
@@ -326,7 +335,7 @@ const updateFilters = () => {
                                     {{ campus.name }}
                                 </SelectItem>
                             </SelectContent>
-                        </Select>
+                        </Select> -->
                         <Select v-model="filters.program_id" @update:model-value="handleFilter">
                             <SelectTrigger class="w-full md:w-48">
                                 <SelectValue placeholder="Filter by program..." />
@@ -381,6 +390,11 @@ const updateFilters = () => {
             </CardContent>
         </Card>
 
-        <DataPagination :pagination-data="students" @page-changed="handlePageChange" @page-size-changed="handlePageSizeChange" />
+        <DataPagination
+            :pagination-data="students"
+            item-name="students"
+            @navigate="handlePaginationNavigate"
+            @page-size-change="handlePageSizeChange"
+        />
     </div>
 </template>

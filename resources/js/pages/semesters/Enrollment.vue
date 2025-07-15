@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
-import type { BreadcrumbItem } from '@/types';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
@@ -92,33 +91,6 @@ interface RegistrationStats {
     }>;
 }
 
-interface RegistrableStudent {
-    student_id: string;
-    student_name: string;
-    semester_number: number;
-    available_courses: Array<{
-        unit_code: string;
-        unit_name: string;
-        course_offering_id: number;
-        is_required: boolean;
-        has_capacity: boolean;
-        current_enrollment: number;
-        max_capacity: number;
-    }>;
-    total_courses: number;
-    available_with_capacity: number;
-}
-
-interface RegistrableStudentsData {
-    students: RegistrableStudent[];
-    summary: {
-        total_students: number;
-        total_enrollments: number;
-        total_available_registrations: number;
-        avg_courses_per_student: number;
-    };
-}
-
 interface Props {
     semester: Semester & {
         enrollments?: Enrollment[];
@@ -133,12 +105,6 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const breadcrumbItems: BreadcrumbItem[] = [
-    { title: 'Semesters', href: '/semesters' },
-    { title: props.semester.name, href: `/semesters/${props.semester.id}` },
-    { title: 'Enrollment Management', href: '#' },
-];
-
 // State
 const loading = ref<Record<string, boolean>>({});
 const suggestedCourses = ref<SuggestedCourse[]>([]);
@@ -147,8 +113,6 @@ const selectedCourses = ref<Set<number>>(new Set());
 const showBulkOpenModal = ref(false);
 const showSingleOpenModal = ref(false);
 const selectedUnit = ref<Unit | null>(null);
-const registrableStudents = ref<RegistrableStudentsData | null>(null);
-const showBulkRegisterModal = ref(false);
 
 // API composable
 const api = useApi();
@@ -173,11 +137,6 @@ const singleOpenForm = useForm({
     location: '',
     special_requirements: '',
     notes: '',
-});
-
-const bulkRegisterForm = useForm({
-    registration_method: 'admin_override' as 'online' | 'advisor' | 'admin_override',
-    force_registration: false,
 });
 
 // Generate enrollments
@@ -319,68 +278,6 @@ const submitSingleOpen = async () => {
     }
 };
 
-// Load registrable students
-const loadRegistrableStudents = async () => {
-    loading.value.registrable = true;
-
-    try {
-        const { data } = await api.get(`/api/semesters/${props.semester.id}/enrollment/registrable-students`);
-
-        if (data.value?.success) {
-            registrableStudents.value = data.value.data;
-        } else {
-            toast.error(data.value?.message || 'Failed to load registrable students');
-        }
-    } catch (error) {
-        console.error('Load registrable students error:', error);
-        toast.error('Failed to load registrable students');
-    } finally {
-        loading.value.registrable = false;
-    }
-};
-
-// Bulk register students
-const openBulkRegisterModal = () => {
-    showBulkRegisterModal.value = true;
-};
-
-const submitBulkRegister = async () => {
-    try {
-        const { data } = await api.post(`/api/semesters/${props.semester.id}/enrollment/bulk-register`, {
-            registration_method: bulkRegisterForm.registration_method,
-            force_registration: bulkRegisterForm.force_registration,
-        });
-
-        if (data.value?.success) {
-            showBulkRegisterModal.value = false;
-
-            // Show detailed toast with results
-            const responseData = data.value as any;
-            const message = `${responseData.message}
-                <br/>Registrations: ${responseData.registrations_created}
-                <br/>Students processed: ${responseData.students_processed}
-                ${responseData.students_skipped > 0 ? `<br/>Skipped: ${responseData.students_skipped}` : ''}
-                ${responseData.total_warnings > 0 ? `<br/>Warnings: ${responseData.total_warnings}` : ''}
-                ${responseData.total_errors > 0 ? `<br/>Errors: ${responseData.total_errors}` : ''}`;
-
-            toast.success(markRaw(HeadlessToastWithProps), {
-                componentProps: {
-                    message: message,
-                },
-            });
-
-            // Refresh data
-            loadRegistrableStudents();
-            loadRegistrationStats();
-        } else {
-            toast.error(data.value?.message || 'Failed to bulk register students');
-        }
-    } catch (error) {
-        console.error('Bulk register error:', error);
-        toast.error('An error occurred while bulk registering students');
-    }
-};
-
 // Base columns for suggested courses (without selection)
 const baseSuggestedCoursesColumns: ColumnDef<SuggestedCourse>[] = [
     {
@@ -488,64 +385,10 @@ const registrationStatsColumns: ColumnDef<RegistrationStats['offerings'][0]>[] =
     },
 ];
 
-// Table columns for registrable students
-const registrableStudentsColumns: ColumnDef<RegistrableStudent>[] = [
-    {
-        accessorKey: 'student_id',
-        header: 'Student ID',
-    },
-    {
-        accessorKey: 'student_name',
-        header: 'Student Name',
-        cell: ({ row }) =>
-            h('div', { class: 'max-w-xs' }, [
-                h('div', { class: 'font-medium' }, row.original.student_name),
-                h('div', { class: 'text-sm text-muted-foreground' }, `Semester ${row.original.semester_number}`),
-            ]),
-    },
-    {
-        accessorKey: 'total_courses',
-        header: 'Available Courses',
-        cell: ({ row }) =>
-            h('div', { class: 'text-center' }, [
-                h('div', { class: 'font-medium' }, row.original.total_courses.toString()),
-                h('div', { class: 'text-sm text-muted-foreground' }, `${row.original.available_with_capacity} with capacity`),
-            ]),
-    },
-    {
-        accessorKey: 'available_courses',
-        header: 'Course Details',
-        cell: ({ row }) =>
-            h(
-                'div',
-                { class: 'space-y-1' },
-                row.original.available_courses
-                    .slice(0, 3)
-                    .map((course) =>
-                        h('div', { class: 'text-xs' }, [
-                            h('span', { class: 'font-medium' }, course.unit_code),
-                            ' - ',
-                            h(
-                                'span',
-                                { class: course.has_capacity ? 'text-green-600' : 'text-red-600' },
-                                `${course.current_enrollment}/${course.max_capacity}`,
-                            ),
-                        ]),
-                    )
-                    .concat(
-                        row.original.available_courses.length > 3
-                            ? [h('div', { class: 'text-xs text-muted-foreground' }, `+${row.original.available_courses.length - 3} more`)]
-                            : [],
-                    ),
-            ),
-    },
-];
-
 onMounted(() => {
     if (props.enrollmentStats.total_enrolled > 0) {
         loadSuggestedCourses();
         loadRegistrationStats();
-        loadRegistrableStudents();
     }
 });
 </script>
@@ -608,7 +451,6 @@ onMounted(() => {
         <TabsList>
             <TabsTrigger value="enrollments">Manage Enrollments</TabsTrigger>
             <TabsTrigger value="courses">Suggest Courses</TabsTrigger>
-            <TabsTrigger value="registrations">Course Registrations</TabsTrigger>
             <TabsTrigger value="statistics">Registration Statistics</TabsTrigger>
         </TabsList>
 
@@ -673,65 +515,6 @@ onMounted(() => {
                         empty-message="No course suggestions available. Please generate enrollments first."
                         @selection-change="handleSuggestedCoursesSelection"
                     />
-                </CardContent>
-            </Card>
-        </TabsContent>
-
-        <!-- Step 3: Course Registrations -->
-        <TabsContent value="registrations" class="space-y-4">
-            <Card>
-                <CardHeader>
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Course Registrations</CardTitle>
-                            <CardDescription> Bulk register enrolled students for available course offerings. </CardDescription>
-                        </div>
-                        <div class="flex gap-2">
-                            <Button variant="outline" @click="loadRegistrableStudents" :disabled="loading.registrable">
-                                <Loader2 v-if="loading.registrable" class="mr-2 h-4 w-4 animate-spin" />
-                                Refresh Students
-                            </Button>
-                            <Button @click="openBulkRegisterModal" :disabled="!registrableStudents?.summary?.total_available_registrations">
-                                <Plus class="mr-2 h-4 w-4" />
-                                Bulk Register Students
-                            </Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div v-if="registrableStudents" class="space-y-4">
-                        <!-- Summary Stats -->
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-                            <div class="rounded bg-gray-50 p-3 text-center">
-                                <div class="text-lg font-semibold">{{ registrableStudents.summary.total_students }}</div>
-                                <div class="text-muted-foreground text-sm">Students with Courses</div>
-                            </div>
-                            <div class="rounded bg-gray-50 p-3 text-center">
-                                <div class="text-lg font-semibold">{{ registrableStudents.summary.total_available_registrations }}</div>
-                                <div class="text-muted-foreground text-sm">Available Registrations</div>
-                            </div>
-                            <div class="rounded bg-gray-50 p-3 text-center">
-                                <div class="text-lg font-semibold">{{ registrableStudents.summary.avg_courses_per_student }}</div>
-                                <div class="text-muted-foreground text-sm">Avg Courses/Student</div>
-                            </div>
-                            <div class="rounded bg-gray-50 p-3 text-center">
-                                <div class="text-lg font-semibold">{{ registrableStudents.summary.total_enrollments }}</div>
-                                <div class="text-muted-foreground text-sm">Total Enrollments</div>
-                            </div>
-                        </div>
-
-                        <!-- Students Table -->
-                        <DataTable
-                            :data="registrableStudents.students"
-                            :columns="registrableStudentsColumns"
-                            :loading="loading.registrable"
-                            empty-message="No students with available course registrations."
-                        />
-                    </div>
-                    <div v-else class="text-muted-foreground py-8 text-center">
-                        <div v-if="loading.registrable">Loading registrable students...</div>
-                        <div v-else>No registrable students data available.</div>
-                    </div>
                 </CardContent>
             </Card>
         </TabsContent>
@@ -892,62 +675,6 @@ onMounted(() => {
             <DialogFooter>
                 <Button variant="outline" @click="showSingleOpenModal = false">Cancel</Button>
                 <Button @click="submitSingleOpen"> Create Offering </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
-
-    <!-- Bulk Registration Modal -->
-    <Dialog v-model:open="showBulkRegisterModal">
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Bulk Register Students</DialogTitle>
-                <DialogDescription>
-                    Register all eligible students for their available course offerings based on their curriculum.
-                </DialogDescription>
-            </DialogHeader>
-
-            <div class="grid gap-4 py-4">
-                <div class="grid grid-cols-4 items-center gap-4">
-                    <Label for="registration-method" class="text-right">Registration Method</Label>
-                    <Select v-model="bulkRegisterForm.registration_method">
-                        <SelectTrigger class="col-span-3">
-                            <SelectValue placeholder="Select method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="admin_override">Admin Override</SelectItem>
-                            <SelectItem value="online">Online</SelectItem>
-                            <SelectItem value="advisor">Advisor</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div class="grid grid-cols-4 items-center gap-4">
-                    <Label for="force-registration" class="text-right">Force Registration</Label>
-                    <div class="col-span-3 flex items-center space-x-2">
-                        <input
-                            id="force-registration"
-                            v-model="bulkRegisterForm.force_registration"
-                            type="checkbox"
-                            class="h-4 w-4 rounded border-gray-300"
-                        />
-                        <Label for="force-registration" class="text-muted-foreground text-sm">
-                            Register students even if courses are at capacity
-                        </Label>
-                    </div>
-                </div>
-            </div>
-
-            <div v-if="registrableStudents" class="rounded bg-gray-50 p-4">
-                <div class="mb-2 text-sm font-medium">Registration Summary:</div>
-                <div class="text-muted-foreground space-y-1 text-sm">
-                    <div>• {{ registrableStudents.summary.total_students }} students eligible</div>
-                    <div>• {{ registrableStudents.summary.total_available_registrations }} available registrations</div>
-                    <div>• {{ registrableStudents.summary.avg_courses_per_student }} average courses per student</div>
-                </div>
-            </div>
-
-            <DialogFooter>
-                <Button variant="outline" @click="showBulkRegisterModal = false">Cancel</Button>
-                <Button @click="submitBulkRegister">Register Students</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

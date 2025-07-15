@@ -9,6 +9,7 @@ use App\Models\Syllabus;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\Unit;
+use App\Models\CurriculumUnit;
 use Illuminate\Database\Seeder;
 
 class SyllabusSeeder extends Seeder
@@ -39,44 +40,42 @@ class SyllabusSeeder extends Seeder
 
     private function createSyllabi(): void
     {
-        $courseOfferings = CourseOffering::with(['unit', 'semester'])->get();
+        $curriculumUnits = CurriculumUnit::with(['unit', 'semester'])->get();
 
-        if ($courseOfferings->isEmpty()) {
-            throw new \Exception('Course offerings not found. Please run SemesterAndOfferingSeeder first.');
+        if ($curriculumUnits->isEmpty()) {
+            throw new \Exception('Curriculum units not found. Please ensure curriculum setup is complete.');
         }
 
-        // Group offerings by unit and semester to avoid duplicate syllabi
-        $groupedOfferings = $courseOfferings->groupBy(function ($offering) {
-            return $offering->unit_id . '_' . $offering->semester_id;
-        });
-
-        foreach ($groupedOfferings as $group) {
-            // Take the first offering from each group to create syllabus
-            $courseOffering = $group->first();
-            $this->createSyllabusForOffering($courseOffering);
+        foreach ($curriculumUnits as $curriculumUnit) {
+            $this->createSyllabusForCurriculumUnit($curriculumUnit);
         }
     }
 
-    private function createSyllabusForOffering(CourseOffering $courseOffering): void
+    private function createSyllabusForCurriculumUnit(CurriculumUnit $curriculumUnit): void
     {
-        $unit = $courseOffering->unit;
-        $semester = $courseOffering->semester;
+        $unit = $curriculumUnit->unit;
+        $semester = $curriculumUnit->semester;
+
+        // If no semester assigned to curriculum unit, use current active semester
+        if (!$semester) {
+            $semester = \App\Models\Semester::where('is_active', true)->first();
+        }
 
         // Create syllabus
         $syllabus = Syllabus::create([
-            'unit_id' => $unit->id,
+            'curriculum_unit_id' => $curriculumUnit->id,
             'version' => 'v1.0',
             'description' => $this->generateSyllabusDescription($unit),
             'total_hours' => $this->getTotalHours($unit),
             'hours_per_session' => $this->getHoursPerSession($unit),
-            'semester_id' => $semester->id,
             'is_active' => true,
         ]);
 
         // Create assessment components
         $this->createAssessmentComponents($syllabus, $unit);
 
-        $this->command->info("📋 Created syllabus for {$unit->code} - {$semester->name}");
+        $semesterName = $semester ? $semester->name : 'General';
+        $this->command->info("📋 Created syllabus for {$unit->code} - {$semesterName}");
     }
 
     private function generateSyllabusDescription(Unit $unit): string

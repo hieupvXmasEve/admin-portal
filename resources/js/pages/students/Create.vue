@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { CurriculumVersion, Program, Specialization } from '@/types/models';
@@ -12,6 +13,7 @@ import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, GraduationCap, Phone, Save, User } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { computed, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
 interface Props {
@@ -26,31 +28,58 @@ const props = defineProps<Props>();
 // Form validation schema
 const createStudentSchema = toTypedSchema(
     z.object({
-        full_name: z.string().min(1, 'Full name is required').max(100, 'Full name is too long'),
-        email: z.string().email('Invalid email format').max(255, 'Email is too long'),
-        phone: z.string().max(20, 'Phone number is too long').optional(),
-        date_of_birth: z.string().optional(),
-        gender: z.enum(['male', 'female', 'other']).optional(),
-        nationality: z.string().max(100, 'Nationality is too long').optional(),
-        national_id: z.string().max(20, 'National ID is too long').optional(),
-        address: z.string().optional(),
-        program_id: z.string().min(1, 'Program is required'),
+        full_name: z.string().min(1, 'Full name is required').max(100, 'Full name cannot exceed 100 characters'),
+        email: z.string().email('Please provide a valid email address').max(255, 'Email cannot exceed 255 characters'),
+        phone: z.string().min(1, 'Phone number is required').max(20, 'Phone number cannot exceed 20 characters'),
+        date_of_birth: z.string().min(1, 'Date of birth is required'),
+        gender: z.enum(['male', 'female', 'other'], {
+            errorMap: () => ({ message: 'Gender must be male, female, or other' }),
+        }),
+        nationality: z.string().min(1, 'Nationality is required').max(100, 'Nationality cannot exceed 100 characters'),
+        national_id: z.string().min(1, 'National ID is required').max(20, 'National ID cannot exceed 20 characters'),
+        address: z.string().min(1, 'Address is required'),
+        program_id: z.string().min(1, 'Program selection is required'),
         specialization_id: z.string().min(1, 'Specialization is required'),
         curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
-        admission_date: z.string().min(1, 'Admission date is required'),
-        expected_graduation_date: z.string().optional(),
-        emergency_contact_name: z.string().max(255, 'Emergency contact name is too long').optional(),
-        emergency_contact_phone: z.string().max(20, 'Emergency contact phone is too long').optional(),
-        emergency_contact_relationship: z.string().max(100, 'Emergency contact relationship is too long').optional(),
-        high_school_name: z.string().max(255, 'High school name is too long').optional(),
-        high_school_graduation_year: z.string().optional(),
-        entrance_exam_score: z.string().optional(),
-        admission_notes: z.string().optional(),
+        admission_date: z
+            .string()
+            .min(1, 'Admission date is required')
+            .refine((date) => {
+                const admissionDate = new Date(date);
+                const today = new Date();
+                today.setHours(23, 59, 59, 999); // Set to end of day for comparison
+                return admissionDate <= today;
+            }, 'Admission date cannot be in the future'),
+        emergency_contact_name: z.string().max(255, 'Emergency contact name cannot exceed 255 characters').optional().or(z.literal('')),
+        emergency_contact_phone: z.string().max(20, 'Emergency contact phone cannot exceed 20 characters').optional().or(z.literal('')),
+        emergency_contact_relationship: z
+            .string()
+            .max(100, 'Emergency contact relationship cannot exceed 100 characters')
+            .optional()
+            .or(z.literal('')),
+        high_school_name: z.string().min(1, 'High school name is required').max(255, 'High school name cannot exceed 255 characters'),
+        high_school_graduation_year: z
+            .number()
+            .min(1, 'High school graduation year is required')
+            .refine((year) => {
+                const currentYear = new Date().getFullYear();
+                return year >= 1900 && year <= currentYear + 1;
+            }, 'High school graduation year must be between 1900 and next year'),
+        entrance_exam_score: z
+            .string()
+            .optional()
+            .or(z.literal(''))
+            .refine((score) => {
+                if (!score || score === '') return true;
+                const scoreNum = parseFloat(score);
+                return scoreNum >= 0 && scoreNum <= 100;
+            }, 'Entrance exam score must be between 0 and 100'),
+        admission_notes: z.string().optional().or(z.literal('')),
     }),
 );
 
-// Form validation
-const { handleSubmit, isSubmitting, values, defineField, setFieldValue } = useForm({
+// Form validation with vee-validate
+const { handleSubmit, isSubmitting, values, setFieldValue } = useForm({
     validationSchema: createStudentSchema,
     initialValues: {
         full_name: '',
@@ -64,38 +93,16 @@ const { handleSubmit, isSubmitting, values, defineField, setFieldValue } = useFo
         program_id: '',
         specialization_id: '',
         curriculum_version_id: '',
-        admission_date: '',
-        expected_graduation_date: '',
+        admission_date: new Date().toISOString().split('T')[0],
         emergency_contact_name: '',
         emergency_contact_phone: '',
         emergency_contact_relationship: '',
         high_school_name: '',
-        high_school_graduation_year: '',
+        high_school_graduation_year: 2025,
         entrance_exam_score: '',
         admission_notes: '',
     },
 });
-
-const [fullName, fullNameAttrs] = defineField('full_name');
-const [email, emailAttrs] = defineField('email');
-const [phone, phoneAttrs] = defineField('phone');
-const [dateOfBirth, dateOfBirthAttrs] = defineField('date_of_birth');
-const [gender, genderAttrs] = defineField('gender');
-const [nationality, nationalityAttrs] = defineField('nationality');
-const [nationalId, nationalIdAttrs] = defineField('national_id');
-const [address, addressAttrs] = defineField('address');
-const [programId, programIdAttrs] = defineField('program_id');
-const [specializationId, specializationIdAttrs] = defineField('specialization_id');
-const [curriculumVersionId, curriculumVersionIdAttrs] = defineField('curriculum_version_id');
-const [admissionDate, admissionDateAttrs] = defineField('admission_date');
-const [expectedGraduationDate, expectedGraduationDateAttrs] = defineField('expected_graduation_date');
-const [emergencyContactName, emergencyContactNameAttrs] = defineField('emergency_contact_name');
-const [emergencyContactPhone, emergencyContactPhoneAttrs] = defineField('emergency_contact_phone');
-const [emergencyContactRelationship, emergencyContactRelationshipAttrs] = defineField('emergency_contact_relationship');
-const [highSchoolName, highSchoolNameAttrs] = defineField('high_school_name');
-const [highSchoolGraduationYear, highSchoolGraduationYearAttrs] = defineField('high_school_graduation_year');
-const [entranceExamScore, entranceExamScoreAttrs] = defineField('entrance_exam_score');
-const [admissionNotes, admissionNotesAttrs] = defineField('admission_notes');
 
 // Inertia form for submission
 const createInertiaForm = useInertiaForm({
@@ -103,20 +110,20 @@ const createInertiaForm = useInertiaForm({
     email: '',
     phone: '',
     date_of_birth: '',
-    gender: undefined,
+    gender: '',
     nationality: 'Vietnamese',
     national_id: '',
     address: '',
+    campus_id: '',
     program_id: '',
     specialization_id: '',
     curriculum_version_id: '',
-    admission_date: '',
-    expected_graduation_date: '',
+    admission_date: new Date().toISOString().split('T')[0],
     emergency_contact_name: '',
     emergency_contact_phone: '',
     emergency_contact_relationship: '',
     high_school_name: '',
-    high_school_graduation_year: '',
+    high_school_graduation_year: 2025,
     entrance_exam_score: '',
     admission_notes: '',
 });
@@ -182,9 +189,9 @@ watch(availableCurriculumVersions, (newVersions) => {
     }
 });
 
-// Fix the form submission handler
-const onCreateSubmit = (formValues: any) => {
-    // Convert string values back to appropriate types
+// Form submission handler
+const onCreateSubmit = handleSubmit(async (formValues: any) => {
+    // Convert string values back to appropriate types for backend
     const submitData = {
         ...formValues,
         program_id: parseInt(formValues.program_id),
@@ -194,36 +201,43 @@ const onCreateSubmit = (formValues: any) => {
                 : parseInt(formValues.specialization_id)
             : null,
         curriculum_version_id: parseInt(formValues.curriculum_version_id),
-        high_school_graduation_year: formValues.high_school_graduation_year ? parseInt(formValues.high_school_graduation_year) : null,
+        high_school_graduation_year: formValues.high_school_graduation_year,
         entrance_exam_score: formValues.entrance_exam_score ? parseFloat(formValues.entrance_exam_score) : null,
-        // Remove empty strings
+        // Keep required fields as is, only convert optional fields to null if empty
         phone: formValues.phone || null,
-        date_of_birth: formValues.date_of_birth || null,
-        gender: formValues.gender || null,
-        nationality: formValues.nationality || null,
-        national_id: formValues.national_id || null,
-        address: formValues.address || null,
-        expected_graduation_date: formValues.expected_graduation_date || null,
+        date_of_birth: formValues.date_of_birth,
+        gender: formValues.gender,
+        nationality: formValues.nationality,
+        national_id: formValues.national_id,
+        address: formValues.address,
         emergency_contact_name: formValues.emergency_contact_name || null,
         emergency_contact_phone: formValues.emergency_contact_phone || null,
         emergency_contact_relationship: formValues.emergency_contact_relationship || null,
-        high_school_name: formValues.high_school_name || null,
+        high_school_name: formValues.high_school_name,
         admission_notes: formValues.admission_notes || null,
         campus_id: props.current_campus_id,
     };
 
-    // Update Inertia form data
+    // Update Inertia form with all submit data
     Object.assign(createInertiaForm, submitData);
 
-    createInertiaForm.post(route('students.store'), {
+    createInertiaForm.post(studentRoutes.store(), {
         onSuccess: () => {
+            console.log('Student created successfully');
+            toast.success('Student created successfully');
             router.visit(studentRoutes.list());
         },
         onError: (errors) => {
             console.error('Form submission errors:', errors);
+            toast.error('Failed to create student', {
+                description: JSON.stringify(errors),
+            });
+        },
+        onFinish: () => {
+            console.log('Form submission finished');
         },
     });
-};
+});
 </script>
 
 <template>
@@ -243,7 +257,7 @@ const onCreateSubmit = (formValues: any) => {
         </div>
 
         <!-- Main Form -->
-        <form @submit.prevent="handleSubmit(onCreateSubmit)">
+        <form @submit="onCreateSubmit" class="space-y-6">
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 <!-- Basic Information -->
                 <div class="lg:col-span-2">
@@ -261,7 +275,7 @@ const onCreateSubmit = (formValues: any) => {
                                     <FormItem>
                                         <FormLabel>Full Name *</FormLabel>
                                         <FormControl>
-                                            <Input v-model="fullName" v-bind="fullNameAttrs" placeholder="Enter full name" />
+                                            <Input v-bind="componentField" placeholder="Enter full name" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -271,7 +285,7 @@ const onCreateSubmit = (formValues: any) => {
                                     <FormItem>
                                         <FormLabel>Email *</FormLabel>
                                         <FormControl>
-                                            <Input v-model="email" v-bind="emailAttrs" type="email" placeholder="Enter email" />
+                                            <Input v-bind="componentField" type="email" placeholder="Enter email" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -283,7 +297,7 @@ const onCreateSubmit = (formValues: any) => {
                                     <FormItem>
                                         <FormLabel>Phone</FormLabel>
                                         <FormControl>
-                                            <Input v-model="phone" v-bind="phoneAttrs" placeholder="Enter phone number" />
+                                            <Input v-bind="componentField" placeholder="Enter phone number" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -291,9 +305,9 @@ const onCreateSubmit = (formValues: any) => {
 
                                 <FormField v-slot="{ componentField }" name="date_of_birth">
                                     <FormItem>
-                                        <FormLabel>Date of Birth</FormLabel>
+                                        <FormLabel>Date of Birth *</FormLabel>
                                         <FormControl>
-                                            <Input v-model="dateOfBirth" v-bind="dateOfBirthAttrs" type="date" />
+                                            <Input v-bind="componentField" type="date" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -303,8 +317,8 @@ const onCreateSubmit = (formValues: any) => {
                             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 <FormField v-slot="{ componentField }" name="gender">
                                     <FormItem>
-                                        <FormLabel>Gender</FormLabel>
-                                        <Select v-model="gender" v-bind="genderAttrs">
+                                        <FormLabel>Gender *</FormLabel>
+                                        <Select v-bind="componentField">
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select gender" />
@@ -322,9 +336,9 @@ const onCreateSubmit = (formValues: any) => {
 
                                 <FormField v-slot="{ componentField }" name="nationality">
                                     <FormItem>
-                                        <FormLabel>Nationality</FormLabel>
+                                        <FormLabel>Nationality *</FormLabel>
                                         <FormControl>
-                                            <Input v-model="nationality" v-bind="nationalityAttrs" placeholder="Enter nationality" />
+                                            <Input v-bind="componentField" placeholder="Enter nationality" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -332,9 +346,9 @@ const onCreateSubmit = (formValues: any) => {
 
                                 <FormField v-slot="{ componentField }" name="national_id">
                                     <FormItem>
-                                        <FormLabel>National ID</FormLabel>
+                                        <FormLabel>National ID *</FormLabel>
                                         <FormControl>
-                                            <Input v-model="nationalId" v-bind="nationalIdAttrs" placeholder="Enter national ID" />
+                                            <Input v-bind="componentField" placeholder="Enter national ID" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -343,9 +357,9 @@ const onCreateSubmit = (formValues: any) => {
 
                             <FormField v-slot="{ componentField }" name="address">
                                 <FormItem>
-                                    <FormLabel>Address</FormLabel>
+                                    <FormLabel>Address *</FormLabel>
                                     <FormControl>
-                                        <Textarea v-model="address" v-bind="addressAttrs" placeholder="Enter address" />
+                                        <Textarea v-bind="componentField" placeholder="Enter address" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -368,7 +382,7 @@ const onCreateSubmit = (formValues: any) => {
                             <FormField v-slot="{ componentField }" name="program_id">
                                 <FormItem>
                                     <FormLabel>Program *</FormLabel>
-                                    <Select v-model="programId" v-bind="programIdAttrs">
+                                    <Select v-bind="componentField">
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select program" />
@@ -386,8 +400,8 @@ const onCreateSubmit = (formValues: any) => {
 
                             <FormField v-slot="{ componentField }" name="specialization_id">
                                 <FormItem>
-                                    <FormLabel>Specialization</FormLabel>
-                                    <Select v-model="specializationId" v-bind="specializationIdAttrs" :disabled="!filteredSpecializations.length">
+                                    <FormLabel>Specialization *</FormLabel>
+                                    <Select v-bind="componentField" :disabled="!filteredSpecializations.length">
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select specialization" />
@@ -411,11 +425,7 @@ const onCreateSubmit = (formValues: any) => {
                             <FormField v-slot="{ componentField }" name="curriculum_version_id">
                                 <FormItem>
                                     <FormLabel>Curriculum Version *</FormLabel>
-                                    <Select
-                                        v-model="curriculumVersionId"
-                                        v-bind="curriculumVersionIdAttrs"
-                                        :disabled="!availableCurriculumVersions.length"
-                                    >
+                                    <Select v-bind="componentField" :disabled="!availableCurriculumVersions.length">
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select curriculum version" />
@@ -440,17 +450,7 @@ const onCreateSubmit = (formValues: any) => {
                                     <FormItem>
                                         <FormLabel>Admission Date *</FormLabel>
                                         <FormControl>
-                                            <Input v-model="admissionDate" v-bind="admissionDateAttrs" type="date" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-
-                                <FormField v-slot="{ componentField }" name="expected_graduation_date">
-                                    <FormItem>
-                                        <FormLabel>Expected Graduation Date</FormLabel>
-                                        <FormControl>
-                                            <Input v-model="expectedGraduationDate" v-bind="expectedGraduationDateAttrs" type="date" />
+                                            <Input v-bind="componentField" type="date" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -477,7 +477,7 @@ const onCreateSubmit = (formValues: any) => {
                             <FormItem>
                                 <FormLabel>Contact Name</FormLabel>
                                 <FormControl>
-                                    <Input v-model="emergencyContactName" v-bind="emergencyContactNameAttrs" placeholder="Enter contact name" />
+                                    <Input v-bind="componentField" placeholder="Enter contact name" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -488,11 +488,7 @@ const onCreateSubmit = (formValues: any) => {
                                 <FormItem>
                                     <FormLabel>Contact Phone</FormLabel>
                                     <FormControl>
-                                        <Input
-                                            v-model="emergencyContactPhone"
-                                            v-bind="emergencyContactPhoneAttrs"
-                                            placeholder="Enter contact phone"
-                                        />
+                                        <Input v-bind="componentField" placeholder="Enter contact phone" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -502,11 +498,7 @@ const onCreateSubmit = (formValues: any) => {
                                 <FormItem>
                                     <FormLabel>Relationship</FormLabel>
                                     <FormControl>
-                                        <Input
-                                            v-model="emergencyContactRelationship"
-                                            v-bind="emergencyContactRelationshipAttrs"
-                                            placeholder="e.g., Parent, Guardian"
-                                        />
+                                        <Input v-bind="componentField" placeholder="e.g., Parent, Guardian" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -527,9 +519,9 @@ const onCreateSubmit = (formValues: any) => {
                     <CardContent class="space-y-4">
                         <FormField v-slot="{ componentField }" name="high_school_name">
                             <FormItem>
-                                <FormLabel>High School Name</FormLabel>
+                                <FormLabel>High School Name *</FormLabel>
                                 <FormControl>
-                                    <Input v-model="highSchoolName" v-bind="highSchoolNameAttrs" placeholder="Enter high school name" />
+                                    <Input v-bind="componentField" placeholder="Enter high school name" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -538,15 +530,18 @@ const onCreateSubmit = (formValues: any) => {
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <FormField v-slot="{ componentField }" name="high_school_graduation_year">
                                 <FormItem>
-                                    <FormLabel>Graduation Year</FormLabel>
+                                    <FormLabel>Graduation Year *</FormLabel>
                                     <FormControl>
-                                        <Input
-                                            v-model="highSchoolGraduationYear"
-                                            v-bind="highSchoolGraduationYearAttrs"
-                                            type="number"
-                                            placeholder="Enter year"
-                                            min="1900"
+                                        <NumberInput
+                                            :model-value="componentField.modelValue"
+                                            @update:model-value="componentField['onUpdate:modelValue']"
+                                            :min="2000"
                                             :max="new Date().getFullYear() + 1"
+                                            :allow-decimal="false"
+                                            :allow-negative="false"
+                                            placeholder="Enter year"
+                                            :name="componentField.name"
+                                            @blur="componentField.onBlur"
                                         />
                                     </FormControl>
                                     <FormMessage />
@@ -557,15 +552,7 @@ const onCreateSubmit = (formValues: any) => {
                                 <FormItem>
                                     <FormLabel>Entrance Exam Score</FormLabel>
                                     <FormControl>
-                                        <Input
-                                            v-model="entranceExamScore"
-                                            v-bind="entranceExamScoreAttrs"
-                                            type="number"
-                                            placeholder="Enter score"
-                                            min="0"
-                                            max="100"
-                                            step="0.01"
-                                        />
+                                        <Input v-bind="componentField" type="number" placeholder="Enter score" min="0" max="100" step="0.01" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -576,7 +563,7 @@ const onCreateSubmit = (formValues: any) => {
                             <FormItem>
                                 <FormLabel>Admission Notes</FormLabel>
                                 <FormControl>
-                                    <Textarea v-model="admissionNotes" v-bind="admissionNotesAttrs" placeholder="Enter any additional notes" />
+                                    <Textarea v-bind="componentField" placeholder="Enter any additional notes" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -590,7 +577,7 @@ const onCreateSubmit = (formValues: any) => {
                 <Button type="button" variant="outline" @click="router.visit(studentRoutes.list())"> Cancel </Button>
                 <Button type="submit" :disabled="isSubmitting || createInertiaForm.processing">
                     <Save class="mr-2 h-4 w-4" />
-                    Create Student
+                    {{ isSubmitting || createInertiaForm.processing ? 'Creating...' : 'Create Student' }}
                 </Button>
             </div>
         </form>

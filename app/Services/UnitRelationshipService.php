@@ -221,16 +221,14 @@ class UnitRelationshipService
             // Get units this unit is equivalent to (outgoing relationships)
             $outgoingEquivalents = EquivalentUnit::where('unit_id', $currentUnit->id)
                 ->with([
-                    'equivalentUnit',
-                    'validFromSemester'
+                    'equivalentUnit'
                 ])
                 ->get();
 
             // Get units that are equivalent to this unit (incoming relationships)
             $incomingEquivalents = EquivalentUnit::where('equivalent_unit_id', $currentUnit->id)
                 ->with([
-                    'unit',
-                    'validFromSemester'
+                    'unit'
                 ])
                 ->get();
 
@@ -241,7 +239,7 @@ class UnitRelationshipService
                         'id' => $equivalent->id,
                         'unit' => $equivalent->equivalentUnit,
                         'reason' => $equivalent->reason,
-                        'valid_from_semester' => $equivalent->validFromSemester,
+                        'valid_from_semester' => null, // Field not available in current schema
                         'relationship_type' => 'equivalent_to' // This unit is equivalent to the found unit
                     ]);
 
@@ -257,7 +255,7 @@ class UnitRelationshipService
                         'id' => $equivalent->id,
                         'unit' => $equivalent->unit,
                         'reason' => $equivalent->reason,
-                        'valid_from_semester' => $equivalent->validFromSemester,
+                        'valid_from_semester' => null, // Field not available in current schema
                         'relationship_type' => 'equivalent_from' // The found unit is equivalent to this unit
                     ]);
 

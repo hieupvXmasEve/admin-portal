@@ -98,11 +98,11 @@ class SpecializationController extends Controller
 
     public function create(Request $request): Response
     {
-        $programId = $request->query('program_id');
+        // $programId = $request->query('program_id');
 
         return Inertia::render('specializations/Create', [
             'programs' => Program::orderBy('name')->get(['id', 'name']),
-            'selectedProgramId' => $programId ? (int) $programId : null,
+            // 'selectedProgramId' => $programId ? (int) $programId : null,
         ]);
     }
 
@@ -187,7 +187,7 @@ class SpecializationController extends Controller
         try {
             DB::beginTransaction();
 
-            $specialization->update($request->validated());
+            $this->specializationService->updateSpecialization($specialization, $request->validated());
 
             DB::commit();
 
@@ -221,15 +221,10 @@ class SpecializationController extends Controller
     public function destroy(Specialization $specialization): RedirectResponse
     {
         try {
-            // Check if specialization has any curriculum versions
-            if ($specialization->curriculumVersions()->count() > 0) {
-                return back()->withErrors(['error' => 'Cannot delete specialization with existing curriculum versions.']);
-            }
-
             DB::beginTransaction();
 
             $specializationName = $specialization->name;
-            $specialization->delete();
+            $this->specializationService->deleteSpecialization($specialization);
 
             DB::commit();
 
@@ -240,25 +235,17 @@ class SpecializationController extends Controller
             DB::rollBack();
             Log::error('Specialization deletion failed: ' . $e->getMessage());
 
-            return back()->withErrors(['error' => 'Failed to delete specialization. Please try again.']);
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
 
     public function apiDestroy(Specialization $specialization)
     {
         try {
-            // Check if specialization has any curriculum versions
-            if ($specialization->curriculumVersions()->count() > 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cannot delete specialization with existing curriculum versions.'
-                ], 400);
-            }
-
             DB::beginTransaction();
 
             $specializationName = $specialization->name;
-            $specialization->delete();
+            $this->specializationService->deleteSpecialization($specialization);
 
             DB::commit();
 
@@ -272,7 +259,7 @@ class SpecializationController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete specialization. Please try again.'
+                'message' => $e->getMessage()
             ], 500);
         }
     }
@@ -287,29 +274,15 @@ class SpecializationController extends Controller
         try {
             DB::beginTransaction();
 
-            $specializations = Specialization::whereIn('id', $validated['specialization_ids'])->get();
-            $deleted = [];
-            $failed = [];
-
-            foreach ($specializations as $specialization) {
-                if ($specialization->curriculumVersions()->count() > 0) {
-                    $failed[] = [
-                        'name' => $specialization->name,
-                        'reason' => 'Has existing curriculum versions'
-                    ];
-                } else {
-                    $deleted[] = $specialization->name;
-                    $specialization->delete();
-                }
-            }
+            $result = $this->specializationService->bulkDeleteSpecializations($validated['specialization_ids']);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'deleted' => $deleted,
-                'failed' => $failed,
-                'message' => count($deleted) . ' specializations deleted successfully.'
+                'deleted' => $result['deleted'],
+                'failed' => $result['failed'],
+                'message' => count($result['deleted']) . ' specializations deleted successfully.'
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

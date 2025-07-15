@@ -30,11 +30,11 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
             throw new \Exception('SPRING2025 semester not found. Please create semester first.');
         }
 
-        // Get all active students
-        $students = Student::where('status', 'active')->get();
+        // Get all students (active or suspended)
+        $students = Student::whereIn('status', ['active', 'suspended'])->get();
 
         if ($students->isEmpty()) {
-            throw new \Exception('No active students found.');
+            throw new \Exception('No students found.');
         }
 
         $eligibleCount = 0;
@@ -82,9 +82,9 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
             ->latest('calculated_at')
             ->first();
 
-        if ($latestGPA && $latestGPA->gpa < 1.0) {
+        if ($latestGPA && $latestGPA->gpa < 0.5) {
             $eligible = false;
-            $reasons[] = 'GPA below minimum threshold (1.0)';
+            $reasons[] = 'GPA below minimum threshold (0.5)';
 
             // Create academic suspension hold
             $this->createAcademicSuspensionHold($student, $semester);
@@ -180,7 +180,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
             'hold_type' => 'academic',
             'hold_category' => 'all',
             'title' => 'Academic Suspension',
-            'description' => 'Student suspended from enrollment due to extremely poor academic performance (GPA < 1.0). Academic appeal process required.',
+            'description' => 'Student suspended from enrollment due to extremely poor academic performance (GPA < 0.5). Academic appeal process required.',
             'amount' => null,
             'priority' => 'high',
             'status' => 'active',
@@ -195,7 +195,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
         // Update student status
         $student->update([
             'status' => 'suspended',
-            'admission_notes' => 'Academic suspension due to GPA below 1.0'
+            'admission_notes' => 'Academic suspension due to GPA below 0.5'
         ]);
     }
 }

@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Database\Seeders\InitialSetup\InitialSeederRunner;
+use Database\Seeders\Timeline\TimelineSeederRunner;
 
 class DatabaseSeeder extends Seeder
 {
@@ -11,6 +13,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([]);
+        $this->call([
+            InitialSeederRunner::class,
+            // TimelineSeederRunner::class,
+
+            // This seeder should be run manually when permissions are updated
+            // UpdatePermissionsSeeder::class,
+        ]);
     }
 }

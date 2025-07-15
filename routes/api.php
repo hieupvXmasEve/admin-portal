@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\ProgramController;
+use App\Http\Controllers\Api\SyllabusController;
 
 /*
 |--------------------------------------------------------------------------
@@ -91,6 +92,13 @@ Route::name('api.admin.')->middleware(['auth:sanctum', 'admin'])->group(function
 
     // Program Management
     Route::apiResource('programs', ProgramController::class);
+
+    // Syllabus Management
+    Route::prefix('units/{unit}/syllabus')->name('syllabus.')->group(function () {
+        Route::get('/', [SyllabusController::class, 'index'])->name('index');
+        Route::get('/active', [SyllabusController::class, 'active'])->name('active');
+        Route::get('/{syllabus}', [SyllabusController::class, 'show'])->name('show');
+    });
 
     // Student Management
     Route::get('/students/search', [WebStudentController::class, 'apiSearch'])->name('students.search');

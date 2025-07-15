@@ -6,9 +6,9 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { BreadcrumbItem } from '@/types';
 import type { Program } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
+import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Plus } from 'lucide-vue-next';
@@ -30,17 +30,6 @@ const sourceFromUrl = urlParams.get('source');
 
 // Use selectedProgramId prop or URL parameter
 const initialProgramId = props.selectedProgramId?.toString() || programIdFromUrl || '';
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Specializations',
-        href: '/specializations',
-    },
-    {
-        title: 'Create',
-        href: '/specializations/create',
-    },
-];
 
 // Define validation schema
 const formSchema = toTypedSchema(
@@ -109,14 +98,7 @@ const onSubmit = handleSubmit((values) => {
         </div>
 
         <div class="flex flex-wrap gap-2">
-            <Link :href="route('programs.show', { program: programIdFromUrl })">
-                <Button variant="outline">
-                    <ArrowLeft class="mr-2 h-4 w-4" />
-                    Back to programs
-                </Button>
-            </Link>
-
-            <Link :href="route('specializations.index')">
+            <Link :href="curriculumRoutes.specializations.index()">
                 <Button variant="outline">
                     <ArrowLeft class="mr-2 h-4 w-4" />
                     Back to Specializations
@@ -207,7 +189,7 @@ const onSubmit = handleSubmit((values) => {
                 </FormField>
 
                 <div class="flex justify-end gap-3">
-                    <Link :href="route('specializations.index')">
+                    <Link :href="curriculumRoutes.specializations.index()">
                         <Button type="button" variant="outline"> Cancel </Button>
                     </Link>
                     <Button type="submit" :disabled="isSubmitting">

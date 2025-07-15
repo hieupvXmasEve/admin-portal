@@ -45,7 +45,7 @@ class SemesterAndOfferingSeeder extends Seeder
                 'end_date' => '2025-05-31',
                 'enrollment_start_date' => '2025-01-15',
                 'enrollment_end_date' => '2025-02-15',
-                'is_active' => true,
+                'is_active' => false,
                 'is_archived' => false,
             ]
         );
@@ -54,11 +54,11 @@ class SemesterAndOfferingSeeder extends Seeder
             ['code' => 'SUMMER2025'],
             [
                 'name' => 'Summer Semester 2025',
-                'start_date' => '2025-06-01',
-                'end_date' => '2025-08-31',
-                'enrollment_start_date' => '2025-05-15',
-                'enrollment_end_date' => '2025-06-15',
-                'is_active' => false,
+                'start_date' => '2025-07-01',
+                'end_date' => '2025-09-30',
+                'enrollment_start_date' => '2025-06-15',
+                'enrollment_end_date' => '2025-07-15',
+                'is_active' => true,
                 'is_archived' => false,
             ]
         );

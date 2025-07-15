@@ -20,23 +20,22 @@ class StoreStudentRequest extends FormRequest
         return [
             'full_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'unique:students,email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:20'],
-            'date_of_birth' => ['nullable', 'date'],
-            'gender' => ['nullable', 'string', 'in:male,female,other'],
-            'nationality' => ['nullable', 'string', 'max:100'],
-            'national_id' => ['nullable', 'string', 'max:20'],
-            'address' => ['nullable', 'string'],
-            'campus_id' => ['nullable', 'exists:campuses,id'], // Optional if taken from session
+            'phone' => ['required', 'string', 'max:20'],
+            'date_of_birth' => ['required', 'date'],
+            'gender' => ['required', 'string', 'in:male,female,other'],
+            'nationality' => ['required', 'string', 'max:100'],
+            'national_id' => ['required', 'string', 'max:20'],
+            'address' => ['required', 'string'],
+            'campus_id' => ['required', 'exists:campuses,id'], // Optional if taken from session
             'program_id' => ['required', 'exists:programs,id'],
-            'specialization_id' => ['nullable', 'exists:specializations,id'],
+            'specialization_id' => ['required', 'exists:specializations,id'],
             'curriculum_version_id' => ['required', 'exists:curriculum_versions,id'],
             'admission_date' => ['required', 'date', 'before_or_equal:today'],
-            'expected_graduation_date' => ['nullable', 'date', 'after:admission_date'],
             'emergency_contact_name' => ['nullable', 'string', 'max:255'],
             'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
             'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
-            'high_school_name' => ['nullable', 'string', 'max:255'],
-            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
+            'high_school_name' => ['required', 'string', 'max:255'],
+            'high_school_graduation_year' => ['required', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
         ];
@@ -51,6 +50,7 @@ class StoreStudentRequest extends FormRequest
             'email.email' => 'Please provide a valid email address',
             'email.unique' => 'This email is already registered',
             'email.max' => 'Email cannot exceed 255 characters',
+
             'phone.max' => 'Phone number cannot exceed 20 characters',
             'gender.in' => 'Gender must be male, female, or other',
             'nationality.max' => 'Nationality cannot exceed 100 characters',
@@ -62,8 +62,8 @@ class StoreStudentRequest extends FormRequest
             'admission_date.required' => 'Admission date is required',
             'admission_date.date' => 'Please provide a valid admission date',
             'admission_date.before_or_equal' => 'Admission date cannot be in the future',
-            'expected_graduation_date.date' => 'Please provide a valid expected graduation date',
-            'expected_graduation_date.after' => 'Expected graduation date must be after admission date',
+            // 'expected_graduation_date.date' => 'Please provide a valid expected graduation date',
+            // 'expected_graduation_date.after' => 'Expected graduation date must be after admission date',
             'emergency_contact_name.max' => 'Emergency contact name cannot exceed 255 characters',
             'emergency_contact_phone.max' => 'Emergency contact phone cannot exceed 20 characters',
             'emergency_contact_relationship.max' => 'Emergency contact relationship cannot exceed 100 characters',
@@ -85,11 +85,11 @@ class StoreStudentRequest extends FormRequest
             ]);
         }
 
-        if ($this->has('expected_graduation_date') && $this->expected_graduation_date) {
-            $this->merge([
-                'expected_graduation_date' => date('Y-m-d', strtotime($this->expected_graduation_date))
-            ]);
-        }
+        // if ($this->has('expected_graduation_date') && $this->expected_graduation_date) {
+        //     $this->merge([
+        //         'expected_graduation_date' => date('Y-m-d', strtotime($this->expected_graduation_date))
+        //     ]);
+        // }
 
         if ($this->has('date_of_birth') && $this->date_of_birth) {
             $this->merge([

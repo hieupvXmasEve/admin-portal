@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import Tooltip from '@/components/ui/tooltip/Tooltip.vue';
+import TooltipContent from '@/components/ui/tooltip/TooltipContent.vue';
+import TooltipProvider from '@/components/ui/tooltip/TooltipProvider.vue';
+import TooltipTrigger from '@/components/ui/tooltip/TooltipTrigger.vue';
 import type { PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -28,7 +32,7 @@ interface Props {
     deliveryModeOptions: { value: string; label: string }[];
 }
 const props = defineProps<Props>();
-console.log(props.courseOfferings);
+console.log(props.courseOfferings.data);
 const filters = ref({
     search: props.filters.search || '',
     semester_id: props.filters.semester_id || 'all',
@@ -243,7 +247,7 @@ const columns: ColumnDef<CourseOffering>[] = [
         cell: ({ row }) => {
             const course = row.original;
             return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'font-medium' }, course.unit?.code || 'N/A'),
+                h('div', { class: 'font-medium' }, course.curriculum_unit.unit.code || 'N/A'),
                 course.section_code && h('div', { class: 'text-sm text-muted-foreground' }, `Section: ${course.section_code}`),
             ]);
         },
@@ -254,8 +258,9 @@ const columns: ColumnDef<CourseOffering>[] = [
         cell: ({ row }) => {
             const course = row.original;
             return h('div', { class: 'max-w-xs' }, [
-                h('div', { class: 'font-medium truncate' }, course.unit?.name || 'N/A'),
-                course.unit?.credit_points && h('div', { class: 'text-sm text-muted-foreground' }, `${course.unit.credit_points} credits`),
+                h('div', { class: 'font-medium truncate' }, course.curriculum_unit.unit.name || 'N/A'),
+                course.curriculum_unit.unit.credit_points &&
+                    h('div', { class: 'text-sm text-muted-foreground' }, `${course.curriculum_unit.unit.credit_points} credits`),
             ]);
         },
     },
@@ -498,7 +503,72 @@ const columns: ColumnDef<CourseOffering>[] = [
     <!-- Data Table -->
     <Card>
         <CardContent class="px-4">
-            <DataTable :data="courseOfferings.data" :columns="columns" :loading="isLoading" v-model:selected="selectedItems" row-key="id" />
+            <DataTable :data="courseOfferings.data" :columns="columns" :loading="isLoading" v-model:selected="selectedItems" row-key="id">
+                <template #cell-actions="{ row }">
+                    <div class="flex items-center gap-2">
+                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        @click="router.visit(`/course-offerings/${row.original.id}`)"
+                                        title="View course offering"
+                                    >
+                                        <Eye class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>View course offering</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+
+                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        @click="router.visit(`/course-offerings/${row.original.id}/edit`)"
+                                        title="Edit course offering"
+                                    >
+                                        <Edit class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Edit course offering</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button variant="ghost" size="sm" @click="toggleStatus(row.original)" title="Toggle course offering status">
+                                        <ToggleRight class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>{{ row.original.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration' }}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+
+                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button variant="ghost" size="sm" @click="deleteCourseOffering(row.original)" title="Delete program">
+                                        <Trash2 class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Delete course offering</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                </template>
+            </DataTable>
         </CardContent>
     </Card>
 

@@ -21,11 +21,11 @@ class CourseExemptionSeeder extends Seeder
     {
         $this->command->info('📜 Processing course exemptions...');
 
-        // Get active students
-        $students = Student::where('status', 'active')->get();
+        // Get students (active or suspended but not dropped/graduated)
+        $students = Student::whereNotIn('status', ['dropped', 'graduated'])->get();
 
         if ($students->isEmpty()) {
-            throw new \Exception('No active students found.');
+            throw new \Exception('No students found.');
         }
 
         // Get SPRING2025 semester for dating exemptions

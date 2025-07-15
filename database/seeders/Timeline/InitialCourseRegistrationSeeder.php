@@ -22,20 +22,24 @@ class InitialCourseRegistrationSeeder extends Seeder
     {
         $this->command->info('📝 Registering students for FALL2024 courses...');
 
-        // Get active students and FALL2024 semester
-        $students = Student::where('status', 'active')->get();
+        // Get students (active or suspended) and FALL2024 semester
+        $students = Student::whereIn('status', ['active', 'suspended'])->get();
         $semester = Semester::where('code', 'FALL2024')->first();
 
         if ($students->isEmpty()) {
-            throw new \Exception('No active students found. Please run previous seeders first.');
+            throw new \Exception('No students found. Please run previous seeders first.');
         }
 
         if (!$semester) {
             throw new \Exception('FALL2024 semester not found.');
         }
 
-        // Clean existing registrations for this semester
-        CourseRegistration::where('semester_id', $semester->id)->delete();
+        // Check if registrations already exist for this semester
+        $existingRegistrations = CourseRegistration::where('semester_id', $semester->id)->count();
+        if ($existingRegistrations > 0) {
+            $this->command->info("✅ Course registrations already exist for FALL2024 ({$existingRegistrations} found). Skipping creation.");
+            return;
+        }
 
         $registrationCount = 0;
 
@@ -54,37 +58,39 @@ class InitialCourseRegistrationSeeder extends Seeder
     private function registerStudentForCourses(Student $student, Semester $semester): void
     {
         // Get first semester units for this student's curriculum
-        $firstSemesterUnits = $this->getFirstSemesterUnits($student);
+        $eligibleUnits = $this->getFirstSemesterUnits($student);
 
-        if ($firstSemesterUnits->isEmpty()) {
-            $this->command->warn("No first semester units found for student {$student->student_id}");
-            return;
-        }
-
-        foreach ($firstSemesterUnits as $curriculumUnit) {
-            // Find available course offering for this unit
-            $courseOffering = $this->findAvailableCourseOffering($curriculumUnit->unit_id, $semester->id);
-
-            if (!$courseOffering) {
-                $this->command->warn("No course offering found for unit {$curriculumUnit->unit->code}");
+        foreach ($eligibleUnits as $unitId) {
+            // Check prerequisite requirements before registration
+            if (!$this->checkPrerequisiteRequirements($student, $unitId)) {
+                $this->command->warn("  Student {$student->student_id} does not meet prerequisites for unit {$unitId}");
                 continue;
             }
 
-            // Register student for the course
-            $this->createCourseRegistration($student, $courseOffering, $semester);
+            // Check if student has active academic holds that restrict registration
+            if (!$this->checkAcademicHoldRestrictions($student, $unitId)) {
+                $this->command->warn("  Student {$student->student_id} has academic holds restricting registration for unit {$unitId}");
+                continue;
+            }
 
-            // Update course offering enrollment count
-            $courseOffering->increment('current_enrollment');
+            $courseOffering = $this->findAvailableCourseOffering($unitId, $semester->id);
+
+            if ($courseOffering && ($courseOffering->max_capacity - $courseOffering->current_enrollment) > 0) {
+                $this->createCourseRegistration($student, $courseOffering, $semester);
+                $this->command->info("  ✓ Registered {$student->student_id} for {$courseOffering->unit->unit_code}");
+            } else {
+                $this->command->warn("  No available spots for unit {$unitId}");
+            }
         }
     }
 
-    private function getFirstSemesterUnits(Student $student)
+    private function getFirstSemesterUnits(Student $student): array
     {
-        // Get units for semester 1 from student's curriculum
-        return CurriculumUnit::with('unit')
-            ->where('curriculum_version_id', $student->curriculum_version_id)
+        // Get unit IDs for semester 1 from student's curriculum
+        return CurriculumUnit::where('curriculum_version_id', $student->curriculum_version_id)
             ->where('semester_number', 1)
-            ->get();
+            ->pluck('unit_id')
+            ->toArray();
     }
 
     private function findAvailableCourseOffering(int $unitId, int $semesterId): ?CourseOffering
@@ -153,5 +159,185 @@ class InitialCourseRegistrationSeeder extends Seeder
         // Random date within enrollment period
         $daysDiff = (int) $startDate->diffInDays($endDate);
         return $startDate->copy()->addDays(rand(0, $daysDiff));
+    }
+
+    /**
+     * Check if student meets prerequisite requirements for a unit
+     */
+    private function checkPrerequisiteRequirements(Student $student, int $unitId): bool
+    {
+        // Get all prerequisite groups for this unit
+        $prerequisiteGroups = \App\Models\UnitPrerequisiteGroup::where('unit_id', $unitId)->get();
+
+        if ($prerequisiteGroups->isEmpty()) {
+            return true; // No prerequisites required
+        }
+
+        foreach ($prerequisiteGroups as $group) {
+            $groupSatisfied = $this->checkPrerequisiteGroup($student, $group);
+
+            // If any group is satisfied, student can register
+            if ($groupSatisfied) {
+                return true;
+            }
+        }
+
+        return false; // No prerequisite groups satisfied
+    }
+
+    /**
+     * Check if a prerequisite group is satisfied
+     */
+    private function checkPrerequisiteGroup(Student $student, $group): bool
+    {
+        $conditions = $group->conditions;
+        $satisfiedConditions = 0;
+        $totalConditions = $conditions->count();
+
+        foreach ($conditions as $condition) {
+            if ($this->checkPrerequisiteCondition($student, $condition)) {
+                $satisfiedConditions++;
+            }
+        }
+
+        // Check based on logic operator
+        if ($group->logic_operator === 'AND') {
+            return $satisfiedConditions === $totalConditions;
+        } else { // OR
+            return $satisfiedConditions > 0;
+        }
+    }
+
+    /**
+     * Check individual prerequisite condition
+     */
+    private function checkPrerequisiteCondition(Student $student, $condition): bool
+    {
+        switch ($condition->type) {
+            case 'prerequisite':
+                // Check if student has passed the required unit
+                return $this->hasPassedUnit($student, $condition->required_unit_id);
+
+            case 'co_requisite':
+                // Check if student is currently enrolled or has passed
+                return $this->hasPassedOrEnrolledUnit($student, $condition->required_unit_id);
+
+            case 'credit_requirement':
+                // Check if student has minimum credits
+                return $this->hasMinimumCredits($student, $condition->required_credits);
+
+            case 'anti_requisite':
+                // Check if student has NOT taken this unit
+                return !$this->hasAttemptedUnit($student, $condition->required_unit_id);
+
+            case 'assumed_knowledge':
+            case 'textual':
+                // For first semester, assume these are satisfied
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Check if student has active holds that restrict course registration
+     */
+    private function checkAcademicHoldRestrictions(Student $student, int $unitId): bool
+    {
+        $activeHolds = $student->academicHolds()->where('status', 'active')->get();
+
+        foreach ($activeHolds as $hold) {
+            // Check hold type and restrictions
+            switch ($hold->hold_type) {
+                case 'academic_probation':
+                    // Allow registration but with restrictions on advanced courses
+                    $unit = \App\Models\Unit::find($unitId);
+                    if ($unit && $this->isAdvancedUnit($unit)) {
+                        return false; // Block advanced units for probation students
+                    }
+                    break;
+
+                case 'financial_hold':
+                case 'disciplinary_hold':
+                    return false; // Block all registrations
+
+                case 'prerequisite_violation':
+                    // Only block if this specific unit has unmet prerequisites
+                    return $this->checkPrerequisiteRequirements($student, $unitId);
+            }
+        }
+
+        return true; // No restricting holds
+    }
+
+    /**
+     * Helper method to check if unit is advanced level
+     */
+    private function isAdvancedUnit($unit): bool
+    {
+        // Check if unit code indicates advanced level (e.g., 300+ level)
+        if (preg_match('/(\d{3})/', $unit->unit_code, $matches)) {
+            $level = (int) $matches[1];
+            return $level >= 300; // 300+ level courses are advanced
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if student has passed a specific unit
+     */
+    private function hasPassedUnit(Student $student, int $unitId): bool
+    {
+        return $student->academicRecords()
+            ->where('unit_id', $unitId)
+            ->where('grade_status', 'final')
+            ->where('final_letter_grade', '!=', 'F')
+            ->where('final_letter_grade', '!=', 'WF')
+            ->exists();
+    }
+
+    /**
+     * Check if student has passed or is currently enrolled in a unit
+     */
+    private function hasPassedOrEnrolledUnit(Student $student, int $unitId): bool
+    {
+        // Check if passed
+        if ($this->hasPassedUnit($student, $unitId)) {
+            return true;
+        }
+
+        // Check if currently enrolled
+        return $student->courseRegistrations()
+            ->whereHas('courseOffering', function ($query) use ($unitId) {
+                $query->where('unit_id', $unitId);
+            })
+            ->where('registration_status', 'registered')
+            ->exists();
+    }
+
+    /**
+     * Check if student has minimum credit hours
+     */
+    private function hasMinimumCredits(Student $student, int $requiredCredits): bool
+    {
+        $earnedCredits = $student->academicRecords()
+            ->where('grade_status', 'final')
+            ->where('final_letter_grade', '!=', 'F')
+            ->where('final_letter_grade', '!=', 'WF')
+            ->sum('credit_hours_earned');
+
+        return $earnedCredits >= $requiredCredits;
+    }
+
+    /**
+     * Check if student has attempted a unit (regardless of outcome)
+     */
+    private function hasAttemptedUnit(Student $student, int $unitId): bool
+    {
+        return $student->academicRecords()
+            ->where('unit_id', $unitId)
+            ->exists();
     }
 }

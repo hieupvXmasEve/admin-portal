@@ -74,7 +74,7 @@ export interface CurriculumUnit {
     note?: string;
     created_at: string;
     updated_at: string;
-    unit?: Unit;
+    unit: Unit;
     curriculum_version?: CurriculumVersion;
 }
 
@@ -178,22 +178,33 @@ export interface Student {
     student_id: string;
     full_name: string;
     email: string;
-    phone?: string;
+    phone: string;
     status: 'admitted' | 'active' | 'inactive' | 'graduated' | 'dropped_out';
-    admission_date?: string; // ISO date string
+    admission_date: string;
     admission_notes?: string;
-    expected_graduation_date?: string;
+    // expected_graduation_date?: string;
+    date_of_birth: string;
+    gender: 'male' | 'female' | 'other';
+    nationality: string;
+    national_id: string;
+    address: string;
+    high_school_name: string;
+    high_school_graduation_year: string;
+    entrance_exam_score?: string;
+    emergency_contact_name?: string;
+    emergency_contact_phone?: string;
+    emergency_contact_relationship?: string;
 
     // Relationships
     campus_id: number;
     program_id: number;
-    specialization_id?: number;
+    specialization_id: number;
     curriculum_version_id: number;
 
-    campus?: Campus;
-    program?: Program;
-    specialization?: Specialization;
-    curriculum_version?: CurriculumVersion;
+    campus: Campus;
+    program: Program;
+    specialization: Specialization;
+    curriculum_version: CurriculumVersion;
 
     // Computed fields
     display_name?: string;
@@ -306,11 +317,18 @@ export interface BuildingFormData {
     description?: string;
     address?: string;
 }
-
+export enum ScheduleDay {
+    Monday = 'Monday',
+    Tuesday = 'Tuesday',
+    Wednesday = 'Wednesday',
+    Thursday = 'Thursday',
+    Friday = 'Friday',
+    Saturday = 'Saturday',
+}
 export interface CourseOffering {
     id: number;
     semester_id: number;
-    unit_id: number;
+    curriculum_unit_id: number;
     lecture_id?: number;
     section_code?: string;
     max_capacity: number;
@@ -318,7 +336,7 @@ export interface CourseOffering {
     waitlist_capacity: number;
     current_waitlist: number;
     delivery_mode: 'in_person' | 'online' | 'hybrid' | 'blended';
-    schedule_days?: string[];
+    schedule_days?: ScheduleDay[];
     schedule_time_start?: string;
     schedule_time_end?: string;
     location?: string;
@@ -328,7 +346,7 @@ export interface CourseOffering {
     registration_end_date?: string;
     special_requirements?: string;
     notes?: string;
-    unit?: Unit;
+    curriculum_unit: CurriculumUnit;
     lecture?: Lecture;
     semester?: Semester;
     campus?: Campus;
@@ -359,7 +377,7 @@ export interface EnrollmentFormData {
 
 export interface CourseOfferingFormData {
     semester_id: string;
-    unit_id: string;
+    curriculum_unit_id: string;
     lecture_id?: string;
     section_code?: string;
     max_capacity: number;

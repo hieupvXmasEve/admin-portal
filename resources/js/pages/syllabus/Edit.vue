@@ -30,6 +30,25 @@ interface Semester {
     year: number;
 }
 
+interface CurriculumVersion {
+    id: number;
+    version: string;
+    specialization: {
+        id: number;
+        name: string;
+    };
+    program: {
+        id: number;
+        name: string;
+    };
+}
+
+interface CurriculumUnit {
+    id: number;
+    semester: Semester;
+    curriculum_version: CurriculumVersion;
+}
+
 interface AssessmentComponentDetail {
     id?: number;
     name: string;
@@ -47,22 +66,22 @@ interface AssessmentComponent {
 
 interface Syllabus {
     id: number;
+    curriculum_unit_id: number;
     version: string | null;
     description: string | null;
     total_hours: number | null;
     hours_per_session: number | null;
     is_active: boolean;
-    semester_id: number | null;
+    curriculum_unit: CurriculumUnit;
     assessment_components: AssessmentComponent[];
 }
 
 const props = defineProps<{
     unit: Unit;
     syllabus: Syllabus;
-    semesters: Semester[];
+    curriculumUnits: CurriculumUnit[];
     assessmentTypes: Record<string, string>;
 }>();
-console.log('semesters', props.semesters);
 
 // Validation Schema
 const formSchema = toTypedSchema(
@@ -71,7 +90,6 @@ const formSchema = toTypedSchema(
         description: z.string().min(1, { message: 'Description is required' }),
         total_hours: z.number().positive({ message: 'Total hours must be a positive number' }),
         hours_per_session: z.number().positive({ message: 'Hours per session must be a positive number' }),
-        semester_id: z.number().int().positive().optional().nullable(),
         is_active: z.boolean().default(false),
         assessment_components: z
             .array(
@@ -126,7 +144,6 @@ const form = useForm({
         description: props.syllabus.description || '',
         total_hours: Number(props.syllabus.total_hours) || 0,
         hours_per_session: Number(props.syllabus.hours_per_session) || 0,
-        semester_id: props.syllabus.semester_id,
         is_active: props.syllabus.is_active,
         assessment_components:
             props.syllabus.assessment_components.map((comp) => ({
@@ -230,178 +247,133 @@ const getAssessmentTypeColor = (type: string) => {
     }
 };
 
-// Form Submission using the shadcn-vue pattern
-const onSubmit = form.handleSubmit((formData) => {
-    console.log('Assessment Components:', JSON.stringify(formData.assessment_components, null, 2));
-    console.log('Form is valid, submitting:', formData);
+// Form Submission
+const onSubmit = form.handleSubmit(async (formData) => {
     isSubmitting.value = true;
 
-    // Convert semester_id to number if it's a string
     const submitData = {
         ...formData,
-        semester_id: formData.semester_id ? Number(formData.semester_id) : null,
     };
 
-    router.put(`/units/${props.unit.id}/syllabus/${props.syllabus.id}`, submitData, {
-        onSuccess: () => {
-            toast.success('Syllabus updated successfully');
-        },
-        onError: (serverErrors) => {
-            toast.error('Failed to update syllabus. Please check the form for errors.');
-            console.error('Server validation errors:', serverErrors);
-        },
-        onFinish: () => {
-            isSubmitting.value = false;
-        },
-    });
+    try {
+        router.put(`/units/${props.unit.id}/syllabus/${props.syllabus.id}`, submitData, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Syllabus updated successfully!');
+                router.visit(`/units/${props.unit.id}/syllabus`);
+            },
+            onError: (errors) => {
+                console.error('Form submission errors:', errors);
+                toast.error('Failed to update syllabus. Please check the form for errors.');
+            },
+            onFinish: () => {
+                isSubmitting.value = false;
+            },
+        });
+    } catch (error) {
+        console.error('Form submission error:', error);
+        toast.error('An error occurred while updating the syllabus.');
+        isSubmitting.value = false;
+    }
 });
 </script>
 
 <template>
     <Head :title="`Edit Syllabus - ${unit.code}`" />
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-3xl font-bold">Edit Syllabus</h1>
-            <p class="text-xl text-gray-700">{{ unit.code }} - {{ unit.name }}</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <Button variant="outline" @click="router.visit(`/units/${unit.id}/syllabus`)">
-                <ArrowLeft class="mr-2 h-4 w-4" />
-                Cancel
-            </Button>
-            <Button @click="onSubmit" :disabled="isSubmitting">
-                <Save class="mr-2 h-4 w-4" />
-                {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
-            </Button>
-        </div>
-    </div>
 
-    <form class="space-y-6" @submit="onSubmit">
+    <form @submit="onSubmit">
+        <!-- Header -->
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <div class="mb-2 flex items-center gap-3">
+                    <h1 class="text-3xl font-bold">Edit Syllabus</h1>
+                    <Badge class="bg-blue-100 text-blue-800">{{ unit.code }}</Badge>
+                </div>
+                <p class="text-xl text-gray-700">{{ unit.name }}</p>
+                <div class="mt-2 text-sm text-gray-600">
+                    <span class="font-medium">Context:</span>
+                    {{ syllabus.curriculum_unit.semester.name }} - {{ syllabus.curriculum_unit.curriculum_version.specialization.name }}
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <Button type="button" variant="outline" @click="router.visit(`/units/${unit.id}/syllabus`)">
+                    <ArrowLeft class="mr-2 h-4 w-4" />
+                    Back to Syllabus
+                </Button>
+                <Button type="submit" :disabled="isSubmitting">
+                    <Save class="mr-2 h-4 w-4" />
+                    {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
+                </Button>
+            </div>
+        </div>
+
         <!-- Basic Information -->
-        <Card>
+        <Card class="mb-8">
             <CardHeader>
                 <CardTitle>Basic Information</CardTitle>
-                <CardDescription>General syllabus details and metadata</CardDescription>
+                <CardDescription>Update the syllabus version, description, and basic details.</CardDescription>
             </CardHeader>
-            <CardContent class="space-y-4">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <CardContent class="space-y-6">
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <FormField v-slot="{ componentField }" name="version">
                         <FormItem>
                             <FormLabel for="version">Version</FormLabel>
                             <FormControl>
-                                <Input id="version" type="text" placeholder="e.g., v1.0, v2.1" v-bind="componentField" />
+                                <Input v-bind="componentField" placeholder="e.g., v1.0, v2.1" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="semester_id">
-                        <FormItem>
-                            <FormLabel for="semester_id">Effective From Semester</FormLabel>
-                            <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select semester" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id">
-                                            {{ semester.name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-                </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <FormField v-slot="{ componentField }" name="total_hours">
+                            <FormItem>
+                                <FormLabel for="total_hours">Total Hours</FormLabel>
+                                <FormControl>
+                                    <NumberField v-bind="componentField" :default-value="0" :min="0">
+                                        <NumberFieldContent>
+                                            <NumberFieldInput />
+                                        </NumberFieldContent>
+                                    </NumberField>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField
-                        v-slot="{ componentField }"
-                        name="total_hours"
-                        :transform="
-                            (value: any) => {
-                                if (value === '' || value === null || value === undefined) return 0;
-                                const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
-                                return isNaN(num) ? 0 : num;
-                            }
-                        "
-                    >
-                        <FormItem>
-                            <FormLabel for="total_hours">Total Hours</FormLabel>
-                            <FormControl>
-                                <NumberField
-                                    v-bind="componentField"
-                                    :step="0.5"
-                                    :format-options="{
-                                        minimumFractionDigits: 0,
-                                        maximumFractionDigits: 2,
-                                    }"
-                                >
-                                    <NumberFieldContent>
-                                        <NumberFieldInput />
-                                    </NumberFieldContent>
-                                </NumberField>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField
-                        v-slot="{ componentField }"
-                        name="hours_per_session"
-                        :transform="
-                            (value: any) => {
-                                if (value === '' || value === null || value === undefined) return 0;
-                                const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
-                                return isNaN(num) ? 0 : num;
-                            }
-                        "
-                    >
-                        <FormItem>
-                            <FormLabel for="hours_per_session">Hours per Session</FormLabel>
-                            <FormControl>
-                                <NumberField
-                                    v-bind="componentField"
-                                    :step="0.5"
-                                    :format-options="{
-                                        minimumFractionDigits: 0,
-                                        maximumFractionDigits: 2,
-                                    }"
-                                >
-                                    <NumberFieldContent>
-                                        <NumberFieldInput />
-                                    </NumberFieldContent>
-                                </NumberField>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                        <FormField v-slot="{ componentField }" name="hours_per_session">
+                            <FormItem>
+                                <FormLabel for="hours_per_session">Hours per Session</FormLabel>
+                                <FormControl>
+                                    <NumberField v-bind="componentField" :default-value="0" :min="0">
+                                        <NumberFieldContent>
+                                            <NumberFieldInput />
+                                        </NumberFieldContent>
+                                    </NumberField>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
                 </div>
 
                 <FormField v-slot="{ componentField }" name="description">
                     <FormItem>
                         <FormLabel for="description">Description</FormLabel>
                         <FormControl>
-                            <Textarea
-                                id="description"
-                                rows="4"
-                                placeholder="Describe the course content, objectives, and structure..."
-                                v-bind="componentField"
-                            />
+                            <Textarea v-bind="componentField" placeholder="Describe the syllabus content and objectives..." rows="4" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
                 </FormField>
 
-                <FormField v-slot="{ componentField }" name="is_active">
-                    <FormItem class="flex flex-row items-start space-y-0 space-x-3">
+                <FormField v-slot="{ value, handleChange }" name="is_active">
+                    <FormItem class="flex items-center space-y-0 space-x-3">
                         <FormControl>
-                            <Checkbox v-bind="componentField" />
+                            <Checkbox :checked="value" @update:checked="handleChange" />
                         </FormControl>
                         <div class="space-y-1 leading-none">
-                            <FormLabel>Set as active syllabus</FormLabel>
+                            <FormLabel class="text-sm font-medium">Set as Active Syllabus</FormLabel>
+                            <p class="text-muted-foreground text-xs">Only one syllabus per curriculum unit can be active at a time</p>
                         </div>
                     </FormItem>
                 </FormField>
@@ -410,206 +382,173 @@ const onSubmit = form.handleSubmit((formData) => {
 
         <!-- Assessment Components -->
         <Card>
-            <CardHeader>
-                <div class="flex items-center justify-between">
-                    <div>
-                        <CardTitle>Assessment Components</CardTitle>
-                        <CardDescription>Define assessment structure and weightings</CardDescription>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-lg font-bold">Total Weight: {{ getTotalWeight().toFixed(2) }}%</div>
-                        <div v-if="Math.abs(getTotalWeight() - 100) >= 0.01" class="text-sm text-red-600">Must equal exactly 100%</div>
-                        <div v-else class="text-sm text-green-600">Complete</div>
-                    </div>
+            <CardHeader class="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle class="flex items-center gap-2">
+                        Assessment Components
+                        <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
+                            {{ getTotalWeight() }}%
+                        </Badge>
+                    </CardTitle>
+                    <CardDescription>Define the assessment structure and weightings for this syllabus.</CardDescription>
                 </div>
-                <FormField name="assessment_components">
-                    <FormItem>
-                        <FormMessage />
-                    </FormItem>
-                </FormField>
-            </CardHeader>
-            <CardContent class="space-y-4">
-                <Button type="button" @click="addAssessmentComponent" variant="outline">
+                <Button type="button" variant="outline" @click="addAssessmentComponent">
                     <Plus class="mr-2 h-4 w-4" />
-                    Add Assessment Component
+                    Add Component
                 </Button>
+            </CardHeader>
+            <CardContent class="space-y-6">
+                <div
+                    v-for="(component, componentIndex) in form.values.assessment_components || []"
+                    :key="componentIndex"
+                    class="rounded-lg border p-4"
+                >
+                    <div class="mb-4 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-medium">Component {{ componentIndex + 1 }}</h4>
+                            <Badge v-if="component.type" :class="getAssessmentTypeColor(component.type)">
+                                {{ assessmentTypes[component.type] || component.type }}
+                            </Badge>
+                        </div>
+                        <Button
+                            v-if="(form.values.assessment_components || []).length > 1"
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            @click="removeAssessmentComponent(componentIndex)"
+                        >
+                            <Trash2 class="h-4 w-4" />
+                        </Button>
+                    </div>
 
-                <div v-if="form.values.assessment_components && form.values.assessment_components.length > 0" class="space-y-4">
-                    <div v-for="(component, componentIndex) in form.values.assessment_components" :key="componentIndex" class="rounded-lg border p-4">
-                        <div class="mb-4 flex items-center justify-between">
-                            <h3 class="text-lg font-medium">Component {{ componentIndex + 1 }}</h3>
-                            <Button type="button" variant="ghost" size="sm" @click="removeAssessmentComponent(componentIndex)">
-                                <Trash2 class="h-4 w-4 text-red-600" />
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                        <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.name`">
+                            <FormItem>
+                                <FormLabel>Component Name</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="e.g., Assignment 1" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.weight`">
+                            <FormItem>
+                                <FormLabel>Weight (%)</FormLabel>
+                                <FormControl>
+                                    <NumberField v-bind="componentField" :default-value="0" :min="0" :max="100">
+                                        <NumberFieldContent>
+                                            <NumberFieldInput />
+                                        </NumberFieldContent>
+                                    </NumberField>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.type`">
+                            <FormItem>
+                                <FormLabel>Type</FormLabel>
+                                <FormControl>
+                                    <Select v-bind="componentField">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="(label, value) in assessmentTypes" :key="value" :value="value">
+                                                {{ label }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <div class="flex items-end">
+                            <Button type="button" variant="outline" size="sm" @click="addComponentDetail(componentIndex)">
+                                <Plus class="mr-1 h-3 w-3" />
+                                Add Detail
                             </Button>
                         </div>
+                    </div>
 
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.name`">
-                                <FormItem>
-                                    <FormLabel :for="`component_name_${componentIndex}`">Name</FormLabel>
-                                    <FormControl>
-                                        <Input :id="`component_name_${componentIndex}`" placeholder="e.g., Final Exam" v-bind="componentField" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                    <FormField v-slot="{ value, handleChange }" :name="`assessment_components.${componentIndex}.is_required_to_sit_final_exam`">
+                        <FormItem class="mt-4 flex items-center space-y-0 space-x-3">
+                            <FormControl>
+                                <Checkbox :checked="value" @update:checked="handleChange" />
+                            </FormControl>
+                            <FormLabel class="text-sm">Required to sit final exam</FormLabel>
+                        </FormItem>
+                    </FormField>
 
-                            <FormField
-                                v-slot="{ componentField }"
-                                :name="`assessment_components.${componentIndex}.weight`"
-                                :transform="
-                                    (value: any) => {
-                                        if (value === '' || value === null || value === undefined) return 0;
-                                        const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
-                                        return isNaN(num) ? 0 : num;
-                                    }
+                    <!-- Component Details -->
+                    <div v-if="component.details && component.details.length > 0" class="mt-4 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <Label class="text-sm font-medium">Subcomponents</Label>
+                            <Badge
+                                v-if="getSubcomponentTotalWeight(componentIndex) !== null"
+                                :class="
+                                    getSubcomponentTotalWeight(componentIndex) === 100
+                                        ? 'bg-green-100 text-green-800'
+                                        : 'bg-orange-100 text-orange-800'
                                 "
                             >
-                                <FormItem>
-                                    <FormLabel :for="`component_weight_${componentIndex}`">Weight (%)</FormLabel>
-                                    <FormControl>
-                                        <NumberField
-                                            :model-value="
-                                                typeof componentField.modelValue === 'string'
-                                                    ? parseFloat(componentField.modelValue) || 0
-                                                    : componentField.modelValue
-                                            "
-                                            @update:model-value="componentField['onUpdate:modelValue']"
-                                            :step="0.01"
-                                            :format-options="{
-                                                minimumFractionDigits: 0,
-                                                maximumFractionDigits: 2,
-                                            }"
-                                        >
-                                            <NumberFieldContent>
-                                                <NumberFieldInput />
-                                            </NumberFieldContent>
-                                        </NumberField>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.type`">
-                                <FormItem>
-                                    <FormLabel :for="`component_type_${componentIndex}`">Type</FormLabel>
-                                    <FormControl>
-                                        <Select v-bind="componentField">
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem v-for="(label, value) in assessmentTypes" :key="value" :value="value">
-                                                    <div class="flex items-center gap-2">
-                                                        <Badge :class="getAssessmentTypeColor(value)" class="text-xs">
-                                                            {{ value.toUpperCase() }}
-                                                        </Badge>
-                                                        {{ label }}
-                                                    </div>
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
+                                {{ getSubcomponentTotalWeight(componentIndex) }}%
+                            </Badge>
                         </div>
-
-                        <div class="mt-4">
-                            <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.is_required_to_sit_final_exam`">
-                                <FormItem class="flex flex-row items-start space-y-0 space-x-3">
-                                    <FormControl>
-                                        <Checkbox v-bind="componentField" />
-                                    </FormControl>
-                                    <div class="space-y-1 leading-none">
-                                        <FormLabel :for="`component_required_${componentIndex}`">Required to sit final exam</FormLabel>
-                                    </div>
-                                </FormItem>
-                            </FormField>
-                        </div>
-
-                        <!-- Component Details -->
-                        <div class="mt-4">
-                            <div class="mb-2 flex items-center justify-between">
-                                <Label>Sub-components (optional)</Label>
-                                <div class="flex items-center gap-2">
-                                    <div v-if="getSubcomponentTotalWeight(componentIndex) !== null" class="text-sm">
-                                        <span class="font-medium"
-                                            >Subcomponent Total: {{ getSubcomponentTotalWeight(componentIndex)?.toFixed(2) }}%</span
-                                        >
-                                        <span
-                                            v-if="Math.abs((getSubcomponentTotalWeight(componentIndex) || 0) - 100) >= 0.01"
-                                            class="ml-2 text-red-600"
-                                            >❌ Must equal 100%</span
-                                        >
-                                        <span v-else class="ml-2 text-green-600">✅</span>
-                                    </div>
-                                    <Button type="button" variant="outline" size="sm" @click="addComponentDetail(componentIndex)">
-                                        <Plus class="mr-1 h-3 w-3" />
-                                        Add Detail
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <div v-if="component.details && component.details.length > 0" class="space-y-2">
-                                <FormField :name="`assessment_components.${componentIndex}.details`">
-                                    <FormItem>
+                        <div class="rounded border bg-gray-50 p-3">
+                            <div v-for="(detail, detailIndex) in component.details" :key="detailIndex" class="mb-3 flex items-end gap-3 last:mb-0">
+                                <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`">
+                                    <FormItem class="flex-1">
+                                        <FormLabel v-if="detailIndex === 0" class="text-xs">Detail Name</FormLabel>
+                                        <FormControl>
+                                            <Input v-bind="componentField" placeholder="e.g., Part A" class="text-sm" />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 </FormField>
-                                <div v-for="(detail, detailIndex) in component.details" :key="detailIndex" class="flex items-center gap-2">
-                                    <FormField
-                                        v-slot="{ componentField }"
-                                        :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`"
-                                    >
-                                        <FormItem class="flex-1">
-                                            <FormControl>
-                                                <Input placeholder="Detail name" v-bind="componentField" />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    </FormField>
-                                    <FormField
-                                        v-slot="{ componentField }"
-                                        :name="`assessment_components.${componentIndex}.details.${detailIndex}.weight`"
-                                        :transform="
-                                            (value: any) => {
-                                                if (value === '' || value === null || value === undefined) return null;
-                                                const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
-                                                return isNaN(num) ? null : num;
-                                            }
-                                        "
-                                    >
-                                        <FormItem class="w-24">
-                                            <FormControl>
-                                                <NumberField
-                                                    :model-value="
-                                                        typeof componentField.modelValue === 'string'
-                                                            ? parseFloat(componentField.modelValue) || null
-                                                            : componentField.modelValue
-                                                    "
-                                                    @update:model-value="componentField['onUpdate:modelValue']"
-                                                    :step="0.01"
-                                                    :format-options="{
-                                                        minimumFractionDigits: 0,
-                                                        maximumFractionDigits: 2,
-                                                    }"
-                                                >
-                                                    <NumberFieldContent>
-                                                        <NumberFieldInput />
-                                                    </NumberFieldContent>
-                                                </NumberField>
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    </FormField>
-                                    <Button type="button" variant="ghost" size="sm" @click="removeComponentDetail(componentIndex, detailIndex)">
-                                        <Trash2 class="h-4 w-4 text-red-600" />
-                                    </Button>
-                                </div>
+
+                                <FormField
+                                    v-slot="{ componentField }"
+                                    :name="`assessment_components.${componentIndex}.details.${detailIndex}.weight`"
+                                >
+                                    <FormItem class="w-24">
+                                        <FormLabel v-if="detailIndex === 0" class="text-xs">Weight (%)</FormLabel>
+                                        <FormControl>
+                                            <NumberField v-bind="componentField" :default-value="0" :min="0" :max="100">
+                                                <NumberFieldContent>
+                                                    <NumberFieldInput class="text-sm" />
+                                                </NumberFieldContent>
+                                            </NumberField>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
+
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="removeComponentDetail(componentIndex, detailIndex)"
+                                    class="mb-1"
+                                >
+                                    <Trash2 class="h-3 w-3" />
+                                </Button>
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- Total Weight Summary -->
+                <div class="rounded-lg bg-gray-50 p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium">Total Assessment Weight:</span>
+                        <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
+                            {{ getTotalWeight() }}% / 100%
+                        </Badge>
+                    </div>
+                    <p class="mt-1 text-sm text-gray-600">All assessment components must total exactly 100% for a valid syllabus.</p>
                 </div>
             </CardContent>
         </Card>

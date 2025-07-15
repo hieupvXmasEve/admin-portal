@@ -1,17 +1,23 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
-import TableActions from '@/components/TableActions.vue';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent } from '@/components/ui/tooltip';
+import TooltipProvider from '@/components/ui/tooltip/TooltipProvider.vue';
+import TooltipTrigger from '@/components/ui/tooltip/TooltipTrigger.vue';
+import { useGlobalDeleteDialog } from '@/composables';
+import { ROLE_ROUTE_NAMES } from '@/constants';
 import type { PaginatedResponse } from '@/types';
 import type { Role } from '@/types/Role';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
+import { Edit, Trash2 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 const props = defineProps<{
     roles: PaginatedResponse<Role>;
 }>();
+const deleteDialog = useGlobalDeleteDialog();
 
 // Reactive data
 const data = computed(() => props.roles.data);
@@ -70,6 +76,17 @@ const handlePageSizeChange = (pageSize: number) => {
         only: ['roles'],
     });
 };
+
+// Delete role function
+const deleteRole = (role: Role) => {
+    deleteDialog.deleteItem(role.name, 'role', () => {
+        router.delete(route(ROLE_ROUTE_NAMES.DESTROY, role.id), {
+            onSuccess: () => {
+                console.log('Role deleted successfully');
+            },
+        });
+    });
+};
 </script>
 
 <template>
@@ -88,7 +105,30 @@ const handlePageSizeChange = (pageSize: number) => {
     <!-- Data Table -->
     <DataTable :data="data" :columns="columns">
         <template #cell-actions="{ row }">
-            <TableActions @edit="editRole(row.original)" />
+            <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                <Tooltip>
+                    <TooltipTrigger as-child>
+                        <Button variant="ghost" size="sm" @click="editRole(row.original)" title="Edit unit">
+                            <Edit class="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Edit role</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                <Tooltip>
+                    <TooltipTrigger as-child>
+                        <Button variant="ghost" size="sm" @click="deleteRole(row.original)" title="Delete unit">
+                            <Trash2 class="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Delete unit</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </template>
     </DataTable>
 

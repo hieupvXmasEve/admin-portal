@@ -21,9 +21,9 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables';
-import type { BreadcrumbItem } from '@/types';
 import type { CurriculumVersion, Program, Semester, Specialization } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
+import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -50,17 +50,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Specializations',
-        href: '/specializations',
-    },
-    {
-        title: props.specialization.name,
-        href: `/specializations/${props.specialization.id}`,
-    },
-];
 
 // API composable
 const api = useApi();
@@ -101,7 +90,7 @@ const editFormSchema = toTypedSchema(
     }),
 );
 
-const { handleSubmit, isSubmitting, resetForm } = useForm({
+const { isSubmitting, resetForm } = useForm({
     validationSchema: formSchema,
     initialValues: {
         version_code: '',
@@ -230,7 +219,6 @@ const curriculumVersionColumns: ColumnDef<CurriculumVersion>[] = [
             const version = row.original;
             return h('div', { class: 'space-y-1' }, [
                 h('div', { class: 'font-medium' }, version.version_code || 'Unnamed Version'),
-                h(Badge, { variant: 'outline', class: 'text-xs' }, () => 'Specialization Level'),
                 version.effective_from_semester
                     ? h('div', { class: 'text-xs text-muted-foreground' }, `From: ${version.effective_from_semester.name}`)
                     : null,
@@ -313,7 +301,7 @@ const curriculumPaginationData = computed(() => ({
 }));
 
 // Form submission handler
-const onSubmit = handleSubmit(async (values) => {
+const onSubmit = async (values: any) => {
     console.log(values);
     const submitData = {
         program_id: props.specialization.program_id,
@@ -335,7 +323,7 @@ const onSubmit = handleSubmit(async (values) => {
         const errorMessage = data.value?.message || error.value || 'Failed to create curriculum version';
         toast.error(errorMessage);
     }
-});
+};
 
 // Helper function to open create dialog
 const openCreateDialog = () => {
@@ -375,13 +363,13 @@ const formatDate = (dateString: string): string => {
             </div>
 
             <div class="flex flex-wrap gap-2">
-                <Link :href="route('specializations.edit', { specialization: specialization.id })">
+                <Link :href="curriculumRoutes.specializations.edit(specialization.id)">
                     <Button variant="outline">
                         <Edit class="mr-2 h-4 w-4" />
                         Edit
                     </Button>
                 </Link>
-                <Link :href="route('specializations.index')">
+                <Link :href="curriculumRoutes.specializations.index()">
                     <Button variant="outline">
                         <ArrowLeft class="mr-2 h-4 w-4" />
                         Back to Specializations
@@ -446,7 +434,7 @@ const formatDate = (dateString: string): string => {
                             <DialogDescription> Add a new curriculum version for {{ specialization.name }} specialization. </DialogDescription>
                         </DialogHeader>
 
-                        <form @submit="onSubmit" class="space-y-4">
+                        <Form :validation-schema="formSchema" @submit="onSubmit" class="space-y-4">
                             <FormField v-slot="{ componentField }" name="version_code">
                                 <FormItem>
                                     <FormLabel>Version Code *</FormLabel>
@@ -501,7 +489,7 @@ const formatDate = (dateString: string): string => {
                                     {{ isSubmitting ? 'Creating...' : 'Create Version' }}
                                 </Button>
                             </DialogFooter>
-                        </form>
+                        </Form>
                     </DialogContent>
                 </Dialog>
             </div>

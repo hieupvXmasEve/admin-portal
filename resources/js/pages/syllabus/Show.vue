@@ -23,6 +23,34 @@ interface Semester {
     year: string;
 }
 
+interface Program {
+    id: number;
+    name: string;
+    degree_level?: string;
+}
+
+interface Specialization {
+    id: number;
+    name: string;
+    description?: string;
+}
+
+interface CurriculumVersion {
+    id: number;
+    version_code: string;
+    program: Program;
+    specialization: Specialization;
+}
+
+interface CurriculumUnit {
+    id: number;
+    semester: Semester;
+    curriculum_version: CurriculumVersion;
+    type: 'core' | 'major' | 'elective';
+    year_level?: number;
+    semester_number?: number;
+}
+
 interface AssessmentComponentDetail {
     id: number;
     name: string;
@@ -40,12 +68,13 @@ interface AssessmentComponent {
 
 interface Syllabus {
     id: number;
+    curriculum_unit_id: number;
     version: string | null;
     description: string | null;
     total_hours: number | null;
     hours_per_session: number | null;
     is_active: boolean;
-    effective_from_semester: Semester | null;
+    curriculum_unit: CurriculumUnit;
     assessment_components: AssessmentComponent[];
     total_assessment_weight: number;
     created_at: string;
@@ -56,7 +85,7 @@ const props = defineProps<{
     unit: Unit;
     syllabus: Syllabus;
 }>();
-
+console.log(props.syllabus.curriculum_unit);
 // Track which components have expanded details
 const expandedComponents = ref<Set<number>>(new Set());
 
@@ -132,13 +161,15 @@ const getAssessmentTypeColor = (type: string) => {
                     <p class="text-lg font-semibold">{{ syllabus.version || 'Not specified' }}</p>
                 </div>
 
-                <div v-if="syllabus.effective_from_semester">
-                    <h4 class="mb-1 text-sm font-medium text-gray-500">Effective From</h4>
+                <div>
+                    <h4 class="mb-1 text-sm font-medium text-gray-500">Context</h4>
                     <div class="flex items-center gap-2">
                         <Calendar class="h-4 w-4 text-gray-400" />
-                        <p class="text-lg">
-                            {{ syllabus.effective_from_semester.name }}
-                        </p>
+                        <div>
+                            <p class="text-base font-semibold">{{ syllabus.curriculum_unit?.semester?.name }}</p>
+                            <p class="text-sm text-gray-600">{{ syllabus.curriculum_unit?.curriculum_version?.specialization?.name }}</p>
+                            <p class="text-xs text-gray-500">{{ syllabus.curriculum_unit?.curriculum_version?.program?.name }}</p>
+                        </div>
                     </div>
                 </div>
 

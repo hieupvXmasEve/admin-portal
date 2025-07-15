@@ -69,19 +69,29 @@ class Unit extends Model
     }
 
     /**
-     * Get all syllabus for this unit.
+     * Get all syllabus for this unit through curriculum units.
      */
-    public function syllabus(): HasMany
+    public function syllabus()
     {
-        return $this->hasMany(Syllabus::class);
+        return $this->hasManyThrough(
+            Syllabus::class,
+            CurriculumUnit::class,
+            'unit_id',
+            'curriculum_unit_id'
+        );
     }
 
     /**
-     * Get the active syllabus for this unit.
+     * Get the active syllabus for this unit through curriculum units.
      */
     public function activeSyllabus()
     {
-        return $this->hasOne(Syllabus::class)->where('is_active', true);
+        return $this->hasManyThrough(
+            Syllabus::class,
+            CurriculumUnit::class,
+            'unit_id',
+            'curriculum_unit_id'
+        )->where('syllabus.is_active', true);
     }
 
     /**
