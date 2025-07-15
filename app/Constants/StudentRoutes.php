@@ -23,12 +23,8 @@ class StudentRoutes
     public const ASSIGN_PROGRAM = 'students.assign-program';
     public const UPDATE_STATUS = 'students.update-status';
 
-    // AJAX Student Routes
-    public const AJAX_SEARCH = 'ajax.students.search';
-    public const AJAX_SHOW = 'ajax.students.show';
-    public const AJAX_SPECIALIZATIONS = 'ajax.students.specializations';
-    public const AJAX_CURRICULUM_VERSIONS = 'ajax.students.curriculum-versions';
-    public const AJAX_BY_IDS = 'ajax.students.by-ids';
+    public const NEW_STUDENTS = 'students.new-students.index';
+    public const BULK_ONBOARDING = 'students.new-students.bulk-onboarding';
 
     // Route Prefixes
     public const WEB_PREFIX = 'students.';

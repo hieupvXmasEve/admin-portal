@@ -92,6 +92,18 @@ return [
             'edit_course' => 'edit_course',
             'delete_course' => 'delete_course',
         ],
+        'course_offerings' => [
+            'view_course_offering' => 'view_course_offering',
+            'create_course_offering' => 'create_course_offering',
+            'edit_course_offering' => 'edit_course_offering',
+            'delete_course_offering' => 'delete_course_offering',
+        ],
+        'course_registrations' => [
+            'view_course_registration' => 'view_course_registration',
+            'create_course_registration' => 'create_course_registration',
+            'edit_course_registration' => 'edit_course_registration',
+            'delete_course_registration' => 'delete_course_registration',
+        ],
 
         // Student Management
         'students' => [

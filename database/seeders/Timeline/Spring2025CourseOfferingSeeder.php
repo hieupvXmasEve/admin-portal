@@ -31,11 +31,12 @@ class Spring2025CourseOfferingSeeder extends Seeder
             throw new \Exception('SPRING2025 semester not found. Please create semester first.');
         }
 
-        // Clean existing offerings and syllabi for this semester (force delete to bypass soft deletes)
-        CourseOffering::where('semester_id', $semester->id)->forceDelete();
-
-        // Also clean existing syllabi for this semester
-        Syllabus::where('semester_id', $semester->id)->delete();
+        // Check if offerings already exist for this semester
+        $existingOfferings = CourseOffering::where('semester_id', $semester->id)->count();
+        if ($existingOfferings > 0) {
+            $this->command->info("✅ Course offerings already exist for SPRING2025 ({$existingOfferings} found). Skipping creation.");
+            return;
+        }
 
         $units = Unit::all();
         $lecturers = Lecture::where('is_active', true)->get();
@@ -258,9 +259,16 @@ class Spring2025CourseOfferingSeeder extends Seeder
 
     private function createSyllabusForUnit(Unit $unit, Semester $semester): void
     {
-        // Check if syllabus already exists for this unit and semester
-        $existingSyllabus = Syllabus::where('unit_id', $unit->id)
-            ->where('semester_id', $semester->id)
+        // Find curriculum unit for this unit (simplified approach for test data)
+        $curriculumUnit = \App\Models\CurriculumUnit::where('unit_id', $unit->id)->first();
+
+        if (!$curriculumUnit) {
+            // Skip creating syllabus if no curriculum unit found
+            return;
+        }
+
+        // Check if syllabus already exists for this curriculum unit
+        $existingSyllabus = Syllabus::where('curriculum_unit_id', $curriculumUnit->id)
             ->where('is_active', true)
             ->first();
 
@@ -270,12 +278,11 @@ class Spring2025CourseOfferingSeeder extends Seeder
 
         // Create syllabus
         $syllabus = Syllabus::create([
-            'unit_id' => $unit->id,
+            'curriculum_unit_id' => $curriculumUnit->id,
             'version' => 'v1.0',
             'description' => $this->generateSyllabusDescription($unit),
             'total_hours' => $this->getTotalHours($unit),
             'hours_per_session' => $this->getHoursPerSession($unit),
-            'semester_id' => $semester->id,
             'is_active' => true,
         ]);
 

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import type { AcademicHold, CourseRegistration, Student } from '@/types/models';
+import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     AlertTriangle,
@@ -261,16 +262,16 @@ console.log('props', props.student);
                                 <Calendar class="text-muted-foreground h-4 w-4" />
                                 <div>
                                     <p class="text-muted-foreground text-sm">Admission Date</p>
-                                    <p class="font-medium">{{ formatDate(student.admission_date) }}</p>
+                                    <p class="font-medium">{{ formatDate(student?.admission_date || '') }}</p>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-3" v-if="student.expected_graduation_date">
+                            <!-- <div class="flex items-center gap-3" v-if="student.expected_graduation_date">
                                 <Calendar class="text-muted-foreground h-4 w-4" />
                                 <div>
                                     <p class="text-muted-foreground text-sm">Expected Graduation</p>
                                     <p class="font-medium">{{ formatDate(student.expected_graduation_date) }}</p>
                                 </div>
-                            </div>
+                            </div> -->
                         </div>
                     </div>
 
@@ -312,7 +313,7 @@ console.log('props', props.student);
                             <p class="text-muted-foreground text-sm">Program</p>
                             <div class="flex items-center gap-2">
                                 <p class="font-medium">{{ student.program?.name || 'Not assigned' }}</p>
-                                <Link :href="route('programs.show', { program: student.program?.id })" class="ml-2">
+                                <Link :href="curriculumRoutes.programs.show(student.program.id)" class="ml-2">
                                     <Eye class="h-4 w-4" />
                                 </Link>
                             </div>
@@ -325,7 +326,7 @@ console.log('props', props.student);
                             <p class="text-muted-foreground text-sm">Specialization</p>
                             <div class="flex items-center gap-2">
                                 <p class="font-medium">{{ student.specialization.name }}</p>
-                                <Link :href="route('specializations.show', { specialization: student.specialization?.id })" class="ml-2">
+                                <Link :href="curriculumRoutes.specializations.show(student.specialization.id)" class="ml-2">
                                     <Eye class="h-4 w-4" />
                                 </Link>
                             </div>
@@ -339,7 +340,7 @@ console.log('props', props.student);
                             <p class="text-muted-foreground text-sm">Curriculum Version</p>
                             <div class="flex items-center gap-2">
                                 <p class="font-medium">{{ student.curriculum_version.version_code }}</p>
-                                <Link :href="route('curriculum_version.show', { curriculum_version: student.curriculum_version?.id })" class="ml-2">
+                                <Link :href="curriculumRoutes.curriculumVersions.show(student.curriculum_version.id)" class="ml-2">
                                     <Eye class="h-4 w-4" />
                                 </Link>
                             </div>
@@ -368,7 +369,7 @@ console.log('props', props.student);
     </div>
 
     <!-- Emergency Contact Information -->
-    <Card v-if="student.parent_guardian_name || student.emergency_contact_name">
+    <!-- <Card v-if="student.parent_guardian_name || student.emergency_contact_name">
         <CardHeader>
             <CardTitle class="flex items-center gap-2">
                 <Phone class="h-5 w-5" />
@@ -401,7 +402,7 @@ console.log('props', props.student);
                 </div>
             </div>
         </CardContent>
-    </Card>
+    </Card> -->
 
     <!-- Academic Holds -->
     <Card v-if="activeHolds.length > 0">

@@ -37,10 +37,15 @@ class ClassSessionSeeder extends Seeder
             throw new \Exception('No FALL2024 course offerings found.');
         }
 
-        // Clean existing class sessions for this semester
-        ClassSession::whereHas('courseOffering', function ($query) use ($semester) {
+        // Check if class sessions already exist for this semester
+        $existingSessions = ClassSession::whereHas('courseOffering', function ($query) use ($semester) {
             $query->where('semester_id', $semester->id);
-        })->delete();
+        })->count();
+
+        if ($existingSessions > 0) {
+            $this->command->info("✅ Class sessions already exist for FALL2024 ({$existingSessions} found). Skipping creation.");
+            return;
+        }
 
         $sessionCount = 0;
 

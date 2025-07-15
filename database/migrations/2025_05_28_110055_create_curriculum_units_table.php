@@ -21,8 +21,8 @@ return new class extends Migration
 
             $table->enum('type', ['core', 'major', 'elective'])->notNull();
             $table->string('unit_scope')->default('program')->comment('Scope of the unit: program, common, specialization_specific, cross_program');
-            $table->unsignedTinyInteger('year_level')->nullable()->comment('Academic year level (1-4)');
-            $table->unsignedTinyInteger('semester_number')->nullable()->comment('Suggested semester number within the course (1-12)');
+            $table->unsignedTinyInteger('year_level')->nullable()->comment('Academic year level (1-3)');
+            $table->unsignedTinyInteger('semester_number')->nullable()->comment('Suggested semester number within the course (1-9)');
             $table->boolean('is_required')->default(true);
             $table->decimal('minimum_grade', 4, 2)->nullable()->comment('Minimum grade required for completion (optional)');
             $table->text('note')->nullable();

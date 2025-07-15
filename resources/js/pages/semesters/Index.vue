@@ -321,7 +321,7 @@ const submitCreate = () => {
 
     createForm
         .transform(() => formData)
-        .post(systemRoutes.semesters.create(), {
+        .post(systemRoutes.semesters.store(), {
             onSuccess: () => {
                 closeModals();
             },
@@ -343,7 +343,7 @@ const submitEdit = () => {
 
     editForm
         .transform(() => formData)
-        .put(systemRoutes.semesters.edit(selectedSemester.value!.id), {
+        .put(systemRoutes.semesters.update(selectedSemester.value!.id), {
             onSuccess: () => {
                 closeModals();
             },
@@ -353,7 +353,7 @@ const submitEdit = () => {
 const submitDelete = () => {
     if (!selectedSemester.value) return;
 
-    deleteForm.delete(systemRoutes.semesters.edit(selectedSemester.value.id), {
+    deleteForm.delete(systemRoutes.semesters.destroy(selectedSemester.value.id), {
         onSuccess: () => {
             closeModals();
         },

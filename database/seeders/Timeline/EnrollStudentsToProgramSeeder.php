@@ -20,29 +20,18 @@ class EnrollStudentsToProgramSeeder extends Seeder
     {
         $this->command->info('📚 Enrolling students into programs...');
 
-        // Get all eligible students (admitted or active status)
-        $eligibleStudents = Student::whereIn('status', ['admitted', 'active'])->get();
+        // Get all eligible students (admitted, active, or suspended status)
+        $eligibleStudents = Student::whereIn('status', ['admitted', 'active', 'suspended'])->get();
 
         if ($eligibleStudents->isEmpty()) {
             throw new \Exception('No eligible students found. Please run previous seeders first.');
         }
 
-        // Get or create the first semester (FALL2024)
+        // Get the first semester (FALL2024) - should already exist from SemesterSeeder
         $firstSemester = Semester::where('code', 'FALL2024')->first();
 
         if (!$firstSemester) {
-            // Create FALL2024 semester
-            $firstSemester = Semester::create([
-                'name' => 'Fall Semester 2024',
-                'code' => 'FALL2024',
-                'start_date' => '2024-08-01',
-                'end_date' => '2024-12-15',
-                'enrollment_start_date' => '2024-07-01',
-                'enrollment_end_date' => '2024-07-31',
-                'is_active' => true,
-                'is_archived' => false,
-            ]);
-            $this->command->info("  📅 Created FALL2024 semester");
+            throw new \Exception('FALL2024 semester not found. Please run InitialSetup seeders first.');
         }
 
         $enrollmentCount = 0;
@@ -68,7 +57,7 @@ class EnrollStudentsToProgramSeeder extends Seeder
                 $enrollmentCount++;
             }
 
-            // Update student status to active if they were admitted
+            // Update student status to active if they were admitted (don't change suspended students)
             if ($student->status === 'admitted') {
                 $student->update([
                     'status' => 'active',

@@ -18,6 +18,8 @@ class SyllabusRoutes
     public const EDIT = 'syllabus.edit';
     public const UPDATE = 'syllabus.update';
     public const DESTROY = 'syllabus.destroy';
+    public const TOGGLE_ACTIVE = 'syllabus.toggle-active';
+    public const CLONE = 'syllabus.clone';
 
     // Syllabus Assessment Routes
     public const ASSESSMENT_INDEX = 'syllabus.assessment.index';

@@ -37,10 +37,12 @@ class AssessmentScoreSeeder extends Seeder
             throw new \Exception('No course registrations found for FALL2024.');
         }
 
-        // Clean existing scores
-        AssessmentComponentDetailScore::whereHas('assessmentComponentDetail.component.syllabus', function ($query) use ($semester) {
-            $query->where('semester_id', $semester->id);
-        })->delete();
+        // Check if assessment scores already exist
+        $existingScores = AssessmentComponentDetailScore::count();
+        if ($existingScores > 0) {
+            $this->command->info("✅ Assessment scores already exist ({$existingScores} found). Skipping creation.");
+            return;
+        }
 
         $scoreCount = 0;
 
@@ -61,9 +63,8 @@ class AssessmentScoreSeeder extends Seeder
         $scores = [];
 
         // Get assessment component details for this course offering
-        $assessmentDetails = AssessmentComponentDetail::whereHas('component.syllabus', function ($query) use ($registration) {
-            $query->where('unit_id', $registration->courseOffering->unit_id)
-                ->where('semester_id', $registration->semester_id);
+        $assessmentDetails = AssessmentComponentDetail::whereHas('component.syllabus.curriculumUnit', function ($query) use ($registration) {
+            $query->where('unit_id', $registration->courseOffering->unit_id);
         })->with(['component'])->get();
 
         foreach ($assessmentDetails as $detail) {

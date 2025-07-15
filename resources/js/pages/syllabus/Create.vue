@@ -29,11 +29,31 @@ interface Semester {
     name: string;
 }
 
+interface CurriculumVersion {
+    id: number;
+    version: string;
+    specialization: {
+        id: number;
+        name: string;
+    };
+    program: {
+        id: number;
+        name: string;
+    };
+}
+
+interface CurriculumUnit {
+    id: number;
+    semester: Semester;
+    curriculum_version: CurriculumVersion;
+}
+
 const props = defineProps<{
     unit: Unit;
-    semesters: Semester[];
+    curriculumUnits: CurriculumUnit[];
     assessmentTypes: Record<string, string>;
 }>();
+console.log(props);
 
 // Validation Schema
 const formSchema = toTypedSchema(
@@ -42,7 +62,7 @@ const formSchema = toTypedSchema(
         description: z.string().min(1, { message: 'Description is required' }),
         total_hours: z.number().positive({ message: 'Total hours must be a positive number' }),
         hours_per_session: z.number().positive({ message: 'Hours per session must be a positive number' }),
-        semester_id: z.number().int().positive().optional().nullable(),
+        curriculum_unit_id: z.number().int().positive({ message: 'Please select a curriculum unit' }),
         is_active: z.boolean().default(false),
         assessment_components: z
             .array(
@@ -95,7 +115,7 @@ const form = useForm({
         description: '',
         total_hours: 0,
         hours_per_session: 0,
-        semester_id: null,
+        curriculum_unit_id: 0,
         is_active: false,
         // init 3 components
         assessment_components: [
@@ -218,10 +238,10 @@ const onSubmit = form.handleSubmit((formData) => {
     console.log('Form is valid, submitting:', formData);
     isSubmitting.value = true;
 
-    // Convert semester_id to number if it's a string
+    // Convert curriculum_unit_id to number if it's a string
     const submitData = {
         ...formData,
-        semester_id: formData.semester_id ? Number(formData.semester_id) : null,
+        curriculum_unit_id: formData.curriculum_unit_id ? Number(formData.curriculum_unit_id) : null,
     };
 
     router.post(`/units/${props.unit.id}/syllabus`, submitData, {
@@ -278,17 +298,21 @@ const onSubmit = form.handleSubmit((formData) => {
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="semester_id">
+                    <FormField v-slot="{ componentField }" name="curriculum_unit_id">
                         <FormItem>
-                            <FormLabel for="semester_id">Effective From Semester</FormLabel>
+                            <FormLabel for="curriculum_unit_id">Curriculum Unit Context</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select semester" />
+                                        <SelectValue placeholder="Select curriculum unit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id">
-                                            {{ semester.name }}
+                                        <SelectItem
+                                            v-for="curriculumUnit in curriculumUnits"
+                                            :key="curriculumUnit.id"
+                                            :value="curriculumUnit.id.toString()"
+                                        >
+                                            {{ curriculumUnit.semester.name }} - {{ curriculumUnit.curriculum_version.specialization.name }}
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>

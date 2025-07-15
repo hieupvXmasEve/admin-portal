@@ -341,7 +341,7 @@ class UnitExcelExportService
                     $equivalent->equivalentUnit->code,
                     $equivalent->equivalentUnit->name,
                     $equivalent->reason,
-                    $equivalent->validFromSemester?->term . ' ' . $equivalent->validFromSemester?->year ?? '',
+                    'N/A', // validFromSemester field not available in current schema
                     $equivalent->created_at->format('Y-m-d H:i:s')
                 ], null, "A{$row}");
 

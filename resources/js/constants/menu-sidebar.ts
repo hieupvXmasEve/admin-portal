@@ -98,6 +98,12 @@ export const mainNavItems: NavItem[] = [
                 requiredPermissions: ['view_student'],
             },
             {
+                title: 'New Students',
+                href: studentRoutes.newStudents(),
+                icon: UserPlus,
+                requiredPermissions: ['view_student'],
+            },
+            {
                 title: 'Academic Records',
                 href: studentRoutes.academicRecords(), // Placeholder
                 icon: FileText,

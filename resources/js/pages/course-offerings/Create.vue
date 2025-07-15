@@ -22,12 +22,12 @@ interface Props {
 
 const props = defineProps<Props>();
 const submitError = ref<string | null>(null);
-
+console.log(props.units);
 // Define validation schema that exactly matches backend CourseOffering validation rules
 const formSchema = toTypedSchema(
     z.object({
         semester_id: z.string().min(1, 'Semester is required'),
-        unit_id: z.string().min(1, 'Unit is required'),
+        curriculum_unit_id: z.string().min(1, 'Curriculum unit is required'),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(500, 'Max capacity cannot exceed 500'),
@@ -56,7 +56,7 @@ const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
         semester_id: '',
-        unit_id: '',
+        curriculum_unit_id: '',
         lecture_id: '',
         section_code: '',
         max_capacity: 30,
@@ -82,7 +82,7 @@ const onSubmit = handleSubmit((values) => {
     // Transform form data to match backend expectations
     const formData = {
         semester_id: values.semester_id,
-        unit_id: values.unit_id,
+        curriculum_unit_id: values.curriculum_unit_id,
         lecture_id: values.lecture_id === 'none' || values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
         max_capacity: Number(values.max_capacity),
@@ -188,13 +188,13 @@ const dayOptions = [
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="unit_id">
+                    <FormField v-slot="{ componentField }" name="curriculum_unit_id">
                         <FormItem>
-                            <FormLabel>Unit</FormLabel>
+                            <FormLabel>Curriculum Unit</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select unit" />
+                                        <SelectValue placeholder="Select curriculum unit" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem v-for="unit in props.units" :key="unit.id" :value="unit.id.toString()">
@@ -301,6 +301,38 @@ const dayOptions = [
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="schedule_days">
+                        <FormItem>
+                            <FormLabel>Schedule Days</FormLabel>
+                            <FormControl>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div v-for="day in dayOptions" :key="day.value" class="flex items-center space-x-2">
+                                        <input
+                                            :id="day.value"
+                                            type="checkbox"
+                                            :value="day.value"
+                                            :checked="componentField.modelValue?.includes(day.value)"
+                                            @change="
+                                                (e) => {
+                                                    const target = e.target as HTMLInputElement;
+                                                    const currentValue = componentField.modelValue || [];
+                                                    if (target.checked) {
+                                                        componentField['onUpdate:modelValue']([...currentValue, day.value]);
+                                                    } else {
+                                                        componentField['onUpdate:modelValue'](currentValue.filter((d) => d !== day.value));
+                                                    }
+                                                }
+                                            "
+                                            class="text-primary focus:ring-primary rounded border-gray-300"
+                                        />
+                                        <label :for="day.value" class="text-sm font-medium">{{ day.label }}</label>
+                                    </div>
+                                </div>
                             </FormControl>
                             <FormMessage />
                         </FormItem>

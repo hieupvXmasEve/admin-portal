@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { CourseRegistration } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { BookOpen, Calendar, CreditCard, Edit, FileText, GraduationCap, Trash2, User } from 'lucide-vue-next';
+import { BookOpen, Calendar, Edit, FileText, GraduationCap, Trash2, User } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 interface Props {
@@ -219,9 +219,9 @@ const withdrawRegistration = () => {
                             <label class="text-muted-foreground text-sm font-medium">Credit Hours</label>
                             <p class="mt-1 text-sm">{{ registration.course_offering.credit_hours }}</p>
                         </div>
-                        <div v-if="registration.course_offering.instructor">
-                            <label class="text-muted-foreground text-sm font-medium">Instructor</label>
-                            <p class="mt-1 text-sm">{{ registration.course_offering.instructor.name }}</p>
+                        <div v-if="registration.course_offering.lecture">
+                            <label class="text-muted-foreground text-sm font-medium">Lecture</label>
+                            <p class="mt-1 text-sm">{{ registration.course_offering.lecture.full_name }}</p>
                         </div>
                         <div v-if="registration.course_offering.campus">
                             <label class="text-muted-foreground text-sm font-medium">Campus</label>
@@ -274,7 +274,7 @@ const withdrawRegistration = () => {
         <!-- Sidebar -->
         <div class="space-y-6">
             <!-- Financial Summary -->
-            <Card>
+            <!-- <Card>
                 <CardHeader>
                     <CardTitle class="flex items-center space-x-2">
                         <CreditCard class="h-5 w-5" />
@@ -305,7 +305,7 @@ const withdrawRegistration = () => {
                         </div>
                     </div>
                 </CardContent>
-            </Card>
+            </Card> -->
 
             <!-- Important Dates -->
             <Card>

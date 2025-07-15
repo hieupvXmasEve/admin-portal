@@ -1,3 +1,18 @@
+import {
+    CAMPUS_ROUTE_NAMES,
+    COURSE_OFFERING_ROUTE_NAMES,
+    COURSE_REGISTRATION_ROUTE_NAMES,
+    CURRICULUM_ROUTE_NAMES,
+    PROGRAM_ROUTE_NAMES,
+    ROLE_ROUTE_NAMES,
+    SEMESTER_ROUTE_NAMES,
+    SETTINGS_ROUTE_NAMES,
+    SPECIALIZATION_ROUTE_NAMES,
+    STUDENT_ROUTE_NAMES,
+    SYLLABUS_ROUTE_NAMES,
+    UNIT_ROUTE_NAMES,
+    USER_ROUTE_NAMES,
+} from '@/constants';
 import { route } from 'ziggy-js';
 
 /**
@@ -9,38 +24,42 @@ import { route } from 'ziggy-js';
 // System Management Routes
 export const systemRoutes = {
     users: {
-        index: () => route('users.index'),
-        create: () => route('users.create'),
-        edit: (id: number) => route('users.edit', { user: id }),
-        show: (id: number) => route('users.show', { user: id }),
-        import: () => route('users.import.form'),
-        exportFiltered: () => route('users.export.excel.filtered'),
+        index: () => route(USER_ROUTE_NAMES.INDEX),
+        create: () => route(USER_ROUTE_NAMES.CREATE),
+        edit: (id: number) => route(USER_ROUTE_NAMES.EDIT, { user: id }),
+        show: (id: number) => route(USER_ROUTE_NAMES.SHOW, { user: id }),
+        import: () => route(USER_ROUTE_NAMES.IMPORT_FORM),
+        exportFiltered: () => route(USER_ROUTE_NAMES.EXPORT_EXCEL_FILTERED),
     },
     roles: {
-        index: () => route('roles.index'),
-        create: () => route('roles.create'),
-        edit: (id: number) => route('roles.edit', { role: id }),
-        show: (id: number) => route('roles.show', { role: id }),
+        index: () => route(ROLE_ROUTE_NAMES.INDEX),
+        create: () => route(ROLE_ROUTE_NAMES.CREATE),
+        edit: (id: number) => route(ROLE_ROUTE_NAMES.EDIT, { role: id }),
+        show: (id: number) => route(ROLE_ROUTE_NAMES.SHOW, { role: id }),
     },
     semesters: {
-        index: () => route('semesters.index'),
-        create: () => route('semesters.create'),
-        edit: (id: number) => route('semesters.edit', { semester: id }),
-        show: (id: number) => route('semesters.show', { semester: id }),
-        enrollment: (id: number) => route('semesters.enrollment.show', { semester: id }),
+        index: () => route(SEMESTER_ROUTE_NAMES.INDEX),
+        create: () => route(SEMESTER_ROUTE_NAMES.CREATE),
+        store: () => route(SEMESTER_ROUTE_NAMES.STORE),
+        edit: (id: number) => route(SEMESTER_ROUTE_NAMES.EDIT, { semester: id }),
+        update: (id: number) => route(SEMESTER_ROUTE_NAMES.UPDATE, { semester: id }),
+        destroy: (id: number) => route(SEMESTER_ROUTE_NAMES.DESTROY, { semester: id }),
+        show: (id: number) => route(SEMESTER_ROUTE_NAMES.SHOW, { semester: id }),
+        enrollment: (id: number) => route(SEMESTER_ROUTE_NAMES.ENROLLMENT_SHOW, { semester: id }),
     },
     // Campus Management Routes
     campuses: {
-        index: () => route('campuses.index'),
-        create: () => route('campuses.create'),
-        edit: (id: number) => route('campuses.edit', { campus: id }),
-        show: (id: number) => route('campuses.show', { campus: id }),
+        index: () => route(CAMPUS_ROUTE_NAMES.INDEX),
+        create: () => route(CAMPUS_ROUTE_NAMES.CREATE),
+        edit: (id: number) => route(CAMPUS_ROUTE_NAMES.EDIT, { campus: id }),
+        show: (id: number) => route(CAMPUS_ROUTE_NAMES.SHOW, { campus: id }),
         buildings: {
-            create: (campusId: number) => route('campuses.buildings.create', { campus: campusId }),
-            store: (campusId: number) => route('campuses.buildings.store', { campus: campusId }),
-            edit: (campusId: number, buildingId: number) => route('campuses.buildings.edit', { campus: campusId, building: buildingId }),
-            update: (campusId: number, buildingId: number) => route('campuses.buildings.update', { campus: campusId, building: buildingId }),
-            destroy: (campusId: number, buildingId: number) => route('campuses.buildings.destroy', { campus: campusId, building: buildingId }),
+            create: (campusId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_CREATE, { campus: campusId }),
+            store: (campusId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_STORE, { campus: campusId }),
+            edit: (campusId: number, buildingId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_EDIT, { campus: campusId, building: buildingId }),
+            update: (campusId: number, buildingId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_UPDATE, { campus: campusId, building: buildingId }),
+            destroy: (campusId: number, buildingId: number) =>
+                route(CAMPUS_ROUTE_NAMES.BUILDINGS_DESTROY, { campus: campusId, building: buildingId }),
         },
     },
 } as const;
@@ -48,25 +67,35 @@ export const systemRoutes = {
 // Student Management Routes
 export const studentRoutes = {
     // Web routes
-    list: () => route('students.index'),
-    create: () => route('students.create'),
-    edit: (id: number) => route('students.edit', { student: id }),
-    show: (id: number) => route('students.show', { student: id }),
+    list: () => route(STUDENT_ROUTE_NAMES.INDEX),
+    create: () => route(STUDENT_ROUTE_NAMES.CREATE),
+    edit: (id: number) => route(STUDENT_ROUTE_NAMES.EDIT, { student: id }),
+    show: (id: number) => route(STUDENT_ROUTE_NAMES.SHOW, { student: id }),
+    store: () => route(STUDENT_ROUTE_NAMES.STORE),
 
     // API routes
     index: () => route('api.admin.students.index'),
-    store: () => route('api.admin.students.store'),
+
     stats: () => route('api.admin.students.stats'),
     update: (studentId: number) => route('api.admin.students.update', { student: studentId }),
     destroy: (studentId: number) => route('api.admin.students.destroy', { student: studentId }),
 
-    // Placeholder for future student management features
-    academicRecords: (/* id: number */) => '#', // Will be implemented later
-    programChange: (/* id: number */) => '#',
-    repeatCourses: (/* id: number */) => '#',
-    academicStanding: (/* id: number */) => '#',
-    enrollments: (/* id: number */) => '#',
-    statusTracking: () => '#',
+    // Student Management Features - General Access (for menu)
+    newStudents: () => route('students.new-students.index'),
+    academicRecords: () => route('academic-records.index'),
+    programChange: () => route('program-changes.index'),
+    repeatCourses: () => route('course-retakes.index'),
+    academicStanding: () => route('academic-standings.index'),
+    enrollments: () => route('student-enrollments.index'),
+    statusTracking: () => route('students.status.index'),
+    
+    // Student Management Features - Student Specific
+    studentAcademicRecords: (id: number) => route('students.academic-records.index', { student: id }),
+    studentAcademicRecordsTranscript: (id: number) => route('students.academic-records.transcript', { student: id }),
+    studentAcademicRecordsGpaHistory: (id: number) => route('students.academic-records.gpa-history', { student: id }),
+    studentProgramChange: (id: number) => route('students.program-changes.create', { student: id }),
+    studentRepeatCourses: (id: number) => route('students.retakes.index', { student: id }),
+    studentAcademicStanding: (id: number) => route('students.standing.index', { student: id }),
 } as const;
 
 // Lecturer Management Routes (Placeholder for future implementation)
@@ -81,35 +110,35 @@ export const lecturerRoutes = {
 // Curriculum & Courses Routes
 export const curriculumRoutes = {
     programs: {
-        index: () => route('programs.index'),
-        show: (id: number) => route('programs.show', { program: id }),
+        index: () => route(PROGRAM_ROUTE_NAMES.INDEX),
+        show: (id: number) => route(PROGRAM_ROUTE_NAMES.SHOW, { program: id }),
     },
     specializations: {
-        index: () => route('specializations.index'),
-        create: () => route('specializations.create'),
-        edit: (id: number) => route('specializations.edit', { specialization: id }),
-        show: (id: number) => route('specializations.show', { specialization: id }),
+        index: () => route(SPECIALIZATION_ROUTE_NAMES.INDEX),
+        create: () => route(SPECIALIZATION_ROUTE_NAMES.CREATE),
+        edit: (id: number) => route(SPECIALIZATION_ROUTE_NAMES.EDIT, { specialization: id }),
+        show: (id: number) => route(SPECIALIZATION_ROUTE_NAMES.SHOW, { specialization: id }),
     },
     curriculumVersions: {
-        index: () => route('curriculum_versions.index'),
-        create: () => route('curriculum_versions.create'),
-        edit: (id: number) => route('curriculum_versions.edit', { curriculum_version: id }),
-        show: (id: number) => route('curriculum_versions.show', { curriculum_version: id }),
+        index: () => route(CURRICULUM_ROUTE_NAMES.VERSION_INDEX),
+        create: () => route(CURRICULUM_ROUTE_NAMES.VERSION_CREATE),
+        edit: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_EDIT, { curriculum_version: id }),
+        show: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SHOW, { curriculum_version: id }),
         electives: (id: number) => route('curriculum_versions.electives', { curriculumVersion: id }),
     },
     units: {
-        index: () => route('units.index'),
-        create: () => route('units.create'),
-        edit: (id: number) => route('units.edit', { unit: id }),
-        show: (id: number) => route('units.show', { unit: id }),
-        import: () => route('units.import'),
-        export: () => route('units.export.excel'),
-        syllabus: (unitId: number) => route('syllabus.index', { unit: unitId }),
+        index: () => route(UNIT_ROUTE_NAMES.INDEX),
+        create: () => route(UNIT_ROUTE_NAMES.CREATE),
+        edit: (id: number) => route(UNIT_ROUTE_NAMES.EDIT, { unit: id }),
+        show: (id: number) => route(UNIT_ROUTE_NAMES.SHOW, { unit: id }),
+        import: () => route(UNIT_ROUTE_NAMES.IMPORT),
+        export: () => route(UNIT_ROUTE_NAMES.EXPORT_EXCEL),
+        syllabus: (unitId: number) => route(SYLLABUS_ROUTE_NAMES.INDEX, { unit: unitId }),
     },
     curriculumUnits: {
-        index: () => route('curriculum_units.index'),
-        create: () => route('curriculum_units.create'),
-        edit: (id: number) => route('curriculum_units.edit', { curriculum_unit: id }),
+        index: () => route(CURRICULUM_ROUTE_NAMES.UNIT_INDEX),
+        create: () => route(CURRICULUM_ROUTE_NAMES.UNIT_CREATE),
+        edit: (id: number) => route(CURRICULUM_ROUTE_NAMES.UNIT_EDIT, { curriculum_unit: id }),
     },
     // Placeholder for future features
     equivalentCourses: () => '#', // Will be implemented later
@@ -119,17 +148,17 @@ export const curriculumRoutes = {
 // Course Offerings & Registration Routes
 export const courseRoutes = {
     offerings: {
-        index: () => route('course-offerings.index'),
-        create: () => route('course-offerings.create'),
-        edit: (id: number) => route('course-offerings.edit', { courseOffering: id }),
-        show: (id: number) => route('course-offerings.show', { courseOffering: id }),
-        split: (id: number) => route('course-offerings.split.show', { courseOffering: id }),
+        index: () => route(COURSE_OFFERING_ROUTE_NAMES.INDEX),
+        create: () => route(COURSE_OFFERING_ROUTE_NAMES.CREATE),
+        edit: (id: number) => route(COURSE_OFFERING_ROUTE_NAMES.EDIT, { courseOffering: id }),
+        show: (id: number) => route(COURSE_OFFERING_ROUTE_NAMES.SHOW, { courseOffering: id }),
+        split: (id: number) => route(COURSE_OFFERING_ROUTE_NAMES.SPLIT_SHOW, { courseOffering: id }),
     },
     registrations: {
-        index: () => route('course-registrations.index'),
-        create: () => route('course-registrations.create'),
-        edit: (id: number) => route('course-registrations.edit', { adminCourseRegistration: id }),
-        show: (id: number) => route('course-registrations.show', { adminCourseRegistration: id }),
+        index: () => route(COURSE_REGISTRATION_ROUTE_NAMES.INDEX),
+        create: () => route(COURSE_REGISTRATION_ROUTE_NAMES.CREATE),
+        edit: (id: number) => route(COURSE_REGISTRATION_ROUTE_NAMES.EDIT, { adminCourseRegistration: id }),
+        show: (id: number) => route(COURSE_REGISTRATION_ROUTE_NAMES.SHOW, { adminCourseRegistration: id }),
     },
     // Placeholder for future features
     roomAssignment: () => '#', // Will be implemented later
@@ -181,10 +210,10 @@ export const reportRoutes = {
 
 // Course Syllabus & Content Routes
 export const syllabusRoutes = {
-    management: (unitId: number) => route('syllabus.index', { unit: unitId }),
-    create: (unitId: number) => route('syllabus.create', { unit: unitId }),
-    edit: (unitId: number, syllabusId: number) => route('syllabus.edit', { unit: unitId, syllabus: syllabusId }),
-    show: (unitId: number, syllabusId: number) => route('syllabus.show', { unit: unitId, syllabus: syllabusId }),
+    management: (unitId: number) => route(SYLLABUS_ROUTE_NAMES.INDEX, { unit: unitId }),
+    create: (unitId: number) => route(SYLLABUS_ROUTE_NAMES.CREATE, { unit: unitId }),
+    edit: (unitId: number, syllabusId: number) => route(SYLLABUS_ROUTE_NAMES.EDIT, { unit: unitId, syllabus: syllabusId }),
+    show: (unitId: number, syllabusId: number) => route(SYLLABUS_ROUTE_NAMES.SHOW, { unit: unitId, syllabus: syllabusId }),
     // Placeholder for future features
     learningMaterials: () => '#', // Will be implemented later
     learningOutcomes: () => '#',
@@ -193,16 +222,16 @@ export const syllabusRoutes = {
 
 // Settings Routes
 export const settingsRoutes = {
-    profile: () => route('profile.edit'),
-    password: () => route('password.edit'),
-    appearance: () => route('appearance'),
+    profile: () => route(SETTINGS_ROUTE_NAMES.PROFILE_EDIT),
+    password: () => route(SETTINGS_ROUTE_NAMES.PASSWORD_UPDATE),
+    appearance: () => route(SETTINGS_ROUTE_NAMES.APPEARANCE),
 } as const;
 
 // Dashboard Route
 export const dashboardRoute = () => route('dashboard');
 
 // Campus Selection Route
-export const campusSelectionRoute = () => route('select-campus.index');
+export const campusSelectionRoute = () => route(CAMPUS_ROUTE_NAMES.SELECT_CAMPUS_INDEX);
 
 /**
  * Helper function to generate route with parameters

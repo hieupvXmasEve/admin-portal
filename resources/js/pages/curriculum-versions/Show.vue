@@ -22,7 +22,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables';
 import { createColumns } from '@/lib/table-utils';
-import type { BreadcrumbItem } from '@/types';
 import type { CurriculumUnit, CurriculumVersion, Program, Semester, Specialization, Unit, UnitType } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
@@ -46,17 +45,7 @@ interface Props {
 const props = defineProps<Props>();
 const page = usePage();
 const api = useApi();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Curriculum Versions',
-        href: '/curriculum-versions',
-    },
-    {
-        title: props.curriculumVersion.version_code || `Version #${props.curriculumVersion.id}`,
-        href: `/curriculum-versions/${props.curriculumVersion.id}`,
-    },
-];
+console.log(props);
 
 // Modal states
 const showAddUnitModal = ref(false);
@@ -111,7 +100,7 @@ const editUnitFormSchema = addUnitFormSchema;
 
 // Helper function to calculate year level from semester number
 const calculateYearLevel = (semesterNumber: number): number => {
-    return Math.ceil(semesterNumber / 2);
+    return Math.ceil(semesterNumber / 3);
 };
 
 // Form submission handlers (Form component handles validation automatically)
@@ -221,6 +210,7 @@ const stats = computed(() => {
 
 const organizedUnits = computed(() => {
     const units = curriculumUnits.value;
+
     const organized = {} as Record<number, Record<number, CurriculumUnit[]>>;
 
     units.forEach((unit) => {
@@ -236,6 +226,7 @@ const organizedUnits = computed(() => {
 
         organized[year][semester].push(unit);
     });
+    console.log('organized', organized);
 
     return organized;
 });
@@ -957,7 +948,7 @@ const getUnitTypeColor = (type: string) => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="semester" :value="semester.toString()">
-                                            Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }})
+                                            Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }})
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>

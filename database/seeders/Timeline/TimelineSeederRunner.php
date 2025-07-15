@@ -21,8 +21,7 @@ class TimelineSeederRunner extends Seeder
             // Phase 1: Student Creation and Initial Setup
             $this->command->info("\n📋 Phase 1: Student Creation and Initial Setup");
             $this->call([
-                \Database\Seeders\Timeline\CreateInitialStudentsSeeder::class,
-                \Database\Seeders\Timeline\StudentAdmissionSeeder::class,
+                \Database\Seeders\Timeline\CreateActiveStudentsSeeder::class,
             ]);
 
             // Phase 2: Program Enrollment (ALL eligible students, including first semester)

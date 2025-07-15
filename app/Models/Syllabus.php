@@ -16,12 +16,11 @@ class Syllabus extends Model
     protected $table = 'syllabus';
 
     protected $fillable = [
-        'unit_id',
+        'curriculum_unit_id',
         'version',
         'description',
         'total_hours',
         'hours_per_session',
-        'semester_id',
         'is_active',
     ];
 
@@ -32,19 +31,56 @@ class Syllabus extends Model
     ];
 
     /**
-     * Get the unit that owns this syllabus.
+     * Get the curriculum unit that owns this syllabus.
      */
-    public function unit(): BelongsTo
+    public function curriculumUnit(): BelongsTo
     {
-        return $this->belongsTo(Unit::class);
+        return $this->belongsTo(CurriculumUnit::class);
     }
 
     /**
-     * Get the semester from which this syllabus is effective.
+     * Get the unit through curriculum unit relationship.
      */
-    public function effectiveFromSemester(): BelongsTo
+    public function unit()
     {
-        return $this->belongsTo(Semester::class, 'semester_id');
+        return $this->hasOneThrough(
+            Unit::class,
+            CurriculumUnit::class,
+            'id',
+            'id',
+            'curriculum_unit_id',
+            'unit_id'
+        );
+    }
+
+    /**
+     * Get the semester through curriculum unit relationship.
+     */
+    public function semester()
+    {
+        return $this->hasOneThrough(
+            Semester::class,
+            CurriculumUnit::class,
+            'id',
+            'id',
+            'curriculum_unit_id',
+            'semester_id'
+        );
+    }
+
+    /**
+     * Get the curriculum version through curriculum unit.
+     */
+    public function curriculumVersion()
+    {
+        return $this->hasOneThrough(
+            CurriculumVersion::class,
+            CurriculumUnit::class,
+            'id',
+            'id',
+            'curriculum_unit_id',
+            'curriculum_version_id'
+        );
     }
 
     /**

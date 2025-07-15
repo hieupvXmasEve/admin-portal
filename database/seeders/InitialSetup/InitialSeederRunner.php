@@ -35,8 +35,8 @@ class InitialSeederRunner extends Seeder
             // 006. Link units to programs and graduation requirements
             CurriculumSeeder::class,
 
-            // 007. Create semesters, course offerings, and assign lecturers
-            SemesterAndOfferingSeeder::class,
+            // 007. Create academic semesters for the year
+            SemesterSeeder::class,
 
             // 008. Create syllabus and assessment components for each class
             SyllabusSeeder::class,

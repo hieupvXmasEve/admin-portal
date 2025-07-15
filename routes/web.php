@@ -68,7 +68,7 @@ require __DIR__ . '/web/syllabus.php';
 require __DIR__ . '/web/programs.php';
 require __DIR__ . '/web/specializations.php';
 require __DIR__ . '/web/curriculum.php';
-require __DIR__ . '/web/students.php';
 require __DIR__ . '/web/course-offerings.php';
 require __DIR__ . '/web/course-registrations.php';
 require __DIR__ . '/web/campuses.php';
+require __DIR__ . '/web/student-management.php';

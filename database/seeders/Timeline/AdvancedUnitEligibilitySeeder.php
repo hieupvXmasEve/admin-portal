@@ -44,7 +44,7 @@ class AdvancedUnitEligibilitySeeder extends Seeder
 
         foreach ($students as $student) {
             $result = $this->assessStudentEligibility($student);
-            
+
             foreach ($result as $key => $value) {
                 if (isset($eligibilityResults[$key]) && $value) {
                     $eligibilityResults[$key]++;
@@ -101,13 +101,13 @@ class AdvancedUnitEligibilitySeeder extends Seeder
         return $results;
     }
 
-    private function checkYear2Eligibility(Student $student, int $completedCredits, GpaCalculation $gpa): bool
+    private function checkYear2Eligibility(Student $student, float $completedCredits, GpaCalculation $gpa): bool
     {
         // Requirements for year 2:
         // - Completed at least 24 credit hours (typical year 1 load)
         // - GPA >= 1.5
         // - Completed core foundation units
-        
+
         if ($completedCredits < 24 || $gpa->gpa < 1.5) {
             return false;
         }
@@ -123,13 +123,13 @@ class AdvancedUnitEligibilitySeeder extends Seeder
         return $completedFoundationUnits >= ($foundationUnits->count() * 0.75);
     }
 
-    private function checkYear3Eligibility(Student $student, int $completedCredits, GpaCalculation $gpa): bool
+    private function checkYear3Eligibility(Student $student, float $completedCredits, GpaCalculation $gpa): bool
     {
         // Requirements for year 3:
         // - Completed at least 48 credit hours (typical years 1-2 load)
         // - GPA >= 2.0
         // - Completed year 2 core units
-        
+
         if ($completedCredits < 48 || $gpa->gpa < 2.0) {
             return false;
         }
@@ -139,13 +139,13 @@ class AdvancedUnitEligibilitySeeder extends Seeder
         return false;
     }
 
-    private function checkHonorsEligibility(Student $student, int $completedCredits, GpaCalculation $gpa): bool
+    private function checkHonorsEligibility(Student $student, float $completedCredits, GpaCalculation $gpa): bool
     {
         // Requirements for honors:
         // - Completed at least 72 credit hours (3 years)
         // - GPA >= 3.5
         // - No failed units in final year
-        
+
         if ($completedCredits < 72 || $gpa->gpa < 3.5) {
             return false;
         }
@@ -159,13 +159,13 @@ class AdvancedUnitEligibilitySeeder extends Seeder
         return $recentFailures === 0;
     }
 
-    private function checkAdvancedStanding(Student $student, int $completedCredits, GpaCalculation $gpa): bool
+    private function checkAdvancedStanding(Student $student, float $completedCredits, GpaCalculation $gpa): bool
     {
         // Advanced standing criteria:
         // - Exceptional GPA (>= 3.8)
         // - Completed more credits than typical for time enrolled
         // - No failed units
-        
+
         if ($gpa->gpa < 3.8) {
             return false;
         }
@@ -196,7 +196,7 @@ class AdvancedUnitEligibilitySeeder extends Seeder
 
         // Check if any failed units are prerequisites for other units
         $blockedUnits = UnitPrerequisiteGroup::whereHas('conditions', function ($query) use ($failedUnits) {
-            $query->whereIn('prerequisite_unit_id', $failedUnits);
+            $query->whereIn('required_unit_id', $failedUnits);
         })->count();
 
         return $blockedUnits > 0;

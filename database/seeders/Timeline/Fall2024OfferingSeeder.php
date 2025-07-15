@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Semester;
-use App\Models\Unit;
-use App\Models\Lecture;
-use App\Models\CourseOffering;
-use App\Models\Syllabus;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
+use App\Models\CourseOffering;
+use App\Models\Lecture;
+use App\Models\Semester;
+use App\Models\Syllabus;
+use App\Models\Unit;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class Fall2024OfferingSeeder extends Seeder
 {
@@ -27,22 +26,36 @@ class Fall2024OfferingSeeder extends Seeder
         // Get FALL2024 semester
         $semester = Semester::where('code', 'FALL2024')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('FALL2024 semester not found. Please create semester first.');
         }
 
-        // Clean existing offerings and related data for this semester
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        // Check existing data for this semester
+        if (!$this->shouldCreateOfferings($semester)) {
+            return;
+        }
 
-        // For simplicity, truncate all related tables since this is seeding
-        DB::table('assessment_component_details')->truncate();
-        DB::table('assessment_components')->truncate();
-        DB::table('syllabus')->truncate();
-        DB::table('course_offerings')->where('semester_id', $semester->id)->delete();
-        DB::table('course_registrations')->where('semester_id', $semester->id)->delete();
+        // Create course offerings
+        $this->createCourseOfferings($semester);
 
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        $this->command->info('✅ FALL2024 course offerings created successfully!');
+    }
 
+    private function shouldCreateOfferings(Semester $semester): bool
+    {
+        // Check if offerings already exist for this semester
+        $existingOfferings = CourseOffering::where('semester_id', $semester->id)->count();
+        if ($existingOfferings > 0) {
+            $this->command->info("  ✅ Course offerings already exist for semester {$semester->id} ({$existingOfferings} found). Skipping creation.");
+            return false;
+        }
+
+        $this->command->info("  ✓ No existing course offerings found, proceeding with creation");
+        return true;
+    }
+
+    private function createCourseOfferings(Semester $semester): void
+    {
         $units = Unit::all();
         $lecturers = Lecture::where('is_active', true)->get();
 
@@ -60,44 +73,8 @@ class Fall2024OfferingSeeder extends Seeder
         $unitsWithOfferings = collect();
 
         foreach ($foundationUnits as $unit) {
-            // Determine how many sections this unit should have
-            $sectionCount = $this->getSectionCount($unit);
-
-            for ($i = 1; $i <= $sectionCount; $i++) {
-                // Assign a lecturer based on their specialization
-                $lecturer = $this->assignLecturerToUnit($unit, $lecturers);
-
-                $courseOffering = CourseOffering::create([
-                    'semester_id' => $semester->id,
-                    'unit_id' => $unit->id,
-                    'lecture_id' => $lecturer->id,
-                    'section_code' => $sectionCount > 1 ? sprintf('%02d', $i) : null,
-                    'max_capacity' => $this->getCapacityForUnit($unit),
-                    'current_enrollment' => 0, // Will be updated during registration
-                    'waitlist_capacity' => 10,
-                    'current_waitlist' => 0,
-                    'delivery_mode' => $this->getDeliveryMode($lecturer),
-                    'schedule_days' => $this->getScheduleDays(),
-                    'schedule_time_start' => $this->getTimeSlot()['start'],
-                    'schedule_time_end' => $this->getTimeSlot()['end'],
-                    'location' => $this->getLocation($lecturer),
-                    'is_active' => true,
-                    'enrollment_status' => 'open',
-                    'registration_start_date' => $semester->enrollment_start_date?->toDateString(),
-                    'registration_end_date' => $semester->enrollment_end_date?->toDateString(),
-                    'notes' => "FALL2024 offering for first-year students",
-                ]);
-
-                $offeringCount++;
-
-                // Track units that have offerings
-                if (!$unitsWithOfferings->contains($unit->id)) {
-                    $unitsWithOfferings->push($unit->id);
-                }
-
-                $this->command->info("  📖 {$unit->code} - {$lecturer->first_name} {$lecturer->last_name}" .
-                    ($courseOffering->section_code ? " (Section {$courseOffering->section_code})" : ""));
-            }
+            $this->command->info("  Creating offerings for {$unit->code} (ID: {$unit->id})");
+            $offeringCount += $this->createOfferingsForUnit($unit, $semester, $lecturers, $unitsWithOfferings);
         }
 
         // Create syllabi for all units (one per unit per semester)
@@ -108,6 +85,51 @@ class Fall2024OfferingSeeder extends Seeder
 
         $this->command->info("✅ Created {$offeringCount} course offerings for FALL2024!");
         $this->command->info("✅ Created {$syllabusCount} syllabi for FALL2024!");
+    }
+
+    private function createOfferingsForUnit(Unit $unit, Semester $semester, $lecturers, $unitsWithOfferings): int
+    {
+        // Determine how many sections this unit should have
+        $sectionCount = $this->getSectionCount($unit);
+        $createdCount = 0;
+
+        for ($i = 1; $i <= $sectionCount; $i++) {
+            // Assign a lecturer based on their specialization
+            $lecturer = $this->assignLecturerToUnit($unit, $lecturers);
+
+            $courseOffering = CourseOffering::create([
+                'semester_id' => $semester->id,
+                'unit_id' => $unit->id,
+                'lecture_id' => $lecturer->id,
+                'section_code' => sprintf('%02d', $i),
+                'max_capacity' => $this->getCapacityForUnit($unit),
+                'current_enrollment' => 0, // Will be updated during registration
+                'waitlist_capacity' => 10,
+                'current_waitlist' => 0,
+                'delivery_mode' => $this->getDeliveryMode($lecturer),
+                'schedule_days' => $this->getScheduleDays(),
+                'schedule_time_start' => $this->getTimeSlot()['start'],
+                'schedule_time_end' => $this->getTimeSlot()['end'],
+                'location' => $this->getLocation($lecturer),
+                'is_active' => true,
+                'enrollment_status' => 'open',
+                'registration_start_date' => $semester->enrollment_start_date?->toDateString(),
+                'registration_end_date' => $semester->enrollment_end_date?->toDateString(),
+                'notes' => 'FALL2024 offering for first-year students',
+            ]);
+
+            $createdCount++;
+
+            // Track units that have offerings
+            if (! $unitsWithOfferings->contains($unit->id)) {
+                $unitsWithOfferings->push($unit->id);
+            }
+
+            $this->command->info("  📖 {$unit->code} - {$lecturer->first_name} {$lecturer->last_name}" .
+                ($courseOffering->section_code ? " (Section {$courseOffering->section_code})" : ''));
+        }
+
+        return $createdCount;
     }
 
     private function getFoundationUnits($units)
@@ -218,14 +240,23 @@ class Fall2024OfferingSeeder extends Seeder
         $campusName = $lecturer->campus->name ?? 'Main Campus';
         $roomNumbers = ['101', '102', '201', '202', '301', '302', 'Lab A', 'Lab B', 'Auditorium'];
 
-        return "Room " . $roomNumbers[array_rand($roomNumbers)] . ", " . $campusName;
+        return 'Room ' . $roomNumbers[array_rand($roomNumbers)] . ', ' . $campusName;
     }
 
     private function createSyllabusForUnit(Unit $unit, Semester $semester): void
     {
-        // Check if syllabus already exists for this unit and semester
-        $existingSyllabus = Syllabus::where('unit_id', $unit->id)
-            ->where('semester_id', $semester->id)
+        // Get curriculum unit for this unit and semester
+        $curriculumUnit = \App\Models\CurriculumUnit::whereHas('curriculumVersion', function ($query) use ($semester) {
+            $query->where('semester_id', $semester->id);
+        })->where('unit_id', $unit->id)->first();
+
+        if (!$curriculumUnit) {
+            $this->command->warn("No curriculum unit found for {$unit->code} in {$semester->code}");
+            return;
+        }
+
+        // Check if syllabus already exists for this curriculum unit
+        $existingSyllabus = Syllabus::where('curriculum_unit_id', $curriculumUnit->id)
             ->where('is_active', true)
             ->first();
 
@@ -235,31 +266,32 @@ class Fall2024OfferingSeeder extends Seeder
 
         // Create syllabus
         $syllabus = Syllabus::create([
-            'unit_id' => $unit->id,
+            'curriculum_unit_id' => $curriculumUnit->id,
             'version' => 'v1.0',
             'description' => $this->generateSyllabusDescription($unit),
             'total_hours' => $this->getTotalHours($unit),
             'hours_per_session' => $this->getHoursPerSession($unit),
-            'semester_id' => $semester->id,
             'is_active' => true,
         ]);
 
         // Create assessment components
         $this->createAssessmentComponents($syllabus, $unit);
+
+        $this->command->info("📋 Created syllabus for {$unit->code} - {$semester->code}");
     }
 
     private function generateSyllabusDescription(Unit $unit): string
     {
         $descriptions = [
-            'COS10009' => "Introduction to Programming provides students with fundamental programming concepts using modern programming languages. Students will learn problem-solving techniques, algorithm design, and software development practices.",
-            'COS10011' => "Creating Web Applications introduces students to web development technologies including HTML, CSS, JavaScript, and server-side programming. Students will build dynamic web applications.",
-            'MAT10001' => "Mathematics for Computing covers essential mathematical concepts for computer science including discrete mathematics, logic, and statistical foundations.",
-            'ENG10001' => "English for Academic Purposes develops academic writing and communication skills essential for university study and professional practice.",
-            'HRM10001' => "Introduction to Human Resource Management explores the fundamental principles of managing people in organizations, including recruitment, performance management, and employee development.",
-            'MKT10001' => "Introduction to Marketing examines marketing concepts, consumer behavior, market research, and marketing strategy development in contemporary business environments.",
-            'ACC10007' => "Accounting for Decision Making provides fundamental accounting principles and practices for business decision-making, including financial reporting and analysis.",
-            'ENG10002' => "Engineering Fundamentals introduces core engineering principles, problem-solving methodologies, and professional engineering practices.",
-            'ENG10003' => "Engineering Mathematics covers mathematical foundations essential for engineering disciplines including calculus, linear algebra, and differential equations.",
+            'COS10009' => 'Introduction to Programming provides students with fundamental programming concepts using modern programming languages. Students will learn problem-solving techniques, algorithm design, and software development practices.',
+            'COS10011' => 'Creating Web Applications introduces students to web development technologies including HTML, CSS, JavaScript, and server-side programming. Students will build dynamic web applications.',
+            'MAT10001' => 'Mathematics for Computing covers essential mathematical concepts for computer science including discrete mathematics, logic, and statistical foundations.',
+            'ENG10001' => 'English for Academic Purposes develops academic writing and communication skills essential for university study and professional practice.',
+            'HRM10001' => 'Introduction to Human Resource Management explores the fundamental principles of managing people in organizations, including recruitment, performance management, and employee development.',
+            'MKT10001' => 'Introduction to Marketing examines marketing concepts, consumer behavior, market research, and marketing strategy development in contemporary business environments.',
+            'ACC10007' => 'Accounting for Decision Making provides fundamental accounting principles and practices for business decision-making, including financial reporting and analysis.',
+            'ENG10002' => 'Engineering Fundamentals introduces core engineering principles, problem-solving methodologies, and professional engineering practices.',
+            'ENG10003' => 'Engineering Mathematics covers mathematical foundations essential for engineering disciplines including calculus, linear algebra, and differential equations.',
         ];
 
         return $descriptions[$unit->code] ?? "This unit provides comprehensive coverage of {$unit->name} with theoretical foundations and practical applications.";
@@ -268,7 +300,7 @@ class Fall2024OfferingSeeder extends Seeder
     private function getTotalHours(Unit $unit): int
     {
         // Calculate based on credit points (typically 10 hours per credit point)
-        return (int)($unit->credit_points * 10);
+        return (int) ($unit->credit_points * 10);
     }
 
     private function getHoursPerSession(Unit $unit): int
@@ -318,7 +350,7 @@ class Fall2024OfferingSeeder extends Seeder
                     'details' => [
                         ['name' => 'Assignment 1: Basic Programming', 'weight' => 15.00],
                         ['name' => 'Assignment 2: Data Structures', 'weight' => 25.00],
-                    ]
+                    ],
                 ],
                 ['name' => 'Mid-term Exam', 'weight' => 15.00, 'type' => 'exam', 'required_for_final' => true],
                 ['name' => 'Final Exam', 'weight' => 25.00, 'type' => 'exam', 'required_for_final' => true],
@@ -333,7 +365,7 @@ class Fall2024OfferingSeeder extends Seeder
                         ['name' => 'HTML/CSS Assignment', 'weight' => 15.00],
                         ['name' => 'JavaScript Assignment', 'weight' => 15.00],
                         ['name' => 'Full Stack Project', 'weight' => 20.00],
-                    ]
+                    ],
                 ],
                 ['name' => 'Portfolio Project', 'weight' => 30.00, 'type' => 'project', 'required_for_final' => true],
                 ['name' => 'Final Exam', 'weight' => 20.00, 'type' => 'exam', 'required_for_final' => true],

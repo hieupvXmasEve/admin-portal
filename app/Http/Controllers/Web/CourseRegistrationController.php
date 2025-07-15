@@ -115,10 +115,11 @@ class CourseRegistrationController extends Controller
         // Get course offerings for the selected semester
         $courseOfferings = collect();
         if ($request->filled('semester_id') && $request->semester_id !== 'all') {
-            $courseOfferings = CourseOffering::with(['unit'])
+            $courseOfferings = CourseOffering::with(['curriculumUnit.unit'])
                 ->where('semester_id', $request->semester_id)
                 ->where('is_active', true)
-                ->join('units', 'course_offerings.unit_id', '=', 'units.id')
+                ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
+                ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
                 ->orderBy('units.code')
                 ->orderBy('course_offerings.section_code')
                 ->select('course_offerings.*')
@@ -161,10 +162,11 @@ class CourseRegistrationController extends Controller
         if ($request->filled('semester_id')) {
             $selectedSemester = Semester::find($request->semester_id);
 
-            $courseOfferings = CourseOffering::with(['unit', 'lecture'])
+            $courseOfferings = CourseOffering::with(['curriculumUnit.unit', 'lecture'])
                 ->where('semester_id', $request->semester_id)
                 ->where('is_active', true)
-                ->join('units', 'course_offerings.unit_id', '=', 'units.id')
+                ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
+                ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
                 ->orderBy('units.code')
                 ->orderBy('course_offerings.section_code')
                 ->select('course_offerings.*')

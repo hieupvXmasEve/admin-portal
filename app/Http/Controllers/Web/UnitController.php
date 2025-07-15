@@ -99,7 +99,7 @@ class UnitController extends Controller
             'curriculumUnits.curriculumVersion.specialization',
             'curriculumUnits.semester',
             'prerequisiteGroups.conditions.requiredUnit',
-            'syllabus.effectiveFromSemester',
+            'syllabus.curriculumUnit.semester',
             'syllabus.assessmentComponents.details'
         ]);
 

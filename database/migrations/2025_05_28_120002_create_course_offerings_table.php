@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('course_offerings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('semester_id')->constrained()->onDelete('cascade');
-            $table->foreignId('unit_id')->constrained()->onDelete('cascade');
+            $table->foreignId('curriculum_unit_id')->constrained()->onDelete('cascade');
             $table->foreignId('lecture_id')->nullable()->constrained('lectures')->onDelete('set null');
 
             $table->string('section_code', 10)->nullable(); // e.g., "A", "B", "01", "02"
@@ -53,7 +53,7 @@ return new class extends Migration
             $table->softDeletes();
 
             // Indexes
-            $table->index(['semester_id', 'unit_id']);
+            $table->index(['semester_id', 'curriculum_unit_id']);
             $table->index(['lecture_id', 'semester_id']);
             $table->index(['is_active', 'enrollment_status']);
             $table->index(['delivery_mode']);
@@ -61,7 +61,7 @@ return new class extends Migration
             $table->index(['registration_start_date', 'registration_end_date'], 'co_registration_dates_idx');
 
             // Unique constraint for section codes within semester-unit combination
-            $table->unique(['semester_id', 'unit_id', 'section_code'], 'unique_semester_unit_section');
+            $table->unique(['semester_id', 'curriculum_unit_id', 'section_code'], 'unique_semester_unit_section');
         });
     }
 

@@ -66,6 +66,12 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => !$request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'permissions' => fn() => $user ? app(PermissionService::class)->getUserPermissions($user, $currentCampusId) : [],
+            'flash' => function () {
+                return [
+                    'success' => session('success'),
+                    'error' => session('error'),
+                ];
+            },
         ];
     }
 }

@@ -39,16 +39,12 @@ class GPACalculationSeeder extends Seeder
             throw new \Exception('No students with academic records found for FALL2024.');
         }
 
-        // Clean existing GPA calculations for this semester
-        $deletedCount = GpaCalculation::where('semester_id', $semester->id)->delete();
-        $this->command->info("  Cleaned {$deletedCount} existing GPA calculations...");
-
-        // Also clean by student IDs for safety
-        $studentIds = $students->pluck('id');
-        $deletedByStudents = GpaCalculation::whereIn('student_id', $studentIds)
-            ->where('semester_id', $semester->id)
-            ->delete();
-        $this->command->info("  Cleaned {$deletedByStudents} additional existing GPA calculations by student...");
+        // Check if GPA calculations already exist for this semester
+        $existingCalculations = GpaCalculation::where('semester_id', $semester->id)->count();
+        if ($existingCalculations > 0) {
+            $this->command->info("✅ GPA calculations already exist for FALL2024 ({$existingCalculations} found). Skipping creation.");
+            return;
+        }
 
         $calculationCount = 0;
         $processedStudentIds = [];

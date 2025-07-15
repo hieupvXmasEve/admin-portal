@@ -85,6 +85,7 @@ const handleStatusUpdate = () => {
     });
     toast.success('Registration status updated successfully');
 };
+console.log(props.courseOffering);
 </script>
 
 <template>
@@ -211,9 +212,11 @@ const handleStatusUpdate = () => {
                     <p class="text-lg font-semibold">{{ courseOffering.semester?.name }} ({{ courseOffering.semester?.code }})</p>
                 </div>
 
-                <div v-if="courseOffering.unit">
+                <div v-if="courseOffering.curriculum_unit">
                     <p class="text-muted-foreground text-sm font-medium">Unit</p>
-                    <p class="text-lg font-semibold">{{ courseOffering.unit.code }} - {{ courseOffering.unit.name }}</p>
+                    <p class="text-lg font-semibold">
+                        {{ courseOffering.curriculum_unit.unit.code }} - {{ courseOffering.curriculum_unit.unit.name }}
+                    </p>
                 </div>
 
                 <div v-if="courseOffering.lecture">
@@ -231,23 +234,36 @@ const handleStatusUpdate = () => {
                     Important Dates
                 </CardTitle>
             </CardHeader>
-            <CardContent class="space-y-4">
-                <div>
-                    <p class="text-muted-foreground text-sm font-medium">Registration Period</p>
-                    <p class="text-sm">
-                        {{ formatDate(courseOffering.registration_start_date) }} -
-                        {{ formatDate(courseOffering.registration_end_date) }}
-                    </p>
-                </div>
+            <CardContent class="grid grid-cols-2 gap-4">
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-muted-foreground text-sm font-medium">Registration Period</p>
+                        <p class="text-sm">
+                            {{ formatDate(courseOffering.registration_start_date) }} -
+                            {{ formatDate(courseOffering.registration_end_date) }}
+                        </p>
+                    </div>
 
-                <div>
-                    <p class="text-muted-foreground text-sm font-medium">Drop Deadline</p>
-                    <p class="text-sm">{{ formatDate(courseOffering.drop_deadline) }}</p>
-                </div>
+                    <div>
+                        <p class="text-muted-foreground text-sm font-medium">Drop Deadline</p>
+                        <p class="text-sm">{{ formatDate(courseOffering.drop_deadline) }}</p>
+                    </div>
 
-                <div>
-                    <p class="text-muted-foreground text-sm font-medium">Withdrawal Deadline</p>
-                    <p class="text-sm">{{ formatDate(courseOffering.withdrawal_deadline) }}</p>
+                    <div>
+                        <p class="text-muted-foreground text-sm font-medium">Withdrawal Deadline</p>
+                        <p class="text-sm">{{ formatDate(courseOffering.withdrawal_deadline) }}</p>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <!-- schedule day -->
+                    <div>
+                        <p class="text-muted-foreground text-sm font-medium">Schedule</p>
+                        <p class="text-sm">{{ courseOffering.schedule_days?.join(', ') ?? 'Not set' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-muted-foreground text-sm font-medium">Schedule</p>
+                        <p class="text-sm">{{ courseOffering.schedule_time_start }} - {{ courseOffering.schedule_time_end }}</p>
+                    </div>
                 </div>
             </CardContent>
         </Card>
@@ -261,14 +277,14 @@ const handleStatusUpdate = () => {
                     <UserCheck class="h-4 w-4" />
                     Student Registration Status
                 </CardTitle>
-                <Button
+                <!-- <Button
                     v-if="courseOffering.course_registrations && courseOffering.course_registrations.length > 0"
                     @click="showStatusModal = true"
                     variant="outline"
                 >
                     <UserCheck class="mr-2 h-4 w-4" />
                     Manage Status
-                </Button>
+                </Button> -->
             </div>
         </CardHeader>
         <CardContent>
@@ -281,6 +297,7 @@ const handleStatusUpdate = () => {
                 <Table>
                     <TableHeader>
                         <TableRow>
+                            <TableHead>No</TableHead>
                             <TableHead>Student ID</TableHead>
                             <TableHead>Student Name</TableHead>
                             <TableHead>Email</TableHead>
@@ -290,7 +307,11 @@ const handleStatusUpdate = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="registration in courseOffering.course_registrations" :key="registration.id">
+                        <TableRow v-for="(registration, index) in courseOffering.course_registrations" :key="registration.id">
+                            <!-- No column -->
+                            <TableCell>
+                                {{ index + 1 }}
+                            </TableCell>
                             <TableCell class="font-medium">
                                 {{ registration.student?.student_id }}
                             </TableCell>

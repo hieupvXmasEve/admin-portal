@@ -26,7 +26,7 @@ class ReEnrollmentSeeder extends Seeder
         $returningStudents = Student::whereIn('status', ['on_leave', 'suspended'])
             ->whereHas('academicHolds', function ($query) {
                 $query->where('status', 'active')
-                      ->whereIn('hold_category', ['academic_leave', 'academic_suspension']);
+                    ->whereIn('hold_category', ['academic_leave', 'academic_suspension']);
             })
             ->get();
 
@@ -53,17 +53,17 @@ class ReEnrollmentSeeder extends Seeder
     private function processReEnrollment(Student $student): string
     {
         $reEnrollmentType = $this->determineReEnrollmentOutcome($student);
-        
+
         switch ($reEnrollmentType['outcome']) {
             case 'approved':
                 return $this->processSuccessfulReturn($student, $reEnrollmentType);
-                
+
             case 'conditional':
                 return $this->processConditionalReturn($student, $reEnrollmentType);
-                
+
             case 'denied':
                 return $this->processDeniedReturn($student, $reEnrollmentType);
-                
+
             case 'pending':
             default:
                 return $this->processPendingReturn($student, $reEnrollmentType);
@@ -79,7 +79,7 @@ class ReEnrollmentSeeder extends Seeder
             ->first();
 
         $gpa = $latestGPA ? $latestGPA->gpa : 0.0;
-        
+
         // Get reason for original leave/suspension
         $currentStatus = $student->status;
         $leaveReason = $this->extractLeaveReason($student);
@@ -132,9 +132,9 @@ class ReEnrollmentSeeder extends Seeder
         // Update student status
         $student->update([
             'status' => 'active',
-            'admission_notes' => ($student->admission_notes ?? '') . 
-                              " | Re-enrolled: " . now()->format('Y-m-d') . 
-                              " (Approved return from {$reEnrollmentType['leave_reason']})"
+            'admission_notes' => ($student->admission_notes ?? '') .
+                " | Re-enrolled: " . now()->format('Y-m-d') .
+                " (Approved return from {$reEnrollmentType['leave_reason']})"
         ]);
 
         // Resolve academic holds
@@ -144,7 +144,7 @@ class ReEnrollmentSeeder extends Seeder
         $this->registerForCurrentSemester($student);
 
         $this->command->info("  ✅ {$student->student_id}: Successful return (was {$reEnrollmentType['leave_reason']})");
-        
+
         return 'successful_returns';
     }
 
@@ -152,12 +152,12 @@ class ReEnrollmentSeeder extends Seeder
     {
         // Update student status with conditions
         $conditions = $this->generateReturnConditions($reEnrollmentType);
-        
+
         $student->update([
             'status' => 'active',
-            'admission_notes' => ($student->admission_notes ?? '') . 
-                              " | Conditional re-enrollment: " . now()->format('Y-m-d') . 
-                              " (Conditions: {$conditions})"
+            'admission_notes' => ($student->admission_notes ?? '') .
+                " | Conditional re-enrollment: " . now()->format('Y-m-d') .
+                " (Conditions: {$conditions})"
         ]);
 
         // Create conditional enrollment hold
@@ -167,7 +167,7 @@ class ReEnrollmentSeeder extends Seeder
         $this->resolveAcademicHolds($student, 'Conditional re-enrollment approved');
 
         $this->command->info("  ⚠️ {$student->student_id}: Conditional return ({$conditions})");
-        
+
         return 'conditional_returns';
     }
 
@@ -175,16 +175,16 @@ class ReEnrollmentSeeder extends Seeder
     {
         // Keep student in current status, add denial note
         $student->update([
-            'admission_notes' => ($student->admission_notes ?? '') . 
-                              " | Re-enrollment denied: " . now()->format('Y-m-d') . 
-                              " (Reason: Insufficient academic progress)"
+            'admission_notes' => ($student->admission_notes ?? '') .
+                " | Re-enrollment denied: " . now()->format('Y-m-d') .
+                " (Reason: Insufficient academic progress)"
         ]);
 
         // Create denial hold
         $this->createDenialHold($student);
 
         $this->command->info("  ❌ {$student->student_id}: Re-enrollment denied");
-        
+
         return 'denied_returns';
     }
 
@@ -192,23 +192,23 @@ class ReEnrollmentSeeder extends Seeder
     {
         // Add pending review note
         $student->update([
-            'admission_notes' => ($student->admission_notes ?? '') . 
-                              " | Re-enrollment under review: " . now()->format('Y-m-d') . 
-                              " (Pending committee decision)"
+            'admission_notes' => ($student->admission_notes ?? '') .
+                " | Re-enrollment under review: " . now()->format('Y-m-d') .
+                " (Pending committee decision)"
         ]);
 
         // Create review hold
         $this->createReviewHold($student);
 
         $this->command->info("  📋 {$student->student_id}: Under review");
-        
+
         return 'pending_review';
     }
 
     private function extractLeaveReason(Student $student): string
     {
         $notes = $student->admission_notes ?? '';
-        
+
         if (str_contains($notes, 'Medical leave')) {
             return 'medical leave';
         } elseif (str_contains($notes, 'Personal')) {
@@ -225,16 +225,16 @@ class ReEnrollmentSeeder extends Seeder
     private function generateReturnConditions(array $reEnrollmentType): string
     {
         $conditions = [];
-        
+
         if ($reEnrollmentType['previous_gpa'] < 2.0) {
             $conditions[] = 'Academic probation';
             $conditions[] = 'Mandatory tutoring';
         }
-        
+
         if ($reEnrollmentType['leave_reason'] === 'medical leave') {
             $conditions[] = 'Medical clearance required';
         }
-        
+
         if ($reEnrollmentType['leave_reason'] === 'academic suspension') {
             $conditions[] = 'Reduced course load';
             $conditions[] = 'Academic counseling';
@@ -263,7 +263,7 @@ class ReEnrollmentSeeder extends Seeder
         AcademicHold::create([
             'student_id' => $student->id,
             'hold_type' => 'academic',
-            'hold_category' => 'conditional_enrollment',
+            'hold_category' => 'registration',
             'title' => 'Conditional Re-enrollment',
             'description' => "Student re-enrolled under conditions: {$conditions}",
             'amount' => null,
@@ -283,7 +283,7 @@ class ReEnrollmentSeeder extends Seeder
         AcademicHold::create([
             'student_id' => $student->id,
             'hold_type' => 'administrative',
-            'hold_category' => 'enrollment_denied',
+            'hold_category' => 'registration',
             'title' => 'Re-enrollment Denied',
             'description' => 'Re-enrollment application denied. Appeal process available.',
             'amount' => null,
@@ -303,7 +303,7 @@ class ReEnrollmentSeeder extends Seeder
         AcademicHold::create([
             'student_id' => $student->id,
             'hold_type' => 'administrative',
-            'hold_category' => 'enrollment_review',
+            'hold_category' => 'registration',
             'title' => 'Re-enrollment Under Review',
             'description' => 'Re-enrollment application under committee review.',
             'amount' => null,
@@ -321,8 +321,8 @@ class ReEnrollmentSeeder extends Seeder
     private function registerForCurrentSemester(Student $student): void
     {
         // Get current semester
-        $currentSemester = Semester::where('is_current', true)->first();
-        
+        $currentSemester = Semester::where('is_active', true)->first();
+
         if (!$currentSemester) {
             return;
         }
@@ -341,7 +341,7 @@ class ReEnrollmentSeeder extends Seeder
                 'semester_id' => $currentSemester->id,
                 'registration_status' => 'registered',
                 'registration_date' => now(),
-                'registration_method' => 'administrative',
+                'registration_method' => 'admin_override',
                 'credit_hours' => $offering->unit->credit_points,
                 'attempt_number' => 1,
                 'is_retake' => false,
@@ -356,14 +356,14 @@ class ReEnrollmentSeeder extends Seeder
     {
         // For demonstration, mark some active students as on leave
         $students = Student::where('status', 'active')->take(5)->get();
-        
+
         foreach ($students as $student) {
-            $student->update(['status' => 'on_leave']);
-            
+            $student->update(['status' => 'inactive']);
+
             AcademicHold::create([
                 'student_id' => $student->id,
                 'hold_type' => 'administrative',
-                'hold_category' => 'academic_leave',
+                'hold_category' => 'registration',
                 'title' => 'Academic Leave',
                 'description' => 'Student on academic leave',
                 'status' => 'active',
@@ -371,14 +371,14 @@ class ReEnrollmentSeeder extends Seeder
                 'placed_by_user_id' => 1,
             ]);
         }
-        
+
         return $students;
     }
 
     private function displayReEnrollmentStatistics(array $stats): void
     {
         $total = array_sum($stats);
-        
+
         $this->command->info("✅ Re-enrollment processing complete!");
         $this->command->info("  ✅ Successful returns: {$stats['successful_returns']} students");
         $this->command->info("  ⚠️ Conditional returns: {$stats['conditional_returns']} students");

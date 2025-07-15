@@ -5,7 +5,8 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { CourseOffering, Semester, Unit, User } from '@/types/models';
+import type { CourseOffering, Lecture, Semester, Unit } from '@/types/models';
+import { ScheduleDay } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Save } from 'lucide-vue-next';
@@ -16,7 +17,7 @@ interface Props {
     courseOffering: CourseOffering;
     semesters: Semester[];
     units: Unit[];
-    instructors: User[];
+    lectures: Lecture[];
 }
 
 const props = defineProps<Props>();
@@ -25,7 +26,7 @@ const props = defineProps<Props>();
 const formSchema = toTypedSchema(
     z.object({
         semester_id: z.string().min(1, 'Semester is required'),
-        unit_id: z.string().min(1, 'Unit is required'),
+        curriculum_unit_id: z.string().min(1, 'Curriculum unit is required'),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(500, 'Max capacity cannot exceed 500'),
@@ -51,11 +52,11 @@ const formatDateForInput = (dateString: string | null): string => {
     return new Date(dateString).toISOString().split('T')[0];
 };
 
-const { handleSubmit, isSubmitting, setFieldValue } = useForm({
+const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
         semester_id: props.courseOffering.semester_id.toString(),
-        unit_id: props.courseOffering.unit_id.toString(),
+        curriculum_unit_id: props.courseOffering.curriculum_unit_id?.toString() || '',
         section_code: props.courseOffering.section_code || '',
         max_capacity: props.courseOffering.max_capacity,
         waitlist_capacity: props.courseOffering.waitlist_capacity || 0,
@@ -65,19 +66,19 @@ const { handleSubmit, isSubmitting, setFieldValue } = useForm({
         schedule_time_end: props.courseOffering.schedule_time_end || '',
         location: props.courseOffering.location || '',
         enrollment_status: props.courseOffering.enrollment_status,
-        instructor_id: props.courseOffering.instructor_id?.toString() || '',
-        registration_start_date: formatDateForInput(props.courseOffering.registration_start_date),
-        registration_end_date: formatDateForInput(props.courseOffering.registration_end_date),
+        lecture_id: props.courseOffering.lecture_id?.toString() || '',
+        registration_start_date: formatDateForInput(props.courseOffering.registration_start_date || null),
+        registration_end_date: formatDateForInput(props.courseOffering.registration_end_date || null),
         special_requirements: props.courseOffering.special_requirements || '',
         notes: props.courseOffering.notes || '',
     },
 });
-
+console.log('schedule_time_start', props.courseOffering.schedule_time_start);
 const onSubmit = handleSubmit((values) => {
     const formData = {
         semester_id: values.semester_id,
-        unit_id: values.unit_id,
-        instructor_id: values.instructor_id === '' ? null : values.instructor_id,
+        curriculum_unit_id: values.curriculum_unit_id,
+        lecture_id: values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
         max_capacity: Number(values.max_capacity),
         waitlist_capacity: Number(values.waitlist_capacity) || 0,
@@ -161,13 +162,13 @@ const enrollmentStatusOptions = [
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="unit_id">
+                    <FormField v-slot="{ componentField }" name="curriculum_unit_id">
                         <FormItem>
-                            <FormLabel>Unit</FormLabel>
+                            <FormLabel>Curriculum Unit</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select unit" />
+                                        <SelectValue placeholder="Select curriculum unit" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem v-for="unit in units" :key="unit.id" :value="unit.id.toString()">
@@ -190,18 +191,18 @@ const enrollmentStatusOptions = [
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="instructor_id">
+                    <FormField v-slot="{ componentField }" name="lecture_id">
                         <FormItem>
-                            <FormLabel>Instructor</FormLabel>
+                            <FormLabel>Lecture</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select instructor (optional)" />
+                                        <SelectValue placeholder="Select lecture (optional)" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">No instructor assigned</SelectItem>
-                                        <SelectItem v-for="instructor in instructors" :key="instructor.id" :value="instructor.id.toString()">
-                                            {{ instructor.name }}
+                                        <SelectItem value="none">No lecture assigned</SelectItem>
+                                        <SelectItem v-for="lecture in lectures" :key="lecture.id" :value="lecture.id.toString()">
+                                            {{ lecture.full_name }}
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -254,6 +255,36 @@ const enrollmentStatusOptions = [
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="schedule_days">
+                        <FormItem>
+                            <FormLabel>Schedule Days</FormLabel>
+                            <FormControl>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div v-for="day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']" :key="day" class="flex items-center space-x-2">
+                                        <input
+                                            :id="day"
+                                            type="checkbox"
+                                            :value="day"
+                                            :checked="componentField.modelValue?.includes(day)"
+                                            @change="(e) => {
+                                                const target = e.target as HTMLInputElement;
+                                                const currentValue = componentField.modelValue || [];
+                                                if (target.checked) {
+                                                    componentField['onUpdate:modelValue']([...currentValue, day]);
+                                                } else {
+                                                    componentField['onUpdate:modelValue'](currentValue.filter(d => d !== day));
+                                                }
+                                            }"
+                                            class="rounded border-gray-300 text-primary focus:ring-primary"
+                                        />
+                                        <label :for="day" class="text-sm font-medium">{{ day }}</label>
+                                    </div>
+                                </div>
                             </FormControl>
                             <FormMessage />
                         </FormItem>

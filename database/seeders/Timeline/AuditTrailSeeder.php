@@ -146,7 +146,7 @@ class AuditTrailSeeder extends Seeder
             $withdrawalAudit['action'] = 'course_withdrawal';
             $withdrawalAudit['timestamp'] = $registration->withdrawal_date;
             $withdrawalAudit['details']['withdrawal_reason'] = $registration->notes ?? 'Student initiated';
-            
+
             $this->createAuditEntry($withdrawalAudit);
         }
     }
@@ -182,7 +182,7 @@ class AuditTrailSeeder extends Seeder
             $resolutionAudit['timestamp'] = $hold->resolved_date;
             $resolutionAudit['details']['resolution_notes'] = $hold->resolution_notes;
             $resolutionAudit['performed_by'] = $hold->resolved_by_user_id;
-            
+
             $this->createAuditEntry($resolutionAudit);
         }
     }
@@ -292,7 +292,7 @@ class AuditTrailSeeder extends Seeder
         if (preg_match($pattern, $notes, $matches)) {
             return Carbon::parse($matches[1]);
         }
-        
+
         return now()->subDays(rand(1, 365)); // Fallback random date
     }
 
@@ -317,11 +317,12 @@ class AuditTrailSeeder extends Seeder
         // In a real system, this would insert into an audit_log table
         // For this seeder, we'll update the student's notes with audit summary
         $student = Student::where('student_id', $auditData['student_id'])->first();
-        
+
         if ($student) {
-            $auditSummary = "AUDIT: {$auditData['action']} on {$auditData['timestamp']->format('Y-m-d')}";
+            $timestamp = $auditData['timestamp'] ?? now();
+            $auditSummary = "AUDIT: {$auditData['action']} on {$timestamp->format('Y-m-d')}";
             $currentNotes = $student->admission_notes ?? '';
-            
+
             // Only add if not already present (to avoid duplicates)
             if (!str_contains($currentNotes, $auditSummary)) {
                 $student->update([

@@ -50,12 +50,8 @@ class CurriculumUnit extends Model
      */
     public function semester(): BelongsTo
     {
-        return $this->belongsTo(Semester::class);
+        return $this->belongsTo(Semester::class, 'semester_id');
     }
-
-
-
-
 
     /**
      * Check if prerequisites are met for this curriculum unit.

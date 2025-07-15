@@ -32,6 +32,7 @@ class Spring2025RegistrationSeeder extends Seeder
         }
 
         // Get eligible students (active status, no blocking holds)
+        // First try to get active students without major holds
         $eligibleStudents = Student::where('status', 'active')
             ->whereDoesntHave('academicHolds', function ($query) {
                 $query->where('status', 'active')
@@ -39,12 +40,29 @@ class Spring2025RegistrationSeeder extends Seeder
             })
             ->get();
 
+        // If no active students found, try to get all students who have completed FALL2024
+        if ($eligibleStudents->isEmpty()) {
+            $this->command->info('No active students without holds found. Checking for students who completed FALL2024...');
+
+            $eligibleStudents = Student::whereHas('academicRecords', function ($query) {
+                $query->whereHas('semester', function ($semesterQuery) {
+                    $semesterQuery->where('code', 'FALL2024');
+                });
+            })
+                ->whereNotIn('status', ['dropped', 'graduated'])
+                ->get();
+        }
+
         if ($eligibleStudents->isEmpty()) {
             throw new \Exception('No eligible students found for SPRING2025 registration.');
         }
 
-        // Clean existing registrations for this semester
-        CourseRegistration::where('semester_id', $semester->id)->delete();
+        // Check if registrations already exist for this semester
+        $existingRegistrations = CourseRegistration::where('semester_id', $semester->id)->count();
+        if ($existingRegistrations > 0) {
+            $this->command->info("✅ Course registrations already exist for SPRING2025 ({$existingRegistrations} found). Skipping creation.");
+            return;
+        }
 
         $registrationCount = 0;
         $retakeCount = 0;

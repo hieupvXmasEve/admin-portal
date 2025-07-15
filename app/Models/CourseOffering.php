@@ -20,7 +20,7 @@ class CourseOffering extends Model
 
     protected $fillable = [
         'semester_id',
-        'unit_id',
+        'curriculum_unit_id',
         'lecture_id',
         'section_code',
         'max_capacity',
@@ -45,8 +45,8 @@ class CourseOffering extends Model
         'current_enrollment' => 'integer',
         'waitlist_capacity' => 'integer',
         'current_waitlist' => 'integer',
-        'schedule_time_start' => 'datetime',
-        'schedule_time_end' => 'datetime',
+        'schedule_time_start' => 'datetime:H:i',
+        'schedule_time_end' => 'datetime:H:i',
         'is_active' => 'boolean',
         'schedule_days' => 'array',
         'registration_start_date' => 'date',
@@ -70,7 +70,7 @@ class CourseOffering extends Model
     {
         return [
             'semester_id' => ['required', 'exists:semesters,id'],
-            'unit_id' => ['required', 'exists:units,id'],
+            'curriculum_unit_id' => ['required', 'exists:curriculum_units,id'],
             'lecture_id' => ['nullable', 'exists:lectures,id'],
             'section_code' => ['nullable', 'string', 'max:10'],
             'max_capacity' => ['required', 'integer', 'min:1', 'max:500'],
@@ -97,8 +97,8 @@ class CourseOffering extends Model
         return [
             'semester_id.required' => 'Semester is required',
             'semester_id.exists' => 'Selected semester does not exist',
-            'unit_id.required' => 'Unit is required',
-            'unit_id.exists' => 'Selected unit does not exist',
+            'curriculum_unit_id.required' => 'Curriculum unit is required',
+            'curriculum_unit_id.exists' => 'Selected curriculum unit does not exist',
             'lecture_id.exists' => 'Selected lecture does not exist',
             'section_code.max' => 'Section code cannot exceed 10 characters',
             'max_capacity.required' => 'Maximum capacity is required',
@@ -134,6 +134,11 @@ class CourseOffering extends Model
         return $this->belongsTo(Unit::class);
     }
 
+    public function curriculumUnit(): BelongsTo
+    {
+        return $this->belongsTo(CurriculumUnit::class);
+    }
+
     public function lecture(): BelongsTo
     {
         return $this->belongsTo(Lecture::class);
@@ -146,7 +151,7 @@ class CourseOffering extends Model
 
     public function syllabus(): HasOne
     {
-        return $this->hasOne(Syllabus::class, 'unit_id', 'unit_id')
+        return $this->hasOne(Syllabus::class, 'curriculum_unit_id', 'curriculum_unit_id')
             ->whereColumn('syllabus.semester_id', 'course_offerings.semester_id')
             ->where('syllabus.is_active', true);
     }
@@ -154,17 +159,17 @@ class CourseOffering extends Model
     // Computed Properties / Accessors
     public function getCourseCodeAttribute(): ?string
     {
-        return $this->unit?->code;
+        return $this->curriculumUnit?->unit?->code;
     }
 
     public function getCourseTitleAttribute(): ?string
     {
-        return $this->unit?->name;
+        return $this->curriculumUnit?->unit?->name;
     }
 
     public function getCreditHoursAttribute(): ?int
     {
-        return $this->unit ? (int) $this->unit->credit_points : null;
+        return $this->curriculumUnit?->unit ? (int) $this->curriculumUnit->unit->credit_points : null;
     }
 
     public function getStatusAttribute(): string
@@ -284,9 +289,9 @@ class CourseOffering extends Model
         $query->where('semester_id', $semesterId);
     }
 
-    public function scopeForUnit(Builder $query, int $unitId): void
+    public function scopeForCurriculumUnit(Builder $query, int $curriculumUnitId): void
     {
-        $query->where('unit_id', $unitId);
+        $query->where('curriculum_unit_id', $curriculumUnitId);
     }
 
     public function scopeByLecture(Builder $query, int $lectureId): void

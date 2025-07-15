@@ -36,8 +36,12 @@ class AttendanceSeeder extends Seeder
             throw new \Exception('No class sessions found for FALL2024.');
         }
 
-        // Clean existing attendance records
-        Attendance::whereIn('class_session_id', $classSessions->pluck('id'))->delete();
+        // Check if attendance records already exist
+        $existingAttendance = Attendance::whereIn('class_session_id', $classSessions->pluck('id'))->count();
+        if ($existingAttendance > 0) {
+            $this->command->info("✅ Attendance records already exist for FALL2024 ({$existingAttendance} found). Skipping creation.");
+            return;
+        }
 
         $attendanceCount = 0;
 

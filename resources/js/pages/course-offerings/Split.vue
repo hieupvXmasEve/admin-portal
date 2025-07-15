@@ -38,12 +38,6 @@ interface SplitFormData {
 
 const props = defineProps<Props>();
 
-const breadcrumbItems = [
-    { title: 'Course Offerings', href: '/course-offerings' },
-    { title: props.courseOffering.course_code + ' - ' + props.courseOffering.course_title, href: `/course-offerings/${props.courseOffering.id}` },
-    { title: 'Split into Sections', href: `/course-offerings/${props.courseOffering.id}/split` },
-];
-
 // Form schema
 const formSchema = toTypedSchema(
     z.object({

@@ -9,7 +9,6 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail,
-    SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { mainNavItems } from '@/constants/menu-sidebar';
 import { Link } from '@inertiajs/vue3';
@@ -44,10 +43,7 @@ import NavUser from './NavUser.vue';
         </SidebarContent>
 
         <SidebarFooter class="border-t border-gray-200 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-900/50">
-            <div class="p-2">
-                <SidebarSeparator class="my-2 bg-gray-200 group-data-[collapsible=icon]:hidden dark:bg-gray-700" />
-                <NavUser />
-            </div>
+            <NavUser />
         </SidebarFooter>
         <SidebarRail />
     </Sidebar>

@@ -18,7 +18,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { BreadcrumbItem, PaginatedResponse } from '@/types';
+import type { PaginatedResponse } from '@/types';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -49,13 +49,6 @@ const props = defineProps<{
     };
     errors?: any;
 }>();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Programs',
-        href: '/programs',
-    },
-];
 
 // Reactive data
 const data = computed(() => props.programs.data);

@@ -73,7 +73,7 @@ class CompletionTrackingSeeder extends Seeder
             ->latest('calculated_at')
             ->first();
 
-        $currentGPA = $latestGPA ? $latestGPA->gpa : 0.0;
+        $currentGPA = $latestGPA ? (float) $latestGPA->gpa : 0.0;
 
         // Analyze completion by category
         $completionByCategory = $this->analyzeCompletionByCategory($student);

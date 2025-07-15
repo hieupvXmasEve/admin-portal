@@ -46,6 +46,10 @@ class Student extends Authenticatable
         'entrance_exam_score',
         'admission_notes',
         'status',
+        'academic_status',
+        'status_change_date',
+        'status_reason',
+        'status_changed_by',
         'last_login_at',
         'email_verified_at',
     ];
@@ -58,6 +62,7 @@ class Student extends Authenticatable
         'date_of_birth' => 'date',
         'admission_date' => 'date',
         'expected_graduation_date' => 'date',
+        'status_change_date' => 'date',
         'entrance_exam_score' => 'decimal:2',
         'last_login_at' => 'datetime',
         'email_verified_at' => 'datetime',
@@ -88,7 +93,7 @@ class Student extends Authenticatable
             'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:admitted,active,inactive,suspended,graduated,dropped_out'],
+            'status' => ['nullable', 'in:active,inactive,suspended,graduated'],
         ];
     }
 
@@ -156,6 +161,16 @@ class Student extends Authenticatable
         return $this->hasMany(GpaCalculation::class);
     }
 
+    public function programChangeRequests(): HasMany
+    {
+        return $this->hasMany(ProgramChangeRequest::class);
+    }
+
+    public function academicStandings(): HasMany
+    {
+        return $this->hasMany(AcademicStanding::class);
+    }
+
     public function hasActiveHolds(): bool
     {
         return $this->academicHolds()->where('status', 'active')->exists();
@@ -181,5 +196,63 @@ class Student extends Authenticatable
         }
 
         return $campusCode . $year . str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
+    }
+
+    // New Student Management methods
+    public function hasPendingProgramChange(): bool
+    {
+        return $this->programChangeRequests()->where('status', 'pending')->exists();
+    }
+
+    public function getCurrentAcademicStanding(): ?AcademicStanding
+    {
+        return $this->academicStandings()
+            ->where('is_active', true)
+            ->latest('effective_date')
+            ->first();
+    }
+
+    public function isAcademicStatusActive(): bool
+    {
+        return $this->academic_status === 'active';
+    }
+
+    public function canRetakeCourse(): bool
+    {
+        return $this->isAcademicStatusActive() && !$this->hasActiveHolds();
+    }
+
+    public function getRetakeCoursesCount(): int
+    {
+        return $this->courseRegistrations()->where('is_retake', true)->count();
+    }
+
+    public function statusChangedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'status_changed_by');
+    }
+
+    public function getAcademicStatusLabelAttribute(): string
+    {
+        return match ($this->academic_status) {
+            'active' => 'Active',
+            'inactive' => 'Inactive',
+            'graduated' => 'Graduated',
+            'suspended' => 'Suspended',
+            'withdrawn' => 'Withdrawn',
+            default => 'Unknown',
+        };
+    }
+
+    public function getAcademicStatusColorAttribute(): string
+    {
+        return match ($this->academic_status) {
+            'active' => 'green',
+            'inactive' => 'yellow',
+            'graduated' => 'blue',
+            'suspended' => 'red',
+            'withdrawn' => 'gray',
+            default => 'gray',
+        };
     }
 }
