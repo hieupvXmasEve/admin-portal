@@ -25,6 +25,15 @@ return new class extends Migration
             $table->string('phone', 20)->nullable();
             $table->string('mobile_phone', 20)->nullable();
 
+            // Authentication and OAuth fields
+            $table->string('password')->nullable();
+            $table->string('oauth_provider')->nullable(); // google, microsoft, etc.
+            $table->string('oauth_provider_id')->nullable();
+            $table->string('avatar_url')->nullable();
+            $table->timestamp('last_login_at')->nullable();
+            $table->timestamp('email_verified_at')->nullable();
+            $table->rememberToken();
+
             // Campus and Department
             $table->foreignId('campus_id')->constrained()->onDelete('restrict');
             $table->string('department', 100)->nullable();
@@ -109,6 +118,8 @@ return new class extends Migration
             $table->index(['last_name', 'first_name']);
             $table->index(['department', 'faculty']);
             $table->index(['is_available_for_assignment', 'employment_status']);
+            $table->index(['oauth_provider', 'oauth_provider_id']);
+            $table->index(['last_login_at']);
         });
     }
 

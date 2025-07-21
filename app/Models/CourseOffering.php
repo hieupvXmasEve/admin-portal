@@ -149,10 +149,14 @@ class CourseOffering extends Model
         return $this->hasMany(CourseRegistration::class, 'course_offering_id');
     }
 
+    public function classSessions(): HasMany
+    {
+        return $this->hasMany(ClassSession::class, 'course_offering_id');
+    }
+
     public function syllabus(): HasOne
     {
         return $this->hasOne(Syllabus::class, 'curriculum_unit_id', 'curriculum_unit_id')
-            ->whereColumn('syllabus.semester_id', 'course_offerings.semester_id')
             ->where('syllabus.is_active', true);
     }
 

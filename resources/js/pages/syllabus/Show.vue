@@ -85,7 +85,7 @@ const props = defineProps<{
     unit: Unit;
     syllabus: Syllabus;
 }>();
-console.log(props.syllabus.curriculum_unit);
+console.log('syllabus', props.syllabus.curriculum_unit);
 // Track which components have expanded details
 const expandedComponents = ref<Set<number>>(new Set());
 

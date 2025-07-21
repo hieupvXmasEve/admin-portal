@@ -51,7 +51,7 @@ class AssessmentComponent extends Model
      */
     public function details(): HasMany
     {
-        return $this->hasMany(AssessmentComponentDetail::class, 'component_id');
+        return $this->hasMany(AssessmentComponentDetail::class, 'assessment_component_id');
     }
 
     /**

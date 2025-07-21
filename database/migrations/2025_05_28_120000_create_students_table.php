@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('full_name', 100);
             $table->string('email', 255)->unique();
             $table->string('phone', 20)->nullable();
+            $table->string('password', 255)->nullable();
 
             // OAuth Integration (simplified)
             $table->enum('oauth_provider', ['google', 'microsoft', 'manual'])->default('google');

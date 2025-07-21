@@ -66,8 +66,9 @@ class SyllabusSeeder extends Seeder
             'curriculum_unit_id' => $curriculumUnit->id,
             'version' => 'v1.0',
             'description' => $this->generateSyllabusDescription($unit),
-            'total_hours' => $this->getTotalHours($unit),
-            'hours_per_session' => $this->getHoursPerSession($unit),
+            'total_hours' => 120,
+            // 'hours_per_session' => $this->getHoursPerSession($unit),
+            'hours_per_session' => 3,
             'is_active' => true,
         ]);
 
@@ -119,8 +120,7 @@ class SyllabusSeeder extends Seeder
 
     private function createAssessmentComponents(Syllabus $syllabus, Unit $unit): void
     {
-        $unitCode = $unit->code;
-        $assessmentStructure = $this->getAssessmentStructure($unitCode);
+        $assessmentStructure = $this->getFoundationAssessmentStructure();
 
         foreach ($assessmentStructure as $componentData) {
             $component = AssessmentComponent::create([
@@ -131,88 +131,62 @@ class SyllabusSeeder extends Seeder
                 'is_required_to_sit_final_exam' => $componentData['required_for_final'] ?? true,
             ]);
 
-            // Create component details if specified
-            if (isset($componentData['details'])) {
-                foreach ($componentData['details'] as $detailData) {
-                    AssessmentComponentDetail::create([
-                        'component_id' => $component->id,
-                        'name' => $detailData['name'],
-                        'weight' => $detailData['weight'],
-                    ]);
-                }
+            // Create component details for each assessment component
+            foreach ($componentData['details'] as $detailData) {
+                AssessmentComponentDetail::create([
+                    'assessment_component_id' => $component->id,
+                    'name' => $detailData['name'],
+                    'weight' => $detailData['weight'],
+                ]);
             }
         }
     }
 
-    private function getAssessmentStructure(string $unitCode): array
+    private function getFoundationAssessmentStructure(): array
     {
-        $unitPrefix = substr($unitCode, 0, 3);
-        $unitLevel = substr($unitCode, 3, 1); // 1, 2, 3, 4
-
-        // Define assessment structures based on unit type and level
-        $structures = [
-            'foundation' => [
-                ['name' => 'Weekly Quizzes', 'weight' => 20.00, 'type' => 'quiz', 'required_for_final' => false],
-                ['name' => 'Programming Assignments', 'weight' => 40.00, 'type' => 'assignment', 'required_for_final' => true],
-                ['name' => 'Mid-term Exam', 'weight' => 15.00, 'type' => 'exam', 'required_for_final' => true],
-                ['name' => 'Final Exam', 'weight' => 25.00, 'type' => 'exam', 'required_for_final' => true],
+        return [
+            [
+                'name' => 'Weekly Quizzes',
+                'weight' => 20.00,
+                'type' => 'quiz',
+                'required_for_final' => false,
+                'details' => [
+                    ['name' => 'Quiz 1', 'weight' => 4.00],
+                    ['name' => 'Quiz 2', 'weight' => 4.00],
+                    ['name' => 'Quiz 3', 'weight' => 4.00],
+                    ['name' => 'Quiz 4', 'weight' => 4.00],
+                    ['name' => 'Quiz 5', 'weight' => 4.00],
+                ]
             ],
-            'programming' => [
-                [
-                    'name' => 'Coding Assignments',
-                    'weight' => 50.00,
-                    'type' => 'assignment',
-                    'required_for_final' => true,
-                    'details' => [
-                        ['name' => 'Assignment 1', 'weight' => 15.00],
-                        ['name' => 'Assignment 2', 'weight' => 15.00],
-                        ['name' => 'Assignment 3', 'weight' => 20.00],
-                    ]
-                ],
-                ['name' => 'Project', 'weight' => 30.00, 'type' => 'project', 'required_for_final' => true],
-                ['name' => 'Final Exam', 'weight' => 20.00, 'type' => 'exam', 'required_for_final' => true],
+            [
+                'name' => 'Programming Assignments',
+                'weight' => 40.00,
+                'type' => 'assignment',
+                'required_for_final' => true,
+                'details' => [
+                    ['name' => 'Assignment 1', 'weight' => 15.00],
+                    ['name' => 'Assignment 2', 'weight' => 15.00],
+                    ['name' => 'Assignment 3', 'weight' => 10.00],
+                ]
             ],
-            'business' => [
-                ['name' => 'Case Study Analysis', 'weight' => 25.00, 'type' => 'assignment', 'required_for_final' => true],
-                ['name' => 'Group Project', 'weight' => 30.00, 'type' => 'project', 'required_for_final' => true],
-                ['name' => 'Presentation', 'weight' => 15.00, 'type' => 'other', 'required_for_final' => false],
-                ['name' => 'Final Exam', 'weight' => 30.00, 'type' => 'exam', 'required_for_final' => true],
+            [
+                'name' => 'Mid-term Exam',
+                'weight' => 15.00,
+                'type' => 'exam',
+                'required_for_final' => true,
+                'details' => [
+                    ['name' => 'Mid-term Exam', 'weight' => 15.00],
+                ]
             ],
-            'engineering' => [
-                ['name' => 'Laboratory Reports', 'weight' => 30.00, 'type' => 'assignment', 'required_for_final' => true],
-                ['name' => 'Design Project', 'weight' => 35.00, 'type' => 'project', 'required_for_final' => true],
-                ['name' => 'Mid-term Test', 'weight' => 15.00, 'type' => 'exam', 'required_for_final' => true],
-                ['name' => 'Final Exam', 'weight' => 20.00, 'type' => 'exam', 'required_for_final' => true],
-            ],
-            'mathematics' => [
-                ['name' => 'Problem Sets', 'weight' => 25.00, 'type' => 'assignment', 'required_for_final' => true],
-                ['name' => 'Mid-term Exam', 'weight' => 25.00, 'type' => 'exam', 'required_for_final' => true],
-                ['name' => 'Final Exam', 'weight' => 50.00, 'type' => 'exam', 'required_for_final' => true],
-            ],
-            'capstone' => [
-                ['name' => 'Project Proposal', 'weight' => 10.00, 'type' => 'assignment', 'required_for_final' => true],
-                ['name' => 'Progress Reports', 'weight' => 20.00, 'type' => 'assignment', 'required_for_final' => true],
-                ['name' => 'Final Project', 'weight' => 50.00, 'type' => 'project', 'required_for_final' => true],
-                ['name' => 'Presentation', 'weight' => 20.00, 'type' => 'other', 'required_for_final' => true],
+            [
+                'name' => 'Final Exam',
+                'weight' => 25.00,
+                'type' => 'exam',
+                'required_for_final' => true,
+                'details' => [
+                    ['name' => 'Final Exam', 'weight' => 25.00],
+                ]
             ],
         ];
-
-        // Determine assessment type based on unit code
-        if (in_array($unitPrefix, ['COS', 'TNE']) && $unitLevel === '1') {
-            return $structures['foundation'];
-        } elseif (in_array($unitPrefix, ['COS', 'TNE']) && in_array($unitLevel, ['2', '3'])) {
-            return $structures['programming'];
-        } elseif (in_array($unitPrefix, ['MKT', 'ACC', 'HRM', 'ECO', 'FIN'])) {
-            return $structures['business'];
-        } elseif (in_array($unitPrefix, ['ENG', 'CIV', 'MEC', 'ELE'])) {
-            return $structures['engineering'];
-        } elseif ($unitPrefix === 'MAT') {
-            return $structures['mathematics'];
-        } elseif ($unitLevel === '4' || str_contains($unitCode, '40')) {
-            return $structures['capstone'];
-        }
-
-        // Default structure
-        return $structures['foundation'];
     }
 }

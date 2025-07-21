@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use Carbon\Carbon;
 
-class Lecture extends Model
+class Lecture extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\LectureFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, Notifiable, HasApiTokens;
+
+    protected $guard = 'lecturer';
 
     protected $fillable = [
         'employee_id',
@@ -25,6 +29,9 @@ class Lecture extends Model
         'email',
         'phone',
         'mobile_phone',
+        'oauth_provider',
+        'oauth_provider_id',
+        'avatar_url',
         'campus_id',
         'department',
         'faculty',
@@ -59,6 +66,14 @@ class Lecture extends Model
         'can_teach_online',
         'is_available_for_assignment',
         'notes',
+        'password',
+        'last_login_at',
+        'email_verified_at',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
     ];
 
     protected $casts = [
@@ -79,6 +94,8 @@ class Lecture extends Model
         'is_active' => 'boolean',
         'can_teach_online' => 'boolean',
         'is_available_for_assignment' => 'boolean',
+        'last_login_at' => 'datetime',
+        'email_verified_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -99,6 +116,9 @@ class Lecture extends Model
             'email' => ['required', 'email', 'unique:lectures,email'],
             'phone' => ['nullable', 'string', 'max:20'],
             'mobile_phone' => ['nullable', 'string', 'max:20'],
+            'oauth_provider' => ['nullable', 'string', 'in:google'],
+            'oauth_provider_id' => ['nullable', 'string'],
+            'avatar_url' => ['nullable', 'string', 'url'],
             'campus_id' => ['required', 'exists:campuses,id'],
             'department' => ['nullable', 'string', 'max:100'],
             'faculty' => ['nullable', 'string', 'max:100'],

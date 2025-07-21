@@ -14,7 +14,6 @@ import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import type { BreadcrumbItem } from '@/types';
 import type { UnitData as Unit } from '@/types/Unit';
 import { curriculumRoutes, syllabusRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
@@ -92,17 +91,7 @@ const props = defineProps<{
     canEdit: boolean;
     canDelete: boolean;
 }>();
-console.log(props.canEdit);
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Units',
-        href: '/units',
-    },
-    {
-        title: props.unit.code,
-        href: `/units/${props.unit.id}`,
-    },
-];
+console.log(props.unit.syllabus);
 
 // Delete confirmation
 const isDeleting = ref(false);
@@ -524,11 +513,11 @@ const hasRelationships = () => {
                         </Badge>
                     </div>
 
-                    <div class="flex items-center justify-between text-xs">
+                    <!-- <div class="flex items-center justify-between text-xs">
                         <span :class="curriculumUnit.is_compulsory ? 'font-medium text-red-600' : 'text-gray-500'">
                             {{ curriculumUnit.is_compulsory ? 'Compulsory' : 'Elective' }}
                         </span>
-                    </div>
+                    </div> -->
 
                     <div v-if="curriculumUnit.note" class="mt-2 text-xs text-gray-600 italic">
                         {{ curriculumUnit.note }}

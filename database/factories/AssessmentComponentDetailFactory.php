@@ -40,7 +40,7 @@ class AssessmentComponentDetailFactory extends Factory
         ];
 
         return [
-            'component_id' => AssessmentComponent::factory(),
+            'assessment_component_id' => AssessmentComponent::factory(),
             'name' => $this->faker->randomElement($names),
             'weight' => $this->faker->numberBetween(5, 20),
         ];

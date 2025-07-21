@@ -327,7 +327,7 @@ class Fall2024OfferingSeeder extends Seeder
             if (isset($componentData['details'])) {
                 foreach ($componentData['details'] as $detailData) {
                     AssessmentComponentDetail::create([
-                        'component_id' => $component->id,
+                        'assessment_component_id' => $component->id,
                         'name' => $detailData['name'],
                         'weight' => $detailData['weight'],
                     ]);

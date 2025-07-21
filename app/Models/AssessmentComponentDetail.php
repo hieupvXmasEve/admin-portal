@@ -14,7 +14,7 @@ class AssessmentComponentDetail extends Model
     use HasFactory;
 
     protected $fillable = [
-        'component_id',
+        'assessment_component_id',
         'name',
         'weight',
     ];
@@ -26,9 +26,9 @@ class AssessmentComponentDetail extends Model
     /**
      * Get the assessment component that owns this detail.
      */
-    public function component(): BelongsTo
+    public function assessmentComponent(): BelongsTo
     {
-        return $this->belongsTo(AssessmentComponent::class, 'component_id');
+        return $this->belongsTo(AssessmentComponent::class, 'assessment_component_id');
     }
 
     /**

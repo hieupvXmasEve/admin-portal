@@ -59,10 +59,10 @@ class Building extends Model
     }
 
     // Note: Room model not yet implemented
-    // public function rooms(): HasMany
-    // {
-    //     return $this->hasMany(Room::class);
-    // }
+    public function rooms(): HasMany
+    {
+        return $this->hasMany(Room::class);
+    }
 
     // Scopes
     public function scopeActive($query)

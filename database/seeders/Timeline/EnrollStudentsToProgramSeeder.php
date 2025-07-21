@@ -28,7 +28,7 @@ class EnrollStudentsToProgramSeeder extends Seeder
         }
 
         // Get the first semester (FALL2024) - should already exist from SemesterSeeder
-        $firstSemester = Semester::where('code', 'FALL2024')->first();
+        $firstSemester = Semester::where('is_active', true)->first();
 
         if (!$firstSemester) {
             throw new \Exception('FALL2024 semester not found. Please run InitialSetup seeders first.');
@@ -45,11 +45,11 @@ class EnrollStudentsToProgramSeeder extends Seeder
 
             if (!$existingEnrollment) {
                 // Create enrollment record
-                $enrollment = Enrollment::create([
+                Enrollment::create([
                     'student_id' => $student->id,
                     'semester_id' => $firstSemester->id,
                     'curriculum_version_id' => $student->curriculum_version_id,
-                    'semester_number' => 1, // First semester
+                    'semester_number' => 1,
                     'status' => 'in_progress',
                     'notes' => 'Initial enrollment into program for first semester',
                 ]);

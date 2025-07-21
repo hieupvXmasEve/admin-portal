@@ -145,10 +145,15 @@ class CourseOfferingController extends Controller
         $courseOffering->load([
             'semester',
             'curriculumUnit.unit',
+            'curriculumUnit.syllabus',
             'lecture',
             'courseRegistrations' => function ($query) {
                 $query->with('student')
                     ->orderBy('registration_date', 'desc');
+            },
+            'classSessions' => function ($query) {
+                $query->orderBy('session_date')
+                    ->orderBy('start_time');
             },
         ]);
 

@@ -111,6 +111,7 @@ return [
             'create_student' => 'create_student',
             'edit_student' => 'edit_student',
             'delete_student' => 'delete_student',
+            'view_student_summary' => 'view_student_summary',
         ],
 
         // Student Activities
