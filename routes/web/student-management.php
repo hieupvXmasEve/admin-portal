@@ -9,6 +9,7 @@ use App\Http\Controllers\Web\CourseRetakeController;
 use App\Http\Controllers\Web\AcademicStandingController;
 use App\Http\Controllers\Web\StudentController;
 use App\Http\Controllers\Web\StudentStatusController;
+use App\Http\Controllers\Web\StudentAcademicSummaryController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -69,6 +70,31 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('students/{student}/update-status', [StudentController::class, 'updateStatus'])
         ->middleware('can:edit_student')
         ->name(StudentRoutes::UPDATE_STATUS);
+
+    // Student Academic Summary routes
+    Route::get('students/{student}/academic-summary', [StudentAcademicSummaryController::class, 'show'])
+        ->middleware('can:view_student_summary')
+        ->name(StudentRoutes::ACADEMIC_SUMMARY_SHOW);
+
+    Route::get('students/{student}/academic-summary/filter-by-semester', [StudentAcademicSummaryController::class, 'filterBySemester'])
+        ->middleware('can:view_student_summary')
+        ->name(StudentRoutes::ACADEMIC_SUMMARY_FILTER_BY_SEMESTER);
+
+    Route::get('students/{student}/academic-summary/filter-by-course-offering', [StudentAcademicSummaryController::class, 'filterByCourseOffering'])
+        ->middleware('can:view_student_summary')
+        ->name(StudentRoutes::ACADEMIC_SUMMARY_FILTER_BY_COURSE_OFFERING);
+
+    Route::get('students/{student}/academic-summary/attendance-details', [StudentAcademicSummaryController::class, 'getAttendanceDetails'])
+        ->middleware('can:view_student_summary')
+        ->name(StudentRoutes::ACADEMIC_SUMMARY_ATTENDANCE_DETAILS);
+
+    Route::get('students/{student}/academic-summary/score-details', [StudentAcademicSummaryController::class, 'getScoreDetails'])
+        ->middleware('can:view_student_summary')
+        ->name(StudentRoutes::ACADEMIC_SUMMARY_SCORE_DETAILS);
+
+    Route::get('students/{student}/academic-summary/course-scores/{courseOfferingId}', [StudentAcademicSummaryController::class, 'getCourseScores'])
+        ->middleware('can:view_student_summary')
+        ->name(StudentRoutes::ACADEMIC_SUMMARY_COURSE_SCORES);
 });
 
 

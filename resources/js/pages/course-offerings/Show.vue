@@ -5,20 +5,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { CourseOffering, CourseRegistration } from '@/types/models';
+import { useApi } from '@/composables/useApiRequest';
+import type { ClassSession, CourseOffering, CourseRegistration } from '@/types/models';
+import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, Calendar, MapPin, UserCheck, Users } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, Calendar, Clock, ExternalLink, Eye, MapPin, Play, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 interface Props {
     courseOffering: CourseOffering & {
         course_registrations: CourseRegistration[];
+        class_sessions?: ClassSession[];
     };
 }
 
 const props = defineProps<Props>();
-console.log(props.courseOffering);
+console.log(props.courseOffering.curriculum_unit);
+
+const api = useApi();
 const showStatusModal = ref(false);
+const isGenerating = ref(false);
+const classSessions = ref<ClassSession[]>(props.courseOffering.class_sessions || []);
 
 const getStatusVariant = (status: string) => {
     switch (status) {
@@ -85,7 +92,66 @@ const handleStatusUpdate = () => {
     });
     toast.success('Registration status updated successfully');
 };
-console.log(props.courseOffering);
+
+// Class sessions management functions
+const generateClassSessions = async () => {
+    try {
+        isGenerating.value = true;
+        const result = await api.post(`/api/course-offerings/${props.courseOffering.id}/class-sessions/generate`, {});
+        console.log('result.data', result.data);
+        if (result.data?.value?.success) {
+            classSessions.value = result.data.value.data.sessions;
+            toast.success(`${result.data.value.data.sessions_count} class sessions generated successfully`);
+        } else {
+            toast.error(result.data?.value?.message || 'Failed to generate class sessions');
+        }
+    } catch (error) {
+        console.error('Error generating class sessions:', error);
+        toast.error('Failed to generate class sessions');
+    } finally {
+        isGenerating.value = false;
+    }
+};
+
+const deleteClassSessions = async () => {
+    try {
+        const result = await api.delete(`/api/course-offerings/${props.courseOffering.id}/class-sessions`);
+
+        if (result.data?.value?.success) {
+            classSessions.value = [];
+            toast.success('Class sessions deleted successfully');
+        } else {
+            toast.error(result.data?.value?.message || 'Failed to delete class sessions');
+        }
+    } catch (error) {
+        console.error('Error deleting class sessions:', error);
+        toast.error('Failed to delete class sessions');
+    }
+};
+
+const getSessionTypeIcon = (type: string) => {
+    switch (type) {
+        case 'lecture':
+            return BookOpen;
+        case 'assessment':
+            return Clock;
+        default:
+            return BookOpen;
+    }
+};
+
+const getSessionStatusVariant = (status: string) => {
+    switch (status) {
+        case 'scheduled':
+            return 'default';
+        case 'completed':
+            return 'outline';
+        case 'cancelled':
+            return 'destructive';
+        default:
+            return 'secondary';
+    }
+};
 </script>
 
 <template>
@@ -206,22 +272,43 @@ console.log(props.courseOffering);
             <CardHeader>
                 <CardTitle>Academic Details</CardTitle>
             </CardHeader>
-            <CardContent class="space-y-4">
-                <div>
-                    <p class="text-muted-foreground text-sm font-medium">Semester</p>
-                    <p class="text-lg font-semibold">{{ courseOffering.semester?.name }} ({{ courseOffering.semester?.code }})</p>
-                </div>
+            <CardContent class="grid grid-cols-2 gap-4">
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-muted-foreground text-sm font-medium">Semester</p>
+                        <p class="text-lg font-semibold">{{ courseOffering.semester?.name }} ({{ courseOffering.semester?.code }})</p>
+                    </div>
 
-                <div v-if="courseOffering.curriculum_unit">
-                    <p class="text-muted-foreground text-sm font-medium">Unit</p>
-                    <p class="text-lg font-semibold">
-                        {{ courseOffering.curriculum_unit.unit.code }} - {{ courseOffering.curriculum_unit.unit.name }}
-                    </p>
-                </div>
+                    <div v-if="courseOffering.curriculum_unit">
+                        <p class="text-muted-foreground text-sm font-medium">Unit</p>
+                        <Link :href="`/units/${courseOffering.curriculum_unit.unit.id}`" class="flex items-center gap-2 text-lg font-semibold">
+                            {{ courseOffering.curriculum_unit.unit.code }} - {{ courseOffering.curriculum_unit.unit.name }}
+                            <ExternalLink class="h-4 w-4" />
+                        </Link>
+                    </div>
 
-                <div v-if="courseOffering.lecture">
-                    <p class="text-muted-foreground text-sm font-medium">Lecture</p>
-                    <p class="text-lg font-semibold">{{ courseOffering.lecture.display_name }}</p>
+                    <div v-if="courseOffering.lecture">
+                        <p class="text-muted-foreground text-sm font-medium">Lecture</p>
+                        <p class="text-lg font-semibold">{{ courseOffering.lecture.display_name }}</p>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <!-- show syllabus link -->
+                    <div>
+                        <p class="text-muted-foreground text-sm font-medium">Syllabus</p>
+                        <Link
+                            :href="
+                                curriculumRoutes.units.syllabusShow(
+                                    courseOffering.curriculum_unit.unit.id,
+                                    courseOffering.curriculum_unit.syllabus.id,
+                                )
+                            "
+                            class="flex items-center gap-2 text-lg font-semibold"
+                        >
+                            {{ courseOffering.curriculum_unit.syllabus.version }}
+                            <ExternalLink class="h-4 w-4" />
+                        </Link>
+                    </div>
                 </div>
             </CardContent>
         </Card>
@@ -268,6 +355,87 @@ console.log(props.courseOffering);
             </CardContent>
         </Card>
     </div>
+
+    <!-- Class Sessions Management -->
+    <Card>
+        <CardHeader>
+            <div class="flex items-center justify-between">
+                <CardTitle class="flex items-center gap-2">
+                    <Calendar class="h-4 w-4" />
+                    Class Sessions
+                </CardTitle>
+                <div class="flex items-center gap-2">
+                    <Button v-if="classSessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
+                        <Trash2 class="mr-2 h-4 w-4" />
+                        Delete All
+                    </Button>
+                    <Button @click="generateClassSessions" :disabled="isGenerating" size="sm">
+                        <Play class="mr-2 h-4 w-4" />
+                        {{ isGenerating ? 'Generating...' : 'Auto-Generate Sessions' }}
+                    </Button>
+                </div>
+            </div>
+        </CardHeader>
+        <CardContent>
+            <div v-if="classSessions.length === 0" class="py-8 text-center">
+                <Calendar class="text-muted-foreground mx-auto h-12 w-12" />
+                <h3 class="mt-2 text-sm font-semibold text-gray-900">No class sessions</h3>
+                <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class sessions based on the syllabus.</p>
+            </div>
+            <div v-else>
+                <Table class="h-20 overflow-y-auto">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Session</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Time</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Duration</TableHead>
+                            <TableHead>Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody class="h-20 overflow-y-auto">
+                        <TableRow v-for="session in classSessions" :key="session.id">
+                            <TableCell>
+                                <div class="flex items-center gap-2">
+                                    <component :is="getSessionTypeIcon(session.session_type)" class="h-4 w-4" />
+                                    <div>
+                                        <p class="font-medium">{{ session.session_title }}</p>
+                                        <p v-if="session.session_description" class="text-muted-foreground text-sm">
+                                            {{ session.session_description }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                {{ formatDate(session.session_date) }}
+                            </TableCell>
+                            <TableCell> {{ session.start_time }} - {{ session.end_time }} </TableCell>
+                            <TableCell>
+                                <Badge :variant="session.is_assessment ? 'secondary' : 'outline'">
+                                    {{ session.session_type.toUpperCase() }}
+                                </Badge>
+                            </TableCell>
+                            <TableCell>
+                                <Badge :variant="getSessionStatusVariant(session.status)">
+                                    {{ session.status.toUpperCase() }}
+                                </Badge>
+                            </TableCell>
+                            <TableCell class="text-muted-foreground"> {{ session.duration_minutes }} min </TableCell>
+                            <TableCell>
+                                <Link :href="classSessionRoutes.show(session.id)">
+                                    <Button variant="ghost" size="sm">
+                                        <Eye class="h-4 w-4" />
+                                    </Button>
+                                </Link>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </div>
+        </CardContent>
+    </Card>
 
     <!-- Student Registration Status -->
     <Card>

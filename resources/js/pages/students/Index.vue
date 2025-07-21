@@ -194,7 +194,7 @@ const hasActiveFilters = computed(() => {
 
 // View and edit functions
 const viewStudent = (student: Student) => {
-    router.visit(studentRoutes.show(student.id));
+    router.visit(studentRoutes.studentAcademicSummary(student.id));
 };
 
 const editStudent = (student: Student) => {

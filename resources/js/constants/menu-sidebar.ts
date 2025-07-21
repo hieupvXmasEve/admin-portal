@@ -251,25 +251,25 @@ export const mainNavItems: NavItem[] = [
         children: [
             {
                 title: 'Class Sessions',
-                href: attendanceRoutes.classSessions(),
+                href: attendanceRoutes.classSessions.index(),
                 icon: CalendarIcon,
                 requiredPermissions: ['view_attendance'], // Will be implemented later
             },
             {
                 title: 'Take Attendance',
-                href: attendanceRoutes.takeAttendance(),
+                href: attendanceRoutes.attendance.create(),
                 icon: CheckSquare,
                 requiredPermissions: ['edit_attendance'], // Will be implemented later
             },
             {
                 title: 'Attendance Reports',
-                href: attendanceRoutes.reports(),
+                href: attendanceRoutes.attendance.index(),
                 icon: FileText,
                 requiredPermissions: ['view_attendance'], // Will be implemented later
             },
             {
                 title: 'GPS & Method Tracking',
-                href: attendanceRoutes.gpsTracking(),
+                href: attendanceRoutes.attendance.index(),
                 icon: MapPin,
                 requiredPermissions: ['view_attendance'], // Will be implemented later
             },

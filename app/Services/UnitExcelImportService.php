@@ -1127,7 +1127,7 @@ class UnitExcelImportService
                 }
 
                 // Check for existing detail
-                $existingDetail = \App\Models\AssessmentComponentDetail::where('component_id', $component->id)
+                $existingDetail = \App\Models\AssessmentComponentDetail::where('assessment_component_id', $component->id)
                     ->where('name', $detailName)
                     ->first();
 
@@ -1139,7 +1139,7 @@ class UnitExcelImportService
 
                 // Create new assessment detail
                 \App\Models\AssessmentComponentDetail::create([
-                    'component_id' => $component->id,
+                    'assessment_component_id' => $component->id,
                     'name' => $detailName,
                     'weight' => $weight,
                 ]);

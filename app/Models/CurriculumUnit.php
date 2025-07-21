@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class CurriculumUnit extends Model
 {
@@ -28,6 +29,14 @@ class CurriculumUnit extends Model
         'year_level' => 'integer',
         'semester_number' => 'integer',
     ];
+
+    /**
+     * Get the syllabus for this curriculum unit.
+     */
+    public function syllabus(): HasOne
+    {
+        return $this->hasOne(Syllabus::class, 'curriculum_unit_id', 'id');
+    }
 
     /**
      * Get the curriculum version that owns this curriculum unit.
@@ -153,22 +162,6 @@ class CurriculumUnit extends Model
     public function isCrossProgram(): bool
     {
         return $this->unit_scope === 'cross_program';
-    }
-
-    /**
-     * Scope for required/compulsory units.
-     */
-    public function scopeRequired(Builder $query): void
-    {
-        $query->where('is_compulsory', true);
-    }
-
-    /**
-     * Scope for elective units.
-     */
-    public function scopeElective(Builder $query): void
-    {
-        $query->where('is_compulsory', false);
     }
 
     /**

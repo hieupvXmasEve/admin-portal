@@ -32,7 +32,7 @@ class Attendance extends Model
         'affects_grade',
         'is_makeup_allowed',
         'verified_at',
-        'verified_by_lecture_id',
+        'verified_by_user_id',
         'batch_id',
         'device_info',
         'ip_address',
@@ -43,8 +43,10 @@ class Attendance extends Model
     protected $casts = [
         'check_in_time' => 'datetime',
         'check_out_time' => 'datetime',
-        'excused' => 'boolean',
-        'location_data' => 'array',
+        'verified_at' => 'datetime',
+        'is_verified' => 'boolean',
+        'affects_grade' => 'boolean',
+        'is_makeup_allowed' => 'boolean',
         'device_info' => 'array',
     ];
 
@@ -61,40 +63,50 @@ class Attendance extends Model
 
     public function recordedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'recorded_by');
+        return $this->belongsTo(User::class, 'recorded_by_lecture_id');
     }
 
-    public function modifiedBy(): BelongsTo
+    public function verifiedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'modified_by');
+        return $this->belongsTo(User::class, 'verified_by_user_id');
     }
 
     // Scopes
     public function scopePresent($query)
     {
-        return $query->where('attendance_status', 'present');
+        return $query->where('status', 'present');
     }
 
     public function scopeAbsent($query)
     {
-        return $query->where('attendance_status', 'absent');
+        return $query->where('status', 'absent');
     }
 
     public function scopeLate($query)
     {
-        return $query->where('attendance_status', 'late');
+        return $query->where('status', 'late');
     }
 
     public function scopeExcused($query)
     {
-        return $query->where('excused', true);
+        return $query->where('status', 'excused');
+    }
+
+    public function scopeByStatus($query, string $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    public function scopeByRecordingMethod($query, string $method)
+    {
+        return $query->where('recording_method', $method);
     }
 
     // Helper methods
     public function markAsPresent(): void
     {
         $this->update([
-            'attendance_status' => 'present',
+            'status' => 'present',
             'check_in_time' => now(),
         ]);
     }
@@ -102,44 +114,65 @@ class Attendance extends Model
     public function markAsAbsent(): void
     {
         $this->update([
-            'attendance_status' => 'absent',
+            'status' => 'absent',
         ]);
     }
 
     public function markAsLate(int $lateMinutes): void
     {
         $this->update([
-            'attendance_status' => 'late',
+            'status' => 'late',
             'check_in_time' => now(),
-            'late_minutes' => $lateMinutes,
+            'minutes_late' => $lateMinutes,
         ]);
     }
 
     public function markAsExcused(string $reason): void
     {
         $this->update([
-            'excused' => true,
+            'status' => 'excused',
             'excuse_reason' => $reason,
         ]);
     }
 
     public function isPresent(): bool
     {
-        return in_array($this->attendance_status, ['present', 'late']);
+        return in_array($this->status, ['present', 'late']);
     }
 
     public function isAbsent(): bool
     {
-        return $this->attendance_status === 'absent';
+        return $this->status === 'absent';
     }
 
     public function isLate(): bool
     {
-        return $this->attendance_status === 'late';
+        return $this->status === 'late';
     }
 
     public function isExcused(): bool
     {
-        return $this->excused;
+        return $this->status === 'excused';
+    }
+
+    public function getFormattedCheckInTimeAttribute(): ?string
+    {
+        return $this->check_in_time?->format('g:i A');
+    }
+
+    public function getFormattedCheckOutTimeAttribute(): ?string
+    {
+        return $this->check_out_time?->format('g:i A');
+    }
+
+    public function getStatusBadgeColorAttribute(): string
+    {
+        return match ($this->status) {
+            'present' => 'success',
+            'late' => 'warning',
+            'absent' => 'destructive',
+            'excused' => 'secondary',
+            default => 'default',
+        };
     }
 }

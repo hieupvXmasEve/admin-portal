@@ -84,4 +84,9 @@ class User extends Authenticatable
         $campusId = $campusId ?? session('current_campus_id');
         return $this->campusRoles()->where('campus_id', $campusId)->where('code', $roleCode)->exists();
     }
+    public function getAllPermissions($campusId = null)
+    {
+        $campusId = $campusId ?? session('current_campus_id');
+        return $this->campusRoles()->where('campus_id', $campusId)->get();
+    }
 }

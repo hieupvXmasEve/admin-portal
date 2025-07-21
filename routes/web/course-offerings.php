@@ -71,4 +71,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('api/course-offerings/{courseOffering}/bulk-update-status', [CourseOfferingController::class, 'bulkUpdateRegistrationStatus'])
         ->middleware('can:edit_course_offering')
         ->name(CourseOfferingRoutes::API_BULK_UPDATE_STATUS);
+
+    // Class Session Management
+    Route::prefix('api/course-offerings/{courseOffering}/class-sessions')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\ClassSessionController::class, 'index'])
+            ->middleware('can:view_course_offering');
+        Route::post('/generate', [\App\Http\Controllers\Api\ClassSessionController::class, 'generate'])
+            ->middleware('can:edit_course_offering');
+        Route::delete('/', [\App\Http\Controllers\Api\ClassSessionController::class, 'destroy'])
+            ->middleware('can:edit_course_offering');
+    });
 });

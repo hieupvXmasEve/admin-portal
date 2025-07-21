@@ -66,18 +66,7 @@ class CurriculumSeeder extends Seeder
         }
 
         // Create a default semester if none exists
-        $defaultSemester = Semester::firstOrCreate(
-            ['code' => 'DEFAULT2025'],
-            [
-                'name' => 'Academic Year 2025 - AI Program',
-                'start_date' => now()->startOfYear(),
-                'end_date' => now()->endOfYear(),
-                'enrollment_start_date' => now()->startOfYear(),
-                'enrollment_end_date' => now()->addMonths(2),
-                'is_active' => true,
-                'is_archived' => false,
-            ]
-        );
+        $defaultSemester = Semester::where('is_active', true)->first();
 
         // Create curriculum version
         $curriculumVersion = CurriculumVersion::updateOrCreate(
@@ -127,7 +116,6 @@ class CurriculumSeeder extends Seeder
 
             // Semester 5 - Year 2
             ['code' => 'SWE30003', 'year' => 2, 'semester' => 5, 'type' => 'major'], // Software Architectures and Design
-            ['code' => 'COS30018', 'year' => 2, 'semester' => 5, 'type' => 'major'], // Intelligent Systems
             ['code' => 'STA10003', 'year' => 2, 'semester' => 5, 'type' => 'elective'], // Foundation of Statistics
 
             // Semester 6 - Year 2

@@ -13,6 +13,7 @@ import {
     UNIT_ROUTE_NAMES,
     USER_ROUTE_NAMES,
 } from '@/constants';
+import { CLASS_SESSION_ROUTE_NAMES } from '@/constants/class-session-routes';
 import { route } from 'ziggy-js';
 
 /**
@@ -88,7 +89,7 @@ export const studentRoutes = {
     academicStanding: () => route('academic-standings.index'),
     enrollments: () => route('student-enrollments.index'),
     statusTracking: () => route('students.status.index'),
-    
+
     // Student Management Features - Student Specific
     studentAcademicRecords: (id: number) => route('students.academic-records.index', { student: id }),
     studentAcademicRecordsTranscript: (id: number) => route('students.academic-records.transcript', { student: id }),
@@ -96,6 +97,9 @@ export const studentRoutes = {
     studentProgramChange: (id: number) => route('students.program-changes.create', { student: id }),
     studentRepeatCourses: (id: number) => route('students.retakes.index', { student: id }),
     studentAcademicStanding: (id: number) => route('students.standing.index', { student: id }),
+
+    // Student Academic Summary Routes
+    studentAcademicSummary: (id: number) => route('students.academic-summary.show', { student: id }),
 } as const;
 
 // Lecturer Management Routes (Placeholder for future implementation)
@@ -134,6 +138,9 @@ export const curriculumRoutes = {
         import: () => route(UNIT_ROUTE_NAMES.IMPORT),
         export: () => route(UNIT_ROUTE_NAMES.EXPORT_EXCEL),
         syllabus: (unitId: number) => route(SYLLABUS_ROUTE_NAMES.INDEX, { unit: unitId }),
+        syllabusCreate: (unitId: number) => route(SYLLABUS_ROUTE_NAMES.CREATE, { unit: unitId }),
+        syllabusEdit: (unitId: number, syllabusId: number) => route(SYLLABUS_ROUTE_NAMES.EDIT, { unit: unitId, syllabus: syllabusId }),
+        syllabusShow: (unitId: number, syllabusId: number) => route(SYLLABUS_ROUTE_NAMES.SHOW, { unit: unitId, syllabus: syllabusId }),
     },
     curriculumUnits: {
         index: () => route(CURRICULUM_ROUTE_NAMES.UNIT_INDEX),
@@ -166,12 +173,27 @@ export const courseRoutes = {
     enrollmentSummary: () => '#',
 } as const;
 
-// Attendance Management Routes (Placeholder for future implementation)
+// Attendance Management Routes
 export const attendanceRoutes = {
-    classSessions: () => '#', // Will be implemented later
-    takeAttendance: () => '#',
-    reports: () => '#',
-    gpsTracking: () => '#',
+    classSessions: {
+        index: () => route('class-sessions.index'),
+        create: () => route('class-sessions.create'),
+        edit: (id: number) => route('class-sessions.edit', { classSession: id }),
+        show: (id: number) => route('class-sessions.show', { classSession: id }),
+        store: () => route('class-sessions.store'),
+        update: (id: number) => route('class-sessions.update', { classSession: id }),
+        destroy: (id: number) => route('class-sessions.destroy', { classSession: id }),
+    },
+    attendance: {
+        index: () => route('attendance.index'),
+        create: () => route('attendance.create'),
+        edit: (id: number) => route('attendance.edit', { attendance: id }),
+        show: (id: number) => route('attendance.show', { attendance: id }),
+        store: () => route('attendance.store'),
+        update: (id: number) => route('attendance.update', { attendance: id }),
+        destroy: (id: number) => route('attendance.destroy', { attendance: id }),
+        bulkUpdate: () => route('attendance.api.bulk-update'),
+    },
 } as const;
 
 // Assessments & Grading Routes (Placeholder for future implementation)
@@ -261,3 +283,11 @@ export const isActiveRoutes = (routeNames: string[], currentRoute?: string) => {
     if (!currentRoute) return false;
     return routeNames.some((routeName) => isActiveRoute(routeName, currentRoute));
 };
+
+// Class Session Routes
+export const classSessionRoutes = {
+    index: () => route(CLASS_SESSION_ROUTE_NAMES.INDEX),
+    create: () => route(CLASS_SESSION_ROUTE_NAMES.CREATE),
+    edit: (id: number) => route(CLASS_SESSION_ROUTE_NAMES.EDIT, { classSession: id }),
+    show: (id: number) => route(CLASS_SESSION_ROUTE_NAMES.SHOW, { classSession: id }),
+} as const;

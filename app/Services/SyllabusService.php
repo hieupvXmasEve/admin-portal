@@ -217,10 +217,10 @@ class SyllabusService
                         'type' => $componentData['type'],
                         'is_required_to_sit_final_exam' => $componentData['is_required_to_sit_final_exam'] ?? true,
                     ]);
-                    Log::info('Updated existing component', ['component_id' => $component->id]);
+                    Log::info('Updated existing component', ['assessment_component_id' => $component->id]);
                 } else {
                     // Component not found or doesn't belong to this syllabus, skip
-                    Log::warning('Component not found or invalid', ['component_id' => $componentData['id']]);
+                    Log::warning('Component not found or invalid', ['assessment_component_id' => $componentData['id']]);
                     continue;
                 }
             } else {
@@ -231,7 +231,7 @@ class SyllabusService
                     'type' => $componentData['type'],
                     'is_required_to_sit_final_exam' => $componentData['is_required_to_sit_final_exam'] ?? true,
                 ]);
-                Log::info('Created new component', ['component_id' => $component->id]);
+                Log::info('Created new component', ['assessment_component_id' => $component->id]);
             }
 
             // Handle component details using the original data to prevent corruption
@@ -247,7 +247,7 @@ class SyllabusService
     private function updateComponentDetails(AssessmentComponent $component, array $details): void
     {
         Log::info('Processing component details', [
-            'component_id' => $component->id,
+            'assessment_component_id' => $component->id,
             'details_count' => count($details),
             'details' => $details,
         ]);

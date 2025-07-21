@@ -13,8 +13,11 @@ return new class extends Migration
     {
         Schema::create('assessment_component_details', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('component_id')->constrained('assessment_components')->onDelete('cascade');
+            $table->foreignId('assessment_component_id')->constrained('assessment_components')->onDelete('cascade');
             $table->string('name', 100);
+            $table->string('description', 255)->nullable();
+            $table->date('due_date')->nullable();
+            $table->decimal('max_points', 5, 2)->nullable();
             $table->decimal('weight', 5, 2)->nullable();
             $table->timestamps();
         });

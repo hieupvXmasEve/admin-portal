@@ -26,6 +26,14 @@ class StudentRoutes
     public const NEW_STUDENTS = 'students.new-students.index';
     public const BULK_ONBOARDING = 'students.new-students.bulk-onboarding';
 
+    // Academic Summary Routes
+    public const ACADEMIC_SUMMARY_SHOW = 'students.academic-summary.show';
+    public const ACADEMIC_SUMMARY_FILTER_BY_SEMESTER = 'students.academic-summary.filter-by-semester';
+    public const ACADEMIC_SUMMARY_FILTER_BY_COURSE_OFFERING = 'students.academic-summary.filter-by-course-offering';
+    public const ACADEMIC_SUMMARY_ATTENDANCE_DETAILS = 'students.academic-summary.attendance-details';
+    public const ACADEMIC_SUMMARY_SCORE_DETAILS = 'students.academic-summary.score-details';
+    public const ACADEMIC_SUMMARY_COURSE_SCORES = 'students.academic-summary.course-scores';
+
     // Route Prefixes
     public const WEB_PREFIX = 'students.';
     public const AJAX_PREFIX = 'ajax.students.';

@@ -1,3 +1,5 @@
+import { BadgeVariants } from '@/components/ui/badge';
+
 export interface Specialization {
     id: number;
     program_id: number;
@@ -64,6 +66,17 @@ export interface UnitType {
     updated_at: string;
 }
 
+export interface Syllabus {
+    id: number;
+    curriculum_unit_id: number;
+    version: string | null;
+    description: string | null;
+    total_hours: number | null;
+    hours_per_session: number | null;
+    is_active: boolean;
+    total_assessment_weight: number;
+}
+
 export interface CurriculumUnit {
     id: number;
     curriculum_version_id: number;
@@ -76,6 +89,7 @@ export interface CurriculumUnit {
     updated_at: string;
     unit: Unit;
     curriculum_version?: CurriculumVersion;
+    syllabus: Syllabus;
 }
 
 export interface User {
@@ -255,6 +269,330 @@ export interface StudentStats {
     by_status: Record<string, number>;
 }
 
+// Student Academic Summary interfaces
+export interface StudentOverview {
+    student_info: {
+        id: number;
+        student_id: string;
+        full_name: string;
+        email: string;
+        phone?: string;
+        date_of_birth?: string;
+        gender?: 'male' | 'female' | 'other';
+        nationality?: string;
+        national_id?: string;
+        address?: string;
+        status: 'admitted' | 'active' | 'inactive' | 'graduated' | 'dropped_out';
+        academic_status: string;
+        admission_date?: string;
+        expected_graduation_date?: string;
+        status_change_date?: string;
+        status_reason?: string;
+    };
+    program_info: {
+        campus?: {
+            id: number;
+            name: string;
+            code: string;
+        };
+        program?: {
+            id: number;
+            name: string;
+            code: string;
+        };
+        specialization?: {
+            id: number;
+            name: string;
+            code: string;
+        };
+        curriculum_version?: {
+            id: number;
+            name: string;
+            version: string;
+            version_code: string;
+        };
+    };
+    academic_stats: {
+        total_registrations: number;
+        completed_courses: number;
+        active_registrations: number;
+        current_semester_enrollments: number;
+        total_credits_earned: number;
+        total_credits_attempted: number;
+        current_gpa: number;
+        cumulative_gpa: number;
+        academic_standing: string;
+        active_holds: number;
+        retake_courses: number;
+    };
+    emergency_contact: {
+        name?: string;
+        phone?: string;
+        relationship?: string;
+    };
+    additional_info: {
+        high_school_name?: string;
+        high_school_graduation_year?: string;
+        entrance_exam_score?: string;
+        admission_notes?: string;
+    };
+}
+
+// Course Registration interfaces for Academic Summary
+export interface CourseRegistrationRecord {
+    id: number;
+    course_name: string;
+    course_code: string;
+    credit_points: number;
+    semester: string;
+    semester_code: string;
+    academic_year: string;
+    semester_start_date: string | null;
+    semester_end_date: string | null;
+    registration_status: 'enrolled' | 'active' | 'registered' | 'confirmed' | 'completed' | 'dropped' | 'withdrawn';
+    registration_date: string;
+    registration_method: string;
+    final_grade: string | null;
+    grade_points: number | null;
+    credit_hours: number;
+    is_retake: boolean;
+    attempt_number: number;
+    completion_date: string | null;
+    drop_date: string | null;
+    withdrawal_date: string | null;
+    retake_fee: number;
+    is_retake_paid: 'yes' | 'no';
+    notes: string | null;
+    status_badge_color: BadgeVariants['variant'];
+    grade_badge_color: BadgeVariants['variant'];
+    is_passing_grade: boolean;
+    formatted_registration_date: string | null;
+    formatted_completion_date: string | null;
+}
+
+export interface RegistrationsSummary {
+    total_registrations: number;
+    completed: number;
+    active: number;
+    dropped: number;
+    withdrawn: number;
+    retakes: number;
+    total_credits_attempted: number;
+    total_credits_earned: number;
+    completion_rate: number;
+    retake_rate: number;
+    average_grade_points: number;
+}
+
+export interface SemesterGroup {
+    academic_year: string;
+    semesters: Array<{
+        id: number;
+        name: string;
+        code: string;
+        academic_year: string;
+    }>;
+    total_registrations: number;
+}
+
+export interface StatusBreakdown {
+    status: string;
+    count: number;
+    percentage: number;
+    badge_color: 'success' | 'primary' | 'warning' | 'destructive' | 'secondary';
+}
+
+export interface RegistrationsPagination {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+    has_more_pages: boolean;
+}
+
+export interface RegistrationsData {
+    data: CourseRegistrationRecord[];
+    pagination: RegistrationsPagination;
+    summary: RegistrationsSummary;
+    semester_groups: SemesterGroup[];
+    status_breakdown: StatusBreakdown[];
+    filters: Record<string, any>;
+}
+
+export interface RegistrationsFilters {
+    semester_id?: number;
+    academic_year?: string;
+    status?: string;
+    is_retake?: string;
+    per_page?: number;
+}
+
+// Scores interfaces
+export interface AssessmentScore {
+    id: number;
+    assessment_name: string;
+    assessment_type: string;
+    due_date?: string;
+    max_points: number;
+    points_earned: number;
+    percentage_score: number;
+    letter_grade?: string;
+    gpa_points?: number;
+    submitted_at?: string;
+    graded_at?: string;
+    is_late: boolean;
+    status: 'pending' | 'submitted' | 'graded' | 'missing';
+}
+
+export interface CourseScores {
+    course_offering_id: number;
+    course_name: string;
+    course_code: string;
+    semester: string;
+    scores: AssessmentScore[];
+    course_average: number;
+    total_assessments: number;
+    completed_assessments: number;
+}
+
+export interface ScoresData {
+    data: CourseScores[];
+    summary: {
+        total_courses: number;
+        total_assessments: number;
+        completed_assessments: number;
+        overall_average: number;
+    };
+}
+
+// Attendance interfaces
+export interface AttendanceSession {
+    session_date: string;
+    start_time: string;
+    end_time: string;
+    status: 'present' | 'late' | 'absent' | 'excused';
+    check_in_time?: string;
+    minutes_late?: number;
+}
+
+export interface UnitAttendance {
+    unit_id: number;
+    unit_name: string;
+    unit_code: string;
+    semester: string;
+    course_offering_id: number;
+    total_sessions: number;
+    attended_count: number;
+    present_count: number;
+    late_count: number;
+    absent_count: number;
+    excused_count: number;
+    attendance_percentage: number;
+    attendance_status: 'excellent' | 'good' | 'warning' | 'critical';
+    sessions: AttendanceSession[];
+}
+
+export interface AttendanceData {
+    data: UnitAttendance[];
+    summary: {
+        total_units: number;
+        total_sessions: number;
+        total_attended: number;
+        total_absent: number;
+        overall_percentage: number;
+        units_at_risk: number;
+    };
+}
+
+// GPA interfaces
+export interface GpaRecord {
+    id: number;
+    semester: string;
+    semester_code: string;
+    academic_year: string;
+    semester_gpa: number;
+    cumulative_gpa: number;
+    credit_hours_attempted: number;
+    credit_hours_earned: number;
+    quality_points: number;
+    academic_standing: string;
+    dean_list_eligible: boolean;
+    honors_eligible: boolean;
+    probation_status: boolean;
+    warning_status: boolean;
+    calculation_date: string;
+}
+
+export interface GpaData {
+    data: GpaRecord[];
+    summary: {
+        current_semester_gpa: number;
+        current_cumulative_gpa: number;
+        total_credit_hours_earned: number;
+        total_quality_points: number;
+        current_academic_standing: string;
+        dean_list_semesters: number;
+        probation_semesters: number;
+        warning_semesters: number;
+        gpa_trend: 'improving' | 'declining' | 'stable' | 'insufficient_data';
+    };
+}
+
+// Graduation interfaces
+export interface RequirementStatus {
+    required: number | boolean;
+    earned?: number;
+    completed?: boolean;
+    status: 'completed' | 'in_progress' | 'pending' | 'not_started';
+}
+
+export interface GraduationRequirements {
+    core_credits: RequirementStatus;
+    elective_credits: RequirementStatus;
+    internship: RequirementStatus;
+    thesis: RequirementStatus;
+    english_requirement: RequirementStatus;
+}
+
+export interface GraduationData {
+    credit_summary: {
+        total_required: number;
+        total_earned: number;
+        remaining: number;
+        completion_percentage: number;
+    };
+    requirements: GraduationRequirements;
+    graduation_status: {
+        ready_to_graduate: boolean;
+        expected_graduation?: string;
+        risks: string[];
+        risk_level: 'low' | 'medium' | 'high';
+    };
+    progress_timeline: {
+        current_semester: {
+            semester?: string;
+            enrolled_credits: number;
+            status: 'enrolled' | 'not_enrolled' | 'no_current_semester';
+        };
+        projected_completion: {
+            semesters_remaining: number;
+            projected_date: string;
+            on_track: boolean;
+        };
+    };
+}
+
+export interface StudentAcademicSummary {
+    overview: StudentOverview;
+    registrations: RegistrationsData;
+    scores: ScoresData;
+    attendance: AttendanceData;
+    gpa: GpaData;
+    graduation: GraduationData;
+}
+
 export interface Enrollment {
     id: number;
     student_id: number;
@@ -363,6 +701,128 @@ export interface CourseOffering {
     additional_fees: number;
     drop_deadline?: string;
     withdrawal_deadline?: string;
+}
+
+export enum ClassSessionStatus {
+    SCHEDULED = 'scheduled',
+    IN_PROGRESS = 'in_progress',
+    COMPLETED = 'completed',
+    CANCELLED = 'cancelled',
+    POSTPONED = 'postponed',
+}
+export enum ClassSessionType {
+    LECTURE = 'lecture',
+    TUTORIAL = 'tutorial',
+    LAB = 'lab',
+    EXAM = 'exam',
+    ASSESSMENT = 'assessment',
+    OTHER = 'other',
+}
+export enum ClassSessionDeliveryMode {
+    IN_PERSON = 'in_person',
+    ONLINE = 'online',
+    HYBRID = 'hybrid',
+}
+export interface ClassSession {
+    id: number;
+    course_offering_id: number;
+    room_id?: number;
+    room_booking_id?: number;
+    instructor_id?: number;
+    session_title?: string;
+    session_description?: string;
+    session_date: string;
+    start_time: string;
+    end_time: string;
+    duration_minutes: number;
+    session_type: ClassSessionType;
+    delivery_mode: ClassSessionDeliveryMode;
+    status: ClassSessionStatus;
+    online_meeting_url?: string;
+    meeting_id?: string;
+    meeting_password?: string;
+    learning_objectives?: string[];
+    required_materials?: string[];
+    topics_covered?: string[];
+    attendance_required: boolean;
+    attendance_tracking_enabled: boolean;
+    expected_attendees?: number;
+    actual_attendees?: number;
+    attendance_percentage?: number;
+    is_assessment: boolean;
+    assessment_weight?: number;
+    assessment_duration_minutes?: number;
+    assessment_materials_allowed?: string[];
+    is_recurring: boolean;
+    parent_session_id?: number;
+    sequence_number?: number;
+    instructor_notes?: string;
+    admin_notes?: string;
+    student_instructions?: string;
+    cancellation_reason?: string;
+    scheduled_at?: string;
+    started_at?: string;
+    ended_at?: string;
+    cancelled_at?: string;
+    course_offering?: CourseOffering;
+    created_at: string;
+    updated_at: string;
+    // Additional properties
+    attendances?: Attendance[];
+    instructor?: User;
+    attendance_stats?: {
+        total: number;
+        present: number;
+        late: number;
+        absent: number;
+        excused: number;
+        attendance_percentage: number;
+    };
+    status_badge_color?: string;
+    // Computed properties
+    formatted_date?: string;
+    formatted_time?: string;
+    duration_in_minutes?: number;
+}
+
+export interface Attendance {
+    id: number;
+    class_session_id: number;
+    student_id: number;
+    recorded_by_lecture_id?: number;
+    status: 'present' | 'late' | 'absent' | 'excused';
+    check_in_time?: string;
+    check_out_time?: string;
+    minutes_late?: number;
+    minutes_present?: number;
+    recording_method: 'manual' | 'qr_code' | 'rfid' | 'geolocation' | 'biometric' | 'mobile_app';
+    notes?: string;
+    excuse_reason?: string;
+    excuse_document_path?: string;
+    participation_level?: 'excellent' | 'good' | 'average' | 'poor';
+    participation_score?: number;
+    participation_notes?: string;
+    is_verified: boolean;
+    affects_grade: boolean;
+    is_makeup_allowed: boolean;
+    verified_at?: string;
+    verified_by_user_id?: number;
+    batch_id?: string;
+    device_info?: Record<string, any>;
+    ip_address?: string;
+    latitude?: number;
+    longitude?: number;
+    created_at: string;
+    updated_at: string;
+    // Relationships
+    class_session?: ClassSession;
+    student?: Student;
+    recorded_by?: User;
+    verified_by?: User;
+    // Computed properties
+    formatted_check_in_time?: string;
+    formatted_check_out_time?: string;
+    status_badge_color?: string;
 }
 
 // Form data types for strict validation

@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ClassSession extends Model
 {
@@ -55,9 +56,9 @@ class ClassSession extends Model
     ];
 
     protected $casts = [
-        'session_date' => 'date',
-        'start_time' => 'datetime',
-        'end_time' => 'datetime',
+        'session_date' => 'date:Y-m-d',
+        'start_time' => 'datetime:H:i',
+        'end_time' => 'datetime:H:i',
         'learning_objectives' => 'array',
         'required_materials' => 'array',
         'topics_covered' => 'array',
@@ -76,6 +77,16 @@ class ClassSession extends Model
     public function courseOffering(): BelongsTo
     {
         return $this->belongsTo(CourseOffering::class);
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    public function instructor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'instructor_id');
     }
 
     // Scopes
@@ -117,7 +128,7 @@ class ClassSession extends Model
 
     public function getDurationInMinutesAttribute(): int
     {
-        return $this->start_time->diffInMinutes($this->end_time);
+        return (int) $this->start_time->diffInMinutes($this->end_time);
     }
 
     // Helper methods
@@ -138,13 +149,42 @@ class ClassSession extends Model
 
     public function canTakeAttendance(): bool
     {
-        return !$this->attendance_taken &&
+        return $this->attendance_tracking_enabled &&
             ($this->isToday() || $this->isPast()) &&
-            $this->status === 'scheduled';
+            in_array($this->status, ['scheduled', 'in_progress']);
     }
 
     public function markAttendanceTaken(): void
     {
-        $this->update(['attendance_taken' => true]);
+        $this->update(['status' => 'completed']);
+    }
+
+    public function getAttendanceStatsAttribute(): array
+    {
+        $total = $this->attendances()->count();
+        $present = $this->attendances()->present()->count();
+        $late = $this->attendances()->late()->count();
+        $absent = $this->attendances()->absent()->count();
+        $excused = $this->attendances()->excused()->count();
+
+        return [
+            'total' => $total,
+            'present' => $present,
+            'late' => $late,
+            'absent' => $absent,
+            'excused' => $excused,
+            'attendance_percentage' => $total > 0 ? round(($present + $late) / $total * 100, 1) : 0,
+        ];
+    }
+
+    public function getStatusBadgeColorAttribute(): string
+    {
+        return match ($this->status) {
+            'scheduled' => 'default',
+            'in_progress' => 'warning',
+            'completed' => 'success',
+            'cancelled' => 'destructive',
+            default => 'secondary',
+        };
     }
 }

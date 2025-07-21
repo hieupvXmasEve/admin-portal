@@ -82,6 +82,7 @@ const props = defineProps<{
     curriculumUnits: CurriculumUnit[];
     assessmentTypes: Record<string, string>;
 }>();
+console.log(props.syllabus.curriculum_unit);
 
 // Validation Schema
 const formSchema = toTypedSchema(
@@ -292,7 +293,7 @@ const onSubmit = form.handleSubmit(async (formData) => {
                 <p class="text-xl text-gray-700">{{ unit.name }}</p>
                 <div class="mt-2 text-sm text-gray-600">
                     <span class="font-medium">Context:</span>
-                    {{ syllabus.curriculum_unit.semester.name }} - {{ syllabus.curriculum_unit.curriculum_version.specialization.name }}
+                    {{ syllabus.curriculum_unit.semester?.name }} - {{ syllabus.curriculum_unit.curriculum_version.specialization?.name }}
                 </div>
             </div>
             <div class="flex items-center gap-3">
