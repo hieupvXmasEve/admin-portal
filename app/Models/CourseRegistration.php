@@ -42,6 +42,7 @@ class CourseRegistration extends Model
         'grade_points' => 'decimal:2',
         'retake_fee' => 'decimal:2',
         'is_retake' => 'boolean',
+        'is_retake_paid' => 'boolean',
     ];
 
     // Validation Rules
@@ -51,7 +52,7 @@ class CourseRegistration extends Model
             'student_id' => ['required', 'exists:students,id'],
             'course_offering_id' => ['required', 'exists:course_offerings,id'],
             'semester_id' => ['required', 'exists:semesters,id'],
-            'registration_status' => ['nullable', 'in:registered,confirmed,dropped,withdrawn,completed'],
+            'registration_status' => ['nullable', 'in:pending,registered,confirmed,dropped,withdrawn,completed,waitlisted,failed'],
             'registration_method' => ['nullable', 'in:online,advisor,admin_override'],
             'credit_hours' => ['required', 'numeric', 'min:0', 'max:10'],
             'final_grade' => ['nullable', 'string', 'max:3'],
@@ -59,7 +60,7 @@ class CourseRegistration extends Model
             'attempt_number' => ['nullable', 'integer', 'min:1'],
             'is_retake' => ['nullable', 'boolean'],
             'retake_fee' => ['nullable', 'numeric', 'min:0'],
-            'is_retake_paid' => ['nullable', 'in:yes,no'],
+            'is_retake_paid' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
         ];
     }
@@ -97,7 +98,7 @@ class CourseRegistration extends Model
     // Helper Methods
     public function isActive(): bool
     {
-        return in_array($this->registration_status, ['registered', 'confirmed']);
+        return in_array($this->registration_status, ['pending', 'registered', 'confirmed']);
     }
 
     public function isPassing(): bool
@@ -151,7 +152,7 @@ class CourseRegistration extends Model
     // Scopes
     public function scopeActive(Builder $query): void
     {
-        $query->whereIn('registration_status', ['registered', 'confirmed']);
+        $query->whereIn('registration_status', ['pending', 'registered', 'confirmed']);
     }
 
     public function scopeCompleted(Builder $query): void

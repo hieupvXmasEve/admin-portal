@@ -33,8 +33,16 @@ return Application::configure(basePath: dirname(__DIR__))
             'permissions' => CheckPermissions::class,
             'admin' => AdminMiddleware::class,
             'student' => StudentMiddleware::class,
+            'student.api.auth' => \App\Http\Middleware\StudentApiAuthorization::class,
+            'student.api.rate' => \App\Http\Middleware\StudentApiRateLimiter::class,
+            'api.logging' => \App\Http\Middleware\ApiLogging::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (Throwable $e, $request) {
+            // Handle API exceptions with custom handler
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return app(\App\Exceptions\ApiExceptionHandler::class)->handle($e, $request);
+            }
+        });
     })->create();
