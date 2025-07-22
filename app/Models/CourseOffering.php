@@ -139,7 +139,7 @@ class CourseOffering extends Model
         return $this->belongsTo(CurriculumUnit::class);
     }
 
-    public function lecture(): BelongsTo
+    public function lecturer(): BelongsTo
     {
         return $this->belongsTo(Lecture::class);
     }
