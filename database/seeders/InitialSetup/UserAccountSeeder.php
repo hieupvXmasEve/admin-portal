@@ -48,8 +48,8 @@ class UserAccountSeeder extends Seeder
     private function createSuperAdminUser(): void
     {
         $superAdmin = User::create([
-            'id' => 1,
-            'name' => 'Super Admin',
+            'id' => 2,
+            'name' => 'Super Admin 2',
             'email' => 'hieupv2412@gmail.com',
             'password' => Hash::make('123456'),
             'email_verified_at' => now(),
@@ -76,7 +76,7 @@ class UserAccountSeeder extends Seeder
         foreach ($campuses as $index => $campus) {
             if (isset($adminUsers[$index])) {
                 $adminData = $adminUsers[$index];
-                
+
                 $admin = User::create([
                     'name' => $adminData['name'],
                     'email' => $adminData['email'],

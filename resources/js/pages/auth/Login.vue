@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { AUTH_ROUTE_NAMES } from '@/constants/auth-routes';
+import { onMounted, ref } from 'vue';
 import { route } from 'ziggy-js';
 
 const handleGoogleSignIn = () => {
@@ -10,6 +11,14 @@ const handleGoogleSignIn = () => {
     console.log('Initiating Google sign-in for Swinburne Vietnam...');
     window.location.href = route(AUTH_ROUTE_NAMES.GOOGLE_LOGIN);
 };
+const errorMessage = ref('');
+// http://127.0.0.1:8000/login?email=hieupv2412%40gmail.com&error=Email%20is%20not%20registered
+// get error from url
+onMounted(() => {
+    const error = new URLSearchParams(window.location.search).get('error');
+    const email = new URLSearchParams(window.location.search).get('email');
+    errorMessage.value = email + ' ' + error;
+});
 </script>
 
 <template>
@@ -41,6 +50,7 @@ const handleGoogleSignIn = () => {
                 <CardContent class="space-y-8 px-8 pb-8">
                     <!-- Google Sign-in Button -->
                     <div class="space-y-4">
+                        <div v-if="errorMessage" class="text-red-500">{{ errorMessage }}</div>
                         <Button
                             @click="handleGoogleSignIn"
                             class="group h-14 w-full border-2 border-gray-200 bg-white text-base font-semibold text-gray-800 shadow-lg transition-all duration-300 hover:border-red-300 hover:bg-gray-50 hover:shadow-xl"

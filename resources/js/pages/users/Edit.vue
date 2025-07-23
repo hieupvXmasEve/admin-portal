@@ -34,8 +34,12 @@ const props = defineProps<{
     userRoleIds: number[];
 }>();
 
-// Form data - initialize with user's current roles
+// Form data - initialize with user's data and current roles
 const form = useForm({
+    name: props.user.name,
+    email: props.user.email,
+    password: '',
+    password_confirmation: '',
     selectedRoles: [...props.userRoleIds] as number[],
 });
 
@@ -135,19 +139,32 @@ const goBack = () => {
                         <Users class="h-5 w-5" />
                         User Information
                     </CardTitle>
-                    <CardDescription> User details (read-only)</CardDescription>
+                    <CardDescription>Update user details and password</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
                     <div class="space-y-2">
                         <Label for="name">Full Name</Label>
-                        <Input disabled id="name" :model-value="user.name" />
-                        <p class="text-muted-foreground text-xs">Name cannot be changed from this page</p>
+                        <Input id="name" v-model="form.name" required />
+                        <p v-if="form.errors.name" class="text-destructive text-xs">{{ form.errors.name }}</p>
                     </div>
 
                     <div class="space-y-2">
                         <Label for="email">Email Address</Label>
-                        <Input disabled id="email" :model-value="user.email" type="email" readonly />
-                        <p class="text-muted-foreground text-xs">Email cannot be changed from this page</p>
+                        <Input id="email" v-model="form.email" type="email" required />
+                        <p v-if="form.errors.email" class="text-destructive text-xs">{{ form.errors.email }}</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="password">New Password (optional)</Label>
+                        <Input id="password" v-model="form.password" type="password" />
+                        <p v-if="form.errors.password" class="text-destructive text-xs">{{ form.errors.password }}</p>
+                        <p class="text-muted-foreground text-xs">Leave blank to keep current password</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label for="password_confirmation">Confirm New Password</Label>
+                        <Input id="password_confirmation" v-model="form.password_confirmation" type="password" />
+                        <p v-if="form.errors.password_confirmation" class="text-destructive text-xs">{{ form.errors.password_confirmation }}</p>
                     </div>
                 </CardContent>
             </Card>
