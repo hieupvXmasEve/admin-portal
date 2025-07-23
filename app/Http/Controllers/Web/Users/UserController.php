@@ -69,7 +69,7 @@ class UserController extends Controller
         $roleController = new \App\Http\Controllers\Web\RoleController(new \App\Services\RoleService());
         $roles = $roleController->getRolesWithPermissions();
 
-        return Inertia::render('users/Add', [
+        return Inertia::render('users/Create', [
             'roles' => $roles
         ]);
     }

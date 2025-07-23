@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -39,7 +40,7 @@ class UserService
     public function updateUser(User $user, array $data): User
     {
         $userData = collect($data)->except('selectedRoles')->toArray();
-
+        Log::info('Updating user', ['userData' => $userData]);
         if (!empty($userData['password'])) {
             $userData['password'] = Hash::make($userData['password']);
         } else {
@@ -70,13 +71,40 @@ class UserService
             return;
         }
 
-        // Remove existing roles for this campus
-        $user->campusRoles()->where('campus_id', $currentCampusId)->delete();
+        // Get current roles for this campus
+        $existingRoleIds = $user->campusRoles()
+            ->where('campus_id', $currentCampusId)
+            ->pluck('role_id')
+            ->toArray();
 
-        // Add new roles for this campus
+        // Validate that all role IDs exist in the roles table
+        $validRoleIds = [];
         if (!empty($roleIds)) {
+            $validRoleIds = Role::whereIn('id', $roleIds)->pluck('id')->toArray();
+
+            if (empty($validRoleIds)) {
+                Log::warning("No valid role IDs found for user {$user->id}", ['provided_roles' => $roleIds]);
+                // If no valid roles found, treat as empty array (remove all roles)
+                $validRoleIds = [];
+            }
+        }
+
+        // Find roles to remove and roles to add
+        $rolesToRemove = array_diff($existingRoleIds, $validRoleIds);
+        $rolesToAdd = array_diff($validRoleIds, $existingRoleIds);
+
+        // Remove roles that are no longer selected
+        if (!empty($rolesToRemove)) {
+            \App\Models\CampusUserRole::where('user_id', $user->id)
+                ->where('campus_id', $currentCampusId)
+                ->whereIn('role_id', $rolesToRemove)
+                ->delete();
+        }
+
+        // Add new roles
+        if (!empty($rolesToAdd)) {
             $rolesToSync = [];
-            foreach ($roleIds as $roleId) {
+            foreach ($rolesToAdd as $roleId) {
                 $rolesToSync[] = [
                     'user_id' => $user->id,
                     'campus_id' => $currentCampusId,
@@ -102,7 +130,9 @@ class UserService
 
         if ($currentCampusId) {
             // Remove user's roles for this campus only
-            $user->campusRoles()->where('campus_id', $currentCampusId)->delete();
+            \App\Models\CampusUserRole::where('user_id', $user->id)
+                ->where('campus_id', $currentCampusId)
+                ->delete();
         }
 
         // If user has no roles in any campus, delete the user
