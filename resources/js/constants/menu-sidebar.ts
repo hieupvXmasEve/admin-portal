@@ -148,19 +148,19 @@ export const mainNavItems: NavItem[] = [
         children: [
             {
                 title: 'Lecturer List',
-                href: lecturerRoutes.list(),
+                href: lecturerRoutes.index(),
                 icon: Users,
                 requiredPermissions: ['view_lecturer'], // Will be implemented later
             },
             {
                 title: 'Teaching Assignments',
-                href: lecturerRoutes.assignments(), // Placeholder
+                href: lecturerRoutes.index(), // Placeholder
                 icon: BookOpen,
                 requiredPermissions: ['view_lecturer'], // Will be implemented later
             },
             {
                 title: 'Lecturer Timetable',
-                href: lecturerRoutes.timetable(), // Placeholder
+                href: lecturerRoutes.index(), // Placeholder
                 icon: CalendarIcon,
                 requiredPermissions: ['view_lecturer'], // Will be implemented later
             },

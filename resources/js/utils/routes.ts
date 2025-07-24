@@ -3,6 +3,7 @@ import {
     COURSE_OFFERING_ROUTE_NAMES,
     COURSE_REGISTRATION_ROUTE_NAMES,
     CURRICULUM_ROUTE_NAMES,
+    LECTURE_ROUTE_NAMES,
     PROGRAM_ROUTE_NAMES,
     ROLE_ROUTE_NAMES,
     SEMESTER_ROUTE_NAMES,
@@ -102,13 +103,18 @@ export const studentRoutes = {
     studentAcademicSummary: (id: number) => route('students.academic-summary.show', { student: id }),
 } as const;
 
-// Lecturer Management Routes (Placeholder for future implementation)
+// Lecturer Management Routes
 export const lecturerRoutes = {
-    list: () => '#', // Will be implemented later
-    create: () => '#',
-    edit: (/* id: number */) => '#',
-    assignments: (/* id: number */) => '#',
-    timetable: (/* id: number */) => '#',
+    index: () => route(LECTURE_ROUTE_NAMES.INDEX),
+    create: () => route(LECTURE_ROUTE_NAMES.CREATE),
+    edit: (id: number) => route(LECTURE_ROUTE_NAMES.EDIT, { lecture: id }),
+    show: (id: number) => route(LECTURE_ROUTE_NAMES.SHOW, { lecture: id }),
+    store: () => route(LECTURE_ROUTE_NAMES.STORE),
+    update: (id: number) => route(LECTURE_ROUTE_NAMES.UPDATE, { lecture: id }),
+    destroy: (id: number) => route(LECTURE_ROUTE_NAMES.DESTROY, { lecture: id }),
+    // API routes
+    apiSearch: () => route(LECTURE_ROUTE_NAMES.API_SEARCH),
+    apiStatistics: () => route(LECTURE_ROUTE_NAMES.API_STATISTICS),
 } as const;
 
 // Curriculum & Courses Routes

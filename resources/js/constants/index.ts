@@ -3,6 +3,7 @@ export * from './campus-routes';
 export * from './course-offering-routes';
 export * from './course-registration-routes';
 export * from './curriculum-routes';
+export * from './lecture-routes';
 export * from './program-routes';
 export * from './role-routes';
 export * from './semester-routes';

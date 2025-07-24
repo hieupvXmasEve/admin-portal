@@ -1,527 +1,194 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **Goal**: Tell Claude Code exactly how to work in this repo—fast, accurate, minimal fluff.
 
-## Development Commands
+## 0. TL;DR For Claude
 
-### Primary Development Command
+* **Always**: 1) Confirm context → 2) List a short plan → 3) Output final code/patch.
+* **Never invent** DB fields, routes, or props. Verify against schema & codebase.
+* **Touch one concern per turn** (small, composable tasks).
+* **Return diffs or full files with correct paths.**
+* **Follow our architectures & patterns below without re-explaining them.**
+
+## 1. Repo Facts (Do Not Re-Explain)
+
+**Backend**: Laravel 12, PHP 8.4, FrankenPHP, MySQL 8, Redis
+**Frontend**: Vue 3, TS, Inertia.js, TailwindCSS 4
+**UI**: reka-ui (shadcn-vue), @tanstack/vue-table
+**Validation**: vee-validate + Zod
+**State**: Pinia
+**Auth**: Sanctum + Socialite, multiple guards (web, student, api)
+**Permissions**: Spatie Laravel Permission (campus-scoped)
+
+## 2. Commands You May Need
+
 ```bash
+# Dev everything
 composer dev
-```
-This starts the complete development environment with color-coded output:
-- Laravel development server (`php artisan serve`)
-- Queue worker (`php artisan queue:listen --tries=1`)
-- Log viewer (`php artisan pail --timeout=0`)
-- Vite development server (`npm run dev`)
 
-### Testing Commands
-```bash
-# Quick local tests
-./scripts/pre-push.sh
-
-# Full Docker integration tests
-./scripts/test-local.sh
-npm run test:local
-
-# Pre-push validation with Docker
-./scripts/pre-push.sh --docker
-npm run pre-push:docker
-
-# PHP tests only
+# PHP tests
 composer test
 php artisan test
 ./vendor/bin/pest
 
-# TypeScript type checking
-npm run type-check
-npx vue-tsc --noEmit
+# TS type check
+pnpm run type-check
+pnpm run vue-tsc --noEmit
+
+# Frontend build/lint/format
+pnpm run dev
+pnpm run build
+pnpm run build:ssr
+pnpm run lint
+pnpm run format
+pnpm run format:check
+
+# PHP format
+./vendor/bin/pint
 ```
 
-### Build Commands
-```bash
-# Frontend development
-npm run dev                # Development with HMR
-npm run build              # Production build
-npm run build:ssr          # SSR production build
+## 3. Workflow You Must Follow
 
-# PHP code formatting
-./vendor/bin/pint          # Auto-format PHP code
+1. **Check Context**
+   * Ask for missing files only if truly needed.
+   * Reuse given paths/types instead of guessing.
+2. **Plan First**
+   * Bullet the steps you’ll take (max \~5 bullets).
+3. **Implement**
+   * Provide code with correct file paths.
+   * For edits, output a **unified diff** or a clearly marked replacement block.
+4. **Self-Review**
+   * Validate field names, route names, relationships.
+   * Ensure TS/PHPCS/ESLint rules will pass.
+5. **Next Step Suggestion (Optional)**
 
-# Frontend linting
-npm run lint               # ESLint with auto-fix
-npm run format             # Prettier formatting
-npm run format:check       # Check formatting
-```
+   * One line if obvious.
 
-### Docker Commands
-```bash
-# Development environment
-./dev.sh start
-./dev.sh stop
+## 4. Architectural Rules (Service–Request–Resource Pattern)
 
-# Local production testing
-./local-prod.sh start
+* **Service** (`app/Services/`): Business logic + transactions.
+* **FormRequest** (`app/Http/Requests/`): Validation only.
+* **API Resource** (`app/Http/Resources/`): JSON shaping.
+* **Web Controller** (`app/Http/Controllers/Web/`): Inertia views.
+* **API Controller** (`app/Http/Controllers/Api/`): JSON endpoints.
 
-# Production deployment
-./prod.sh deploy
-```
+Controllers stay thin: call Service → return Resource/Redirect.
 
-## High-Level Architecture
+## 5. Multi-Campus Rules
+* Campus context must exist (middleware `CheckCampusSelected`).
+* All queries filter by current campus.
+* Permissions/roles are campus-specific.
 
-### Tech Stack
-- **Backend**: Laravel 12, PHP 8.4, FrankenPHP, MySQL 8.0, Redis
-- **Frontend**: Vue.js 3, TypeScript, Inertia.js, TailwindCSS 4.x
-- **UI Components**: reka-ui Vue, @tanstack/vue-table
-- **Form Validation**: vee-validate + Zod schemas
-- **State Management**: Pinia stores
-- **Development**: Docker, Vite HMR, Hot reload
+## 6. Frontend Standards (Vue 3 + TS)
 
-### Multi-Campus Architecture
-The system is designed as a multi-campus educational management platform:
-- **Campus Selection**: Users select a campus context that persists across sessions
-- **Campus Isolation**: Data is filtered by campus context throughout the application
-- **Middleware**: `CheckCampusSelected` middleware ensures campus context exists
-- **Role-Based Access**: Permissions are campus-specific
+* `<script setup lang="ts">` for all new components.
+* Use `reka-ui` components, `DataTable.vue`, `DataPagination.vue`, `DebouncedInput.vue`.
+* Filters are server-driven; use `applyFilters()` to push params via Inertia.
+* **Never** use empty string in `<SelectItem value="">`; use meaningful placeholders (e.g. "none").
+* Zod schema ≙ Laravel validation. Keep them in sync.
+* Convert form data types before submit (string→number/null, etc.).
+* Use `preserveState` & `preserveScroll` in Inertia visits.
 
-### Service Layer Pattern
-Business logic is organized in service classes following the Service-Request-Resource Pattern:
-```php
-// Example: StudentService handles complex student operations
-class StudentService
-{
-    public function createAdmittedStudent(array $data): Student
-    {
-        return DB::transaction(function () use ($data) {
-            // Complex business logic with transactions
-        });
-    }
+**DataTable pattern (short):**
+
+```ts
+const filters = ref({ search: '', sort: '', direction: 'asc', per_page: 15 })
+const applyFilters = (f: typeof filters.value) => {
+  const p = new URLSearchParams()
+  // set params if present ...
+  router.visit(`/resource-path${p.toString() ? '?' + p : ''}`, {
+    preserveState: true,
+    preserveScroll: true,
+    only: ['items', 'filters'],
+  })
 }
 ```
 
-#### Service-Request-Resource Pattern
-For each module, implement the following structure:
-1. **Service** (in `app/Services/`) - Business logic, entity operations, logging
-2. **Form Request** (in `app/Http/Requests/Module/`) - Validation rules
-3. **API Resource** (in `app/Http/Resources/Module/`) - JSON response formatting
-4. **Web Controller** (in `app/Http/Controllers/Web/`) - Uses FormRequests, calls Service, returns Inertia views
-5. **API Controller** (in `app/Http/Controllers/Api/`) - Uses FormRequests, calls Service, returns Resource responses
+## 7. Testing & Quality
+* Use Pest for PHP tests, factories for data.
+* Unit tests for services, feature/integration for APIs.
+* Transactional tests for DB isolation.
+* All code must pass ESLint, Prettier, Pint, TS strict.
 
-### Database Architecture
-Core academic entities follow this hierarchy:
-```
-Campuses → Buildings → Rooms
-Programs → Specializations → Curriculum Versions → Curriculum Units
-Semesters → Course Offerings → Class Schedules
-Users → Students/Faculty/Staff
-```
+## 8. Common Mistakes To Avoid
+* Using fields not in DB schema.
+* Mixing controller concerns (validation/business logic).
+* Returning partial diffs or unnamed files.
+* Ignoring campus context or permissions.
+* TS any/implicit types.
 
-Key patterns:
-- **Soft Deletes**: Used for data integrity
-- **Eloquent Relationships**: Well-defined relationships with proper constraints
-- **Model Validation**: Static validation rules in models
-- **Database Transactions**: Complex operations wrapped in transactions
-
-### Authentication & Authorization
-Multi-layered security system:
-1. **Authentication**: Laravel Sanctum + Socialite with multiple guards (web, student, api)
-2. **Campus Context**: Middleware ensuring campus selection
-3. **Role-Based Permissions**: Campus-specific role assignments using Spatie Laravel Permission
-4. **Frontend Guards**: Vue directives for UI authorization
-5. **Permission System**: Centralized definitions in `config/permission.php` with automatic gate registration
-
-### API Design
-Dual response strategy for controllers:
-```php
-// Controllers handle both web (Inertia) and API (JSON) requests
-public function store(Request $request): RedirectResponse|JsonResponse
-{
-    $model = $this->service->create($request->validated());
-    
-    if ($request->expectsJson()) {
-        return new ModelResource($model);
-    }
-    
-    return redirect()->route('models.index');
-}
+## 9. Output Format Rules For Claude
+* **Edits**: Prefer diff blocks:
+```dif a/app/Services/ExampleService.php
++++ b/app/Services/ExampleService.php
+@@
+- old line
++ new line
 ```
 
-## Frontend Architecture
+* **New files**: Show full path then code block.
+* **Multiple files**: Separate clearly with headings.
+* **No prose walls**: Keep explanations short.
 
-### Component Standards
-- **UI Components**: Use reka-ui (shadcn-vue) consistently
-- **Data Tables**: Always use `DataTable.vue` + `DataPagination.vue` + `DebouncedInput.vue`
-- **Form Components**: Use vee-validate + Zod schemas + reka-ui form components
-- **Type Safety**: TypeScript interfaces in `resources/js/types/`
-- **Structure**: Use `<script setup>` syntax for all new components
-- **Naming**: PascalCase for components, kebab-case for templates
-- **Composition API**: Prefer over options API for new components
+## 10. When Unsure
+* Ask a **single, precise** clarification question.
+* Offer safest assumption and proceed if trivial.
 
-### DataTable and DataPagination Usage Pattern
-Follow this standardized pattern for all data table implementations:
+## 11. Import/Export & Misc
+* Uses `maatwebsite/excel` for bulk ops → validate client & server side.
+* Soft deletes everywhere unless stated.
+* Transactions for multi-step data ops.
+* 
+## 12. Model & Schema Compliance (MANDATORY)
+You MUST validate that all:
 
-#### Interface and Props
-```typescript
-import type { PaginatedResponse } from '@/types';
+- Field names exist in the actual database schema
+- Eloquent relationships are correctly defined and used
+- Foreign key references match real model connections
+- Pivot tables (many-to-many) are handled with correct intermediate model or `belongsToMany()`
 
-interface Props {
-    items: PaginatedResponse<ModelType>;
-    filters?: {
-        search?: string;
-        sort?: string;
-        direction?: string;
-        per_page?: number;
-        // ... other filters
-    };
-}
-```
+Before using any model field or relationship:
 
-#### Filter State Management
-```typescript
-// Filter state - Initialize with props or defaults
-const filters = ref({
-    search: props.filters?.search || '',
-    sort: props.filters?.sort || '',
-    direction: props.filters?.direction || 'asc',
-    per_page: props.filters?.per_page || 15,
-    // ... other filters with defaults
-});
+- Look at the actual Model class if present
+- OR ask for schema/table definition if unsure
 
-// Server-side filtering functions
-const applyFilters = (newFilters: typeof filters.value) => {
-    const params = new URLSearchParams();
+❌ DO NOT:
+- Guess field names
+- Invent relationships
+- Assume `$model->relatedModel` exists without confirmation
 
-    if (newFilters.search) params.set('search', newFilters.search);
-    if (newFilters.sort) params.set('sort', newFilters.sort);
-    if (newFilters.direction) params.set('direction', newFilters.direction);
-    if (newFilters.per_page) params.set('per_page', newFilters.per_page.toString());
+✅ INSTEAD:
+- Use `$model->relation_name` only if it's defined in the Model class
+- Use `::with('relation')` only for valid eager-loadable relations
 
-    const url = `/resource-path${params.toString() ? '?' + params.toString() : ''}`;
+Always assume the schema is real, fixed, and authoritative.
 
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['items', 'filters'],
-    });
-};
+## 13. Test-Driven Workflow (REQUIRED)
 
-// Search handler for DebouncedInput
-const handleSearch = (value: string | number) => {
-    filters.value.search = String(value);
-    applyFilters(filters.value);
-};
+All new features MUST follow Test-Driven Development (TDD):
 
-const clearFilters = () => {
-    filters.value = {
-        search: '',
-        sort: '',
-        direction: 'asc',
-        per_page: 15,
-        // ... reset other filters to defaults
-    };
-    router.visit('/resource-path', {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['items', 'filters'],
-    });
-};
+1. **Write a test first** that defines the expected behavior.
+2. **Run test and confirm it fails** (red).
+3. **Write only enough code** to make the test pass (green).
+4. **Refactor if needed**, and ensure all tests still pass (green).
+5. **Update tests** if existing code is changed.
 
-const hasActiveFilters = computed(() => {
-    return filters.value.search || /* other filter conditions */;
-});
-```
+Required test coverage includes:
+- ✅ Unit tests for Service methods
+- ✅ Feature tests for API endpoints
+- ✅ Permission tests for protected routes
+- ✅ Integration tests for data flow and DB integrity
+- ✅ Factory usage for test data
 
-#### Column Definitions
-```typescript
-const columns: ColumnDef<ModelType>[] = [
-    {
-        header: 'No',
-        id: 'no',
-        enableSorting: false,
-        enableHiding: false,
-        cell: ({ row }) => {
-            const currentPage = props.items.current_page;
-            const perPage = props.items.per_page;
-            const rowIndex = row.index;
-            return (currentPage - 1) * perPage + rowIndex + 1;
-        },
-    },
-    {
-        header: 'Column Name',
-        accessorKey: 'field_name',
-        enableSorting: true,
-        cell: ({ row }) => {
-            const item = row.original;
-            return h('div', { class: 'font-medium' }, item.field_name);
-        },
-    },
-    // ... other columns
-    {
-        id: 'actions',
-        header: 'Actions',
-        enableHiding: false,
-        enableSorting: false,
-        cell: 'actions', // Use template slot
-    },
-];
-```
+Test Frameworks:
+- Use [Pest PHP](https://pestphp.com) for all PHP tests
+- Use model factories + `RefreshDatabase` trait
+- Use `@test` methods or `it()` syntax
+- Prefer `expect()` and `assertDatabaseHas()` for clarity
 
-#### Pagination Handlers
-```typescript
-// Pagination navigation
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['items'],
-    });
-};
+DO NOT:
+- Skip test writing
+- Write code without a failing test
+- Leave broken or outdated tests behind
 
-const handlePageSizeChange = (pageSize: number) => {
-    filters.value.per_page = pageSize;
-    applyFilters(filters.value);
-};
-```
-
-#### Template Structure
-```vue
-<template>
-    <!-- Filters Section -->
-    <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
-        <div class="min-w-[200px] flex-1">
-            <DebouncedInput 
-                placeholder="Search..." 
-                v-model="filters.search" 
-                @debounced="handleSearch" 
-            />
-        </div>
-        
-        <!-- Additional filters as Select components -->
-        
-        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
-            <X class="mr-2 h-4 w-4" />
-            Clear Filters
-        </Button>
-    </div>
-
-    <!-- Data Table -->
-    <DataTable :data="data" :columns="columns">
-        <template #cell-actions="{ row }">
-            <div class="flex items-center gap-2">
-                <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                    <Tooltip>
-                        <TooltipTrigger as-child>
-                            <Button variant="ghost" size="sm" @click="action(row.original)">
-                                <Icon class="h-4 w-4" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Action description</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            </div>
-        </template>
-    </DataTable>
-
-    <!-- Pagination -->
-    <DataPagination 
-        :pagination-data="items" 
-        @navigate="handlePaginationNavigate" 
-        @page-size-change="handlePageSizeChange" 
-    />
-</template>
-```
-
-#### Key Principles
-- Use `PaginatedResponse<T>` type for consistent pagination structure
-- Always implement server-side filtering with `applyFilters()`
-- Use `DebouncedInput` for search with `@debounced` event
-- Define actions column with `cell: 'actions'` and use template slots
-- Implement pagination handlers for navigation and page size changes
-- Use `preserveState: true` and `preserveScroll: true` for better UX
-- Use `only: ['items', 'filters']` to optimize network requests
-
-### Critical Frontend Patterns
-1. **SelectItem Values**: Never use empty string `value=""` - use `"none"` or meaningful values
-2. **Form Validation**: Zod schemas must align with Laravel validation rules
-3. **Data Transformation**: Transform form data before submission (strings to numbers, null handling)
-4. **Error Handling**: Comprehensive error logging and user feedback
-5. **Component Installation**: Add TODO comments for missing reka-ui components: `<!-- TODO: Run npx shadcn-vue add [component] -->`
-6. **Template Guidelines**: Use `v-show` for frequent toggles, `v-if` for rare changes, always use `:key` with `v-for`
-
-### State Management
-- **Pinia**: For complex state management
-- **Composables**: For reusable reactive logic
-- **Inertia Props**: For server-side data injection
-
-## Development Standards
-
-### PHP Standards
-- **PSR-12**: Follow PSR-12 coding standards
-- **Strict Types**: Always use `declare(strict_types=1)`
-- **Laravel Pint**: Auto-format with `./vendor/bin/pint`
-- **Service Layer**: Business logic in service classes, not controllers
-- **Controllers**: Keep thin - delegate to services, use form requests for validation
-- **Database**: Use snake_case for columns/tables, PascalCase for models
-- **Routes**: Use RESTful conventions with proper namespacing
-
-### TypeScript Standards
-- **Strict Mode**: TypeScript strict mode enabled
-- **Interface First**: Define interfaces before implementation
-- **Type Organization**: All types in `resources/js/types/`
-- **Satisfies Keyword**: Use `satisfies` for compile-time type checking
-- **Explicit Types**: Function parameters and return types must be explicitly typed
-- **Imports**: Use `import type` for type-only imports
-- **Constants**: Prefer `const` over `let`, avoid `var` entirely
-
-### Testing Standards
-- **Pest PHP**: Modern testing framework for PHP
-- **Factory Pattern**: Model factories for test data
-- **Database Transactions**: Clean test isolation
-- **Feature Tests**: End-to-end functionality testing
-- **Unit Tests**: Required for new services
-- **Integration Tests**: Required for new API endpoints
-- **Permission Tests**: Test authorization controls
-
-### Code Quality Standards
-- **Linting**: All code must pass ESLint and Prettier validation
-- **Type Safety**: All TypeScript code must have explicit types
-- **Error Handling**: Use try-catch blocks with meaningful error messages
-- **Documentation**: TODO comments required for missing components, routes, migrations
-- **Validation**: Consistent validation between frontend (Zod) and backend (Laravel)
-- **Database Fields**: ALWAYS verify model fields exist in database schema before using them - never assume fields exist
-
-### Naming Conventions
-- **Backend**: PascalCase for controllers/models/services, snake_case for database
-- **Frontend**: PascalCase for components, camelCase for functions/variables
-- **Routes**: kebab-case for URLs, dot notation for route names
-- **Files**: Match content naming (UserController.php, UserService.php, User.vue)
-
-### Directory Structure Requirements
-- **Controllers**: Separate Web (`app/Http/Controllers/Web/`) and API (`app/Http/Controllers/Api/`) controllers
-- **Services**: Business logic in `app/Services/` directory
-- **Form Requests**: Validation in `app/Http/Requests/Module/` directories
-- **Resources**: API responses in `app/Http/Resources/Module/` directories
-- **Frontend**: Components in `resources/js/components/`, types in `resources/js/types/`
-
-## Key File Locations
-
-### Configuration Files
-- `composer.json` - PHP dependencies and scripts
-- `package.json` - Frontend dependencies and scripts
-- `vite.config.ts` - Vite configuration
-- `tailwind.config.js` - TailwindCSS configuration
-- `eslint.config.js` - ESLint configuration
-- `tsconfig.json` - TypeScript configuration
-
-### Development Rules
-- `.cursor/rules/` - Development standards and patterns
-- `.cursor/rules/code-generation.mdc` - Code generation and quality standards
-- `.cursor/rules/service-request-resource-pattern.mdc` - Service layer architecture
-- `.cursor/rules/structure.mdc` - Project structure and organization
-- `.cursor/rules/tech.mdc` - Technology stack and build system
-
-### Docker Configuration
-- `docker-compose.yml` - Base Docker configuration
-- `docker-compose.dev.yml` - Development environment
-- `docker-compose.prod.yml` - Production environment
-- `./dev.sh`, `./local-prod.sh`, `./prod.sh` - Environment scripts
-
-## Common Patterns
-
-### Controller Pattern
-```php
-class ResourceController extends Controller
-{
-    public function __construct(
-        protected ResourceService $service
-    ) {}
-    
-    public function index(Request $request): Response
-    {
-        $query = Resource::with(['relations'])
-            ->orderBy('created_at', 'desc');
-            
-        // Apply filters
-        if ($request->filled('search')) {
-            $query->where('name', 'like', "%{$request->search}%");
-        }
-        
-        return Inertia::render('Resources/Index', [
-            'resources' => $query->paginate(15),
-            'filters' => $request->only(['search']),
-        ]);
-    }
-}
-```
-
-### Vue Component Pattern
-```vue
-<script setup lang="ts">
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
-import { z } from 'zod'
-
-const formSchema = toTypedSchema(z.object({
-    name: z.string().min(1, 'Name is required'),
-    // ... other fields
-}))
-
-const { handleSubmit, isSubmitting } = useForm({
-    validationSchema: formSchema,
-    initialValues: {
-        name: '',
-        // ... other fields
-    }
-})
-
-const onSubmit = handleSubmit((values) => {
-    router.post('/resources', values, {
-        onSuccess: () => console.log('Success'),
-        onError: (errors) => console.error('Errors:', errors)
-    })
-})
-</script>
-```
-
-### Service Pattern
-```php
-class ResourceService
-{
-    public function create(array $data): Resource
-    {
-        return DB::transaction(function () use ($data) {
-            $resource = Resource::create($data);
-            
-            // Additional business logic
-            $this->handleRelatedOperations($resource);
-            
-            return $resource;
-        });
-    }
-}
-```
-
-## Import/Export Functionality
-The system includes comprehensive import/export capabilities:
-- **Excel Integration**: Uses `maatwebsite/excel` package
-- **Bulk Operations**: Support for bulk create/update/delete
-- **Validation**: Client-side and server-side validation during import
-- **Error Handling**: Detailed error reporting for failed imports
-
-## Deployment Environments
-- **Development**: HTTP-only, debug enabled, hot reload
-- **Local Production**: HTTPS testing, production-like environment
-- **Production**: Full HTTPS, SSL certificates, optimized performance
-
-## Database Management
-- **Migrations**: Well-structured with proper dependencies
-- **Seeders**: Organized in timeline-based approach
-- **Foreign Keys**: Proper constraints with cascade rules
-- **Indexing**: Appropriate indexes for performance
-
-Run these commands when working with the codebase:
-- **Setup**: `composer dev` for development
-- **Test**: `./scripts/pre-push.sh` before pushing
-- **Build**: `npm run build` for production
-- **Lint**: `./vendor/bin/pint` and `npm run lint`
+ALL PRs must include passing tests for new features and bugfixes.

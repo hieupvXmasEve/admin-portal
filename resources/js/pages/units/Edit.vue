@@ -92,7 +92,7 @@ const validateCode = async (code: string) => {
     isValidatingCode.value = true;
 
     try {
-        const result = await api.post('/api/units/validate-code', {
+        const result = await api.post('/units/validate-code', {
             code: code,
             unit_id: props.unit.id,
         });
@@ -133,7 +133,7 @@ const searchUnits = async (query: string) => {
             limit: '10',
         };
 
-        const result = await api.get('/api/units/search', params);
+        const result = await api.get('/units/search', params);
 
         if (result.data.value?.success) {
             unitSearchResults.value = result.data.value.data;

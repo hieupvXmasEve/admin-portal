@@ -35,6 +35,18 @@ Route::middleware('auth')->group(function () {
     Route::get('units/create', [UnitController::class, 'create'])
         ->middleware('can:create_unit')
         ->name(UnitRoutes::CREATE);
+    
+    // Specific routes must come before parameterized routes  
+    Route::get('units/search', [UnitController::class, 'search'])
+        ->middleware('can:view_unit')
+        ->name('units.search');
+    Route::post('units/validate-code', [UnitController::class, 'validateCode'])
+        ->name('units.validate-code');
+    Route::post('units/validate-prerequisite-expression', [UnitController::class, 'validatePrerequisiteExpression'])
+        ->name('units.validate-prerequisite-expression');
+    Route::delete('units/bulk-delete', [UnitController::class, 'bulkDelete'])
+        ->name('units.bulk-delete');
+    
     Route::post('units', [UnitController::class, 'store'])
         ->middleware('can:create_unit')
         ->name(UnitRoutes::STORE);
@@ -50,16 +62,4 @@ Route::middleware('auth')->group(function () {
     Route::delete('units/{unit}', [UnitController::class, 'destroy'])
         ->middleware('can:delete_unit')
         ->name(UnitRoutes::DESTROY);
-});
-
-// API routes for AJAX calls
-Route::middleware(['auth'])->group(function () {
-    Route::get('api/units/search', [UnitController::class, 'search'])
-        ->name(UnitRoutes::API_SEARCH);
-    Route::post('api/units/validate-code', [UnitController::class, 'validateCode'])
-        ->name(UnitRoutes::API_VALIDATE_CODE);
-    Route::post('api/units/validate-prerequisite-expression', [UnitController::class, 'validatePrerequisiteExpression'])
-        ->name(UnitRoutes::API_VALIDATE_PREREQUISITE_EXPRESSION);
-    Route::delete('api/units/bulk-delete', [UnitController::class, 'bulkDelete'])
-        ->name(UnitRoutes::API_BULK_DELETE);
 });

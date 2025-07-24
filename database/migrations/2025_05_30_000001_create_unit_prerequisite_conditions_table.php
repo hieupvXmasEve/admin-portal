@@ -17,7 +17,7 @@ return new class extends Migration
             $table->enum('type', [
                 'prerequisite',
                 'co_requisite',
-                'concurrent',
+                'concurrent_prerequisite',
                 'anti_requisite',
                 'assumed_knowledge',
                 'credit_requirement',

@@ -85,7 +85,7 @@ const searchUnits = async (query: string) => {
             limit: '10',
         };
 
-        const result = await api.get('/api/units/search', params);
+        const result = await api.get('/units/search', params);
 
         if (result.data.value?.success) {
             unitSearchResults.value = result.data.value.data;
@@ -95,6 +95,9 @@ const searchUnits = async (query: string) => {
         }
     } catch (error: any) {
         console.error('Unit search failed:', error);
+        if (error.response?.status === 401) {
+            console.error('Authentication error: Please refresh the page and try again.');
+        }
         unitSearchResults.value = [];
     } finally {
         isSearchingUnits.value = false;
@@ -285,7 +288,7 @@ if (groups.value.length === 0) {
 
             <!-- Groups -->
             <div class="space-y-4">
-                <div v-for="(group, groupIndex) in groups" :key="`group-${groupIndex}`" class="rounded-lg border">
+                <div v-for="(group, groupIndex) in groups" :key="`group-${groupIndex}`" class="">
                     <PrerequisiteGroupCard
                         :group="group"
                         :group-index="groupIndex"
@@ -304,7 +307,7 @@ if (groups.value.length === 0) {
         </div>
 
         <!-- Unit Search Modal -->
-        <div v-if="showUnitSearch" class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div v-if="showUnitSearch" class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div class="mx-4 max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6">
                 <div class="mb-4 flex items-center justify-between">
                     <h3 class="text-lg font-semibold">Search Units</h3>

@@ -17,7 +17,9 @@ const errorMessage = ref('');
 onMounted(() => {
     const error = new URLSearchParams(window.location.search).get('error');
     const email = new URLSearchParams(window.location.search).get('email');
-    errorMessage.value = email + ' ' + error;
+    if (error) {
+        errorMessage.value = email + ' ' + error;
+    }
 });
 </script>
 
