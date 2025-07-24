@@ -12,8 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
-import { systemRoutes } from '@/utils/routes';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { courseRoutes, systemRoutes } from '@/utils/routes';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { BarChart3, BookOpen, ChevronLeft, FileCheck, Loader2, Plus, Users } from 'lucide-vue-next';
 import { h, markRaw, onMounted, ref } from 'vue';
@@ -283,7 +283,9 @@ const baseSuggestedCoursesColumns: ColumnDef<SuggestedCourse>[] = [
     {
         accessorKey: 'unit.code',
         header: 'Unit Code',
-        cell: ({ row }) => row.original.unit.code,
+        // Link to course-offerings?search=COS10004
+        cell: ({ row }) =>
+            h(Link, { href: courseRoutes.offerings.index() + '?search=' + row.original.unit.code, class: 'text-red-500' }, row.original.unit.code),
     },
     {
         accessorKey: 'unit.name',

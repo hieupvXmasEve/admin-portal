@@ -11,6 +11,7 @@ use App\Models\Semester;
 use App\Exceptions\BusinessLogicException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class CourseRegistrationService
 {
@@ -31,29 +32,36 @@ class CourseRegistrationService
             throw new BusinessLogicException('No active semester for registration');
         }
 
-        $query = CourseOffering::where('semester_id', $currentSemester->id)
+        // B1: Lấy course_offering (1 section mỗi môn)
+        $courseOfferings = CourseOffering::where('semester_id', $currentSemester->id)
             ->where('is_active', true)
             ->with([
                 'curriculumUnit.unit',
                 'lecturer',
-                // 'room',
                 'classSessions.room',
                 'courseRegistrations' => function ($q) {
                     $q->where('registration_status', 'registered');
                 }
-            ]);
-
-        $courseOfferings = $query->get();
-
-        // Filter out courses already registered by student
-        $registeredCourseIds = $student->courseRegistrations()
+            ])
+            ->get()
+            ->unique('curriculum_unit_id') // giữ lại 1 section/môn
+            ->values();
+        Log::info('Course offerings: ' . json_encode($courseOfferings));
+        // B2: Lấy danh sách curriculum_unit_id mà sinh viên đã đăng ký (không lấy course_offering_id nữa)
+        $registeredCurriculumUnitIds = $student->courseRegistrations()
             ->where('semester_id', $currentSemester->id)
-            ->whereIn('registration_status', ['registered', 'pending'])
-            ->pluck('course_offering_id')
+            ->whereIn('registration_status', ['registered', 'pending', 'confirmed'])
+            ->with('courseOffering') // để truy cập curriculum_unit_id
+            ->get()
+            ->pluck('courseOffering.curriculum_unit_id')
+            ->filter() // loại null (phòng trường hợp course_offering bị xóa)
+            ->unique()
             ->toArray();
+        Log::info('Registered curriculum unit IDs: ' . json_encode($registeredCurriculumUnitIds));
 
-        return $courseOfferings->reject(function ($offering) use ($registeredCourseIds) {
-            return in_array($offering->id, $registeredCourseIds);
+        // B3: Loại những môn đã đăng ký (dù khác section)
+        return $courseOfferings->reject(function ($offering) use ($registeredCurriculumUnitIds) {
+            return in_array($offering->curriculum_unit_id, $registeredCurriculumUnitIds);
         })->map(function ($offering) use ($student) {
             return $this->formatCourseOfferingForRegistration($offering, $student);
         });

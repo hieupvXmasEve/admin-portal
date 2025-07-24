@@ -11,3 +11,7 @@ export const formatTime = (time: string) => {
 export const formatDateTime = (date: string, time: string) => {
     return format(new Date(`${date} ${time}`), 'dd/MM/yyyy HH:mm');
 };
+// format date to 01 Jun 2025
+export const formatDateToShort = (date: string) => {
+    return format(new Date(date), 'MMM dd, yyyy');
+};

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Lecture\StoreLectureRequest;
+use App\Http\Requests\Lecture\UpdateLectureRequest;
 use App\Models\Lecture;
 use App\Models\Campus;
 use App\Constants\LectureRoutes;
@@ -18,10 +20,10 @@ class LectureController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('can:view_lecture')->only(['index', 'show']);
-        $this->middleware('can:create_lecture')->only(['create', 'store']);
-        $this->middleware('can:edit_lecture')->only(['edit', 'update']);
-        $this->middleware('can:delete_lecture')->only(['destroy']);
+        // $this->middleware('can:view_lecturer')->only(['index', 'show']);
+        // $this->middleware('can:create_lecturer')->only(['create', 'store']);
+        // $this->middleware('can:edit_lecturer')->only(['edit', 'update']);
+        // $this->middleware('can:delete_lecturer')->only(['destroy']);
     }
 
     /**
@@ -29,7 +31,9 @@ class LectureController extends Controller
      */
     public function index(Request $request): Response
     {
+        $currentCampusId = session('current_campus_id');
         $query = Lecture::with(['campus'])
+            ->where('campus_id', $currentCampusId)
             ->orderByName();
 
         // Apply filters
@@ -47,10 +51,6 @@ class LectureController extends Controller
 
         if ($request->filled('campus_id') && $request->campus_id !== 'all') {
             $query->where('campus_id', $request->campus_id);
-        }
-
-        if ($request->filled('academic_rank') && $request->academic_rank !== 'all') {
-            $query->where('academic_rank', $request->academic_rank);
         }
 
         if ($request->filled('employment_status') && $request->employment_status !== 'all') {
@@ -72,8 +72,9 @@ class LectureController extends Controller
         $lectures = $query->paginate(15)->withQueryString();
 
         // Get filter options
-        $campuses = Campus::orderBy('name')->get(['id', 'name']);
+
         $departments = Lecture::select('department')
+            ->where('campus_id', $currentCampusId)
             ->whereNotNull('department')
             ->distinct()
             ->orderBy('department')
@@ -84,23 +85,12 @@ class LectureController extends Controller
             'filters' => $request->only([
                 'search',
                 'campus_id',
-                'academic_rank',
                 'employment_status',
                 'employment_type',
                 'department',
                 'available_for_assignment'
             ]),
-            'campuses' => $campuses,
             'departments' => $departments,
-            'academicRankOptions' => [
-                ['value' => 'lecturer', 'label' => 'Lecturer'],
-                ['value' => 'senior_lecturer', 'label' => 'Senior Lecturer'],
-                ['value' => 'associate_professor', 'label' => 'Associate Professor'],
-                ['value' => 'professor', 'label' => 'Professor'],
-                ['value' => 'emeritus_professor', 'label' => 'Emeritus Professor'],
-                ['value' => 'visiting_lecturer', 'label' => 'Visiting Lecturer'],
-                ['value' => 'adjunct_professor', 'label' => 'Adjunct Professor'],
-            ],
             'employmentStatusOptions' => [
                 ['value' => 'active', 'label' => 'Active'],
                 ['value' => 'on_leave', 'label' => 'On Leave'],
@@ -124,24 +114,24 @@ class LectureController extends Controller
      */
     public function create(): Response
     {
+        $currentCampusId = session('current_campus_id');
         $campuses = Campus::orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('lectures/Create', [
             'campuses' => $campuses,
+            'currentCampusId' => $currentCampusId,
         ]);
     }
 
     /**
      * Store a newly created lecture
      */
-    public function store(Request $request): RedirectResponse
+    public function store(StoreLectureRequest $request): RedirectResponse
     {
-        $request->validate(Lecture::validationRules(), Lecture::validationMessages());
-
-        $lecture = Lecture::create($request->all());
+        $lecture = Lecture::create($request->validated());
 
         return Redirect::route(LectureRoutes::INDEX)
-            ->with('success', 'Lecture created successfully.');
+            ->with('success', 'Lecturer created successfully.');
     }
 
     /**
@@ -176,20 +166,12 @@ class LectureController extends Controller
     /**
      * Update the specified lecture
      */
-    public function update(Request $request, Lecture $lecture): RedirectResponse
+    public function update(UpdateLectureRequest $request, Lecture $lecture): RedirectResponse
     {
-        $rules = Lecture::validationRules();
-
-        // Update unique validation rules for existing record
-        $rules['employee_id'] = ['required', 'string', 'max:20', 'unique:lectures,employee_id,' . $lecture->id];
-        $rules['email'] = ['required', 'email', 'unique:lectures,email,' . $lecture->id];
-
-        $request->validate($rules, Lecture::validationMessages());
-
-        $lecture->update($request->all());
+        $lecture->update($request->validated());
 
         return Redirect::route(LectureRoutes::INDEX)
-            ->with('success', 'Lecture updated successfully.');
+            ->with('success', 'Lecturer updated successfully.');
     }
 
     /**
@@ -273,9 +255,6 @@ class LectureController extends Controller
             'full_time_lectures' => (clone $query)->fullTime()->count(),
             'part_time_lectures' => (clone $query)->partTime()->count(),
             'contract_lectures' => (clone $query)->contract()->count(),
-            'professors' => (clone $query)->where('academic_rank', 'professor')->count(),
-            'associate_professors' => (clone $query)->where('academic_rank', 'associate_professor')->count(),
-            'senior_lecturers' => (clone $query)->where('academic_rank', 'senior_lecturer')->count(),
             'lecturers' => (clone $query)->where('academic_rank', 'lecturer')->count(),
         ];
 

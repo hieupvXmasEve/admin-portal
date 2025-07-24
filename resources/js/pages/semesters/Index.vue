@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { formatDateToShort } from '@/utils/date';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { fromDate } from '@internationalized/date';
@@ -162,12 +163,12 @@ const columns: ColumnDef<Semester>[] = [
     {
         accessorKey: 'start_date',
         header: 'Start Date',
-        cell: ({ row }) => new Date(row.original.start_date).toLocaleDateString(),
+        cell: ({ row }) => formatDateToShort(row.original.start_date), // convert to dd MMM yyyy
     },
     {
         accessorKey: 'end_date',
         header: 'End Date',
-        cell: ({ row }) => new Date(row.original.end_date).toLocaleDateString(),
+        cell: ({ row }) => formatDateToShort(row.original.end_date),
     },
     {
         accessorKey: 'enrollment_period',
@@ -177,8 +178,8 @@ const columns: ColumnDef<Semester>[] = [
             if (!semester.enrollment_start_date || !semester.enrollment_end_date) {
                 return 'Not set';
             }
-            const start = new Date(semester.enrollment_start_date).toLocaleDateString();
-            const end = new Date(semester.enrollment_end_date).toLocaleDateString();
+            const start = formatDateToShort(semester.enrollment_start_date);
+            const end = formatDateToShort(semester.enrollment_end_date);
             return `${start} - ${end}`;
         },
     },

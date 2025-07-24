@@ -24,6 +24,7 @@ import { useApi } from '@/composables';
 import { createColumns } from '@/lib/table-utils';
 import type { CurriculumUnit, CurriculumVersion, Program, Semester, Specialization, Unit, UnitType } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
+import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -591,7 +592,9 @@ const getUnitTypeColor = (type: string) => {
                                         <div class="space-y-2">
                                             <div class="flex items-start justify-between">
                                                 <div>
-                                                    <p class="text-sm font-medium">{{ unit.unit?.code }}</p>
+                                                    <Link :href="curriculumRoutes.units.show(unit.unit?.id)" class="text-sm font-medium">
+                                                        {{ unit.unit?.code }}
+                                                    </Link>
                                                     <p class="text-xs text-gray-600">{{ unit.unit?.name }}</p>
                                                 </div>
                                                 <Badge :class="getUnitTypeColor(unit.type || 'unknown')" class="text-xs">

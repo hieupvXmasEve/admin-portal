@@ -38,7 +38,7 @@ class CourseOfferingController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecture'])
+        $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecturer'])
             ->orderBy('semester_id', 'desc')
             ->orderBy('section_code');
 
@@ -146,7 +146,7 @@ class CourseOfferingController extends Controller
             'semester',
             'curriculumUnit.unit',
             'curriculumUnit.syllabus',
-            'lecture',
+            'lecturer',
             'courseRegistrations' => function ($query) {
                 $query->with('student')
                     ->orderBy('registration_date', 'desc');
@@ -319,7 +319,7 @@ class CourseOfferingController extends Controller
         $courseOffering->load([
             'semester',
             'unit',
-            'lecture',
+            'lecturer',
             'courseRegistrations.student',
         ]);
 

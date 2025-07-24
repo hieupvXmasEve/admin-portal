@@ -82,7 +82,7 @@ class Lecture extends Authenticatable
         'teaching_modalities' => 'array',
         'certifications' => 'array',
         'languages' => 'array',
-        'hire_date' => 'date',
+        'hire_date' => 'date:Y-m-d',
         'contract_start_date' => 'date',
         'contract_end_date' => 'date',
         'preferred_start_time' => 'datetime',

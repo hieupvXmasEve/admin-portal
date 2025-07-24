@@ -438,7 +438,7 @@ class SemesterEnrollmentController extends Controller
     {
         try {
             $query = CourseOffering::where('semester_id', $semester->id)
-                ->with(['unit', 'lecture', 'courseRegistrations.student']);
+                ->with(['unit', 'lecturer', 'courseRegistrations.student']);
 
             // Apply filters
             if ($request->filled('unit_id')) {
@@ -472,7 +472,7 @@ class SemesterEnrollmentController extends Controller
                         'unit_code' => $offering->unit?->code,
                         'unit_name' => $offering->unit?->name,
                         'section_code' => $offering->section_code,
-                        'instructor_name' => $offering->lecture?->display_name,
+                        'instructor_name' => $offering->lecturer?->display_name,
                         'max_capacity' => $offering->max_capacity,
                         'current_enrollment' => $offering->current_enrollment,
                         'waitlist_capacity' => $offering->waitlist_capacity,

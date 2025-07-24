@@ -143,10 +143,10 @@ class UnitController extends Controller
     public function edit(Unit $unit)
     {
         // Check if unit can be edited
-        if (!$this->validationService->canEditUnit($unit)) {
-            return redirect()->route(UnitRoutes::SHOW, $unit)
-                ->with('error', 'Unit cannot be edited due to active relationships.');
-        }
+        // if (!$this->validationService->canEditUnit($unit)) {
+        //     return redirect()->route(UnitRoutes::SHOW, $unit)
+        //         ->with('error', 'Unit cannot be edited due to active relationships.');
+        // }
 
         // Load prerequisite groups with conditions
         $unit->load(['prerequisiteGroups.conditions.requiredUnit']);
@@ -263,7 +263,11 @@ class UnitController extends Controller
             ->limit($validated['limit'] ?? 10)
             ->get(['id', 'code', 'name', 'credit_points']);
 
-        return response()->json($units);
+        return response()->json([
+            'success' => true,
+            'data' => $units,
+            'message' => 'Units retrieved successfully'
+        ]);
     }
 
     public function validatePrerequisiteExpression(Request $request)

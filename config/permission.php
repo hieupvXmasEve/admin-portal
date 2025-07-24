@@ -147,6 +147,14 @@ return [
             'view_queries' => 'view_queries',
             'detail_queries' => 'detail_queries',
         ],
+
+        // Lecturer Management
+        'lecturers' => [
+            'view_lecturer' => 'view_lecturer',
+            'create_lecturer' => 'create_lecturer',
+            'edit_lecturer' => 'edit_lecturer',
+            'delete_lecturer' => 'delete_lecturer',
+        ],
     ],
 
     // Simplified module structure
