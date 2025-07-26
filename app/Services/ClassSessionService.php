@@ -55,7 +55,9 @@ class ClassSessionService
             $scheduleDays = $courseOffering->schedule_days ?? ['Monday'];
             $startTime = $courseOffering->schedule_time_start ? $courseOffering->schedule_time_start->format('H:i') : '09:00';
             $endTime = $courseOffering->schedule_time_end ? $courseOffering->schedule_time_end->format('H:i') : '11:00';
+            $lectureId = $courseOffering->lecture_id;
 
+            Log::info("Lecture ID: {$lectureId}");
             Log::info("Schedule: {$startDate}, Days: " . implode(',', $scheduleDays) . ", Time: {$startTime}-{$endTime}");
 
             $sessions = collect();
@@ -68,11 +70,12 @@ class ClassSessionService
                 $scheduleDays,
                 $startTime,
                 $endTime,
-                $sessionDuration
+                $sessionDuration,
+                $lectureId
             );
 
             $sessions = $sessions->merge($regularSessions);
-            Log::info("Generated {$regularSessions->count()} regular sessions");
+            Log::info("Generated {$regularSessions} regular sessions");
 
             // // Generate assessment sessions
             // $assessmentSessions = $this->generateAssessmentSessions(
@@ -131,7 +134,8 @@ class ClassSessionService
         array $scheduleDays,
         string $startTime,
         string $endTime,
-        int $sessionDuration
+        int $sessionDuration,
+        int $lectureId
     ): Collection {
         $sessions = collect();
         $currentDate = $startDate->copy();
@@ -158,6 +162,7 @@ class ClassSessionService
                     'is_assessment' => false,
                     'is_recurring' => false,
                     'sequence_number' => $sessionCount + 1,
+                    'lecture_id' => $lectureId,
                 ];
 
                 $session = ClassSession::create($sessionData);

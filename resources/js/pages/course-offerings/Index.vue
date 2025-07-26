@@ -242,7 +242,7 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
-        accessorKey: 'unit',
+        accessorKey: 'curriculum_unit.unit.code',
         header: 'Unit',
         cell: ({ row }) => {
             const course = row.original;
@@ -253,7 +253,7 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
-        accessorKey: 'unit.name',
+        accessorKey: 'curriculum_unit.unit.name',
         header: 'Unit Name',
         cell: ({ row }) => {
             const course = row.original;
@@ -310,8 +310,9 @@ const columns: ColumnDef<CourseOffering>[] = [
         accessorKey: 'lecture',
         header: 'Lecturer',
         cell: ({ row }) => {
-            const lecture = row.original.lecture;
-            return lecture ? lecture.first_name + ' ' + lecture.last_name : 'Not Assigned';
+            const lecturer = row.original.lecturer;
+
+            return lecturer ? lecturer.display_name : 'Not Assigned';
         },
     },
     {

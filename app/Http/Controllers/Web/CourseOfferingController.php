@@ -41,7 +41,7 @@ class CourseOfferingController extends Controller
         $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecturer'])
             ->orderBy('semester_id', 'desc')
             ->orderBy('section_code');
-
+        Log::info('CourseOffering: ' . json_encode(CourseOffering::select(['id', 'lecture_id', 'semester_id', 'curriculum_unit_id', 'section_code'])->get()));
         // Apply filters
         if ($request->filled('search')) {
             $search = $request->search;

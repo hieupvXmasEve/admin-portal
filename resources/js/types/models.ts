@@ -685,7 +685,7 @@ export interface CourseOffering {
     special_requirements?: string;
     notes?: string;
     curriculum_unit: CurriculumUnit;
-    lecture?: Lecture;
+    lecturer?: Lecture;
     semester?: Semester;
     campus?: Campus;
     courseRegistrations?: CourseRegistration[];

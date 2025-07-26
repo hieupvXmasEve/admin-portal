@@ -100,7 +100,7 @@ class CreateActiveStudentsSeeder extends Seeder
             $student = Student::create([
                 'student_id' => $studentId,
                 'full_name' => $fullName,
-                'email' => $email,
+                'email' => $i == 1 ? 'hieunuce11@gmail.com' : $email,
                 'password' => Hash::make('1234'),
                 'phone' => $faker->phoneNumber,
                 'date_of_birth' => $faker->dateTimeBetween('-25 years', '-18 years')->format('Y-m-d'),

@@ -17,7 +17,7 @@ class ClassSession extends Model
         'course_offering_id',
         'room_id',
         'room_booking_id',
-        'instructor_id',
+        'lecture_id',
         'session_title',
         'session_description',
         'session_date',
@@ -84,9 +84,9 @@ class ClassSession extends Model
         return $this->hasMany(Attendance::class);
     }
 
-    public function instructor(): BelongsTo
+    public function lecture(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'instructor_id');
+        return $this->belongsTo(Lecture::class, 'lecture_id');
     }
 
     // Scopes

@@ -68,7 +68,7 @@ class LecturerSeeder extends Seeder
         $lecturerRole = Role::where('code', 'giang_vien')->first();
 
         $lecturerData = [
-            ['name' => 'Dr. Nguyễn Văn An', 'email' => 'hieunucek6@gmail.com', 'department' => 'Computer Science', 'specialization' => 'Software Engineering'],
+            ['name' => 'Mr. Phạm Văn Hiếu', 'email' => 'hieunucek6@gmail.com', 'department' => 'Computer Science', 'specialization' => 'Software Engineering'],
             ['name' => 'Prof. Trần Thị Bình', 'email' => 'tran.thi.binh@swinburne.edu.vn', 'department' => 'Computer Science', 'specialization' => 'Artificial Intelligence'],
             ['name' => 'Dr. Lê Minh Cường', 'email' => 'le.minh.cuong@swinburne.edu.vn', 'department' => 'Computer Science', 'specialization' => 'Cybersecurity'],
             ['name' => 'Ms. Phạm Thị Dung', 'email' => 'pham.thi.dung@swinburne.edu.vn', 'department' => 'Computer Science', 'specialization' => 'Database Systems'],
