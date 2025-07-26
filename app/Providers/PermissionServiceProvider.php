@@ -36,7 +36,6 @@ class PermissionServiceProvider extends ServiceProvider
     private function registerPermissionGates(): void
     {
         $permissions = config('permission.access', []);
-        Log::info('Permissions: ' . json_encode($permissions));
         foreach ($permissions as $module => $modulePermissions) {
             foreach ($modulePermissions as $permission) {
                 Gate::define($permission, function ($user) use ($permission) {
@@ -46,7 +45,6 @@ class PermissionServiceProvider extends ServiceProvider
                     // Sử dụng service để lấy quyền từ cache
                     $permissionService = app(PermissionService::class);
                     $permissions = $permissionService->getUserPermissions($user, $currentCampusId);
-                    Log::info('Permissions: ' . json_encode($permissions));
                     return in_array($permission, $permissions);
                 });
             }

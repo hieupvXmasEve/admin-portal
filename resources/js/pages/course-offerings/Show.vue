@@ -20,7 +20,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log(props.courseOffering.curriculum_unit);
+console.log(props.courseOffering);
 
 const api = useApi();
 const showStatusModal = ref(false);
@@ -102,6 +102,9 @@ const generateClassSessions = async () => {
         if (result.data?.value?.success) {
             classSessions.value = result.data.value.data.sessions;
             toast.success(`${result.data.value.data.sessions_count} class sessions generated successfully`);
+            router.reload({
+                only: ['courseOffering'],
+            });
         } else {
             toast.error(result.data?.value?.message || 'Failed to generate class sessions');
         }
@@ -165,7 +168,10 @@ const getSessionStatusVariant = (status: string) => {
             </div>
         </div>
         <div class="flex items-center gap-2">
-            <Link v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0" :href="`/course-offerings/${courseOffering.id}/split`">
+            <Link
+                v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0 && !courseOffering.class_sessions?.length"
+                :href="`/course-offerings/${courseOffering.id}/split`"
+            >
                 <Button variant="outline">
                     <Users class="mr-2 h-4 w-4" />
                     Split into Sections
@@ -287,9 +293,9 @@ const getSessionStatusVariant = (status: string) => {
                         </Link>
                     </div>
 
-                    <div v-if="courseOffering.lecture">
+                    <div v-if="courseOffering?.lecturer">
                         <p class="text-muted-foreground text-sm font-medium">Lecture</p>
-                        <p class="text-lg font-semibold">{{ courseOffering.lecture.display_name }}</p>
+                        <p class="text-lg font-semibold">{{ courseOffering.lecturer.display_name }}</p>
                     </div>
                 </div>
                 <div class="space-y-4">

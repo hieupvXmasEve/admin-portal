@@ -90,10 +90,10 @@ return new class extends Migration
         // Add additional performance indexes
 
         // Cross-table indexes for complex queries
-        Schema::table('class_sessions', function (Blueprint $table) {
-            $table->index(['session_date', 'room_id', 'start_time', 'end_time'], 'daily_room_schedule_idx');
-            $table->index(['instructor_id', 'session_date', 'session_type'], 'instructor_daily_schedule_idx');
-        });
+        // Schema::table('class_sessions', function (Blueprint $table) {
+        //     $table->index(['session_date', 'room_id', 'start_time', 'end_time'], 'daily_room_schedule_idx');
+        //     $table->index(['instructor_id', 'session_date', 'session_type'], 'instructor_daily_schedule_idx');
+        // });
 
         Schema::table('attendances', function (Blueprint $table) {
             $table->index(['student_id', 'check_in_time', 'status'], 'student_attendance_timeline_idx');

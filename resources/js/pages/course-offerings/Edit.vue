@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { CourseOffering, Lecture, Semester, Unit } from '@/types/models';
-import { ScheduleDay } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Save } from 'lucide-vue-next';
@@ -29,7 +28,7 @@ const formSchema = toTypedSchema(
         curriculum_unit_id: z.string().min(1, 'Curriculum unit is required'),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
-        max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(500, 'Max capacity cannot exceed 500'),
+        max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(1000, 'Max capacity cannot exceed 1000'),
         waitlist_capacity: z.number().int().min(0, 'Waitlist capacity must be 0 or greater').max(100, 'Waitlist capacity cannot exceed 100'),
         delivery_mode: z.enum(['in_person', 'online', 'hybrid', 'blended'], {
             errorMap: () => ({ message: 'Please select a delivery mode' }),
@@ -224,7 +223,7 @@ const enrollmentStatusOptions = [
                             <FormItem>
                                 <FormLabel>Max Capacity *</FormLabel>
                                 <FormControl>
-                                    <Input v-bind="componentField" type="number" min="1" max="500" />
+                                    <Input v-bind="componentField" type="number" min="1" max="1000" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -265,22 +264,28 @@ const enrollmentStatusOptions = [
                             <FormLabel>Schedule Days</FormLabel>
                             <FormControl>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div v-for="day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']" :key="day" class="flex items-center space-x-2">
+                                    <div
+                                        v-for="day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']"
+                                        :key="day"
+                                        class="flex items-center space-x-2"
+                                    >
                                         <input
                                             :id="day"
                                             type="checkbox"
                                             :value="day"
                                             :checked="componentField.modelValue?.includes(day)"
-                                            @change="(e) => {
-                                                const target = e.target as HTMLInputElement;
-                                                const currentValue = componentField.modelValue || [];
-                                                if (target.checked) {
-                                                    componentField['onUpdate:modelValue']([...currentValue, day]);
-                                                } else {
-                                                    componentField['onUpdate:modelValue'](currentValue.filter(d => d !== day));
+                                            @change="
+                                                (e) => {
+                                                    const target = e.target as HTMLInputElement;
+                                                    const currentValue = componentField.modelValue || [];
+                                                    if (target.checked) {
+                                                        componentField['onUpdate:modelValue']([...currentValue, day]);
+                                                    } else {
+                                                        componentField['onUpdate:modelValue'](currentValue.filter((d) => d !== day));
+                                                    }
                                                 }
-                                            }"
-                                            class="rounded border-gray-300 text-primary focus:ring-primary"
+                                            "
+                                            class="text-primary focus:ring-primary rounded border-gray-300"
                                         />
                                         <label :for="day" class="text-sm font-medium">{{ day }}</label>
                                     </div>

@@ -51,10 +51,12 @@ Route::get('/health', function () {
 
 // require __DIR__.'/api/public.php';
 require __DIR__ . '/api/admin.php';
-require __DIR__ . '/api/student.php';
-require __DIR__ . '/api/lecture.php';
 
 // Versioned API routes
 Route::prefix('v1/student')->name('v1.student.')->group(function () {
     require __DIR__ . '/api/v1/student.php';
+});
+// Lecture
+Route::prefix('v1/lecturer')->name('v1.lecturer.')->group(function () {
+    require __DIR__ . '/api/v1/lecturer.php';
 });

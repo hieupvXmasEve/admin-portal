@@ -196,6 +196,12 @@ class Lecture extends Authenticatable
         return $this->hasMany(CourseOffering::class, 'lecture_id');
     }
 
+    // class sessions
+    public function classSessions(): HasMany
+    {
+        return $this->hasMany(ClassSession::class, 'lecture_id');
+    }
+
     // Computed Properties / Accessors
     public function getFullNameAttribute(): string
     {

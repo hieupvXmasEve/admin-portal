@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('course_offering_id')->constrained('course_offerings')->onDelete('cascade');
             $table->foreignId('room_id')->nullable()->constrained('rooms')->nullOnDelete();
             $table->foreignId('room_booking_id')->nullable()->constrained('room_bookings')->nullOnDelete();
-            $table->foreignId('instructor_id')->nullable()->constrained('lectures')->nullOnDelete();
+            $table->foreignId('lecture_id')->nullable()->constrained('lectures')->nullOnDelete();
 
             $table->string('session_title', 200)->nullable(); // e.g., "Introduction to Programming", "Midterm Exam"
             $table->text('session_description')->nullable();
@@ -103,7 +103,7 @@ return new class extends Migration
             // Indexes for performance
             $table->index(['course_offering_id', 'session_date', 'start_time'], 'co_session_schedule_idx');
             $table->index(['room_id', 'session_date', 'start_time', 'end_time'], 'room_session_conflict_idx');
-            $table->index(['instructor_id', 'session_date', 'start_time'], 'instructor_schedule_idx');
+            $table->index(['lecture_id', 'session_date', 'start_time'], 'instructor_schedule_idx');
             $table->index(['session_type', 'status']);
             $table->index(['delivery_mode', 'session_date']);
             $table->index(['is_assessment', 'session_date']);

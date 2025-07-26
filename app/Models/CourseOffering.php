@@ -73,7 +73,7 @@ class CourseOffering extends Model
             'curriculum_unit_id' => ['required', 'exists:curriculum_units,id'],
             'lecture_id' => ['nullable', 'exists:lectures,id'],
             'section_code' => ['nullable', 'string', 'max:10'],
-            'max_capacity' => ['required', 'integer', 'min:1', 'max:500'],
+            'max_capacity' => ['required', 'integer', 'min:1', 'max:1000'],
             'current_enrollment' => ['nullable', 'integer', 'min:0'],
             'waitlist_capacity' => ['nullable', 'integer', 'min:0', 'max:100'],
             'current_waitlist' => ['nullable', 'integer', 'min:0'],
@@ -104,7 +104,7 @@ class CourseOffering extends Model
             'max_capacity.required' => 'Maximum capacity is required',
             'max_capacity.integer' => 'Maximum capacity must be a number',
             'max_capacity.min' => 'Maximum capacity must be at least 1',
-            'max_capacity.max' => 'Maximum capacity cannot exceed 500',
+            'max_capacity.max' => 'Maximum capacity cannot exceed 1000',
             'waitlist_capacity.max' => 'Waitlist capacity cannot exceed 100',
             'delivery_mode.required' => 'Delivery mode is required',
             'delivery_mode.in' => 'Invalid delivery mode selected',
@@ -141,7 +141,7 @@ class CourseOffering extends Model
 
     public function lecturer(): BelongsTo
     {
-        return $this->belongsTo(Lecture::class);
+        return $this->belongsTo(Lecture::class, 'lecture_id');
     }
 
     public function courseRegistrations(): HasMany
@@ -178,12 +178,12 @@ class CourseOffering extends Model
 
     public function getStatusAttribute(): string
     {
-        return $this->enrollment_status;
+        return $this->enrollment_status ?? 'open';
     }
 
     public function getMaxEnrollmentAttribute(): int
     {
-        return $this->max_capacity;
+        return $this->max_capacity ?? 0;
     }
 
     public function getTuitionPerCreditAttribute(): float
