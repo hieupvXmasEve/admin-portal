@@ -129,17 +129,12 @@ class CourseOffering extends Model
         return $this->belongsTo(Semester::class);
     }
 
-    public function unit(): BelongsTo
-    {
-        return $this->belongsTo(Unit::class);
-    }
-
     public function curriculumUnit(): BelongsTo
     {
         return $this->belongsTo(CurriculumUnit::class);
     }
 
-    public function lecturer(): BelongsTo
+    public function lecture(): BelongsTo
     {
         return $this->belongsTo(Lecture::class, 'lecture_id');
     }

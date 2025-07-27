@@ -138,14 +138,14 @@ class CourseRegistration extends Model
     public function canDrop(): bool
     {
         return $this->isActive() &&
-            $this->courseOffering->semester->isAddDropPeriod() &&
+            $this->semester->isRegistrationOpen() &&
             !$this->drop_date;
     }
 
     public function canWithdraw(): bool
     {
         return $this->isActive() &&
-            $this->courseOffering->semester->isWithdrawalPeriod() &&
+            $this->semester->isActive() &&
             !$this->withdrawal_date;
     }
 

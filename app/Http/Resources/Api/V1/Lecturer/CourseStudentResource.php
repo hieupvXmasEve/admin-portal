@@ -21,15 +21,38 @@ class CourseStudentResource extends JsonResource
             'email' => $this->resource['email'],
             'registration_date' => $this->resource['registration_date'],
             
+            // Course Registration Information
+            'registration' => [
+                'status' => $this->resource['registration_status'],
+                'attempt_number' => $this->resource['attempt_number'],
+                'is_retake' => $this->resource['is_retake'],
+            ],
+            
+            // Academic Scores and Grades
+            'academics' => [
+                'final_score' => $this->resource['final_score'],
+                'final_grade' => $this->resource['final_grade'],
+                'grade_status' => $this->resource['grade_status'],
+                'grade_status_label' => $this->getGradeStatusLabel($this->resource['grade_status']),
+            ],
+            
             // Attendance Information
             'attendance' => [
                 'percentage' => $this->resource['attendance_percentage'],
                 'sessions_attended' => $this->resource['sessions_attended'],
                 'total_sessions' => $this->resource['total_sessions'],
                 'last_attendance' => $this->resource['last_attendance'],
+                'meets_requirement' => $this->resource['meets_attendance_requirement'],
                 'status' => $this->resource['status'],
                 'status_label' => $this->getStatusLabel($this->resource['status']),
                 'status_color' => $this->getStatusColor($this->resource['status']),
+            ],
+            
+            // Academic Standing
+            'academic_standing' => [
+                'status' => $this->resource['academic_standing'],
+                'label' => $this->resource['academic_standing_label'],
+                'color' => $this->getAcademicStandingColor($this->resource['academic_standing']),
             ],
             
             // Risk Assessment
@@ -172,5 +195,34 @@ class CourseStudentResource extends JsonResource
     protected function needsAttention(): bool
     {
         return $this->getRiskLevel() !== 'low';
+    }
+
+    /**
+     * Get grade status label for display
+     */
+    protected function getGradeStatusLabel(string $gradeStatus): string
+    {
+        return match ($gradeStatus) {
+            'provisional' => 'Provisional Grade',
+            'final' => 'Final Grade',
+            'pending' => 'Grade Pending',
+            'submitted' => 'Grade Submitted',
+            'approved' => 'Grade Approved',
+            default => 'Unknown Status',
+        };
+    }
+
+    /**
+     * Get academic standing color for UI
+     */
+    protected function getAcademicStandingColor(string $standing): string
+    {
+        return match ($standing) {
+            'good' => 'green',
+            'honors' => 'blue',
+            'probation' => 'yellow',
+            'suspension' => 'red',
+            default => 'gray',
+        };
     }
 }
