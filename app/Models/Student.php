@@ -140,6 +140,10 @@ class Student extends Authenticatable
     {
         return $this->hasMany(CourseRegistration::class);
     }
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class, 'student_id');
+    }
 
     public function academicHolds(): HasMany
     {

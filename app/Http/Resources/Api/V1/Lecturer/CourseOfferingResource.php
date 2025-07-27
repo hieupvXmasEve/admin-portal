@@ -30,8 +30,8 @@ class CourseOfferingResource extends JsonResource
             'curriculum_unit' => $this->whenLoaded('curriculumUnit', function () {
                 return [
                     'id' => $this->curriculumUnit->id,
-                    'unit_code' => $this->curriculumUnit->unit_code,
-                    'unit_name' => $this->curriculumUnit->unit_name,
+                    'code' => $this->curriculumUnit->unit->code,
+                    'name' => $this->curriculumUnit->unit->name,
                     'credit_hours' => $this->curriculumUnit->credit_hours,
                     'description' => $this->curriculumUnit->description,
                 ];

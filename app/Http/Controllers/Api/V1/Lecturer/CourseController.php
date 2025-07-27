@@ -14,6 +14,7 @@ use App\Http\Responses\ApiResponse;
 use App\Services\V1\Lecturer\LecturerCourseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CourseController extends Controller
 {
@@ -123,7 +124,6 @@ class CourseController extends Controller
         try {
             $filters = $request->validated();
             $students = $this->courseService->getCourseStudents($lecturer, $courseOfferingId, $filters);
-
             return ApiResponse::success(
                 CourseStudentResource::collection($students),
                 'Course students retrieved successfully'

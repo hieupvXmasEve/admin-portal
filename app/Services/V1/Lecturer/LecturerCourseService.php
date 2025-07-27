@@ -11,6 +11,7 @@ use App\Models\Unit;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Log;
 
 class LecturerCourseService
 {
@@ -27,7 +28,7 @@ class LecturerCourseService
                 'curriculumUnit',
                 'semester',
                 'courseRegistrations' => function ($q) {
-                    $q->where('registration_status', 'enrolled');
+                    $q->where('registration_status', 'confirmed');
                 },
                 'classSessions' => function ($q) {
                     $q->orderBy('session_date', 'desc')->limit(5);
@@ -131,7 +132,6 @@ class LecturerCourseService
             ->where('id', $courseOfferingId)
             ->where('is_active', true)
             ->first();
-
         if (!$courseOffering) {
             throw new \Exception('Course offering not found or access denied');
         }
@@ -143,29 +143,57 @@ class LecturerCourseService
                     $q->whereHas('classSession', function ($sessionQuery) use ($courseOfferingId) {
                         $sessionQuery->where('course_offering_id', $courseOfferingId);
                     });
+                },
+                'student.academicRecords' => function ($q) use ($courseOfferingId) {
+                    $q->where('course_offering_id', $courseOfferingId);
+                },
+                'student.academicStandings' => function ($q) use ($courseOffering) {
+                    $q->where('semester_id', $courseOffering->semester_id)
+                        ->where('is_active', true)
+                        ->latest('effective_date');
                 }
             ])
-            ->where('registration_status', 'enrolled');
+            ->where('registration_status', 'confirmed');
 
         // Apply student filters
         $this->applyStudentFilters($studentsQuery, $filters);
 
         $students = $studentsQuery->get();
 
-        return $students->map(function ($registration) use ($courseOfferingId) {
+        return $students->map(function ($registration) use ($courseOfferingId, $courseOffering) {
             $student = $registration->student;
             $attendanceStats = $this->calculateStudentAttendanceStats($student, $courseOfferingId);
-
+            $academicRecord = $student->academicRecords->first();
+            $academicStanding = $student->academicStandings->first();
+            $finalScore = $this->calculateStudentFinalScore($student->id, $courseOfferingId);
+            
             return [
                 'student_id' => $student->id,
-                'student_number' => $student->student_number,
+                'student_number' => $student->student_id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'registration_date' => $registration->created_at->format('Y-m-d'),
+                
+                // Course Registration Information
+                'registration_status' => $registration->registration_status,
+                'attempt_number' => $registration->attempt_number ?? 1,
+                'is_retake' => $registration->is_retake ?? false,
+                
+                // Academic Scores and Grades
+                'final_score' => $finalScore,
+                'final_grade' => $academicRecord?->final_letter_grade ?? $registration->final_grade,
+                'grade_status' => $academicRecord?->grade_status ?? 'provisional',
+                
+                // Attendance and Academic Standing
                 'attendance_percentage' => $attendanceStats['percentage'],
                 'sessions_attended' => $attendanceStats['attended'],
                 'total_sessions' => $attendanceStats['total'],
                 'last_attendance' => $attendanceStats['last_attendance'],
+                'meets_attendance_requirement' => $academicRecord?->meets_attendance_requirement ?? 
+                    ($attendanceStats['percentage'] >= 75),
+                'academic_standing' => $academicStanding?->standing ?? 'good',
+                'academic_standing_label' => $academicStanding?->standing_label ?? 'Good Standing',
+                
                 'status' => $this->getStudentStatus($attendanceStats),
             ];
         })->toArray();
@@ -245,9 +273,9 @@ class LecturerCourseService
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
-            $query->whereHas('curriculumUnit', function ($q) use ($search) {
-                $q->where('unit_code', 'like', "%{$search}%")
-                    ->orWhere('unit_name', 'like', "%{$search}%");
+            $query->whereHas('curriculumUnit.unit', function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
             });
         }
     }
@@ -260,9 +288,8 @@ class LecturerCourseService
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->whereHas('student', function ($q) use ($search) {
-                $q->where('student_number', 'like', "%{$search}%")
-                    ->orWhere('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
+                $q->where('student_id', 'like', "%{$search}%")
+                    ->orWhere('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
         }
@@ -291,10 +318,10 @@ class LecturerCourseService
             'schedule_time_end' => $courseOffering->schedule_time_end?->format('H:i'),
             'curriculum_unit' => [
                 'id' => $courseOffering->curriculumUnit->id,
-                'unit_code' => $courseOffering->curriculumUnit->unit_code,
-                'unit_name' => $courseOffering->curriculumUnit->unit_name,
-                'credit_hours' => $courseOffering->curriculumUnit->credit_hours,
-                'description' => $courseOffering->curriculumUnit->description,
+                'unit_code' => $courseOffering->curriculumUnit->unit->code,
+                'unit_name' => $courseOffering->curriculumUnit->unit->name,
+                'credit_hours' => $courseOffering->curriculumUnit->unit->credit_points,
+                'description' => $courseOffering->curriculumUnit->note,
             ],
             'semester' => [
                 'id' => $courseOffering->semester->id,
@@ -313,7 +340,7 @@ class LecturerCourseService
     {
         $totalRegistrations = $courseOffering->courseRegistrations()->count();
         $enrolledStudents = $courseOffering->courseRegistrations()
-            ->where('registration_status', 'enrolled')->count();
+            ->where('registration_status', 'confirmed')->count();
         $waitlistedStudents = $courseOffering->courseRegistrations()
             ->where('registration_status', 'waitlisted')->count();
         $droppedStudents = $courseOffering->courseRegistrations()
@@ -425,10 +452,9 @@ class LecturerCourseService
                 $q->where('course_offering_id', $courseOfferingId);
             })
             ->get();
-
         $totalSessions = DB::table('class_sessions')
             ->where('course_offering_id', $courseOfferingId)
-            ->where('attendance_marked', true)
+            ->where('actual_attendees', '>', 0)
             ->count();
 
         $attendedSessions = $attendances->whereIn('status', ['present', 'late'])->count();
@@ -442,6 +468,100 @@ class LecturerCourseService
             'percentage' => $percentage,
             'last_attendance' => $lastAttendance?->created_at?->format('Y-m-d'),
         ];
+    }
+
+    /**
+     * Calculate student's final score from assessment components
+     */
+    protected function calculateStudentFinalScore(int $studentId, int $courseOfferingId): ?float
+    {
+        try {
+            // Get course offering to access syllabus
+            $courseOffering = CourseOffering::with([
+                'syllabus.assessmentComponents.details.scores' => function ($q) use ($studentId) {
+                    $q->where('student_id', $studentId)
+                        ->where('score_excluded', false)
+                        ->whereIn('score_status', ['final', 'graded'])
+                        ->whereNotNull('percentage_score')
+                        ->orderBy('graded_at', 'desc');
+                }
+            ])->find($courseOfferingId);
+
+            if (!$courseOffering || !$courseOffering->syllabus) {
+                return null;
+            }
+
+            $totalWeightedScore = 0;
+            $totalWeight = 0;
+
+            foreach ($courseOffering->syllabus->assessmentComponents as $component) {
+                $componentWeight = $component->weight ?? 0;
+                
+                if ($componentWeight <= 0) {
+                    continue;
+                }
+
+                $componentScore = $this->calculateComponentScore($component, $studentId);
+                
+                if ($componentScore !== null) {
+                    $totalWeightedScore += ($componentScore * $componentWeight);
+                    $totalWeight += $componentWeight;
+                }
+            }
+
+            // Only return a score if we have some assessment data
+            if ($totalWeight > 0) {
+                return round($totalWeightedScore / $totalWeight, 2);
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            // Log error but don't break the API response
+            Log::error('Failed to calculate student final score', [
+                'student_id' => $studentId,
+                'course_offering_id' => $courseOfferingId,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Calculate score for a specific assessment component
+     */
+    protected function calculateComponentScore($component, int $studentId): ?float
+    {
+        if ($component->details->isEmpty()) {
+            // Component has no details, check if there are direct scores
+            return null;
+        }
+
+        $totalDetailScore = 0;
+        $totalDetailWeight = 0;
+        $hasAnyScores = false;
+
+        foreach ($component->details as $detail) {
+            $detailWeight = $detail->weight ?? 0;
+            
+            if ($detailWeight <= 0) {
+                continue;
+            }
+
+            // Get the best/latest score for this detail
+            $score = $detail->scores->sortByDesc('graded_at')->first();
+            
+            if ($score && $score->percentage_score !== null) {
+                $totalDetailScore += ($score->percentage_score * $detailWeight);
+                $totalDetailWeight += $detailWeight;
+                $hasAnyScores = true;
+            }
+        }
+
+        if (!$hasAnyScores || $totalDetailWeight == 0) {
+            return null;
+        }
+
+        return $totalDetailScore / $totalDetailWeight;
     }
 
     /**
