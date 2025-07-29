@@ -20,11 +20,16 @@ class ClassSessionService
     /**
      * Auto-generate class sessions based on syllabus data
      */
-    public function generateClassSessions(CourseOffering $courseOffering): Collection
+    public function generateClassSessions(CourseOffering $courseOffering, int $roomId): Collection
     {
         Log::info("Generating class sessions for course offering {$courseOffering->id}");
 
         try {
+            // Check if class sessions already exist for this course offering
+            $existingSessions = ClassSession::where('course_offering_id', $courseOffering->id)->count();
+            if ($existingSessions > 0) {
+                throw new \Exception('Class sessions already exist for this course offering');
+            }
             // Load required relationships with proper error checking
             $courseOffering->load([
                 'curriculumUnit.syllabus.assessmentComponents.details',
@@ -58,7 +63,7 @@ class ClassSessionService
             $lectureId = $courseOffering->lecture_id;
 
             Log::info("Lecture ID: {$lectureId}");
-            Log::info("Schedule: {$startDate}, Days: " . implode(',', $scheduleDays) . ", Time: {$startTime}-{$endTime}");
+            Log::info("Schedule: {$startDate}, Days: ".implode(',', $scheduleDays).", Time: {$startTime}-{$endTime}");
 
             $sessions = collect();
 
@@ -71,7 +76,8 @@ class ClassSessionService
                 $startTime,
                 $endTime,
                 $sessionDuration,
-                $lectureId
+                $lectureId,
+                $roomId
             );
 
             $sessions = $sessions->merge($regularSessions);
@@ -94,8 +100,8 @@ class ClassSessionService
 
             return $sessions;
         } catch (\Exception $e) {
-            Log::error("Error generating class sessions for course offering {$courseOffering->id}: " . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error("Error generating class sessions for course offering {$courseOffering->id}: ".$e->getMessage());
+            Log::error('Stack trace: '.$e->getTraceAsString());
             throw $e;
         }
     }
@@ -135,7 +141,8 @@ class ClassSessionService
         string $startTime,
         string $endTime,
         int $sessionDuration,
-        int $lectureId
+        int $lectureId,
+        int $roomId
     ): Collection {
         $sessions = collect();
         $currentDate = $startDate->copy();
@@ -148,7 +155,7 @@ class ClassSessionService
             if (in_array($currentDate->dayOfWeek, $dayNumbers)) {
                 $sessionData = [
                     'course_offering_id' => $courseOffering->id,
-                    'session_title' => 'Session ' . ($sessionCount + 1),
+                    'session_title' => 'Session '.($sessionCount + 1),
                     'session_description' => 'Regular class session',
                     'session_date' => $currentDate->toDateString(),
                     'start_time' => $currentDate->copy()->setTimeFromTimeString($startTime),
@@ -163,6 +170,7 @@ class ClassSessionService
                     'is_recurring' => false,
                     'sequence_number' => $sessionCount + 1,
                     'lecture_id' => $lectureId,
+                    'room_id' => $roomId,
                 ];
 
                 $session = ClassSession::create($sessionData);
@@ -216,8 +224,8 @@ class ClassSessionService
 
             $sessionData = [
                 'course_offering_id' => $courseOffering->id,
-                'session_title' => $component->name . ' Assessment',
-                'session_description' => 'Assessment session for ' . $component->name,
+                'session_title' => $component->name.' Assessment',
+                'session_description' => 'Assessment session for '.$component->name,
                 'session_date' => $assessmentDate->toDateString(),
                 'start_time' => $assessmentDate->copy()->setTimeFromTimeString($startTime),
                 'end_time' => $assessmentDate->copy()->setTimeFromTimeString($endTime),

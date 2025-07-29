@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import RegistrationStatusModal from '@/components/RegistrationStatusModal.vue';
+import RoomSelectionModal from '@/components/RoomSelectionModal.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
-import type { ClassSession, CourseOffering, CourseRegistration } from '@/types/models';
+import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, Calendar, Clock, ExternalLink, Eye, MapPin, Play, Trash2, UserCheck, Users } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, Calendar, Clock, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
         course_registrations: CourseRegistration[];
         class_sessions?: ClassSession[];
     };
+    availableRooms: Room[];
 }
 
 const props = defineProps<Props>();
@@ -94,10 +96,12 @@ const handleStatusUpdate = () => {
 };
 
 // Class sessions management functions
-const generateClassSessions = async () => {
+const generateClassSessions = async (roomId: number) => {
     try {
         isGenerating.value = true;
-        const result = await api.post(`/api/course-offerings/${props.courseOffering.id}/class-sessions/generate`, {});
+        const result = await api.post(`/api/course-offerings/${props.courseOffering.id}/class-sessions/generate`, {
+            room_id: roomId,
+        });
         console.log('result.data', result.data);
         if (result.data?.value?.success) {
             classSessions.value = result.data.value.data.sessions;
@@ -293,9 +297,9 @@ const getSessionStatusVariant = (status: string) => {
                         </Link>
                     </div>
 
-                    <div v-if="courseOffering?.lecturer">
+                    <div v-if="courseOffering?.lecture">
                         <p class="text-muted-foreground text-sm font-medium">Lecture</p>
-                        <p class="text-lg font-semibold">{{ courseOffering.lecturer.display_name }}</p>
+                        <p class="text-lg font-semibold">{{ courseOffering.lecture.display_name }}</p>
                     </div>
                 </div>
                 <div class="space-y-4">
@@ -375,10 +379,11 @@ const getSessionStatusVariant = (status: string) => {
                         <Trash2 class="mr-2 h-4 w-4" />
                         Delete All
                     </Button>
-                    <Button @click="generateClassSessions" :disabled="isGenerating" size="sm">
-                        <Play class="mr-2 h-4 w-4" />
-                        {{ isGenerating ? 'Generating...' : 'Auto-Generate Sessions' }}
-                    </Button>
+                    <RoomSelectionModal
+                        :available-rooms="availableRooms"
+                        :is-generating="isGenerating"
+                        @generate="generateClassSessions"
+                    />
                 </div>
             </div>
         </CardHeader>

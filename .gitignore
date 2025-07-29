@@ -28,6 +28,11 @@ yarn-error.log
 # prompt
 
 /screenshots
-.serena
-# /tasks
 /prompt-template
+.serena
+/tasks
+# /prd
+# .augment
+# .claude
+# .kiro
+# docs

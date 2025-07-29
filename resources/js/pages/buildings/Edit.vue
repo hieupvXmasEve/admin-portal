@@ -73,7 +73,7 @@ const onSubmit = (values: any) => {
 };
 
 const goBack = () => {
-    router.visit(systemRoutes.buildings.index());
+    router.visit(systemRoutes.campuses.show(props.building.campus_id));
 };
 </script>
 

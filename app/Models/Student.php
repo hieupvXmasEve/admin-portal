@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -124,6 +125,18 @@ class Student extends Authenticatable
     public function program(): BelongsTo
     {
         return $this->belongsTo(Program::class);
+    }
+
+    public function curriculumUnits(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            CurriculumUnit::class,
+            CurriculumVersion::class,
+            'id', // Foreign key on curriculum_versions table
+            'curriculum_version_id', // Foreign key on curriculum_units table
+            'curriculum_version_id', // Local key on students table
+            'id' // Local key on curriculum_versions table
+        );
     }
 
     public function specialization(): BelongsTo

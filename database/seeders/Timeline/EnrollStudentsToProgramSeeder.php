@@ -44,14 +44,20 @@ class EnrollStudentsToProgramSeeder extends Seeder
                 ->first();
 
             if (!$existingEnrollment) {
+                $semesterNumber = Semester::query()
+                    ->whereDate('start_date', '>=', $student->admission_date)
+                    ->whereDate('start_date', '<=', $firstSemester->start_date)
+                    ->orderBy('start_date')
+                    ->count();
+
                 // Create enrollment record
                 Enrollment::create([
                     'student_id' => $student->id,
                     'semester_id' => $firstSemester->id,
                     'curriculum_version_id' => $student->curriculum_version_id,
-                    'semester_number' => 1,
+                    'semester_number' => $semesterNumber,
                     'status' => 'in_progress',
-                    'notes' => 'Initial enrollment into program for first semester',
+                    'notes' => 'Initial enrollment into program for semester #' . $semesterNumber,
                 ]);
 
                 $enrollmentCount++;
