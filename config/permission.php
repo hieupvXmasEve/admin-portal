@@ -155,6 +155,16 @@ return [
             'edit_lecturer' => 'edit_lecturer',
             'delete_lecturer' => 'delete_lecturer',
         ],
+
+        // Assessment Management
+        'assessments' => [
+            'view_assessment' => 'view_assessment',
+            'create_assessment' => 'create_assessment',
+            'edit_assessment' => 'edit_assessment',
+            'delete_assessment' => 'delete_assessment',
+            'grade_assessment' => 'grade_assessment',
+            'export_assessment' => 'export_assessment',
+        ],
     ],
 
     // Simplified module structure
@@ -165,6 +175,7 @@ return [
         'student_activities' => ['groups', 'events', 'clubs'],
         'financial' => ['fees'],
         'reporting' => ['queries'],
+        'teaching' => ['assessments'],
     ],
 
     'actions' => [

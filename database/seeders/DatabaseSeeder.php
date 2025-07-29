@@ -23,8 +23,10 @@ class DatabaseSeeder extends Seeder
             EnrollStudentsToProgramSeeder::class,
 
             // Step 3: Open course offerings
+            CourseOfferingsSeeder::class,
 
-
+            // Step 4: Register students to course offerings
+            CourseRegistrationSeeder::class,
 
             // This seeder should be run manually when permissions are updated
             // UpdatePermissionsSeeder::class,

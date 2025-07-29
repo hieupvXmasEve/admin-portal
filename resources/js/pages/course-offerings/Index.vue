@@ -308,11 +308,11 @@ const columns: ColumnDef<CourseOffering>[] = [
     },
     {
         accessorKey: 'lecture',
-        header: 'Lecturer',
+        header: 'Lecture',
         cell: ({ row }) => {
-            const lecturer = row.original.lecturer;
+            const lecture = row.original.lecture;
 
-            return lecturer ? lecturer.display_name : 'Not Assigned';
+            return lecture ? lecture.display_name : 'Not Assigned';
         },
     },
     {

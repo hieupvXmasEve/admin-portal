@@ -37,7 +37,7 @@ class CourseRegistrationService
             ->where('is_active', true)
             ->with([
                 'curriculumUnit.unit',
-                'lecturer',
+                'lecture',
                 'classSessions.room',
                 'courseRegistrations' => function ($q) {
                     $q->where('registration_status', 'registered');

@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\V1\Lecturer\CourseController;
 use App\Http\Controllers\Api\V1\Lecturer\AttendanceController;
 use App\Http\Controllers\Api\V1\Lecturer\TimetableController;
 use App\Http\Controllers\Api\V1\Lecturer\StudentController;
+use App\Http\Controllers\Api\V1\Lecturer\AssessmentController;
+use App\Http\Controllers\Api\V1\Lecturer\AssessmentReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -129,5 +131,39 @@ Route::middleware([
         Route::post('/{student}/notes', [StudentController::class, 'addNote'])->name('add-note');
         Route::put('/{student}/notes/{note}', [StudentController::class, 'updateNote'])->name('update-note');
         Route::delete('/{student}/notes/{note}', [StudentController::class, 'deleteNote'])->name('delete-note');
+    });
+
+    // Assessment management endpoints
+    Route::prefix('courses/{courseOffering}/assessments')->name('assessments.')->group(function () {
+        Route::get('/', [AssessmentController::class, 'index'])
+            ->middleware(['lecturer.api.rate:lecturer-assessment-management'])
+            ->name('index');
+
+        Route::post('/', [AssessmentController::class, 'store'])->name('store');
+        Route::put('/{assessmentComponent}', [AssessmentController::class, 'update'])->name('update');
+        Route::delete('/{assessmentComponent}', [AssessmentController::class, 'destroy'])->name('destroy');
+
+        // Assessment detail management endpoints
+        Route::post('/{assessmentComponent}/details', [AssessmentController::class, 'storeDetail'])->name('store-detail');
+        Route::put('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'updateDetail'])->name('update-detail');
+        Route::delete('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'destroyDetail'])->name('destroy-detail');
+
+        // Grading endpoints
+        Route::get('/grade/student/{student}', [AssessmentController::class, 'gradeByStudent'])->name('grade-by-student');
+        Route::get('/grade/component/{assessmentComponent}', [AssessmentController::class, 'gradeByComponent'])->name('grade-by-component');
+        Route::put('/scores/{score}', [AssessmentController::class, 'updateGrade'])->name('update-grade');
+        Route::post('/scores/bulk-update', [AssessmentController::class, 'bulkUpdateGrades'])->name('bulk-update-grades');
+
+        // Assessment reporting endpoints
+        Route::prefix('report')->name('report.')->group(function () {
+            Route::get('/overview', [AssessmentReportController::class, 'overview'])->name('overview');
+            Route::get('/grade-matrix', [AssessmentReportController::class, 'gradeMatrix'])->name('grade-matrix');
+            Route::get('/statistics', [AssessmentReportController::class, 'statistics'])->name('statistics');
+            Route::get('/export/excel', [AssessmentReportController::class, 'exportExcel'])->name('export-excel');
+            Route::get('/export/pdf', [AssessmentReportController::class, 'exportPdf'])->name('export-pdf');
+        });
+
+        // Assessment weight validation endpoint
+        Route::get('/validate-weights', [AssessmentController::class, 'validateWeights'])->name('validate-weights');
     });
 });

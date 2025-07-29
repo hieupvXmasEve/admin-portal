@@ -139,7 +139,7 @@ class CourseController extends Controller
      */
     public function show(CourseOffering $courseOffering): JsonResponse
     {
-        $courseOffering->load(['unit', 'lecturer', 'semester']);
+        $courseOffering->load(['unit', 'lecture', 'semester']);
 
         return response()->json([
             'success' => true,

@@ -173,6 +173,30 @@ export interface Campus {
     updated_at: string;
 }
 
+export interface Room {
+    id: number;
+    campus_id: number;
+    name: string;
+    code: string;
+    building: string;
+    floor: string;
+    type: 'classroom' | 'laboratory' | 'computer_lab' | 'auditorium' | 'meeting_room' | 'library' | 'study_room' | 'workshop' | 'office' | 'other';
+    capacity: number;
+    status: 'available' | 'occupied' | 'maintenance' | 'out_of_service' | 'reserved';
+    is_bookable: boolean;
+    requires_approval: boolean;
+    available_from: string;
+    available_until: string;
+    blocked_days: string[];
+    description: string;
+    usage_guidelines: string;
+    booking_notes: string;
+    campus?: Campus;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
+}
+
 export interface Building {
     id: number;
     campus_id: number;
@@ -685,7 +709,7 @@ export interface CourseOffering {
     special_requirements?: string;
     notes?: string;
     curriculum_unit: CurriculumUnit;
-    lecturer?: Lecture;
+    lecture?: Lecture;
     semester?: Semester;
     campus?: Campus;
     courseRegistrations?: CourseRegistration[];

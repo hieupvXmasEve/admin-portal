@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\GenerateClassSessionsRequest;
 use App\Http\Resources\ClassSession\ClassSessionResource;
 use App\Models\CourseOffering;
 use App\Services\ClassSessionService;
@@ -28,14 +29,13 @@ class ClassSessionController extends Controller
     /**
      * Auto-generate class sessions for a course offering
      */
-    public function generate(CourseOffering $courseOffering): JsonResponse
+    public function generate(GenerateClassSessionsRequest $request, CourseOffering $courseOffering): JsonResponse
     {
         try {
-            // Delete existing sessions first
-            $this->classSessionService->deleteClassSessions($courseOffering);
+            $roomId = $request->validated()['room_id'];
 
             // Generate new sessions
-            $sessions = $this->classSessionService->generateClassSessions($courseOffering);
+            $sessions = $this->classSessionService->generateClassSessions($courseOffering, $roomId);
 
             return response()->json([
                 'success' => true,
@@ -46,10 +46,12 @@ class ClassSessionController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            $statusCode = str_contains($e->getMessage(), 'already exist') ? 400 : 500;
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to generate class sessions: '.$e->getMessage(),
-            ], 500);
+                'message' => $e->getMessage(),
+            ], $statusCode);
         }
     }
 

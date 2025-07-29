@@ -22,16 +22,16 @@ class AttendanceService
     public function getAttendanceSummary(Student $student, ?int $semesterId = null, array $filters = []): array
     {
         $semester = $this->resolveSemester($semesterId);
-        
+
         if (!$semester) {
             return $this->getEmptyAttendanceSummary();
         }
 
         $cacheKey = "attendance:summary:student:{$student->id}:semester:{$semester->id}:" . md5(serialize($filters));
-        
+
         return Cache::remember($cacheKey, 300, function () use ($student, $semester, $filters) {
             $attendanceRecords = $this->getAttendanceRecords($student, $semester, $filters);
-            
+
             return [
                 'semester' => [
                     'id' => $semester->id,
@@ -52,7 +52,7 @@ class AttendanceService
      */
     public function getCourseAttendance(Student $student, int $courseOfferingId): array
     {
-        $courseOffering = CourseOffering::with(['curriculumUnit.unit', 'semester', 'lecturer'])
+        $courseOffering = CourseOffering::with(['curriculumUnit.unit', 'semester', 'lecture'])
             ->findOrFail($courseOfferingId);
 
         // Verify student is enrolled
@@ -92,13 +92,13 @@ class AttendanceService
     public function getAttendanceStatistics(Student $student, ?int $semesterId = null): array
     {
         $semester = $this->resolveSemester($semesterId);
-        
+
         if (!$semester) {
             return [];
         }
 
         $attendanceRecords = $this->getAttendanceRecords($student, $semester);
-        
+
         return [
             'overall_statistics' => $this->calculateOverallStatistics($attendanceRecords),
             'monthly_breakdown' => $this->calculateMonthlyBreakdown($attendanceRecords),
@@ -176,7 +176,7 @@ class AttendanceService
             'excused_sessions' => $excusedSessions,
             'attendance_rate' => $attendanceRate,
             'attendance_status' => $this->getAttendanceStatus($attendanceRate),
-            'punctuality_rate' => $totalSessions > 0 
+            'punctuality_rate' => $totalSessions > 0
                 ? round((($presentSessions - $lateSessions) / $totalSessions) * 100, 1)
                 : 0,
         ];
@@ -237,17 +237,17 @@ class AttendanceService
             ->whereHas('courseOffering', function ($q) use ($semester) {
                 $q->where('semester_id', $semester->id);
             })
-            ->selectRaw('WEEK(session_date) as week, COUNT(*) as total_sessions, 
+            ->selectRaw('WEEK(session_date) as week, COUNT(*) as total_sessions,
                        SUM(CASE WHEN status IN ("present", "late") THEN 1 ELSE 0 END) as present_sessions')
             ->groupBy('week')
             ->orderBy('week')
             ->get();
 
         $trendData = $weeklyAttendance->map(function ($week) {
-            $rate = $week->total_sessions > 0 
+            $rate = $week->total_sessions > 0
                 ? round(($week->present_sessions / $week->total_sessions) * 100, 1)
                 : 0;
-            
+
             return [
                 'week' => $week->week,
                 'total_sessions' => $week->total_sessions,
@@ -273,7 +273,7 @@ class AttendanceService
                 'course_code' => $record->courseOffering->curriculumUnit->unit->code,
                 'course_name' => $record->courseOffering->curriculumUnit->unit->name,
                 'session_date' => $record->session_date->toDateString(),
-                'session_time' => $record->classSession ? 
+                'session_time' => $record->classSession ?
                     $record->classSession->start_time . ' - ' . $record->classSession->end_time : null,
                 'status' => $record->status,
                 'status_display' => $this->getStatusDisplay($record->status),
@@ -289,7 +289,7 @@ class AttendanceService
     protected function generateAttendanceAlerts(Student $student, Semester $semester): array
     {
         $alerts = [];
-        
+
         // Get courses with low attendance
         $courseAttendance = $this->groupAttendanceByCourse(
             $this->getAttendanceRecords($student, $semester)
@@ -297,7 +297,7 @@ class AttendanceService
 
         foreach ($courseAttendance as $course) {
             $rate = $course['attendance_summary']['attendance_rate'];
-            
+
             if ($rate < 75) {
                 $alerts[] = [
                     'type' => 'low_attendance',
@@ -375,7 +375,7 @@ class AttendanceService
 
         $attendanceRate = $records->whereIn('status', ['present', 'late'])->count() / $records->count() * 100;
         $recentRate = $records->take(10)->whereIn('status', ['present', 'late'])->count() / min(10, $records->count()) * 100;
-        
+
         $patternType = $this->determinePatternType($records);
         $consistency = $this->calculateConsistency($records);
         $riskLevel = $this->assessRiskLevel($attendanceRate, $recentRate, $consistency);
@@ -386,8 +386,7 @@ class AttendanceService
             'risk_level' => $riskLevel,
             'overall_rate' => round($attendanceRate, 1),
             'recent_rate' => round($recentRate, 1),
-            'trend' => $recentRate > $attendanceRate ? 'improving' : 
-                      ($recentRate < $attendanceRate ? 'declining' : 'stable'),
+            'trend' => $recentRate > $attendanceRate ? 'improving' : ($recentRate < $attendanceRate ? 'declining' : 'stable'),
         ];
     }
 
@@ -408,7 +407,7 @@ class AttendanceService
     {
         $totalSessions = $records->count();
         $presentSessions = $records->whereIn('status', ['present', 'late'])->count();
-        
+
         return [
             'total_sessions' => $totalSessions,
             'attendance_rate' => $totalSessions > 0 ? round(($presentSessions / $totalSessions) * 100, 1) : 0,
@@ -428,7 +427,7 @@ class AttendanceService
         })->map(function ($monthRecords, $month) {
             $totalSessions = $monthRecords->count();
             $presentSessions = $monthRecords->whereIn('status', ['present', 'late'])->count();
-            
+
             return [
                 'month' => $month,
                 'month_display' => Carbon::createFromFormat('Y-m', $month)->format('F Y'),
@@ -449,7 +448,7 @@ class AttendanceService
         })->map(function ($dayRecords, $day) {
             $totalSessions = $dayRecords->count();
             $presentSessions = $dayRecords->whereIn('status', ['present', 'late'])->count();
-            
+
             return [
                 'day' => strtolower($day),
                 'day_display' => $day,
@@ -469,7 +468,7 @@ class AttendanceService
             return $record->classSession;
         })->groupBy(function ($record) {
             $hour = Carbon::createFromTimeString($record->classSession->start_time)->hour;
-            
+
             if ($hour < 12) {
                 return 'morning';
             } elseif ($hour < 17) {
@@ -480,7 +479,7 @@ class AttendanceService
         })->map(function ($timeRecords, $timeOfDay) {
             $totalSessions = $timeRecords->count();
             $presentSessions = $timeRecords->whereIn('status', ['present', 'late'])->count();
-            
+
             return [
                 'time_of_day' => $timeOfDay,
                 'total_sessions' => $totalSessions,
@@ -499,7 +498,7 @@ class AttendanceService
             $courseOffering = $courseRecords->first()->courseOffering;
             $totalSessions = $courseRecords->count();
             $presentSessions = $courseRecords->whereIn('status', ['present', 'late'])->count();
-            
+
             return [
                 'course_code' => $courseOffering->curriculumUnit->unit->code,
                 'course_name' => $courseOffering->curriculumUnit->unit->name,
@@ -553,7 +552,7 @@ class AttendanceService
     {
         $start = Carbon::createFromTimeString($startTime);
         $end = Carbon::createFromTimeString($endTime);
-        
+
         return $start->format('g:i A') . ' - ' . $end->format('g:i A');
     }
 
@@ -657,7 +656,7 @@ class AttendanceService
     {
         $mean = $values->avg();
         $variance = $values->map(fn($value) => pow($value - $mean, 2))->avg();
-        
+
         return sqrt($variance);
     }
 
@@ -670,7 +669,7 @@ class AttendanceService
             $courseOffering = $courseRecords->first()->courseOffering;
             $totalSessions = $courseRecords->count();
             $presentSessions = $courseRecords->whereIn('status', ['present', 'late'])->count();
-            
+
             return [
                 'course_code' => $courseOffering->curriculumUnit->unit->code,
                 'course_name' => $courseOffering->curriculumUnit->unit->name,
@@ -690,7 +689,7 @@ class AttendanceService
             $courseOffering = $courseRecords->first()->courseOffering;
             $totalSessions = $courseRecords->count();
             $presentSessions = $courseRecords->whereIn('status', ['present', 'late'])->count();
-            
+
             return [
                 'course_code' => $courseOffering->curriculumUnit->unit->code,
                 'course_name' => $courseOffering->curriculumUnit->unit->name,
@@ -710,7 +709,7 @@ class AttendanceService
             return $courseRecords->every(fn($record) => in_array($record->status, ['present', 'late']));
         })->map(function ($courseRecords) {
             $courseOffering = $courseRecords->first()->courseOffering;
-            
+
             return [
                 'course_code' => $courseOffering->curriculumUnit->unit->code,
                 'course_name' => $courseOffering->curriculumUnit->unit->name,
@@ -727,7 +726,7 @@ class AttendanceService
         if ($semesterId) {
             return Semester::find($semesterId);
         }
-        
+
         return Semester::where('is_active', true)->first();
     }
 

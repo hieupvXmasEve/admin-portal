@@ -11,6 +11,7 @@ use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Lecture;
+use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Unit;
 use App\Constants\CourseOfferingRoutes;
@@ -38,7 +39,7 @@ class CourseOfferingController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecturer'])
+        $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecture'])
             ->orderBy('semester_id', 'desc')
             ->orderBy('section_code');
         Log::info('CourseOffering: ' . json_encode(CourseOffering::select(['id', 'lecture_id', 'semester_id', 'curriculum_unit_id', 'section_code'])->get()));
@@ -146,7 +147,7 @@ class CourseOfferingController extends Controller
             'semester',
             'curriculumUnit.unit',
             'curriculumUnit.syllabus',
-            'lecturer',
+            'lecture',
             'courseRegistrations' => function ($query) {
                 $query->with('student')
                     ->orderBy('registration_date', 'desc');
@@ -157,8 +158,16 @@ class CourseOfferingController extends Controller
             },
         ]);
 
+        // Get available rooms for class session generation
+        $availableRooms = Room::bookable()
+            ->withStatus(Room::STATUS_AVAILABLE)
+            ->orderBy('building')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'building', 'capacity', 'type']);
+
         return Inertia::render('course-offerings/Show', [
             'courseOffering' => $courseOffering,
+            'availableRooms' => $availableRooms,
         ]);
     }
 
@@ -319,7 +328,7 @@ class CourseOfferingController extends Controller
         $courseOffering->load([
             'semester',
             'unit',
-            'lecturer',
+            'lecture',
             'courseRegistrations.student',
         ]);
 

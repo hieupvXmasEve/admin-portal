@@ -418,8 +418,8 @@ class UnitImportController extends Controller
         $prereqSheet->fromArray(['CS301', 'OR', 'Business ethics requirement', 'prerequisite', 'BUS30010', '', ''], null, 'A5');
         $prereqSheet->fromArray(['CS301', 'OR', 'Business ethics requirement', 'prerequisite', 'BUS30024', '', ''], null, 'A6');
 
-        // Add dropdown validation for Unit Code column (column A)
-        $this->addUnitCodeDropdownValidation($prereqSheet, 'A', 2, 100);
+        // Unit code validation removed to prevent Excel corruption
+        // $this->addUnitCodeDropdownValidation($prereqSheet, 'A', 2, 100);
 
         // Add dropdown validation for Group Logic column (column B)
         $this->addGroupLogicDropdownValidation($prereqSheet, 'B', 2, 100);
@@ -494,14 +494,14 @@ class UnitImportController extends Controller
         $equivSheet->fromArray(['CS101', 'COMP101', 'Course code change', 'Semester 1 2023'], null, 'A2');
         $equivSheet->fromArray(['CS201', 'COMP201', 'Course code change', 'Semester 1 2023'], null, 'A3');
 
-        // Add dropdown validations
-        $this->addUnitCodeDropdownValidation($prereqSheet, 'A', 2, 100);
+        // Add dropdown validations (unit code validations removed to prevent Excel corruption)
+        // $this->addUnitCodeDropdownValidation($prereqSheet, 'A', 2, 100);
         $this->addGroupLogicDropdownValidation($prereqSheet, 'B', 2, 100);
         $this->addTypeDropdownValidation($prereqSheet, 'D', 2, 100);
 
-        // Add validations to equivalents sheet
-        $this->addUnitCodeDropdownValidation($equivSheet, 'A', 2, 100);
-        $this->addUnitCodeDropdownValidation($equivSheet, 'B', 2, 100);
+        // Add validations to equivalents sheet (unit code validations removed)
+        // $this->addUnitCodeDropdownValidation($equivSheet, 'A', 2, 100);
+        // $this->addUnitCodeDropdownValidation($equivSheet, 'B', 2, 100);
 
         // Style all sheets
         foreach ([$unitsSheet, $prereqSheet, $equivSheet] as $sheet) {
@@ -565,7 +565,7 @@ class UnitImportController extends Controller
         $prereqSheet->fromArray(['CS301', 'OR', 'Business ethics requirement', 'prerequisite', 'BUS30024', '', ''], null, 'A6');
 
         // Add dropdown validations for Prerequisites sheet
-        $this->addUnitCodeDropdownValidation($prereqSheet, 'A', 2, 100);
+        // $this->addUnitCodeDropdownValidation($prereqSheet, 'A', 2, 100);
         $this->addGroupLogicDropdownValidation($prereqSheet, 'B', 2, 100);
         $this->addTypeDropdownValidation($prereqSheet, 'D', 2, 100);
 
@@ -709,21 +709,22 @@ class UnitImportController extends Controller
             'textual'
         ];
 
-        $validation = $worksheet->getCell($column . $startRow)->getDataValidation();
-        $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
-            ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
-            ->setAllowBlank(false)
-            ->setShowInputMessage(true)
-            ->setShowErrorMessage(true)
-            ->setShowDropDown(true)
-            ->setErrorTitle('Invalid Condition Type')
-            ->setError('Please select a valid condition type from the dropdown.')
-            ->setPromptTitle('Condition Type')
-            ->setPrompt('Select the type of prerequisite condition.')
-            ->setFormula1('"' . implode(',', $typeOptions) . '"');
-
-        // Apply validation to the range
-        $worksheet->setDataValidation($column . $startRow . ':' . $column . $endRow, $validation);
+        try {
+            $validation = $worksheet->getDataValidation($column . $startRow . ':' . $column . $endRow);
+            $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
+                ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+                ->setAllowBlank(true)
+                ->setShowInputMessage(true)
+                ->setShowErrorMessage(true)
+                ->setShowDropDown(true)
+                ->setErrorTitle('Invalid Condition Type')
+                ->setError('Please select a valid condition type from the dropdown.')
+                ->setPromptTitle('Condition Type')
+                ->setPrompt('Select the type of prerequisite condition.')
+                ->setFormula1('"' . implode(',', $typeOptions) . '"');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to add type validation: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -733,21 +734,22 @@ class UnitImportController extends Controller
     {
         $logicOptions = ['AND', 'OR'];
 
-        $validation = $worksheet->getCell($column . $startRow)->getDataValidation();
-        $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
-            ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
-            ->setAllowBlank(false)
-            ->setShowInputMessage(true)
-            ->setShowErrorMessage(true)
-            ->setShowDropDown(true)
-            ->setErrorTitle('Invalid Logic Operator')
-            ->setError('Please select either AND or OR.')
-            ->setPromptTitle('Group Logic')
-            ->setPrompt('Select the logic operator for this prerequisite group. Use AND when ALL conditions must be met, OR when ANY condition can be met.')
-            ->setFormula1('"' . implode(',', $logicOptions) . '"');
-
-        // Apply validation to the range
-        $worksheet->setDataValidation($column . $startRow . ':' . $column . $endRow, $validation);
+        try {
+            $validation = $worksheet->getDataValidation($column . $startRow . ':' . $column . $endRow);
+            $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
+                ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+                ->setAllowBlank(true)
+                ->setShowInputMessage(true)
+                ->setShowErrorMessage(true)
+                ->setShowDropDown(true)
+                ->setErrorTitle('Invalid Logic Operator')
+                ->setError('Please select either AND or OR.')
+                ->setPromptTitle('Group Logic')
+                ->setPrompt('Select the logic operator for this prerequisite group.')
+                ->setFormula1('"' . implode(',', $logicOptions) . '"');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to add group logic validation: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -1084,20 +1086,33 @@ class UnitImportController extends Controller
             $units = ['CS101', 'CS201', 'BUS30010', 'BUS30024', 'MATH101'];
         }
 
-        $validation = $worksheet->getCell($column . $startRow)->getDataValidation();
-        $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
-            ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
-            ->setAllowBlank(false)
-            ->setShowInputMessage(true)
-            ->setShowErrorMessage(true)
-            ->setShowDropDown(true)
-            ->setErrorTitle('Invalid Unit Code')
-            ->setError('Please select a valid unit code from the dropdown.')
-            ->setPromptTitle('Unit Code')
-            ->setPrompt('Select the unit code that has prerequisites.')
-            ->setFormula1('"' . implode(',', $units) . '"');
+        // Limit the number of items to prevent Excel corruption
+        $units = array_slice($units, 0, 100);
 
-        // Apply validation to the range
-        $worksheet->setDataValidation($column . $startRow . ':' . $column . $endRow, $validation);
+        // Ensure the formula string doesn't exceed Excel's limits
+        $formula = '"' . implode(',', $units) . '"';
+        if (strlen($formula) > 255) {
+            // Fallback to fewer items if formula is too long
+            $units = array_slice($units, 0, 20);
+            $formula = '"' . implode(',', $units) . '"';
+        }
+
+        try {
+            $validation = $worksheet->getDataValidation($column . $startRow . ':' . $column . $endRow);
+            $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
+                ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
+                ->setAllowBlank(true)
+                ->setShowInputMessage(true)
+                ->setShowErrorMessage(true)
+                ->setShowDropDown(true)
+                ->setErrorTitle('Invalid Unit Code')
+                ->setError('Please enter a valid unit code.')
+                ->setPromptTitle('Unit Code')
+                ->setPrompt('Enter or select a unit code.')
+                ->setFormula1($formula);
+        } catch (\Exception $e) {
+            // If validation fails, skip it to prevent corruption
+            \Illuminate\Support\Facades\Log::warning('Failed to add unit code validation: ' . $e->getMessage());
+        }
     }
 }
