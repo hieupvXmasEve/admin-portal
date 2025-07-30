@@ -194,7 +194,7 @@ const columns: ColumnDef<Attendance>[] = [
                         variant: attendance.status_badge_color as any,
                         class: 'capitalize',
                     },
-                    [h(IconComponent, { class: 'mr-1 h-3 w-3' }), attendance.status?.replace('_', ' ')],
+                    () => [h(IconComponent, { class: 'mr-1 h-3 w-3' }), attendance.status?.replace('_', ' ')],
                 ),
             ]);
         },

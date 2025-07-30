@@ -42,7 +42,7 @@ class CourseRetakeService
                 'attempt_number' => $attemptNumber,
             ]);
 
-            return $retakeRegistration->fresh(['courseOffering.unit', 'student']);
+            return $retakeRegistration->fresh(['courseOffering.curriculumUnit.unit', 'student']);
         });
     }
 
@@ -53,7 +53,7 @@ class CourseRetakeService
     {
         return $student->courseRegistrations()
             ->where('is_retake', true)
-            ->with(['courseOffering.unit', 'courseOffering.semester'])
+            ->with(['courseOffering.curriculumUnit.unit', 'courseOffering.semester'])
             ->orderBy('registration_date', 'desc')
             ->paginate(15);
     }

@@ -40,7 +40,7 @@ class CourseRegistrationController extends Controller
         $query = CourseRegistration::with([
             'student',
             'semester',
-            'courseOffering.unit',
+            'courseOffering.curriculumUnit.unit',
             'courseOffering.semester',
         ])->orderBy('created_at', 'desc');
 
@@ -230,7 +230,7 @@ class CourseRegistrationController extends Controller
     {
         $adminCourseRegistration->load([
             'student',
-            'courseOffering.unit',
+            'courseOffering.curriculumUnit.unit',
             'courseOffering.semester',
             'courseOffering.lecture',
         ]);
@@ -247,7 +247,7 @@ class CourseRegistrationController extends Controller
     {
         $adminCourseRegistration->load([
             'student',
-            'courseOffering.unit',
+            'courseOffering.curriculumUnit.unit',
             'courseOffering.semester',
             'courseOffering.lecture',
         ]);
@@ -446,7 +446,7 @@ class CourseRegistrationController extends Controller
             'semester_id' => 'nullable|exists:semesters,id',
         ]);
 
-        $query = CourseRegistration::with(['courseOffering.unit'])
+        $query = CourseRegistration::with(['courseOffering.curriculumUnit.unit'])
             ->where('student_id', $request->student_id);
 
         if ($request->filled('semester_id')) {

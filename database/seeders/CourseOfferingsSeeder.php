@@ -91,7 +91,7 @@ class CourseOfferingsSeeder extends Seeder
                 $sectionNumber++;
             }
             $sectionCode = sprintf('%02d', $sectionNumber);
-
+            $timeSlot = $this->getTimeSlot();
             // Create course offering
             CourseOffering::create([
                 'semester_id' => $activeSemester->id,
@@ -105,8 +105,8 @@ class CourseOfferingsSeeder extends Seeder
                 'current_waitlist' => 0,
                 'delivery_mode' => 'in_person',
                 'schedule_days' => $this->getScheduleDays(),
-                'schedule_time_start' => $this->getTimeSlot()['start'],
-                'schedule_time_end' => $this->getTimeSlot()['end'],
+                'schedule_time_start' => $timeSlot['start'],
+                'schedule_time_end' => $timeSlot['end'],
                 'location' => $this->getLocation(),
                 'is_active' => true,
                 'enrollment_status' => 'open',

@@ -42,7 +42,7 @@ class RegistrationController extends Controller
         }
 
         $query = CourseRegistration::with([
-            'courseOffering.unit',
+            'courseOffering.curriculumUnit.unit',
             'courseOffering.lecture',
             'semester'
         ])->where('student_id', $student->id);

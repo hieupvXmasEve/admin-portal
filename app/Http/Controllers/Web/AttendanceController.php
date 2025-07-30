@@ -21,7 +21,7 @@ class AttendanceController extends Controller
     {
         $query = Attendance::with([
             'classSession.courseOffering.curriculumUnit.unit',
-            'classSession.instructor',
+            'classSession.lecture',
             'student',
             'recordedBy',
             'verifiedBy',
@@ -208,7 +208,7 @@ class AttendanceController extends Controller
     {
         $attendance->load([
             'classSession.courseOffering.curriculumUnit.unit',
-            'classSession.instructor',
+            'classSession.lecture',
             'student',
             'recordedBy',
             'verifiedBy',

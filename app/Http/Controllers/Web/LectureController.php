@@ -142,7 +142,7 @@ class LectureController extends Controller
         $lecture->load([
             'campus',
             'courseOfferings.semester',
-            'courseOfferings.unit'
+            'courseOfferings.curriculumUnit.unit'
         ]);
 
         return Inertia::render('lectures/Show', [

@@ -163,6 +163,7 @@ class CourseOfferingController extends Controller
             ->withStatus(Room::STATUS_AVAILABLE)
             ->orderBy('building')
             ->orderBy('name')
+            ->forCampus(app('campus')->id)
             ->get(['id', 'name', 'code', 'building', 'capacity', 'type']);
 
         return Inertia::render('course-offerings/Show', [

@@ -4,13 +4,14 @@ import RoomSelectionModal from '@/components/RoomSelectionModal.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
 import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, Calendar, Clock, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 interface Props {
@@ -25,7 +26,7 @@ const props = defineProps<Props>();
 console.log(props.courseOffering);
 
 const api = useApi();
-const showStatusModal = ref(false);
+// const showStatusModal = ref(false);
 const isGenerating = ref(false);
 const classSessions = ref<ClassSession[]>(props.courseOffering.class_sessions || []);
 
@@ -367,162 +368,184 @@ const getSessionStatusVariant = (status: string) => {
     </div>
 
     <!-- Class Sessions Management -->
-    <Card>
-        <CardHeader>
-            <div class="flex items-center justify-between">
-                <CardTitle class="flex items-center gap-2">
-                    <Calendar class="h-4 w-4" />
-                    Class Sessions
-                </CardTitle>
-                <div class="flex items-center gap-2">
-                    <Button v-if="classSessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
-                        <Trash2 class="mr-2 h-4 w-4" />
-                        Delete All
-                    </Button>
-                    <RoomSelectionModal
-                        :available-rooms="availableRooms"
-                        :is-generating="isGenerating"
-                        @generate="generateClassSessions"
-                    />
+    <Collapsible >
+        <Card>
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CollapsibleTrigger asChild>
+                        <Button variant="ghost" class="w-full justify-start p-0 font-normal">
+                            <div class="flex items-center gap-2">
+                                <Calendar class="h-4 w-4" />
+                                <CardTitle class="flex items-center gap-2">
+                                    Class Sessions Management
+                                </CardTitle>
+                                <ChevronDown class="h-4 w-4 shrink-0 transition-transform duration-200 [&[data-state=open]]:rotate-180" />
+                            </div>
+                        </Button>
+                    </CollapsibleTrigger>
+                    <div class="flex items-center gap-2">
+                        <Button v-if="classSessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
+                            <Trash2 class="mr-2 h-4 w-4" />
+                            Delete All
+                        </Button>
+                        <RoomSelectionModal
+                            :available-rooms="availableRooms"
+                            :is-generating="isGenerating"
+                            @generate="generateClassSessions"
+                        />
+                    </div>
                 </div>
-            </div>
-        </CardHeader>
-        <CardContent>
-            <div v-if="classSessions.length === 0" class="py-8 text-center">
-                <Calendar class="text-muted-foreground mx-auto h-12 w-12" />
-                <h3 class="mt-2 text-sm font-semibold text-gray-900">No class sessions</h3>
-                <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class sessions based on the syllabus.</p>
-            </div>
-            <div v-else>
-                <Table class="h-20 overflow-y-auto">
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Session</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Time</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Duration</TableHead>
-                            <TableHead>Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody class="h-20 overflow-y-auto">
-                        <TableRow v-for="session in classSessions" :key="session.id">
-                            <TableCell>
-                                <div class="flex items-center gap-2">
-                                    <component :is="getSessionTypeIcon(session.session_type)" class="h-4 w-4" />
-                                    <div>
-                                        <p class="font-medium">{{ session.session_title }}</p>
-                                        <p v-if="session.session_description" class="text-muted-foreground text-sm">
-                                            {{ session.session_description }}
-                                        </p>
-                                    </div>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                {{ formatDate(session.session_date) }}
-                            </TableCell>
-                            <TableCell> {{ session.start_time }} - {{ session.end_time }} </TableCell>
-                            <TableCell>
-                                <Badge :variant="session.is_assessment ? 'secondary' : 'outline'">
-                                    {{ session.session_type.toUpperCase() }}
-                                </Badge>
-                            </TableCell>
-                            <TableCell>
-                                <Badge :variant="getSessionStatusVariant(session.status)">
-                                    {{ session.status.toUpperCase() }}
-                                </Badge>
-                            </TableCell>
-                            <TableCell class="text-muted-foreground"> {{ session.duration_minutes }} min </TableCell>
-                            <TableCell>
-                                <Link :href="classSessionRoutes.show(session.id)">
-                                    <Button variant="ghost" size="sm">
-                                        <Eye class="h-4 w-4" />
-                                    </Button>
-                                </Link>
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </div>
-        </CardContent>
-    </Card>
+            </CardHeader>
+            <CollapsibleContent>
+                <CardContent>
+                    <div v-if="classSessions.length === 0" class="py-8 text-center">
+                        <Calendar class="text-muted-foreground mx-auto h-12 w-12" />
+                        <h3 class="mt-2 text-sm font-semibold text-gray-900">No class sessions</h3>
+                        <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class sessions based on the syllabus.</p>
+                    </div>
+                    <div v-else>
+                        <Table class="h-20 overflow-y-auto">
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Session</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Time</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Duration</TableHead>
+                                    <TableHead>Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody class="h-20 overflow-y-auto">
+                                <TableRow v-for="session in classSessions" :key="session.id">
+                                    <TableCell>
+                                        <div class="flex items-center gap-2">
+                                            <component :is="getSessionTypeIcon(session.session_type)" class="h-4 w-4" />
+                                            <div>
+                                                <p class="font-medium">{{ session.session_title }}</p>
+                                                <p v-if="session.session_description" class="text-muted-foreground text-sm">
+                                                    {{ session.session_description }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {{ formatDate(session.session_date) }}
+                                    </TableCell>
+                                    <TableCell> {{ session.start_time }} - {{ session.end_time }} </TableCell>
+                                    <TableCell>
+                                        <Badge :variant="session.is_assessment ? 'secondary' : 'outline'">
+                                            {{ session.session_type.toUpperCase() }}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge :variant="getSessionStatusVariant(session.status)">
+                                            {{ session.status.toUpperCase() }}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell class="text-muted-foreground"> {{ session.duration_minutes }} min </TableCell>
+                                    <TableCell>
+                                        <Link :href="classSessionRoutes.show(session.id)">
+                                            <Button variant="ghost" size="sm">
+                                                <Eye class="h-4 w-4" />
+                                            </Button>
+                                        </Link>
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </CollapsibleContent>
+        </Card>
+    </Collapsible>
 
     <!-- Student Registration Status -->
-    <Card>
-        <CardHeader>
-            <div class="flex items-center justify-between">
-                <CardTitle class="flex items-center gap-2">
-                    <UserCheck class="h-4 w-4" />
-                    Student Registration Status
-                </CardTitle>
-                <!-- <Button
-                    v-if="courseOffering.course_registrations && courseOffering.course_registrations.length > 0"
-                    @click="showStatusModal = true"
-                    variant="outline"
-                >
-                    <UserCheck class="mr-2 h-4 w-4" />
-                    Manage Status
-                </Button> -->
-            </div>
-        </CardHeader>
-        <CardContent>
-            <div v-if="!courseOffering.course_registrations || courseOffering.course_registrations?.length === 0" class="py-8 text-center">
-                <Users class="text-muted-foreground mx-auto h-12 w-12" />
-                <h3 class="mt-2 text-sm font-semibold text-gray-900">No registrations</h3>
-                <p class="text-muted-foreground mt-1 text-sm">No students have registered for this course offering yet.</p>
-            </div>
-            <div v-else>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>No</TableHead>
-                            <TableHead>Student ID</TableHead>
-                            <TableHead>Student Name</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Registration Date</TableHead>
-                            <TableHead>Method</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        <TableRow v-for="(registration, index) in courseOffering.course_registrations" :key="registration.id">
-                            <!-- No column -->
-                            <TableCell>
-                                {{ index + 1 }}
-                            </TableCell>
-                            <TableCell class="font-medium">
-                                {{ registration.student?.student_id }}
-                            </TableCell>
-                            <TableCell>
-                                {{ registration.student?.full_name }}
-                            </TableCell>
-                            <TableCell class="text-muted-foreground">
-                                {{ registration.student?.email }}
-                            </TableCell>
-                            <TableCell>
-                                <Badge :variant="getRegistrationStatusVariant(registration.registration_status)">
-                                    {{ registration.registration_status.toUpperCase() }}
-                                </Badge>
-                            </TableCell>
-                            <TableCell class="text-muted-foreground">
-                                {{ formatDateTime(registration.registration_date) }}
-                            </TableCell>
-                            <TableCell class="text-muted-foreground">
-                                {{ registration.registration_method }}
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </div>
-        </CardContent>
-    </Card>
+    <Collapsible >
+        <Card>
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CollapsibleTrigger asChild>
+                        <Button variant="ghost" class="w-full justify-start p-0 font-normal">
+                            <div class="flex items-center gap-2">
+                                <UserCheck class="h-4 w-4" />
+                                <CardTitle class="flex items-center gap-2">
+                                    Student Registration Status
+                                </CardTitle>
+                                <ChevronDown class="h-4 w-4 shrink-0 transition-transform duration-200 [&[data-state=open]]:rotate-180" />
+                            </div>
+                        </Button>
+                    </CollapsibleTrigger>
+                    <!-- <Button
+                        v-if="courseOffering.course_registrations && courseOffering.course_registrations.length > 0"
+                        @click="showStatusModal = true"
+                        variant="outline"
+                    >
+                        <UserCheck class="mr-2 h-4 w-4" />
+                        Manage Status
+                    </Button> -->
+                </div>
+            </CardHeader>
+            <CollapsibleContent>
+                <CardContent>
+                    <div v-if="!courseOffering.course_registrations || courseOffering.course_registrations?.length === 0" class="py-8 text-center">
+                        <Users class="text-muted-foreground mx-auto h-12 w-12" />
+                        <h3 class="mt-2 text-sm font-semibold text-gray-900">No registrations</h3>
+                        <p class="text-muted-foreground mt-1 text-sm">No students have registered for this course offering yet.</p>
+                    </div>
+                    <div v-else>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>No</TableHead>
+                                    <TableHead>Student ID</TableHead>
+                                    <TableHead>Student Name</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Registration Date</TableHead>
+                                    <TableHead>Method</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow v-for="(registration, index) in courseOffering.course_registrations" :key="registration.id">
+                                    <!-- No column -->
+                                    <TableCell>
+                                        {{ index + 1 }}
+                                    </TableCell>
+                                    <TableCell class="font-medium">
+                                        {{ registration.student?.student_id }}
+                                    </TableCell>
+                                    <TableCell>
+                                        {{ registration.student?.full_name }}
+                                    </TableCell>
+                                    <TableCell class="text-muted-foreground">
+                                        {{ registration.student?.email }}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge :variant="getRegistrationStatusVariant(registration.registration_status)">
+                                            {{ registration.registration_status.toUpperCase() }}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell class="text-muted-foreground">
+                                        {{ formatDateTime(registration.registration_date) }}
+                                    </TableCell>
+                                    <TableCell class="text-muted-foreground">
+                                        {{ registration.registration_method }}
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </CollapsibleContent>
+        </Card>
+    </Collapsible>
 
     <!-- Registration Status Management Modal -->
-    <RegistrationStatusModal
-        v-if="showStatusModal"
-        :course-offering="courseOffering"
-        @close="showStatusModal = false"
-        @updated="handleStatusUpdate"
-    />
+<!--    <RegistrationStatusModal-->
+<!--        v-if="showStatusModal"-->
+<!--        :course-offering="courseOffering"-->
+<!--        @close="showStatusModal = false"-->
+<!--        @updated="handleStatusUpdate"-->
+<!--    />-->
 </template>
