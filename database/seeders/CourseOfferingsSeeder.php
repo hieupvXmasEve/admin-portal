@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CurriculumUnit;
 use App\Models\Semester;
@@ -25,6 +26,11 @@ class CourseOfferingsSeeder extends Seeder
         $lecturer = Lecture::find(1);
         if (!$lecturer) {
             throw new \Exception('Lecturer with ID 1 not found. Please ensure lecturer exists before running this seeder.');
+        }
+        // Verify campus exists
+        $campus = Campus::where('code', 'HN')->first();
+        if (!$campus) {
+            throw new \Exception('Campus with code HN not found. Please ensure campus exists before running this seeder.');
         }
 
         // Get the current active semester
@@ -91,6 +97,7 @@ class CourseOfferingsSeeder extends Seeder
                 'semester_id' => $activeSemester->id,
                 'curriculum_unit_id' => $curriculumUnit->id,
                 'lecture_id' => 1,
+                'campus_id' => 1,
                 'section_code' => $sectionCode,
                 'max_capacity' => 120,
                 'current_enrollment' => 0,

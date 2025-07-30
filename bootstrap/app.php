@@ -3,6 +3,7 @@
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\CheckCampusSelected;
+use App\Http\Middleware\SetCampus;
 use App\Http\Middleware\CheckPermissions;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\StudentMiddleware;
@@ -25,7 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
-            CheckCampusSelected::class
+            CheckCampusSelected::class,
+            SetCampus::class
         ]);
 
         // Register route middleware aliases
@@ -33,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permissions' => CheckPermissions::class,
             'admin' => AdminMiddleware::class,
             'student' => StudentMiddleware::class,
+            'campus.selected' => CheckCampusSelected::class,
             'student.api.auth' => \App\Http\Middleware\StudentApiAuthorization::class,
             'student.api.rate' => \App\Http\Middleware\StudentApiRateLimiter::class,
             'lecturer.api.auth' => \App\Http\Middleware\LecturerApiAuthorization::class,

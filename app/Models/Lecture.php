@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -400,5 +401,75 @@ class Lecture extends Authenticatable
                 ELSE 8
             END
         ");
+    }
+
+    // Teaching Assignment Scopes
+    public function scopeAvailableForTeaching(Builder $query): void
+    {
+        $query->where('is_available_for_assignment', true)
+            ->where('employment_status', 'active')
+            ->where('is_active', true);
+    }
+
+    public function scopeWithCurrentLoad(Builder $query): void
+    {
+        $query->withCount(['courseOfferings as current_course_load' => function ($query) {
+            $query->whereHas('semester', function ($semesterQuery) {
+                $semesterQuery->where('is_active', true);
+            });
+        }]);
+    }
+
+    public function scopeByFacultyAndDepartment(Builder $query, ?string $faculty = null, ?string $department = null): void
+    {
+        if ($faculty) {
+            $query->where('faculty', $faculty);
+        }
+        if ($department) {
+            $query->where('department', $department);
+        }
+    }
+
+    // Teaching Assignment Methods
+    public function hasScheduleConflictWith(CourseOffering $courseOffering): bool
+    {
+        if (!$courseOffering->schedule_days || !$courseOffering->schedule_time_start || !$courseOffering->schedule_time_end) {
+            return false;
+        }
+
+        $conflictingCourses = $this->getConflictingCourses($courseOffering);
+        return $conflictingCourses->isNotEmpty();
+    }
+
+    public function getConflictingCourses(CourseOffering $courseOffering): Collection
+    {
+        return $this->courseOfferings()
+            ->where('id', '!=', $courseOffering->id)
+            ->whereHas('semester', function ($query) use ($courseOffering) {
+                $query->where('id', $courseOffering->semester_id);
+            })
+            ->where(function ($query) use ($courseOffering) {
+                // Check for overlapping days
+                foreach ($courseOffering->schedule_days as $day) {
+                    $query->orWhereJsonContains('schedule_days', $day);
+                }
+            })
+            ->where(function ($query) use ($courseOffering) {
+                // Check for overlapping times
+                $query->where(function ($timeQuery) use ($courseOffering) {
+                    $timeQuery->where('schedule_time_start', '<', $courseOffering->schedule_time_end)
+                        ->where('schedule_time_end', '>', $courseOffering->schedule_time_start);
+                });
+            })
+            ->get();
+    }
+
+    public function getCurrentSemesterLoad(): int
+    {
+        return $this->courseOfferings()
+            ->whereHas('semester', function ($query) {
+                $query->where('is_active', true);
+            })
+            ->count();
     }
 }

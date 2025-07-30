@@ -8,6 +8,8 @@ import {
     DialogClose,
     DialogContent,
     DialogDescription,
+    DialogFooter,
+    DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
@@ -16,7 +18,7 @@ import { CheckCircle, MapPin, Users } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
 
 interface Props {
-    availableRooms: Room[];
+    availableRooms?: Room[];
     isGenerating: boolean;
 }
 
@@ -74,18 +76,18 @@ const getRoomDisplayName = (room: Room) => {
             </Button>
         </DialogTrigger>
         <DialogContent class="max-w-2xl">
-            <div class="flex flex-col space-y-1.5 text-center sm:text-left">
-                <DialogTitle class="text-lg font-semibold leading-none tracking-tight">
+            <DialogHeader>
+                <DialogTitle>
                     Select Room for Class Sessions
                 </DialogTitle>
-                <DialogDescription class="text-sm text-muted-foreground">
+                <DialogDescription>
                     Choose a room where the class sessions will be held. All generated sessions will be assigned to the selected room.
                 </DialogDescription>
-            </div>
+            </DialogHeader>
 
-                <div class="max-h-96 overflow-y-auto">
+            <div class="max-h-96 overflow-y-auto">
                     <RadioGroup v-model="selectedRoomId" class="grid gap-4">
-                        <div v-for="room in availableRooms" :key="room.id">
+                        <div v-for="room in (availableRooms || [])" :key="room.id">
                             <Label
                                 :for="`room-${room.id}`"
                                 class="cursor-pointer"
@@ -137,7 +139,7 @@ const getRoomDisplayName = (room: Room) => {
                         </div>
                     </RadioGroup>
 
-                    <div v-if="availableRooms.length === 0" class="py-8 text-center">
+                    <div v-if="!availableRooms || availableRooms.length === 0" class="py-8 text-center">
                         <Users class="mx-auto h-12 w-12 text-muted-foreground" />
                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No available rooms</h3>
                         <p class="mt-1 text-sm text-muted-foreground">
@@ -146,18 +148,17 @@ const getRoomDisplayName = (room: Room) => {
                     </div>
                 </div>
 
-                <div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
-                    <DialogClose as-child>
-                        <Button variant="outline">Cancel</Button>
-                    </DialogClose>
-                    <Button
-                        @click="handleGenerate"
-                        :disabled="!selectedRoomId || isGenerating"
-                        class="mb-2 sm:mb-0"
-                    >
-                        {{ isGenerating ? 'Generating...' : 'Generate Sessions' }}
-                    </Button>
-                </div>
+            <DialogFooter>
+                <DialogClose as-child>
+                    <Button variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button
+                    @click="handleGenerate"
+                    :disabled="!selectedRoomId || isGenerating"
+                >
+                    {{ isGenerating ? 'Generating...' : 'Generate Sessions' }}
+                </Button>
+            </DialogFooter>
             </DialogContent>
     </Dialog>
 </template>

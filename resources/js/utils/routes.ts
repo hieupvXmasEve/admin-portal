@@ -1,11 +1,13 @@
 import {
     CAMPUS_ROUTE_NAMES,
+    CLASS_SESSION_ROUTE_NAMES,
     COURSE_OFFERING_ROUTE_NAMES,
     COURSE_REGISTRATION_ROUTE_NAMES,
     CURRICULUM_ROUTE_NAMES,
     LECTURE_ROUTE_NAMES,
     PROGRAM_ROUTE_NAMES,
     ROLE_ROUTE_NAMES,
+    ROOM_ROUTE_NAMES,
     SEMESTER_ROUTE_NAMES,
     SETTINGS_ROUTE_NAMES,
     SPECIALIZATION_ROUTE_NAMES,
@@ -14,7 +16,6 @@ import {
     UNIT_ROUTE_NAMES,
     USER_ROUTE_NAMES,
 } from '@/constants';
-import { CLASS_SESSION_ROUTE_NAMES } from '@/constants/class-session-routes';
 import { route } from 'ziggy-js';
 
 /**
@@ -63,6 +64,16 @@ export const systemRoutes = {
             destroy: (campusId: number, buildingId: number) =>
                 route(CAMPUS_ROUTE_NAMES.BUILDINGS_DESTROY, { campus: campusId, building: buildingId }),
         },
+    },
+    // Room Management Routes
+    rooms: {
+        index: () => route(ROOM_ROUTE_NAMES.INDEX),
+        create: () => route(ROOM_ROUTE_NAMES.CREATE),
+        edit: (id: number) => route(ROOM_ROUTE_NAMES.EDIT, { room: id }),
+        show: (id: number) => route(ROOM_ROUTE_NAMES.SHOW, { room: id }),
+        store: () => route(ROOM_ROUTE_NAMES.STORE),
+        update: (id: number) => route(ROOM_ROUTE_NAMES.UPDATE, { room: id }),
+        destroy: (id: number) => route(ROOM_ROUTE_NAMES.DESTROY, { room: id }),
     },
 } as const;
 

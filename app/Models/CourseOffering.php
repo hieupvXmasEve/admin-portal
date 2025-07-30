@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Carbon\Carbon;
 
 class CourseOffering extends Model
@@ -153,6 +154,12 @@ class CourseOffering extends Model
     {
         return $this->hasOne(Syllabus::class, 'curriculum_unit_id', 'curriculum_unit_id')
             ->where('syllabus.is_active', true);
+    }
+
+    // Campus
+    public function campus(): BelongsTo
+    {
+        return $this->belongsTo(Campus::class);
     }
 
     // Computed Properties / Accessors
@@ -401,5 +408,84 @@ class CourseOffering extends Model
     public function getAssignedInstructorEmail(): ?string
     {
         return $this->lecture?->email;
+    }
+
+    // Teaching Assignment Scopes
+    public function scopeWithAssignmentDetails(Builder $query): void
+    {
+        $query->with([
+            'semester:id,name,code,start_date,end_date',
+            'curriculumUnit.unit:id,code,name,credit_points',
+            'lecture:id,employee_id,first_name,last_name,title,department,faculty,campus_id',
+            'lecture.campus:id,name,code'
+        ]);
+    }
+
+    public function scopeByAssignmentStatus(Builder $query, string $status): void
+    {
+        match ($status) {
+            'assigned' => $query->whereNotNull('lecture_id'),
+            'unassigned' => $query->whereNull('lecture_id'),
+            'urgent' => $query->whereNull('lecture_id')
+                ->whereHas('semester', function ($semesterQuery) {
+                    $semesterQuery->where('start_date', '<=', now());
+                }),
+            default => $query
+        };
+    }
+
+    public function scopeForTeachingAssignments(Builder $query): void
+    {
+        $query->where('is_active', true)
+            ->whereHas('semester', function ($semesterQuery) {
+                $semesterQuery->where('is_archived', false);
+            });
+    }
+
+    // Teaching Assignment Methods
+    public function getAssignmentPriority(): string
+    {
+        if ($this->hasInstructor()) {
+            return 'assigned';
+        }
+
+        if ($this->needsInstructorBeforeClasses()) {
+            return 'urgent';
+        }
+
+        // Check if semester starts soon (within 2 weeks)
+        if ($this->semester && $this->semester->start_date <= now()->addWeeks(2)) {
+            return 'high';
+        }
+
+        return 'normal';
+    }
+
+    public function canBeAssignedTo(Lecture $lecturer): bool
+    {
+        // Check if lecturer is available for assignment
+        if (!$lecturer->isAvailableForAssignment()) {
+            return false;
+        }
+
+        // Check for schedule conflicts
+        if ($lecturer->hasScheduleConflictWith($this)) {
+            return false;
+        }
+
+        // Check if lecturer has reached maximum teaching hours
+        if (
+            $lecturer->max_teaching_hours_per_week &&
+            $lecturer->getCurrentSemesterLoad() >= $lecturer->max_teaching_hours_per_week
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function getScheduleConflictsWith(Lecture $lecturer): Collection
+    {
+        return $lecturer->getConflictingCourses($this);
     }
 }
