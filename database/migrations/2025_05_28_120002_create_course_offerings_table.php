@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('semester_id')->constrained()->onDelete('cascade');
             $table->foreignId('curriculum_unit_id')->constrained()->onDelete('cascade');
             $table->foreignId('lecture_id')->nullable()->constrained('lectures')->onDelete('set null');
+            $table->foreignId('campus_id')->nullable()->constrained('campuses')->onDelete('set null');
 
             $table->string('section_code', 10)->nullable(); // e.g., "A", "B", "01", "02"
             $table->integer('max_capacity')->default(1000);

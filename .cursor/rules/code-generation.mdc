@@ -1,9 +1,6 @@
 ---
-description:
-globs:
-alwaysApply: true
+alwaysApply: false
 ---
-
 # Code Generation Standards
 
 Strict rules for all AI-generated code in this Vue 3 + Inertia + Laravel project.

@@ -11,6 +11,7 @@ import {
     CheckSquare,
     ClipboardList,
     Clock,
+    DoorOpen,
     FileSpreadsheet,
     FileText,
     GraduationCap,
@@ -84,6 +85,12 @@ export const mainNavItems: NavItem[] = [
                 icon: Building2,
                 requiredPermissions: ['view_campus'], // Will be implemented later
             },
+            {
+                title: 'Room Management',
+                href: systemRoutes.rooms.index(),
+                icon: DoorOpen,
+                requiredPermissions: ['view_room'],
+            },
         ],
     },
     {
@@ -152,12 +159,12 @@ export const mainNavItems: NavItem[] = [
                 icon: Users,
                 requiredPermissions: ['view_lecturer'], // Will be implemented later
             },
-            {
-                title: 'Teaching Assignments',
-                href: lecturerRoutes.index(), // Placeholder
-                icon: BookOpen,
-                requiredPermissions: ['view_lecturer'], // Will be implemented later
-            },
+            // {
+            //     title: 'Teaching Assignments',
+            //     href: '/teaching-assignments',
+            //     icon: BookOpen,
+            //     requiredPermissions: ['view_teaching_assignment'],
+            // },
             {
                 title: 'Lecturer Timetable',
                 href: lecturerRoutes.index(), // Placeholder

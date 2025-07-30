@@ -1,7 +1,5 @@
 ---
-description:
-globs:
-alwaysApply: true
+alwaysApply: false
 ---
 **Objective:**
 Strictly follow the `Service-Request-Resource Pattern` when implementing or modifying any module in a Laravel application. Ensure the codebase is well-structured, maintainable, and scalable.

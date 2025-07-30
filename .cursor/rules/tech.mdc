@@ -1,9 +1,6 @@
 ---
-description:
-globs:
-alwaysApply: true
+alwaysApply: false
 ---
-
 # Technology Stack & Build System
 
 ## Backend

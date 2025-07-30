@@ -156,6 +156,15 @@ return [
             'delete_lecturer' => 'delete_lecturer',
         ],
 
+        // Teaching Assignment Management
+        'teaching_assignments' => [
+            'view_teaching_assignment' => 'view_teaching_assignment',
+            'assign_lecturer' => 'assign_lecturer',
+            'unassign_lecturer' => 'unassign_lecturer',
+            'export_teaching_assignment' => 'export_teaching_assignment',
+            'manage_teaching_assignment' => 'manage_teaching_assignment',
+        ],
+
         // Assessment Management
         'assessments' => [
             'view_assessment' => 'view_assessment',
@@ -175,7 +184,7 @@ return [
         'student_activities' => ['groups', 'events', 'clubs'],
         'financial' => ['fees'],
         'reporting' => ['queries'],
-        'teaching' => ['assessments'],
+        'teaching' => ['assessments', 'teaching_assignments'],
     ],
 
     'actions' => [
