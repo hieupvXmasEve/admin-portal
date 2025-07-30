@@ -29,7 +29,7 @@ class SemesterEnrollmentController extends Controller
     public function show(Semester $semester): Response
     {
 
-        $semester->load(['enrollments.student.curriculumVersion', 'courseOfferings.unit']);
+        $semester->load(['enrollments.student.curriculumVersion', 'courseOfferings.curriculumUnit.unit']);
 
         $enrollmentStats = [
             'total_enrolled' => $semester->enrollments()->count(),
@@ -438,11 +438,11 @@ class SemesterEnrollmentController extends Controller
     {
         try {
             $query = CourseOffering::where('semester_id', $semester->id)
-                ->with(['unit', 'lecture', 'courseRegistrations.student']);
+                ->with(['curriculumUnit.unit', 'lecture', 'courseRegistrations.student']);
 
             // Apply filters
             if ($request->filled('unit_id')) {
-                $query->whereHas('curriculumUnit', function ($q) use ($request) {
+                $query->whereHas('curriculumUnit.unit', function ($q) use ($request) {
                     $q->where('unit_id', $request->unit_id);
                 });
             }

@@ -32,7 +32,7 @@ class AcademicRecordSeeder extends Seeder
         // Get all course registrations for FALL2024
         $registrations = CourseRegistration::where('semester_id', $semester->id)
             ->where('registration_status', 'registered')
-            ->with(['student', 'courseOffering.unit'])
+            ->with(['student', 'courseOffering.curriculumUnit.unit'])
             ->get();
 
         if ($registrations->isEmpty()) {

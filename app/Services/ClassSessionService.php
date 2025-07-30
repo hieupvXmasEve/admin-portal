@@ -346,7 +346,7 @@ class ClassSessionService
     {
         $query = ClassSession::with([
             'courseOffering.curriculumUnit.unit',
-            'instructor',
+            'lecture',
             'attendances',
         ])->orderBy('session_date', 'desc')
             ->orderBy('start_time', 'desc');
@@ -363,7 +363,7 @@ class ClassSessionService
     {
         return ClassSession::with([
             'courseOffering.curriculumUnit.unit',
-            'instructor',
+            'lecture',
             'attendances.student',
         ])->find($sessionId);
     }
@@ -387,7 +387,7 @@ class ClassSessionService
      */
     public function getSessionsByStatus(string $status, ?int $limit = null): Collection
     {
-        $query = ClassSession::with(['courseOffering.curriculumUnit.unit', 'instructor'])
+        $query = ClassSession::with(['courseOffering.curriculumUnit.unit', 'lecture'])
             ->where('status', $status)
             ->orderBy('session_date', 'desc');
 
@@ -474,7 +474,7 @@ class ClassSessionService
                         $q->where('code', 'like', "%{$search}%")
                             ->orWhere('name', 'like', "%{$search}%");
                     })
-                    ->orWhereHas('instructor', function ($q) use ($search) {
+                    ->orWhereHas('lecture', function ($q) use ($search) {
                         $q->where('name', 'like', "%{$search}%");
                     });
             });
@@ -504,8 +504,8 @@ class ClassSessionService
             $query->where('course_offering_id', $filters['course_offering_id']);
         }
 
-        if (! empty($filters['instructor_id'])) {
-            $query->where('instructor_id', $filters['instructor_id']);
+        if (! empty($filters['lecture_id'])) {
+            $query->where('lecture_id', $filters['lecture_id']);
         }
 
         if (isset($filters['attendance_required'])) {

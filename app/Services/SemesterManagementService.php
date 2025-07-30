@@ -289,7 +289,7 @@ class SemesterManagementService
         // Calculate full-time vs part-time based on credit hours
         $registrations = $semester->courseRegistrations()
             ->active()
-            ->with('courseOffering.unit')
+            ->with('courseOffering.curriculumUnit.unit')
             ->get()
             ->groupBy('student_id');
 

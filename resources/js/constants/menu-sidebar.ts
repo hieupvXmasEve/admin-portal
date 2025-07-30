@@ -195,23 +195,23 @@ export const mainNavItems: NavItem[] = [
                 requiredPermissions: ['view_curriculum_version'],
             },
             {
-                title: 'Units (Courses)',
+                title: 'Units',
                 href: curriculumRoutes.units.index(),
                 icon: BookMarked,
                 requiredPermissions: ['view_unit'],
             },
-            {
-                title: 'Equivalent/Substitute Courses',
-                href: curriculumRoutes.equivalentCourses(),
-                icon: RefreshCw,
-                requiredPermissions: ['view_unit'], // Will be implemented later
-            },
-            {
-                title: 'Curriculum Structure',
-                href: curriculumRoutes.curriculumStructure(),
-                icon: Layers,
-                requiredPermissions: ['view_curriculum_version'], // Will be implemented later
-            },
+            // {
+            //     title: 'Equivalent/Substitute Courses',
+            //     href: curriculumRoutes.equivalentCourses(),
+            //     icon: RefreshCw,
+            //     requiredPermissions: ['view_unit'], // Will be implemented later
+            // },
+            // {
+            //     title: 'Curriculum Structure',
+            //     href: curriculumRoutes.curriculumStructure(),
+            //     icon: Layers,
+            //     requiredPermissions: ['view_curriculum_version'], // Will be implemented later
+            // },
         ],
     },
     {
@@ -225,12 +225,12 @@ export const mainNavItems: NavItem[] = [
                 icon: BookOpen,
                 requiredPermissions: ['view_course_offering'],
             },
-            {
-                title: 'Room & Instructor Assignment',
-                href: courseRoutes.roomAssignment(),
-                icon: MapPin,
-                requiredPermissions: ['edit_course_offering'], // Will be implemented later
-            },
+            // {
+            //     title: 'Room & Instructor Assignment',
+            //     href: courseRoutes.roomAssignment(),
+            //     icon: MapPin,
+            //     requiredPermissions: ['edit_course_offering'], // Will be implemented later
+            // },
             {
                 title: 'Class Schedule',
                 href: courseRoutes.classSchedule(),
@@ -243,12 +243,12 @@ export const mainNavItems: NavItem[] = [
                 icon: UserPlus,
                 requiredPermissions: ['view_course_registration'],
             },
-            {
-                title: 'Enrollment Summary',
-                href: courseRoutes.enrollmentSummary(),
-                icon: BarChart3,
-                requiredPermissions: ['view_course_registration'], // Will be implemented later
-            },
+            // {
+            //     title: 'Enrollment Summary',
+            //     href: courseRoutes.enrollmentSummary(),
+            //     icon: BarChart3,
+            //     requiredPermissions: ['view_course_registration'], // Will be implemented later
+            // },
         ],
     },
     {
@@ -262,24 +262,24 @@ export const mainNavItems: NavItem[] = [
                 icon: CalendarIcon,
                 requiredPermissions: ['view_attendance'], // Will be implemented later
             },
-            {
-                title: 'Take Attendance',
-                href: attendanceRoutes.attendance.create(),
-                icon: CheckSquare,
-                requiredPermissions: ['edit_attendance'], // Will be implemented later
-            },
+            // {
+            //     title: 'Take Attendance',
+            //     href: attendanceRoutes.attendance.create(),
+            //     icon: CheckSquare,
+            //     requiredPermissions: ['edit_attendance'], // Will be implemented later
+            // },
             {
                 title: 'Attendance Reports',
                 href: attendanceRoutes.attendance.index(),
                 icon: FileText,
                 requiredPermissions: ['view_attendance'], // Will be implemented later
             },
-            {
-                title: 'GPS & Method Tracking',
-                href: attendanceRoutes.attendance.index(),
-                icon: MapPin,
-                requiredPermissions: ['view_attendance'], // Will be implemented later
-            },
+            // {
+            //     title: 'GPS & Method Tracking',
+            //     href: attendanceRoutes.attendance.index(),
+            //     icon: MapPin,
+            //     requiredPermissions: ['view_attendance'], // Will be implemented later
+            // },
         ],
     },
     {
