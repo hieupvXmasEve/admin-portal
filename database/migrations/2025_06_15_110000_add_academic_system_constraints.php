@@ -11,6 +11,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Skip constraints for SQLite (used in testing)
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Add check constraints to ensure data integrity
 
         // Rooms table constraints

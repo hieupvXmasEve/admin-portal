@@ -13,10 +13,13 @@ use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\ProgramController;
 use App\Http\Controllers\Api\SyllabusController;
 use App\Http\Controllers\Api\ClassSessionController;
+use App\Http\Controllers\Api\AdminScheduleController;
 
 // Admin API routes (for internal use)
-Route::name('api.admin.')->middleware(['auth:sanctum'])->group(function () {
+Route::middleware(['auth'])->name('api.admin.')->group(function () {
     // Student Management
     Route::get('/students', [StudentController::class, 'index'])->name('students.index');
     Route::get('/students/stats', [StudentController::class, 'stats'])->name('students.stats');
+
+    // Other admin API routes can go here if needed
 });

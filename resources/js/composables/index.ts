@@ -1,6 +1,10 @@
 // API composables
 export { useApi } from './useApiRequest';
 
+// Schedule management composables
+export { useAdminSchedule } from './useAdminSchedule';
+export { useScheduleManagement } from './useScheduleManagement';
+
 // Global dialog composables
 export { useGlobalDeleteDialog } from './useGlobalDeleteDialog';
 export type { DeleteDialogCallbacks, DeleteDialogOptions } from './useGlobalDeleteDialog';

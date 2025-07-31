@@ -77,3 +77,14 @@ require __DIR__ . '/web/teaching-assignments.php';
 require __DIR__ . '/web/student-management.php';
 require __DIR__ . '/web/class-sessions.php';
 require __DIR__ . '/web/attendance.php';
+require __DIR__ . '/web/class-schedule.php';
+
+// Admin Schedule API routes (using web auth for SPA)
+Route::middleware(['auth', 'verified'])->name('api.admin.')->group(function () {
+    Route::prefix('api/admin/schedules')->name('schedules.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\AdminScheduleController::class, 'index'])->name('index');
+        Route::get('/filter-options', [\App\Http\Controllers\Api\AdminScheduleController::class, 'filterOptions'])->name('filter-options');
+        Route::get('/{session}', [\App\Http\Controllers\Api\AdminScheduleController::class, 'show'])->name('show');
+        Route::patch('/{session}', [\App\Http\Controllers\Api\AdminScheduleController::class, 'update'])->name('update');
+    });
+});

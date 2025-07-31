@@ -39,8 +39,16 @@ class LecturerApiRateLimiter
         // Add rate limit headers to successful responses
         $remaining = RateLimiter::remaining($key, $limits['maxAttempts']);
         
-        return $response->header('X-RateLimit-Limit', $limits['maxAttempts'])
-                       ->header('X-RateLimit-Remaining', max(0, $remaining));
+        // Handle different response types for rate limit headers
+        if ($response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse) {
+            $response->headers->set('X-RateLimit-Limit', (string) $limits['maxAttempts']);
+            $response->headers->set('X-RateLimit-Remaining', (string) max(0, $remaining));
+        } else {
+            $response->header('X-RateLimit-Limit', $limits['maxAttempts'])
+                    ->header('X-RateLimit-Remaining', max(0, $remaining));
+        }
+        
+        return $response;
     }
 
     /**

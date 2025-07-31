@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import RegistrationStatusModal from '@/components/RegistrationStatusModal.vue';
 import RoomSelectionModal from '@/components/RoomSelectionModal.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
+
 interface Props {
     courseOffering: CourseOffering & {
         course_registrations: CourseRegistration[];
@@ -270,7 +270,9 @@ const getSessionStatusVariant = (status: string) => {
 
                 <div>
                     <p class="text-muted-foreground text-sm font-medium">Available Spots</p>
-                    <p class="text-lg font-semibold">{{ Math.max(0, courseOffering.max_capacity - courseOffering.current_enrollment) }}</p>
+                    <p class="text-lg font-semibold">
+                        {{ Math.max(0, courseOffering.max_capacity - courseOffering.current_enrollment) }}
+                    </p>
                 </div>
             </CardContent>
         </Card>
@@ -368,7 +370,7 @@ const getSessionStatusVariant = (status: string) => {
     </div>
 
     <!-- Class Sessions Management -->
-    <Collapsible >
+    <Collapsible>
         <Card>
             <CardHeader>
                 <div class="flex items-center justify-between">
@@ -376,24 +378,11 @@ const getSessionStatusVariant = (status: string) => {
                         <Button variant="ghost" class="w-full justify-start p-0 font-normal">
                             <div class="flex items-center gap-2">
                                 <Calendar class="h-4 w-4" />
-                                <CardTitle class="flex items-center gap-2">
-                                    Class Sessions Management
-                                </CardTitle>
+                                <CardTitle class="flex items-center gap-2"> Class Sessions Management </CardTitle>
                                 <ChevronDown class="h-4 w-4 shrink-0 transition-transform duration-200 [&[data-state=open]]:rotate-180" />
                             </div>
                         </Button>
                     </CollapsibleTrigger>
-                    <div class="flex items-center gap-2">
-                        <Button v-if="classSessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
-                            <Trash2 class="mr-2 h-4 w-4" />
-                            Delete All
-                        </Button>
-                        <RoomSelectionModal
-                            :available-rooms="availableRooms"
-                            :is-generating="isGenerating"
-                            @generate="generateClassSessions"
-                        />
-                    </div>
                 </div>
             </CardHeader>
             <CollapsibleContent>
@@ -401,7 +390,16 @@ const getSessionStatusVariant = (status: string) => {
                     <div v-if="classSessions.length === 0" class="py-8 text-center">
                         <Calendar class="text-muted-foreground mx-auto h-12 w-12" />
                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No class sessions</h3>
-                        <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class sessions based on the syllabus.</p>
+                        <p class="text-muted-foreground mt-1 text-sm">
+                            Click "Auto-Generate Sessions" to create class sessions based on the syllabus.
+                        </p>
+                        <div class="mt-1 flex items-center justify-center gap-2">
+                            <Button v-if="classSessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
+                                <Trash2 class="mr-2 h-4 w-4" />
+                                Delete All
+                            </Button>
+                            <RoomSelectionModal :available-rooms="availableRooms" :is-generating="isGenerating" @generate="generateClassSessions" />
+                        </div>
                     </div>
                     <div v-else>
                         <Table class="h-20 overflow-y-auto">
@@ -432,7 +430,7 @@ const getSessionStatusVariant = (status: string) => {
                                     <TableCell>
                                         {{ formatDate(session.session_date) }}
                                     </TableCell>
-                                    <TableCell> {{ session.start_time }} - {{ session.end_time }} </TableCell>
+                                    <TableCell> {{ session.start_time }} - {{ session.end_time }}</TableCell>
                                     <TableCell>
                                         <Badge :variant="session.is_assessment ? 'secondary' : 'outline'">
                                             {{ session.session_type.toUpperCase() }}
@@ -461,7 +459,7 @@ const getSessionStatusVariant = (status: string) => {
     </Collapsible>
 
     <!-- Student Registration Status -->
-    <Collapsible >
+    <Collapsible>
         <Card>
             <CardHeader>
                 <div class="flex items-center justify-between">
@@ -469,9 +467,7 @@ const getSessionStatusVariant = (status: string) => {
                         <Button variant="ghost" class="w-full justify-start p-0 font-normal">
                             <div class="flex items-center gap-2">
                                 <UserCheck class="h-4 w-4" />
-                                <CardTitle class="flex items-center gap-2">
-                                    Student Registration Status
-                                </CardTitle>
+                                <CardTitle class="flex items-center gap-2"> Student Registration Status </CardTitle>
                                 <ChevronDown class="h-4 w-4 shrink-0 transition-transform duration-200 [&[data-state=open]]:rotate-180" />
                             </div>
                         </Button>
@@ -542,10 +538,10 @@ const getSessionStatusVariant = (status: string) => {
     </Collapsible>
 
     <!-- Registration Status Management Modal -->
-<!--    <RegistrationStatusModal-->
-<!--        v-if="showStatusModal"-->
-<!--        :course-offering="courseOffering"-->
-<!--        @close="showStatusModal = false"-->
-<!--        @updated="handleStatusUpdate"-->
-<!--    />-->
+    <!--    <RegistrationStatusModal-->
+    <!--        v-if="showStatusModal"-->
+    <!--        :course-offering="courseOffering"-->
+    <!--        @close="showStatusModal = false"-->
+    <!--        @updated="handleStatusUpdate"-->
+    <!--    />-->
 </template>

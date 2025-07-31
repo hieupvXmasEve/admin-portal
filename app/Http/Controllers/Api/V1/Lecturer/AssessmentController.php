@@ -11,6 +11,7 @@ use App\Http\Requests\StoreAssessmentDetailRequest;
 use App\Http\Requests\UpdateAssessmentDetailRequest;
 use App\Http\Requests\UpdateGradeRequest;
 use App\Http\Requests\BulkUpdateGradesRequest;
+use App\Http\Requests\ImportGradesRequest;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
 use App\Models\AssessmentComponent;
@@ -19,9 +20,11 @@ use App\Models\AssessmentComponentDetailScore;
 use App\Models\Student;
 use App\Services\AssessmentManagementService;
 use App\Services\AssessmentWeightValidationService;
+use App\Services\AssessmentGradeExcelService;
 use App\Http\Resources\Api\V1\WeightValidationResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -808,7 +811,7 @@ class AssessmentController extends Controller
                         }
 
                         // Remove ID from update data
-                        $updateData = array_except($scoreData, ['id']);
+                        $updateData = collect($scoreData)->except(['id'])->toArray();
 
                         // Update the score
                         $score->update($updateData);
@@ -910,11 +913,163 @@ class AssessmentController extends Controller
     }
 
     /**
+     * Export grade template for an assessment component detail
+     */
+    public function exportGradeTemplate(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): BinaryFileResponse|JsonResponse
+    {
+        /** @var \App\Models\Lecture $lecturer */
+        $lecturer = $request->user();
+
+        try {
+            // Check authorization
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+                return ApiResponse::error(
+                    'Unauthorized access to course offering',
+                    [],
+                    'UNAUTHORIZED',
+                    403
+                );
+            }
+
+            // Verify the assessment component detail belongs to this course offering
+            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+                return ApiResponse::error(
+                    'Assessment component detail does not belong to this course offering',
+                    [],
+                    'INVALID_ASSESSMENT',
+                    400
+                );
+            }
+
+            // Use service to export grade template
+            $excelService = app(AssessmentGradeExcelService::class);
+            $filePath = $excelService->exportGradeTemplate($assessmentComponentDetail, $courseOffering);
+
+            // Return file download response
+            return response()->download($filePath, basename($filePath), [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to export grade template', [
+                'course_offering_id' => $courseOffering->id,
+                'assessment_component_detail_id' => $assessmentComponentDetail->id,
+                'lecturer_id' => $lecturer->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return ApiResponse::error(
+                'Failed to export grade template',
+                [],
+                'SERVER_ERROR',
+                500
+            );
+        }
+    }
+
+    /**
+     * Import grades from Excel file for an assessment component detail
+     */
+    public function importGrades(ImportGradesRequest $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
+    {
+        /** @var \App\Models\Lecture $lecturer */
+        $lecturer = $request->user();
+
+        try {
+            // Check authorization
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+                return ApiResponse::error(
+                    'Unauthorized access to course offering',
+                    [],
+                    'UNAUTHORIZED',
+                    403
+                );
+            }
+
+            // Verify the assessment component detail belongs to this course offering
+            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+                return ApiResponse::error(
+                    'Assessment component detail does not belong to this course offering',
+                    [],
+                    'INVALID_ASSESSMENT',
+                    400
+                );
+            }
+
+            // Get validated data with defaults
+            $validated = $request->validatedWithDefaults();
+            $file = $request->file('file');
+
+            // Use service to import grades
+            $excelService = app(AssessmentGradeExcelService::class);
+            $importResults = $excelService->importGrades(
+                $assessmentComponentDetail,
+                $courseOffering,
+                $file,
+                $validated,
+                $lecturer->id
+            );
+
+            // Determine response based on results
+            $hasErrors = !empty($importResults['errors']);
+            $hasWarnings = !empty($importResults['warnings']);
+
+            if ($hasErrors && $importResults['successful_updates'] === 0 && $importResults['successful_creates'] === 0) {
+                return ApiResponse::error(
+                    'Grade import failed',
+                    $importResults,
+                    'IMPORT_FAILED',
+                    422
+                );
+            }
+
+            if ($hasErrors || $hasWarnings) {
+                return ApiResponse::success(
+                    $importResults,
+                    'Grade import completed with some issues'
+                );
+            }
+
+            return ApiResponse::success(
+                $importResults,
+                'Grade import completed successfully'
+            );
+
+        } catch (\Exception $e) {
+            Log::error('Failed to import grades', [
+                'course_offering_id' => $courseOffering->id,
+                'assessment_component_detail_id' => $assessmentComponentDetail->id,
+                'lecturer_id' => $lecturer->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return ApiResponse::error(
+                'Failed to import grades',
+                [],
+                'SERVER_ERROR',
+                500
+            );
+        }
+    }
+
+    /**
      * Check if lecturer can access the course offering
      */
     private function canAccessCourseOffering($lecturer, CourseOffering $courseOffering): bool
     {
         return $courseOffering->lecture_id === $lecturer->id;
+    }
+
+    /**
+     * Check if assessment component detail belongs to the course offering
+     */
+    private function assessmentBelongsToCourse(AssessmentComponentDetail $assessmentComponentDetail, CourseOffering $courseOffering): bool
+    {
+        return $assessmentComponentDetail->assessmentComponent
+            && $assessmentComponentDetail->assessmentComponent->syllabus
+            && $assessmentComponentDetail->assessmentComponent->syllabus->curriculum_unit_id === $courseOffering->curriculum_unit_id;
     }
 
     /**
