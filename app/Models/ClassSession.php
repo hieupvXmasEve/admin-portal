@@ -88,6 +88,11 @@ class ClassSession extends Model
     {
         return $this->belongsTo(Lecture::class, 'lecture_id');
     }
+    // Rooms
+    public function room(): BelongsTo
+    {
+        return $this->belongsTo(Room::class);
+    }
 
     // Scopes
     public function scopeByStatus($query, string $status)

@@ -7,20 +7,30 @@ import { createFetch } from '@vueuse/core';
 const useApiRequest = createFetch({
     baseUrl: '',
     options: {
+        credentials: 'include', // Include cookies for Laravel Sanctum session auth
         beforeFetch({ options }) {
             const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
             options.headers = {
                 ...options.headers,
                 'Content-Type': 'application/json',
-                Accept: 'application/json',
+                'Accept': 'application/json',
                 'X-CSRF-TOKEN': token || '',
+                'X-Requested-With': 'XMLHttpRequest', // Laravel SPA authentication requirement
             };
+
+            // Ensure credentials are included for session-based auth
+            options.credentials = 'include';
 
             return { options };
         },
-        onFetchError({ error, data }) {
-            console.error('API Request Error:', error);
+        onFetchError({ error, data, response }) {
+            console.error('API Request Error:', {
+                error,
+                data,
+                status: response?.status,
+                statusText: response?.statusText,
+            });
             return { error, data };
         },
     },
@@ -87,12 +97,14 @@ export function useApi() {
      * GET request
      * @param url - API endpoint URL
      * @param params - Query parameters
+     * @param options - Additional options including AbortController
      * @returns Promise with standardized API response
      */
-    const get = async <T = any>(url: string, params?: Record<string, any>) => {
+    const get = async <T = any>(url: string, params?: Record<string, any>, options?: { signal?: AbortSignal }) => {
         const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
         return useApiRequest(url + queryString, {
             method: 'GET',
+            signal: options?.signal,
         })
             .get()
             .json<ApiResponse<T>>();

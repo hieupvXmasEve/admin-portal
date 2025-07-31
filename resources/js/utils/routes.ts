@@ -186,7 +186,7 @@ export const courseRoutes = {
     },
     // Placeholder for future features
     roomAssignment: () => '#', // Will be implemented later
-    classSchedule: () => '#',
+    classSchedule: () => route('schedules.index'),
     enrollmentSummary: () => '#',
 } as const;
 

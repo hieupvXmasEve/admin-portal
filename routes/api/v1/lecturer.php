@@ -165,5 +165,9 @@ Route::middleware([
 
         // Assessment weight validation endpoint
         Route::get('/validate-weights', [AssessmentController::class, 'validateWeights'])->name('validate-weights');
+
+        // Excel grade management endpoints
+        Route::get('/details/{assessmentComponentDetail}/export-template', [AssessmentController::class, 'exportGradeTemplate'])->name('export-grade-template');
+        Route::post('/details/{assessmentComponentDetail}/import-grades', [AssessmentController::class, 'importGrades'])->name('import-grades');
     });
 });

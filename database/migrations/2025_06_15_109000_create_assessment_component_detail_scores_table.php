@@ -125,7 +125,7 @@ return new class extends Migration
             $table->unique(['assessment_component_detail_id', 'student_id', 'course_offering_id', 'submission_attempt'], 'unique_detail_student_course_attempt');
 
             // Indexes for GPA calculations and transcript generation
-            $table->index(['student_id', 'score_status', 'score_excluded', 'gpa_points'], 'student_gpa_calc_idx');
+            $table->index(['student_id', 'score_status', 'score_excluded', 'gpa_points'], 'student_score_gpa_calc_idx');
             $table->index(['student_id', 'graded_at', 'score_status'], 'student_transcript_idx');
         });
     }

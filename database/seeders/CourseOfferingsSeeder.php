@@ -182,7 +182,7 @@ class CourseOfferingsSeeder extends Seeder
             ['Friday'],
         ];
 
-        return $dayOptions[array_rand($dayOptions)];
+        return $dayOptions[2];
     }
 
     /**
@@ -198,7 +198,7 @@ class CourseOfferingsSeeder extends Seeder
             ['start' => '17:00:00', 'end' => '19:00:00'],
         ];
 
-        return $timeSlots[array_rand($timeSlots)];
+        return $timeSlots[1];
     }
 
     /**

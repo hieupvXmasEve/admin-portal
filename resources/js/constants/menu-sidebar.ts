@@ -74,12 +74,6 @@ export const mainNavItems: NavItem[] = [
                 requiredPermissions: ['view_role'],
             },
             {
-                title: 'Academic Terms',
-                href: systemRoutes.semesters.index(),
-                icon: Calendar,
-                requiredPermissions: ['view_semester'],
-            },
-            {
                 title: 'Campuses & Departments',
                 href: systemRoutes.campuses.index(),
                 icon: Building2,
@@ -94,90 +88,16 @@ export const mainNavItems: NavItem[] = [
         ],
     },
     {
-        title: 'Student Management',
-        href: '#',
-        icon: User,
-        children: [
-            {
-                title: 'Student List',
-                href: studentRoutes.list(),
-                icon: Users,
-                requiredPermissions: ['view_student'],
-            },
-            {
-                title: 'New Students',
-                href: studentRoutes.newStudents(),
-                icon: UserPlus,
-                requiredPermissions: ['view_student'],
-            },
-            {
-                title: 'Academic Records',
-                href: studentRoutes.academicRecords(), // Placeholder
-                icon: FileText,
-                requiredPermissions: ['view_student'], // Will be implemented later
-            },
-            {
-                title: 'Program/Specialization Change',
-                href: studentRoutes.programChange(), // Placeholder
-                icon: RefreshCw,
-                requiredPermissions: ['edit_student'], // Will be implemented later
-            },
-            {
-                title: 'Repeat/Retake Courses',
-                href: studentRoutes.repeatCourses(), // Placeholder
-                icon: Repeat,
-                requiredPermissions: ['edit_student'], // Will be implemented later
-            },
-            {
-                title: 'Academic Standing',
-                href: studentRoutes.academicStanding(), // Placeholder
-                icon: TrendingUp,
-                requiredPermissions: ['view_student'], // Will be implemented later
-            },
-            {
-                title: 'Enrollments & Holds',
-                href: studentRoutes.enrollments(), // Placeholder
-                icon: ClipboardList,
-                requiredPermissions: ['view_student'], // Will be implemented later
-            },
-            {
-                title: 'Student Status Tracking',
-                href: studentRoutes.statusTracking(),
-                icon: UserCheck,
-                requiredPermissions: ['view_student'], // Will be implemented later
-            },
-        ],
-    },
-    {
-        title: 'Lecturer Management',
-        href: '#',
-        icon: GraduationCap,
-        children: [
-            {
-                title: 'Lecturer List',
-                href: lecturerRoutes.index(),
-                icon: Users,
-                requiredPermissions: ['view_lecturer'], // Will be implemented later
-            },
-            // {
-            //     title: 'Teaching Assignments',
-            //     href: '/teaching-assignments',
-            //     icon: BookOpen,
-            //     requiredPermissions: ['view_teaching_assignment'],
-            // },
-            {
-                title: 'Lecturer Timetable',
-                href: lecturerRoutes.index(), // Placeholder
-                icon: CalendarIcon,
-                requiredPermissions: ['view_lecturer'], // Will be implemented later
-            },
-        ],
-    },
-    {
         title: 'Curriculum & Courses',
         href: '#',
         icon: BookOpen,
         children: [
+            {
+                title: 'Academic Terms',
+                href: systemRoutes.semesters.index(),
+                icon: Calendar,
+                requiredPermissions: ['view_semester'],
+            },
             {
                 title: 'Programs',
                 href: curriculumRoutes.programs.index(),
@@ -214,6 +134,88 @@ export const mainNavItems: NavItem[] = [
             // },
         ],
     },
+    {
+        title: 'Student Management',
+        href: '#',
+        icon: User,
+        children: [
+            {
+                title: 'Student List',
+                href: studentRoutes.list(),
+                icon: Users,
+                requiredPermissions: ['view_student'],
+            },
+            // {
+            //     title: 'New Students',
+            //     href: studentRoutes.newStudents(),
+            //     icon: UserPlus,
+            //     requiredPermissions: ['view_student'],
+            // },
+            {
+                title: 'Enrollments & Holds',
+                href: studentRoutes.enrollments(), // Placeholder
+                icon: ClipboardList,
+                requiredPermissions: ['view_student'], // Will be implemented later
+            },
+            {
+                title: 'Academic Records',
+                href: studentRoutes.academicRecords(), // Placeholder
+                icon: FileText,
+                requiredPermissions: ['view_student'], // Will be implemented later
+            },
+            {
+                title: 'Program/Specialization Change',
+                href: '#', // Placeholder
+                icon: RefreshCw,
+                requiredPermissions: ['edit_student'], // Will be implemented later
+            },
+            {
+                title: 'Repeat/Retake Courses',
+                href: '#', // Placeholder
+                icon: Repeat,
+                requiredPermissions: ['edit_student'], // Will be implemented later
+            },
+            {
+                title: 'Academic Standing',
+                href: '#', // Placeholder
+                icon: TrendingUp,
+                requiredPermissions: ['view_student'], // Will be implemented later
+            },
+
+            {
+                title: 'Student Status Tracking',
+                href: studentRoutes.statusTracking(),
+                icon: UserCheck,
+                requiredPermissions: ['view_student'], // Will be implemented later
+            },
+        ],
+    },
+    {
+        title: 'Lecturer Management',
+        href: '#',
+        icon: GraduationCap,
+        children: [
+            {
+                title: 'Lecturer List',
+                href: lecturerRoutes.index(),
+                icon: Users,
+                requiredPermissions: ['view_lecturer'], // Will be implemented later
+            },
+            // {
+            //     title: 'Teaching Assignments',
+            //     href: '/teaching-assignments',
+            //     icon: BookOpen,
+            //     requiredPermissions: ['view_teaching_assignment'],
+            // },
+            // {
+            //     title: 'Lecturer Timetable',
+            //     href: lecturerRoutes.index(), // Placeholder
+            //     icon: CalendarIcon,
+            //     requiredPermissions: ['view_lecturer'], // Will be implemented later
+            // },
+        ],
+    },
+
     {
         title: 'Course Offerings & Registration',
         href: '#',
@@ -356,37 +358,37 @@ export const mainNavItems: NavItem[] = [
             },
         ],
     },
-    {
-        title: 'Program Transfers & Course Retakes',
-        href: '#',
-        icon: ArrowUpRight,
-        children: [
-            {
-                title: 'Program Change Requests',
-                href: transferRoutes.programChangeRequests(),
-                icon: RefreshCw,
-                requiredPermissions: ['edit_student'], // Will be implemented later
-            },
-            {
-                title: 'Repeated Courses',
-                href: transferRoutes.repeatedCourses(),
-                icon: Repeat,
-                requiredPermissions: ['view_student'], // Will be implemented later
-            },
-            {
-                title: 'Substitute Course Mapping',
-                href: transferRoutes.substituteCourseMapping(),
-                icon: BookMarked,
-                requiredPermissions: ['view_unit'], // Will be implemented later
-            },
-            {
-                title: 'Credit Transfer Evaluation',
-                href: transferRoutes.creditTransferEvaluation(),
-                icon: CheckSquare,
-                requiredPermissions: ['edit_student'], // Will be implemented later
-            },
-        ],
-    },
+    // {
+    //     title: 'Program Transfers & Course Retakes',
+    //     href: '#',
+    //     icon: ArrowUpRight,
+    //     children: [
+    //         {
+    //             title: 'Program Change Requests',
+    //             href: transferRoutes.programChangeRequests(),
+    //             icon: RefreshCw,
+    //             requiredPermissions: ['edit_student'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Repeated Courses',
+    //             href: transferRoutes.repeatedCourses(),
+    //             icon: Repeat,
+    //             requiredPermissions: ['view_student'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Substitute Course Mapping',
+    //             href: transferRoutes.substituteCourseMapping(),
+    //             icon: BookMarked,
+    //             requiredPermissions: ['view_unit'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Credit Transfer Evaluation',
+    //             href: transferRoutes.creditTransferEvaluation(),
+    //             icon: CheckSquare,
+    //             requiredPermissions: ['edit_student'], // Will be implemented later
+    //         },
+    //     ],
+    // },
     {
         title: 'Reports & Analytics',
         href: '#',

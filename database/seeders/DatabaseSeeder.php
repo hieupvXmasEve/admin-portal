@@ -28,6 +28,9 @@ class DatabaseSeeder extends Seeder
             // Step 4: Register students to course offerings
             CourseRegistrationSeeder::class,
 
+            // Step 5: Generate class sessions for course offerings
+            ClassSessionSeeder::class,
+
             // This seeder should be run manually when permissions are updated
             // UpdatePermissionsSeeder::class,
         ]);

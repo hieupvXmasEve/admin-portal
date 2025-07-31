@@ -143,7 +143,7 @@ class CourseRegistrationService
         $query = $student->courseRegistrations()
             ->with([
                 'courseOffering.curriculumUnit.unit',
-                'courseOffering.lecturer',
+                'courseOffering.lecture',
                 'courseOffering.classSessions.room',
                 'semester'
             ]);
@@ -249,9 +249,9 @@ class CourseRegistrationService
                 'credit_hours' => (float)$offering->curriculumUnit->unit->credit_points,
             ],
             'lecturer' => [
-                'id' => $offering->lecturer?->id,
-                'name' => $offering->lecturer?->display_name ?? $offering->lecturer?->full_name ?? null,
-                'email' => $offering->lecturer?->email,
+                'id' => $offering->lecture?->id,
+                'name' => $offering->lecture?->display_name ?? $offering->lecture?->full_name ?? null,
+                'email' => $offering->lecture?->email,
             ],
             'registration_eligibility' => [
                 'can_register' => $this->canRegisterForCourse($student, $offering),
@@ -278,8 +278,8 @@ class CourseRegistrationService
                 'credit_hours' => (float) $registration->credit_hours,
             ],
             'lecturer' => [
-                'name' => $registration->courseOffering->lecturer?->display_name ?? $registration->courseOffering->lecturer?->full_name ?? null,
-                'email' => $registration->courseOffering->lecturer?->email,
+                'name' => $registration->courseOffering->lecture?->display_name ?? $registration->courseOffering->lecture?->full_name ?? null,
+                'email' => $registration->courseOffering->lecture?->email,
             ],
             'semester' => [
                 'name' => $registration->semester->name,
