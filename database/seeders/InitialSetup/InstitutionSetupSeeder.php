@@ -55,18 +55,18 @@ class InstitutionSetupSeeder extends Seeder
                 'code' => 'HCM',
                 'address' => 'Số 123 Đường Nguyễn Văn Cừ, Phường An Hoà, Quận Ninh Kiều, Thành phố Hồ Chí Minh',
             ],
-            [
-                'id' => 3,
-                'name' => 'Swinburne Đà Nẵng',
-                'code' => 'DN',
-                'address' => 'Số 456 Đường Ngô Quyền, Phường An Hải Bắc, Quận Sơn Trà, Thành phố Đà Nẵng',
-            ],
-            [
-                'id' => 4,
-                'name' => 'Swinburne Cần Thơ',
-                'code' => 'CT',
-                'address' => 'Số 789 Đường 3 Tháng 2, Phường Xuân Khánh, Quận Ninh Kiều, Thành phố Cần Thơ',
-            ],
+//            [
+//                'id' => 3,
+//                'name' => 'Swinburne Đà Nẵng',
+//                'code' => 'DN',
+//                'address' => 'Số 456 Đường Ngô Quyền, Phường An Hải Bắc, Quận Sơn Trà, Thành phố Đà Nẵng',
+//            ],
+//            [
+//                'id' => 4,
+//                'name' => 'Swinburne Cần Thơ',
+//                'code' => 'CT',
+//                'address' => 'Số 789 Đường 3 Tháng 2, Phường Xuân Khánh, Quận Ninh Kiều, Thành phố Cần Thơ',
+//            ],
         ];
 
         foreach ($campuses as $campusData) {

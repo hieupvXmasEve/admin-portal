@@ -22,7 +22,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
+console.log('%c props', 'color: red', props.campuses);
 const selectedCampus = ref<Campus | null>(null);
 
 const form = useForm({
@@ -76,7 +76,7 @@ const handleLogout = () => {
             </div>
 
             <!-- Campus Grid -->
-            <div v-if="campuses?.length" class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div v-if="campuses?.length" class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
                 <Card
                     v-for="campus in campuses"
                     :key="campus.id"
