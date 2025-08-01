@@ -18,7 +18,9 @@ class UserService
     public function createUser(array $data): User
     {
         $userData = collect($data)->except('selectedRoles')->toArray();
-        $userData['password'] = Hash::make($userData['password']);
+        if (!empty($userData['password'])) {
+            $userData['password'] = Hash::make($userData['password']);
+        }
 
         Log::info('Creating a new user', ['email' => $userData['email']]);
         $user = User::create($userData);

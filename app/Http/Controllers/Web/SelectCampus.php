@@ -15,7 +15,7 @@ class SelectCampus extends Controller
     public function index()
     {
         $user = Auth::user();
-        $campuses = $user->campuses;
+        $campuses = $user->campuses->unique('id');
 
         return Inertia::render('SelectCampus', [
             'campuses' => $campuses

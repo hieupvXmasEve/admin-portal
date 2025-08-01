@@ -48,68 +48,67 @@ const permissionGroups = computed(() => {
 // Form data - initialize with role's current permissions
 const form = useForm({
     name: props.role.name,
-    selectedPermissions: [...props.rolePermissionIds] as number[],
+    permissions: [...props.rolePermissionIds] as number[],
 });
 
 // Handle permission selection
 const togglePermissionSelection = (permissionId: number) => {
-    const currentPermissions = [...form.selectedPermissions];
+    const currentPermissions = [...form.permissions];
     const index = currentPermissions.indexOf(permissionId);
     if (index > -1) {
         currentPermissions.splice(index, 1);
     } else {
         currentPermissions.push(permissionId);
     }
-    form.selectedPermissions = currentPermissions;
+    form.permissions = currentPermissions;
 };
 
 // Handle module permission selection (group checkbox)
 const toggleModulePermissionSelection = (permissionGroup: PermissionGroup) => {
     const modulePermissionIds = permissionGroup.permissions.map((permission) => permission.id);
-    const allModulePermissionsSelected = modulePermissionIds.every((id) => form.selectedPermissions.includes(id));
+    const allModulePermissionsSelected = modulePermissionIds.every((id) => form.permissions.includes(id));
 
     if (allModulePermissionsSelected) {
         // Unselect all permissions in this module
-        const currentPermissions = form.selectedPermissions.filter((id) => !modulePermissionIds.includes(id));
-        form.selectedPermissions = currentPermissions;
+        const currentPermissions = form.permissions.filter((id) => !modulePermissionIds.includes(id));
+        form.permissions = currentPermissions;
     } else {
         // Select all permissions in this module
-        const currentPermissions = [...form.selectedPermissions];
+        const currentPermissions = [...form.permissions];
         modulePermissionIds.forEach((id) => {
             if (!currentPermissions.includes(id)) {
                 currentPermissions.push(id);
             }
         });
-        form.selectedPermissions = currentPermissions;
+        form.permissions = currentPermissions;
     }
 };
 
 // Check if permission is selected
 const isPermissionSelected = (permissionId: number) => {
-    return form.selectedPermissions.includes(permissionId);
+    return form.permissions.includes(permissionId);
 };
 
 // Check if module (group) permissions are all selected
 const isModulePermissionSelected = (permissionGroup: PermissionGroup) => {
     const modulePermissionIds = permissionGroup.permissions.map((permission) => permission.id);
-    return modulePermissionIds.length > 0 && modulePermissionIds.every((id) => form.selectedPermissions.includes(id));
+    return modulePermissionIds.length > 0 && modulePermissionIds.every((id) => form.permissions.includes(id));
 };
 
 // Check if module permissions are partially selected
 const isModulePermissionPartiallySelected = (permissionGroup: PermissionGroup) => {
     const modulePermissionIds = permissionGroup.permissions.map((permission) => permission.id);
-    const selectedModulePermissionIds = modulePermissionIds.filter((id) => form.selectedPermissions.includes(id));
+    const selectedModulePermissionIds = modulePermissionIds.filter((id) => form.permissions.includes(id));
     return selectedModulePermissionIds.length > 0 && selectedModulePermissionIds.length < modulePermissionIds.length;
 };
 
 // Get selected permissions count
-const selectedPermissionsCount = computed(() => {
-    return form.selectedPermissions.length;
+const permissionsCount = computed(() => {
+    return form.permissions.length;
 });
 
 // Submit form
 const handleSubmit = () => {
-    console.log('Form data being sent:', form.data());
     form.put(`/roles/${props.role.id}`, {
         onSuccess: () => {
             router.visit('/roles');
@@ -168,7 +167,7 @@ const goBack = () => {
                     <CardDescription> Overview of selected permissions </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div v-if="selectedPermissionsCount === 0" class="text-muted-foreground py-8 text-center">
+                    <div v-if="permissionsCount === 0" class="text-muted-foreground py-8 text-center">
                         <Shield class="mx-auto mb-2 h-12 w-12 opacity-50" />
                         <p>No permissions selected</p>
                         <p class="text-sm">Select permissions from the groups below</p>
@@ -176,11 +175,11 @@ const goBack = () => {
 
                     <div v-else class="space-y-4">
                         <div>
-                            <h4 class="mb-2 font-medium">Total Permissions ({{ selectedPermissionsCount }})</h4>
+                            <h4 class="mb-2 font-medium">Total Permissions ({{ permissionsCount }})</h4>
                             <div class="max-h-32 overflow-y-auto">
                                 <div class="flex flex-wrap gap-1">
                                     <span
-                                        v-for="permissionId in form.selectedPermissions"
+                                        v-for="permissionId in form.permissions"
                                         :key="permissionId"
                                         class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
                                     >
