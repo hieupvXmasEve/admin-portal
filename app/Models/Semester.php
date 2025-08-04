@@ -242,7 +242,7 @@ class Semester extends Model
     {
         $now = Carbon::now();
 
-        return static::where('is_active', true)
+        return (int)static::where('is_active', true)
             ->where('end_date', '<', $now)
             ->update(['is_active' => false]);
     }

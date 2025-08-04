@@ -24,8 +24,10 @@ class UnitController extends Controller
         private UnitValidationService    $validationService,
         private UnitRelationshipService  $relationshipService,
         private PrerequisiteLogicService $prerequisiteLogicService,
-        private UnitService $unitService
-    ) {}
+        private UnitService              $unitService
+    )
+    {
+    }
 
     public function index(Request $request): Response
     {
@@ -75,7 +77,7 @@ class UnitController extends Controller
             'formDefaults' => [
                 'code' => '',
                 'name' => '',
-                'credit_points' => 12.5,
+                'credit_points' => 3,
             ],
         ]);
     }
@@ -311,8 +313,11 @@ class UnitController extends Controller
             ->exists();
 
         return response()->json([
-            'valid' => !$exists,
-            'message' => $exists ? 'Unit code already exists' : 'Unit code is available',
+            'success' => true,
+            'data' => [
+                'valid' => !$exists,
+                'message' => $exists ? 'Unit code already exists' : 'Unit code is available',
+            ]
         ]);
     }
 

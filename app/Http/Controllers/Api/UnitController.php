@@ -42,4 +42,5 @@ class UnitController extends Controller
         $this->unitService->deleteUnit($unit);
         return response()->noContent();
     }
+
 }

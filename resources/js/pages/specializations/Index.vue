@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { BreadcrumbItem, PaginatedResponse } from '@/types';
+import type { PaginatedResponse } from '@/types';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
@@ -59,16 +59,8 @@ const props = defineProps<{
     statistics: Statistics;
     programs: Array<{ id: number; name: string }>;
 }>();
-console.log('props', props.programs);
 
 const page = usePage();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Specializations',
-        href: '/specializations',
-    },
-];
 
 // Reactive data
 const data = computed(() => props.specializations.data);

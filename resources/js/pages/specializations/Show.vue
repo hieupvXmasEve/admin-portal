@@ -365,14 +365,14 @@ const formatDate = (dateString: string): string => {
             <div class="flex flex-wrap gap-2">
                 <Link :href="curriculumRoutes.specializations.edit(specialization.id)">
                     <Button variant="outline">
-                        <Edit class="mr-2 h-4 w-4" />
+                        <Edit class="h-4 w-4" />
                         Edit
                     </Button>
                 </Link>
                 <Link :href="curriculumRoutes.specializations.index()">
                     <Button variant="outline">
-                        <ArrowLeft class="mr-2 h-4 w-4" />
-                        Back to Specializations
+                        <ArrowLeft class="h-4 w-4" />
+                        Back
                     </Button>
                 </Link>
             </div>

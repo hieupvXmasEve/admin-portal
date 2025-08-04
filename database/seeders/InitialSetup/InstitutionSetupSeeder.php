@@ -80,29 +80,7 @@ class InstitutionSetupSeeder extends Seeder
     {
         $buildingTypes = [
             'Academic' => [
-                'Science Building A',
-                'Science Building B',
-                'Engineering Block',
-                'Business Faculty',
-                'Computer Science Center',
-            ],
-            'Administration' => [
-                'Main Administration',
-                'Student Services',
-                'Finance Office',
-            ],
-            'Library' => [
-                'Central Library',
-                'Digital Learning Center',
-            ],
-            'Student' => [
-                'Student Center',
-                'Recreation Center',
-                'Food Court',
-            ],
-            'Sports' => [
-                'Gymnasium',
-                'Sports Complex',
+                'Building A',
             ],
         ];
 
@@ -159,7 +137,7 @@ class InstitutionSetupSeeder extends Seeder
             for ($i = 1; $i <= $config['count']; $i++) {
                 $roomNumber++;
                 $capacity = rand($config['capacity_range'][0], $config['capacity_range'][1]);
-                $floor = (string) floor($roomNumber / 100);
+                $floor = (string)floor($roomNumber / 100);
 
                 Room::create([
                     'campus_id' => $building->campus_id,

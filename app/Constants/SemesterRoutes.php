@@ -25,6 +25,7 @@ class SemesterRoutes
     public const ACTIVATION_STATUSES = 'semesters.activation-statuses';
 
     // Semester Enrollment Routes
+    public const API_UPDATE = 'api.semesters.update';
     public const ENROLLMENT_SHOW = 'semesters.enrollment.show';
 
     // API Semester Enrollment Routes

@@ -12,6 +12,7 @@ export const SEMESTER_ROUTE_NAMES = {
     EDIT: 'semesters.edit',
     UPDATE: 'semesters.update',
     DESTROY: 'semesters.destroy',
+    API_UPDATE: 'api.semesters.update',
 
     // Activation
     ACTIVATE: 'semesters.activate',
@@ -60,17 +61,12 @@ export const semesterRoutes = {
 
     // API Enrollment
     apiEnrollmentGenerate: (semesterId: number | string) => SEMESTER_ROUTE_NAMES.API_ENROLLMENT_GENERATE.replace(':semester', semesterId.toString()),
-    apiEnrollmentSuggestedCourses: (semesterId: number | string) =>
-        SEMESTER_ROUTE_NAMES.API_ENROLLMENT_SUGGESTED_COURSES.replace(':semester', semesterId.toString()),
-    apiEnrollmentBulkOpenCourses: (semesterId: number | string) =>
-        SEMESTER_ROUTE_NAMES.API_ENROLLMENT_BULK_OPEN_COURSES.replace(':semester', semesterId.toString()),
-    apiEnrollmentOpenSingleCourse: (semesterId: number | string) =>
-        SEMESTER_ROUTE_NAMES.API_ENROLLMENT_OPEN_SINGLE_COURSE.replace(':semester', semesterId.toString()),
+    apiEnrollmentSuggestedCourses: (semesterId: number | string) => SEMESTER_ROUTE_NAMES.API_ENROLLMENT_SUGGESTED_COURSES.replace(':semester', semesterId.toString()),
+    apiEnrollmentBulkOpenCourses: (semesterId: number | string) => SEMESTER_ROUTE_NAMES.API_ENROLLMENT_BULK_OPEN_COURSES.replace(':semester', semesterId.toString()),
+    apiEnrollmentOpenSingleCourse: (semesterId: number | string) => SEMESTER_ROUTE_NAMES.API_ENROLLMENT_OPEN_SINGLE_COURSE.replace(':semester', semesterId.toString()),
     apiEnrollmentStats: (semesterId: number | string) => SEMESTER_ROUTE_NAMES.API_ENROLLMENT_STATS.replace(':semester', semesterId.toString()),
-    apiEnrollmentRegistrableStudents: (semesterId: number | string) =>
-        SEMESTER_ROUTE_NAMES.API_ENROLLMENT_REGISTRABLE_STUDENTS.replace(':semester', semesterId.toString()),
-    apiEnrollmentBulkRegister: (semesterId: number | string) =>
-        SEMESTER_ROUTE_NAMES.API_ENROLLMENT_BULK_REGISTER.replace(':semester', semesterId.toString()),
+    apiEnrollmentRegistrableStudents: (semesterId: number | string) => SEMESTER_ROUTE_NAMES.API_ENROLLMENT_REGISTRABLE_STUDENTS.replace(':semester', semesterId.toString()),
+    apiEnrollmentBulkRegister: (semesterId: number | string) => SEMESTER_ROUTE_NAMES.API_ENROLLMENT_BULK_REGISTER.replace(':semester', semesterId.toString()),
 
     // Helper functions for frontend paths
     indexPath: () => SEMESTER_ROUTE_PATHS.INDEX,
