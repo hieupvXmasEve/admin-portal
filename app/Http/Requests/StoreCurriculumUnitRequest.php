@@ -20,8 +20,8 @@ class StoreCurriculumUnitRequest extends FormRequest
             'unit_id' => ['required', 'exists:units,id'],
             'semester_id' => ['required', 'exists:semesters,id'],
             'type' => ['required', 'in:core,major,elective'],
-            'year_level' => ['required', 'integer', 'min:1', 'max:6'],
-            'semester_number' => ['required', 'integer', 'min:1', 'max:9'],
+            'year_level' => ['nullable', 'integer', 'min:1', 'max:6'],
+            'semester_number' => ['nullable', 'integer', 'min:1', 'max:9'],
             'note' => ['nullable', 'string', 'max:1000'],
         ];
     }

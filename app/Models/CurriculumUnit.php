@@ -19,7 +19,7 @@ class CurriculumUnit extends Model
         'curriculum_version_id',
         'unit_id',
         'semester_id',
-        'type',
+        'unit_scope',
         'year_level',
         'semester_number',
         'note',

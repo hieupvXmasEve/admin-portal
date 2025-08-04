@@ -2,16 +2,7 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables';
 import { createColumns } from '@/lib/table-utils';
-import type { CurriculumUnit, CurriculumVersion, Program, Semester, Specialization, Unit, UnitType } from '@/types/models';
+import type { CurriculumUnit, CurriculumVersion, Program, Semester, Specialization, Unit, UnitScope } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
 import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
@@ -40,7 +31,7 @@ interface Props {
     specializations?: Specialization[];
     semesters?: Semester[];
     units?: Unit[];
-    unitTypes?: UnitType[];
+    unitScopes?: UnitScope[];
 }
 
 const props = defineProps<Props>();
@@ -59,7 +50,7 @@ const isDeleting = ref(false);
 // Filter states
 const filters = ref({
     search: '',
-    unitType: 'all',
+    unitScope: 'all',
     yearLevel: 'all',
     semesterNumber: 'all',
     page: 1,
@@ -75,7 +66,7 @@ const can = (permission: string) => {
 // TypeScript interfaces for form data
 interface AddUnitFormData {
     unit_id: string;
-    type: 'core' | 'major' | 'elective';
+    unit_scope: 'program' | 'common' | 'specialization_specific' | 'cross_program' | null;
     semester_number: string;
     note?: string;
 }
@@ -85,11 +76,12 @@ type EditUnitFormData = AddUnitFormData;
 const addUnitFormSchema = toTypedSchema(
     z.object({
         unit_id: z.string().min(1, 'Unit is required'),
-        type: z.enum(['core', 'major', 'elective'], { errorMap: () => ({ message: 'Unit type is required' }) }),
+        unit_scope: z.enum(['program', 'common', 'specialization_specific', 'cross_program']).nullable().optional(),
         semester_number: z
             .string()
-            .min(1, 'Semester number is required')
+            .optional()
             .refine((val) => {
+                if (!val || val === 'none') return true;
                 const num = parseInt(val);
                 return num >= 1 && num <= 9;
             }, 'Semester number must be between 1 and 9'),
@@ -135,15 +127,11 @@ const filteredUnits = computed(() => {
     let units = curriculumUnits.value;
 
     if (filters.value.search) {
-        units = units.filter(
-            (unit) =>
-                unit.unit?.code?.toLowerCase().includes(filters.value.search.toLowerCase()) ||
-                unit.unit?.name?.toLowerCase().includes(filters.value.search.toLowerCase()),
-        );
+        units = units.filter((unit) => unit.unit?.code?.toLowerCase().includes(filters.value.search.toLowerCase()) || unit.unit?.name?.toLowerCase().includes(filters.value.search.toLowerCase()));
     }
 
-    if (filters.value.unitType && filters.value.unitType !== 'all') {
-        units = units.filter((unit) => unit.type === filters.value.unitType);
+    if (filters.value.unitScope && filters.value.unitScope !== 'all') {
+        units = units.filter((unit) => unit.unit_scope === filters.value.unitScope);
     }
 
     if (filters.value.yearLevel && filters.value.yearLevel !== 'all') {
@@ -192,10 +180,10 @@ const stats = computed(() => {
         {} as Record<string, number>,
     );
 
-    const byUnitType = units.reduce(
+    const byUnitScope = units.reduce(
         (acc, unit) => {
-            const type = unit.type || 'Unspecified';
-            acc[type] = (acc[type] || 0) + 1;
+            const scope = unit.unit_scope || 'Unspecified';
+            acc[scope] = (acc[scope] || 0) + 1;
             return acc;
         },
         {} as Record<string, number>,
@@ -205,7 +193,7 @@ const stats = computed(() => {
         totalUnits,
         totalCreditPoints,
         byYearLevel,
-        byUnitType,
+        byUnitScope: byUnitScope || {},
     };
 });
 
@@ -245,11 +233,7 @@ const baseColumns: ColumnDef<CurriculumUnit>[] = [
                 return h('div', { class: 'text-gray-500' }, 'N/A');
             }
 
-            return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'font-medium' }, unit.code),
-                h('div', { class: 'text-sm text-gray-600' }, unit.name),
-                h('div', { class: 'text-xs text-gray-500' }, `${unit.credit_points} credit points`),
-            ]);
+            return h('div', { class: 'space-y-1' }, [h('div', { class: 'font-medium' }, unit.code), h('div', { class: 'text-sm text-gray-600' }, unit.name), h('div', { class: 'text-xs text-gray-500' }, `${unit.credit_points} credit points`)]);
         },
     },
     {
@@ -258,19 +242,13 @@ const baseColumns: ColumnDef<CurriculumUnit>[] = [
             const curriculumUnit = row.original;
 
             return h('div', { class: 'space-y-2' }, [
-                curriculumUnit.type
-                    ? h(Badge, { variant: 'outline', class: 'text-xs' }, () => curriculumUnit.type.toUpperCase())
-                    : h(Badge, { variant: 'secondary', class: 'text-xs' }, () => 'Unspecified'),
+                curriculumUnit.unit_scope ? h(Badge, { variant: 'outline', class: 'text-xs' }, () => curriculumUnit.unit_scope.toUpperCase()) : h(Badge, { variant: 'secondary', class: 'text-xs' }, () => 'Unspecified'),
                 h(
                     'div',
                     { class: 'space-y-1' },
                     [
-                        curriculumUnit.year_level
-                            ? h('div', { class: 'text-sm font-medium' }, `Year ${curriculumUnit.year_level}`)
-                            : h('div', { class: 'text-sm text-gray-500' }, 'Unspecified Year'),
-                        curriculumUnit.semester_number
-                            ? h('div', { class: 'text-xs text-gray-600' }, `Semester ${curriculumUnit.semester_number}`)
-                            : h('div', { class: 'text-xs text-gray-400' }, 'No semester'),
+                        curriculumUnit.year_level ? h('div', { class: 'text-sm font-medium' }, `Year ${curriculumUnit.year_level}`) : h('div', { class: 'text-sm text-gray-500' }, 'Unspecified Year'),
+                        curriculumUnit.semester_number ? h('div', { class: 'text-xs text-gray-600' }, `Semester ${curriculumUnit.semester_number}`) : h('div', { class: 'text-xs text-gray-400' }, 'No semester'),
                     ].filter(Boolean),
                 ),
             ]);
@@ -281,9 +259,7 @@ const baseColumns: ColumnDef<CurriculumUnit>[] = [
         accessorKey: 'note',
         cell: ({ row }) => {
             const curriculumUnit = row.original;
-            return curriculumUnit.note
-                ? h('div', { class: 'text-xs text-gray-600 max-w-xs truncate', title: curriculumUnit.note }, curriculumUnit.note)
-                : h('div', { class: 'text-xs text-gray-400' }, 'No notes');
+            return curriculumUnit.note ? h('div', { class: 'text-xs text-gray-600 max-w-xs truncate', title: curriculumUnit.note }, curriculumUnit.note) : h('div', { class: 'text-xs text-gray-400' }, 'No notes');
         },
     },
     {
@@ -362,9 +338,9 @@ const onAddUnitSubmit = async (values: any) => {
         curriculum_version_id: props.curriculumVersion.id,
         unit_id: parseInt(formData.unit_id),
         semester_id: props.curriculumVersion.semester_id,
-        type: formData.type,
-        year_level: calculateYearLevel(parseInt(formData.semester_number)),
-        semester_number: parseInt(formData.semester_number),
+        unit_scope: formData.unit_scope,
+        year_level: formData.semester_number ? calculateYearLevel(parseInt(formData.semester_number)) : null,
+        semester_number: formData.semester_number ? parseInt(formData.semester_number) : null,
         note: formData.note || null,
     };
 
@@ -395,9 +371,7 @@ const editCurriculumUnit = (curriculumUnit: CurriculumUnit) => {
 const onEditUnitSubmit = async (values: any) => {
     // Type assertion for better TypeScript experience
     const formData = values as EditUnitFormData;
-    console.log('Edit form submitted with values:', formData);
     isEditSubmitting.value = true;
-
     if (!curriculumUnitToEdit.value) {
         console.error('No curriculum unit to edit');
         isEditSubmitting.value = false;
@@ -408,9 +382,9 @@ const onEditUnitSubmit = async (values: any) => {
         curriculum_version_id: props.curriculumVersion.id,
         unit_id: parseInt(formData.unit_id),
         semester_id: props.curriculumVersion.semester_id,
-        type: formData.type,
-        year_level: calculateYearLevel(parseInt(formData.semester_number)),
-        semester_number: parseInt(formData.semester_number),
+        unit_scope: formData.unit_scope,
+        year_level: formData.semester_number ? calculateYearLevel(parseInt(formData.semester_number)) : null,
+        semester_number: formData.semester_number ? parseInt(formData.semester_number) : null,
         note: formData.note || null,
     };
 
@@ -468,14 +442,16 @@ const formatDate = (dateString: string): string => {
     });
 };
 
-const getUnitTypeColor = (type: string) => {
-    switch (type.toLowerCase()) {
-        case 'core':
+const getUnitScopeColor = (scope: string) => {
+    switch (scope.toLowerCase()) {
+        case 'program':
             return 'bg-blue-100 text-blue-800';
-        case 'elective':
+        case 'common':
             return 'bg-green-100 text-green-800';
-        case 'major':
+        case 'specialization_specific':
             return 'bg-purple-100 text-purple-800';
+        case 'cross_program':
+            return 'bg-orange-100 text-orange-800';
         default:
             return 'bg-gray-100 text-gray-800';
     }
@@ -500,9 +476,7 @@ const getUnitTypeColor = (type: string) => {
                 <div class="text-muted-foreground flex flex-wrap gap-4 text-sm">
                     <span>Program: {{ curriculumVersion.program?.name }}</span>
                     <span v-if="curriculumVersion.specialization">Specialization: {{ curriculumVersion.specialization.name }}</span>
-                    <span v-if="curriculumVersion.effective_from_semester">
-                        Effective From: {{ curriculumVersion.effective_from_semester.name }}
-                    </span>
+                    <span v-if="curriculumVersion.effective_from_semester"> Effective From: {{ curriculumVersion.effective_from_semester.name }} </span>
                     <span>Created: {{ formatDate(curriculumVersion.created_at) }}</span>
                 </div>
                 <p v-if="curriculumVersion.notes" class="text-muted-foreground text-sm">{{ curriculumVersion.notes }}</p>
@@ -555,12 +529,12 @@ const getUnitTypeColor = (type: string) => {
 
             <Card>
                 <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle class="text-sm font-medium">Unit Types</CardTitle>
+                    <CardTitle class="text-sm font-medium">Unit Scopes</CardTitle>
                     <Info class="h-4 w-4 text-purple-500" />
                 </CardHeader>
                 <CardContent>
-                    <div class="text-2xl font-bold text-purple-600">{{ Object.keys(stats.byUnitType).length }}</div>
-                    <p class="text-muted-foreground text-xs">Different types</p>
+                    <div class="text-2xl font-bold text-purple-600">{{ Object.keys(stats.byUnitScope || {}).length }}</div>
+                    <p class="text-muted-foreground text-xs">Different scopes</p>
                 </CardContent>
             </Card>
         </div>
@@ -580,12 +554,12 @@ const getUnitTypeColor = (type: string) => {
                 <CardContent class="space-y-4">
                     <div v-for="(yearData, year) in organizedUnits" :key="year" class="space-y-4">
                         <h3 class="text-lg font-semibold">
-                            {{ String(year) === '0' ? 'Unspecified Year' : `Year ${year}` }}
+                            {{ String(year) === '0' ? 'Common' : `Year ${year}` }}
                         </h3>
                         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div v-for="(semesterUnits, semester) in yearData" :key="semester" class="space-y-3">
                                 <h4 class="text-sm font-medium text-gray-700">
-                                    {{ String(semester) === '0' ? 'Unspecified Semester' : `Semester ${semester}` }}
+                                    {{ String(semester) === '0' ? '' : `Semester ${semester}` }}
                                 </h4>
                                 <div class="space-y-2">
                                     <Card v-for="unit in semesterUnits" :key="unit.id" class="p-3">
@@ -597,18 +571,13 @@ const getUnitTypeColor = (type: string) => {
                                                     </Link>
                                                     <p class="text-xs text-gray-600">{{ unit.unit?.name }}</p>
                                                 </div>
-                                                <Badge :class="getUnitTypeColor(unit.type || 'unknown')" class="text-xs">
-                                                    {{ unit.type?.toUpperCase() || 'UNKNOWN' }}
+                                                <Badge :class="getUnitScopeColor(unit.unit_scope || 'unknown')" class="text-xs">
+                                                    {{ unit.unit_scope?.toUpperCase() || 'UNKNOWN' }}
                                                 </Badge>
                                             </div>
                                             <div class="flex items-center justify-between text-xs">
                                                 <span class="text-gray-500">{{ unit.unit?.credit_points }} CP</span>
-                                                <Button
-                                                    v-if="can('edit_curriculum_unit')"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    @click="editCurriculumUnit(unit)"
-                                                >
+                                                <Button v-if="can('edit_curriculum_unit')" variant="ghost" size="sm" @click="editCurriculumUnit(unit)">
                                                     <Edit class="h-3 w-3" />
                                                 </Button>
                                             </div>
@@ -646,15 +615,16 @@ const getUnitTypeColor = (type: string) => {
                     <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
                         <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search units..." class="w-full" />
 
-                        <Select v-model="filters.unitType">
+                        <Select v-model="filters.unitScope">
                             <SelectTrigger>
-                                <SelectValue placeholder="All types" />
+                                <SelectValue placeholder="All scopes" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All types</SelectItem>
-                                <SelectItem value="core">Core</SelectItem>
-                                <SelectItem value="major">Major</SelectItem>
-                                <SelectItem value="elective">Elective</SelectItem>
+                                <SelectItem value="all">All scopes</SelectItem>
+                                <SelectItem value="program">Program</SelectItem>
+                                <SelectItem value="common">Common</SelectItem>
+                                <SelectItem value="specialization_specific">Specialization Specific</SelectItem>
+                                <!--                                <SelectItem value="cross_program">Cross Program</SelectItem>-->
                             </SelectContent>
                         </Select>
 
@@ -674,9 +644,7 @@ const getUnitTypeColor = (type: string) => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All semesters</SelectItem>
-                                <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="semester" :value="semester.toString()">
-                                    Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }})
-                                </SelectItem>
+                                <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }}) </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -686,41 +654,19 @@ const getUnitTypeColor = (type: string) => {
                         <Book class="mx-auto h-12 w-12 text-gray-400" />
                         <h3 class="mt-4 text-sm font-medium">No curriculum units found</h3>
                         <p class="text-muted-foreground mt-2 text-sm">
-                            {{
-                                filters.search || filters.unitType !== 'all' || filters.yearLevel !== 'all' || filters.semesterNumber !== 'all'
-                                    ? 'Try adjusting your search filters.'
-                                    : 'Get started by adding curriculum units to this version.'
-                            }}
+                            {{ filters.search || filters.unitScope !== 'all' || filters.yearLevel !== 'all' || filters.semesterNumber !== 'all' ? 'Try adjusting your search filters.' : 'Get started by adding curriculum units to this version.' }}
                         </p>
-                        <div
-                            class="mt-6"
-                            v-if="
-                                !filters.search &&
-                                filters.unitType === 'all' &&
-                                filters.yearLevel === 'all' &&
-                                filters.semesterNumber === 'all' &&
-                                can('create_curriculum_unit')
-                            "
-                        >
+                        <div class="mt-6" v-if="!filters.search && filters.unitScope === 'all' && filters.yearLevel === 'all' && filters.semesterNumber === 'all' && can('create_curriculum_unit')">
                             <Button :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
                                 <Plus class="mr-2 h-4 w-4" />
                                 Add First Unit
                             </Button>
-                            <p v-if="availableUnits.length === 0" class="text-muted-foreground mt-2 text-xs">
-                                All available units have been added to this curriculum version.
-                            </p>
+                            <p v-if="availableUnits.length === 0" class="text-muted-foreground mt-2 text-xs">All available units have been added to this curriculum version.</p>
                         </div>
                     </div>
 
                     <div v-else>
-                        <DataTable
-                            :data="paginatedUnits.data"
-                            :columns="columns"
-                            :loading="false"
-                            :enable-row-selection="true"
-                            @selection-change="handleSelectionChange"
-                            class="border-0"
-                        />
+                        <DataTable :data="paginatedUnits.data" :columns="columns" :loading="false" :enable-row-selection="true" @selection-change="handleSelectionChange" class="border-0" />
                         <div class="border-t p-4" v-if="paginatedUnits.total > 10">
                             <DataPagination :pagination-data="paginationData" @navigate="handlePageChange" />
                         </div>
@@ -760,13 +706,13 @@ const getUnitTypeColor = (type: string) => {
                     <CardHeader>
                         <CardTitle class="flex items-center gap-2">
                             <Target class="h-5 w-5" />
-                            Unit Type Distribution
+                            Unit Scope Distribution
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div class="space-y-3">
-                            <div v-for="(count, type) in stats.byUnitType" :key="type" class="flex items-center justify-between">
-                                <span class="text-sm font-medium">{{ type }}</span>
+                            <div v-for="(count, scope) in stats.byUnitScope" :key="scope" class="flex items-center justify-between">
+                                <span class="text-sm font-medium">{{ scope }}</span>
                                 <div class="flex items-center gap-2">
                                     <div class="h-2 w-16 overflow-hidden rounded-full bg-gray-200">
                                         <div class="h-full bg-green-500" :style="{ width: `${(count / stats.totalUnits) * 100}%` }"></div>
@@ -788,9 +734,7 @@ const getUnitTypeColor = (type: string) => {
                 <DialogTitle>Add Curriculum Unit</DialogTitle>
                 <DialogDescription>
                     Add a new unit to this curriculum version.
-                    <span v-if="availableUnits.length > 0" class="mt-1 block text-sm text-green-600">
-                        {{ availableUnits.length }} unit(s) available to add
-                    </span>
+                    <span v-if="availableUnits.length > 0" class="mt-1 block text-sm text-green-600"> {{ availableUnits.length }} unit(s) available to add </span>
                     <span v-else class="mt-1 block text-sm text-amber-600"> No units available to add </span>
                 </DialogDescription>
             </DialogHeader>
@@ -807,9 +751,7 @@ const getUnitTypeColor = (type: string) => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem v-if="availableUnits.length === 0" value="none" disabled> No available units to add </SelectItem>
-                                        <SelectItem v-for="unit in availableUnits" :key="unit.id" :value="unit.id.toString()">
-                                            {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP)
-                                        </SelectItem>
+                                        <SelectItem v-for="unit in availableUnits" :key="unit.id" :value="unit.id.toString()"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -817,18 +759,19 @@ const getUnitTypeColor = (type: string) => {
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="type">
+                    <FormField v-slot="{ componentField }" name="unit_scope">
                         <FormItem>
-                            <FormLabel>Unit Type *</FormLabel>
+                            <FormLabel>Unit Scope</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select type" />
+                                        <SelectValue placeholder="Select scope (optional)" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="core">Core</SelectItem>
-                                        <SelectItem value="major">Major</SelectItem>
-                                        <SelectItem value="elective">Elective</SelectItem>
+                                        <SelectItem value="program">Program</SelectItem>
+                                        <SelectItem value="common">Common</SelectItem>
+                                        <SelectItem value="specialization_specific">Specialization Specific</SelectItem>
+                                        <!--                                        <SelectItem value="cross_program">Cross Program</SelectItem>-->
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -838,16 +781,15 @@ const getUnitTypeColor = (type: string) => {
 
                     <FormField v-slot="{ componentField }" name="semester_number">
                         <FormItem>
-                            <FormLabel>Semester Number *</FormLabel>
+                            <FormLabel>Semester Number</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select semester" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="semester" :value="semester.toString()">
-                                            Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }})
-                                        </SelectItem>
+                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }}) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -860,12 +802,7 @@ const getUnitTypeColor = (type: string) => {
                     <FormItem>
                         <FormLabel>Notes</FormLabel>
                         <FormControl>
-                            <Textarea
-                                v-bind="componentField"
-                                placeholder="Additional notes..."
-                                rows="3"
-                                :maxlength="ValidationRules.curriculumUnit.note.maxLength"
-                            />
+                            <Textarea v-bind="componentField" placeholder="Additional notes..." rows="3" :maxlength="ValidationRules.curriculumUnit.note.maxLength" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -895,7 +832,7 @@ const getUnitTypeColor = (type: string) => {
                 :validation-schema="editUnitFormSchema"
                 :initial-values="{
                     unit_id: curriculumUnitToEdit.unit_id?.toString() || '',
-                    type: curriculumUnitToEdit.type || 'core',
+                    unit_scope: curriculumUnitToEdit.unit_scope || null,
                     semester_number: curriculumUnitToEdit.semester_number?.toString() || '',
                     note: curriculumUnitToEdit.note || '',
                 }"
@@ -912,9 +849,7 @@ const getUnitTypeColor = (type: string) => {
                                         <SelectValue placeholder="Select a unit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="unit in editableUnits" :key="unit.id" :value="unit.id.toString()">
-                                            {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP)
-                                        </SelectItem>
+                                        <SelectItem v-for="unit in editableUnits" :key="unit.id" :value="unit.id.toString()"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -922,18 +857,19 @@ const getUnitTypeColor = (type: string) => {
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="type">
+                    <FormField v-slot="{ componentField }" name="unit_scope">
                         <FormItem>
-                            <FormLabel>Unit Type *</FormLabel>
+                            <FormLabel>Unit Scope</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select type" />
+                                        <SelectValue placeholder="Select scope (optional)" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="core">Core</SelectItem>
-                                        <SelectItem value="major">Major</SelectItem>
-                                        <SelectItem value="elective">Elective</SelectItem>
+                                        <SelectItem value="program">Program</SelectItem>
+                                        <SelectItem value="common">Common</SelectItem>
+                                        <SelectItem value="specialization_specific">Specialization Specific</SelectItem>
+                                        <!--                                        <SelectItem value="cross_program">Cross Program</SelectItem>-->
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -950,9 +886,8 @@ const getUnitTypeColor = (type: string) => {
                                         <SelectValue placeholder="Select semester" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6, 7, 8, 9]" :key="semester" :value="semester.toString()">
-                                            Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }})
-                                        </SelectItem>
+                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }}) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -965,12 +900,7 @@ const getUnitTypeColor = (type: string) => {
                     <FormItem>
                         <FormLabel>Notes</FormLabel>
                         <FormControl>
-                            <Textarea
-                                v-bind="componentField"
-                                placeholder="Additional notes..."
-                                rows="3"
-                                :maxlength="ValidationRules.curriculumUnit.note.maxLength"
-                            />
+                            <Textarea v-bind="componentField" placeholder="Additional notes..." rows="3" :maxlength="ValidationRules.curriculumUnit.note.maxLength" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>

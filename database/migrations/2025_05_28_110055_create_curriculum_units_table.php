@@ -19,8 +19,8 @@ return new class extends Migration
             $table->foreignId('unit_id')->constrained('units')->onDelete('cascade');
             $table->foreignId('semester_id')->nullable()->constrained('semesters')->onDelete('cascade');
 
-            $table->enum('type', ['core', 'major', 'elective'])->notNull();
-            $table->string('unit_scope')->default('program')->comment('Scope of the unit: program, common, specialization_specific, cross_program');
+            $table->enum('type', ['core', 'major', 'elective'])->nullable();
+            $table->enum('unit_scope', ['program', 'common', 'specialization_specific', 'cross_program'])->nullable();
             $table->unsignedTinyInteger('year_level')->nullable()->comment('Academic year level (1-3)');
             $table->unsignedTinyInteger('semester_number')->nullable()->comment('Suggested semester number within the course (1-9)');
             $table->boolean('is_required')->default(true);
