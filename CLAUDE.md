@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 > **Goal**: Tell Claude Code exactly how to work in this repo—fast, accurate, minimal fluff.
 
 ## 0. TL;DR For Claude
@@ -23,8 +25,12 @@
 ## 2. Commands You May Need
 
 ```bash
-# Dev everything
+# Dev everything (starts server, queue, logs, vite)
 composer dev
+
+# Docker development (recommended)
+./dev.sh start
+./dev.sh stop
 
 # PHP tests
 composer test
@@ -45,24 +51,33 @@ pnpm run format:check
 
 # PHP format
 ./vendor/bin/pint
+
+# Pre-push validation
+pnpm run pre-push
+./scripts/pre-push.sh
+./scripts/pre-push.sh --docker
+
+# Comprehensive testing
+pnpm run test:local
+./scripts/test-local.sh
 ```
 
 ## 3. Workflow You Must Follow
 
 1. **Check Context**
-   * Ask for missing files only if truly needed.
-   * Reuse given paths/types instead of guessing.
+    * Ask for missing files only if truly needed.
+    * Reuse given paths/types instead of guessing.
 2. **Plan First**
-   * Bullet the steps you’ll take (max \~5 bullets).
+    * Bullet the steps you’ll take (max \~5 bullets).
 3. **Implement**
-   * Provide code with correct file paths.
-   * For edits, output a **unified diff** or a clearly marked replacement block.
+    * Provide code with correct file paths.
+    * For edits, output a **unified diff** or a clearly marked replacement block.
 4. **Self-Review**
-   * Validate field names, route names, relationships.
-   * Ensure TS/PHPCS/ESLint rules will pass.
+    * Validate field names, route names, relationships.
+    * Ensure TS/PHPCS/ESLint rules will pass.
 5. **Next Step Suggestion (Optional)**
 
-   * One line if obvious.
+    * One line if obvious.
 
 ## 4. Architectural Rules (Service–Request–Resource Pattern)
 
@@ -75,6 +90,7 @@ pnpm run format:check
 Controllers stay thin: call Service → return Resource/Redirect.
 
 ## 5. Multi-Campus Rules
+
 * Campus context must exist (middleware `CheckCampusSelected`).
 * All queries filter by current campus.
 * Permissions/roles are campus-specific.
@@ -94,23 +110,25 @@ Controllers stay thin: call Service → return Resource/Redirect.
 ```ts
 const filters = ref({ search: '', sort: '', direction: 'asc', per_page: 15 })
 const applyFilters = (f: typeof filters.value) => {
-  const p = new URLSearchParams()
-  // set params if present ...
-  router.visit(`/resource-path${p.toString() ? '?' + p : ''}`, {
-    preserveState: true,
-    preserveScroll: true,
-    only: ['items', 'filters'],
-  })
+    const p = new URLSearchParams()
+    // set params if present ...
+    router.visit(`/resource-path${p.toString() ? '?' + p : ''}`, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['items', 'filters'],
+    })
 }
 ```
 
 ## 7. Testing & Quality
+
 * Use Pest for PHP tests, factories for data.
 * Unit tests for services, feature/integration for APIs.
 * Transactional tests for DB isolation.
 * All code must pass ESLint, Prettier, Pint, TS strict.
 
 ## 8. Common Mistakes To Avoid
+
 * Using fields not in DB schema.
 * Mixing controller concerns (validation/business logic).
 * Returning partial diffs or unnamed files.
@@ -118,7 +136,9 @@ const applyFilters = (f: typeof filters.value) => {
 * TS any/implicit types.
 
 ## 9. Output Format Rules For Claude
+
 * **Edits**: Prefer diff blocks:
+
 ```dif a/app/Services/ExampleService.php
 +++ b/app/Services/ExampleService.php
 @@
@@ -131,15 +151,19 @@ const applyFilters = (f: typeof filters.value) => {
 * **No prose walls**: Keep explanations short.
 
 ## 10. When Unsure
+
 * Ask a **single, precise** clarification question.
 * Offer safest assumption and proceed if trivial.
 
 ## 11. Import/Export & Misc
+
 * Uses `maatwebsite/excel` for bulk ops → validate client & server side.
 * Soft deletes everywhere unless stated.
 * Transactions for multi-step data ops.
-* 
+*
+
 ## 12. Model & Schema Compliance (MANDATORY)
+
 You MUST validate that all:
 
 - Field names exist in the actual database schema
@@ -153,11 +177,13 @@ Before using any model field or relationship:
 - OR ask for schema/table definition if unsure
 
 ❌ DO NOT:
+
 - Guess field names
 - Invent relationships
 - Assume `$model->relatedModel` exists without confirmation
 
 ✅ INSTEAD:
+
 - Use `$model->relation_name` only if it's defined in the Model class
 - Use `::with('relation')` only for valid eager-loadable relations
 
@@ -174,6 +200,7 @@ All new features MUST follow Test-Driven Development (TDD):
 5. **Update tests** if existing code is changed.
 
 Required test coverage includes:
+
 - ✅ Unit tests for Service methods
 - ✅ Feature tests for API endpoints
 - ✅ Permission tests for protected routes
@@ -181,12 +208,14 @@ Required test coverage includes:
 - ✅ Factory usage for test data
 
 Test Frameworks:
+
 - Use [Pest PHP](https://pestphp.com) for all PHP tests
 - Use model factories + `RefreshDatabase` trait
 - Use `@test` methods or `it()` syntax
 - Prefer `expect()` and `assertDatabaseHas()` for clarity
 
 DO NOT:
+
 - Skip test writing
 - Write code without a failing test
 - Leave broken or outdated tests behind

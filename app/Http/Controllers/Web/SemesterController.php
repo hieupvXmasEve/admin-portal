@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Semester;
 use App\Services\SemesterManagementService;
 use App\Constants\SemesterRoutes;
+use App\Http\Requests\ApiUpdateSemesterRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -290,5 +291,87 @@ class SemesterController extends Controller
             'success' => true,
             'data' => $statuses
         ]);
+    }
+
+    /**
+     * Update semester via API
+     */
+    public function apiUpdate(ApiUpdateSemesterRequest $request, Semester $semester): JsonResponse
+    {
+        Log::info('API Update semester request data:', $request->validated());
+
+        $validated = $request->validated();
+
+        // Check for duplicate name (excluding current semester)
+        $exists = Semester::where('name', $validated['name'])
+            ->where('id', '!=', $semester->id)
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A semester with this name already exists.',
+                'errors' => ['name' => ['A semester with this name already exists.']]
+            ], 422);
+        }
+
+        try {
+            // Auto-deactivate expired semesters first
+            Semester::deactivateExpiredSemesters();
+
+            $wasActive = $semester->is_active;
+            $wantsToBeActive = $validated['is_active'] ?? false;
+
+            // Update basic fields first (excluding is_active)
+            $updateData = array_merge($validated, ['is_active' => $semester->is_active]);
+            $semester->update($updateData);
+
+            // Handle activation/deactivation logic
+            if ($wasActive !== $wantsToBeActive) {
+                // User wants to change active status
+                if (!$semester->canChangeActiveStatus()) {
+                    $error = $semester->getActiveStatusChangeError();
+                    return response()->json([
+                        'success' => false,
+                        'message' => $error,
+                        'errors' => ['is_active' => [$error]]
+                    ], 422);
+                }
+
+                if (!$wasActive && $wantsToBeActive) {
+                    // User wants to activate this semester
+                    if ($semester->canBeActivated()) {
+                        $semester->activate();
+                        $message = 'Semester updated and activated successfully!';
+                    } else {
+                        $error = $semester->getActivationError();
+                        return response()->json([
+                            'success' => false,
+                            'message' => $error,
+                            'errors' => ['is_active' => [$error]]
+                        ], 422);
+                    }
+                } elseif ($wasActive && !$wantsToBeActive) {
+                    // User wants to deactivate this semester
+                    $semester->deactivate();
+                    $message = 'Semester updated and deactivated successfully!';
+                }
+            } else {
+                $message = 'Semester updated successfully!';
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => $semester->fresh()
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error updating semester via API: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while updating the semester.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

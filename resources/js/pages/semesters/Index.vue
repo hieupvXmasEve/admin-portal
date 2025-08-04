@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { PaginatedResponse } from '@/types';
 import { formatDateToShort } from '@/utils/date';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
@@ -16,6 +17,7 @@ import { fromDate } from '@internationalized/date';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Edit, Plus, Trash2, X } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 
 interface Semester {
     id: number;
@@ -31,21 +33,8 @@ interface Semester {
     updated_at: string;
 }
 
-interface SemesterData {
-    data: Semester[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    from: number;
-    to: number;
-    prev_page_url: string | null;
-    next_page_url: string | null;
-    links: any[];
-}
-
 interface Props {
-    semesters: SemesterData;
+    semesters: PaginatedResponse<Semester>;
     filters: {
         search: string | null;
         name: string | null;
@@ -66,8 +55,8 @@ const isActiveFilter = ref(props.filters.is_active);
 const isArchivedFilter = ref(props.filters.is_archived);
 
 // String representations for Select components
-const isActiveFilterString = ref(props.filters.is_active === null ? 'null' : props.filters.is_active === true ? 'true' : 'false');
-const isArchivedFilterString = ref(props.filters.is_archived === null ? 'null' : props.filters.is_archived === true ? 'true' : 'false');
+const isActiveFilterString = ref(props.filters.is_active === null ? 'null' : props.filters.is_active ? 'true' : 'false');
+const isArchivedFilterString = ref(props.filters.is_archived === null ? 'null' : props.filters.is_archived ? 'true' : 'false');
 
 // Watch string filters and convert to boolean/null
 watch(isActiveFilterString, (newValue) => {
@@ -94,7 +83,7 @@ const createForm = useForm({
     is_archived: false,
 });
 
-const editForm = useForm({
+const editFormData = ref({
     code: '',
     name: '',
     date_range: { start: null, end: null } as { start: string | null; end: string | null },
@@ -102,6 +91,9 @@ const editForm = useForm({
     is_active: false,
     is_archived: false,
 });
+
+const editFormErrors = ref<Record<string, string[]>>({});
+const editFormProcessing = ref(false);
 
 const deleteForm = useForm({});
 
@@ -114,7 +106,6 @@ const applyFilters = () => {
     if (yearFilter.value) filters['filter[year]'] = yearFilter.value;
     if (isActiveFilter.value !== null) filters['filter[is_active]'] = isActiveFilter.value;
     if (isArchivedFilter.value !== null) filters['filter[is_archived]'] = isArchivedFilter.value;
-
     router.get(systemRoutes.semesters.index(), filters, {
         preserveState: true,
         replace: true,
@@ -221,7 +212,7 @@ const columns: ColumnDef<Semester>[] = [
                         disabled: isArchived,
                         onClick: () => openEditModal(semester),
                     },
-                    [h(Edit, { class: 'h-4 w-4' })],
+                    () => [h(Edit, { class: 'h-4 w-4' })],
                 ),
                 h(
                     Button,
@@ -231,7 +222,7 @@ const columns: ColumnDef<Semester>[] = [
                         disabled: isArchived,
                         onClick: () => navigateToEnrollment(semester),
                     },
-                    ['Manage Enrollment'],
+                    () => ['Manage Enrollment'],
                 ),
                 h(
                     Button,
@@ -241,7 +232,7 @@ const columns: ColumnDef<Semester>[] = [
                         disabled: isArchived,
                         onClick: () => openDeleteModal(semester),
                     },
-                    [h(Trash2, { class: 'h-4 w-4' })],
+                    () => [h(Trash2, { class: 'h-4 w-4' })],
                 ),
             ]);
         },
@@ -270,14 +261,10 @@ const openEditModal = (semester: Semester) => {
     const startDate = semester.start_date ? fromDate(new Date(semester.start_date), 'Asia/Ho_Chi_Minh').toString().split('T')[0] : null;
     const endDate = semester.end_date ? fromDate(new Date(semester.end_date), 'Asia/Ho_Chi_Minh').toString().split('T')[0] : null;
 
-    const enrollmentStartDate = semester.enrollment_start_date
-        ? fromDate(new Date(semester.enrollment_start_date), 'Asia/Ho_Chi_Minh').toString().split('T')[0]
-        : null;
-    const enrollmentEndDate = semester.enrollment_end_date
-        ? fromDate(new Date(semester.enrollment_end_date), 'Asia/Ho_Chi_Minh').toString().split('T')[0]
-        : null;
+    const enrollmentStartDate = semester.enrollment_start_date ? fromDate(new Date(semester.enrollment_start_date), 'Asia/Ho_Chi_Minh').toString().split('T')[0] : null;
+    const enrollmentEndDate = semester.enrollment_end_date ? fromDate(new Date(semester.enrollment_end_date), 'Asia/Ho_Chi_Minh').toString().split('T')[0] : null;
 
-    Object.assign(editForm, {
+    Object.assign(editFormData.value, {
         code: semester.code,
         name: semester.name,
         date_range: {
@@ -291,6 +278,7 @@ const openEditModal = (semester: Semester) => {
         is_active: semester.is_active,
         is_archived: semester.is_archived,
     });
+    editFormErrors.value = {};
     showEditModal.value = true;
 };
 
@@ -319,7 +307,6 @@ const submitCreate = () => {
         is_active: createForm.is_active,
         is_archived: createForm.is_archived,
     };
-
     createForm
         .transform(() => formData)
         .post(systemRoutes.semesters.store(), {
@@ -329,26 +316,53 @@ const submitCreate = () => {
         });
 };
 
-const submitEdit = () => {
-    // Transform date ranges to individual date fields for backend
-    const formData = {
-        code: editForm.code,
-        name: editForm.name,
-        start_date: editForm.date_range.start,
-        end_date: editForm.date_range.end,
-        enrollment_start_date: editForm.enrollment_date_range.start,
-        enrollment_end_date: editForm.enrollment_date_range.end,
-        is_active: editForm.is_active,
-        is_archived: editForm.is_archived,
-    };
-
-    editForm
-        .transform(() => formData)
-        .put(systemRoutes.semesters.update(selectedSemester.value!.id), {
-            onSuccess: () => {
-                closeModals();
+const submitEdit = async () => {
+    if (!selectedSemester.value) return;
+    
+    editFormProcessing.value = true;
+    editFormErrors.value = {};
+    
+    try {
+        // Transform date ranges to individual date fields for backend
+        const formData = {
+            code: editFormData.value.code,
+            name: editFormData.value.name,
+            start_date: editFormData.value.date_range.start,
+            end_date: editFormData.value.date_range.end,
+            enrollment_start_date: editFormData.value.enrollment_date_range.start,
+            enrollment_end_date: editFormData.value.enrollment_date_range.end,
+            is_active: editFormData.value.is_active,
+            is_archived: editFormData.value.is_archived,
+        };
+        
+        const response = await fetch(systemRoutes.semesters.apiUpdate(selectedSemester.value.id), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
             },
+            body: JSON.stringify(formData),
         });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            toast.success(result.message);
+            closeModals();
+            // Refresh the page data
+            router.reload({ only: ['semesters'] });
+        } else {
+            if (result.errors) {
+                editFormErrors.value = result.errors;
+            }
+            toast.error(result.message || 'Failed to update semester');
+        }
+    } catch (error) {
+        console.error('Error updating semester:', error);
+        toast.error('An unexpected error occurred');
+    } finally {
+        editFormProcessing.value = false;
+    }
 };
 
 const submitDelete = () => {
@@ -356,6 +370,7 @@ const submitDelete = () => {
 
     deleteForm.delete(systemRoutes.semesters.destroy(selectedSemester.value.id), {
         onSuccess: () => {
+            toast.success('Semester deleted successfully');
             closeModals();
         },
     });
@@ -374,9 +389,7 @@ const clearFilters = () => {
 const navigateToEnrollment = (semester: Semester) => {
     router.get(systemRoutes.semesters.enrollment(semester.id));
 };
-const hasActiveFilters = computed(
-    () => search.value || nameFilter.value || yearFilter.value || isActiveFilter.value !== null || isArchivedFilter.value !== null,
-);
+const hasActiveFilters = computed(() => search.value || nameFilter.value || yearFilter.value || isActiveFilter.value !== null || isArchivedFilter.value !== null);
 
 // Pagination navigation
 const handlePaginationNavigate = (url: string) => {
@@ -472,13 +485,7 @@ const handlePageSizeChange = (pageSize: number) => {
     <DataTable :data="semesters.data" :columns="columns" :empty-message="'No semesters found.'" />
 
     <!-- Pagination -->
-    <DataPagination
-        :pagination-data="semesters"
-        item-name="semesters"
-        @navigate="handlePaginationNavigate"
-        @page-size-change="handlePageSizeChange"
-        class="mt-4"
-    />
+    <DataPagination :pagination-data="semesters" item-name="semesters" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" class="mt-4" />
 
     <!-- Create Modal -->
     <Dialog v-model:open="showCreateModal">
@@ -491,56 +498,38 @@ const handlePageSizeChange = (pageSize: number) => {
             <div class="grid grid-cols-2 gap-4 py-4">
                 <div>
                     <Label for="create-code">Code *</Label>
-                    <Input
-                        id="create-code"
-                        v-model="createForm.code"
-                        placeholder="e.g., SPR2025"
-                        :class="{ 'border-red-500': createForm.errors.code }"
-                    />
+                    <Input id="create-code" v-model="createForm.code" placeholder="e.g., SPR2025" :class="{ 'border-red-500': createForm.errors.code }" />
                     <p v-if="createForm.errors.code" class="mt-1 text-sm text-red-500">{{ createForm.errors.code }}</p>
                 </div>
 
                 <div>
                     <Label for="create-name">Name *</Label>
-                    <Input
-                        id="create-name"
-                        v-model="createForm.name"
-                        placeholder="e.g., Spring 2025"
-                        :class="{ 'border-red-500': createForm.errors.name }"
-                    />
+                    <Input id="create-name" v-model="createForm.name" placeholder="e.g., Spring 2025" :class="{ 'border-red-500': createForm.errors.name }" />
                     <p v-if="createForm.errors.name" class="mt-1 text-sm text-red-500">{{ createForm.errors.name }}</p>
                 </div>
 
                 <div class="col-span-2">
                     <Label for="create-date-range">Semester Date Range *</Label>
                     <DateRangePicker v-model="createForm.date_range" placeholder="Select semester date range" />
-                    <p v-if="(createForm.errors as any).start_date" class="mt-1 text-sm text-red-500">
-                        Start Date: {{ (createForm.errors as any).start_date }}
-                    </p>
-                    <p v-if="(createForm.errors as any).end_date" class="mt-1 text-sm text-red-500">
-                        End Date: {{ (createForm.errors as any).end_date }}
-                    </p>
+                    <p v-if="(createForm.errors as any).start_date" class="mt-1 text-sm text-red-500">Start Date: {{ (createForm.errors as any).start_date }}</p>
+                    <p v-if="(createForm.errors as any).end_date" class="mt-1 text-sm text-red-500">End Date: {{ (createForm.errors as any).end_date }}</p>
                 </div>
 
                 <div class="col-span-2">
                     <Label for="create-enrollment-date-range">Enrollment Period (Optional)</Label>
                     <DateRangePicker v-model="createForm.enrollment_date_range" placeholder="Select enrollment period" />
-                    <p v-if="(createForm.errors as any).enrollment_start_date" class="mt-1 text-sm text-red-500">
-                        Enrollment Start Date: {{ (createForm.errors as any).enrollment_start_date }}
-                    </p>
-                    <p v-if="(createForm.errors as any).enrollment_end_date" class="mt-1 text-sm text-red-500">
-                        Enrollment End Date: {{ (createForm.errors as any).enrollment_end_date }}
-                    </p>
+                    <p v-if="(createForm.errors as any).enrollment_start_date" class="mt-1 text-sm text-red-500">Enrollment Start Date: {{ (createForm.errors as any).enrollment_start_date }}</p>
+                    <p v-if="(createForm.errors as any).enrollment_end_date" class="mt-1 text-sm text-red-500">Enrollment End Date: {{ (createForm.errors as any).enrollment_end_date }}</p>
                 </div>
 
                 <div class="col-span-2 space-y-4">
                     <div class="flex items-center space-x-2">
-                        <Switch id="create-is-active" v-model:checked="createForm.is_active" />
+                        <Switch id="create-is-active" v-model="createForm.is_active" />
                         <Label for="create-is-active">Is Active (Current Semester)</Label>
                     </div>
 
                     <div class="flex items-center space-x-2">
-                        <Switch id="create-is-archived" v-model:checked="createForm.is_archived" />
+                        <Switch id="create-is-archived" v-model="createForm.is_archived" />
                         <Label for="create-is-archived">Is Archived</Label>
                     </div>
                 </div>
@@ -566,60 +555,41 @@ const handlePageSizeChange = (pageSize: number) => {
             <div class="grid grid-cols-2 gap-4 py-4">
                 <div>
                     <Label for="edit-code">Code</Label>
-                    <Input id="edit-code" v-model="editForm.code" placeholder="e.g., SPR2025" :class="{ 'border-red-500': editForm.errors.code }" />
-                    <p v-if="editForm.errors.code" class="mt-1 text-sm text-red-500">{{ editForm.errors.code }}</p>
+                    <Input id="edit-code" v-model="editFormData.code" placeholder="e.g., SPR2025" :class="{ 'border-red-500': editFormErrors.code }" />
+                    <p v-if="editFormErrors.code" class="mt-1 text-sm text-red-500">{{ editFormErrors.code[0] }}</p>
                 </div>
 
                 <div>
                     <Label for="edit-name">Name *</Label>
-                    <Input
-                        id="edit-name"
-                        v-model="editForm.name"
-                        placeholder="e.g., Spring 2025"
-                        :class="{ 'border-red-500': editForm.errors.name }"
-                    />
-                    <p v-if="editForm.errors.name" class="mt-1 text-sm text-red-500">{{ editForm.errors.name }}</p>
+                    <Input id="edit-name" v-model="editFormData.name" placeholder="e.g., Spring 2025" :class="{ 'border-red-500': editFormErrors.name }" />
+                    <p v-if="editFormErrors.name" class="mt-1 text-sm text-red-500">{{ editFormErrors.name[0] }}</p>
                 </div>
 
                 <div class="col-span-2">
                     <Label for="edit-date-range">Semester Date Range *</Label>
-                    <DateRangePicker v-model="editForm.date_range" placeholder="Select semester date range" />
-                    <p v-if="(editForm.errors as any).start_date" class="mt-1 text-sm text-red-500">
-                        Start Date: {{ (editForm.errors as any).start_date }}
-                    </p>
-                    <p v-if="(editForm.errors as any).end_date" class="mt-1 text-sm text-red-500">
-                        End Date: {{ (editForm.errors as any).end_date }}
-                    </p>
+                    <DateRangePicker v-model="editFormData.date_range" placeholder="Select semester date range" />
+                    <p v-if="editFormErrors.start_date" class="mt-1 text-sm text-red-500">Start Date: {{ editFormErrors.start_date[0] }}</p>
+                    <p v-if="editFormErrors.end_date" class="mt-1 text-sm text-red-500">End Date: {{ editFormErrors.end_date[0] }}</p>
                 </div>
 
                 <div class="col-span-2">
                     <Label for="edit-enrollment-date-range">Enrollment Period (Optional)</Label>
-                    <DateRangePicker v-model="editForm.enrollment_date_range" placeholder="Select enrollment period" />
-                    <p v-if="(editForm.errors as any).enrollment_start_date" class="mt-1 text-sm text-red-500">
-                        Enrollment Start Date: {{ (editForm.errors as any).enrollment_start_date }}
-                    </p>
-                    <p v-if="(editForm.errors as any).enrollment_end_date" class="mt-1 text-sm text-red-500">
-                        Enrollment End Date: {{ (editForm.errors as any).enrollment_end_date }}
-                    </p>
+                    <DateRangePicker v-model="editFormData.enrollment_date_range" placeholder="Select enrollment period" />
+                    <p v-if="editFormErrors.enrollment_start_date" class="mt-1 text-sm text-red-500">Enrollment Start Date: {{ editFormErrors.enrollment_start_date[0] }}</p>
+                    <p v-if="editFormErrors.enrollment_end_date" class="mt-1 text-sm text-red-500">Enrollment End Date: {{ editFormErrors.enrollment_end_date[0] }}</p>
                 </div>
 
                 <div class="col-span-2 space-y-4">
                     <div class="flex items-center space-x-2">
-                        <Switch
-                            id="edit-is-active"
-                            v-model="editForm.is_active"
-                            :disabled="selectedSemester ? isSemesterRunning(selectedSemester) : false"
-                        />
+                        <Switch id="edit-is-active" v-model="editFormData.is_active" :disabled="selectedSemester ? isSemesterRunning(selectedSemester) : false" />
                         <div class="flex flex-col">
                             <Label for="edit-is-active">Is Active (Current Semester)</Label>
-                            <p v-if="selectedSemester && isSemesterRunning(selectedSemester)" class="text-muted-foreground text-xs">
-                                Cannot change active status during semester period
-                            </p>
+                            <p v-if="selectedSemester && isSemesterRunning(selectedSemester)" class="text-muted-foreground text-xs">Cannot change active status during semester period</p>
                         </div>
                     </div>
 
                     <div class="flex items-center space-x-2">
-                        <Switch id="edit-is-archived" v-model="editForm.is_archived" />
+                        <Switch id="edit-is-archived" v-model="editFormData.is_archived" />
                         <Label for="edit-is-archived">Is Archived</Label>
                     </div>
                 </div>
@@ -627,8 +597,8 @@ const handlePageSizeChange = (pageSize: number) => {
 
             <DialogFooter>
                 <Button variant="outline" @click="closeModals">Cancel</Button>
-                <Button @click="submitEdit" :disabled="editForm.processing">
-                    {{ editForm.processing ? 'Updating...' : 'Update Semester' }}
+                <Button @click="submitEdit" :disabled="editFormProcessing">
+                    {{ editFormProcessing ? 'Updating...' : 'Update Semester' }}
                 </Button>
             </DialogFooter>
         </DialogContent>

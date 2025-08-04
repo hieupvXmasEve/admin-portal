@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useApi } from '@/composables/useApiRequest';
-import type { BreadcrumbItem } from '@/types';
 import type { EquivalentUnit, PrerequisiteGroup, Unit } from '@/types/Unit';
 import { curriculumRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
@@ -33,21 +32,6 @@ const props = defineProps<{
     editRestrictions: EditRestriction[];
     prerequisiteDescriptions?: string | null;
 }>();
-
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Units',
-        href: '/units',
-    },
-    {
-        title: props.unit.code,
-        href: `/units/${props.unit.id}`,
-    },
-    {
-        title: 'Edit',
-        href: `/units/edit/${props.unit.id}`,
-    },
-];
 
 // Form handling
 const form = useForm({
@@ -327,9 +311,7 @@ const selectUnit = (unit: Unit) => {
                             {{ form.errors.code }}
                         </p>
 
-                        <p v-if="!isFieldRestricted('code')" class="text-sm text-gray-500">
-                            Unit code must be 2-20 characters, uppercase letters and numbers only.
-                        </p>
+                        <p v-if="!isFieldRestricted('code')" class="text-sm text-gray-500">Unit code must be 2-20 characters, uppercase letters and numbers only.</p>
                     </div>
 
                     <!-- Unit Name -->
@@ -364,15 +346,14 @@ const selectUnit = (unit: Unit) => {
                             v-model.number="form.credit_points"
                             @input="validateCreditPoints($event.target.value)"
                             type="number"
-                            step="0.25"
-                            min="0.25"
-                            max="999.99"
+                            step="1"
+                            min="1"
+                            max="20"
                             placeholder="3.00"
                             :class="{
                                 'border-red-500': form.errors.credit_points,
                                 'bg-gray-50': isFieldRestricted('credit_points'),
                             }"
-                            disabled
                             required
                         />
                         <p v-if="isFieldRestricted('credit_points')" class="text-sm text-amber-600">
@@ -381,9 +362,7 @@ const selectUnit = (unit: Unit) => {
                         <p v-else-if="form.errors.credit_points" class="text-sm text-red-600">
                             {{ form.errors.credit_points }}
                         </p>
-                        <p v-if="!isFieldRestricted('credit_points')" class="text-sm text-gray-500">
-                            Credit points must be between 0.25 and 999.99 (e.g., 3.00, 6.00).
-                        </p>
+                        <p v-if="!isFieldRestricted('credit_points')" class="text-sm text-gray-500">Credit points must be between 0.25 and 999.99 (e.g., 3.00, 6.00).</p>
                     </div>
                 </CardContent>
             </Card>
@@ -392,10 +371,7 @@ const selectUnit = (unit: Unit) => {
             <Card>
                 <CardHeader>
                     <CardTitle>Prerequisites</CardTitle>
-                    <CardDescription>
-                        Define prerequisite requirements using five types: P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A
-                        (Anti-requisite), and AK (Assumed Knowledge). Group conditions with AND/OR logic operators for complex requirements.
-                    </CardDescription>
+                    <CardDescription> Define prerequisite requirements using five types: P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A (Anti-requisite), and AK (Assumed Knowledge). Group conditions with AND/OR logic operators for complex requirements. </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <!-- Current Prerequisites -->
@@ -404,11 +380,7 @@ const selectUnit = (unit: Unit) => {
                         <pre class="text-sm font-medium whitespace-pre-wrap text-blue-700">{{ prerequisiteDescriptions }}</pre>
                     </div>
 
-                    <PrerequisiteGroupsManager
-                        :initial-groups="prerequisiteGroups"
-                        :current-unit-id="unit.id"
-                        @update="(groups) => (prerequisiteGroups = groups)"
-                    />
+                    <PrerequisiteGroupsManager :initial-groups="prerequisiteGroups" :current-unit-id="unit.id" @update="(groups) => (prerequisiteGroups = groups)" />
                 </CardContent>
             </Card>
 
@@ -427,11 +399,7 @@ const selectUnit = (unit: Unit) => {
 
                     <!-- Selected Equivalent Units -->
                     <div v-if="equivalentUnits.length > 0" class="space-y-3">
-                        <div
-                            v-for="(equivalent, index) in equivalentUnits"
-                            :key="equivalent.unit.id"
-                            class="space-y-3 rounded-lg border bg-gray-50 p-3"
-                        >
+                        <div v-for="(equivalent, index) in equivalentUnits" :key="equivalent.unit.id" class="space-y-3 rounded-lg border bg-gray-50 p-3">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
                                     <div class="mb-1 flex items-center gap-2">
@@ -449,13 +417,7 @@ const selectUnit = (unit: Unit) => {
                             </div>
                             <div>
                                 <Label :for="`reason-${index}`" class="text-xs">Reason (optional)</Label>
-                                <Input
-                                    :id="`reason-${index}`"
-                                    v-model="equivalent.reason"
-                                    @input="updateEquivalentReason(index, $event.target.value)"
-                                    placeholder="e.g., Curriculum update, Content overlap"
-                                    class="mt-1"
-                                />
+                                <Input :id="`reason-${index}`" v-model="equivalent.reason" @input="updateEquivalentReason(index, $event.target.value)" placeholder="e.g., Curriculum update, Content overlap" class="mt-1" />
                             </div>
                         </div>
                     </div>
@@ -466,9 +428,7 @@ const selectUnit = (unit: Unit) => {
 
             <!-- Form Actions -->
             <div class="flex items-center justify-end space-x-4 pt-6">
-                <Button type="button" variant="outline" @click="router.visit(curriculumRoutes.units.show(unit.id))" :disabled="form.processing">
-                    Cancel
-                </Button>
+                <Button type="button" variant="outline" @click="router.visit(curriculumRoutes.units.show(unit.id))" :disabled="form.processing"> Cancel </Button>
                 <Button type="submit" :disabled="form.processing || codeValidation?.valid === false">
                     <Save class="mr-2 h-4 w-4" />
                     {{ form.processing ? 'Saving...' : 'Save Changes' }}
@@ -490,13 +450,7 @@ const selectUnit = (unit: Unit) => {
             <div class="space-y-4">
                 <div class="relative">
                     <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <DebouncedInput
-                        v-model="unitSearchQuery"
-                        @debounced="handleUnitSearch"
-                        placeholder="Search by unit code or name..."
-                        class="pl-9"
-                        autofocus
-                    />
+                    <DebouncedInput v-model="unitSearchQuery" @debounced="handleUnitSearch" placeholder="Search by unit code or name..." class="pl-9" autofocus />
                 </div>
 
                 <div v-if="isSearchingUnits" class="py-4 text-center">
@@ -505,12 +459,7 @@ const selectUnit = (unit: Unit) => {
                 </div>
 
                 <div v-else-if="unitSearchResults.length > 0" class="max-h-60 space-y-2 overflow-y-auto">
-                    <div
-                        v-for="unit in unitSearchResults"
-                        :key="unit.id"
-                        class="cursor-pointer rounded-lg border p-3 hover:bg-gray-50"
-                        @click="selectUnit(unit)"
-                    >
+                    <div v-for="unit in unitSearchResults" :key="unit.id" class="cursor-pointer rounded-lg border p-3 hover:bg-gray-50" @click="selectUnit(unit)">
                         <div class="flex items-center justify-between">
                             <div>
                                 <code class="font-mono text-sm">{{ unit.code }}</code>

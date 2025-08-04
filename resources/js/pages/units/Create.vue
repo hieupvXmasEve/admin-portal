@@ -54,7 +54,7 @@ const validateCode = async (code: string) => {
     isValidatingCode.value = true;
 
     try {
-        const result = await api.post('/api/units/validate-code', {
+        const result = await api.post('/units/validate-code', {
             code: code,
         });
 
@@ -93,7 +93,7 @@ const searchUnits = async (query: string) => {
             limit: '10',
         };
 
-        const result = await api.get('/api/units/search', params);
+        const result = await api.get('/units/search', params);
 
         if (result.data.value?.success) {
             unitSearchResults.value = result.data.value.data;
@@ -229,224 +229,217 @@ const selectUnit = (unit: Unit) => {
     </div>
 
     <!-- Form -->
-    <div class="mx-auto w-full max-w-4xl">
-        <form @submit.prevent="handleSubmit" class="space-y-6">
-            <!-- Basic Information -->
-            <Card>
-                <CardHeader>
-                    <CardTitle>Basic Information</CardTitle>
-                    <CardDescription> Create a new unit with code, name, and credit points.</CardDescription>
-                </CardHeader>
-                <CardContent class="space-y-6">
-                    <!-- Unit Code -->
-                    <div class="space-y-2">
-                        <Label for="code">Unit Code *</Label>
-                        <div class="relative">
-                            <Input
-                                id="code"
-                                v-model="form.code"
-                                @input="formatCode($event.target.value)"
-                                placeholder="e.g., CS101, MATH201"
-                                :class="{
-                                    'border-red-500': form.errors.code || codeValidation?.valid === false,
-                                    'border-green-500': codeValidation?.valid === true,
-                                }"
-                                maxlength="20"
-                                required
-                            />
-                            <div v-if="isValidatingCode" class="absolute top-1/2 right-3 -translate-y-1/2">
-                                <div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
-                            </div>
-                        </div>
-
-                        <!-- Code validation feedback -->
-                        <div v-if="codeValidation" class="text-sm">
-                            <p
-                                :class="{
-                                    'text-green-600': codeValidation.valid,
-                                    'text-red-600': !codeValidation.valid,
-                                }"
-                            >
-                                {{ codeValidation.message }}
-                            </p>
-                        </div>
-
-                        <!-- Server validation errors -->
-                        <p v-if="form.errors.code" class="text-sm text-red-600">
-                            {{ form.errors.code }}
-                        </p>
-
-                        <p class="text-sm text-gray-500">Unit code must be 2-20 characters, uppercase letters and numbers only.</p>
-                    </div>
-
-                    <!-- Unit Name -->
-                    <div class="space-y-2">
-                        <Label for="name">Unit Name *</Label>
+    <form @submit.prevent="handleSubmit" class="space-y-4">
+        <!-- Basic Information -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Basic Information</CardTitle>
+                <CardDescription> Create a new unit with code, name, and credit points.</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-6">
+                <!-- Unit Code -->
+                <div class="space-y-2">
+                    <Label for="code">Unit Code *</Label>
+                    <div class="relative">
                         <Input
-                            id="name"
-                            v-model="form.name"
-                            placeholder="e.g., Introduction to Computer Science"
-                            :class="{ 'border-red-500': form.errors.name }"
-                            maxlength="255"
+                            id="code"
+                            v-model="form.code"
+                            @input="formatCode($event.target.value)"
+                            placeholder="e.g., CS101, MATH201"
+                            :class="{
+                                'border-red-500': form.errors.code || codeValidation?.valid === false,
+                                'border-green-500': codeValidation?.valid === true,
+                            }"
+                            maxlength="20"
                             required
                         />
-                        <p v-if="form.errors.name" class="text-sm text-red-600">
-                            {{ form.errors.name }}
-                        </p>
-                        <p class="text-sm text-gray-500">Enter the full name of the unit (3-255 characters).</p>
+                        <div v-if="isValidatingCode" class="absolute top-1/2 right-3 -translate-y-1/2">
+                            <div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+                        </div>
                     </div>
 
-                    <!-- Credit Points -->
-                    <div class="space-y-2">
-                        <Label for="credit_points">Credit Points *</Label>
-                        <Input
-                            id="credit_points"
-                            v-model.number="form.credit_points"
-                            @input="validateCreditPoints($event.target.value)"
-                            type="number"
-                            step="0.25"
-                            min="0.25"
-                            max="999.99"
-                            placeholder="3.00"
-                            :class="{ 'border-red-500': form.errors.credit_points }"
-                            required
-                            disabled
-                        />
-                        <p v-if="form.errors.credit_points" class="text-sm text-red-600">
-                            {{ form.errors.credit_points }}
-                        </p>
-                        <p class="text-sm text-gray-500">Credit points must be between 0.25 and 999.99 (e.g., 3.00, 6.00).</p>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <!-- Prerequisites -->
-            <Card>
-                <CardHeader>
-                    <CardTitle>Prerequisites</CardTitle>
-                    <CardDescription>
-                        Define prerequisite requirements using five types: P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A
-                        (Anti-requisite), and AK (Assumed Knowledge). Group conditions with AND/OR logic operators for complex requirements.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <PrerequisiteGroupsManager :initial-groups="prerequisiteGroups" @update="(groups) => (prerequisiteGroups = groups)" />
-                </CardContent>
-            </Card>
-
-            <!-- Equivalent Units -->
-            <Card>
-                <CardHeader>
-                    <CardTitle>Equivalent Units</CardTitle>
-                    <CardDescription> Specify units that this unit replaces or is equivalent to (optional). </CardDescription>
-                </CardHeader>
-                <CardContent class="space-y-4">
-                    <!-- Add Equivalent Unit Button -->
-                    <Button type="button" variant="outline" @click="openUnitSearch()" class="w-full sm:w-auto">
-                        <Plus class="mr-2 h-4 w-4" />
-                        Add Equivalent Unit
-                    </Button>
-
-                    <!-- Selected Equivalent Units -->
-                    <div v-if="equivalentUnits.length > 0" class="space-y-3">
-                        <div
-                            v-for="(equivalent, index) in equivalentUnits"
-                            :key="equivalent.unit.id"
-                            class="space-y-3 rounded-lg border bg-gray-50 p-3"
+                    <!-- Code validation feedback -->
+                    <div v-if="codeValidation" class="text-sm">
+                        <p
+                            :class="{
+                                'text-green-600': codeValidation.valid,
+                                'text-red-600': !codeValidation.valid,
+                            }"
                         >
-                            <div class="flex items-center justify-between">
-                                <div class="flex-1">
-                                    <div class="mb-1 flex items-center gap-2">
-                                        <code class="rounded bg-white px-2 py-1 font-mono text-sm">
-                                            {{ equivalent.unit.code }}
-                                        </code>
-                                        <Badge class="bg-purple-100 text-purple-800"> Equivalent</Badge>
-                                    </div>
-                                    <p class="text-sm text-gray-600">{{ equivalent.unit.name }}</p>
-                                    <p class="text-xs text-gray-500">{{ equivalent.unit.credit_points }} CP</p>
-                                </div>
-                                <Button type="button" variant="ghost" size="sm" @click="removeEquivalentUnit(index)">
-                                    <X class="h-4 w-4" />
-                                </Button>
-                            </div>
-                            <div>
-                                <Label :for="`reason-${index}`" class="text-xs">Reason (optional)</Label>
-                                <Input
-                                    :id="`reason-${index}`"
-                                    v-model="equivalent.reason"
-                                    placeholder="e.g., Curriculum update, Content overlap"
-                                    class="mt-1"
-                                />
-                            </div>
-                        </div>
+                            {{ codeValidation.message }}
+                        </p>
                     </div>
 
-                    <p v-else class="text-sm text-gray-500 italic">No equivalent units specified. This unit does not replace any existing units.</p>
-                </CardContent>
-            </Card>
+                    <!-- Server validation errors -->
+                    <p v-if="form.errors.code" class="text-sm text-red-600">
+                        {{ form.errors.code }}
+                    </p>
 
-            <!-- Unit Search Modal -->
-            <div v-if="showUnitSearch" class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
-                <div class="mx-4 max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6">
-                    <div class="mb-4 flex items-center justify-between">
-                        <h3 class="text-lg font-semibold">Search Units - Equivalent Units</h3>
-                        <Button variant="ghost" size="sm" @click="showUnitSearch = false">
-                            <X class="h-4 w-4" />
-                        </Button>
-                    </div>
+                    <p class="text-sm text-gray-500">Unit code must be 2-20 characters, uppercase letters and numbers only.</p>
+                </div>
 
-                    <div class="space-y-4">
-                        <div class="relative">
-                            <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                            <Input v-model="unitSearchQuery" placeholder="Search by unit code or name..." class="pl-9" autofocus />
-                        </div>
+                <!-- Unit Name -->
+                <div class="space-y-2">
+                    <Label for="name">Unit Name *</Label>
+                    <Input
+                        id="name"
+                        v-model="form.name"
+                        placeholder="e.g., Introduction to Computer Science"
+                        :class="{ 'border-red-500': form.errors.name }"
+                        maxlength="255"
+                        required
+                    />
+                    <p v-if="form.errors.name" class="text-sm text-red-600">
+                        {{ form.errors.name }}
+                    </p>
+                    <p class="text-sm text-gray-500">Enter the full name of the unit (3-255 characters).</p>
+                </div>
 
-                        <div v-if="isSearchingUnits" class="py-4 text-center">
-                            <div class="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
-                            <p class="mt-2 text-sm text-gray-500">Searching units...</p>
-                        </div>
+                <!-- Credit Points -->
+                <div class="space-y-2">
+                    <Label for="credit_points">Credit Points *</Label>
+                    <Input
+                        id="credit_points"
+                        v-model.number="form.credit_points"
+                        @input="validateCreditPoints($event.target.value)"
+                        type="number"
+                        step="1"
+                        min="1"
+                        max="20"
+                        placeholder="3.00"
+                        :class="{ 'border-red-500': form.errors.credit_points }"
+                        required
+                    />
+                    <p v-if="form.errors.credit_points" class="text-sm text-red-600">
+                        {{ form.errors.credit_points }}
+                    </p>
+                    <p class="text-sm text-gray-500">Credit points must be between 0.25 and 999.99 (e.g., 3.00, 6.00).</p>
+                </div>
+            </CardContent>
+        </Card>
 
-                        <div v-else-if="unitSearchResults.length > 0" class="max-h-60 space-y-2 overflow-y-auto">
-                            <div
-                                v-for="unit in unitSearchResults"
-                                :key="unit.id"
-                                class="cursor-pointer rounded-lg border p-3 hover:bg-gray-50"
-                                @click="selectUnit(unit)"
-                            >
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <code class="font-mono text-sm">{{ unit.code }}</code>
-                                        <p class="text-sm text-gray-600">{{ unit.name }}</p>
-                                        <p class="text-xs text-gray-500">{{ unit.credit_points }} CP</p>
-                                    </div>
-                                    <Button variant="ghost" size="sm">
-                                        <Plus class="h-4 w-4" />
-                                    </Button>
+        <!-- Prerequisites -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Prerequisites</CardTitle>
+                <CardDescription>
+                    Define prerequisite requirements using five types: P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A
+                    (Anti-requisite), and AK (Assumed Knowledge). Group conditions with AND/OR logic operators for complex requirements.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <PrerequisiteGroupsManager :initial-groups="prerequisiteGroups" @update="(groups) => (prerequisiteGroups = groups)" />
+            </CardContent>
+        </Card>
+
+        <!-- Equivalent Units -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Equivalent Units</CardTitle>
+                <CardDescription> Specify units that this unit replaces or is equivalent to (optional). </CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <!-- Add Equivalent Unit Button -->
+                <Button type="button" variant="outline" @click="openUnitSearch()" class="w-full sm:w-auto">
+                    <Plus class="mr-2 h-4 w-4" />
+                    Add Equivalent Unit
+                </Button>
+
+                <!-- Selected Equivalent Units -->
+                <div v-if="equivalentUnits.length > 0" class="space-y-3">
+                    <div v-for="(equivalent, index) in equivalentUnits" :key="equivalent.unit.id" class="space-y-3 rounded-lg border bg-gray-50 p-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="mb-1 flex items-center gap-2">
+                                    <code class="rounded bg-white px-2 py-1 font-mono text-sm">
+                                        {{ equivalent.unit.code }}
+                                    </code>
+                                    <Badge class="bg-purple-100 text-purple-800"> Equivalent</Badge>
                                 </div>
+                                <p class="text-sm text-gray-600">{{ equivalent.unit.name }}</p>
+                                <p class="text-xs text-gray-500">{{ equivalent.unit.credit_points }} CP</p>
                             </div>
+                            <Button type="button" variant="ghost" size="sm" @click="removeEquivalentUnit(index)">
+                                <X class="h-4 w-4" />
+                            </Button>
                         </div>
-
-                        <div v-else-if="unitSearchQuery.length >= 2" class="py-4 text-center">
-                            <p class="text-sm text-gray-500">No units found matching "{{ unitSearchQuery }}"</p>
-                        </div>
-
-                        <div v-else class="py-4 text-center">
-                            <p class="text-sm text-gray-500">Type at least 2 characters to search for units</p>
+                        <div>
+                            <Label :for="`reason-${index}`" class="text-xs">Reason (optional)</Label>
+                            <Input
+                                :id="`reason-${index}`"
+                                v-model="equivalent.reason"
+                                placeholder="e.g., Curriculum update, Content overlap"
+                                class="mt-1"
+                            />
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Form Actions -->
-            <div class="flex items-center justify-end space-x-4 pt-6">
-                <Button type="button" variant="outline" @click="router.visit(curriculumRoutes.units.index())" :disabled="form.processing">
-                    Cancel
-                </Button>
-                <Button type="submit" :disabled="form.processing || codeValidation?.valid === false">
-                    <Save class="mr-2 h-4 w-4" />
-                    {{ form.processing ? 'Creating...' : 'Create Unit' }}
-                </Button>
+                <p v-else class="text-sm text-gray-500 italic">No equivalent units specified. This unit does not replace any existing units.</p>
+            </CardContent>
+        </Card>
+
+        <!-- Unit Search Modal -->
+        <div v-if="showUnitSearch" class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+            <div class="mx-4 max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold">Search Units - Equivalent Units</h3>
+                    <Button variant="ghost" size="sm" @click="showUnitSearch = false">
+                        <X class="h-4 w-4" />
+                    </Button>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="relative">
+                        <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input v-model="unitSearchQuery" placeholder="Search by unit code or name..." class="pl-9" autofocus />
+                    </div>
+
+                    <div v-if="isSearchingUnits" class="py-4 text-center">
+                        <div class="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+                        <p class="mt-2 text-sm text-gray-500">Searching units...</p>
+                    </div>
+
+                    <div v-else-if="unitSearchResults.length > 0" class="max-h-60 space-y-2 overflow-y-auto">
+                        <div
+                            v-for="unit in unitSearchResults"
+                            :key="unit.id"
+                            class="cursor-pointer rounded-lg border p-3 hover:bg-gray-50"
+                            @click="selectUnit(unit)"
+                        >
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <code class="font-mono text-sm">{{ unit.code }}</code>
+                                    <p class="text-sm text-gray-600">{{ unit.name }}</p>
+                                    <p class="text-xs text-gray-500">{{ unit.credit_points }} CP</p>
+                                </div>
+                                <Button variant="ghost" size="sm">
+                                    <Plus class="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-else-if="unitSearchQuery.length >= 2" class="py-4 text-center">
+                        <p class="text-sm text-gray-500">No units found matching "{{ unitSearchQuery }}"</p>
+                    </div>
+
+                    <div v-else class="py-4 text-center">
+                        <p class="text-sm text-gray-500">Type at least 2 characters to search for units</p>
+                    </div>
+                </div>
             </div>
-        </form>
-    </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="flex items-center justify-end space-x-4 pt-6">
+            <Button type="button" variant="outline" @click="router.visit(curriculumRoutes.units.index())" :disabled="form.processing">
+                Cancel
+            </Button>
+            <Button type="submit" :disabled="form.processing || codeValidation?.valid === false">
+                <Save class="mr-2 h-4 w-4" />
+                {{ form.processing ? 'Creating...' : 'Create Unit' }}
+            </Button>
+        </div>
+    </form>
 </template>

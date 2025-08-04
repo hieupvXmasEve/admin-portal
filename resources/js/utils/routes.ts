@@ -49,6 +49,7 @@ export const systemRoutes = {
         destroy: (id: number) => route(SEMESTER_ROUTE_NAMES.DESTROY, { semester: id }),
         show: (id: number) => route(SEMESTER_ROUTE_NAMES.SHOW, { semester: id }),
         enrollment: (id: number) => route(SEMESTER_ROUTE_NAMES.ENROLLMENT_SHOW, { semester: id }),
+        apiUpdate: (id: number) => route(SEMESTER_ROUTE_NAMES.API_UPDATE, { semester: id }),
     },
     // Campus Management Routes
     campuses: {
@@ -61,8 +62,7 @@ export const systemRoutes = {
             store: (campusId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_STORE, { campus: campusId }),
             edit: (campusId: number, buildingId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_EDIT, { campus: campusId, building: buildingId }),
             update: (campusId: number, buildingId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_UPDATE, { campus: campusId, building: buildingId }),
-            destroy: (campusId: number, buildingId: number) =>
-                route(CAMPUS_ROUTE_NAMES.BUILDINGS_DESTROY, { campus: campusId, building: buildingId }),
+            destroy: (campusId: number, buildingId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_DESTROY, { campus: campusId, building: buildingId }),
         },
     },
     // Room Management Routes

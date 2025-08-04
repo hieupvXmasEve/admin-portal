@@ -21,5 +21,6 @@ Route::middleware(['auth'])->name('api.admin.')->group(function () {
     Route::get('/students', [StudentController::class, 'index'])->name('students.index');
     Route::get('/students/stats', [StudentController::class, 'stats'])->name('students.stats');
 
+
     // Other admin API routes can go here if needed
 });
