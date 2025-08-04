@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Unit;
-use App\Models\UnitPrerequisiteGroup;
-use App\Models\UnitPrerequisiteCondition;
 use App\Models\EquivalentUnit;
 use App\Models\Semester;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
+use App\Models\Unit;
+use App\Models\UnitPrerequisiteCondition;
+use App\Models\UnitPrerequisiteGroup;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -21,11 +19,17 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class UnitExcelImportService
 {
     private array $importResults = [];
+
     private array $errors = [];
+
     private array $warnings = [];
+
     private int $processedRows = 0;
+
     private int $successfulRows = 0;
+
     private int $failedRows = 0;
+
     private int $skippedRows = 0;
 
     public function importUnitsFromExcel(string $filePath, array $options = []): array
@@ -40,6 +44,12 @@ class UnitExcelImportService
             $spreadsheet = IOFactory::load($filePath);
             $format = $this->detectFormat($spreadsheet);
 
+            Log::info('Detected import format', [
+                'file' => $filePath,
+                'format' => $format,
+                'sheet_names' => array_map(fn ($sheet) => $sheet->getTitle(), $spreadsheet->getAllSheets()),
+            ]);
+
             // Process based on format
             switch ($format) {
                 case 'simple':
@@ -51,15 +61,26 @@ class UnitExcelImportService
                 case 'complete':
                     $this->processCompleteFormat($spreadsheet, $options);
                     break;
+                case 'unknown':
                 default:
-                    throw new \Exception('Unable to detect import format');
+                    // Get first sheet headers for debugging
+                    $firstSheet = $spreadsheet->getActiveSheet();
+                    $headers = $this->getSheetHeaders($firstSheet);
+
+                    Log::error('Unable to detect import format', [
+                        'file' => $filePath,
+                        'headers' => $headers,
+                        'sheet_names' => array_map(fn ($sheet) => $sheet->getTitle(), $spreadsheet->getAllSheets()),
+                    ]);
+
+                    throw new \Exception('Unable to detect import format. Please ensure your file has the correct headers: Code*, Name*, Credit Points*');
             }
 
             return $this->generateImportReport();
         } catch (\Exception $e) {
-            Log::error('Unit import failed: ' . $e->getMessage(), [
+            Log::error('Unit import failed: '.$e->getMessage(), [
                 'file' => $filePath,
-                'options' => $options
+                'options' => $options,
             ]);
 
             throw $e;
@@ -68,7 +89,7 @@ class UnitExcelImportService
 
     public function validateImportFile(string $filePath): bool
     {
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             throw new \Exception('Import file not found');
         }
 
@@ -83,8 +104,8 @@ class UnitExcelImportService
         $allowedExtensions = config('import.allowed_extensions', ['xlsx', 'xls']);
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
 
-        if (!in_array($extension, $allowedExtensions)) {
-            throw new \Exception('Invalid file format. Allowed formats: ' . implode(', ', $allowedExtensions));
+        if (! in_array($extension, $allowedExtensions)) {
+            throw new \Exception('Invalid file format. Allowed formats: '.implode(', ', $allowedExtensions));
         }
 
         return true;
@@ -97,10 +118,15 @@ class UnitExcelImportService
         $spreadsheet = IOFactory::load($filePath);
         $format = $this->detectFormat($spreadsheet);
 
+        // If format is unknown, still show preview but with simple format assumption
+        if ($format === 'unknown') {
+            $format = 'simple';
+        }
+
         $preview = [
             'format' => $format,
             'sheets' => [],
-            'estimated_units' => 0
+            'estimated_units' => 0,
         ];
 
         foreach ($spreadsheet->getAllSheets() as $index => $worksheet) {
@@ -109,7 +135,7 @@ class UnitExcelImportService
                 'name' => $worksheet->getTitle(),
                 'headers' => $sheetData['headers'],
                 'data' => $sheetData['data'],
-                'total_rows' => $sheetData['total_rows']
+                'total_rows' => $sheetData['total_rows'],
             ];
         }
 
@@ -147,7 +173,7 @@ class UnitExcelImportService
                     $this->errors[] = [
                         'row' => $actualRowNumber,
                         'error' => $e->getMessage(),
-                        'data' => $row
+                        'data' => $row,
                     ];
                 }
             }
@@ -166,7 +192,7 @@ class UnitExcelImportService
             $sheets[$worksheet->getTitle()] = $this->worksheetToArray($worksheet);
         }
 
-        if (!isset($sheets['Units'])) {
+        if (! isset($sheets['Units'])) {
             throw new \Exception('Required sheet not found. Expected: Units');
         }
 
@@ -195,7 +221,7 @@ class UnitExcelImportService
             $sheets[$worksheet->getTitle()] = $this->worksheetToArray($worksheet);
         }
 
-        if (!isset($sheets['Units'])) {
+        if (! isset($sheets['Units'])) {
             throw new \Exception('Required sheet not found. Expected: Units');
         }
 
@@ -228,11 +254,11 @@ class UnitExcelImportService
         $validator = Validator::make($unitData, [
             'code' => 'required|string|max:20',
             'name' => 'required|string|max:255',
-            'credit_points' => 'required|numeric|min:0.25|max:999.99'
+            'credit_points' => 'required|numeric|min:0.25|max:999.99',
         ]);
 
         if ($validator->fails()) {
-            throw new \Exception('Validation failed: ' . implode(', ', $validator->errors()->all()));
+            throw new \Exception('Validation failed: '.implode(', ', $validator->errors()->all()));
         }
 
         // Check if unit exists
@@ -245,13 +271,13 @@ class UnitExcelImportService
                 case 'skip':
                     $this->warnings[] = [
                         'row' => $rowNumber,
-                        'message' => 'Unit already exists, skipped'
+                        'message' => 'Unit already exists, skipped',
                     ];
+
                     return $existingUnit;
 
                 case 'error':
                     throw new \Exception('Unit with code already exists');
-
                 case 'update':
                 default:
                     $existingUnit->update([
@@ -261,7 +287,7 @@ class UnitExcelImportService
 
                     $this->warnings[] = [
                         'row' => $rowNumber,
-                        'message' => 'Unit already exists, updated information'
+                        'message' => 'Unit already exists, updated information',
                     ];
 
                     return $existingUnit;
@@ -280,18 +306,18 @@ class UnitExcelImportService
     {
         // Find units
         $unit = Unit::where('code', $unitCode)->first();
-        if (!$unit) {
+        if (! $unit) {
             throw new \Exception("Unit with code '{$unitCode}' not found");
         }
 
         $requiredUnit = Unit::where('code', $requiredUnitCode)->first();
-        if (!$requiredUnit) {
+        if (! $requiredUnit) {
             throw new \Exception("Required unit with code '{$requiredUnitCode}' not found");
         }
 
         // Check if prerequisite group exists for this unit
         $group = UnitPrerequisiteGroup::where('unit_id', $unit->id)->first();
-        if (!$group) {
+        if (! $group) {
             $group = UnitPrerequisiteGroup::create([
                 'unit_id' => $unit->id,
                 'logic_operator' => 'AND',
@@ -303,14 +329,15 @@ class UnitExcelImportService
         $existingCondition = UnitPrerequisiteCondition::where([
             'group_id' => $group->id,
             'type' => $type,
-            'required_unit_id' => $requiredUnit->id
+            'required_unit_id' => $requiredUnit->id,
         ])->first();
 
         if ($existingCondition) {
             $this->warnings[] = [
                 'row' => $rowNumber,
-                'message' => "Prerequisite relationship already exists between {$unitCode} and {$requiredUnitCode}"
+                'message' => "Prerequisite relationship already exists between {$unitCode} and {$requiredUnitCode}",
             ];
+
             return;
         }
 
@@ -326,26 +353,27 @@ class UnitExcelImportService
     {
         // Find units
         $unit = Unit::where('code', $unitCode)->first();
-        if (!$unit) {
+        if (! $unit) {
             throw new \Exception("Unit with code '{$unitCode}' not found");
         }
 
         $equivalentUnit = Unit::where('code', $equivalentUnitCode)->first();
-        if (!$equivalentUnit) {
+        if (! $equivalentUnit) {
             throw new \Exception("Equivalent unit with code '{$equivalentUnitCode}' not found");
         }
 
         // Check if relationship already exists
         $existingEquivalent = EquivalentUnit::where([
             'unit_id' => $unit->id,
-            'equivalent_unit_id' => $equivalentUnit->id
+            'equivalent_unit_id' => $equivalentUnit->id,
         ])->first();
 
         if ($existingEquivalent) {
             $this->warnings[] = [
                 'row' => $rowNumber,
-                'message' => "Equivalent relationship already exists between {$unitCode} and {$equivalentUnitCode}"
+                'message' => "Equivalent relationship already exists between {$unitCode} and {$equivalentUnitCode}",
             ];
+
             return;
         }
 
@@ -378,8 +406,19 @@ class UnitExcelImportService
         $firstSheet = $spreadsheet->getActiveSheet();
         $headers = $this->getSheetHeaders($firstSheet);
 
+        // Clean headers by removing asterisks and trimming whitespace for comparison
+        $cleanHeaders = array_map(function ($header) {
+            return trim(str_replace('*', '', $header));
+        }, $headers);
+
         // Simple format: basic unit fields only
-        if (in_array('Code', $headers) && in_array('Name', $headers) && in_array('Credit Points', $headers)) {
+        if (in_array('Code', $cleanHeaders) && in_array('Name', $cleanHeaders) && in_array('Credit Points', $cleanHeaders)) {
+            return 'simple';
+        }
+
+        // If we can't detect format but there are headers, default to simple format
+        // This handles cases where headers might have different formatting
+        if (count($cleanHeaders) >= 3) {
             return 'simple';
         }
 
@@ -397,7 +436,7 @@ class UnitExcelImportService
         $headers = [];
 
         for ($col = 'A'; $col <= $highestColumn; $col++) {
-            $headers[] = $worksheet->getCell($col . '1')->getValue();
+            $headers[] = $worksheet->getCell($col.'1')->getValue();
         }
 
         return array_filter($headers); // Remove empty headers
@@ -406,12 +445,12 @@ class UnitExcelImportService
     private function getSheetPreview(Worksheet $worksheet, int $previewRows): array
     {
         $data = $this->worksheetToArray($worksheet);
-        $headers = !empty($data) ? array_shift($data) : [];
+        $headers = ! empty($data) ? array_shift($data) : [];
 
         return [
             'headers' => $headers,
             'data' => array_slice($data, 0, $previewRows),
-            'total_rows' => count($data)
+            'total_rows' => count($data),
         ];
     }
 
@@ -438,8 +477,8 @@ class UnitExcelImportService
 
         $missing = array_diff($required, $cleanHeaders);
 
-        if (!empty($missing)) {
-            throw new \Exception('Missing required headers: ' . implode(', ', $missing));
+        if (! empty($missing)) {
+            throw new \Exception('Missing required headers: '.implode(', ', $missing));
         }
     }
 
@@ -452,6 +491,7 @@ class UnitExcelImportService
             $key = strtolower(str_replace(' ', '_', $cleanHeader));
             $mapped[$key] = $row[$index] ?? null;
         }
+
         return $mapped;
     }
 
@@ -463,7 +503,9 @@ class UnitExcelImportService
 
     private function processUnitsSheet(array $data, array $options): void
     {
-        if (empty($data)) return;
+        if (empty($data)) {
+            return;
+        }
 
         $headers = array_shift($data);
 
@@ -480,7 +522,7 @@ class UnitExcelImportService
                 $this->errors[] = [
                     'row' => $actualRowNumber,
                     'error' => $e->getMessage(),
-                    'data' => $row
+                    'data' => $row,
                 ];
             }
         }
@@ -488,7 +530,9 @@ class UnitExcelImportService
 
     private function processPrerequisitesSheet(array $data, array $options): void
     {
-        if (empty($data)) return;
+        if (empty($data)) {
+            return;
+        }
 
         $headers = array_shift($data);
 
@@ -513,20 +557,21 @@ class UnitExcelImportService
                     $this->errors[] = [
                         'row' => $actualRowNumber,
                         'error' => 'Unit code is required',
-                        'data' => $row
+                        'data' => $row,
                     ];
+
                     continue;
                 }
 
                 // Create a unique group key based on unit code, logic, and description
-                $groupKey = $unitCode . '|' . $groupLogic . '|' . $groupDescription;
+                $groupKey = $unitCode.'|'.$groupLogic.'|'.$groupDescription;
 
-                if (!isset($groupedPrerequisites[$groupKey])) {
+                if (! isset($groupedPrerequisites[$groupKey])) {
                     $groupedPrerequisites[$groupKey] = [
                         'unit_code' => $unitCode,
                         'group_logic' => $groupLogic,
                         'group_description' => $groupDescription ?: 'Imported prerequisites',
-                        'conditions' => []
+                        'conditions' => [],
                     ];
                 }
 
@@ -534,15 +579,15 @@ class UnitExcelImportService
                 $groupedPrerequisites[$groupKey]['conditions'][] = [
                     'type' => $conditionType,
                     'required_unit_code' => $requiredUnitCode,
-                    'required_credits' => $requiredCredits ? (int)$requiredCredits : null,
+                    'required_credits' => $requiredCredits ? (int) $requiredCredits : null,
                     'free_text' => $freeText,
-                    'row_number' => $actualRowNumber
+                    'row_number' => $actualRowNumber,
                 ];
             } catch (\Exception $e) {
                 $this->errors[] = [
                     'row' => $actualRowNumber,
                     'error' => $e->getMessage(),
-                    'data' => $row
+                    'data' => $row,
                 ];
             }
         }
@@ -560,8 +605,8 @@ class UnitExcelImportService
             } catch (\Exception $e) {
                 $this->errors[] = [
                     'row' => 0, // Group level error
-                    'error' => "Failed to create prerequisite group for {$groupData['unit_code']}: " . $e->getMessage(),
-                    'data' => $groupData
+                    'error' => "Failed to create prerequisite group for {$groupData['unit_code']}: ".$e->getMessage(),
+                    'data' => $groupData,
                 ];
             }
         }
@@ -571,7 +616,7 @@ class UnitExcelImportService
     {
         // Find the unit
         $unit = Unit::where('code', $unitCode)->first();
-        if (!$unit) {
+        if (! $unit) {
             throw new \Exception("Unit with code '{$unitCode}' not found");
         }
 
@@ -598,7 +643,7 @@ class UnitExcelImportService
 
         // Validate condition type
         $validTypes = ['prerequisite', 'co_requisite', 'concurrent', 'anti_requisite', 'assumed_knowledge', 'credit_requirement', 'textual'];
-        if (!in_array($type, $validTypes)) {
+        if (! in_array($type, $validTypes)) {
             throw new \Exception("Invalid condition type '{$type}' at row {$rowNumber}");
         }
 
@@ -614,7 +659,7 @@ class UnitExcelImportService
                     throw new \Exception("Required credits must be specified for credit_requirement type at row {$rowNumber}");
                 }
                 $conditionToCreate['required_credits'] = $requiredCredits;
-                if (!empty($freeText)) {
+                if (! empty($freeText)) {
                     $conditionToCreate['free_text'] = $freeText;
                 }
                 break;
@@ -636,7 +681,7 @@ class UnitExcelImportService
                 }
 
                 $requiredUnit = Unit::where('code', $requiredUnitCode)->first();
-                if (!$requiredUnit) {
+                if (! $requiredUnit) {
                     throw new \Exception("Required unit with code '{$requiredUnitCode}' not found at row {$rowNumber}");
                 }
                 $conditionToCreate['required_unit_id'] = $requiredUnit->id;
@@ -651,8 +696,9 @@ class UnitExcelImportService
         if ($existingCondition) {
             $this->warnings[] = [
                 'row' => $rowNumber,
-                'message' => "Prerequisite condition already exists, skipped"
+                'message' => 'Prerequisite condition already exists, skipped',
             ];
+
             return;
         }
 
@@ -662,7 +708,9 @@ class UnitExcelImportService
 
     private function processEquivalentsSheet(array $data, array $options): void
     {
-        if (empty($data)) return;
+        if (empty($data)) {
+            return;
+        }
 
         $headers = array_shift($data);
 
@@ -683,7 +731,7 @@ class UnitExcelImportService
                 $this->errors[] = [
                     'row' => $actualRowNumber,
                     'error' => $e->getMessage(),
-                    'data' => $row
+                    'data' => $row,
                 ];
             }
         }
@@ -697,10 +745,10 @@ class UnitExcelImportService
                 'successful' => $this->successfulRows,
                 'failed' => $this->failedRows,
                 'skipped' => $this->skippedRows,
-                'processing_time' => '0 seconds' // Will be calculated by controller
+                'processing_time' => '0 seconds', // Will be calculated by controller
             ],
             'errors' => $this->errors,
-            'warnings' => $this->warnings
+            'warnings' => $this->warnings,
         ];
     }
 
@@ -718,7 +766,7 @@ class UnitExcelImportService
     private function convertToBytes(string $size): int
     {
         $unit = strtoupper(substr($size, -2));
-        $value = (int)substr($size, 0, -2);
+        $value = (int) substr($size, 0, -2);
 
         switch ($unit) {
             case 'KB':
@@ -728,7 +776,7 @@ class UnitExcelImportService
             case 'GB':
                 return $value * 1024 * 1024 * 1024;
             default:
-                return (int)$size;
+                return (int) $size;
         }
     }
 
@@ -749,7 +797,7 @@ class UnitExcelImportService
                 'assessment_components' => ['created' => 0, 'skipped' => 0],
                 'assessment_details' => ['created' => 0, 'skipped' => 0],
                 'errors' => [],
-                'warnings' => []
+                'warnings' => [],
             ];
 
             DB::beginTransaction();
@@ -832,13 +880,13 @@ class UnitExcelImportService
                     'total_updated' => $totalUpdated,
                     'total_skipped' => $totalSkipped,
                     'total_errors' => count($results['errors']),
-                    'total_warnings' => count($results['warnings'])
+                    'total_warnings' => count($results['warnings']),
                 ],
-                'details' => $results
+                'details' => $results,
             ];
         } catch (\Exception $e) {
             DB::rollBack();
-            throw new \Exception('Combined import failed: ' . $e->getMessage());
+            throw new \Exception('Combined import failed: '.$e->getMessage());
         }
     }
 
@@ -855,7 +903,9 @@ class UnitExcelImportService
         foreach ($rows as $rowIndex => $row) {
             $actualRow = $rowIndex + 2; // Account for header row and 0-based index
 
-            if (empty(array_filter($row))) continue; // Skip empty rows
+            if (empty(array_filter($row))) {
+                continue;
+            } // Skip empty rows
 
             try {
                 $unitCode = trim($row[0] ?? '');
@@ -864,6 +914,7 @@ class UnitExcelImportService
 
                 if (empty($unitCode) || empty($unitName)) {
                     $results['errors'][] = "Row {$actualRow}: Unit code and name are required";
+
                     continue;
                 }
 
@@ -872,9 +923,11 @@ class UnitExcelImportService
                 if ($existingUnit) {
                     if (($options['duplicate_handling'] ?? 'update') === 'skip') {
                         $results['units']['skipped']++;
+
                         continue;
                     } elseif ($options['duplicate_handling'] === 'error') {
                         $results['errors'][] = "Row {$actualRow}: Unit code '{$unitCode}' already exists";
+
                         continue;
                     } else {
                         // Update existing unit
@@ -894,7 +947,7 @@ class UnitExcelImportService
                     $results['units']['created']++;
                 }
             } catch (\Exception $e) {
-                $results['errors'][] = "Row {$actualRow}: " . $e->getMessage();
+                $results['errors'][] = "Row {$actualRow}: ".$e->getMessage();
             }
         }
 
@@ -914,7 +967,9 @@ class UnitExcelImportService
         foreach ($rows as $rowIndex => $row) {
             $actualRow = $rowIndex + 2;
 
-            if (empty(array_filter($row))) continue;
+            if (empty(array_filter($row))) {
+                continue;
+            }
 
             try {
                 $unitCode = trim($row[0] ?? '');
@@ -927,18 +982,20 @@ class UnitExcelImportService
 
                 if (empty($unitCode)) {
                     $results['errors'][] = "Row {$actualRow}: Unit code is required";
+
                     continue;
                 }
 
                 $unit = Unit::where('code', $unitCode)->first();
-                if (!$unit) {
+                if (! $unit) {
                     $results['errors'][] = "Row {$actualRow}: Unit '{$unitCode}' not found";
+
                     continue;
                 }
 
                 // Find semester if specified
                 $semesterId = null;
-                if (!empty($effectiveSemester)) {
+                if (! empty($effectiveSemester)) {
                     $semester = \App\Models\Semester::where('name', $effectiveSemester)->first();
                     if ($semester) {
                         $semesterId = $semester->id;
@@ -955,9 +1012,11 @@ class UnitExcelImportService
                 if ($existingSyllabus) {
                     if (($options['duplicate_handling'] ?? 'update') === 'skip') {
                         $results['syllabus']['skipped']++;
+
                         continue;
                     } elseif ($options['duplicate_handling'] === 'error') {
                         $results['errors'][] = "Row {$actualRow}: Syllabus version '{$version}' already exists for unit '{$unitCode}'";
+
                         continue;
                     } else {
                         // Update existing syllabus
@@ -989,7 +1048,7 @@ class UnitExcelImportService
                     $results['syllabus']['created']++;
                 }
             } catch (\Exception $e) {
-                $results['errors'][] = "Row {$actualRow}: " . $e->getMessage();
+                $results['errors'][] = "Row {$actualRow}: ".$e->getMessage();
             }
         }
 
@@ -1009,7 +1068,9 @@ class UnitExcelImportService
         foreach ($rows as $rowIndex => $row) {
             $actualRow = $rowIndex + 2;
 
-            if (empty(array_filter($row))) continue;
+            if (empty(array_filter($row))) {
+                continue;
+            }
 
             try {
                 $unitCode = trim($row[0] ?? '');
@@ -1021,13 +1082,15 @@ class UnitExcelImportService
 
                 if (empty($unitCode) || empty($componentName) || empty($type)) {
                     $results['errors'][] = "Row {$actualRow}: Unit code, component name, and type are required";
+
                     continue;
                 }
 
                 // Find the syllabus
                 $unit = Unit::where('code', $unitCode)->first();
-                if (!$unit) {
+                if (! $unit) {
                     $results['errors'][] = "Row {$actualRow}: Unit '{$unitCode}' not found";
+
                     continue;
                 }
 
@@ -1035,14 +1098,16 @@ class UnitExcelImportService
                     ->where('version', $syllabusVersion)
                     ->first();
 
-                if (!$syllabus) {
+                if (! $syllabus) {
                     $results['errors'][] = "Row {$actualRow}: Syllabus version '{$syllabusVersion}' not found for unit '{$unitCode}'";
+
                     continue;
                 }
 
                 // Validate assessment type
-                if (!in_array($type, array_keys(\App\Models\AssessmentComponent::TYPES))) {
+                if (! in_array($type, array_keys(\App\Models\AssessmentComponent::TYPES))) {
                     $results['errors'][] = "Row {$actualRow}: Invalid assessment type '{$type}'";
+
                     continue;
                 }
 
@@ -1054,6 +1119,7 @@ class UnitExcelImportService
                 if ($existingComponent) {
                     $results['assessment_components']['skipped']++;
                     $results['warnings'][] = "Row {$actualRow}: Assessment component '{$componentName}' already exists";
+
                     continue;
                 }
 
@@ -1067,7 +1133,7 @@ class UnitExcelImportService
                 ]);
                 $results['assessment_components']['created']++;
             } catch (\Exception $e) {
-                $results['errors'][] = "Row {$actualRow}: " . $e->getMessage();
+                $results['errors'][] = "Row {$actualRow}: ".$e->getMessage();
             }
         }
 
@@ -1087,7 +1153,9 @@ class UnitExcelImportService
         foreach ($rows as $rowIndex => $row) {
             $actualRow = $rowIndex + 2;
 
-            if (empty(array_filter($row))) continue;
+            if (empty(array_filter($row))) {
+                continue;
+            }
 
             try {
                 $unitCode = trim($row[0] ?? '');
@@ -1098,13 +1166,15 @@ class UnitExcelImportService
 
                 if (empty($unitCode) || empty($componentName) || empty($detailName)) {
                     $results['errors'][] = "Row {$actualRow}: Unit code, component name, and detail name are required";
+
                     continue;
                 }
 
                 // Find the assessment component
                 $unit = Unit::where('code', $unitCode)->first();
-                if (!$unit) {
+                if (! $unit) {
                     $results['errors'][] = "Row {$actualRow}: Unit '{$unitCode}' not found";
+
                     continue;
                 }
 
@@ -1112,8 +1182,9 @@ class UnitExcelImportService
                     ->where('version', $syllabusVersion)
                     ->first();
 
-                if (!$syllabus) {
+                if (! $syllabus) {
                     $results['errors'][] = "Row {$actualRow}: Syllabus version '{$syllabusVersion}' not found for unit '{$unitCode}'";
+
                     continue;
                 }
 
@@ -1121,8 +1192,9 @@ class UnitExcelImportService
                     ->where('name', $componentName)
                     ->first();
 
-                if (!$component) {
+                if (! $component) {
                     $results['errors'][] = "Row {$actualRow}: Assessment component '{$componentName}' not found";
+
                     continue;
                 }
 
@@ -1134,6 +1206,7 @@ class UnitExcelImportService
                 if ($existingDetail) {
                     $results['assessment_details']['skipped']++;
                     $results['warnings'][] = "Row {$actualRow}: Assessment detail '{$detailName}' already exists";
+
                     continue;
                 }
 
@@ -1145,7 +1218,7 @@ class UnitExcelImportService
                 ]);
                 $results['assessment_details']['created']++;
             } catch (\Exception $e) {
-                $results['errors'][] = "Row {$actualRow}: " . $e->getMessage();
+                $results['errors'][] = "Row {$actualRow}: ".$e->getMessage();
             }
         }
 
@@ -1165,7 +1238,9 @@ class UnitExcelImportService
         foreach ($rows as $rowIndex => $row) {
             $actualRow = $rowIndex + 2;
 
-            if (empty(array_filter($row))) continue;
+            if (empty(array_filter($row))) {
+                continue;
+            }
 
             try {
                 $unitCode = trim($row[0] ?? '');
@@ -1176,6 +1251,7 @@ class UnitExcelImportService
 
                 if (empty($unitCode) || empty($requiredUnitCode) || empty($type)) {
                     $results['errors'][] = "Row {$actualRow}: Unit code, required unit code, and type are required";
+
                     continue;
                 }
 
@@ -1183,19 +1259,22 @@ class UnitExcelImportService
                 $unit = Unit::where('code', $unitCode)->first();
                 $requiredUnit = Unit::where('code', $requiredUnitCode)->first();
 
-                if (!$unit) {
+                if (! $unit) {
                     $results['errors'][] = "Row {$actualRow}: Unit '{$unitCode}' not found";
+
                     continue;
                 }
 
-                if (!$requiredUnit) {
+                if (! $requiredUnit) {
                     $results['errors'][] = "Row {$actualRow}: Required unit '{$requiredUnitCode}' not found";
+
                     continue;
                 }
 
                 // Validate type
-                if (!in_array($type, ['prerequisite', 'co_requisite', 'anti_requisite'])) {
+                if (! in_array($type, ['prerequisite', 'co_requisite', 'anti_requisite'])) {
                     $results['errors'][] = "Row {$actualRow}: Invalid prerequisite type '{$type}'";
+
                     continue;
                 }
 
@@ -1204,7 +1283,7 @@ class UnitExcelImportService
                     'unit_id' => $unit->id,
                     'logic_operator' => $groupLogic,
                 ], [
-                    'description' => $description ?: "Imported prerequisites"
+                    'description' => $description ?: 'Imported prerequisites',
                 ]);
 
                 // Check for existing condition
@@ -1215,6 +1294,7 @@ class UnitExcelImportService
 
                 if ($existingCondition) {
                     $results['prerequisites']['skipped']++;
+
                     continue;
                 }
 
@@ -1226,7 +1306,7 @@ class UnitExcelImportService
                 ]);
                 $results['prerequisites']['created']++;
             } catch (\Exception $e) {
-                $results['errors'][] = "Row {$actualRow}: " . $e->getMessage();
+                $results['errors'][] = "Row {$actualRow}: ".$e->getMessage();
             }
         }
 
@@ -1246,7 +1326,9 @@ class UnitExcelImportService
         foreach ($rows as $rowIndex => $row) {
             $actualRow = $rowIndex + 2;
 
-            if (empty(array_filter($row))) continue;
+            if (empty(array_filter($row))) {
+                continue;
+            }
 
             try {
                 $unitCode = trim($row[0] ?? '');
@@ -1255,6 +1337,7 @@ class UnitExcelImportService
 
                 if (empty($unitCode) || empty($equivalentUnitCode)) {
                     $results['errors'][] = "Row {$actualRow}: Unit code and equivalent unit code are required";
+
                     continue;
                 }
 
@@ -1262,13 +1345,15 @@ class UnitExcelImportService
                 $unit = Unit::where('code', $unitCode)->first();
                 $equivalentUnit = Unit::where('code', $equivalentUnitCode)->first();
 
-                if (!$unit) {
+                if (! $unit) {
                     $results['errors'][] = "Row {$actualRow}: Unit '{$unitCode}' not found";
+
                     continue;
                 }
 
-                if (!$equivalentUnit) {
+                if (! $equivalentUnit) {
                     $results['errors'][] = "Row {$actualRow}: Equivalent unit '{$equivalentUnitCode}' not found";
+
                     continue;
                 }
 
@@ -1279,6 +1364,7 @@ class UnitExcelImportService
 
                 if ($existingEquivalent) {
                     $results['equivalents']['skipped']++;
+
                     continue;
                 }
 
@@ -1290,7 +1376,7 @@ class UnitExcelImportService
                 ]);
                 $results['equivalents']['created']++;
             } catch (\Exception $e) {
-                $results['errors'][] = "Row {$actualRow}: " . $e->getMessage();
+                $results['errors'][] = "Row {$actualRow}: ".$e->getMessage();
             }
         }
 

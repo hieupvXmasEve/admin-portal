@@ -2,16 +2,7 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -119,13 +110,7 @@ watch(
     () => props.filters,
     (newFilters, oldFilters) => {
         // Only sync if user is not currently interacting and filters actually changed
-        if (
-            !isUserInteracting.value &&
-            newFilters &&
-            typeof newFilters === 'object' &&
-            !Array.isArray(newFilters) &&
-            JSON.stringify(newFilters) !== JSON.stringify(oldFilters)
-        ) {
+        if (!isUserInteracting.value && newFilters && typeof newFilters === 'object' && !Array.isArray(newFilters) && JSON.stringify(newFilters) !== JSON.stringify(oldFilters)) {
             const updatedFilters = {
                 search: newFilters.search || '',
                 program_id: newFilters.program_id || '',
@@ -213,11 +198,8 @@ const curriculumVersionToEdit = ref<CurriculumVersion | null>(null);
 const editFormSchema = toTypedSchema(
     z.object({
         program_id: z.string().min(1, 'Program is required'),
-        specialization_id: z.string().min(1, 'Specialization is required'),
-        version_code: z
-            .string()
-            .min(ValidationRules.curriculumVersion.versionCode.minLength, 'Version code is required')
-            .max(ValidationRules.curriculumVersion.versionCode.maxLength, 'Version code cannot exceed 50 characters'),
+        specialization_id: z.string().optional(),
+        version_code: z.string().min(ValidationRules.curriculumVersion.versionCode.minLength, 'Version code is required').max(ValidationRules.curriculumVersion.versionCode.maxLength, 'Version code cannot exceed 50 characters'),
         semester_id: z.string().min(1, 'Semester is required'),
         notes: z.string().max(ValidationRules.curriculumVersion.notes.maxLength, 'Notes cannot exceed 1000 characters').optional(),
     }),
@@ -339,10 +321,7 @@ const updateProgramFilter = (value: any) => {
     filtersState.value.program_id = value === 'all' ? '' : String(value || '');
 
     // Auto-reset specialization when program changes
-    if (
-        !filtersState.value.program_id ||
-        !filteredSpecializations.value.some((spec) => spec.id.toString() === filtersState.value.specialization_id)
-    ) {
+    if (!filtersState.value.program_id || !filteredSpecializations.value.some((spec) => spec.id.toString() === filtersState.value.specialization_id)) {
         filtersState.value.specialization_id = '';
     }
 
@@ -461,13 +440,7 @@ const columns: ColumnDef<CurriculumVersion>[] = [
                               ),
                           ])
                         : null,
-                    specialization
-                        ? h(Badge, { variant: 'outline', class: 'bg-blue-50 text-blue-600' }, () => [
-                              h('span', { class: 'font-mono' }, specialization.code),
-                              ' - ',
-                              specialization.name,
-                          ])
-                        : null,
+                    specialization ? h(Badge, { variant: 'outline', class: 'bg-blue-50 text-blue-600' }, () => [h('span', { class: 'font-mono' }, specialization.code), ' - ', specialization.name]) : null,
                 ].filter(Boolean),
             );
         },
@@ -484,10 +457,7 @@ const columns: ColumnDef<CurriculumVersion>[] = [
                 return h('div', { class: 'text-gray-400 text-sm' }, 'Not set');
             }
 
-            return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'font-medium text-sm' }, semester.name),
-                h(Badge, { variant: 'secondary', class: 'text-xs' }, () => semester.code),
-            ]);
+            return h('div', { class: 'space-y-1' }, [h('div', { class: 'font-medium text-sm' }, semester.name), h(Badge, { variant: 'secondary', class: 'text-xs' }, () => semester.code)]);
         },
     },
     {
@@ -496,10 +466,7 @@ const columns: ColumnDef<CurriculumVersion>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const cv = row.original;
-            return h('div', { class: 'flex items-center gap-1' }, [
-                h(Book, { class: 'h-3 w-3 text-gray-400' }),
-                h('span', {}, `${cv.curriculum_units_count} units`),
-            ]);
+            return h('div', { class: 'flex items-center gap-1' }, [h(Book, { class: 'h-3 w-3 text-gray-400' }), h('span', {}, `${cv.curriculum_units_count} units`)]);
         },
     },
     {
@@ -598,13 +565,7 @@ const navigateToCreate = () => {
         <div class="min-w-[200px] flex-1">
             <div class="relative">
                 <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <DebouncedInput
-                    v-model="filtersState.search"
-                    @debounced="handleSearch"
-                    placeholder="Search curriculum versions..."
-                    class="pl-9"
-                    :debounce="300"
-                />
+                <DebouncedInput v-model="filtersState.search" @debounced="handleSearch" placeholder="Search curriculum versions..." class="pl-9" :debounce="300" />
             </div>
         </div>
 
@@ -651,9 +612,7 @@ const navigateToCreate = () => {
         </Button>
 
         <!-- Active Filters Indicator -->
-        <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">
-            {{ Object.values(filtersState).filter(Boolean).length }} filter(s) active
-        </div>
+        <div v-if="hasActiveFilters" class="text-muted-foreground text-sm">{{ Object.values(filtersState).filter(Boolean).length }} filter(s) active</div>
     </div>
 
     <!-- Data Table -->
@@ -766,18 +725,14 @@ const navigateToCreate = () => {
 
                     <FormField v-slot="{ componentField }" name="specialization_id">
                         <FormItem>
-                            <FormLabel>Specialization *</FormLabel>
+                            <FormLabel>Specialization</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a specialization" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem
-                                            v-for="specialization in editFilteredSpecializations"
-                                            :key="specialization.id"
-                                            :value="specialization.id.toString()"
-                                        >
+                                        <SelectItem v-for="specialization in editFilteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">
                                             {{ specialization.name }}
                                         </SelectItem>
                                     </SelectContent>
@@ -791,11 +746,7 @@ const navigateToCreate = () => {
                         <FormItem>
                             <FormLabel>Version Code *</FormLabel>
                             <FormControl>
-                                <Input
-                                    v-bind="componentField"
-                                    placeholder="e.g., v1.0, 2023-S1"
-                                    :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength"
-                                />
+                                <Input v-bind="componentField" placeholder="e.g., v1.0, 2023-S1" :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -810,9 +761,7 @@ const navigateToCreate = () => {
                                         <SelectValue placeholder="Select semester" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                            {{ semester.name }} ({{ semester.code }})
-                                        </SelectItem>
+                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()"> {{ semester.name }} ({{ semester.code }}) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -824,12 +773,7 @@ const navigateToCreate = () => {
                         <FormItem>
                             <FormLabel>Notes</FormLabel>
                             <FormControl>
-                                <Textarea
-                                    v-bind="componentField"
-                                    placeholder="Enter any additional notes..."
-                                    rows="4"
-                                    :maxlength="ValidationRules.curriculumVersion.notes.maxLength"
-                                />
+                                <Textarea v-bind="componentField" placeholder="Enter any additional notes..." rows="4" :maxlength="ValidationRules.curriculumVersion.notes.maxLength" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

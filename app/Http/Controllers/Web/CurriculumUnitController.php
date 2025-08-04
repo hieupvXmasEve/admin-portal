@@ -26,7 +26,7 @@ class CurriculumUnitController extends Controller
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
             'filter.curriculum_version_id' => 'nullable|exists:curriculum_versions,id',
-            'filter.type' => 'nullable|in:core,major,elective',
+            'filter.unit_scope' => 'nullable|in:program,common,specialization_specific,cross_program',
             'sort' => 'nullable|string|in:created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
@@ -43,8 +43,8 @@ class CurriculumUnitController extends Controller
             ->when($validated['filter']['curriculum_version_id'] ?? null, function ($query, $versionId) {
                 $query->where('curriculum_version_id', $versionId);
             })
-            ->when($validated['filter']['type'] ?? null, function ($query, $type) {
-                $query->where('type', $type);
+            ->when($validated['filter']['unit_scope'] ?? null, function ($query, $unitScope) {
+                $query->where('unit_scope', $unitScope);
             })
             ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
                 $direction = $validated['direction'] ?? 'asc';
@@ -59,15 +59,16 @@ class CurriculumUnitController extends Controller
             'filters' => [
                 'search' => $validated['search'] ?? null,
                 'curriculum_version_id' => $validated['filter']['curriculum_version_id'] ?? null,
-                'type' => $validated['filter']['type'] ?? null,
+                'unit_scope' => $validated['filter']['unit_scope'] ?? null,
             ],
             'curriculumVersions' => CurriculumVersion::with(['program', 'specialization'])
                 ->orderBy('version_code')
                 ->get(['id', 'version_code', 'program_id', 'specialization_id']),
-            'unitTypes' => [
-                ['value' => 'core', 'label' => 'Core'],
-                ['value' => 'major', 'label' => 'Major'],
-                ['value' => 'elective', 'label' => 'Elective'],
+            'unitScopes' => [
+                ['value' => 'program', 'label' => 'Program'],
+                ['value' => 'common', 'label' => 'Common'],
+                ['value' => 'specialization_specific', 'label' => 'Specialization Specific'],
+//                ['value' => 'cross_program', 'label' => 'Cross Program'],
             ],
         ]);
     }
@@ -80,10 +81,11 @@ class CurriculumUnitController extends Controller
                 ->get(['id', 'version_code', 'program_id', 'specialization_id']),
             'units' => Unit::orderBy('code')->get(['id', 'code', 'name', 'credit_points']),
             'semesters' => Semester::orderBy('start_date')->get(['id', 'name', 'code']),
-            'unitTypes' => [
-                ['value' => 'core', 'label' => 'Core'],
-                ['value' => 'major', 'label' => 'Major'],
-                ['value' => 'elective', 'label' => 'Elective'],
+            'unitScopes' => [
+                ['value' => 'program', 'label' => 'Program'],
+                ['value' => 'common', 'label' => 'Common'],
+                ['value' => 'specialization_specific', 'label' => 'Specialization Specific'],
+                ['value' => 'cross_program', 'label' => 'Cross Program'],
             ],
             'semesterOptions' => collect(range(1, 12))->map(fn($n) => ['value' => $n, 'label' => "Semester {$n}"]),
         ]);
@@ -136,10 +138,11 @@ class CurriculumUnitController extends Controller
                 ->get(['id', 'version_code', 'program_id', 'specialization_id']),
             'units' => Unit::orderBy('code')->get(['id', 'code', 'name', 'credit_points']),
             'semesters' => Semester::orderBy('start_date')->get(['id', 'name', 'code']),
-            'unitTypes' => [
-                ['value' => 'core', 'label' => 'Core'],
-                ['value' => 'major', 'label' => 'Major'],
-                ['value' => 'elective', 'label' => 'Elective'],
+            'unitScopes' => [
+                ['value' => 'program', 'label' => 'Program'],
+                ['value' => 'common', 'label' => 'Common'],
+                ['value' => 'specialization_specific', 'label' => 'Specialization Specific'],
+                ['value' => 'cross_program', 'label' => 'Cross Program'],
             ],
             'semesterOptions' => collect(range(1, 12))->map(fn($n) => ['value' => $n, 'label' => "Semester {$n}"]),
         ]);
@@ -228,9 +231,9 @@ class CurriculumUnitController extends Controller
             'curriculum_version_id' => 'required|exists:curriculum_versions,id',
             'unit_id' => 'required|exists:units,id',
             'semester_id' => 'required|exists:semesters,id',
-            'type' => 'required|in:core,major,elective',
-            'year_level' => 'required|integer|min:1|max:6',
-            'semester_number' => 'required|integer|min:1|max:9',
+            'unit_scope' => 'nullable|in:program,common,specialization_specific,cross_program',
+            'year_level' => 'nullable|integer|min:1|max:6',
+            'semester_number' => 'nullable|integer|min:1|max:9',
             'note' => 'nullable|string|max:1000',
         ]);
 
@@ -276,15 +279,15 @@ class CurriculumUnitController extends Controller
             'curriculum_version_id' => 'required|exists:curriculum_versions,id',
             'unit_id' => 'required|exists:units,id',
             'semester_id' => 'required|exists:semesters,id',
-            'type' => 'required|in:core,major,elective',
-            'year_level' => 'required|integer|min:1|max:6',
-            'semester_number' => 'required|integer|min:1|max:9',
+            'unit_scope' => 'required|in:program,common,specialization_specific,cross_program',
+            'year_level' => 'nullable|integer|min:1|max:6',
+            'semester_number' => 'nullable|integer|min:1|max:9',
             'note' => 'nullable|string|max:1000',
         ]);
 
         try {
             DB::beginTransaction();
-
+            Log::info('Updating curriculum unit', ['data' => $validated]);
             $curriculumUnit->update($validated);
 
             DB::commit();

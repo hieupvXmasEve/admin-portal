@@ -43,11 +43,8 @@ const currentProgramId = ref(initialProgramId);
 const formSchema = toTypedSchema(
     z.object({
         program_id: z.string().min(1, 'Program is required'),
-        specialization_id: z.string().min(1, 'Specialization is required'),
-        version_code: z
-            .string()
-            .min(ValidationRules.curriculumVersion.versionCode.minLength, 'Version code is required')
-            .max(ValidationRules.curriculumVersion.versionCode.maxLength, 'Version code cannot exceed 50 characters'),
+        specialization_id: z.string().optional(),
+        version_code: z.string().min(ValidationRules.curriculumVersion.versionCode.minLength, 'Version code is required').max(ValidationRules.curriculumVersion.versionCode.maxLength, 'Version code cannot exceed 50 characters'),
         semester_id: z.string().min(1, 'Implementation period is required'),
         notes: z.string().max(ValidationRules.curriculumVersion.notes.maxLength, 'Notes cannot exceed 1000 characters').optional(),
     }),
@@ -194,18 +191,14 @@ const onSubmit = handleSubmit((values) => {
 
                 <FormField v-slot="{ componentField }" name="specialization_id">
                     <FormItem>
-                        <FormLabel>Specialization *</FormLabel>
+                        <FormLabel>Specialization</FormLabel>
                         <FormControl>
                             <Select v-bind="componentField">
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a specialization" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem
-                                        v-for="specialization in filteredSpecializations"
-                                        :key="specialization.id"
-                                        :value="specialization.id.toString()"
-                                    >
+                                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">
                                         {{ specialization.name }}
                                     </SelectItem>
                                 </SelectContent>
@@ -219,11 +212,7 @@ const onSubmit = handleSubmit((values) => {
                     <FormItem>
                         <FormLabel>Version Code *</FormLabel>
                         <FormControl>
-                            <Input
-                                v-bind="componentField"
-                                placeholder="e.g., v2025.1, Spring2025, CV-2025-01"
-                                :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength"
-                            />
+                            <Input v-bind="componentField" placeholder="e.g., v2025.1, Spring2025, CV-2025-01" :maxlength="ValidationRules.curriculumVersion.versionCode.maxLength" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -247,9 +236,7 @@ const onSubmit = handleSubmit((values) => {
                                 </SelectContent>
                             </Select>
                         </FormControl>
-                        <div class="text-muted-foreground mt-1 text-xs">
-                            This selects when the curriculum version becomes effective for new students entering the program.
-                        </div>
+                        <div class="text-muted-foreground mt-1 text-xs">This selects when the curriculum version becomes effective for new students entering the program.</div>
                         <FormMessage />
                     </FormItem>
                 </FormField>
@@ -258,12 +245,7 @@ const onSubmit = handleSubmit((values) => {
                     <FormItem>
                         <FormLabel>Notes</FormLabel>
                         <FormControl>
-                            <Textarea
-                                v-bind="componentField"
-                                placeholder="Enter any additional notes..."
-                                rows="4"
-                                :maxlength="ValidationRules.curriculumVersion.notes.maxLength"
-                            />
+                            <Textarea v-bind="componentField" placeholder="Enter any additional notes..." rows="4" :maxlength="ValidationRules.curriculumVersion.notes.maxLength" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
