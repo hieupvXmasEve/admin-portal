@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ProgramController;
 use App\Http\Controllers\Api\SyllabusController;
 use App\Http\Controllers\Api\ClassSessionController;
 use App\Http\Controllers\Api\AdminScheduleController;
+use App\Http\Controllers\Api\StudentApplicationController;
 
 // Admin API routes (for internal use)
 Route::middleware(['auth'])->name('api.admin.')->group(function () {
@@ -21,6 +22,8 @@ Route::middleware(['auth'])->name('api.admin.')->group(function () {
     Route::get('/students', [StudentController::class, 'index'])->name('students.index');
     Route::get('/students/stats', [StudentController::class, 'stats'])->name('students.stats');
 
+    // Student Applications
 
     // Other admin API routes can go here if needed
 });
+Route::post('/student-applications', [StudentApplicationController::class, 'store'])->name('student-applications.store');
