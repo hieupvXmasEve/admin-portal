@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CAMPUS_ROUTE_NAMES } from '@/constants';
-import { Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { CheckCircle2, LogOut, MapPin } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
 import { route } from 'ziggy-js';
@@ -22,7 +22,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log('%c props', 'color: red', props.campuses);
 const selectedCampus = ref<Campus | null>(null);
 
 const form = useForm({
@@ -30,7 +29,6 @@ const form = useForm({
 });
 
 onMounted(() => {
-    console.log('SelectCampus.vue mounted');
     if (props.campuses?.length) {
         // Auto-select first campus and set form value
         selectedCampus.value = props.campuses[0];
@@ -67,6 +65,7 @@ const handleLogout = () => {
 </script>
 
 <template>
+    <Head title="Select campus" />
     <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
         <div class="mx-auto max-w-6xl">
             <!-- Header -->
@@ -80,20 +79,13 @@ const handleLogout = () => {
                 <Card
                     v-for="campus in campuses"
                     :key="campus.id"
-                    :class="[
-                        'cursor-pointer p-0 transition-all duration-300 hover:scale-105 hover:shadow-lg',
-                        selectedCampus?.id === campus.id ? 'bg-blue-50 shadow-lg ring-2 ring-blue-500' : 'hover:shadow-md',
-                    ]"
+                    :class="['cursor-pointer p-0 transition-all duration-300 hover:scale-105 hover:shadow-lg', selectedCampus?.id === campus.id ? 'bg-blue-50 shadow-lg ring-2 ring-blue-500' : 'hover:shadow-md']"
                     @click="handleCampusSelect(campus)"
                 >
                     <CardContent class="p-0">
                         <!-- Campus Image -->
                         <div class="relative">
-                            <img
-                                :src="campus.url || `/placeholder.svg?height=200&width=300&text=${campus.code || campus.name.charAt(0)}`"
-                                :alt="campus.name"
-                                class="h-48 w-full rounded-t-lg object-cover"
-                            />
+                            <img :src="campus.url || `/placeholder.svg?height=200&width=300&text=${campus.code || campus.name.charAt(0)}`" :alt="campus.name" class="h-48 w-full rounded-t-lg object-cover" />
 
                             <!-- Selection Indicator -->
                             <div v-if="selectedCampus?.id === campus.id" class="absolute top-3 right-3 rounded-full bg-blue-500 p-1">
@@ -139,38 +131,18 @@ const handleLogout = () => {
 
             <!-- Action Buttons -->
             <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <Button
-                    @click="submit"
-                    :disabled="!selectedCampus || form.processing"
-                    size="lg"
-                    class="w-full px-8 py-3 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                >
+                <Button @click="submit" :disabled="!selectedCampus || form.processing" size="lg" class="w-full px-8 py-3 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
                     {{ form.processing ? 'Processing...' : selectedCampus ? 'Go to Dashboard' : 'Select a Campus' }}
                 </Button>
 
-                <Button
-                    v-if="selectedCampus"
-                    variant="outline"
-                    @click="handleClearSelection"
-                    size="lg"
-                    class="w-full px-6 sm:w-auto"
-                    :disabled="form.processing"
-                >
-                    Clear Selection
-                </Button>
+                <Button v-if="selectedCampus" variant="outline" @click="handleClearSelection" size="lg" class="w-full px-6 sm:w-auto" :disabled="form.processing"> Clear Selection </Button>
             </div>
 
             <!-- Help Text -->
             <div class="mt-6 text-center">
                 <div class="text-sm text-gray-500">
                     Need help? Contact your campus administration for assistance.
-                    <Link
-                        class="inline-flex cursor-pointer items-center font-bold text-red-500 hover:underline"
-                        method="post"
-                        :href="route('logout')"
-                        @click="handleLogout"
-                        as="button"
-                    >
+                    <Link class="inline-flex cursor-pointer items-center font-bold text-red-500 hover:underline" method="post" :href="route('logout')" @click="handleLogout" as="button">
                         <LogOut class="mr-1 h-4 w-4" />
                         Log out
                     </Link>

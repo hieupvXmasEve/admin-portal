@@ -1,19 +1,11 @@
 <script setup lang="ts">
+import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
-import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    SidebarRail,
-} from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail } from '@/components/ui/sidebar';
 import { mainNavItems } from '@/constants/menu-sidebar';
 import { Link } from '@inertiajs/vue3';
-import { GraduationCap } from 'lucide-vue-next';
 import NavUser from './NavUser.vue';
+const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 </script>
 
 <template>
@@ -23,13 +15,11 @@ import NavUser from './NavUser.vue';
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
                         <Link href="/dashboard">
-                            <div
-                                class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
-                            >
-                                <GraduationCap class="size-4" />
+                            <div class="bg-background text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+                                <AppLogo />
                             </div>
                             <div class="grid flex-1 text-left text-sm leading-tight">
-                                <span class="truncate font-semibold">Swinx</span>
+                                <span class="truncate font-semibold">{{ appName }}</span>
                                 <span class="truncate text-xs">Admin Panel</span>
                             </div>
                         </Link>

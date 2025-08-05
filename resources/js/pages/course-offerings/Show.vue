@@ -85,8 +85,7 @@ const formatDateTime = (dateString: string | null | undefined): string => {
     return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
 };
 
-const enrollmentPercentage =
-    props.courseOffering.max_capacity > 0 ? Math.round((props.courseOffering.current_enrollment / props.courseOffering.max_capacity) * 100) : 0;
+const enrollmentPercentage = props.courseOffering.max_capacity > 0 ? Math.round((props.courseOffering.current_enrollment / props.courseOffering.max_capacity) * 100) : 0;
 
 const handleStatusUpdate = () => {
     // Refresh the page to get updated registration data
@@ -173,10 +172,7 @@ const getSessionStatusVariant = (status: string) => {
             </div>
         </div>
         <div class="flex items-center gap-2">
-            <Link
-                v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0 && !courseOffering.class_sessions?.length"
-                :href="`/course-offerings/${courseOffering.id}/split`"
-            >
+            <Link v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0 && !courseOffering.class_sessions?.length" :href="`/course-offerings/${courseOffering.id}/split`">
                 <Button variant="outline">
                     <Users class="mr-2 h-4 w-4" />
                     Split into Sections
@@ -310,17 +306,14 @@ const getSessionStatusVariant = (status: string) => {
                     <div>
                         <p class="text-muted-foreground text-sm font-medium">Syllabus</p>
                         <Link
-                            :href="
-                                curriculumRoutes.units.syllabusShow(
-                                    courseOffering.curriculum_unit.unit.id,
-                                    courseOffering.curriculum_unit.syllabus.id,
-                                )
-                            "
+                            v-if="courseOffering.curriculum_unit?.syllabus"
+                            :href="curriculumRoutes.units.syllabusShow(courseOffering.curriculum_unit.unit.id, courseOffering.curriculum_unit.syllabus.id)"
                             class="flex items-center gap-2 text-lg font-semibold"
                         >
                             {{ courseOffering.curriculum_unit.syllabus.version }}
                             <ExternalLink class="h-4 w-4" />
                         </Link>
+                        <p v-else class="font-semibold">No syllabus</p>
                     </div>
                 </div>
             </CardContent>
@@ -390,9 +383,7 @@ const getSessionStatusVariant = (status: string) => {
                     <div v-if="classSessions.length === 0" class="py-8 text-center">
                         <Calendar class="text-muted-foreground mx-auto h-12 w-12" />
                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No class sessions</h3>
-                        <p class="text-muted-foreground mt-1 text-sm">
-                            Click "Auto-Generate Sessions" to create class sessions based on the syllabus.
-                        </p>
+                        <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class sessions based on the syllabus.</p>
                         <div class="mt-1 flex items-center justify-center gap-2">
                             <Button v-if="classSessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
                                 <Trash2 class="mr-2 h-4 w-4" />
