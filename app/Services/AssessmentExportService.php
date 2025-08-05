@@ -48,7 +48,7 @@ class AssessmentExportService implements WithMultipleSheets
         $this->filters = array_merge([
             'include_excluded' => false,
             'score_status' => 'final',
-            'student_ids' => [],
+            'student_codes' => [],
             'component_ids' => [],
             'include_statistics' => true,
             'include_grade_matrix' => true,
@@ -109,7 +109,7 @@ class AssessmentExportService implements WithMultipleSheets
             $component = $detail->assessmentComponent;
 
             $formattedData[] = [
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'student_name' => $student->user->name,
                 'student_email' => $student->user->email,
                 'student_number' => $student->student_number,
@@ -193,12 +193,12 @@ class AssessmentExportService implements WithMultipleSheets
         $query = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail.assessmentComponent', function ($q) use ($syllabus) {
             $q->where('syllabus_id', $syllabus->id);
         })
-        ->where('course_offering_id', $this->courseOffering->id)
-        ->with([
-            'student.user',
-            'assessmentComponentDetail.assessmentComponent',
-            'gradedByLecture'
-        ]);
+            ->where('course_offering_id', $this->courseOffering->id)
+            ->with([
+                'student.user',
+                'assessmentComponentDetail.assessmentComponent',
+                'gradedByLecture'
+            ]);
 
         // Apply filters
         if (!$this->filters['include_excluded']) {
@@ -209,8 +209,8 @@ class AssessmentExportService implements WithMultipleSheets
             $query->where('score_status', $this->filters['score_status']);
         }
 
-        if (!empty($this->filters['student_ids'])) {
-            $query->whereIn('student_id', $this->filters['student_ids']);
+        if (!empty($this->filters['student_codes'])) {
+            $query->whereIn('student_code', $this->filters['student_codes']);
         }
 
         if (!empty($this->filters['component_ids'])) {
@@ -219,7 +219,7 @@ class AssessmentExportService implements WithMultipleSheets
             });
         }
 
-        return $query->orderBy('student_id')
+        return $query->orderBy('student_code')
             ->orderBy('assessment_component_detail_id')
             ->get();
     }
@@ -254,8 +254,6 @@ class AssessmentExportService implements WithMultipleSheets
 
         return $breakdown;
     }
-
-
 }
 
 /**
@@ -280,7 +278,7 @@ class GradeMatrixSheet implements FromCollection, WithHeadings, WithStyles, With
 
         return collect($this->gradeMatrix['students'])->map(function ($student) {
             $row = [
-                'student_id' => $student['id'],
+                'student_code' => $student['id'],
                 'student_name' => $student['name'],
                 'student_number' => $student['student_number'] ?? '',
                 'email' => $student['email'] ?? '',
@@ -389,7 +387,7 @@ class DetailedScoresSheet implements FromCollection, WithHeadings, WithStyles, W
     {
         return $this->scores->map(function ($score) {
             return [
-                'student_id' => $score->student->id,
+                'student_code' => $score->student->id,
                 'student_name' => $score->student->user->name,
                 'student_number' => $score->student->student_number ?? '',
                 'student_email' => $score->student->user->email,
@@ -480,12 +478,35 @@ class DetailedScoresSheet implements FromCollection, WithHeadings, WithStyles, W
     public function columnWidths(): array
     {
         return [
-            'A' => 12, 'B' => 25, 'C' => 15, 'D' => 30, 'E' => 20,
-            'F' => 15, 'G' => 12, 'H' => 20, 'I' => 12, 'J' => 12,
-            'K' => 12, 'L' => 12, 'M' => 12, 'N' => 12, 'O' => 10,
-            'P' => 12, 'Q' => 12, 'R' => 20, 'S' => 10, 'T' => 20,
-            'U' => 15, 'V' => 12, 'W' => 15, 'X' => 12, 'Y' => 20,
-            'Z' => 20, 'AA' => 30, 'AB' => 20, 'AC' => 20,
+            'A' => 12,
+            'B' => 25,
+            'C' => 15,
+            'D' => 30,
+            'E' => 20,
+            'F' => 15,
+            'G' => 12,
+            'H' => 20,
+            'I' => 12,
+            'J' => 12,
+            'K' => 12,
+            'L' => 12,
+            'M' => 12,
+            'N' => 12,
+            'O' => 10,
+            'P' => 12,
+            'Q' => 12,
+            'R' => 20,
+            'S' => 10,
+            'T' => 20,
+            'U' => 15,
+            'V' => 12,
+            'W' => 15,
+            'X' => 12,
+            'Y' => 20,
+            'Z' => 20,
+            'AA' => 30,
+            'AB' => 20,
+            'AC' => 20,
         ];
     }
 

@@ -26,7 +26,7 @@ class CourseRetakeService
             $attemptNumber = $this->getNextAttemptNumber($student, $offering->unit_id);
 
             $retakeRegistration = CourseRegistration::create([
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'course_offering_id' => $offering->id,
                 'registration_date' => now(),
                 'status' => 'registered',
@@ -37,7 +37,7 @@ class CourseRetakeService
             ]);
 
             Log::info('Course retake registered', [
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'unit_id' => $offering->unit_id,
                 'attempt_number' => $attemptNumber,
             ]);

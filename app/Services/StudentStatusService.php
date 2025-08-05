@@ -30,7 +30,7 @@ class StudentStatusService
             ]);
 
             Log::info('Student status updated', [
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'old_status' => $oldStatus,
                 'new_status' => $newStatus,
                 'reason' => $reason,
@@ -94,7 +94,7 @@ class StudentStatusService
     private function validateStatusChange(Student $student, string $newStatus): void
     {
         $validStatuses = ['active', 'inactive', 'graduated', 'suspended', 'withdrawn'];
-        
+
         if (!in_array($newStatus, $validStatuses)) {
             throw new Exception('Invalid academic status');
         }

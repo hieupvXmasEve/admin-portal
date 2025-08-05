@@ -291,7 +291,7 @@ class SemesterManagementService
             ->active()
             ->with('courseOffering.curriculumUnit.unit')
             ->get()
-            ->groupBy('student_id');
+            ->groupBy('student_code');
 
         $fullTimeStudents = 0;
         $partTimeStudents = 0;

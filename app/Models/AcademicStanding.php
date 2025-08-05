@@ -14,7 +14,7 @@ class AcademicStanding extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'student_id',
+        'student_code',
         'semester_id',
         'standing',
         'gpa',
@@ -37,7 +37,7 @@ class AcademicStanding extends Model
     public static function validationRules(): array
     {
         return [
-            'student_id' => ['required', 'exists:students,id'],
+            'student_code' => ['required', 'exists:students,id'],
             'semester_id' => ['required', 'exists:semesters,id'],
             'standing' => ['required', 'in:good,probation,suspension,honors'],
             'gpa' => ['required', 'numeric', 'min:0', 'max:4'],
@@ -52,7 +52,7 @@ class AcademicStanding extends Model
     public static function validationMessages(): array
     {
         return [
-            'student_id.required' => 'Student is required',
+            'student_code.required' => 'Student is required',
             'semester_id.required' => 'Semester is required',
             'standing.required' => 'Academic standing is required',
             'gpa.required' => 'GPA is required',

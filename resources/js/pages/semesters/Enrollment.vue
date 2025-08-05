@@ -44,7 +44,7 @@ interface Unit {
 
 interface Enrollment {
     id: number;
-    student_id: number;
+    student_code: number;
     semester_id: number;
     curriculum_version_id: number;
     semester_number: number;
@@ -284,17 +284,12 @@ const baseSuggestedCoursesColumns: ColumnDef<SuggestedCourse>[] = [
         accessorKey: 'unit.code',
         header: 'Unit Code',
         // Link to course-offerings?search=COS10004
-        cell: ({ row }) =>
-            h(Link, { href: courseRoutes.offerings.index() + '?search=' + row.original.unit.code, class: 'text-red-500' }, row.original.unit.code),
+        cell: ({ row }) => h(Link, { href: courseRoutes.offerings.index() + '?search=' + row.original.unit.code, class: 'text-red-500' }, row.original.unit.code),
     },
     {
         accessorKey: 'unit.name',
         header: 'Unit Name',
-        cell: ({ row }) =>
-            h('div', { class: 'max-w-xs' }, [
-                h('div', { class: 'font-medium' }, row.original.unit.name),
-                h('div', { class: 'text-sm text-muted-foreground' }, `${row.original.unit.credit_points} credits`),
-            ]),
+        cell: ({ row }) => h('div', { class: 'max-w-xs' }, [h('div', { class: 'font-medium' }, row.original.unit.name), h('div', { class: 'text-sm text-muted-foreground' }, `${row.original.unit.credit_points} credits`)]),
     },
     {
         accessorKey: 'estimated_students',
@@ -344,11 +339,7 @@ const registrationStatsColumns: ColumnDef<RegistrationStats['offerings'][0]>[] =
     {
         accessorKey: 'unit_name',
         header: 'Unit Name',
-        cell: ({ row }) =>
-            h('div', { class: 'max-w-xs' }, [
-                h('div', { class: 'font-medium' }, row.original.unit_name),
-                row.original.section_code && h('div', { class: 'text-sm text-muted-foreground' }, `Section: ${row.original.section_code}`),
-            ]),
+        cell: ({ row }) => h('div', { class: 'max-w-xs' }, [h('div', { class: 'font-medium' }, row.original.unit_name), row.original.section_code && h('div', { class: 'text-sm text-muted-foreground' }, `Section: ${row.original.section_code}`)]),
     },
     {
         accessorKey: 'instructor_name',
@@ -359,10 +350,7 @@ const registrationStatsColumns: ColumnDef<RegistrationStats['offerings'][0]>[] =
         accessorKey: 'enrollment',
         header: 'Enrollment',
         cell: ({ row }) =>
-            h('div', { class: 'text-center' }, [
-                h('div', { class: 'font-medium' }, `${row.original.current_enrollment}/${row.original.max_capacity}`),
-                h('div', { class: 'text-sm text-muted-foreground' }, `${row.original.enrollment_rate}%`),
-            ]),
+            h('div', { class: 'text-center' }, [h('div', { class: 'font-medium' }, `${row.original.current_enrollment}/${row.original.max_capacity}`), h('div', { class: 'text-sm text-muted-foreground' }, `${row.original.enrollment_rate}%`)]),
     },
     {
         accessorKey: 'enrollment_status',
@@ -373,13 +361,7 @@ const registrationStatsColumns: ColumnDef<RegistrationStats['offerings'][0]>[] =
             return h(
                 'span',
                 {
-                    class: `px-2 py-1 rounded text-xs font-medium ${
-                        variant === 'default'
-                            ? 'bg-green-100 text-green-800'
-                            : variant === 'secondary'
-                              ? 'bg-gray-100 text-gray-800'
-                              : 'bg-blue-100 text-blue-800'
-                    }`,
+                    class: `px-2 py-1 rounded text-xs font-medium ${variant === 'default' ? 'bg-green-100 text-green-800' : variant === 'secondary' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800'}`,
                 },
                 status.replace('_', ' ').toUpperCase(),
             );
@@ -466,9 +448,7 @@ onMounted(() => {
                 <CardContent class="space-y-4">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-muted-foreground text-sm">
-                                This will create enrollment records for students who don't already have one for this semester.
-                            </p>
+                            <p class="text-muted-foreground text-sm">This will create enrollment records for students who don't already have one for this semester.</p>
                         </div>
                         <Button @click="generateEnrollments" :disabled="loading.generate">
                             <Loader2 v-if="loading.generate" class="mr-2 h-4 w-4 animate-spin" />
@@ -559,11 +539,7 @@ onMounted(() => {
                         </div>
 
                         <!-- Course Offerings Table -->
-                        <DataTable
-                            :data="registrationStats.offerings"
-                            :columns="registrationStatsColumns"
-                            empty-message="No course offerings found."
-                        />
+                        <DataTable :data="registrationStats.offerings" :columns="registrationStatsColumns" empty-message="No course offerings found." />
                     </div>
                     <div v-else class="text-muted-foreground py-8 text-center">No registration statistics available.</div>
                 </CardContent>
@@ -612,9 +588,7 @@ onMounted(() => {
         <DialogContent class="max-w-2xl">
             <DialogHeader>
                 <DialogTitle>Open Course Offering</DialogTitle>
-                <DialogDescription v-if="selectedUnit">
-                    Create a detailed course offering for {{ selectedUnit.code }} - {{ selectedUnit.name }}.
-                </DialogDescription>
+                <DialogDescription v-if="selectedUnit"> Create a detailed course offering for {{ selectedUnit.code }} - {{ selectedUnit.name }}. </DialogDescription>
             </DialogHeader>
 
             <div class="grid gap-4 py-4">

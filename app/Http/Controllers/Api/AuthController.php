@@ -68,7 +68,7 @@ class AuthController extends Controller
             'data' => [
                 'student' => [
                     'id' => $student->id,
-                    'student_id' => $student->student_id,
+                    'student_code' => $student->student_code,
                     'full_name' => $student->full_name,
                     'email' => $student->email,
                     'status' => $student->status,
@@ -122,14 +122,14 @@ class AuthController extends Controller
 
             // Check for lecturer account first
             $lecturer = Lecture::where('email', $googleUserData['email'])->first();
-            
+
             if ($lecturer) {
                 return $this->handleLecturerGoogleLogin($lecturer, $googleUserData, $request->device_name);
             }
 
             // Check for student account
             $student = Student::where('email', $googleUserData['email'])->first();
-            
+
             if ($student) {
                 return $this->handleStudentGoogleLogin($student, $googleUserData, $request->device_name);
             }
@@ -165,7 +165,6 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'No account found with this email. Please contact your administrator.'
             ], 404);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -199,7 +198,7 @@ class AuthController extends Controller
             'data' => [
                 'student' => [
                     'id' => $student->id,
-                    'student_id' => $student->student_id,
+                    'student_code' => $student->student_code,
                     'full_name' => $student->full_name,
                     'email' => $student->email,
                     'phone' => $student->phone,
@@ -403,7 +402,7 @@ class AuthController extends Controller
                 'user_type' => 'student',
                 'student' => [
                     'id' => $student->id,
-                    'student_id' => $student->student_id,
+                    'student_code' => $student->student_code,
                     'full_name' => $student->full_name,
                     'email' => $student->email,
                     'status' => $student->status,

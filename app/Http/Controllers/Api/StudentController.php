@@ -123,7 +123,7 @@ class StudentController extends Controller
             'data' => [
                 'student' => [
                     'id' => $student->id,
-                    'student_id' => $student->student_id,
+                    'student_code' => $student->student_code,
                     'full_name' => $student->full_name,
                     'email' => $student->email,
                     'phone' => $student->phone,
@@ -223,7 +223,7 @@ class StudentController extends Controller
             'courseOffering.curriculumUnit.unit',
             'semester'
         ])
-            ->where('student_id', $student->id)
+            ->where('student_code', $student->id)
             ->orderBy('semester_id', 'desc')
             ->orderBy('registration_date', 'desc')
             ->get();
@@ -379,7 +379,7 @@ class StudentController extends Controller
         }
 
         // Calculate completed credits
-        $completedRegistrations = CourseRegistration::where('student_id', $student->id)
+        $completedRegistrations = CourseRegistration::where('student_code', $student->id)
             ->where('registration_status', 'completed')
             ->passing()
             ->with('courseOffering.curriculumUnit.unit')

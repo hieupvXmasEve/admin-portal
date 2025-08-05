@@ -6,23 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import type { AcademicHold, CourseRegistration, Student } from '@/types/models';
 import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import {
-    AlertTriangle,
-    Award,
-    BookOpen,
-    Building,
-    Calendar,
-    CheckCircle,
-    Edit,
-    Eye,
-    GraduationCap,
-    Mail,
-    MapPin,
-    Phone,
-    Trash2,
-    User,
-    Users,
-} from 'lucide-vue-next';
+import { AlertTriangle, Award, BookOpen, Building, Calendar, CheckCircle, Edit, Eye, GraduationCap, Mail, MapPin, Phone, Trash2, User, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Props {
@@ -124,7 +108,7 @@ console.log('props', props.student);
             </div>
             <div>
                 <h1 class="text-3xl font-bold">{{ student.full_name }}</h1>
-                <p class="text-muted-foreground text-lg">{{ student.student_id }}</p>
+                <p class="text-muted-foreground text-lg">{{ student.student_code }}</p>
             </div>
         </div>
 
@@ -358,9 +342,7 @@ console.log('props', props.student);
                             <div class="h-2 w-full rounded-full bg-gray-200">
                                 <div class="bg-primary h-2 rounded-full transition-all duration-300" :style="{ width: `${academicProgress}%` }"></div>
                             </div>
-                            <p class="text-muted-foreground mt-1 text-xs">
-                                {{ academicStats.completed_courses }} of {{ academicStats.total_registrations }} courses completed
-                            </p>
+                            <p class="text-muted-foreground mt-1 text-xs">{{ academicStats.completed_courses }} of {{ academicStats.total_registrations }} courses completed</p>
                         </div>
                     </div>
                 </CardContent>
@@ -442,16 +424,10 @@ console.log('props', props.student);
         </CardHeader>
         <CardContent>
             <div class="space-y-3">
-                <div
-                    v-for="registration in recentRegistrations"
-                    :key="registration.id"
-                    class="flex items-center justify-between rounded-lg border p-3"
-                >
+                <div v-for="registration in recentRegistrations" :key="registration.id" class="flex items-center justify-between rounded-lg border p-3">
                     <div>
                         <p class="font-medium">{{ registration.course_offering?.course_title || 'Course Title' }}</p>
-                        <p class="text-muted-foreground text-sm">
-                            {{ registration.course_offering?.course_code || 'Course Code' }} • {{ registration.credit_hours }} credits
-                        </p>
+                        <p class="text-muted-foreground text-sm">{{ registration.course_offering?.course_code || 'Course Code' }} • {{ registration.credit_hours }} credits</p>
                     </div>
                     <div class="text-right">
                         <Badge :variant="registration.registration_status === 'completed' ? 'default' : 'outline'">

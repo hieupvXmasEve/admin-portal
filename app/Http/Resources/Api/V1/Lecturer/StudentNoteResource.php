@@ -16,7 +16,7 @@ class StudentNoteResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'student_id' => $this->student_id,
+            'student_code' => $this->student_code,
             'course_offering_id' => $this->course_offering_id,
             'note_type' => $this->note_type,
             'title' => $this->title,
@@ -24,7 +24,7 @@ class StudentNoteResource extends JsonResource
             'is_private' => $this->is_private,
             'is_alert' => $this->is_alert,
             'priority' => $this->priority,
-            
+
             // Display Information
             'display_info' => [
                 'type_label' => $this->getTypeLabel(),
@@ -33,7 +33,7 @@ class StudentNoteResource extends JsonResource
                 'visibility_label' => $this->is_private ? 'Private' : 'Shared',
                 'alert_indicator' => $this->is_alert,
             ],
-            
+
             // Student Information (when loaded)
             'student' => $this->whenLoaded('student', function () {
                 return [
@@ -43,7 +43,7 @@ class StudentNoteResource extends JsonResource
                     'email' => $this->student->email,
                 ];
             }),
-            
+
             // Course Information (when loaded)
             'course' => $this->when($this->course_offering_id, function () {
                 return $this->whenLoaded('courseOffering', function () {
@@ -55,7 +55,7 @@ class StudentNoteResource extends JsonResource
                     ];
                 });
             }),
-            
+
             // Lecturer Information (when loaded)
             'lecturer' => $this->whenLoaded('lecture', function () {
                 return [
@@ -64,7 +64,7 @@ class StudentNoteResource extends JsonResource
                     'title' => $this->lecture->title,
                 ];
             }),
-            
+
             // Metadata
             'metadata' => [
                 'word_count' => str_word_count($this->content),
@@ -73,7 +73,7 @@ class StudentNoteResource extends JsonResource
                 'age_in_days' => $this->created_at->diffInDays(now()),
                 'last_modified' => $this->updated_at->diffForHumans(),
             ],
-            
+
             // Actions Available
             'available_actions' => [
                 'can_edit' => $this->canEdit(),
@@ -82,7 +82,7 @@ class StudentNoteResource extends JsonResource
                 'can_convert_to_alert' => !$this->is_alert,
                 'can_change_priority' => true,
             ],
-            
+
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

@@ -30,7 +30,7 @@ class AssessmentGradeExcelService
             $originalMemoryLimit = ini_get('memory_limit');
             $configuredMemoryLimit = config('excel-memory.memory_limit', '512M');
             ini_set('memory_limit', $configuredMemoryLimit);
-            
+
             // Log memory usage if enabled
             if (config('excel-memory.log_memory_usage', false)) {
                 Log::info('Excel export memory usage', [
@@ -40,35 +40,34 @@ class AssessmentGradeExcelService
                     'peak_usage' => memory_get_peak_usage(true)
                 ]);
             }
-            
+
             // Generate filename first
             $fileName = $this->generateExportFileName($assessmentComponentDetail, $courseOffering);
             $filePath = 'temp/' . $fileName;
-            
+
             // Use optimized export with memory management
             $export = new \App\Exports\OptimizedGradeTemplateExport(
-                $assessmentComponentDetail, 
+                $assessmentComponentDetail,
                 $courseOffering
             );
 
             // Store the file with memory optimization
             Excel::store($export, $filePath, 'local');
-            
+
             // Restore original memory limit
             ini_set('memory_limit', $originalMemoryLimit);
-            
+
             // Force garbage collection
             gc_collect_cycles();
 
             // Return the full file path
             return Storage::disk('local')->path($filePath);
-
         } catch (\Exception $e) {
             // Restore memory limit on error
             if (isset($originalMemoryLimit)) {
                 ini_set('memory_limit', $originalMemoryLimit);
             }
-            
+
             Log::error('Failed to export grade template', [
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
                 'course_offering_id' => $courseOffering->id,
@@ -117,7 +116,6 @@ class AssessmentGradeExcelService
             ]);
 
             return $results;
-
         } catch (\Exception $e) {
             Log::error('Failed to import grades', [
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
@@ -166,7 +164,6 @@ class AssessmentGradeExcelService
             ];
 
             return $results;
-
         } catch (\Exception $e) {
             Log::error('Failed to preview import', [
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
@@ -187,17 +184,17 @@ class AssessmentGradeExcelService
         CourseOffering $courseOffering
     ): \Illuminate\Database\Eloquent\Builder {
         return Student::select(
-                'students.id',
-                'students.student_id', 
-                'students.full_name', 
-                'students.email'
-            )
-            ->join('course_registrations', 'students.id', '=', 'course_registrations.student_id')
+            'students.id',
+            'students.student_code',
+            'students.full_name',
+            'students.email'
+        )
+            ->join('course_registrations', 'students.id', '=', 'course_registrations.student_code')
             ->where('course_registrations.course_offering_id', $courseOffering->id)
             ->whereIn('course_registrations.registration_status', ['registered', 'confirmed'])
-            ->orderBy('students.student_id');
+            ->orderBy('students.student_code');
     }
-    
+
     /**
      * Get chunked students for memory-efficient processing
      */
@@ -207,7 +204,7 @@ class AssessmentGradeExcelService
         int $chunkSize = 500
     ): \Generator {
         $query = $this->getStudentsWithScores($assessmentComponentDetail, $courseOffering);
-        
+
         $query->chunk($chunkSize, function ($students) use ($assessmentComponentDetail, $courseOffering) {
             foreach ($students as $student) {
                 // Load score only when needed
@@ -216,18 +213,26 @@ class AssessmentGradeExcelService
             }
         });
     }
-    
+
     /**
      * Get individual student score efficiently
      */
     public function getStudentScore($student, AssessmentComponentDetail $assessmentComponentDetail, CourseOffering $courseOffering)
     {
         return \App\Models\AssessmentComponentDetailScore::select(
-                'points_earned', 'percentage_score', 'letter_grade', 'status', 
-                'score_status', 'instructor_feedback', 'bonus_points', 'bonus_reason',
-                'late_penalty_applied', 'private_notes', 'id'
-            )
-            ->where('student_id', $student->id)
+            'points_earned',
+            'percentage_score',
+            'letter_grade',
+            'status',
+            'score_status',
+            'instructor_feedback',
+            'bonus_points',
+            'bonus_reason',
+            'late_penalty_applied',
+            'private_notes',
+            'id'
+        )
+            ->where('student_code', $student->id)
             ->where('assessment_component_detail_id', $assessmentComponentDetail->id)
             ->where('course_offering_id', $courseOffering->id)
             ->first();
@@ -260,7 +265,7 @@ class AssessmentGradeExcelService
         // Check file extension
         $allowedExtensions = ['xlsx', 'xls', 'csv'];
         $extension = strtolower($file->getClientOriginalExtension());
-        
+
         if (!in_array($extension, $allowedExtensions)) {
             throw new \Exception('File must be an Excel file (.xlsx, .xls) or CSV file (.csv)');
         }
@@ -281,12 +286,12 @@ class AssessmentGradeExcelService
      */
     protected function getTotalStudentCount(CourseOffering $courseOffering): int
     {
-        return Student::join('course_registrations', 'students.id', '=', 'course_registrations.student_id')
+        return Student::join('course_registrations', 'students.id', '=', 'course_registrations.student_code')
             ->where('course_registrations.course_offering_id', $courseOffering->id)
             ->whereIn('course_registrations.registration_status', ['registered', 'confirmed'])
             ->count();
     }
-    
+
     /**
      * Get import statistics for an assessment component detail
      */

@@ -72,19 +72,17 @@ const selectedStudentsCount = ref(0);
 const filteredStudents = computed(() => {
     if (!values.fromStatus) return [];
 
-    return props.courseOffering.course_registrations.filter(
-        (registration: CourseRegistration) => registration.registration_status === values.fromStatus,
-    );
+    return props.courseOffering.course_registrations.filter((registration: CourseRegistration) => registration.registration_status === values.fromStatus);
 });
 
 // DataTable columns
 const baseColumns: ColumnDef<CourseRegistration>[] = [
     {
-        accessorKey: 'student.student_id',
+        accessorKey: 'student.student_code',
         header: 'Student ID',
         cell: ({ row }) => {
             const registration = row.original;
-            return h('span', { class: 'font-medium' }, registration.student?.student_id || 'N/A');
+            return h('span', { class: 'font-medium' }, registration.student?.student_code || 'N/A');
         },
     },
     {
@@ -164,7 +162,7 @@ const onSubmit = handleSubmit(async (values) => {
         const { data: response, error } = await apiCall(`/api/course-offerings/${props.courseOffering.id}/bulk-update-status`, {
             from_status: values.fromStatus,
             to_status: values.toStatus,
-            student_ids: values.studentIds,
+            student_codes: values.studentIds,
         });
 
         if (error.value) {
@@ -196,9 +194,7 @@ const handleClose = () => {
                     <UserCheck class="h-5 w-5" />
                     Bulk Registration Status Update
                 </DialogTitle>
-                <DialogDescription>
-                    Update registration status for multiple students in {{ courseOffering.course_code }} - {{ courseOffering.course_title }}
-                </DialogDescription>
+                <DialogDescription> Update registration status for multiple students in {{ courseOffering.course_code }} - {{ courseOffering.course_title }} </DialogDescription>
             </DialogHeader>
 
             <form @submit="onSubmit" class="flex flex-1 flex-col space-y-6 overflow-hidden">
@@ -247,11 +243,7 @@ const handleClose = () => {
                 <!-- Student Selection -->
                 <div v-if="values.fromStatus" class="flex flex-1 flex-col overflow-hidden">
                     <div class="mb-4">
-                        <h3 class="text-lg font-semibold">
-                            Students with {{ registrationStatuses.find((s) => s.value === values.fromStatus)?.label }} status ({{
-                                filteredStudents.length
-                            }})
-                        </h3>
+                        <h3 class="text-lg font-semibold">Students with {{ registrationStatuses.find((s) => s.value === values.fromStatus)?.label }} status ({{ filteredStudents.length }})</h3>
                     </div>
 
                     <FormField name="studentIds">

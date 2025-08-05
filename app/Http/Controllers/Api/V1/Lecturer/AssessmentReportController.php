@@ -83,7 +83,7 @@ class AssessmentReportController extends Controller
             $filters = [
                 'include_excluded' => $request->boolean('include_excluded', false),
                 'score_status' => $request->input('score_status', 'final'),
-                'student_ids' => $request->input('student_ids', []),
+                'student_codes' => $request->input('student_codes', []),
                 'component_ids' => $request->input('component_ids', []),
             ];
 
@@ -202,7 +202,6 @@ class AssessmentReportController extends Controller
             return response()->download($filePath, $downloadName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ])->deleteFileAfterSend(true);
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -244,7 +243,6 @@ class AssessmentReportController extends Controller
             return response()->download($filePath, $downloadName, [
                 'Content-Type' => 'application/pdf',
             ])->deleteFileAfterSend(true);
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,

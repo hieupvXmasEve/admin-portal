@@ -167,17 +167,17 @@ class CourseExemptionSeeder extends Seeder
         }
 
         // Check if student already has an academic record for this course offering
-        $existingRecord = AcademicRecord::where('student_id', $student->id)
+        $existingRecord = AcademicRecord::where('student_code', $student->id)
             ->where('course_offering_id', $courseOffering->id)
             ->first();
 
         if ($existingRecord) {
-            $this->command->info("  ⚠️ {$student->student_id}: Already has record for {$unit->code}, skipping exemption");
+            $this->command->info("  ⚠️ {$student->student_code}: Already has record for {$unit->code}, skipping exemption");
             return $existingRecord;
         }
 
         $exemption = AcademicRecord::create([
-            'student_id' => $student->id,
+            'student_code' => $student->id,
             'course_offering_id' => $courseOffering->id, // Use existing course offering
             'semester_id' => $semester->id,
             'unit_id' => $unit->id,
@@ -209,7 +209,7 @@ class CourseExemptionSeeder extends Seeder
             'administrative_notes' => "Exemption: {$exemptionData['reason']}. Source: {$exemptionData['source']}",
         ]);
 
-        $this->command->info("  📜 {$student->student_id}: Exempted from {$unit->code} ({$exemptionData['type']})");
+        $this->command->info("  📜 {$student->student_code}: Exempted from {$unit->code} ({$exemptionData['type']})");
 
         return $exemption;
     }

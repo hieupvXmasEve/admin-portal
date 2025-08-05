@@ -20,7 +20,7 @@ class CalendarService
     public function getSemesters(Student $student): array
     {
         $cacheKey = "calendar:semesters:student:{$student->id}";
-        
+
         return Cache::remember($cacheKey, 3600, function () use ($student) {
             $semesters = Semester::where('campus_id', $student->campus_id)
                 ->orderBy('start_date', 'desc')
@@ -41,7 +41,7 @@ class CalendarService
     public function getSemesterDeadlines(Student $student, Semester $semester): array
     {
         $cacheKey = "calendar:deadlines:student:{$student->id}:semester:{$semester->id}";
-        
+
         return Cache::remember($cacheKey, 1800, function () use ($student, $semester) {
             return [
                 'semester_info' => [
@@ -66,7 +66,7 @@ class CalendarService
     public function getAcademicCalendar(Student $student): array
     {
         $cacheKey = "calendar:academic:student:{$student->id}";
-        
+
         return Cache::remember($cacheKey, 3600, function () use ($student) {
             $currentYear = now()->year;
             $events = AcademicCalendarEvent::where('campus_id', $student->campus_id)
@@ -91,10 +91,10 @@ class CalendarService
     public function getCurrentSemesterInfo(Student $student): array
     {
         $cacheKey = "calendar:current_semester:student:{$student->id}";
-        
+
         return Cache::remember($cacheKey, 1800, function () use ($student) {
             $currentSemester = $this->getCurrentSemesterForStudent($student);
-            
+
             if (!$currentSemester) {
                 return [
                     'current_semester' => null,
@@ -223,7 +223,7 @@ class CalendarService
      */
     protected function getAssessmentDeadlines(Student $student, Semester $semester): array
     {
-        $assessments = AssessmentComponentDetailScore::where('student_id', $student->id)
+        $assessments = AssessmentComponentDetailScore::where('student_code', $student->id)
             ->whereHas('courseOffering', function ($query) use ($semester) {
                 $query->where('semester_id', $semester->id);
             })
@@ -349,7 +349,7 @@ class CalendarService
 
         // Sort by date and take next 10
         usort($deadlines, fn($a, $b) => strcmp($a['date'], $b['date']));
-        
+
         return array_slice($deadlines, 0, 10);
     }
 
@@ -546,7 +546,7 @@ class CalendarService
     protected function getSemesterStatus(Semester $semester): string
     {
         $now = now();
-        
+
         if ($now < $semester->start_date) {
             return 'upcoming';
         } elseif ($now > $semester->end_date) {
@@ -559,16 +559,16 @@ class CalendarService
     protected function isRegistrationOpen(Semester $semester): bool
     {
         $now = now();
-        return $semester->registration_start_date && 
-               $semester->registration_end_date &&
-               $now >= $semester->registration_start_date && 
-               $now <= $semester->registration_end_date;
+        return $semester->registration_start_date &&
+            $semester->registration_end_date &&
+            $now >= $semester->registration_start_date &&
+            $now <= $semester->registration_end_date;
     }
 
     protected function calculateUrgency(Carbon $dueDate): string
     {
         $daysUntil = now()->diffInDays($dueDate, false);
-        
+
         return match (true) {
             $daysUntil < 0 => 'overdue',
             $daysUntil <= 1 => 'critical',
@@ -593,7 +593,7 @@ class CalendarService
     protected function getEnrollmentStatus(Collection $registrations): string
     {
         $registeredCount = $registrations->where('registration_status', 'registered')->count();
-        
+
         return match (true) {
             $registeredCount === 0 => 'not_enrolled',
             $registeredCount < 3 => 'part_time',

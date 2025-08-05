@@ -86,7 +86,7 @@ class StudentStatusController extends Controller
             $search = $validated['search'];
             $enrollmentsQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%");
+                    ->orWhere('student_code', 'like', "%{$search}%");
             });
         }
 
@@ -129,7 +129,7 @@ class StudentStatusController extends Controller
             $search = $validated['search'];
             $holdsQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%");
+                    ->orWhere('student_code', 'like', "%{$search}%");
             });
         }
 

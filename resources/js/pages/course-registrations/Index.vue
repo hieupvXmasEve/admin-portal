@@ -128,10 +128,7 @@ const clearFilters = () => {
 };
 
 const hasActiveFilters = computed(() => {
-    return filters.value.search ||
-           filters.value.semester_id !== 'all' ||
-           filters.value.status !== 'all' ||
-           filters.value.course_offering_id !== 'all';
+    return filters.value.search || filters.value.semester_id !== 'all' || filters.value.status !== 'all' || filters.value.course_offering_id !== 'all';
 });
 </script>
 
@@ -260,12 +257,10 @@ const hasActiveFilters = computed(() => {
                 <div class="flex items-center justify-between">
                     <div class="space-y-2">
                         <div class="flex items-center gap-3">
-                            <h3 class="text-lg font-semibold">Student ID: {{ registration.student_id }}</h3>
+                            <h3 class="text-lg font-semibold">Student ID: {{ registration.student_code }}</h3>
                             <Badge variant="outline">Registration #{{ registration.id }}</Badge>
                         </div>
-                        <h4 class="text-muted-foreground text-base">
-                            {{ registration.course_offering?.course_code }} - {{ registration.course_offering?.course_title }}
-                        </h4>
+                        <h4 class="text-muted-foreground text-base">{{ registration.course_offering?.course_code }} - {{ registration.course_offering?.course_title }}</h4>
                         <div class="flex items-center gap-2 text-sm">
                             <span>{{ registration.semester?.name }}</span>
                             <span>•</span>
@@ -293,14 +288,7 @@ const hasActiveFilters = computed(() => {
                             <Link :href="`/course-registrations/${registration.id}/edit`">
                                 <Button variant="outline" size="sm">Edit</Button>
                             </Link>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                @click="deleteRegistration(registration)"
-                                class="text-destructive hover:text-destructive"
-                            >
-                                Delete
-                            </Button>
+                            <Button variant="outline" size="sm" @click="deleteRegistration(registration)" class="text-destructive hover:text-destructive"> Delete </Button>
                         </div>
                     </div>
                 </div>

@@ -63,13 +63,13 @@ class InitialCourseRegistrationSeeder extends Seeder
         foreach ($eligibleUnits as $unitId) {
             // Check prerequisite requirements before registration
             if (!$this->checkPrerequisiteRequirements($student, $unitId)) {
-                $this->command->warn("  Student {$student->student_id} does not meet prerequisites for unit {$unitId}");
+                $this->command->warn("  Student {$student->student_code} does not meet prerequisites for unit {$unitId}");
                 continue;
             }
 
             // Check if student has active academic holds that restrict registration
             if (!$this->checkAcademicHoldRestrictions($student, $unitId)) {
-                $this->command->warn("  Student {$student->student_id} has academic holds restricting registration for unit {$unitId}");
+                $this->command->warn("  Student {$student->student_code} has academic holds restricting registration for unit {$unitId}");
                 continue;
             }
 
@@ -77,7 +77,7 @@ class InitialCourseRegistrationSeeder extends Seeder
 
             if ($courseOffering && ($courseOffering->max_capacity - $courseOffering->current_enrollment) > 0) {
                 $this->createCourseRegistration($student, $courseOffering, $semester);
-                $this->command->info("  ✓ Registered {$student->student_id} for {$courseOffering->unit->unit_code}");
+                $this->command->info("  ✓ Registered {$student->student_code} for {$courseOffering->unit->unit_code}");
             } else {
                 $this->command->warn("  No available spots for unit {$unitId}");
             }
@@ -130,7 +130,7 @@ class InitialCourseRegistrationSeeder extends Seeder
 
         // Create registration record
         CourseRegistration::create([
-            'student_id' => $student->id,
+            'student_code' => $student->id,
             'course_offering_id' => $courseOffering->id,
             'semester_id' => $semester->id,
             'registration_status' => $registrationStatus,

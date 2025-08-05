@@ -18,14 +18,14 @@ class LecturerStudentService
      * Get students for lecturer's courses with filtering and pagination
      */
     public function getStudents(
-        Lecture $lecturer, 
-        array $filters = [], 
+        Lecture $lecturer,
+        array $filters = [],
         int $perPage = 15
     ): LengthAwarePaginator {
         $query = Student::whereHas('courseRegistrations', function ($q) use ($lecturer) {
             $q->whereHas('courseOffering', function ($courseQuery) use ($lecturer) {
                 $courseQuery->where('lecture_id', $lecturer->id)
-                           ->where('is_active', true);
+                    ->where('is_active', true);
             })->where('registration_status', 'enrolled');
         })->with([
             'courseRegistrations' => function ($q) use ($lecturer) {
@@ -44,8 +44,8 @@ class LecturerStudentService
         $this->applyStudentFilters($query, $filters, $lecturer);
 
         return $query->orderBy('last_name')
-                    ->orderBy('first_name')
-                    ->paginate($perPage);
+            ->orderBy('first_name')
+            ->paginate($perPage);
     }
 
     /**
@@ -91,7 +91,7 @@ class LecturerStudentService
     public function getStudentAlerts(Lecture $lecturer, array $filters = []): array
     {
         $cacheKey = "lecturer-student-alerts:{$lecturer->id}:" . md5(serialize($filters));
-        
+
         return Cache::remember($cacheKey, 300, function () use ($lecturer, $filters) {
             $alerts = [];
 
@@ -101,7 +101,7 @@ class LecturerStudentService
                 $alerts[] = [
                     'type' => 'low_attendance',
                     'priority' => $student['attendance_percentage'] < 50 ? 'high' : 'medium',
-                    'student_id' => $student['student_id'],
+                    'student_code' => $student['student_code'],
                     'student_name' => $student['student_name'],
                     'course_code' => $student['course_code'],
                     'attendance_percentage' => $student['attendance_percentage'],
@@ -116,7 +116,7 @@ class LecturerStudentService
                 $alerts[] = [
                     'type' => 'consecutive_absence',
                     'priority' => 'high',
-                    'student_id' => $student['student_id'],
+                    'student_code' => $student['student_code'],
                     'student_name' => $student['student_name'],
                     'course_code' => $student['course_code'],
                     'consecutive_absences' => $student['consecutive_absences'],
@@ -131,7 +131,7 @@ class LecturerStudentService
                 $alerts[] = [
                     'type' => 'no_recent_attendance',
                     'priority' => 'medium',
-                    'student_id' => $student['student_id'],
+                    'student_code' => $student['student_code'],
                     'student_name' => $student['student_name'],
                     'course_code' => $student['course_code'],
                     'days_since_attendance' => $student['days_since_attendance'],
@@ -148,8 +148,8 @@ class LecturerStudentService
      * Add note for student
      */
     public function addStudentNote(
-        Lecture $lecturer, 
-        int $studentId, 
+        Lecture $lecturer,
+        int $studentId,
         array $noteData
     ): array {
         // Verify lecturer has access to this student
@@ -164,7 +164,7 @@ class LecturerStudentService
         }
 
         $note = StudentNote::create([
-            'student_id' => $studentId,
+            'student_code' => $studentId,
             'lecture_id' => $lecturer->id,
             'course_offering_id' => $noteData['course_offering_id'] ?? null,
             'note_type' => $noteData['note_type'] ?? 'general',
@@ -185,13 +185,13 @@ class LecturerStudentService
      * Update student note
      */
     public function updateStudentNote(
-        Lecture $lecturer, 
-        int $noteId, 
+        Lecture $lecturer,
+        int $noteId,
         array $updateData
     ): array {
         $note = StudentNote::where('id', $noteId)
-                          ->where('lecture_id', $lecturer->id)
-                          ->first();
+            ->where('lecture_id', $lecturer->id)
+            ->first();
 
         if (!$note) {
             throw new \Exception('Note not found or access denied');
@@ -211,8 +211,8 @@ class LecturerStudentService
     public function deleteStudentNote(Lecture $lecturer, int $noteId): array
     {
         $note = StudentNote::where('id', $noteId)
-                          ->where('lecture_id', $lecturer->id)
-                          ->first();
+            ->where('lecture_id', $lecturer->id)
+            ->first();
 
         if (!$note) {
             throw new \Exception('Note not found or access denied');
@@ -229,11 +229,11 @@ class LecturerStudentService
      * Get student performance analytics
      */
     public function getStudentPerformanceAnalytics(
-        Lecture $lecturer, 
+        Lecture $lecturer,
         array $filters = []
     ): array {
         $students = $this->getStudents($lecturer, $filters, 1000); // Get all for analytics
-        
+
         $analytics = [
             'total_students' => $students->total(),
             'attendance_distribution' => $this->getAttendanceDistribution($students),
@@ -260,9 +260,9 @@ class LecturerStudentService
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('student_number', 'like', "%{$search}%")
-                  ->orWhere('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -343,7 +343,7 @@ class LecturerStudentService
     protected function getStudentPerformanceIndicators(Student $student, Lecture $lecturer): array
     {
         $attendanceSummary = $this->getStudentAttendanceSummary($student, $lecturer);
-        
+
         return [
             'attendance_status' => $this->getAttendanceStatus($attendanceSummary['attendance_percentage']),
             'risk_level' => $this->getRiskLevel($student, $lecturer),
@@ -357,10 +357,10 @@ class LecturerStudentService
      */
     protected function getStudentNotes(Student $student, Lecture $lecturer): array
     {
-        $notes = StudentNote::where('student_id', $student->id)
-                           ->where('lecture_id', $lecturer->id)
-                           ->orderBy('created_at', 'desc')
-                           ->get();
+        $notes = StudentNote::where('student_code', $student->id)
+            ->where('lecture_id', $lecturer->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         return $notes->map(function ($note) {
             return $this->formatNoteData($note);

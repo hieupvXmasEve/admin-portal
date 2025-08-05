@@ -94,7 +94,7 @@ class AuditTrailSeeder extends Seeder
     private function auditAcademicRecord(Student $student, AcademicRecord $record): void
     {
         $auditData = [
-            'student_id' => $student->student_id,
+            'student_code' => $student->student_code,
             'record_type' => 'academic_record',
             'record_id' => $record->id,
             'action' => 'grade_finalized',
@@ -119,7 +119,7 @@ class AuditTrailSeeder extends Seeder
     private function auditCourseRegistration(Student $student, CourseRegistration $registration): void
     {
         $auditData = [
-            'student_id' => $student->student_id,
+            'student_code' => $student->student_code,
             'record_type' => 'course_registration',
             'record_id' => $registration->id,
             'action' => $this->getRegistrationAction($registration),
@@ -155,7 +155,7 @@ class AuditTrailSeeder extends Seeder
     {
         // Audit hold placement
         $placementAudit = [
-            'student_id' => $student->student_id,
+            'student_code' => $student->student_code,
             'record_type' => 'academic_hold',
             'record_id' => $hold->id,
             'action' => 'hold_placed',
@@ -190,7 +190,7 @@ class AuditTrailSeeder extends Seeder
     private function auditGpaCalculation(Student $student, GpaCalculation $gpaCalc): void
     {
         $auditData = [
-            'student_id' => $student->student_id,
+            'student_code' => $student->student_code,
             'record_type' => 'gpa_calculation',
             'record_id' => $gpaCalc->id,
             'action' => 'gpa_calculated',
@@ -219,7 +219,7 @@ class AuditTrailSeeder extends Seeder
 
         foreach ($statusChanges as $change) {
             $auditData = [
-                'student_id' => $student->student_id,
+                'student_code' => $student->student_code,
                 'record_type' => 'student_status',
                 'record_id' => $student->id,
                 'action' => 'status_change',
@@ -316,7 +316,7 @@ class AuditTrailSeeder extends Seeder
     {
         // In a real system, this would insert into an audit_log table
         // For this seeder, we'll update the student's notes with audit summary
-        $student = Student::where('student_id', $auditData['student_id'])->first();
+        $student = Student::where('student_code', $auditData['student_code'])->first();
 
         if ($student) {
             $timestamp = $auditData['timestamp'] ?? now();

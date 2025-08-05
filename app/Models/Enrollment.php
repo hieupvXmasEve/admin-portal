@@ -15,7 +15,7 @@ class Enrollment extends Model
     use HasFactory;
 
     protected $fillable = [
-        'student_id',
+        'student_code',
         'semester_id',
         'curriculum_version_id',
         'semester_number',
@@ -31,7 +31,7 @@ class Enrollment extends Model
     public static function validationRules(): array
     {
         return [
-            'student_id' => ['required', 'exists:students,id'],
+            'student_code' => ['required', 'exists:students,id'],
             'semester_id' => ['required', 'exists:semesters,id'],
             'curriculum_version_id' => ['required', 'exists:curriculum_versions,id'],
             'semester_number' => ['required', 'integer', 'min:1', 'max:8'],
@@ -43,8 +43,8 @@ class Enrollment extends Model
     public static function validationMessages(): array
     {
         return [
-            'student_id.required' => 'Student is required',
-            'student_id.exists' => 'Selected student does not exist',
+            'student_code.required' => 'Student is required',
+            'student_code.exists' => 'Selected student does not exist',
             'semester_id.required' => 'Semester is required',
             'semester_id.exists' => 'Selected semester does not exist',
             'curriculum_version_id.required' => 'Curriculum version is required',
@@ -123,7 +123,7 @@ class Enrollment extends Model
 
     public function scopeForStudent(Builder $query, int $studentId): void
     {
-        $query->where('student_id', $studentId);
+        $query->where('student_code', $studentId);
     }
 
     public function scopeForCurriculumVersion(Builder $query, int $curriculumVersionId): void

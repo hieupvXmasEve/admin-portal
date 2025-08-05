@@ -56,7 +56,6 @@ const getStatusVariant = (status: string) => {
             return 'outline';
     }
 };
-
 </script>
 
 <template>
@@ -92,9 +91,7 @@ const getStatusVariant = (status: string) => {
                                 </SelectContent>
                             </Select>
                             <div v-if="errors.registration_status" class="text-sm text-red-600">{{ errors.registration_status }}</div>
-                            <div v-if="!props.canEditStatus" class="text-sm text-amber-600">
-                                Status can only be changed during the course registration period
-                            </div>
+                            <div v-if="!props.canEditStatus" class="text-sm text-amber-600">Status can only be changed during the course registration period</div>
                         </div>
 
                         <!-- Notes -->
@@ -161,7 +158,7 @@ const getStatusVariant = (status: string) => {
                 <CardContent class="space-y-3">
                     <div>
                         <p class="font-medium">{{ registration.student.full_name }}</p>
-                        <p class="text-muted-foreground text-sm">{{ registration.student.student_id }}</p>
+                        <p class="text-muted-foreground text-sm">{{ registration.student.student_code }}</p>
                         <p class="text-muted-foreground text-sm">{{ registration.student.email }}</p>
                     </div>
                 </CardContent>

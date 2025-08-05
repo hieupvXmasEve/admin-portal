@@ -29,7 +29,7 @@ class ProgramChangeService
             $affectedCredits = $this->evaluateAffectedCredits($student, $data);
 
             $request = ProgramChangeRequest::create([
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'from_program_id' => $student->program_id,
                 'to_program_id' => $data['to_program_id'],
                 'from_specialization_id' => $student->specialization_id,
@@ -40,7 +40,7 @@ class ProgramChangeService
             ]);
 
             Log::info('Program change request created', [
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'request_id' => $request->id,
                 'from_program' => $student->program_id,
                 'to_program' => $data['to_program_id'],
@@ -73,7 +73,7 @@ class ProgramChangeService
 
             Log::info('Program change request approved', [
                 'request_id' => $request->id,
-                'student_id' => $request->student_id,
+                'student_code' => $request->student_code,
                 'approved_by' => $approver->id,
             ]);
 
@@ -100,7 +100,7 @@ class ProgramChangeService
 
             Log::info('Program change request rejected', [
                 'request_id' => $request->id,
-                'student_id' => $request->student_id,
+                'student_code' => $request->student_code,
                 'rejected_by' => $approver->id,
                 'reason' => $reason,
             ]);
@@ -115,10 +115,10 @@ class ProgramChangeService
     public function getChangeRequests(array $filters = []): \Illuminate\Pagination\LengthAwarePaginator
     {
         $query = ProgramChangeRequest::with([
-            'student', 
-            'fromProgram', 
-            'toProgram', 
-            'fromSpecialization', 
+            'student',
+            'fromProgram',
+            'toProgram',
+            'fromSpecialization',
             'toSpecialization',
             'approvedBy'
         ])->orderBy('created_at', 'desc');
@@ -127,8 +127,8 @@ class ProgramChangeService
             $query->where('status', $filters['status']);
         }
 
-        if (!empty($filters['student_id'])) {
-            $query->where('student_id', $filters['student_id']);
+        if (!empty($filters['student_code'])) {
+            $query->where('student_code', $filters['student_code']);
         }
 
         if (!empty($filters['from_program_id'])) {
@@ -154,13 +154,13 @@ class ProgramChangeService
     public function evaluateAffectedCredits(Student $student, array $changeData): array
     {
         $toProgram = Program::findOrFail($changeData['to_program_id']);
-        $toSpecialization = isset($changeData['to_specialization_id']) 
-            ? Specialization::find($changeData['to_specialization_id']) 
+        $toSpecialization = isset($changeData['to_specialization_id'])
+            ? Specialization::find($changeData['to_specialization_id'])
             : null;
 
         // Get the target curriculum version
         $targetCurriculumVersion = $this->findCurrentCurriculumVersion(
-            $toProgram->id, 
+            $toProgram->id,
             $toSpecialization?->id
         );
 
@@ -177,7 +177,7 @@ class ProgramChangeService
 
         foreach ($completedRecords as $record) {
             $unit = $record->unit;
-            
+
             // Check if this unit is part of the target curriculum
             $isTransferable = $this->isUnitTransferable($unit, $targetCurriculumVersion);
 
@@ -236,7 +236,7 @@ class ProgramChangeService
         // This could be implemented as a separate student history table
 
         Log::info('Program change applied to student', [
-            'student_id' => $student->id,
+            'student_code' => $student->id,
             'old_program_id' => $request->from_program_id,
             'new_program_id' => $request->to_program_id,
             'new_curriculum_version_id' => $newCurriculumVersion->id,
@@ -260,8 +260,10 @@ class ProgramChangeService
         }
 
         // Check if the target program is different from current
-        if ($student->program_id === $data['to_program_id'] && 
-            $student->specialization_id === ($data['to_specialization_id'] ?? null)) {
+        if (
+            $student->program_id === $data['to_program_id'] &&
+            $student->specialization_id === ($data['to_specialization_id'] ?? null)
+        ) {
             throw new Exception('Target program must be different from current program');
         }
 

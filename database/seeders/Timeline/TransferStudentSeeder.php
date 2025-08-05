@@ -63,7 +63,7 @@ class TransferStudentSeeder extends Seeder
         // Create transfer credit records
         $this->createTransferCredits($student);
 
-        $this->command->info("  🔄 {$student->student_id}: Transfer from {$this->getRandomPreviousInstitution()}");
+        $this->command->info("  🔄 {$student->student_code}: Transfer from {$this->getRandomPreviousInstitution()}");
     }
 
     private function createTransferStudentRecord(Campus $campus, Program $program, CurriculumVersion $curriculumVersion): Student
@@ -75,7 +75,7 @@ class TransferStudentSeeder extends Seeder
         $email = strtolower($firstName . '.' . $lastName . rand(100, 999) . '@student.swinburne.edu.au');
 
         return Student::create([
-            'student_id' => $this->generateTransferStudentId($campus),
+            'student_code' => $this->generateTransferStudentId($campus),
             'full_name' => $fullName,
             'email' => $email,
             'campus_id' => $campus->id,
@@ -138,7 +138,7 @@ class TransferStudentSeeder extends Seeder
         }
 
         AcademicRecord::create([
-            'student_id' => $student->id,
+            'student_code' => $student->id,
             'course_offering_id' => $courseOffering->id,
             'semester_id' => $semester->id,
             'unit_id' => $unit->id,

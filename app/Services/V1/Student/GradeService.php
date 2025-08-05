@@ -21,7 +21,7 @@ class GradeService
     public function getStudentGrades(Student $student, ?int $semesterId = null, array $filters = []): array
     {
         $cacheKey = "grades:student:{$student->id}:semester:" . ($semesterId ?? 'all') . ':' . md5(serialize($filters));
-        
+
         return Cache::remember($cacheKey, 600, function () use ($student, $semesterId, $filters) {
             $query = $student->academicRecords()->with([
                 'unit',
@@ -37,8 +37,8 @@ class GradeService
             $this->applyGradeFilters($query, $filters);
 
             $academicRecords = $query->orderBy('semester_id', 'desc')
-                                   ->orderBy('completion_date', 'desc')
-                                   ->get();
+                ->orderBy('completion_date', 'desc')
+                ->get();
 
             return [
                 'grades_by_semester' => $this->groupGradesBySemester($academicRecords),
@@ -54,7 +54,7 @@ class GradeService
      */
     public function getGPATrend(Student $student, int $semesterCount = 8): array
     {
-        $gpaCalculations = GpaCalculation::where('student_id', $student->id)
+        $gpaCalculations = GpaCalculation::where('student_code', $student->id)
             ->where('calculation_type', 'semester')
             ->with('semester')
             ->orderBy('created_at', 'desc')
@@ -96,7 +96,7 @@ class GradeService
             throw new \Exception('No academic record found for this course');
         }
 
-        $assessmentScores = AssessmentComponentDetailScore::where('student_id', $student->id)
+        $assessmentScores = AssessmentComponentDetailScore::where('student_code', $student->id)
             ->where('course_offering_id', $courseOfferingId)
             ->with([
                 'assessmentComponentDetail.assessmentComponent',
@@ -132,7 +132,7 @@ class GradeService
      */
     public function getAssessments(Student $student, array $filters = []): array
     {
-        $query = AssessmentComponentDetailScore::where('student_id', $student->id)
+        $query = AssessmentComponentDetailScore::where('student_code', $student->id)
             ->with([
                 'assessmentComponentDetail.assessmentComponent.assessmentType',
                 'courseOffering.curriculumUnit.unit',
@@ -157,7 +157,7 @@ class GradeService
      */
     public function getAssessmentDetail(Student $student, int $assessmentId): array
     {
-        $assessment = AssessmentComponentDetailScore::where('student_id', $student->id)
+        $assessment = AssessmentComponentDetailScore::where('student_code', $student->id)
             ->where('id', $assessmentId)
             ->with([
                 'assessmentComponentDetail.assessmentComponent.assessmentType',
@@ -186,7 +186,7 @@ class GradeService
             'score' => [
                 'achieved_score' => $assessment->achieved_score,
                 'max_score' => $assessment->max_score,
-                'percentage' => $assessment->max_score > 0 
+                'percentage' => $assessment->max_score > 0
                     ? round(($assessment->achieved_score / $assessment->max_score) * 100, 1)
                     : 0,
                 'grade_equivalent' => $this->calculateGradeEquivalent($assessment->achieved_score, $assessment->max_score),
@@ -206,7 +206,7 @@ class GradeService
     {
         return $academicRecords->groupBy('semester_id')->map(function ($records, $semesterId) {
             $semester = $records->first()->semester;
-            
+
             return [
                 'semester' => [
                     'id' => $semester->id,
@@ -244,14 +244,14 @@ class GradeService
     protected function calculateOverallSummary(Collection $academicRecords): array
     {
         $completedRecords = $academicRecords->where('completion_status', 'completed');
-        
+
         return [
             'total_courses_attempted' => $academicRecords->count(),
             'total_courses_completed' => $completedRecords->count(),
             'total_credits_attempted' => $academicRecords->sum('credit_hours'),
             'total_credits_earned' => $completedRecords->sum('credit_hours_earned'),
             'overall_gpa' => $this->calculateOverallGPA($completedRecords),
-            'completion_rate' => $academicRecords->count() > 0 
+            'completion_rate' => $academicRecords->count() > 0
                 ? round(($completedRecords->count() / $academicRecords->count()) * 100, 1)
                 : 0,
         ];
@@ -264,21 +264,21 @@ class GradeService
     {
         $completedRecords = $academicRecords->where('completion_status', 'completed');
         $distribution = $completedRecords->groupBy('final_letter_grade')->map->count();
-        
+
         $standardGrades = ['HD', 'D', 'C', 'P', 'N', 'F'];
         $formattedDistribution = [];
-        
+
         foreach ($standardGrades as $grade) {
             $count = $distribution[$grade] ?? 0;
             $formattedDistribution[] = [
                 'grade' => $grade,
                 'count' => $count,
-                'percentage' => $completedRecords->count() > 0 
+                'percentage' => $completedRecords->count() > 0
                     ? round(($count / $completedRecords->count()) * 100, 1)
                     : 0,
             ];
         }
-        
+
         return $formattedDistribution;
     }
 
@@ -287,7 +287,7 @@ class GradeService
      */
     protected function calculatePerformanceTrends(Student $student): array
     {
-        $recentGPAs = GpaCalculation::where('student_id', $student->id)
+        $recentGPAs = GpaCalculation::where('student_code', $student->id)
             ->where('calculation_type', 'semester')
             ->orderBy('created_at', 'desc')
             ->limit(4)
@@ -377,7 +377,7 @@ class GradeService
     protected function calculateSemesterGPA(Collection $records): float
     {
         $completedRecords = $records->where('completion_status', 'completed');
-        
+
         if ($completedRecords->isEmpty()) {
             return 0.0;
         }
@@ -448,7 +448,7 @@ class GradeService
     protected function analyzeGPATrend(Collection $gpaCalculations): array
     {
         $gpas = $gpaCalculations->pluck('gpa');
-        
+
         if ($gpas->count() < 2) {
             return [
                 'direction' => 'insufficient_data',
@@ -477,7 +477,7 @@ class GradeService
     protected function predictFutureGPA(Collection $gpaCalculations): array
     {
         $gpas = $gpaCalculations->pluck('gpa');
-        
+
         if ($gpas->count() < 3) {
             return [
                 'next_semester_prediction' => null,
@@ -490,18 +490,18 @@ class GradeService
         $n = $gpas->count();
         $x = range(1, $n);
         $y = $gpas->toArray();
-        
+
         $sumX = array_sum($x);
         $sumY = array_sum($y);
         $sumXY = array_sum(array_map(fn($i) => $x[$i] * $y[$i], range(0, $n - 1)));
         $sumX2 = array_sum(array_map(fn($val) => $val * $val, $x));
-        
+
         $slope = ($n * $sumXY - $sumX * $sumY) / ($n * $sumX2 - $sumX * $sumX);
         $intercept = ($sumY - $slope * $sumX) / $n;
-        
+
         $nextGPA = $slope * ($n + 1) + $intercept;
         $nextGPA = max(0, min(4, $nextGPA)); // Clamp between 0 and 4
-        
+
         return [
             'next_semester_prediction' => round($nextGPA, 2),
             'confidence' => $this->calculatePredictionConfidence($gpas),
@@ -515,7 +515,7 @@ class GradeService
     protected function calculatePredictionConfidence(Collection $gpas): string
     {
         $consistency = $this->calculateConsistency($gpas);
-        
+
         return match ($consistency) {
             'very_consistent', 'consistent' => 'high',
             'moderate' => 'medium',
@@ -552,7 +552,7 @@ class GradeService
                 'weight' => $score->assessmentComponentDetail->weight,
                 'max_score' => $score->max_score,
                 'achieved_score' => $score->achieved_score,
-                'percentage' => $score->max_score > 0 
+                'percentage' => $score->max_score > 0
                     ? round(($score->achieved_score / $score->max_score) * 100, 1)
                     : 0,
                 'due_date' => $score->due_date?->toDateString(),
@@ -592,7 +592,7 @@ class GradeService
     protected function analyzeCoursePerformance(Collection $assessmentScores): array
     {
         $completedAssessments = $assessmentScores->whereNotNull('achieved_score');
-        
+
         if ($completedAssessments->isEmpty()) {
             return [
                 'performance_level' => 'no_data',
@@ -672,7 +672,7 @@ class GradeService
                 'weight' => $assessment->assessmentComponentDetail->weight,
                 'max_score' => $assessment->max_score,
                 'achieved_score' => $assessment->achieved_score,
-                'percentage' => $assessment->achieved_score && $assessment->max_score > 0 
+                'percentage' => $assessment->achieved_score && $assessment->max_score > 0
                     ? round(($assessment->achieved_score / $assessment->max_score) * 100, 1)
                     : null,
                 'due_date' => $assessment->due_date?->toDateString(),
@@ -695,10 +695,10 @@ class GradeService
             'total_assessments' => $assessments->count(),
             'completed_assessments' => $completed->count(),
             'pending_assessments' => $pending->count(),
-            'average_score' => $completed->count() > 0 
+            'average_score' => $completed->count() > 0
                 ? round($completed->avg(function ($assessment) {
-                    return $assessment->max_score > 0 
-                        ? ($assessment->achieved_score / $assessment->max_score) * 100 
+                    return $assessment->max_score > 0
+                        ? ($assessment->achieved_score / $assessment->max_score) * 100
                         : 0;
                 }), 1)
                 : 0,
@@ -710,7 +710,7 @@ class GradeService
      */
     protected function getUpcomingAssessments(Student $student): array
     {
-        $upcomingAssessments = AssessmentComponentDetailScore::where('student_id', $student->id)
+        $upcomingAssessments = AssessmentComponentDetailScore::where('student_code', $student->id)
             ->whereNull('achieved_score')
             ->where('due_date', '>=', now())
             ->with([
@@ -741,12 +741,12 @@ class GradeService
     protected function analyzePerformanceByAssessmentType(Collection $assessments): array
     {
         $completedAssessments = $assessments->whereNotNull('achieved_score');
-        
+
         return $completedAssessments->groupBy('assessmentComponentDetail.assessmentComponent.type')
             ->map(function ($typeAssessments, $type) {
                 $averagePercentage = $typeAssessments->avg(function ($assessment) {
-                    return $assessment->max_score > 0 
-                        ? ($assessment->achieved_score / $assessment->max_score) * 100 
+                    return $assessment->max_score > 0
+                        ? ($assessment->achieved_score / $assessment->max_score) * 100
                         : 0;
                 });
 
@@ -813,8 +813,8 @@ class GradeService
 
         $orderedAssessments = $assessments->sortBy('due_date');
         $scores = $orderedAssessments->map(function ($assessment) {
-            return $assessment->max_score > 0 
-                ? ($assessment->achieved_score / $assessment->max_score) * 100 
+            return $assessment->max_score > 0
+                ? ($assessment->achieved_score / $assessment->max_score) * 100
                 : 0;
         });
 

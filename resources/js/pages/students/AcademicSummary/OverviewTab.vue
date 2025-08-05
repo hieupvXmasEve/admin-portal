@@ -1,24 +1,10 @@
 <script setup lang="ts">
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { StudentOverview } from '@/types/models';
-import {
-    AlertTriangle,
-    Award,
-    BookOpen,
-    Building,
-    Calendar,
-    CheckCircle,
-    GraduationCap,
-    Mail,
-    MapPin,
-    Phone,
-    TrendingUp,
-    User,
-    Users,
-} from 'lucide-vue-next';
+import { AlertTriangle, Award, BookOpen, Building, Calendar, GraduationCap, Mail, MapPin, Phone, TrendingUp, User, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Props {
@@ -115,9 +101,9 @@ const hasAcademicConcerns = computed(() => {
         <!-- Loading State -->
         <div v-if="loading" class="space-y-4">
             <div class="animate-pulse">
-                <div class="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div v-for="i in 4" :key="i" class="h-24 bg-gray-200 rounded"></div>
+                <div class="mb-4 h-8 w-1/3 rounded bg-gray-200"></div>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                    <div v-for="i in 4" :key="i" class="h-24 rounded bg-gray-200"></div>
                 </div>
             </div>
         </div>
@@ -125,22 +111,18 @@ const hasAcademicConcerns = computed(() => {
         <!-- Content -->
         <div v-else>
             <!-- Student Header -->
-            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
-                <div class="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full flex-shrink-0">
+            <div class="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+                <div class="bg-primary/10 flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full">
                     <User class="text-primary h-8 w-8" />
                 </div>
                 <div class="flex-1">
                     <h2 class="text-2xl font-bold">{{ overview.student_info.full_name }}</h2>
-                    <p class="text-muted-foreground text-lg">{{ overview.student_info.student_id }}</p>
-                    <div class="flex flex-wrap items-center gap-2 mt-2">
+                    <p class="text-muted-foreground text-lg">{{ overview.student_info.student_code }}</p>
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
                         <Badge :variant="getStatusBadgeVariant(overview.student_info.status) as any">
                             {{ formatStatus(overview.student_info.status) }}
                         </Badge>
-                        <Badge 
-                            v-if="overview.student_info.academic_status" 
-                            variant="outline"
-                            :class="getAcademicStandingColor(overview.academic_stats.academic_standing)"
-                        >
+                        <Badge v-if="overview.student_info.academic_status" variant="outline" :class="getAcademicStandingColor(overview.academic_stats.academic_standing)">
                             {{ formatStatus(overview.academic_stats.academic_standing) }}
                         </Badge>
                     </div>
@@ -151,18 +133,14 @@ const hasAcademicConcerns = computed(() => {
             <Alert v-if="hasAcademicConcerns" variant="destructive" class="mb-6">
                 <AlertTriangle class="h-4 w-4" />
                 <AlertDescription>
-                    <span v-if="overview.academic_stats.active_holds > 0">
-                        This student has {{ overview.academic_stats.active_holds }} active hold(s).
-                    </span>
-                    <span v-if="['warning', 'probation', 'suspension'].includes(overview.academic_stats.academic_standing)">
-                        Academic standing: {{ formatStatus(overview.academic_stats.academic_standing) }}.
-                    </span>
+                    <span v-if="overview.academic_stats.active_holds > 0"> This student has {{ overview.academic_stats.active_holds }} active hold(s). </span>
+                    <span v-if="['warning', 'probation', 'suspension'].includes(overview.academic_stats.academic_standing)"> Academic standing: {{ formatStatus(overview.academic_stats.academic_standing) }}. </span>
                     Please review their academic status.
                 </AlertDescription>
             </Alert>
 
             <!-- Quick Stats Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardContent class="p-4">
                         <div class="flex items-center justify-between">
@@ -204,23 +182,17 @@ const hasAcademicConcerns = computed(() => {
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-muted-foreground text-sm">Active Holds</p>
-                                <p 
-                                    class="text-2xl font-bold" 
-                                    :class="overview.academic_stats.active_holds > 0 ? 'text-red-600' : 'text-green-600'"
-                                >
+                                <p class="text-2xl font-bold" :class="overview.academic_stats.active_holds > 0 ? 'text-red-600' : 'text-green-600'">
                                     {{ overview.academic_stats.active_holds }}
                                 </p>
                             </div>
-                            <AlertTriangle 
-                                :class="overview.academic_stats.active_holds > 0 ? 'text-red-600' : 'text-green-600'" 
-                                class="h-8 w-8" 
-                            />
+                            <AlertTriangle :class="overview.academic_stats.active_holds > 0 ? 'text-red-600' : 'text-green-600'" class="h-8 w-8" />
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 <!-- Personal Information -->
                 <div class="lg:col-span-2">
                     <Card class="h-full">
@@ -231,13 +203,13 @@ const hasAcademicConcerns = computed(() => {
                             </CardTitle>
                         </CardHeader>
                         <CardContent class="space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div class="space-y-4">
                                     <div class="flex items-center gap-3">
                                         <Mail class="text-muted-foreground h-4 w-4 flex-shrink-0" />
                                         <div class="min-w-0 flex-1">
                                             <p class="text-muted-foreground text-sm">Email</p>
-                                            <p class="font-medium truncate">{{ overview.student_info.email }}</p>
+                                            <p class="truncate font-medium">{{ overview.student_info.email }}</p>
                                         </div>
                                     </div>
 
@@ -372,14 +344,9 @@ const hasAcademicConcerns = computed(() => {
                                             <p class="text-sm font-medium">{{ academicProgress }}%</p>
                                         </div>
                                         <div class="h-2 w-full rounded-full bg-gray-200">
-                                            <div 
-                                                class="bg-primary h-2 rounded-full transition-all duration-300" 
-                                                :style="{ width: `${academicProgress}%` }"
-                                            ></div>
+                                            <div class="bg-primary h-2 rounded-full transition-all duration-300" :style="{ width: `${academicProgress}%` }"></div>
                                         </div>
-                                        <p class="text-muted-foreground mt-1 text-xs">
-                                            {{ overview.academic_stats.completed_courses }} of {{ overview.academic_stats.total_registrations }} courses completed
-                                        </p>
+                                        <p class="text-muted-foreground mt-1 text-xs">{{ overview.academic_stats.completed_courses }} of {{ overview.academic_stats.total_registrations }} courses completed</p>
                                     </div>
 
                                     <!-- Credit Progress -->
@@ -389,14 +356,9 @@ const hasAcademicConcerns = computed(() => {
                                             <p class="text-sm font-medium">{{ creditProgress }}%</p>
                                         </div>
                                         <div class="h-2 w-full rounded-full bg-gray-200">
-                                            <div 
-                                                class="bg-green-500 h-2 rounded-full transition-all duration-300" 
-                                                :style="{ width: `${creditProgress}%` }"
-                                            ></div>
+                                            <div class="h-2 rounded-full bg-green-500 transition-all duration-300" :style="{ width: `${creditProgress}%` }"></div>
                                         </div>
-                                        <p class="text-muted-foreground mt-1 text-xs">
-                                            {{ overview.academic_stats.total_credits_earned }} of {{ overview.academic_stats.total_credits_attempted }} credits earned
-                                        </p>
+                                        <p class="text-muted-foreground mt-1 text-xs">{{ overview.academic_stats.total_credits_earned }} of {{ overview.academic_stats.total_credits_attempted }} credits earned</p>
                                     </div>
 
                                     <!-- GPA Information -->

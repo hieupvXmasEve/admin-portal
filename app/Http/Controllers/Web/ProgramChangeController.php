@@ -29,7 +29,7 @@ class ProgramChangeController extends Controller
     {
         $validated = $request->validate([
             'status' => 'nullable|string|in:pending,approved,rejected',
-            'student_id' => 'nullable|exists:students,id',
+            'student_code' => 'nullable|exists:students,id',
             'from_program_id' => 'nullable|exists:programs,id',
             'to_program_id' => 'nullable|exists:programs,id',
         ]);

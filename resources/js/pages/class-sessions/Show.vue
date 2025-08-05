@@ -111,11 +111,11 @@ const columns: ColumnDef<Attendance>[] = [
     },
     {
         header: 'Student ID',
-        accessorKey: 'student.student_id',
+        accessorKey: 'student.student_code',
         enableSorting: false,
         cell: ({ row }) => {
             const attendance = row.original;
-            return h('div', { class: 'font-mono text-sm' }, attendance.student?.student_id || 'N/A');
+            return h('div', { class: 'font-mono text-sm' }, attendance.student?.student_code || 'N/A');
         },
     },
     {
@@ -421,9 +421,7 @@ const exportAttendance = () => {
             <AlertCircle class="h-4 w-4" />
             <AlertDescription>
                 <strong>{{ studentsWithoutAttendance.length }} student(s)</strong> don't have attendance records yet.
-                <Button variant="link" class="h-auto p-0 text-yellow-700" @click="generateAttendance">
-                    Click here to generate attendance records for all enrolled students.
-                </Button>
+                <Button variant="link" class="h-auto p-0 text-yellow-700" @click="generateAttendance"> Click here to generate attendance records for all enrolled students. </Button>
             </AlertDescription>
         </Alert>
 

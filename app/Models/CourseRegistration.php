@@ -14,7 +14,7 @@ class CourseRegistration extends Model
     use HasFactory;
 
     protected $fillable = [
-        'student_id',
+        'student_code',
         'course_offering_id',
         'semester_id',
         'registration_status',
@@ -49,7 +49,7 @@ class CourseRegistration extends Model
     public static function validationRules(): array
     {
         return [
-            'student_id' => ['required', 'exists:students,id'],
+            'student_code' => ['required', 'exists:students,id'],
             'course_offering_id' => ['required', 'exists:course_offerings,id'],
             'semester_id' => ['required', 'exists:semesters,id'],
             'registration_status' => ['nullable', 'in:pending,registered,confirmed,dropped,withdrawn,completed,waitlisted,failed'],
@@ -68,8 +68,8 @@ class CourseRegistration extends Model
     public static function validationMessages(): array
     {
         return [
-            'student_id.required' => 'Student is required',
-            'student_id.exists' => 'Selected student does not exist',
+            'student_code.required' => 'Student is required',
+            'student_code.exists' => 'Selected student does not exist',
             'course_offering_id.required' => 'Course offering is required',
             'course_offering_id.exists' => 'Selected course offering does not exist',
             'semester_id.required' => 'Semester is required',
@@ -172,6 +172,6 @@ class CourseRegistration extends Model
 
     public function scopeForStudent(Builder $query, int $studentId): void
     {
-        $query->where('student_id', $studentId);
+        $query->where('student_code', $studentId);
     }
 }

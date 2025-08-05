@@ -135,9 +135,9 @@ class AssessmentManagementService
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($component) {
             $query->where('assessment_component_id', $component->id);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where('score_excluded', false)
-        ->get();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('score_excluded', false)
+            ->get();
 
         if ($scores->isEmpty()) {
             return $statistics;
@@ -489,7 +489,7 @@ class AssessmentManagementService
     {
         // Verify student is enrolled
         $isEnrolled = $courseOffering->courseRegistrations()
-            ->where('student_id', $student->id)
+            ->where('student_code', $student->id)
             ->exists();
 
         if (!$isEnrolled) {
@@ -514,7 +514,7 @@ class AssessmentManagementService
         $assessmentComponents = $syllabus->assessmentComponents()
             ->with(['details.scores' => function ($query) use ($courseOffering, $student) {
                 $query->where('course_offering_id', $courseOffering->id)
-                    ->where('student_id', $student->id)
+                    ->where('student_code', $student->id)
                     ->with('assessmentComponentDetail');
             }])
             ->orderBy('sort_order')
@@ -659,7 +659,7 @@ class AssessmentManagementService
             $gradedCount = 0;
 
             foreach ($enrolledStudents as $student) {
-                $score = $detail->scores->where('student_id', $student->id)->first();
+                $score = $detail->scores->where('student_code', $student->id)->first();
 
                 $studentData = [
                     'student' => $this->formatStudentData($student),
@@ -748,7 +748,7 @@ class AssessmentManagementService
     {
         return [
             'id' => $student->id,
-            'student_id' => $student->student_id,
+            'student_code' => $student->student_code,
             'name' => $student->display_name,
             'first_name' => $student->first_name,
             'last_name' => $student->last_name,
@@ -1311,7 +1311,7 @@ class AssessmentManagementService
             'action' => 'appeal_requested',
             'appeal_reason' => $appealReason,
             'requested_at' => now()->toISOString(),
-            'requested_by' => $score->student_id,
+            'requested_by' => $score->student_code,
         ];
         $score->score_history = $history;
         $score->save();
@@ -1728,7 +1728,7 @@ class AssessmentManagementService
                 $detailWeights = [];
 
                 foreach ($component->details as $detail) {
-                    $score = $detail->scores->where('student_id', $student->id)->first();
+                    $score = $detail->scores->where('student_code', $student->id)->first();
 
                     if ($score && ($includeExcluded || !$score->score_excluded)) {
                         $finalScore = $score->calculateFinalScore();
@@ -1760,7 +1760,7 @@ class AssessmentManagementService
                     'weight_used' => $componentWeightUsed,
                     'detail_count' => count($detailScores),
                     'has_excluded_scores' => $component->details->flatMap->scores
-                        ->where('student_id', $student->id)
+                        ->where('student_code', $student->id)
                         ->where('score_excluded', true)
                         ->isNotEmpty()
                 ];
@@ -2072,7 +2072,7 @@ class AssessmentManagementService
         $auditTrail = [];
 
         foreach ($component->details as $detail) {
-            $score = $detail->scores->where('student_id', $student->id)->first();
+            $score = $detail->scores->where('student_code', $student->id)->first();
 
             $detailData = [
                 'detail_id' => $detail->id,
@@ -2142,7 +2142,7 @@ class AssessmentManagementService
                     $auditTrail[] = [
                         'component' => $component->name,
                         'detail' => $detail->name,
-                        'student_id' => $student->id,
+                        'student_code' => $student->id,
                         'score_id' => $score->id,
                         'adjustments' => $adjustments
                     ];

@@ -179,7 +179,7 @@ const withdrawRegistration = () => {
                         </div>
                         <div>
                             <label class="text-muted-foreground text-sm font-medium">Student ID</label>
-                            <p class="mt-1 text-sm">{{ registration.student.student_id }}</p>
+                            <p class="mt-1 text-sm">{{ registration.student.student_code }}</p>
                         </div>
                         <div>
                             <label class="text-muted-foreground text-sm font-medium">Email</label>
@@ -342,9 +342,7 @@ const withdrawRegistration = () => {
                 </CardHeader>
                 <CardContent class="space-y-3">
                     <Button variant="outline" class="w-full" @click="dropRegistration" v-if="!registration.drop_date"> Drop Course </Button>
-                    <Button variant="outline" class="w-full" @click="withdrawRegistration" v-if="!registration.withdrawal_date">
-                        Withdraw from Course
-                    </Button>
+                    <Button variant="outline" class="w-full" @click="withdrawRegistration" v-if="!registration.withdrawal_date"> Withdraw from Course </Button>
                 </CardContent>
             </Card>
         </div>

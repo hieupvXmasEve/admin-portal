@@ -154,7 +154,7 @@ class DropoutScenarioSeeder extends Seeder
     private function withdrawFromCurrentCourses(Student $student, Carbon $dropoutDate, array $dropoutType): void
     {
         // Get current semester registrations
-        $currentRegistrations = CourseRegistration::where('student_id', $student->id)
+        $currentRegistrations = CourseRegistration::where('student_code', $student->id)
             ->where('registration_status', 'registered')
             ->whereHas('semester', function ($query) use ($dropoutDate) {
                 $query->where('start_date', '<=', $dropoutDate)
@@ -177,7 +177,7 @@ class DropoutScenarioSeeder extends Seeder
     private function createDropoutHold(Student $student, array $dropoutType, Carbon $dropoutDate): void
     {
         AcademicHold::create([
-            'student_id' => $student->id,
+            'student_code' => $student->id,
             'hold_type' => 'administrative',
             'hold_category' => 'all', // Use 'all' for withdrawal processing holds
             'title' => 'Student Withdrawal Processing',
@@ -204,7 +204,7 @@ class DropoutScenarioSeeder extends Seeder
         if ($refundPercentage > 0) {
             // Create refund hold/record
             AcademicHold::create([
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'hold_type' => 'financial',
                 'hold_category' => 'all', // Use 'all' for refund processing holds
                 'title' => 'Tuition Refund Processing',
@@ -254,7 +254,7 @@ class DropoutScenarioSeeder extends Seeder
     private function logDropout(Student $student, array $dropoutType): void
     {
         $voluntaryStatus = $dropoutType['voluntary'] ? 'Voluntary' : 'Involuntary';
-        $this->command->info("  📉 {$student->student_id}: {$dropoutType['category']} ({$voluntaryStatus})");
+        $this->command->info("  📉 {$student->student_code}: {$dropoutType['category']} ({$voluntaryStatus})");
     }
 
     private function displayDropoutStatistics(array $stats, int $totalDropouts): void

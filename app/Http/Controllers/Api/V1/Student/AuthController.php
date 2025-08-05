@@ -23,7 +23,7 @@ class AuthController extends Controller
     {
         // Rate limiting key
         $key = 'login:' . $request->ip();
-        
+
         // Check rate limiting
         if (RateLimiter::tooManyAttempts($key, 5)) {
             $seconds = RateLimiter::availableIn($key);
@@ -70,13 +70,13 @@ class AuthController extends Controller
         // Create token with appropriate expiration
         $deviceName = $request->device_name ?? 'Student Portal';
         $expiresAt = $request->remember_me ? now()->addDays(30) : now()->addHours(8);
-        
+
         $token = $student->createToken($deviceName, ['student'], $expiresAt)->plainTextToken;
 
         return ApiResponse::success([
             'student' => [
                 'id' => $student->id,
-                'student_id' => $student->student_id,
+                'student_code' => $student->student_code,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'status' => $student->status,
@@ -99,7 +99,7 @@ class AuthController extends Controller
         // Request is already validated by RefreshTokenRequest
 
         $student = $request->user();
-        
+
         if (!$student instanceof Student) {
             return ApiResponse::authenticationError('Invalid token');
         }
@@ -110,7 +110,7 @@ class AuthController extends Controller
         // Create new token
         $deviceName = $request->device_name ?? 'Student Portal';
         $expiresAt = now()->addHours(8);
-        
+
         $token = $student->createToken($deviceName, ['student'], $expiresAt)->plainTextToken;
 
         return ApiResponse::success([
@@ -140,7 +140,7 @@ class AuthController extends Controller
         return ApiResponse::success([
             'student' => [
                 'id' => $student->id,
-                'student_id' => $student->student_id,
+                'student_code' => $student->student_code,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'phone' => $student->phone,

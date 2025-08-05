@@ -25,7 +25,7 @@ class GraduationEligibilitySeeder extends Seeder
         $potentialGraduates = Student::where('status', 'active')
             ->whereHas('academicRecords', function ($query) {
                 $query->where('completion_status', 'completed')
-                      ->where('grade_status', 'final');
+                    ->where('grade_status', 'final');
             })
             ->with([
                 'academicRecords' => function ($query) {
@@ -34,7 +34,7 @@ class GraduationEligibilitySeeder extends Seeder
                 'curriculumVersion.curriculumUnits.unit',
                 'gpaCalculations' => function ($query) {
                     $query->where('calculation_type', 'cumulative')
-                          ->latest('calculated_at');
+                        ->latest('calculated_at');
                 }
             ])
             ->get();
@@ -210,7 +210,7 @@ class GraduationEligibilitySeeder extends Seeder
 
     private function checkActiveHolds(Student $student): array
     {
-        $activeHolds = AcademicHold::where('student_id', $student->id)
+        $activeHolds = AcademicHold::where('student_code', $student->id)
             ->where('status', 'active')
             ->get();
 
@@ -225,8 +225,8 @@ class GraduationEligibilitySeeder extends Seeder
 
         return [
             'eligible' => $eligible,
-            'issue' => $eligible ? null : 'Active holds blocking graduation: ' . 
-                      $blockingHolds->pluck('title')->implode(', '),
+            'issue' => $eligible ? null : 'Active holds blocking graduation: ' .
+                $blockingHolds->pluck('title')->implode(', '),
             'blocking_holds' => $blockingHolds->count(),
         ];
     }
@@ -246,8 +246,8 @@ class GraduationEligibilitySeeder extends Seeder
 
         return [
             'eligible' => $eligible,
-            'issue' => $eligible ? null : 
-                      "Insufficient residency credits: {$institutionCredits}/{$requiredInstitutionCredits}",
+            'issue' => $eligible ? null :
+                "Insufficient residency credits: {$institutionCredits}/{$requiredInstitutionCredits}",
             'institution_credits' => $institutionCredits,
             'required_credits' => $requiredInstitutionCredits,
         ];
@@ -255,7 +255,9 @@ class GraduationEligibilitySeeder extends Seeder
 
     private function determineEligibilityStatus(array $checks, array $issues): string
     {
-        if (array_reduce($checks, function ($carry, $check) { return $carry && $check; }, true)) {
+        if (array_reduce($checks, function ($carry, $check) {
+            return $carry && $check;
+        }, true)) {
             return 'eligible';
         }
 
@@ -277,8 +279,8 @@ class GraduationEligibilitySeeder extends Seeder
 
     private function updateStudentEligibilityStatus(Student $student, bool $eligible, array $issues, array $checks): void
     {
-        $eligibilityNote = $eligible ? 
-            'ELIGIBLE FOR GRADUATION' : 
+        $eligibilityNote = $eligible ?
+            'ELIGIBLE FOR GRADUATION' :
             'Graduation pending: ' . implode('; ', $issues);
 
         $currentNotes = $student->admission_notes ?? '';
@@ -287,16 +289,16 @@ class GraduationEligibilitySeeder extends Seeder
         ]);
 
         if ($eligible) {
-            $this->command->info("  🎓 {$student->student_id}: ELIGIBLE FOR GRADUATION!");
+            $this->command->info("  🎓 {$student->student_code}: ELIGIBLE FOR GRADUATION!");
         } else {
-            $this->command->info("  📋 {$student->student_id}: Pending - " . implode(', ', array_slice($issues, 0, 2)));
+            $this->command->info("  📋 {$student->student_code}: Pending - " . implode(', ', array_slice($issues, 0, 2)));
         }
     }
 
     private function displayEligibilityResults(array $results): void
     {
         $total = array_sum($results);
-        
+
         $this->command->info("✅ Graduation eligibility assessment complete!");
         $this->command->info("  🎓 Eligible for graduation: {$results['eligible']} students");
         $this->command->info("  📋 Pending requirements: {$results['pending_requirements']} students");

@@ -86,12 +86,12 @@ const columns: ColumnDef<Student>[] = [
         },
     },
     {
-        accessorKey: 'student_id',
+        accessorKey: 'student_code',
         header: 'Student ID',
         enableSorting: true,
         cell: ({ row }) => {
             const student = row.original;
-            return h('div', { class: 'font-medium' }, student.student_id);
+            return h('div', { class: 'font-medium' }, student.student_code);
         },
     },
     {
@@ -319,12 +319,7 @@ const handlePaginationNavigate = (url: string) => {
             <CardContent class="p-4">
                 <div class="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex w-full items-center gap-2 md:w-auto">
-                        <DebouncedInput
-                            v-model="filters.search"
-                            placeholder="Search by name, email or student ID..."
-                            class="w-full md:w-64"
-                            @update:model-value="handleSearch"
-                        />
+                        <DebouncedInput v-model="filters.search" placeholder="Search by name, email or student ID..." class="w-full md:w-64" @update:model-value="handleSearch" />
                         <!-- <Select v-model="filters.campus_id" @update:model-value="handleFilter">
                             <SelectTrigger class="w-full md:w-48">
                                 <SelectValue placeholder="Filter by campus..." />
@@ -390,11 +385,6 @@ const handlePaginationNavigate = (url: string) => {
             </CardContent>
         </Card>
 
-        <DataPagination
-            :pagination-data="students"
-            item-name="students"
-            @navigate="handlePaginationNavigate"
-            @page-size-change="handlePageSizeChange"
-        />
+        <DataPagination :pagination-data="students" item-name="students" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
     </div>
 </template>

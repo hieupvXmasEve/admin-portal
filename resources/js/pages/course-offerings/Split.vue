@@ -27,7 +27,7 @@ interface SectionData {
     max_capacity: number;
     lecture_id: string;
     location?: string;
-    student_ids: number[];
+    student_codes: number[];
 }
 
 interface SplitFormData {
@@ -50,7 +50,7 @@ const formSchema = toTypedSchema(
                     max_capacity: z.number().min(1, 'Capacity must be at least 1'),
                     lecture_id: z.string(),
                     location: z.string().optional(),
-                    student_ids: z.array(z.number()).min(1, 'At least one student must be assigned'),
+                    student_codes: z.array(z.number()).min(1, 'At least one student must be assigned'),
                 }),
             )
             .min(2, 'At least 2 sections required'),
@@ -92,7 +92,7 @@ const getStudentById = (id: number) => {
 
 // Get unassigned students
 const unassignedStudents = computed(() => {
-    const assignedIds = values.sections?.flatMap((s) => s.student_ids) || [];
+    const assignedIds = values.sections?.flatMap((s) => s.student_codes) || [];
     return props.enrolledStudents.filter((s) => !assignedIds.includes(s.id));
 });
 
@@ -104,7 +104,7 @@ const getInstructorById = (id: string) => {
 
 // Validation checks
 const validationSummary = computed(() => {
-    const totalAssigned = values.sections?.reduce((sum, section) => sum + section.student_ids.length, 0) || 0;
+    const totalAssigned = values.sections?.reduce((sum, section) => sum + section.student_codes.length, 0) || 0;
     const totalStudents = props.enrolledStudents.length;
 
     return {
@@ -134,7 +134,7 @@ const distributeStudentsEqually = (sections: SectionData[]) => {
     sections.forEach((section, index) => {
         const startIndex = index * studentsPerSection;
         const endIndex = Math.min(startIndex + studentsPerSection, shuffledStudents.length);
-        section.student_ids = shuffledStudents.slice(startIndex, endIndex).map((s) => s.id);
+        section.student_codes = shuffledStudents.slice(startIndex, endIndex).map((s) => s.id);
     });
 
     setFieldValue('sections', sections);
@@ -153,7 +153,7 @@ watch(
                     max_capacity: Math.ceil(props.courseOffering.max_capacity / newCount),
                     lecture_id: props.courseOffering.lecture_id?.toString() || 'none',
                     location: props.courseOffering.location || '',
-                    student_ids: [],
+                    student_codes: [],
                 });
             }
             setFieldValue('sections', newSections);
@@ -191,11 +191,11 @@ const addStudentToSection = (sectionIndex: number, studentId: number) => {
 
         // Remove from other sections first
         updatedSections.forEach((section) => {
-            section.student_ids = section.student_ids.filter((id) => id !== studentId);
+            section.student_codes = section.student_codes.filter((id) => id !== studentId);
         });
 
         // Add to target section
-        updatedSections[sectionIndex].student_ids.push(studentId);
+        updatedSections[sectionIndex].student_codes.push(studentId);
         setFieldValue('sections', updatedSections);
     }
 };
@@ -204,7 +204,7 @@ const addStudentToSection = (sectionIndex: number, studentId: number) => {
 const removeStudentFromSection = (sectionIndex: number, studentId: number) => {
     if (values.sections) {
         const updatedSections = [...values.sections];
-        updatedSections[sectionIndex].student_ids = updatedSections[sectionIndex].student_ids.filter((id) => id !== studentId);
+        updatedSections[sectionIndex].student_codes = updatedSections[sectionIndex].student_codes.filter((id) => id !== studentId);
         setFieldValue('sections', updatedSections);
     }
 };
@@ -402,46 +402,30 @@ const updateSectionLocation = (sectionIndex: number, location: any) => {
                                 <CardHeader>
                                     <CardTitle class="flex items-center gap-2">
                                         Section {{ section.section_code }}
-                                        <Badge variant="secondary"> {{ section.student_ids.length }} students </Badge>
+                                        <Badge variant="secondary"> {{ section.student_codes.length }} students </Badge>
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent class="space-y-4">
                                     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                                         <div>
                                             <label class="text-sm font-medium">Max Capacity</label>
-                                            <Input
-                                                type="number"
-                                                :model-value="section.max_capacity"
-                                                @update:model-value="(value) => updateSectionCapacity(sectionIndex, Number(value))"
-                                                min="1"
-                                                class="mt-1"
-                                            />
+                                            <Input type="number" :model-value="section.max_capacity" @update:model-value="(value) => updateSectionCapacity(sectionIndex, Number(value))" min="1" class="mt-1" />
                                         </div>
                                         <div>
                                             <label class="text-sm font-medium">Lecturer</label>
-                                            <Select
-                                                :model-value="section.lecture_id"
-                                                @update:model-value="(value) => updateSectionInstructor(sectionIndex, value)"
-                                            >
+                                            <Select :model-value="section.lecture_id" @update:model-value="(value) => updateSectionInstructor(sectionIndex, value)">
                                                 <SelectTrigger class="mt-1">
                                                     <SelectValue placeholder="Select lecturer" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="none">No lecturer assigned</SelectItem>
-                                                    <SelectItem v-for="instructor in lectures" :key="instructor.id" :value="instructor.id.toString()">
-                                                        {{ instructor.first_name }} {{ instructor.last_name }} ({{ instructor.email }})
-                                                    </SelectItem>
+                                                    <SelectItem v-for="instructor in lectures" :key="instructor.id" :value="instructor.id.toString()"> {{ instructor.first_name }} {{ instructor.last_name }} ({{ instructor.email }}) </SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
                                         <div>
                                             <label class="text-sm font-medium">Location</label>
-                                            <Input
-                                                :model-value="section.location"
-                                                @update:model-value="(value) => updateSectionLocation(sectionIndex, value)"
-                                                placeholder="Enter location"
-                                                class="mt-1"
-                                            />
+                                            <Input :model-value="section.location" @update:model-value="(value) => updateSectionLocation(sectionIndex, value)" placeholder="Enter location" class="mt-1" />
                                         </div>
                                     </div>
 
@@ -449,26 +433,15 @@ const updateSectionLocation = (sectionIndex: number, location: any) => {
                                     <div v-if="values.assignment_mode === 'custom'">
                                         <div class="mb-3 flex items-center justify-between">
                                             <label class="text-sm font-medium">Assigned Students</label>
-                                            <span class="text-muted-foreground text-sm">
-                                                {{ section.student_ids.length }} / {{ section.max_capacity }}
-                                            </span>
+                                            <span class="text-muted-foreground text-sm"> {{ section.student_codes.length }} / {{ section.max_capacity }} </span>
                                         </div>
                                         <div class="max-h-40 space-y-2 overflow-y-auto">
-                                            <div
-                                                v-for="studentId in section.student_ids"
-                                                :key="studentId"
-                                                class="bg-muted flex items-center justify-between rounded p-2"
-                                            >
+                                            <div v-for="studentId in section.student_codes" :key="studentId" class="bg-muted flex items-center justify-between rounded p-2">
                                                 <div>
                                                     <p class="font-medium">{{ getStudentById(studentId)?.full_name }}</p>
-                                                    <p class="text-muted-foreground text-sm">{{ getStudentById(studentId)?.student_id }}</p>
+                                                    <p class="text-muted-foreground text-sm">{{ getStudentById(studentId)?.student_code }}</p>
                                                 </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    @click="removeStudentFromSection(sectionIndex, studentId)"
-                                                >
+                                                <Button type="button" variant="ghost" size="sm" @click="removeStudentFromSection(sectionIndex, studentId)">
                                                     <Trash2 class="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -490,23 +463,17 @@ const updateSectionLocation = (sectionIndex: number, location: any) => {
                         </CardHeader>
                         <CardContent>
                             <div class="max-h-60 space-y-2 overflow-y-auto">
-                                <div
-                                    v-for="student in unassignedStudents"
-                                    :key="student.id"
-                                    class="bg-muted flex items-center justify-between rounded p-2"
-                                >
+                                <div v-for="student in unassignedStudents" :key="student.id" class="bg-muted flex items-center justify-between rounded p-2">
                                     <div>
                                         <p class="font-medium">{{ student.full_name }}</p>
-                                        <p class="text-muted-foreground text-sm">{{ student.student_id }}</p>
+                                        <p class="text-muted-foreground text-sm">{{ student.student_code }}</p>
                                     </div>
                                     <Select @update:model-value="(value) => addStudentToSection(Number(value), student.id)">
                                         <SelectTrigger class="w-32">
                                             <SelectValue placeholder="Assign to..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem v-for="(section, index) in values.sections" :key="index" :value="index.toString()">
-                                                Section {{ section.section_code }}
-                                            </SelectItem>
+                                            <SelectItem v-for="(section, index) in values.sections" :key="index" :value="index.toString()"> Section {{ section.section_code }} </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -541,10 +508,7 @@ const updateSectionLocation = (sectionIndex: number, location: any) => {
                             </div>
 
                             <div v-if="!validationSummary.isValid" class="bg-destructive/10 border-destructive mt-4 rounded border p-4">
-                                <p class="text-destructive font-medium">
-                                    ⚠️ {{ validationSummary.unassignedCount }} students are not assigned to any section. Please assign all students
-                                    before proceeding.
-                                </p>
+                                <p class="text-destructive font-medium">⚠️ {{ validationSummary.unassignedCount }} students are not assigned to any section. Please assign all students before proceeding.</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -559,15 +523,13 @@ const updateSectionLocation = (sectionIndex: number, location: any) => {
                                 <div class="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <p class="font-medium">Capacity:</p>
-                                        <p>{{ section.student_ids.length }} / {{ section.max_capacity }}</p>
+                                        <p>{{ section.student_codes.length }} / {{ section.max_capacity }}</p>
                                     </div>
                                     <div>
                                         <p class="font-medium">Instructor:</p>
                                         <p>
                                             {{ getInstructorById(section.lecture_id)?.first_name }}
-                                            {{ getInstructorById(section.lecture_id)?.last_name }} ({{
-                                                getInstructorById(section.lecture_id)?.email
-                                            }})
+                                            {{ getInstructorById(section.lecture_id)?.last_name }} ({{ getInstructorById(section.lecture_id)?.email }})
                                         </p>
                                     </div>
                                     <div class="col-span-2">
@@ -579,11 +541,11 @@ const updateSectionLocation = (sectionIndex: number, location: any) => {
                                 <Separator />
 
                                 <div>
-                                    <p class="mb-2 text-sm font-medium">Students ({{ section.student_ids.length }}):</p>
+                                    <p class="mb-2 text-sm font-medium">Students ({{ section.student_codes.length }}):</p>
                                     <div class="max-h-40 space-y-1 overflow-y-auto">
-                                        <div v-for="studentId in section.student_ids" :key="studentId" class="bg-muted rounded p-2 text-sm">
+                                        <div v-for="studentId in section.student_codes" :key="studentId" class="bg-muted rounded p-2 text-sm">
                                             <p class="font-medium">{{ getStudentById(studentId)?.full_name }}</p>
-                                            <p class="text-muted-foreground">{{ getStudentById(studentId)?.student_id }}</p>
+                                            <p class="text-muted-foreground">{{ getStudentById(studentId)?.student_code }}</p>
                                         </div>
                                     </div>
                                 </div>

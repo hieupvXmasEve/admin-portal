@@ -142,11 +142,8 @@ const columns: ColumnDef<Attendance>[] = [
         cell: ({ row }) => {
             const attendance = row.original;
             return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'flex items-center gap-2' }, [
-                    h(User, { class: 'h-4 w-4' }),
-                    h('span', { class: 'font-medium' }, attendance.student?.full_name),
-                ]),
-                h('div', { class: 'text-xs text-muted-foreground' }, attendance.student?.student_id),
+                h('div', { class: 'flex items-center gap-2' }, [h(User, { class: 'h-4 w-4' }), h('span', { class: 'font-medium' }, attendance.student?.full_name)]),
+                h('div', { class: 'text-xs text-muted-foreground' }, attendance.student?.student_code),
                 h('div', { class: 'text-xs text-muted-foreground' }, attendance.student?.email),
             ]);
         },
@@ -160,15 +157,8 @@ const columns: ColumnDef<Attendance>[] = [
             const session = attendance.class_session;
             return h('div', { class: 'space-y-1' }, [
                 h('div', { class: 'font-medium text-sm' }, session?.session_title),
-                h(
-                    'div',
-                    { class: 'text-xs text-muted-foreground' },
-                    `${session?.course_offering?.curriculum_unit?.unit.code} - ${session?.course_offering?.curriculum_unit?.unit.name}`,
-                ),
-                h('div', { class: 'flex items-center gap-1 text-xs text-muted-foreground' }, [
-                    h(Calendar, { class: 'h-3 w-3' }),
-                    h('span', session?.formatted_date),
-                ]),
+                h('div', { class: 'text-xs text-muted-foreground' }, `${session?.course_offering?.curriculum_unit?.unit.code} - ${session?.course_offering?.curriculum_unit?.unit.name}`),
+                h('div', { class: 'flex items-center gap-1 text-xs text-muted-foreground' }, [h(Calendar, { class: 'h-3 w-3' }), h('span', session?.formatted_date)]),
                 h('div', { class: 'text-xs text-muted-foreground' }, session?.instructor?.name),
             ]);
         },
@@ -206,13 +196,9 @@ const columns: ColumnDef<Attendance>[] = [
         cell: ({ row }) => {
             const attendance = row.original;
             return h('div', { class: 'space-y-1 text-xs' }, [
-                attendance.check_in_time &&
-                    h('div', [h('span', { class: 'text-muted-foreground' }, 'In: '), h('span', attendance.formatted_check_in_time)]),
-                attendance.check_out_time &&
-                    h('div', [h('span', { class: 'text-muted-foreground' }, 'Out: '), h('span', attendance.formatted_check_out_time)]),
-                attendance.minutes_late &&
-                    attendance.minutes_late > 0 &&
-                    h('div', { class: 'text-orange-600' }, `${attendance.minutes_late} min late`),
+                attendance.check_in_time && h('div', [h('span', { class: 'text-muted-foreground' }, 'In: '), h('span', attendance.formatted_check_in_time)]),
+                attendance.check_out_time && h('div', [h('span', { class: 'text-muted-foreground' }, 'Out: '), h('span', attendance.formatted_check_out_time)]),
+                attendance.minutes_late && attendance.minutes_late > 0 && h('div', { class: 'text-orange-600' }, `${attendance.minutes_late} min late`),
                 attendance.minutes_present && h('div', { class: 'text-green-600' }, `${attendance.minutes_present} min present`),
             ]);
         },
@@ -431,9 +417,7 @@ const viewSessions = () => {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Sessions</SelectItem>
-                            <SelectItem v-for="session in classSessions" :key="session.id" :value="session.id.toString()">
-                                {{ session.course }} - {{ session.title }}
-                            </SelectItem>
+                            <SelectItem v-for="session in classSessions" :key="session.id" :value="session.id.toString()"> {{ session.course }} - {{ session.title }} </SelectItem>
                         </SelectContent>
                     </Select>
 

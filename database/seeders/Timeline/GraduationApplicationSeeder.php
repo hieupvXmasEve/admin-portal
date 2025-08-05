@@ -35,7 +35,7 @@ class GraduationApplicationSeeder extends Seeder
 
         // Simulate applications instead of creating database records
         // Clean existing applications - SKIP DATABASE OPERATION
-        // GraduationApplication::whereIn('student_id', $eligibleStudents->pluck('id'))->delete();
+        // GraduationApplication::whereIn('student_code', $eligibleStudents->pluck('id'))->delete();
 
         $applicationCount = 0;
 
@@ -50,7 +50,7 @@ class GraduationApplicationSeeder extends Seeder
     private function createGraduationApplication(Student $student): void
     {
         // Get student's latest GPA
-        $latestGPA = GpaCalculation::where('student_id', $student->id)
+        $latestGPA = GpaCalculation::where('student_code', $student->id)
             ->where('calculation_type', 'cumulative')
             ->latest('calculated_at')
             ->first();
@@ -65,7 +65,7 @@ class GraduationApplicationSeeder extends Seeder
         $expectedGraduationDate = $this->calculateExpectedGraduationDate();
 
         $application = GraduationApplication::create([
-            'student_id' => $student->id,
+            'student_code' => $student->id,
             'program_id' => $student->program_id,
             'specialization_id' => $student->specialization_id,
             'curriculum_version_id' => $student->curriculum_version_id,
@@ -256,7 +256,7 @@ class GraduationApplicationSeeder extends Seeder
             $notes[] = "Graduating with {$honorsText[$honors]} honors";
         }
 
-        $notes[] = "Application processed for {$student->student_id}";
+        $notes[] = "Application processed for {$student->student_code}";
 
         // Add random additional notes
         $additionalNotes = [
@@ -279,7 +279,7 @@ class GraduationApplicationSeeder extends Seeder
         $status = $application->application_status;
         $honors = $application->graduation_honors;
 
-        $logMessage = "  📝 {$student->student_id}: {$status}";
+        $logMessage = "  📝 {$student->student_code}: {$status}";
 
         if ($honors) {
             $logMessage .= " (with honors)";
@@ -291,7 +291,7 @@ class GraduationApplicationSeeder extends Seeder
     private function simulateGraduationApplication(Student $student): void
     {
         // Get student's latest GPA
-        $latestGPA = GpaCalculation::where('student_id', $student->id)
+        $latestGPA = GpaCalculation::where('student_code', $student->id)
             ->where('calculation_type', 'cumulative')
             ->latest('calculated_at')
             ->first();
@@ -306,7 +306,7 @@ class GraduationApplicationSeeder extends Seeder
         $expectedGraduationDate = $this->calculateExpectedGraduationDate();
 
         // Log simulated application details
-        $this->command->info("  📋 {$student->student_id}: Graduation application");
+        $this->command->info("  📋 {$student->student_code}: Graduation application");
         $this->command->info("    Status: {$applicationStatus['status']}");
         $this->command->info("    Expected graduation: {$expectedGraduationDate->format('Y-m-d')}");
         if ($graduationHonors) {
@@ -318,7 +318,7 @@ class GraduationApplicationSeeder extends Seeder
 
         // Simulate all the data that would be created but don't save to database
         $simulatedApplication = [
-            'student_id' => $student->id,
+            'student_code' => $student->id,
             'application_date' => $this->getApplicationDate(),
             'expected_graduation_date' => $expectedGraduationDate,
             'graduation_ceremony_date' => $this->getGraduationCeremonyDate($expectedGraduationDate),

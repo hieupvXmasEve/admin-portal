@@ -72,7 +72,7 @@ class AssessmentScoreSeeder extends Seeder
 
             $assessmentScore = AssessmentComponentDetailScore::create([
                 'assessment_component_detail_id' => $detail->id,
-                'student_id' => $registration->student_id,
+                'student_code' => $registration->student_code,
                 'course_offering_id' => $registration->course_offering_id,
                 'graded_by_lecture_id' => $registration->courseOffering->instructor_id,
                 'points_earned' => $score['score'],
@@ -135,7 +135,7 @@ class AssessmentScoreSeeder extends Seeder
     {
         // Generate consistent performance based on student characteristics
         // Use student ID as seed for consistency
-        $seed = (int) substr($student->student_id, -3);
+        $seed = (int) substr($student->student_code, -3);
         srand($seed);
 
         // Most students perform in the 60-85 range
