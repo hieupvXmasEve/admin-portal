@@ -22,6 +22,7 @@ interface UnitData {
 interface AvailableUnitsResponse {
     semester: any;
     units: UnitData[];
+    registered_units: UnitData[];
 }
 
 // Form state
@@ -38,6 +39,7 @@ const isLoadingUnits = ref(false);
 // State for dynamic data loading
 const selectedStudent = ref<Student | null>(null);
 const availableUnits = ref<UnitData[]>([]);
+const registeredUnits = ref<UnitData[]>([]);
 const activeSemester = ref<any>(null);
 
 // Computed properties
@@ -53,6 +55,7 @@ const canSubmit = computed(() => selectedStudent.value && selectedUnitsCount.val
 const handleStudentSelect = async (student: Student | null) => {
     selectedStudent.value = student;
     availableUnits.value = [];
+    registeredUnits.value = [];
     activeSemester.value = null;
     form.value.unit_ids = [];
 
@@ -81,6 +84,7 @@ const loadAvailableUnits = async (studentId: number) => {
         if (data.success) {
             const unitsData: AvailableUnitsResponse = data.data;
             availableUnits.value = unitsData.units;
+            registeredUnits.value = unitsData.registered_units || [];
             activeSemester.value = unitsData.semester;
         } else {
             console.error('Failed to load available units:', data.message);
@@ -187,6 +191,23 @@ const onSubmit = () => {
                             <div class="bg-muted/50 rounded-lg border p-4">
                                 <h3 class="mb-1 text-sm font-medium">Active Semester</h3>
                                 <p class="text-lg font-semibold">{{ activeSemester.name }}</p>
+                            </div>
+
+                            <!-- Registered Units ---->
+                            <div v-if="registeredUnits.length > 0" class="space-y-3">
+                                <h3 class="text-sm font-medium">Already Registered Units ({{ registeredUnits.length }})</h3>
+                                <div class="space-y-2">
+                                    <div v-for="unitData in registeredUnits" :key="`registered-${unitData.unit.id}`" class="bg-blue-50 border-blue-200 flex items-start space-x-3 rounded-lg border p-3">
+                                        <CheckCircle class="h-5 w-5 text-blue-600 mt-0.5" />
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-center space-x-2">
+                                                <span class="font-medium">{{ unitData.unit.code }} - {{ unitData.unit.name }}</span>
+                                                <Badge variant="outline" class="text-xs bg-blue-100 text-blue-800 border-blue-300">Registered</Badge>
+                                            </div>
+                                            <p class="text-muted-foreground mt-1 text-sm">{{ unitData.unit.credit_points }} credit points</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Eligible Units -->
@@ -304,6 +325,10 @@ const onSubmit = () => {
                         <div>
                             <span class="text-muted-foreground">Available:</span>
                             <p class="font-medium text-green-600">{{ eligibleUnits.length }}</p>
+                        </div>
+                        <div>
+                            <span class="text-muted-foreground">Registered:</span>
+                            <p class="font-medium text-blue-600">{{ registeredUnits.length }}</p>
                         </div>
                         <div>
                             <span class="text-muted-foreground">Unavailable:</span>
