@@ -526,16 +526,29 @@ class CourseRegistrationController extends Controller
                 }
             }
 
-            // Check for already registered units
-            $registeredUnitIds = CourseRegistration::where('student_id', $student->id)
+            // Get already registered units with full data
+            $registeredUnits = [];
+            $registrations = CourseRegistration::where('student_id', $student->id)
                 ->where('semester_id', $activeSemester->id)
                 ->whereIn('registration_status', ['registered', 'confirmed'])
                 ->with('courseOffering.curriculumUnit.unit')
-                ->get()
-                ->pluck('courseOffering.curriculumUnit.unit.id')
-                ->unique()
-                ->toArray();
+                ->get();
 
+            $registeredUnitIds = [];
+            foreach ($registrations as $registration) {
+                $unit = $registration->courseOffering->curriculumUnit->unit;
+                $registeredUnitIds[] = $unit->id;
+                
+                $registeredUnits[] = [
+                    'unit' => $unit,
+                    'offerings' => [$registration->courseOffering],
+                    'is_eligible' => false,
+                    'is_already_registered' => true,
+                    'reasons' => ['Already registered for this unit'],
+                ];
+            }
+
+            // Mark units as already registered in unitsData
             foreach ($registeredUnitIds as $unitId) {
                 if (isset($unitsData[$unitId])) {
                     $unitsData[$unitId]['is_already_registered'] = true;
@@ -549,6 +562,7 @@ class CourseRegistrationController extends Controller
                 'data' => [
                     'semester' => $activeSemester,
                     'units' => array_values($unitsData),
+                    'registered_units' => $registeredUnits,
                 ],
             ]);
         } catch (\Exception $e) {
