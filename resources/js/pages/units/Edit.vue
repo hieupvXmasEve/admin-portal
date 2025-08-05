@@ -229,7 +229,7 @@ const selectUnit = (unit: Unit) => {
     <!-- Header -->
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Edit Unit - {{ unit.code }}</h1>
-        <Button variant="outline" size="sm" @click="router.visit(curriculumRoutes.units.show(unit.id))">
+        <Button variant="outline" size="sm" @click="router.visit(curriculumRoutes.units.index())">
             <ArrowLeft class="mr-2 h-4 w-4" />
             Back to Unit
         </Button>
@@ -428,7 +428,7 @@ const selectUnit = (unit: Unit) => {
 
             <!-- Form Actions -->
             <div class="flex items-center justify-end space-x-4 pt-6">
-                <Button type="button" variant="outline" @click="router.visit(curriculumRoutes.units.show(unit.id))" :disabled="form.processing"> Cancel </Button>
+                <Button type="button" variant="outline" @click="router.visit(curriculumRoutes.units.index())" :disabled="form.processing"> Cancel </Button>
                 <Button type="submit" :disabled="form.processing || codeValidation?.valid === false">
                     <Save class="mr-2 h-4 w-4" />
                     {{ form.processing ? 'Saving...' : 'Save Changes' }}

@@ -23,6 +23,7 @@ class CourseOffering extends Model
         'semester_id',
         'curriculum_unit_id',
         'lecture_id',
+        'campus_id',
         'section_code',
         'max_capacity',
         'current_enrollment',
@@ -280,7 +281,7 @@ class CourseOffering extends Model
     // Scopes
     public function scopeActive(Builder $query): void
     {
-        $query->where('is_active', true);
+        $query->where('course_offerings.is_active', true);
     }
 
     public function scopeCurrentSemester(Builder $query): void
@@ -292,7 +293,7 @@ class CourseOffering extends Model
 
     public function scopeForSemester(Builder $query, int $semesterId): void
     {
-        $query->where('semester_id', $semesterId);
+        $query->where('course_offerings.semester_id', $semesterId);
     }
 
     public function scopeForCurriculumUnit(Builder $query, int $curriculumUnitId): void
@@ -331,11 +332,11 @@ class CourseOffering extends Model
     {
         $now = Carbon::now()->toDateString();
         $query->where(function ($q) use ($now) {
-            $q->whereNull('registration_start_date')
-                ->orWhere('registration_start_date', '<=', $now);
+            $q->whereNull('course_offerings.registration_start_date')
+                ->orWhere('course_offerings.registration_start_date', '<=', $now);
         })->where(function ($q) use ($now) {
-            $q->whereNull('registration_end_date')
-                ->orWhere('registration_end_date', '>=', $now);
+            $q->whereNull('course_offerings.registration_end_date')
+                ->orWhere('course_offerings.registration_end_date', '>=', $now);
         });
     }
 
@@ -410,6 +411,41 @@ class CourseOffering extends Model
         return $this->lecture?->email;
     }
 
+    public function isAvailableForRegistration(): bool
+    {
+        return $this->is_active
+            && $this->enrollment_status === 'open'
+            && $this->isRegistrationOpen();
+    }
+
+    public function incrementEnrollment(): void
+    {
+        $this->increment('current_enrollment');
+    }
+
+    public function decrementEnrollment(): void
+    {
+        $this->decrement('current_enrollment');
+    }
+
+    public function updateStatus(): void
+    {
+        if ($this->current_enrollment >= $this->max_capacity) {
+            $this->update(['enrollment_status' => 'waitlist_only']);
+        } elseif ($this->enrollment_status === 'waitlist_only' && $this->current_enrollment < $this->max_capacity) {
+            $this->update(['enrollment_status' => 'open']);
+        }
+    }
+
+    public function getTotalTuition(): float
+    {
+        $creditHours = $this->getCreditHoursAttribute();
+        $tuitionPerCredit = $this->getTuitionPerCreditAttribute();
+        $additionalFees = $this->getAdditionalFeesAttribute();
+        
+        return ($creditHours * $tuitionPerCredit) + $additionalFees;
+    }
+
     // Teaching Assignment Scopes
     public function scopeWithAssignmentDetails(Builder $query): void
     {
@@ -440,6 +476,18 @@ class CourseOffering extends Model
             ->whereHas('semester', function ($semesterQuery) {
                 $semesterQuery->where('is_archived', false);
             });
+    }
+
+    public function scopeForCampus(Builder $query, int $campusId): void
+    {
+        $query->where('campus_id', $campusId);
+    }
+
+    public function scopeAvailableForRegistration(Builder $query): void
+    {
+        $query->active()
+            ->where('enrollment_status', 'open')
+            ->registrationOpen();
     }
 
     // Teaching Assignment Methods

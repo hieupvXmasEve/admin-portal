@@ -277,7 +277,7 @@ class CourseController extends Controller
             ], 422);
         }
 
-        $query = CourseOffering::with(['unit', 'lecture'])
+        $query = CourseOffering::with(['curriculumUnit.unit', 'lecture'])
             ->forSemester($semester->id)
             ->forCampus($student->campus_id);
 

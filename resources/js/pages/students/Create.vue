@@ -39,7 +39,6 @@ const createStudentSchema = toTypedSchema(
         national_id: z.string().min(1, 'National ID is required').max(20, 'National ID cannot exceed 20 characters'),
         address: z.string().min(1, 'Address is required'),
         program_id: z.string().min(1, 'Program selection is required'),
-        specialization_id: z.string().min(1, 'Specialization is required'),
         curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
         admission_date: z
             .string()
@@ -91,7 +90,6 @@ const { handleSubmit, isSubmitting, values, setFieldValue } = useForm({
         national_id: '',
         address: '',
         program_id: '',
-        specialization_id: '',
         curriculum_version_id: '',
         admission_date: new Date().toISOString().split('T')[0],
         emergency_contact_name: '',
@@ -116,7 +114,6 @@ const createInertiaForm = useInertiaForm({
     address: '',
     campus_id: '',
     program_id: '',
-    specialization_id: '',
     curriculum_version_id: '',
     admission_date: new Date().toISOString().split('T')[0],
     emergency_contact_name: '',
@@ -128,29 +125,16 @@ const createInertiaForm = useInertiaForm({
     admission_notes: '',
 });
 
-// Computed specializations filtered by selected program
-const filteredSpecializations = computed(() => {
-    if (!values.program_id) {
-        return [];
-    }
-    const selectedProgram = props.programs.find((p) => p.id.toString() === values.program_id);
-    return selectedProgram?.specializations || [];
-});
-
 // Computed curriculum versions filtered by program and specialization
 const availableCurriculumVersions = computed(() => {
     if (!values.program_id) {
         return [];
     }
     const selectedProgramId = parseInt(values.program_id);
-    const selectedSpecializationId = values.specialization_id && values.specialization_id !== 'none' ? parseInt(values.specialization_id) : null;
 
     return props.curriculumVersions.filter((cv) => {
         if (cv.program_id !== selectedProgramId) {
             return false;
-        }
-        if (selectedSpecializationId) {
-            return cv.specialization_id === selectedSpecializationId;
         }
         return cv.specialization_id === null;
     });
@@ -161,17 +145,6 @@ watch(
     () => values.program_id,
     (newProgramId, oldProgramId) => {
         if (newProgramId !== oldProgramId) {
-            setFieldValue('specialization_id', '');
-            setFieldValue('curriculum_version_id', '');
-        }
-    },
-);
-
-// Watch for specialization changes to fetch curriculum versions
-watch(
-    () => values.specialization_id,
-    (newVal, oldVal) => {
-        if (newVal !== oldVal) {
             setFieldValue('curriculum_version_id', '');
         }
     },
@@ -195,11 +168,6 @@ const onCreateSubmit = handleSubmit(async (formValues: any) => {
     const submitData = {
         ...formValues,
         program_id: parseInt(formValues.program_id),
-        specialization_id: formValues.specialization_id
-            ? formValues.specialization_id === 'none'
-                ? null
-                : parseInt(formValues.specialization_id)
-            : null,
         curriculum_version_id: parseInt(formValues.curriculum_version_id),
         high_school_graduation_year: formValues.high_school_graduation_year,
         entrance_exam_score: formValues.entrance_exam_score ? parseFloat(formValues.entrance_exam_score) : null,
@@ -391,30 +359,6 @@ const onCreateSubmit = handleSubmit(async (formValues: any) => {
                                         <SelectContent>
                                             <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
                                                 {{ program.name }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            </FormField>
-
-                            <FormField v-slot="{ componentField }" name="specialization_id">
-                                <FormItem>
-                                    <FormLabel>Specialization *</FormLabel>
-                                    <Select v-bind="componentField" :disabled="!filteredSpecializations.length">
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select specialization" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="none">No specialization</SelectItem>
-                                            <SelectItem
-                                                v-for="specialization in filteredSpecializations"
-                                                :key="specialization.id"
-                                                :value="specialization.id.toString()"
-                                            >
-                                                {{ specialization.name }}
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>

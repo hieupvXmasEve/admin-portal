@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { PaginatedResponse } from '@/types';
 import type { CourseRegistration, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { BookOpen, CreditCard, Plus, Users } from 'lucide-vue-next';
-import { ref, watch } from 'vue';
+import { BookOpen, CreditCard, Plus, Users, X } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 
 interface Props {
     registrations: PaginatedResponse<CourseRegistration>;
@@ -23,48 +23,55 @@ interface Props {
         semester_id?: string;
         status?: string;
         course_offering_id?: string;
+        per_page?: number;
     };
     semesters: Semester[];
     courseOfferings: { value: number; label: string }[];
     statusOptions: { value: string; label: string }[];
 }
 const props = defineProps<Props>();
-
 const filters = ref({
     search: props.filters.search || '',
     semester_id: props.filters.semester_id || 'all',
     status: props.filters.status || 'all',
     course_offering_id: props.filters.course_offering_id || 'all',
+    per_page: props.filters.per_page || props.registrations.per_page || 15,
 });
 
-const updateFilters = () => {
-    const filterParams = {
-        search: filters.value.search || undefined,
-        semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
-        status: filters.value.status === 'all' ? undefined : filters.value.status,
-        course_offering_id: filters.value.course_offering_id === 'all' ? undefined : filters.value.course_offering_id,
-    };
+const applyFilters = (newFilters: typeof filters.value) => {
+    const params = new URLSearchParams();
 
-    router.get('/course-registrations', filterParams, {
+    if (newFilters.search) params.set('search', newFilters.search);
+    if (newFilters.semester_id && newFilters.semester_id !== 'all') params.set('semester_id', newFilters.semester_id);
+    if (newFilters.status && newFilters.status !== 'all') params.set('status', newFilters.status);
+    if (newFilters.course_offering_id && newFilters.course_offering_id !== 'all') params.set('course_offering_id', newFilters.course_offering_id);
+    if (newFilters.per_page) params.set('per_page', newFilters.per_page.toString());
+
+    const url = `/course-registrations${params.toString() ? '?' + params.toString() : ''}`;
+
+    router.visit(url, {
         preserveState: true,
         preserveScroll: true,
+        only: ['registrations', 'filters', 'courseOfferings'],
     });
 };
 
 const handleSearch = (value: string | number) => {
     filters.value.search = String(value);
-    updateFilters();
+    applyFilters(filters.value);
 };
 
-const handlePageChange = (url: string) => {
-    router.get(
-        url,
-        {},
-        {
-            preserveState: true,
-            preserveScroll: true,
-        },
-    );
+const handlePaginationNavigate = (url: string) => {
+    router.visit(url, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['registrations'],
+    });
+};
+
+const handlePageSizeChange = (pageSize: number) => {
+    filters.value.per_page = pageSize;
+    applyFilters(filters.value);
 };
 
 const getStatusVariant = (status: string) => {
@@ -104,6 +111,28 @@ watch(
         }
     },
 );
+
+const clearFilters = () => {
+    filters.value = {
+        search: '',
+        semester_id: 'all',
+        status: 'all',
+        course_offering_id: 'all',
+        per_page: 15,
+    };
+    router.visit('/course-registrations', {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['registrations', 'filters', 'courseOfferings'],
+    });
+};
+
+const hasActiveFilters = computed(() => {
+    return filters.value.search ||
+           filters.value.semester_id !== 'all' ||
+           filters.value.status !== 'all' ||
+           filters.value.course_offering_id !== 'all';
+});
 </script>
 
 <template>
@@ -171,7 +200,7 @@ watch(
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Semester</label>
-                    <Select v-model="filters.semester_id" @update:model-value="updateFilters">
+                    <Select v-model="filters.semester_id" @update:model-value="() => applyFilters(filters)">
                         <SelectTrigger>
                             <SelectValue placeholder="All Semesters" />
                         </SelectTrigger>
@@ -186,7 +215,7 @@ watch(
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Course Offering</label>
-                    <Select v-model="filters.course_offering_id" @update:model-value="updateFilters" :disabled="filters.semester_id === 'all'">
+                    <Select v-model="filters.course_offering_id" @update:model-value="() => applyFilters(filters)" :disabled="filters.semester_id === 'all'">
                         <SelectTrigger>
                             <SelectValue placeholder="All Course Offerings" />
                         </SelectTrigger>
@@ -201,7 +230,7 @@ watch(
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Registration Status</label>
-                    <Select v-model="filters.status" @update:model-value="updateFilters">
+                    <Select v-model="filters.status" @update:model-value="() => applyFilters(filters)">
                         <SelectTrigger>
                             <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
@@ -213,6 +242,13 @@ watch(
                         </SelectContent>
                     </Select>
                 </div>
+            </div>
+
+            <div v-if="hasActiveFilters" class="flex justify-end pt-4">
+                <Button variant="ghost" size="sm" @click="clearFilters">
+                    <X class="mr-2 h-4 w-4" />
+                    Clear Filters
+                </Button>
             </div>
         </CardContent>
     </Card>
@@ -283,5 +319,5 @@ watch(
     </Card>
 
     <!-- Pagination -->
-    <DataPagination v-if="registrations.data.length > 0" :pagination-data="registrations" @navigate="handlePageChange" />
+    <DataPagination v-if="registrations.data.length > 0" :pagination-data="registrations" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 </template>

@@ -489,7 +489,7 @@ class CourseOfferingController extends Controller
         $semesterId = $request->semester_id;
 
         // Get all active course offerings without lectures
-        $offeringsWithoutInstructors = CourseOffering::with(['unit', 'semester'])
+        $offeringsWithoutInstructors = CourseOffering::with(['curriculumUnit.unit', 'semester'])
             ->where('semester_id', $semesterId)
             ->where('is_active', true)
             ->whereNull('lecture_id')

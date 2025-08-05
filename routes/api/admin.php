@@ -17,10 +17,12 @@ use App\Http\Controllers\Api\AdminScheduleController;
 use App\Http\Controllers\Api\StudentApplicationController;
 
 // Admin API routes (for internal use)
-Route::middleware(['auth'])->name('api.admin.')->group(function () {
+Route::middleware(['web'])->name('api.admin.')->group(function () {
     // Student Management
     Route::get('/students', [StudentController::class, 'index'])->name('students.index');
     Route::get('/students/stats', [StudentController::class, 'stats'])->name('students.stats');
+    Route::get('students/search', [WebStudentController::class, 'apiSearch'])->name('students.apiSearch');
+    Route::get('students/{student}', [WebStudentController::class, 'apiShow'])->name('students.apiShow');
 
     // Student Applications
 

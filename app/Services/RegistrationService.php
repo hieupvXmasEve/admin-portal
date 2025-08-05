@@ -113,7 +113,7 @@ class RegistrationService
         $semester = Semester::findOrFail($semesterId);
 
         // Get course offerings for the semester and campus
-        $courseOfferings = CourseOffering::with(['unit', 'lecture'])
+        $courseOfferings = CourseOffering::with(['curriculumUnit.unit', 'lecture'])
             ->forSemester($semesterId)
             ->forCampus($student->campus_id)
             ->availableForRegistration()
