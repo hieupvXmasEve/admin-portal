@@ -6,18 +6,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import type { CourseRegistration } from '@/types/models';
 import { Head, router } from '@inertiajs/vue3';
-import { BookOpen, CreditCard, Save, Users, X } from 'lucide-vue-next';
+import { BookOpen, Save, Users, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 interface Props {
     registration: CourseRegistration;
+    canEditStatus: boolean;
 }
 
 const props = defineProps<Props>();
 
 // Form state
 const form = ref({
-    payment_status: props.registration.payment_status,
+    registration_status: props.registration.registration_status,
     notes: props.registration.notes || '',
 });
 
@@ -56,20 +57,6 @@ const getStatusVariant = (status: string) => {
     }
 };
 
-const getPaymentStatusVariant = (status: string) => {
-    switch (status) {
-        case 'paid':
-            return 'default';
-        case 'pending':
-            return 'secondary';
-        case 'overdue':
-            return 'destructive';
-        case 'waived':
-            return 'outline';
-        default:
-            return 'outline';
-    }
-};
 </script>
 
 <template>
@@ -89,21 +76,25 @@ const getPaymentStatusVariant = (status: string) => {
                 </CardHeader>
                 <CardContent>
                     <form @submit.prevent="onSubmit" class="space-y-6">
-                        <!-- Payment Status -->
+                        <!-- Registration Status -->
                         <div class="space-y-2">
-                            <label class="text-sm font-medium">Payment Status *</label>
-                            <Select v-model="form.payment_status">
+                            <label class="text-sm font-medium">Registration Status *</label>
+                            <Select v-model="form.registration_status" :disabled="!props.canEditStatus">
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select payment status" />
+                                    <SelectValue placeholder="Select registration status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="paid">Paid</SelectItem>
-                                    <SelectItem value="overdue">Overdue</SelectItem>
-                                    <SelectItem value="waived">Waived</SelectItem>
+                                    <SelectItem value="registered">Registered</SelectItem>
+                                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                                    <SelectItem value="dropped">Dropped</SelectItem>
+                                    <SelectItem value="withdrawn">Withdrawn</SelectItem>
+                                    <SelectItem value="completed">Completed</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <div v-if="errors.payment_status" class="text-sm text-red-600">{{ errors.payment_status }}</div>
+                            <div v-if="errors.registration_status" class="text-sm text-red-600">{{ errors.registration_status }}</div>
+                            <div v-if="!props.canEditStatus" class="text-sm text-amber-600">
+                                Status can only be changed during the course registration period
+                            </div>
                         </div>
 
                         <!-- Notes -->
@@ -189,40 +180,6 @@ const getPaymentStatusVariant = (status: string) => {
                         <p class="font-medium">{{ registration.course_offering.course_code }}</p>
                         <p class="text-muted-foreground text-sm">{{ registration.course_offering.course_title }}</p>
                         <p class="text-muted-foreground text-sm">Section {{ registration.course_offering.section_code }}</p>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <!-- Financial Summary -->
-            <Card>
-                <CardHeader>
-                    <CardTitle class="flex items-center space-x-2">
-                        <CreditCard class="h-5 w-5" />
-                        <span>Financial Summary</span>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent class="space-y-3">
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-muted-foreground">Tuition:</span>
-                            <span class="font-medium">${{ registration.tuition_amount.toFixed(2) }}</span>
-                        </div>
-                        <div v-if="registration.fees_amount > 0" class="flex justify-between">
-                            <span class="text-muted-foreground">Fees:</span>
-                            <span class="font-medium">${{ registration.fees_amount.toFixed(2) }}</span>
-                        </div>
-                        <div class="flex justify-between border-t pt-2">
-                            <span class="font-medium">Total:</span>
-                            <span class="text-lg font-bold">${{ (registration.tuition_amount + registration.fees_amount).toFixed(2) }}</span>
-                        </div>
-                    </div>
-                    <div class="pt-2">
-                        <label class="text-muted-foreground text-sm font-medium">Current Payment Status</label>
-                        <div class="mt-1">
-                            <Badge :variant="getPaymentStatusVariant(registration.payment_status)">
-                                {{ registration.payment_status }}
-                            </Badge>
-                        </div>
                     </div>
                 </CardContent>
             </Card>

@@ -64,7 +64,7 @@ class UnitController extends Controller
             ],
             'statistics' => [
                 'total_units' => Unit::count(),
-                'units_with_prerequisites' => Unit::has('prerequisiteGroups')->count(),
+                'units_with_prerequisites' => Unit::has('prerequisiteConditions')->count(),
                 'units_with_equivalents' => Unit::has('equivalentUnits')->count(),
                 'avg_credit_points' => Unit::avg('credit_points'),
             ],

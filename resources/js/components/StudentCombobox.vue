@@ -249,15 +249,15 @@ onMounted(() => {
                 </ComboboxTrigger>
             </ComboboxAnchor>
 
-            <ComboboxList class="w-full">
+            <ComboboxList class="w-[var(--reka-combobox-trigger-width)]">
                 <!-- Search Input -->
                 <div class="relative w-full items-center">
                     <ComboboxInput
-                        class="h-10 rounded-none border-0 border-b pl-4 focus-visible:ring-0"
+                        class="h-10 rounded-none border-0 border-b pl-10 pr-4 focus-visible:ring-0"
                         placeholder="Search students..."
                         @update:model-value="debouncedSearch"
                     />
-                    <span class="absolute inset-y-0 start-0 flex items-center justify-center px-3">
+                    <span class="absolute inset-y-0 left-0 flex items-center justify-center px-3 pointer-events-none">
                         <Search class="text-muted-foreground size-4" />
                     </span>
                 </div>

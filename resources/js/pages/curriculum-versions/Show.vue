@@ -556,12 +556,12 @@ const getUnitScopeColor = (scope: string) => {
                         <h3 class="text-lg font-semibold">
                             {{ String(year) === '0' ? 'Common' : `Year ${year}` }}
                         </h3>
-                        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            <div v-for="(semesterUnits, semester) in yearData" :key="semester" class="space-y-3">
+                        <div class="space-y-3">
+                            <div v-for="(semesterUnits, semester) in yearData" :key="semester" class="space-y-1">
                                 <h4 class="text-sm font-medium text-gray-700">
                                     {{ String(semester) === '0' ? '' : `Semester ${semester}` }}
                                 </h4>
-                                <div class="space-y-2">
+                                <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                                     <Card v-for="unit in semesterUnits" :key="unit.id" class="p-3">
                                         <div class="space-y-2">
                                             <div class="flex items-start justify-between">

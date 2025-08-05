@@ -28,7 +28,7 @@ class ClassSessionSeeder extends Seeder
             throw new \Exception('FALL2024 semester not found.');
         }
 
-        $courseOfferings = CourseOffering::with(['unit', 'lecture'])
+        $courseOfferings = CourseOffering::with(['curriculumUnit.unit', 'lecture'])
             ->where('semester_id', $semester->id)
             ->where('is_active', true)
             ->get();

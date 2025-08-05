@@ -28,7 +28,6 @@ class StoreStudentRequest extends FormRequest
             'address' => ['required', 'string'],
             'campus_id' => ['required', 'exists:campuses,id'], // Optional if taken from session
             'program_id' => ['required', 'exists:programs,id'],
-            'specialization_id' => ['required', 'exists:specializations,id'],
             'curriculum_version_id' => ['required', 'exists:curriculum_versions,id'],
             'admission_date' => ['required', 'date', 'before_or_equal:today'],
             'emergency_contact_name' => ['nullable', 'string', 'max:255'],
@@ -97,12 +96,6 @@ class StoreStudentRequest extends FormRequest
             ]);
         }
 
-        // Handle specialization_id when "none" is selected
-        if ($this->has('specialization_id') && $this->specialization_id === 'none') {
-            $this->merge([
-                'specialization_id' => null
-            ]);
-        }
 
         // Use session campus_id if not provided
         if (!$this->has('campus_id') || !$this->campus_id) {

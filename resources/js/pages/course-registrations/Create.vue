@@ -3,129 +3,131 @@ import StudentCombobox from '@/components/StudentCombobox.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import type { CourseOffering, Semester, Student } from '@/types/models';
+import type { Student, Unit } from '@/types/models';
 import { Head, router } from '@inertiajs/vue3';
-import { BookOpen, CreditCard, Users } from 'lucide-vue-next';
+import { AlertCircle, BookOpen, CheckCircle, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
 
-interface Props {
-    semesters: Semester[];
-    selectedSemester?: Semester;
-    courseOfferings: CourseOffering[];
+interface UnitData {
+    unit: Unit;
+    offerings: any[];
+    is_eligible: boolean;
+    is_already_registered: boolean;
+    reasons: string[];
 }
 
-const props = defineProps<Props>();
-
-const breadcrumbs = ref([
-    {
-        title: 'Course Registrations',
-        href: '/course-registrations',
-    },
-    {
-        title: 'Register Student',
-        href: '/course-registrations/create',
-    },
-]);
+interface AvailableUnitsResponse {
+    semester: any;
+    units: UnitData[];
+}
 
 // Form state
 const form = ref({
     student_id: '',
-    course_offering_id: '',
-    payment_status: 'pending',
+    unit_ids: [] as string[],
     notes: '',
 });
 
 const errors = ref<any>({});
 const isSubmitting = ref(false);
+const isLoadingUnits = ref(false);
 
 // State for dynamic data loading
-const selectedSemesterId = ref(props.selectedSemester?.id?.toString() || '');
-const courseSearch = ref('');
 const selectedStudent = ref<Student | null>(null);
-const selectedCourseOffering = ref<CourseOffering | null>(null);
+const availableUnits = ref<UnitData[]>([]);
+const activeSemester = ref<any>(null);
 
 // Computed properties
-const filteredCourseOfferings = computed(() => {
-    if (!courseSearch.value.trim()) return props.courseOfferings;
-    const searchLower = courseSearch.value.toLowerCase();
-    return props.courseOfferings.filter(
-        (offering) =>
-            offering.course_code?.toLowerCase().includes(searchLower) ||
-            offering.course_title?.toLowerCase().includes(searchLower) ||
-            offering.section_code?.toLowerCase().includes(searchLower),
-    );
-});
+const eligibleUnits = computed(() => availableUnits.value.filter((unit) => unit.is_eligible && !unit.is_already_registered));
 
-const tuitionAmount = computed(() => {
-    if (!selectedCourseOffering.value) return 0;
-    const creditHours = selectedCourseOffering.value.credit_hours || 0;
-    const perCredit = selectedCourseOffering.value.tuition_per_credit || 0;
-    return creditHours * perCredit;
-});
+const ineligibleUnits = computed(() => availableUnits.value.filter((unit) => !unit.is_eligible || unit.is_already_registered));
 
-const totalAmount = computed(() => {
-    if (!selectedCourseOffering.value) return 0;
-    return tuitionAmount.value + (selectedCourseOffering.value.additional_fees || 0);
-});
+const selectedUnitsCount = computed(() => form.value.unit_ids.length);
 
-// Handle semester change
-const handleSemesterChange = (value: any) => {
-    const semesterId = String(value);
-    selectedSemesterId.value = semesterId;
-    if (semesterId && semesterId !== 'none') {
-        router.get(
-            '/course-registrations/create',
-            { semester_id: semesterId },
-            {
-                preserveState: true,
-                only: ['students', 'courseOfferings', 'selectedSemester'],
-            },
-        );
-    }
-};
+const canSubmit = computed(() => selectedStudent.value && selectedUnitsCount.value > 0 && !isSubmitting.value);
 
 // Handle student selection
-const handleStudentSelect = (student: Student | null) => {
+const handleStudentSelect = async (student: Student | null) => {
+    selectedStudent.value = student;
+    availableUnits.value = [];
+    activeSemester.value = null;
+    form.value.unit_ids = [];
+
     if (student) {
         form.value.student_id = student.id.toString();
-        selectedStudent.value = student;
+        await loadAvailableUnits(student.id);
     } else {
         form.value.student_id = '';
-        selectedStudent.value = null;
     }
 };
 
-// Handle course selection
-const handleCourseSelect = (value: any) => {
-    const offeringId = String(value);
-    form.value.course_offering_id = offeringId;
-    selectedCourseOffering.value = props.courseOfferings.find((o) => o.id.toString() === offeringId) || null;
+// Load available units for the selected student
+const loadAvailableUnits = async (studentId: number) => {
+    if (!studentId) return;
+
+    isLoadingUnits.value = true;
+    try {
+        const response = await fetch(`/api/course-registrations/available-units?student_id=${studentId}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const unitsData: AvailableUnitsResponse = data.data;
+            availableUnits.value = unitsData.units;
+            activeSemester.value = unitsData.semester;
+        } else {
+            console.error('Failed to load available units:', data.message);
+        }
+    } catch (error) {
+        console.error('Error loading available units:', error);
+    } finally {
+        isLoadingUnits.value = false;
+    }
+};
+
+// Handle unit selection
+const handleUnitSelect = (unitId: string, checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+        if (!form.value.unit_ids.includes(unitId)) {
+            form.value.unit_ids.push(unitId);
+        }
+    } else {
+        form.value.unit_ids = form.value.unit_ids.filter((id) => id !== unitId);
+    }
 };
 
 // Form submission
 const onSubmit = () => {
-    if (!form.value.student_id || !form.value.course_offering_id) {
-        return;
-    }
+    if (!canSubmit.value) return;
 
     isSubmitting.value = true;
     errors.value = {};
 
     const formData = {
         student_id: Number(form.value.student_id),
-        course_offering_id: Number(form.value.course_offering_id),
-        payment_status: form.value.payment_status,
+        unit_ids: form.value.unit_ids.map((id) => Number(id)),
         notes: form.value.notes,
     };
 
     router.post('/course-registrations', formData, {
+        preserveScroll: true,
         onSuccess: () => {
             isSubmitting.value = false;
+            toast.success('Registration successful');
         },
         onError: (errs) => {
             errors.value = errs;
+            isSubmitting.value = false;
+            toast.error('Registration failed');
+        },
+        onFinish: () => {
             isSubmitting.value = false;
         },
     });
@@ -133,11 +135,11 @@ const onSubmit = () => {
 </script>
 
 <template>
-    <Head title="Register Student for Course" />
+    <Head title="Register Student for Units" />
     <!-- Header -->
     <div>
-        <h1 class="text-3xl font-bold tracking-tight">Register Student for Course</h1>
-        <p class="text-muted-foreground">Add a new course registration for a student</p>
+        <h1 class="text-3xl font-bold tracking-tight">Register Student for Units</h1>
+        <p class="text-muted-foreground">Select a student and register them for multiple units in the active semester</p>
     </div>
 
     <div class="grid gap-6 lg:grid-cols-3">
@@ -149,84 +151,85 @@ const onSubmit = () => {
                 </CardHeader>
                 <CardContent>
                     <form @submit.prevent="onSubmit" class="space-y-6">
-                        <!-- Semester Selection -->
+                        <!-- Student Selection -->
                         <div class="space-y-2">
-                            <label class="text-sm font-medium">Semester *</label>
-                            <Select :model-value="selectedSemesterId" @update:model-value="handleSemesterChange">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select semester" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">Select semester</SelectItem>
-                                    <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                        {{ semester.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <label class="text-sm font-medium">Student *</label>
+                            <StudentCombobox v-model="form.student_id" :error-message="errors.student_id" placeholder="Search and select a student..." @select="handleStudentSelect" />
                         </div>
 
-                        <div v-if="!selectedSemesterId || selectedSemesterId === 'none'" class="py-8 text-center">
+                        <!-- No Student Selected -->
+                        <div v-if="!selectedStudent" class="py-8 text-center">
                             <div class="flex flex-col items-center space-y-3">
-                                <BookOpen class="text-muted-foreground h-12 w-12" />
-                                <p class="text-muted-foreground">Please select a semester to continue</p>
+                                <Users class="text-muted-foreground h-12 w-12" />
+                                <p class="text-muted-foreground">Please select a student to continue</p>
                             </div>
                         </div>
 
+                        <!-- Loading Units -->
+                        <div v-else-if="isLoadingUnits" class="py-8 text-center">
+                            <div class="flex flex-col items-center space-y-3">
+                                <div class="border-primary h-8 w-8 animate-spin rounded-full border-b-2"></div>
+                                <p class="text-muted-foreground">Loading available units...</p>
+                            </div>
+                        </div>
+
+                        <!-- No Active Semester -->
+                        <div v-else-if="!activeSemester" class="py-8 text-center">
+                            <div class="flex flex-col items-center space-y-3">
+                                <AlertCircle class="text-destructive h-12 w-12" />
+                                <p class="text-destructive">No active semester found</p>
+                            </div>
+                        </div>
+
+                        <!-- Unit Selection -->
                         <div v-else class="space-y-6">
-                            <!-- Student Selection -->
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium">Student *</label>
-                                <StudentCombobox
-                                    v-model="form.student_id"
-                                    :error-message="errors.student_id"
-                                    placeholder="Search and select a student..."
-                                    @select="handleStudentSelect"
-                                />
+                            <!-- Active Semester Info -->
+                            <div class="bg-muted/50 rounded-lg border p-4">
+                                <h3 class="mb-1 text-sm font-medium">Active Semester</h3>
+                                <p class="text-lg font-semibold">{{ activeSemester.name }}</p>
                             </div>
 
-                            <!-- Course Offering Selection -->
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium">Course Offering *</label>
-                                <div class="space-y-3">
-                                    <Select :model-value="form.course_offering_id" @update:model-value="handleCourseSelect">
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select course offering" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">Select course offering</SelectItem>
-                                            <SelectItem
-                                                v-for="offering in filteredCourseOfferings"
-                                                :key="offering.id"
-                                                :value="offering.id.toString()"
-                                            >
-                                                <div class="flex flex-col">
-                                                    <span class="font-medium">{{ offering.course_code }} - {{ offering.course_title }}</span>
-                                                    <span class="text-muted-foreground text-sm">
-                                                        Section {{ offering.section_code }} • {{ offering.credit_hours }} credits •
-                                                        {{ offering.current_enrollment }}/{{ offering.max_enrollment }} enrolled
-                                                    </span>
-                                                </div>
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                            <!-- Eligible Units -->
+                            <div v-if="eligibleUnits.length > 0" class="space-y-3">
+                                <h3 class="text-sm font-medium">Available Units ({{ eligibleUnits.length }})</h3>
+                                <div class="space-y-2">
+                                    <div v-for="unitData in eligibleUnits" :key="unitData.unit.id" class="hover:bg-muted/50 flex items-start space-x-3 rounded-lg border p-3">
+                                        <Checkbox :id="`unit-${unitData.unit.id}`" :model-value="form.unit_ids.includes(unitData.unit.id.toString())" @update:model-value="(checked) => handleUnitSelect(unitData.unit.id.toString(), checked)" />
+                                        <div class="min-w-0 flex-1">
+                                            <label :for="`unit-${unitData.unit.id}`" class="block cursor-pointer font-medium"> {{ unitData.unit.code }} - {{ unitData.unit.name }} </label>
+                                            <p class="text-muted-foreground mt-1 text-sm">{{ unitData.unit.credit_points }} credit points • {{ unitData.offerings.length }} section(s) available</p>
+                                        </div>
+                                        <CheckCircle class="h-5 w-5 text-green-600" />
+                                    </div>
                                 </div>
-                                <div v-if="errors.course_offering_id" class="text-sm text-red-600">{{ errors.course_offering_id }}</div>
                             </div>
 
-                            <!-- Payment Status -->
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium">Payment Status</label>
-                                <Select v-model="form.payment_status">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select payment status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="pending">Pending</SelectItem>
-                                        <SelectItem value="paid">Paid</SelectItem>
-                                        <SelectItem value="overdue">Overdue</SelectItem>
-                                        <SelectItem value="waived">Waived</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                            <!-- Ineligible Units -->
+                            <div v-if="ineligibleUnits.length > 0" class="space-y-3">
+                                <h3 class="text-sm font-medium">Unavailable Units ({{ ineligibleUnits.length }})</h3>
+                                <div class="space-y-2">
+                                    <div v-for="unitData in ineligibleUnits" :key="unitData.unit.id" class="bg-muted/20 flex items-start space-x-3 rounded-lg border p-3 opacity-60">
+                                        <Checkbox :id="`unit-${unitData.unit.id}`" :model-value="false" disabled />
+                                        <div class="min-w-0 flex-1">
+                                            <label :for="`unit-${unitData.unit.id}`" class="block font-medium"> {{ unitData.unit.code }} - {{ unitData.unit.name }} </label>
+                                            <p class="text-muted-foreground mt-1 text-sm">{{ unitData.unit.credit_points }} credit points</p>
+                                            <div class="mt-2 space-y-1">
+                                                <Badge v-for="reason in unitData.reasons" :key="reason" variant="destructive" class="text-xs">
+                                                    {{ reason }}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                        <AlertCircle class="text-destructive h-5 w-5" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- No Units Available -->
+                            <div v-if="availableUnits.length === 0" class="py-8 text-center">
+                                <div class="flex flex-col items-center space-y-3">
+                                    <BookOpen class="text-muted-foreground h-12 w-12" />
+                                    <p class="text-muted-foreground">No units available for registration</p>
+                                </div>
                             </div>
 
                             <!-- Notes -->
@@ -235,14 +238,22 @@ const onSubmit = () => {
                                 <Textarea v-model="form.notes" placeholder="Optional registration notes..." class="min-h-[100px]" />
                             </div>
 
+                            <!-- Error Display -->
+                            <div v-if="Object.keys(errors).length > 0" class="rounded-lg border border-red-200 bg-red-50 p-4">
+                                <h4 class="mb-2 font-medium text-red-800">Please fix the following errors:</h4>
+                                <ul class="list-inside list-disc space-y-1 text-sm text-red-700">
+                                    <li v-for="(error, field) in errors" :key="field">
+                                        <span class="font-medium">{{ field }}:</span> {{ Array.isArray(error) ? error[0] : error }}
+                                    </li>
+                                </ul>
+                            </div>
+
                             <!-- Submit Button -->
                             <div class="flex space-x-4">
-                                <Button type="submit" :disabled="isSubmitting || !form.student_id || !form.course_offering_id" class="flex-1">
-                                    {{ isSubmitting ? 'Registering...' : 'Register Student' }}
+                                <Button type="submit" :disabled="!canSubmit" class="flex-1">
+                                    {{ isSubmitting ? 'Registering...' : `Register for ${selectedUnitsCount} Unit(s)` }}
                                 </Button>
-                                <Button type="button" variant="outline" @click="router.visit('/course-registrations')" class="flex-1">
-                                    Cancel
-                                </Button>
+                                <Button type="button" variant="outline" @click="router.visit('/course-registrations')" class="flex-1"> Cancel </Button>
                             </div>
                         </div>
                     </form>
@@ -272,61 +283,43 @@ const onSubmit = () => {
                 </CardContent>
             </Card>
 
-            <!-- Selected Course Info -->
-            <Card v-if="selectedCourseOffering">
+            <!-- Registration Summary -->
+            <Card v-if="selectedStudent && activeSemester">
                 <CardHeader>
                     <CardTitle class="flex items-center space-x-2">
                         <BookOpen class="h-5 w-5" />
-                        <span>Selected Course</span>
+                        <span>Registration Summary</span>
                     </CardTitle>
                 </CardHeader>
                 <CardContent class="space-y-3">
-                    <div>
-                        <p class="font-medium">{{ selectedCourseOffering.course_code }}</p>
-                        <p class="text-muted-foreground text-sm">{{ selectedCourseOffering.course_title }}</p>
-                        <p class="text-muted-foreground text-sm">Section {{ selectedCourseOffering.section_code }}</p>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div class="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                            <span class="text-muted-foreground">Credits:</span>
-                            <span class="ml-1 font-medium">{{ selectedCourseOffering.credit_hours }}</span>
+                            <span class="text-muted-foreground">Semester:</span>
+                            <p class="font-medium">{{ activeSemester.name }}</p>
                         </div>
                         <div>
-                            <span class="text-muted-foreground">Enrolled:</span>
-                            <span class="ml-1 font-medium"
-                                >{{ selectedCourseOffering.current_enrollment }}/{{ selectedCourseOffering.max_enrollment }}</span
-                            >
+                            <span class="text-muted-foreground">Units Selected:</span>
+                            <p class="font-medium">{{ selectedUnitsCount }}</p>
+                        </div>
+                        <div>
+                            <span class="text-muted-foreground">Available:</span>
+                            <p class="font-medium text-green-600">{{ eligibleUnits.length }}</p>
+                        </div>
+                        <div>
+                            <span class="text-muted-foreground">Unavailable:</span>
+                            <p class="font-medium text-red-600">{{ ineligibleUnits.length }}</p>
                         </div>
                     </div>
-                    <Badge :variant="selectedCourseOffering.enrollment_status === 'open' ? 'default' : 'secondary'">
-                        {{ selectedCourseOffering.enrollment_status }}
-                    </Badge>
-                </CardContent>
-            </Card>
 
-            <!-- Financial Summary -->
-            <Card v-if="selectedCourseOffering">
-                <CardHeader>
-                    <CardTitle class="flex items-center space-x-2">
-                        <CreditCard class="h-5 w-5" />
-                        <span>Financial Summary</span>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent class="space-y-3">
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-muted-foreground"
-                                >Tuition ({{ selectedCourseOffering.credit_hours }} × ${{ selectedCourseOffering.tuition_per_credit }}):</span
-                            >
-                            <span class="font-medium">${{ tuitionAmount.toFixed(2) }}</span>
-                        </div>
-                        <div v-if="selectedCourseOffering.additional_fees" class="flex justify-between">
-                            <span class="text-muted-foreground">Additional Fees:</span>
-                            <span class="font-medium">${{ selectedCourseOffering.additional_fees.toFixed(2) }}</span>
-                        </div>
-                        <div class="flex justify-between border-t pt-2">
-                            <span class="font-medium">Total Amount:</span>
-                            <span class="text-lg font-bold">${{ totalAmount.toFixed(2) }}</span>
+                    <!-- Selected Units List -->
+                    <div v-if="selectedUnitsCount > 0" class="border-t pt-3">
+                        <h4 class="mb-2 text-sm font-medium">Selected Units:</h4>
+                        <div class="space-y-1">
+                            <div v-for="unitId in form.unit_ids" :key="unitId" class="text-sm">
+                                <Badge variant="secondary" class="text-xs">
+                                    {{ availableUnits.find((u) => u.unit.id.toString() === unitId)?.unit.code }}
+                                </Badge>
+                            </div>
                         </div>
                     </div>
                 </CardContent>

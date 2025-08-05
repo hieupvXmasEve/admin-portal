@@ -55,6 +55,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_course_registration')
             ->name('available-courses');
 
+        Route::get('/available-units', [CourseRegistrationController::class, 'getAvailableUnits'])
+            ->middleware('can:view_course_registration')
+            ->name('available-units');
+
         Route::get('/check-eligibility', [CourseRegistrationController::class, 'checkEligibility'])
             ->middleware('can:view_course_registration')
             ->name('check-eligibility');
