@@ -198,7 +198,7 @@ class MixedSemesterProgressionSeeder extends Seeder
             'admission_notes' => trim($currentNotes . ' | ' . $progressionNote)
         ]);
 
-        $this->command->info("  📋 {$student->student_id}: {$progressionType['description']}");
+        $this->command->info("  📋 {$student->student_code}: {$progressionType['description']}");
     }
 
     private function createSampleFutureSemesters(): \Illuminate\Database\Eloquent\Collection

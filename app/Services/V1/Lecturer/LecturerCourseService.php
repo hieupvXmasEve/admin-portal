@@ -166,34 +166,34 @@ class LecturerCourseService
             $academicRecord = $student->academicRecords->first();
             $academicStanding = $student->academicStandings->first();
             $finalScore = $this->calculateStudentFinalScore($student->id, $courseOfferingId);
-            
+
             return [
-                'student_id' => $student->id,
-                'student_number' => $student->student_id,
+                'student_code' => $student->id,
+                'student_number' => $student->student_code,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'registration_date' => $registration->created_at->format('Y-m-d'),
-                
+
                 // Course Registration Information
                 'registration_status' => $registration->registration_status,
                 'attempt_number' => $registration->attempt_number ?? 1,
                 'is_retake' => $registration->is_retake ?? false,
-                
+
                 // Academic Scores and Grades
                 'final_score' => $finalScore,
                 'final_grade' => $academicRecord?->final_letter_grade ?? $registration->final_grade,
                 'grade_status' => $academicRecord?->grade_status ?? 'provisional',
-                
+
                 // Attendance and Academic Standing
                 'attendance_percentage' => $attendanceStats['percentage'],
                 'sessions_attended' => $attendanceStats['attended'],
                 'total_sessions' => $attendanceStats['total'],
                 'last_attendance' => $attendanceStats['last_attendance'],
-                'meets_attendance_requirement' => $academicRecord?->meets_attendance_requirement ?? 
+                'meets_attendance_requirement' => $academicRecord?->meets_attendance_requirement ??
                     ($attendanceStats['percentage'] >= 75),
                 'academic_standing' => $academicStanding?->standing ?? 'good',
                 'academic_standing_label' => $academicStanding?->standing_label ?? 'Good Standing',
-                
+
                 'status' => $this->getStudentStatus($attendanceStats),
             ];
         })->toArray();
@@ -288,7 +288,7 @@ class LecturerCourseService
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->whereHas('student', function ($q) use ($search) {
-                $q->where('student_id', 'like', "%{$search}%")
+                $q->where('student_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
@@ -479,7 +479,7 @@ class LecturerCourseService
             // Get course offering to access syllabus
             $courseOffering = CourseOffering::with([
                 'syllabus.assessmentComponents.details.scores' => function ($q) use ($studentId) {
-                    $q->where('student_id', $studentId)
+                    $q->where('student_code', $studentId)
                         ->where('score_excluded', false)
                         ->whereIn('score_status', ['final', 'graded'])
                         ->whereNotNull('percentage_score')
@@ -496,13 +496,13 @@ class LecturerCourseService
 
             foreach ($courseOffering->syllabus->assessmentComponents as $component) {
                 $componentWeight = $component->weight ?? 0;
-                
+
                 if ($componentWeight <= 0) {
                     continue;
                 }
 
                 $componentScore = $this->calculateComponentScore($component, $studentId);
-                
+
                 if ($componentScore !== null) {
                     $totalWeightedScore += ($componentScore * $componentWeight);
                     $totalWeight += $componentWeight;
@@ -518,7 +518,7 @@ class LecturerCourseService
         } catch (\Exception $e) {
             // Log error but don't break the API response
             Log::error('Failed to calculate student final score', [
-                'student_id' => $studentId,
+                'student_code' => $studentId,
                 'course_offering_id' => $courseOfferingId,
                 'error' => $e->getMessage()
             ]);
@@ -542,14 +542,14 @@ class LecturerCourseService
 
         foreach ($component->details as $detail) {
             $detailWeight = $detail->weight ?? 0;
-            
+
             if ($detailWeight <= 0) {
                 continue;
             }
 
             // Get the best/latest score for this detail
             $score = $detail->scores->sortByDesc('graded_at')->first();
-            
+
             if ($score && $score->percentage_score !== null) {
                 $totalDetailScore += ($score->percentage_score * $detailWeight);
                 $totalDetailWeight += $detailWeight;

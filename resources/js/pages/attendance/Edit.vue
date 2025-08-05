@@ -31,7 +31,7 @@ const formSchema = toTypedSchema(
     z
         .object({
             class_session_id: z.string().min(1, 'Class session is required'),
-            student_id: z.string().min(1, 'Student is required'),
+            student_code: z.string().min(1, 'Student is required'),
             status: z.enum(['present', 'late', 'absent', 'excused'], {
                 required_error: 'Attendance status is required',
             }),
@@ -82,7 +82,7 @@ const { handleSubmit, values } = useForm({
     validationSchema: formSchema,
     initialValues: {
         class_session_id: props.attendance.class_session_id?.toString() || '',
-        student_id: props.attendance.student_id?.toString() || '',
+        student_code: props.attendance.student_code?.toString() || '',
         status: props.attendance.status || 'present',
         check_in_time: props.attendance.check_in_time?.substring(11, 16) || '',
         check_out_time: props.attendance.check_out_time?.substring(11, 16) || '',
@@ -105,7 +105,7 @@ const onSubmit = handleSubmit((formValues) => {
     const data = {
         ...formValues,
         class_session_id: parseInt(formValues.class_session_id),
-        student_id: parseInt(formValues.student_id),
+        student_code: parseInt(formValues.student_code),
     };
 
     router.put(`/attendance/${props.attendance.id}`, data, {
@@ -225,7 +225,7 @@ const showExcuseReason = computed(() => {
                             </FormField>
 
                             <!-- Student -->
-                            <FormField v-slot="{ componentField }" name="student_id">
+                            <FormField v-slot="{ componentField }" name="student_code">
                                 <FormItem>
                                     <FormLabel>Student *</FormLabel>
                                     <Select v-bind="componentField" :disabled="true">
@@ -235,9 +235,7 @@ const showExcuseReason = computed(() => {
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem v-for="student in students" :key="student.id" :value="student.id.toString()">
-                                                {{ student.student_id }} - {{ student.full_name }}
-                                            </SelectItem>
+                                            <SelectItem v-for="student in students" :key="student.id" :value="student.id.toString()"> {{ student.student_code }} - {{ student.full_name }} </SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />

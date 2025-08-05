@@ -14,7 +14,7 @@ class AcademicRecord extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'student_id',
+        'student_code',
         'course_offering_id',
         'semester_id',
         'unit_id',

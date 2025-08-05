@@ -14,7 +14,7 @@ class AcademicHold extends Model
     use HasFactory;
 
     protected $fillable = [
-        'student_id',
+        'student_code',
         'hold_type',
         'hold_category',
         'title',
@@ -41,7 +41,7 @@ class AcademicHold extends Model
     public static function validationRules(): array
     {
         return [
-            'student_id' => ['required', 'exists:students,id'],
+            'student_code' => ['required', 'exists:students,id'],
             'hold_type' => ['required', 'in:financial,academic,disciplinary,administrative,health,library'],
             'hold_category' => ['nullable', 'in:registration,graduation,transcript,all'],
             'title' => ['required', 'string', 'max:255'],
@@ -61,8 +61,8 @@ class AcademicHold extends Model
     public static function validationMessages(): array
     {
         return [
-            'student_id.required' => 'Student is required',
-            'student_id.exists' => 'Selected student does not exist',
+            'student_code.required' => 'Student is required',
+            'student_code.exists' => 'Selected student does not exist',
             'hold_type.required' => 'Hold type is required',
             'title.required' => 'Hold title is required',
             'placed_date.required' => 'Placed date is required',
@@ -100,8 +100,8 @@ class AcademicHold extends Model
 
     public function isExpired(): bool
     {
-        return $this->status === 'expired' || 
-               ($this->due_date && $this->due_date->isPast() && $this->status === 'active');
+        return $this->status === 'expired' ||
+            ($this->due_date && $this->due_date->isPast() && $this->status === 'active');
     }
 
     public function blocksRegistration(): bool
@@ -154,10 +154,10 @@ class AcademicHold extends Model
     {
         $query->where(function ($q) {
             $q->where('status', 'expired')
-              ->orWhere(function ($subQ) {
-                  $subQ->where('status', 'active')
-                       ->where('due_date', '<', now());
-              });
+                ->orWhere(function ($subQ) {
+                    $subQ->where('status', 'active')
+                        ->where('due_date', '<', now());
+                });
         });
     }
 
@@ -178,6 +178,6 @@ class AcademicHold extends Model
 
     public function scopeForStudent(Builder $query, int $studentId): void
     {
-        $query->where('student_id', $studentId);
+        $query->where('student_code', $studentId);
     }
 }

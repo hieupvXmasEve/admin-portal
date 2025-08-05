@@ -16,7 +16,7 @@ class AssessmentComponentDetailScore extends Model
 
     protected $fillable = [
         'assessment_component_detail_id',
-        'student_id',
+        'student_code',
         'course_offering_id',
         'graded_by_lecture_id',
         'points_earned',
@@ -293,7 +293,7 @@ class AssessmentComponentDetailScore extends Model
             'action' => 'late_excuse_requested',
             'excuse' => $excuse,
             'requested_at' => now()->toISOString(),
-            'requested_by' => $this->student_id,
+            'requested_by' => $this->student_code,
         ];
         $this->score_history = $history;
 
@@ -342,8 +342,8 @@ class AssessmentComponentDetailScore extends Model
     public function canRequestLateExcuse(): bool
     {
         return $this->is_late &&
-               empty($this->late_excuse) &&
-               !$this->late_excuse_approved;
+            empty($this->late_excuse) &&
+            !$this->late_excuse_approved;
     }
 
     /**
@@ -495,7 +495,7 @@ class AssessmentComponentDetailScore extends Model
             'plagiarism_notes' => $this->plagiarism_notes,
             'integrity_status' => $this->integrity_status,
             'has_integrity_concerns' => $this->plagiarism_suspected ||
-                                       in_array($this->integrity_status, ['under_review', 'violation_confirmed', 'pending_hearing']),
+                in_array($this->integrity_status, ['under_review', 'violation_confirmed', 'pending_hearing']),
             'is_under_review' => $this->integrity_status === 'under_review',
             'violation_confirmed' => $this->integrity_status === 'violation_confirmed',
             'can_appeal' => in_array($this->integrity_status, ['violation_confirmed']) && !$this->appeal_requested,
@@ -510,7 +510,7 @@ class AssessmentComponentDetailScore extends Model
     public function hasIntegrityConcerns(): bool
     {
         return $this->plagiarism_suspected ||
-               in_array($this->integrity_status, ['under_review', 'violation_confirmed', 'pending_hearing']);
+            in_array($this->integrity_status, ['under_review', 'violation_confirmed', 'pending_hearing']);
     }
 
     /**
@@ -566,7 +566,7 @@ class AssessmentComponentDetailScore extends Model
             'action' => 'appeal_requested',
             'appeal_reason' => $reason,
             'requested_at' => now()->toISOString(),
-            'requested_by' => $this->student_id,
+            'requested_by' => $this->student_code,
         ];
         $this->score_history = $history;
 
@@ -643,7 +643,7 @@ class AssessmentComponentDetailScore extends Model
     public function canRequestAppeal(): bool
     {
         return !$this->appeal_requested &&
-               in_array($this->integrity_status, ['violation_confirmed', 'sanctions_applied']);
+            in_array($this->integrity_status, ['violation_confirmed', 'sanctions_applied']);
     }
 
     /**

@@ -27,7 +27,7 @@ interface AvailableUnitsResponse {
 
 // Form state
 const form = ref({
-    student_id: '',
+    student_code: '',
     unit_ids: [] as string[],
     notes: '',
 });
@@ -60,10 +60,10 @@ const handleStudentSelect = async (student: Student | null) => {
     form.value.unit_ids = [];
 
     if (student) {
-        form.value.student_id = student.id.toString();
+        form.value.student_code = student.id.toString();
         await loadAvailableUnits(student.id);
     } else {
-        form.value.student_id = '';
+        form.value.student_code = '';
     }
 };
 
@@ -73,7 +73,7 @@ const loadAvailableUnits = async (studentId: number) => {
 
     isLoadingUnits.value = true;
     try {
-        const response = await fetch(`/api/course-registrations/available-units?student_id=${studentId}`, {
+        const response = await fetch(`/api/course-registrations/available-units?student_code=${studentId}`, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
             },
@@ -115,7 +115,7 @@ const onSubmit = () => {
     errors.value = {};
 
     const formData = {
-        student_id: Number(form.value.student_id),
+        student_code: Number(form.value.student_code),
         unit_ids: form.value.unit_ids.map((id) => Number(id)),
         notes: form.value.notes,
     };
@@ -158,7 +158,7 @@ const onSubmit = () => {
                         <!-- Student Selection -->
                         <div class="space-y-2">
                             <label class="text-sm font-medium">Student *</label>
-                            <StudentCombobox v-model="form.student_id" :error-message="errors.student_id" placeholder="Search and select a student..." @select="handleStudentSelect" />
+                            <StudentCombobox v-model="form.student_code" :error-message="errors.student_code" placeholder="Search and select a student..." @select="handleStudentSelect" />
                         </div>
 
                         <!-- No Student Selected -->
@@ -197,12 +197,12 @@ const onSubmit = () => {
                             <div v-if="registeredUnits.length > 0" class="space-y-3">
                                 <h3 class="text-sm font-medium">Already Registered Units ({{ registeredUnits.length }})</h3>
                                 <div class="space-y-2">
-                                    <div v-for="unitData in registeredUnits" :key="`registered-${unitData.unit.id}`" class="bg-blue-50 border-blue-200 flex items-start space-x-3 rounded-lg border p-3">
-                                        <CheckCircle class="h-5 w-5 text-blue-600 mt-0.5" />
+                                    <div v-for="unitData in registeredUnits" :key="`registered-${unitData.unit.id}`" class="flex items-start space-x-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                                        <CheckCircle class="mt-0.5 h-5 w-5 text-blue-600" />
                                         <div class="min-w-0 flex-1">
                                             <div class="flex items-center space-x-2">
                                                 <span class="font-medium">{{ unitData.unit.code }} - {{ unitData.unit.name }}</span>
-                                                <Badge variant="outline" class="text-xs bg-blue-100 text-blue-800 border-blue-300">Registered</Badge>
+                                                <Badge variant="outline" class="border-blue-300 bg-blue-100 text-xs text-blue-800">Registered</Badge>
                                             </div>
                                             <p class="text-muted-foreground mt-1 text-sm">{{ unitData.unit.credit_points }} credit points</p>
                                         </div>
@@ -295,7 +295,7 @@ const onSubmit = () => {
                 <CardContent class="space-y-3">
                     <div>
                         <p class="font-medium">{{ selectedStudent.full_name }}</p>
-                        <p class="text-muted-foreground text-sm">{{ selectedStudent.student_id }}</p>
+                        <p class="text-muted-foreground text-sm">{{ selectedStudent.student_code }}</p>
                         <p class="text-muted-foreground text-sm">{{ selectedStudent.email }}</p>
                     </div>
                     <div v-if="selectedStudent.program">

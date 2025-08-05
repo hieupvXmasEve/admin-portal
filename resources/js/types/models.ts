@@ -115,14 +115,7 @@ export interface Lecture {
     faculty?: string;
     specialization?: string;
     expertise_areas?: string[];
-    academic_rank:
-        | 'lecturer'
-        | 'senior_lecturer'
-        | 'associate_professor'
-        | 'professor'
-        | 'emeritus_professor'
-        | 'visiting_lecturer'
-        | 'adjunct_professor';
+    academic_rank: 'lecturer' | 'senior_lecturer' | 'associate_professor' | 'professor' | 'emeritus_professor' | 'visiting_lecturer' | 'adjunct_professor';
     highest_degree?: string;
     degree_field?: string;
     alma_mater?: string;
@@ -213,7 +206,7 @@ export interface Building {
 
 export interface Student {
     id: number;
-    student_id: string;
+    student_code: string;
     full_name: string;
     email: string;
     phone: string;
@@ -297,7 +290,7 @@ export interface StudentStats {
 export interface StudentOverview {
     student_info: {
         id: number;
-        student_id: string;
+        student_code: string;
         full_name: string;
         email: string;
         phone?: string;
@@ -619,7 +612,7 @@ export interface StudentAcademicSummary {
 
 export interface Enrollment {
     id: number;
-    student_id: number;
+    student_code: number;
     semester_id: number;
     curriculum_version_id: number;
     semester_number: number;
@@ -634,7 +627,7 @@ export interface Enrollment {
 
 export interface CourseRegistration {
     id: number;
-    student_id: number;
+    student_code: number;
     course_offering_id: number;
     semester_id: number;
     registration_status: 'registered' | 'confirmed' | 'dropped' | 'withdrawn' | 'completed';
@@ -660,7 +653,7 @@ export interface CourseRegistration {
 
 // Form data type for course registration validation
 export interface CourseRegistrationFormData {
-    student_id: string;
+    student_code: string;
     course_offering_id: string;
     notes?: string;
 }
@@ -812,7 +805,7 @@ export interface ClassSession {
 export interface Attendance {
     id: number;
     class_session_id: number;
-    student_id: number;
+    student_code: number;
     recorded_by_lecture_id?: number;
     status: 'present' | 'late' | 'absent' | 'excused';
     check_in_time?: string;
@@ -851,7 +844,7 @@ export interface Attendance {
 
 // Form data types for strict validation
 export interface EnrollmentFormData {
-    student_id: string;
+    student_code: string;
     semester_id: string;
     curriculum_version_id: string;
     semester_number: number;
@@ -891,14 +884,7 @@ export interface LectureFormData {
     faculty?: string;
     specialization?: string;
     expertise_areas?: string[];
-    academic_rank:
-        | 'lecturer'
-        | 'senior_lecturer'
-        | 'associate_professor'
-        | 'professor'
-        | 'emeritus_professor'
-        | 'visiting_lecturer'
-        | 'adjunct_professor';
+    academic_rank: 'lecturer' | 'senior_lecturer' | 'associate_professor' | 'professor' | 'emeritus_professor' | 'visiting_lecturer' | 'adjunct_professor';
     highest_degree?: string;
     degree_field?: string;
     alma_mater?: string;
@@ -931,7 +917,7 @@ export interface LectureFormData {
 
 export interface AcademicHold {
     id: number;
-    student_id: number;
+    student_code: number;
     hold_type: 'financial' | 'academic' | 'disciplinary' | 'administrative' | 'health' | 'library';
     hold_category: 'registration' | 'graduation' | 'transcript' | 'all';
     title: string;

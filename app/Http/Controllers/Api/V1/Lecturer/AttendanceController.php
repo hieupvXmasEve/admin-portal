@@ -140,7 +140,7 @@ class AttendanceController extends Controller
                 'sessions' => 'required|array|min:1|max:10',
                 'sessions.*.session_id' => 'required|integer',
                 'sessions.*.attendance_data' => 'required|array',
-                'sessions.*.attendance_data.*.student_id' => 'required|integer',
+                'sessions.*.attendance_data.*.student_code' => 'required|integer',
                 'sessions.*.attendance_data.*.status' => 'required|in:present,absent,late,excused',
             ]);
 
@@ -188,7 +188,7 @@ class AttendanceController extends Controller
         $lecturer = $request->user();
 
         try {
-            $filters = $request->only(['date_from', 'date_to', 'student_id']);
+            $filters = $request->only(['date_from', 'date_to', 'student_code']);
 
             $analytics = $this->attendanceService->getCourseAttendanceAnalytics(
                 $lecturer,

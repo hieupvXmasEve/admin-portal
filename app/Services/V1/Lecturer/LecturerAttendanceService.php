@@ -63,14 +63,14 @@ class LecturerAttendanceService
             ->where('registration_status', 'confirmed')
             ->pluck('student');
 
-        $attendanceRecords = $session->attendances->keyBy('student_id');
+        $attendanceRecords = $session->attendances->keyBy('student_code');
 
         $students = $enrolledStudents->map(function ($student) use ($attendanceRecords) {
             $attendance = $attendanceRecords->get($student->id);
 
             return [
-                'student_id' => $student->id,
-                'student_number' => $student->student_id,
+                'student_code' => $student->id,
+                'student_number' => $student->student_code,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'phone' => $student->phone,
@@ -159,14 +159,14 @@ class LecturerAttendanceService
                 try {
                     $attendance = $this->markStudentAttendance($session, $record, $lecturer);
                     $results[] = [
-                        'student_id' => $record['student_id'],
+                        'student_code' => $record['student_code'],
                         'status' => 'success',
                         'attendance_id' => $attendance->id,
                     ];
                     $totalMarked++;
                 } catch (\Exception $e) {
                     $errors[] = [
-                        'student_id' => $record['student_id'],
+                        'student_code' => $record['student_code'],
                         'error' => $e->getMessage(),
                     ];
                 }
@@ -222,7 +222,7 @@ class LecturerAttendanceService
 
             foreach ($enrolledStudents as $registration) {
                 $existingAttendance = Attendance::where('class_session_id', $sessionId)
-                    ->where('student_id', $registration->student_id)
+                    ->where('student_code', $registration->student_code)
                     ->first();
 
                 if ($existingAttendance) {
@@ -232,7 +232,7 @@ class LecturerAttendanceService
 
                 $attendance = Attendance::create([
                     'class_session_id' => $sessionId,
-                    'student_id' => $registration->student_id,
+                    'student_code' => $registration->student_code,
                     'recorded_by_lecture_id' => $lecturer->id,
                     'status' => 'absent', // Default status
                     'recording_method' => 'manual',
@@ -240,7 +240,7 @@ class LecturerAttendanceService
                 ]);
 
                 $createdRecords[] = [
-                    'student_id' => $registration->student_id,
+                    'student_code' => $registration->student_code,
                     'student_name' => $registration->student->full_name ?? 'Unknown',
                     'student_number' => $registration->student->student_number ?? 'Unknown',
                     'attendance_id' => $attendance->id,
@@ -329,7 +329,7 @@ class LecturerAttendanceService
             $alerts[] = [
                 'type' => 'low_attendance',
                 'priority' => $student['attendance_percentage'] < 50 ? 'high' : 'medium',
-                'student_id' => $student['student_id'],
+                'student_code' => $student['student_code'],
                 'message' => "{$student['student_name']} has {$student['attendance_percentage']}% attendance in {$student['course_code']}",
                 'course' => $student['course_code'],
                 'attendance_percentage' => $student['attendance_percentage'],
@@ -412,7 +412,7 @@ class LecturerAttendanceService
     ): Attendance {
         $attendanceData = [
             'class_session_id' => $session->id,
-            'student_id' => $record['student_id'],
+            'student_code' => $record['student_code'],
             'status' => $record['status'],
             'recorded_by_lecture_id' => $lecturer->id,
             'check_in_time' => $record['check_in_time'] ?? null,
@@ -425,7 +425,7 @@ class LecturerAttendanceService
         return Attendance::updateOrCreate(
             [
                 'class_session_id' => $session->id,
-                'student_id' => $record['student_id'],
+                'student_code' => $record['student_code'],
             ],
             $attendanceData
         );

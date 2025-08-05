@@ -75,9 +75,9 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
     public function map($student): array
     {
         $score = $student->scores->first(); // Current score for this assessment detail
-        
+
         return [
-            $student->student_id,
+            $student->student_code,
             $student->full_name,
             $student->email,
             $score?->points_earned ?? 0,
@@ -175,20 +175,20 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => function(AfterSheet $event) {
+            AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
-                
+
                 // Hide metadata columns (O, P, Q)
                 $sheet->getColumnDimension('O')->setVisible(false);
                 $sheet->getColumnDimension('P')->setVisible(false);
                 $sheet->getColumnDimension('Q')->setVisible(false);
-                
+
                 // Freeze the header row
                 $sheet->freezePane('A2');
-                
+
                 // Add data validation for specific columns
                 $this->addDataValidation($sheet);
-                
+
                 // Add instructions/notes
                 $this->addInstructions($sheet);
             },
@@ -201,7 +201,7 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
     protected function addDataValidation(Worksheet $sheet): void
     {
         $lastRow = $this->studentsWithScores->count() + 1;
-        
+
         // Letter Grade validation
         $letterGradeValidation = $sheet->getCell('F2')->getDataValidation();
         $letterGradeValidation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
@@ -215,10 +215,10 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
         $letterGradeValidation->setPromptTitle('Letter Grade');
         $letterGradeValidation->setPrompt('Select a letter grade from the dropdown');
         $letterGradeValidation->setFormula1('"A+,A,A-,B+,B,B-,C+,C,C-,D+,D,F,I,W,P,NP"');
-        
+
         // Apply to all rows
         $sheet->setDataValidation("F2:F{$lastRow}", $letterGradeValidation);
-        
+
         // Status validation
         $statusValidation = $sheet->getCell('G2')->getDataValidation();
         $statusValidation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
@@ -226,7 +226,7 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
         $statusValidation->setShowDropDown(true);
         $statusValidation->setFormula1('"not_submitted,submitted,grading,graded,returned"');
         $sheet->setDataValidation("G2:G{$lastRow}", $statusValidation);
-        
+
         // Score Status validation
         $scoreStatusValidation = $sheet->getCell('H2')->getDataValidation();
         $scoreStatusValidation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
@@ -242,11 +242,11 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
     protected function addInstructions(Worksheet $sheet): void
     {
         $lastRow = $this->studentsWithScores->count() + 3;
-        
+
         // Add instructions below the data
         $sheet->setCellValue("A{$lastRow}", 'INSTRUCTIONS:');
         $sheet->getStyle("A{$lastRow}")->getFont()->setBold(true);
-        
+
         $instructions = [
             '1. Do not modify Student ID, Student Name, or Email columns',
             '2. Points Earned should not exceed Max Points (' . ($this->assessmentComponentDetail->max_points ?? 100) . ')',
@@ -256,7 +256,7 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
             '6. Do not modify or unhide the hidden columns (Assessment Detail ID, Max Points, Current Score ID)',
             '7. Save the file and upload it back to the system for import'
         ];
-        
+
         foreach ($instructions as $index => $instruction) {
             $row = $lastRow + $index + 1;
             $sheet->setCellValue("A{$row}", $instruction);

@@ -27,7 +27,7 @@ class EnrollmentCapacityService
     public function getCurrentEnrollmentCount(CourseOffering $courseOffering): int
     {
         $cacheKey = "enrollment_count:course_offering:{$courseOffering->id}";
-        
+
         return Cache::remember($cacheKey, 300, function () use ($courseOffering) {
             return CourseRegistration::where('course_offering_id', $courseOffering->id)
                 ->where('registration_status', 'registered')
@@ -81,7 +81,7 @@ class EnrollmentCapacityService
     {
         $cacheKey = "enrollment_count:course_offering:{$courseOffering->id}";
         Cache::forget($cacheKey);
-        
+
         // Refresh the cache
         $this->getCurrentEnrollmentCount($courseOffering);
     }
@@ -101,7 +101,7 @@ class EnrollmentCapacityService
 
         // Check if student is already waitlisted
         $existingWaitlist = CourseRegistration::where('course_offering_id', $courseOffering->id)
-            ->where('student_id', $student->id)
+            ->where('student_code', $student->id)
             ->where('registration_status', 'waitlisted')
             ->exists();
 
@@ -114,7 +114,7 @@ class EnrollmentCapacityService
             $currentWaitlistCount = CourseRegistration::where('course_offering_id', $courseOffering->id)
                 ->where('registration_status', 'waitlisted')
                 ->count();
-            
+
             return $currentWaitlistCount < $courseOffering->max_waitlist;
         }
 
@@ -136,7 +136,7 @@ class EnrollmentCapacityService
             ->max('waitlist_position') + 1;
 
         return CourseRegistration::create([
-            'student_id' => $student->id,
+            'student_code' => $student->id,
             'course_offering_id' => $courseOffering->id,
             'semester_id' => $courseOffering->semester_id,
             'registration_status' => 'waitlisted',
@@ -193,7 +193,7 @@ class EnrollmentCapacityService
     public function getWaitlistInfo(CourseOffering $courseOffering, Student $student): ?array
     {
         $waitlistRegistration = CourseRegistration::where('course_offering_id', $courseOffering->id)
-            ->where('student_id', $student->id)
+            ->where('student_code', $student->id)
             ->where('registration_status', 'waitlisted')
             ->first();
 
@@ -237,11 +237,11 @@ class EnrollmentCapacityService
         // This could be enhanced with actual historical drop rates
         $historicalDropRate = 0.15; // Assume 15% drop rate
         $expectedDrops = $courseOffering->max_enrollment * $historicalDropRate;
-        
+
         if ($position <= $expectedDrops) {
             return min(100, (($expectedDrops - $position + 1) / $expectedDrops) * 100);
         }
-        
+
         return max(5, 100 - ($position * 10)); // Minimum 5% chance
     }
 

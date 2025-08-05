@@ -16,7 +16,7 @@ class StudentResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'student_id' => $this->student_id,
+            'student_code' => $this->student_code,
             'full_name' => $this->full_name,
             'email' => $this->email,
             'phone' => $this->phone,
@@ -64,7 +64,7 @@ class StudentResource extends JsonResource
             }),
 
             // Computed fields
-            'display_name' => $this->full_name . ' (' . $this->student_id . ')',
+            'display_name' => $this->full_name . ' (' . $this->student_code . ')',
             'status_label' => ucfirst(str_replace('_', ' ', $this->status)),
 
             // Timestamps

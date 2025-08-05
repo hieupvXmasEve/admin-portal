@@ -14,7 +14,7 @@ class ProgramChangeRequest extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'student_id',
+        'student_code',
         'from_program_id',
         'to_program_id',
         'from_specialization_id',
@@ -35,7 +35,7 @@ class ProgramChangeRequest extends Model
     public static function validationRules(): array
     {
         return [
-            'student_id' => ['required', 'exists:students,id'],
+            'student_code' => ['required', 'exists:students,id'],
             'from_program_id' => ['required', 'exists:programs,id'],
             'to_program_id' => ['required', 'exists:programs,id', 'different:from_program_id'],
             'from_specialization_id' => ['nullable', 'exists:specializations,id'],
@@ -49,7 +49,7 @@ class ProgramChangeRequest extends Model
     public static function validationMessages(): array
     {
         return [
-            'student_id.required' => 'Student is required',
+            'student_code.required' => 'Student is required',
             'from_program_id.required' => 'Current program is required',
             'to_program_id.required' => 'Target program is required',
             'to_program_id.different' => 'Target program must be different from current program',

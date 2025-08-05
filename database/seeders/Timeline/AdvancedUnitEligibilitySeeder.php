@@ -66,7 +66,7 @@ class AdvancedUnitEligibilitySeeder extends Seeder
         ];
 
         // Get student's latest GPA
-        $latestGPA = GpaCalculation::where('student_id', $student->id)
+        $latestGPA = GpaCalculation::where('student_code', $student->id)
             ->where('calculation_type', 'cumulative')
             ->latest('calculated_at')
             ->first();
@@ -251,7 +251,7 @@ class AdvancedUnitEligibilitySeeder extends Seeder
 
         // Log high-performing students
         if ($results['advanced_standing'] || $results['honors_eligible']) {
-            $this->command->info("  🌟 {$student->student_id}: " . implode(', ', $eligibilityNotes) . " (GPA: {$gpa->gpa})");
+            $this->command->info("  🌟 {$student->student_code}: " . implode(', ', $eligibilityNotes) . " (GPA: {$gpa->gpa})");
         }
     }
 

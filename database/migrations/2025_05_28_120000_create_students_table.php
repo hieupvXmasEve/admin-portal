@@ -15,7 +15,7 @@ return new class extends Migration
 
         Schema::create('students', function (Blueprint $table) {
             $table->id();
-            $table->string('student_id', 20)->unique();
+            $table->string('student_code', 20)->unique();
             $table->string('full_name', 100);
             $table->string('email', 255)->unique();
             $table->string('phone', 20)->nullable();
@@ -61,7 +61,7 @@ return new class extends Migration
             $table->softDeletes();
 
             // Indexes
-            $table->index('student_id');
+            $table->index('student_code');
             $table->index('email');
             $table->index(['oauth_provider', 'oauth_provider_id']);
             $table->index('campus_id');

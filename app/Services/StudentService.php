@@ -38,7 +38,7 @@ class StudentService
 
             // Create student with admitted status by default
             $student = Student::create([
-                'student_id' => $studentId,
+                'student_code' => $studentId,
                 'full_name' => $data['full_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'] ?? null,
@@ -117,7 +117,7 @@ class StudentService
 
             // Create student with active status by default
             $student = Student::create([
-                'student_id' => $studentId,
+                'student_code' => $studentId,
                 'full_name' => $data['full_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'] ?? null,
@@ -155,8 +155,8 @@ class StudentService
 
             // Log the creation and admission
             Log::info('Student created and admitted', [
-                'student_id' => $student->id,
-                'student_code' => $student->student_id,
+                'student_code' => $student->id,
+                'student_code' => $student->student_code,
                 'campus_id' => $campusId,
                 'admission_date' => $data['admission_date'],
             ]);
@@ -178,7 +178,7 @@ class StudentService
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%")
+                    ->orWhere('student_code', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
         }
@@ -212,8 +212,8 @@ class StudentService
 
             // Log the admission
             Log::info('Student admitted', [
-                'student_id' => $student->id,
-                'student_code' => $student->student_id,
+                'student_code' => $student->id,
+                'student_code' => $student->student_code,
                 'admission_date' => $data['admission_date'],
             ]);
 
@@ -273,12 +273,12 @@ class StudentService
         $prefix = strtoupper($campusCode) . $year;
 
         // Find the last student ID with this prefix
-        $lastStudent = Student::where('student_id', 'like', $prefix . '%')
-            ->orderBy('student_id', 'desc')
+        $lastStudent = Student::where('student_code', 'like', $prefix . '%')
+            ->orderBy('student_code', 'desc')
             ->first();
 
         if ($lastStudent) {
-            $lastNumber = (int) substr($lastStudent->student_id, -4);
+            $lastNumber = (int) substr($lastStudent->student_code, -4);
             $newNumber = $lastNumber + 1;
         } else {
             $newNumber = 1;

@@ -75,12 +75,12 @@ const columns: ColumnDef<Student>[] = [
         },
     },
     {
-        accessorKey: 'student_id',
+        accessorKey: 'student_code',
         header: 'Student ID',
         enableSorting: true,
         cell: ({ row }) => {
             const student = row.original;
-            return h('div', { class: 'font-medium' }, student.student_id);
+            return h('div', { class: 'font-medium' }, student.student_code);
         },
     },
     {
@@ -134,9 +134,7 @@ const columns: ColumnDef<Student>[] = [
             return h(
                 'span',
                 {
-                    class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        statusColors[student.status as keyof typeof statusColors] || statusColors.inactive
-                    }`,
+                    class: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[student.status as keyof typeof statusColors] || statusColors.inactive}`,
                 },
                 student.status,
             );
@@ -336,11 +334,7 @@ const executeCompleteOnboarding = () => {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Specializations</SelectItem>
-                            <SelectItem
-                                v-for="specialization in filteredSpecializations"
-                                :key="specialization.id"
-                                :value="specialization.id.toString()"
-                            >
+                            <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">
                                 {{ specialization.name }}
                             </SelectItem>
                         </SelectContent>
@@ -358,9 +352,7 @@ const executeCompleteOnboarding = () => {
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-medium">Automated Enrollment</h3>
-                        <p class="text-muted-foreground text-xs">
-                            Automatically enroll all {{ students.total }} filtered students with course assignments
-                        </p>
+                        <p class="text-muted-foreground text-xs">Automatically enroll all {{ students.total }} filtered students with course assignments</p>
                     </div>
 
                     <div class="flex gap-2">
@@ -391,14 +383,7 @@ const executeCompleteOnboarding = () => {
 
                                     <!-- Results Display -->
                                     <div v-else-if="enrollmentResults" class="space-y-4">
-                                        <div
-                                            :class="[
-                                                'rounded-lg border p-4',
-                                                enrollmentResults.success
-                                                    ? 'border-green-200 bg-green-50 text-green-800'
-                                                    : 'border-red-200 bg-red-50 text-red-800',
-                                            ]"
-                                        >
+                                        <div :class="['rounded-lg border p-4', enrollmentResults.success ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800']">
                                             <div class="mb-2 flex items-center gap-2">
                                                 <CheckCircle v-if="enrollmentResults.success" class="h-5 w-5" />
                                                 <AlertCircle v-else class="h-5 w-5" />
@@ -411,9 +396,7 @@ const executeCompleteOnboarding = () => {
                                             </div>
                                         </div>
 
-                                        <div v-if="enrollmentResults.success" class="text-muted-foreground text-xs">
-                                            This dialog will close automatically in a few seconds...
-                                        </div>
+                                        <div v-if="enrollmentResults.success" class="text-muted-foreground text-xs">This dialog will close automatically in a few seconds...</div>
                                     </div>
 
                                     <!-- Initial State -->

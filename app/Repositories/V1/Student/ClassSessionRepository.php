@@ -20,10 +20,10 @@ class ClassSessionRepository
         $query = ClassSession::query()
             ->whereHas('courseOffering', function (Builder $query) use ($student, $semester) {
                 $query->where('semester_id', $semester->id)
-                      ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                          $regQuery->where('student_id', $student->id)
-                                   ->where('registration_status', 'registered');
-                      });
+                    ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
+                        $regQuery->where('student_code', $student->id)
+                            ->where('registration_status', 'registered');
+                    });
             })
             ->with([
                 'courseOffering.curriculumUnit.unit',
@@ -44,7 +44,7 @@ class ClassSessionRepository
     {
         return $classSession->courseOffering
             ->courseRegistrations()
-            ->where('student_id', $student->id)
+            ->where('student_code', $student->id)
             ->where('registration_status', 'registered')
             ->exists();
     }
@@ -108,7 +108,7 @@ class ClassSessionRepository
     public function getNextUpcomingSession(Student $student): ?ClassSession
     {
         $currentSemester = Semester::where('is_active', true)->first();
-        
+
         if (!$currentSemester) {
             return null;
         }
@@ -118,12 +118,12 @@ class ClassSessionRepository
 
         // First, try to find a session today that hasn't started yet
         $todaySession = ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
-                $query->where('semester_id', $currentSemester->id)
-                      ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                          $regQuery->where('student_id', $student->id)
-                                   ->where('registration_status', 'registered');
-                      });
-            })
+            $query->where('semester_id', $currentSemester->id)
+                ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
+                    $regQuery->where('student_code', $student->id)
+                        ->where('registration_status', 'registered');
+                });
+        })
             ->where('day_of_week', $currentDay)
             ->where('start_time', '>', $currentTime)
             ->orderBy('start_time')
@@ -136,18 +136,18 @@ class ClassSessionRepository
         // If no session today, find the next session in the week
         $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         $currentDayIndex = array_search($currentDay, $daysOfWeek);
-        
+
         for ($i = 1; $i <= 7; $i++) {
             $nextDayIndex = ($currentDayIndex + $i) % 7;
             $nextDay = $daysOfWeek[$nextDayIndex];
-            
+
             $nextSession = ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
-                    $query->where('semester_id', $currentSemester->id)
-                          ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                              $regQuery->where('student_id', $student->id)
-                                       ->where('registration_status', 'registered');
-                          });
-                })
+                $query->where('semester_id', $currentSemester->id)
+                    ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
+                        $regQuery->where('student_code', $student->id)
+                            ->where('registration_status', 'registered');
+                    });
+            })
                 ->where('day_of_week', $nextDay)
                 ->orderBy('start_time')
                 ->first();
@@ -166,7 +166,7 @@ class ClassSessionRepository
     public function getCurrentSessions(Student $student): Collection
     {
         $currentSemester = Semester::where('is_active', true)->first();
-        
+
         if (!$currentSemester) {
             return collect();
         }
@@ -175,12 +175,12 @@ class ClassSessionRepository
         $currentTime = now()->format('H:i');
 
         return ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
-                $query->where('semester_id', $currentSemester->id)
-                      ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                          $regQuery->where('student_id', $student->id)
-                                   ->where('registration_status', 'registered');
-                      });
-            })
+            $query->where('semester_id', $currentSemester->id)
+                ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
+                    $regQuery->where('student_code', $student->id)
+                        ->where('registration_status', 'registered');
+                });
+        })
             ->where('day_of_week', $currentDay)
             ->where('start_time', '<=', $currentTime)
             ->where('end_time', '>', $currentTime)
@@ -198,7 +198,7 @@ class ClassSessionRepository
     public function getTodaySessions(Student $student): Collection
     {
         $currentSemester = Semester::where('is_active', true)->first();
-        
+
         if (!$currentSemester) {
             return collect();
         }
@@ -206,12 +206,12 @@ class ClassSessionRepository
         $currentDay = strtolower(now()->format('l'));
 
         return ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
-                $query->where('semester_id', $currentSemester->id)
-                      ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                          $regQuery->where('student_id', $student->id)
-                                   ->where('registration_status', 'registered');
-                      });
-            })
+            $query->where('semester_id', $currentSemester->id)
+                ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
+                    $regQuery->where('student_code', $student->id)
+                        ->where('registration_status', 'registered');
+                });
+        })
             ->where('day_of_week', $currentDay)
             ->with([
                 'courseOffering.curriculumUnit.unit',
@@ -268,14 +268,14 @@ class ClassSessionRepository
         if (!empty($filters['time_range'])) {
             $startTime = $filters['time_range']['start'];
             $endTime = $filters['time_range']['end'];
-            
+
             $query->where(function (Builder $q) use ($startTime, $endTime) {
                 $q->whereBetween('start_time', [$startTime, $endTime])
-                  ->orWhereBetween('end_time', [$startTime, $endTime])
-                  ->orWhere(function (Builder $subQ) use ($startTime, $endTime) {
-                      $subQ->where('start_time', '<=', $startTime)
-                           ->where('end_time', '>=', $endTime);
-                  });
+                    ->orWhereBetween('end_time', [$startTime, $endTime])
+                    ->orWhere(function (Builder $subQ) use ($startTime, $endTime) {
+                        $subQ->where('start_time', '<=', $startTime)
+                            ->where('end_time', '>=', $endTime);
+                    });
             });
         }
 

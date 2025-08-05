@@ -44,7 +44,7 @@ class StudentController extends Controller
             'search' => 'nullable|string|max:255',
             'program_id' => 'nullable|integer|exists:programs,id',
             'status' => 'nullable|string|in:active,inactive,suspended,graduated',
-            'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at',
+            'sort' => 'nullable|string|in:student_code,full_name,email,admission_date,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
             'page' => 'nullable|integer|min:1',
@@ -57,7 +57,7 @@ class StudentController extends Controller
             ->where('campus_id', $campusId)
             // ->when($validated['search'] ?? null, function ($query, $search) {
             //     $query->where(function ($q) use ($search) {
-            //         $q->where('student_id', 'like', "%{$search}%")
+            //         $q->where('student_code', 'like', "%{$search}%")
             //             ->orWhere('full_name', 'like', "%{$search}%")
             //             ->orWhere('email', 'like', "%{$search}%");
             //     });
@@ -109,7 +109,7 @@ class StudentController extends Controller
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('full_name', 'like', "%{$searchTerm}%")
-                    ->orWhere('student_id', 'like', "%{$searchTerm}%")
+                    ->orWhere('student_code', 'like', "%{$searchTerm}%")
                     ->orWhere('email', 'like', "%{$searchTerm}%");
             });
         }
@@ -255,7 +255,7 @@ class StudentController extends Controller
                 ->with('success', 'Student updated successfully');
         } catch (\Exception $e) {
             Log::error('Failed to update student', [
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'error' => $e->getMessage(),
                 'data' => $request->validated(),
             ]);
@@ -297,7 +297,7 @@ class StudentController extends Controller
                 ->with('success', 'Student deleted successfully');
         } catch (\Exception $e) {
             Log::error('Failed to delete student', [
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'error' => $e->getMessage(),
             ]);
 
@@ -350,7 +350,7 @@ class StudentController extends Controller
                 ->with('success', 'Student status updated successfully');
         } catch (\Exception $e) {
             Log::error('Failed to update student status', [
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'error' => $e->getMessage(),
                 'data' => $validated,
             ]);
@@ -384,7 +384,7 @@ class StudentController extends Controller
                 ->with('success', 'Student program assigned successfully');
         } catch (\Exception $e) {
             Log::error('Failed to assign program to student', [
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'error' => $e->getMessage(),
                 'data' => $validated,
             ]);
@@ -463,7 +463,7 @@ class StudentController extends Controller
         // Apply search query
         if ($searchQuery = $validated['query'] ?? null) {
             $query->where(function ($q) use ($searchQuery) {
-                $q->where('student_id', 'like', "%{$searchQuery}%")
+                $q->where('student_code', 'like', "%{$searchQuery}%")
                     ->orWhere('full_name', 'like', "%{$searchQuery}%")
                     ->orWhere('email', 'like', "%{$searchQuery}%");
             });
@@ -481,7 +481,7 @@ class StudentController extends Controller
                 'items' => $students->map(function ($student) {
                     return [
                         'id' => $student->id,
-                        'student_id' => $student->student_id,
+                        'student_code' => $student->student_code,
                         'full_name' => $student->full_name,
                         'email' => $student->email,
                         'status' => $student->status,
@@ -518,7 +518,7 @@ class StudentController extends Controller
             'message' => 'Student retrieved successfully',
             'data' => [
                 'id' => $student->id,
-                'student_id' => $student->student_id,
+                'student_code' => $student->student_code,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'status' => $student->status,
@@ -552,7 +552,7 @@ class StudentController extends Controller
             'search' => 'nullable|string|max:255',
             'program_id' => 'nullable|integer|exists:programs,id',
             'specialization_id' => 'nullable|integer|exists:specializations,id',
-            'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at',
+            'sort' => 'nullable|string|in:student_code,full_name,email,admission_date,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
             'page' => 'nullable|integer|min:1',
@@ -567,7 +567,7 @@ class StudentController extends Controller
             ->whereDate('created_at', '>=', now()->subMonths(6)) // Students created in last 6 months
             ->when($validated['search'] ?? null, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('student_id', 'like', "%{$search}%")
+                    $q->where('student_code', 'like', "%{$search}%")
                         ->orWhere('full_name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
                 });
@@ -634,7 +634,7 @@ class StudentController extends Controller
                 ->whereDate('created_at', '>=', now()->subMonths(6))
                 ->when($validated['filters']['search'] ?? null, function ($query, $search) {
                     $query->where(function ($q) use ($search) {
-                        $q->where('student_id', 'like', "%{$search}%")
+                        $q->where('student_code', 'like', "%{$search}%")
                             ->orWhere('full_name', 'like', "%{$search}%")
                             ->orWhere('email', 'like', "%{$search}%");
                     });

@@ -28,7 +28,7 @@ class DashboardService
     public function getDashboardData(Student $student): array
     {
         $cacheKey = "dashboard:student:{$student->id}";
-        
+
         return Cache::remember($cacheKey, 300, function () use ($student) {
             return [
                 'current_semester' => $this->getCurrentSemesterData($student),
@@ -48,7 +48,7 @@ class DashboardService
     public function getCurrentSemesterData(Student $student): array
     {
         $currentSemester = Semester::where('is_active', true)->first();
-        
+
         if (!$currentSemester) {
             return [
                 'semester' => null,
@@ -127,7 +127,7 @@ class DashboardService
      */
     public function getAcademicHolds(Student $student): array
     {
-        $holds = AcademicHold::where('student_id', $student->id)
+        $holds = AcademicHold::where('student_code', $student->id)
             ->where('status', 'active')
             ->orderBy('priority', 'desc')
             ->orderBy('placed_date', 'desc')
@@ -159,20 +159,20 @@ class DashboardService
     public function getUpcomingAssessments(Student $student): array
     {
         $currentSemester = Semester::where('is_active', true)->first();
-        
+
         if (!$currentSemester) {
             return ['assessments' => []];
         }
 
         // Get upcoming assessments from registered courses
         $upcomingAssessments = AssessmentComponentDetailScore::whereHas('courseOffering', function ($query) use ($student, $currentSemester) {
-                $query->where('semester_id', $currentSemester->id)
-                      ->whereHas('courseRegistrations', function ($regQuery) use ($student) {
-                          $regQuery->where('student_id', $student->id)
-                                   ->where('registration_status', 'registered');
-                      });
-            })
-            ->where('student_id', $student->id)
+            $query->where('semester_id', $currentSemester->id)
+                ->whereHas('courseRegistrations', function ($regQuery) use ($student) {
+                    $regQuery->where('student_code', $student->id)
+                        ->where('registration_status', 'registered');
+                });
+        })
+            ->where('student_code', $student->id)
             ->whereNull('submitted_at')
             ->with(['assessmentComponentDetail.assessmentComponent', 'courseOffering.curriculumUnit.unit'])
             ->orderBy('due_date')
@@ -203,7 +203,7 @@ class DashboardService
     protected function getEnrollmentStatus(Student $student): array
     {
         $currentSemester = Semester::where('is_active', true)->first();
-        
+
         if (!$currentSemester) {
             return ['status' => 'no_active_semester'];
         }
@@ -241,7 +241,7 @@ class DashboardService
     protected function isOnTrackForGraduation(Student $student): bool
     {
         // Simple logic - can be enhanced
-        $latestGPA = GpaCalculation::where('student_id', $student->id)
+        $latestGPA = GpaCalculation::where('student_code', $student->id)
             ->orderBy('created_at', 'desc')
             ->first();
 
@@ -253,7 +253,7 @@ class DashboardService
      */
     protected function getProjectedGraduation(Student $student): ?string
     {
-        $latestGPA = GpaCalculation::where('student_id', $student->id)
+        $latestGPA = GpaCalculation::where('student_code', $student->id)
             ->orderBy('created_at', 'desc')
             ->first();
 
@@ -266,7 +266,7 @@ class DashboardService
     protected function calculateOverallAttendanceRate(Student $student): float
     {
         $totalSessions = $student->attendances()->count();
-        
+
         if ($totalSessions === 0) {
             return 0.0;
         }

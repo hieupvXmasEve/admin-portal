@@ -143,8 +143,8 @@ class ClassSessionController extends Controller
             $search = $filters['search'];
             $attendanceQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('student_id', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('student_code', 'like', "%{$search}%");
             });
         }
 
@@ -156,9 +156,9 @@ class ClassSessionController extends Controller
         $attendanceData = $attendanceQuery->paginate($perPage);
 
         // Get all enrolled students who don't have attendance records yet
-        $studentsWithAttendance = $session->attendances()->pluck('student_id')->toArray();
+        $studentsWithAttendance = $session->attendances()->pluck('student_code')->toArray();
         $studentsWithoutAttendance = $enrolledStudentsQuery
-            ->whereNotIn('student_id', $studentsWithAttendance)
+            ->whereNotIn('student_code', $studentsWithAttendance)
             ->get()
             ->pluck('student');
 
@@ -166,7 +166,7 @@ class ClassSessionController extends Controller
         $statusOptions = [
             'all' => 'All Statuses',
             'present' => 'Present',
-            'absent' => 'Absent', 
+            'absent' => 'Absent',
             'late' => 'Late',
             'excused' => 'Excused',
         ];
@@ -267,10 +267,10 @@ class ClassSessionController extends Controller
     public function exportAttendance(Request $request, ClassSession $classSession): HttpResponse
     {
         $filters = $request->only(['search', 'status']);
-        
+
         // Get session with relationships
         $session = $this->classSessionService->getSessionWithRelations($classSession->id);
-        
+
         // Get attendance data with filtering (no pagination for export)
         $attendanceQuery = $session->attendances()
             ->with(['student'])
@@ -281,8 +281,8 @@ class ClassSessionController extends Controller
             $search = $filters['search'];
             $attendanceQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('student_id', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('student_code', 'like', "%{$search}%");
             });
         }
 
@@ -295,13 +295,13 @@ class ClassSessionController extends Controller
 
         // Prepare CSV content
         $csvContent = "Student Name,Student ID,Email,Attendance Status,Check In Time,Check Out Time,Minutes Late,Recording Method,Notes,Created At\n";
-        
+
         foreach ($attendanceData as $attendance) {
             $student = $attendance->student;
             $csvContent .= sprintf(
                 "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
                 $this->escapeCsvField($student?->name ?? 'N/A'),
-                $this->escapeCsvField($student?->student_id ?? 'N/A'),
+                $this->escapeCsvField($student?->student_code ?? 'N/A'),
                 $this->escapeCsvField($student?->email ?? 'N/A'),
                 $this->escapeCsvField(ucfirst($attendance->status)),
                 $this->escapeCsvField($attendance->formatted_check_in_time ?? ''),
@@ -335,12 +335,12 @@ class ClassSessionController extends Controller
         if ($field === null) {
             return '';
         }
-        
+
         // Escape quotes by doubling them and wrap in quotes if contains comma, quote, or newline
         if (str_contains($field, ',') || str_contains($field, '"') || str_contains($field, "\n")) {
             return '"' . str_replace('"', '""', $field) . '"';
         }
-        
+
         return $field;
     }
 

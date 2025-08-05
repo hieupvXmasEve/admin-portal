@@ -84,7 +84,7 @@ class CourseRegistrationService
         return DB::transaction(function () use ($student, $courseOffering) {
             // Create registration record
             $registration = CourseRegistration::create([
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'course_offering_id' => $courseOffering->id,
                 'semester_id' => $courseOffering->semester_id,
                 'registration_status' => 'registered',
@@ -105,7 +105,7 @@ class CourseRegistrationService
      */
     public function dropCourse(Student $student, CourseRegistration $registration): bool
     {
-        if ($registration->student_id !== $student->id) {
+        if ($registration->student_code !== $student->id) {
             throw new BusinessLogicException('You can only drop your own registrations');
         }
 

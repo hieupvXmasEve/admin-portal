@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('academic_standings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('student_id')->constrained()->onDelete('cascade');
+            $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
             $table->foreignId('semester_id')->constrained()->onDelete('cascade');
             $table->enum('standing', ['good', 'probation', 'suspension', 'honors'])->default('good');
             $table->decimal('gpa', 4, 2);
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->timestamp('effective_date');
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
-            
+
             $table->index(['student_id', 'semester_id']);
             $table->index(['student_id', 'is_active']);
             $table->index('standing');

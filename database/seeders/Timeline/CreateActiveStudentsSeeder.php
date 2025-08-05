@@ -78,7 +78,7 @@ class CreateActiveStudentsSeeder extends Seeder
             $year = 2024;
             $campusCode = $this->getCampusCode($campus->name);
             $studentId = $this->generateStudentId($campusCode, $year, $i);
-            while (Student::where('student_id', $studentId)->exists()) {
+            while (Student::where('student_code', $studentId)->exists()) {
                 $i++;
                 $studentId = $this->generateStudentId($campusCode, $year, $i);
             }
@@ -98,7 +98,7 @@ class CreateActiveStudentsSeeder extends Seeder
 
             // Create student with active status
             $student = Student::create([
-                'student_id' => $studentId,
+                'student_code' => $studentId,
                 'full_name' => $fullName,
                 'email' => $i == 1 ? 'hieunuce11@gmail.com' : $email,
                 'password' => Hash::make('1234'),

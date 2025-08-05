@@ -21,7 +21,7 @@ class Student extends Authenticatable
     protected $guard = 'student';
 
     protected $fillable = [
-        'student_id',
+        'student_code',
         'full_name',
         'email',
         'phone',
@@ -201,12 +201,12 @@ class Student extends Authenticatable
 
     public function generateStudentId(string $campusCode, int $year): string
     {
-        $lastStudent = static::where('student_id', 'like', $campusCode . $year . '%')
-            ->orderBy('student_id', 'desc')
+        $lastStudent = static::where('student_code', 'like', $campusCode . $year . '%')
+            ->orderBy('student_code', 'desc')
             ->first();
 
         if ($lastStudent) {
-            $lastNumber = (int) substr($lastStudent->student_id, -3);
+            $lastNumber = (int) substr($lastStudent->student_code, -3);
             $newNumber = $lastNumber + 1;
         } else {
             $newNumber = 1;

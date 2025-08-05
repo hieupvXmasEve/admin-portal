@@ -500,7 +500,7 @@ const getSessionStatusVariant = (status: string) => {
                                         {{ index + 1 }}
                                     </TableCell>
                                     <TableCell class="font-medium">
-                                        {{ registration.student?.student_id }}
+                                        {{ registration.student?.student_code }}
                                     </TableCell>
                                     <TableCell>
                                         {{ registration.student?.full_name }}

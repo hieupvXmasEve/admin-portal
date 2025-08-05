@@ -31,7 +31,7 @@ class ProfileResource extends JsonResource
     protected function formatPersonalInfo(array $personalInfo): array
     {
         return [
-            'student_id' => $personalInfo['student_id'],
+            'student_code' => $personalInfo['student_code'],
             'name' => [
                 'first_name' => $personalInfo['first_name'],
                 'last_name' => $personalInfo['last_name'],
@@ -41,8 +41,8 @@ class ProfileResource extends JsonResource
             ],
             'personal_details' => [
                 'date_of_birth' => $personalInfo['date_of_birth'],
-                'age' => $personalInfo['date_of_birth'] 
-                    ? \Carbon\Carbon::parse($personalInfo['date_of_birth'])->age 
+                'age' => $personalInfo['date_of_birth']
+                    ? \Carbon\Carbon::parse($personalInfo['date_of_birth'])->age
                     : null,
                 'gender' => $personalInfo['gender'],
                 'nationality' => $personalInfo['nationality'],
@@ -108,8 +108,8 @@ class ProfileResource extends JsonResource
                 'name' => $contactInfo['emergency_contact_name'],
                 'phone' => $contactInfo['emergency_contact_phone'],
                 'relationship' => $contactInfo['emergency_contact_relationship'],
-                'is_complete' => !empty($contactInfo['emergency_contact_name']) && 
-                               !empty($contactInfo['emergency_contact_phone']),
+                'is_complete' => !empty($contactInfo['emergency_contact_name']) &&
+                    !empty($contactInfo['emergency_contact_phone']),
             ],
             'address' => [
                 'street' => $contactInfo['address']['street'],
@@ -269,9 +269,9 @@ class ProfileResource extends JsonResource
      */
     protected function isAddressComplete(array $address): bool
     {
-        return !empty($address['street']) && 
-               !empty($address['city']) && 
-               !empty($address['country']);
+        return !empty($address['street']) &&
+            !empty($address['city']) &&
+            !empty($address['country']);
     }
 
     /**
@@ -350,7 +350,7 @@ class ProfileResource extends JsonResource
     protected function getEnabledChannels(array $notifications): array
     {
         $channels = [];
-        
+
         if ($notifications['email_enabled']) {
             $channels[] = 'email';
         }
@@ -453,8 +453,10 @@ class ProfileResource extends JsonResource
             $recommendations[] = 'Add your phone number for important notifications';
         }
 
-        if (in_array('emergency_contact_name', $completion['missing_fields']) || 
-            in_array('emergency_contact_phone', $completion['missing_fields'])) {
+        if (
+            in_array('emergency_contact_name', $completion['missing_fields']) ||
+            in_array('emergency_contact_phone', $completion['missing_fields'])
+        ) {
             $recommendations[] = 'Add emergency contact information for safety purposes';
         }
 

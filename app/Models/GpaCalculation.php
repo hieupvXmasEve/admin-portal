@@ -14,7 +14,7 @@ class GpaCalculation extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'student_id',
+        'student_code',
         'semester_id',
         'program_id',
         'calculation_type',

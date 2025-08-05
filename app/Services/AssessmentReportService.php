@@ -89,11 +89,11 @@ class AssessmentReportService
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail.assessmentComponent', function ($query) use ($syllabus) {
             $query->where('syllabus_id', $syllabus->id);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where('score_status', 'final')
-        ->where('score_excluded', false)
-        ->whereNotNull('percentage_score')
-        ->get();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('score_status', 'final')
+            ->where('score_excluded', false)
+            ->whereNotNull('percentage_score')
+            ->get();
 
         if ($scores->isEmpty()) {
             return $this->getEmptyScoreDistribution();
@@ -268,11 +268,11 @@ class AssessmentReportService
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where('score_status', 'final')
-        ->where('score_excluded', false)
-        ->whereNotNull('percentage_score')
-        ->get();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('score_status', 'final')
+            ->where('score_excluded', false)
+            ->whereNotNull('percentage_score')
+            ->get();
 
         if ($scores->isEmpty()) {
             return [
@@ -326,16 +326,16 @@ class AssessmentReportService
         $completedSubmissions = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where('score_status', 'final')
-        ->count();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('score_status', 'final')
+            ->count();
 
         $pendingSubmissions = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->whereIn('score_status', ['draft', 'provisional'])
-        ->count();
+            ->where('course_offering_id', $courseOffering->id)
+            ->whereIn('score_status', ['draft', 'provisional'])
+            ->count();
 
         return [
             'completion_rate' => $expectedSubmissions > 0 ? round(($completedSubmissions / $expectedSubmissions) * 100, 2) : 0,
@@ -370,8 +370,8 @@ class AssessmentReportService
         $stats = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->selectRaw('
+            ->where('course_offering_id', $courseOffering->id)
+            ->selectRaw('
             SUM(CASE WHEN status IN ("submitted", "graded") THEN 1 ELSE 0 END) as submitted,
             SUM(CASE WHEN score_status = "final" THEN 1 ELSE 0 END) as graded,
             SUM(CASE WHEN is_late = 1 THEN 1 ELSE 0 END) as late,
@@ -379,7 +379,7 @@ class AssessmentReportService
             SUM(CASE WHEN appeal_requested = 1 THEN 1 ELSE 0 END) as appeals_requested,
             SUM(CASE WHEN score_excluded = 1 THEN 1 ELSE 0 END) as excluded
         ')
-        ->first();
+            ->first();
 
         return [
             'submitted' => $stats->submitted ?? 0,
@@ -436,12 +436,12 @@ class AssessmentReportService
         $stats = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($component) {
             $query->where('assessment_component_id', $component->id);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->selectRaw('
+            ->where('course_offering_id', $courseOffering->id)
+            ->selectRaw('
             SUM(CASE WHEN status IN ("submitted", "graded") THEN 1 ELSE 0 END) as submitted_count,
             SUM(CASE WHEN score_status = "final" THEN 1 ELSE 0 END) as graded_count
         ')
-        ->first();
+            ->first();
 
         $submittedCount = $stats->submitted_count ?? 0;
         $gradedCount = $stats->graded_count ?? 0;
@@ -609,10 +609,10 @@ class AssessmentReportService
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where('student_id', $student->id)
-        ->with(['assessmentComponentDetail.assessmentComponent'])
-        ->get();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('student_code', $student->id)
+            ->with(['assessmentComponentDetail.assessmentComponent'])
+            ->get();
 
         $totalWeightedScore = 0;
         $totalWeight = 0;
@@ -691,14 +691,14 @@ class AssessmentReportService
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where('student_id', $student->id)
-        ->where('score_status', 'final')
-        ->where('score_excluded', false)
-        ->whereNotNull('percentage_score')
-        ->whereNotNull('graded_at')
-        ->orderBy('graded_at')
-        ->get();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('student_code', $student->id)
+            ->where('score_status', 'final')
+            ->where('score_excluded', false)
+            ->whereNotNull('percentage_score')
+            ->whereNotNull('graded_at')
+            ->orderBy('graded_at')
+            ->get();
 
         if ($scores->count() < 2) {
             return [
@@ -1100,8 +1100,8 @@ class AssessmentReportService
             ->sortBy('display_name');
 
         // Apply student filter if provided
-        if (!empty($filters['student_ids'])) {
-            $students = $students->whereIn('id', $filters['student_ids']);
+        if (!empty($filters['student_codes'])) {
+            $students = $students->whereIn('id', $filters['student_codes']);
         }
 
         // Get assessment components
@@ -1146,15 +1146,15 @@ class AssessmentReportService
                 return $query->where('acds.score_excluded', false);
             })
             ->whereNull('acds.deleted_at')
-            ->when(!empty($filters['student_ids']), function ($query) use ($filters) {
-                return $query->whereIn('acds.student_id', $filters['student_ids']);
+            ->when(!empty($filters['student_codes']), function ($query) use ($filters) {
+                return $query->whereIn('acds.student_code', $filters['student_codes']);
             })
             ->when(!empty($filters['component_ids']), function ($query) use ($filters) {
                 return $query->whereIn('ac.id', $filters['component_ids']);
             })
             ->select([
                 'acds.id as score_id',
-                'acds.student_id',
+                'acds.student_code',
                 'acd.id as detail_id',
                 'ac.id as component_id',
                 'acds.points_earned',
@@ -1179,7 +1179,7 @@ class AssessmentReportService
         // Index scores by student and detail for efficient lookup
         $scoresIndex = [];
         foreach ($allScores as $score) {
-            $scoresIndex[$score->student_id][$score->detail_id] = $score;
+            $scoresIndex[$score->student_code][$score->detail_id] = $score;
         }
 
         // Build grade matrix with enhanced statistics
@@ -1195,7 +1195,7 @@ class AssessmentReportService
             $studentRow = [
                 'student' => [
                     'id' => $student->id,
-                    'student_id' => $student->student_id,
+                    'student_code' => $student->student_code,
                     'name' => $student->display_name,
                     'first_name' => $student->first_name,
                     'last_name' => $student->last_name,
@@ -1411,10 +1411,18 @@ class AssessmentReportService
     private function calculateGradeDistributionFromMatrix(array $gradeMatrix): array
     {
         $distribution = [
-            'A+' => 0, 'A' => 0, 'A-' => 0,
-            'B+' => 0, 'B' => 0, 'B-' => 0,
-            'C+' => 0, 'C' => 0, 'C-' => 0,
-            'D+' => 0, 'D' => 0, 'F' => 0,
+            'A+' => 0,
+            'A' => 0,
+            'A-' => 0,
+            'B+' => 0,
+            'B' => 0,
+            'B-' => 0,
+            'C+' => 0,
+            'C' => 0,
+            'C-' => 0,
+            'D+' => 0,
+            'D' => 0,
+            'F' => 0,
         ];
 
         foreach ($gradeMatrix as $studentRow) {
@@ -1485,10 +1493,10 @@ class AssessmentReportService
     private function scoreHasAdjustments(object $score): bool
     {
         return ($score->is_late && $score->late_penalty_applied > 0) ||
-               $score->bonus_points > 0 ||
-               $score->score_excluded ||
-               $score->plagiarism_suspected ||
-               $score->appeal_requested;
+            $score->bonus_points > 0 ||
+            $score->score_excluded ||
+            $score->plagiarism_suspected ||
+            $score->appeal_requested;
     }
 
     /**
@@ -1716,7 +1724,7 @@ class AssessmentReportService
                 $atRiskStudents[] = [
                     'student' => [
                         'id' => $student->id,
-                        'student_id' => $student->student_id,
+                        'student_code' => $student->student_code,
                         'name' => $student->display_name,
                         'email' => $student->email,
                     ],
@@ -1863,7 +1871,7 @@ class AssessmentReportService
                 $exceptionalStudents[] = [
                     'student' => [
                         'id' => $student->id,
-                        'student_id' => $student->student_id,
+                        'student_code' => $student->student_code,
                         'name' => $student->display_name,
                         'email' => $student->email,
                     ],
@@ -1911,15 +1919,15 @@ class AssessmentReportService
         $integrityScores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where(function ($query) {
-            $query->where('plagiarism_suspected', true)
-                  ->orWhere('appeal_requested', true)
-                  ->orWhereNotNull('plagiarism_score')
-                  ->orWhereNotNull('integrity_status');
-        })
-        ->with(['student', 'assessmentComponentDetail.assessmentComponent'])
-        ->get();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where(function ($query) {
+                $query->where('plagiarism_suspected', true)
+                    ->orWhere('appeal_requested', true)
+                    ->orWhereNotNull('plagiarism_score')
+                    ->orWhereNotNull('integrity_status');
+            })
+            ->with(['student', 'assessmentComponentDetail.assessmentComponent'])
+            ->get();
 
         // Group by student
         $studentIntegrityIssues = [];
@@ -1934,7 +1942,7 @@ class AssessmentReportService
         ];
 
         foreach ($integrityScores as $score) {
-            $studentId = $score->student_id;
+            $studentId = $score->student_code;
             $componentId = $score->assessmentComponentDetail->assessmentComponent->id;
 
             // Track student-level issues
@@ -1942,7 +1950,7 @@ class AssessmentReportService
                 $studentIntegrityIssues[$studentId] = [
                     'student' => [
                         'id' => $score->student->id,
-                        'student_id' => $score->student->student_id,
+                        'student_code' => $score->student->student_code,
                         'name' => $score->student->display_name,
                         'email' => $score->student->email,
                     ],
@@ -2128,11 +2136,11 @@ class AssessmentReportService
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where('score_status', 'final')
-        ->where('score_excluded', false)
-        ->whereNotNull('percentage_score')
-        ->get();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('score_status', 'final')
+            ->where('score_excluded', false)
+            ->whereNotNull('percentage_score')
+            ->get();
 
         if ($scores->isEmpty()) {
             return $this->getEmptyGradeDistribution();
@@ -2258,11 +2266,11 @@ class AssessmentReportService
             $componentScores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($component) {
                 $query->where('assessment_component_id', $component->id);
             })
-            ->where('course_offering_id', $courseOffering->id)
-            ->where('score_status', 'final')
-            ->where('score_excluded', false)
-            ->whereNotNull('percentage_score')
-            ->get();
+                ->where('course_offering_id', $courseOffering->id)
+                ->where('score_status', 'final')
+                ->where('score_excluded', false)
+                ->whereNotNull('percentage_score')
+                ->get();
 
             if ($componentScores->isEmpty()) {
                 continue;
@@ -2282,7 +2290,11 @@ class AssessmentReportService
 
             // Calculate grade distribution for this component
             $gradeDistribution = [
-                'A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'F' => 0
+                'A' => 0,
+                'B' => 0,
+                'C' => 0,
+                'D' => 0,
+                'F' => 0
             ];
 
             foreach ($percentageScores as $score) {
@@ -2316,10 +2328,13 @@ class AssessmentReportService
                         ->whereIn('registration_status', ['registered', 'confirmed'])
                         ->count() * $component->details->count(),
                     'actual_submissions' => $componentScores->count(),
-                    'completion_rate' => $this->calculateComponentCompletionRate($courseOffering, $component,
+                    'completion_rate' => $this->calculateComponentCompletionRate(
+                        $courseOffering,
+                        $component,
                         $courseOffering->courseRegistrations()
                             ->whereIn('registration_status', ['registered', 'confirmed'])
-                            ->count())['completion_rate'],
+                            ->count()
+                    )['completion_rate'],
                 ],
             ];
 
@@ -2364,15 +2379,15 @@ class AssessmentReportService
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where('score_status', 'final')
-        ->where('score_excluded', false)
-        ->whereNotNull('percentage_score')
-        ->whereNotNull('graded_at')
-        ->where('graded_at', '>=', $startDate)
-        ->with(['assessmentComponentDetail.assessmentComponent'])
-        ->orderBy('graded_at')
-        ->get();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('score_status', 'final')
+            ->where('score_excluded', false)
+            ->whereNotNull('percentage_score')
+            ->whereNotNull('graded_at')
+            ->where('graded_at', '>=', $startDate)
+            ->with(['assessmentComponentDetail.assessmentComponent'])
+            ->orderBy('graded_at')
+            ->get();
 
         if ($scores->isEmpty()) {
             return $this->getEmptyPerformanceTrends();
@@ -2490,10 +2505,10 @@ class AssessmentReportService
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($componentIds) {
             $query->whereIn('assessment_component_id', $componentIds);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->whereNotNull('submitted_at')
-        ->with(['assessmentComponentDetail.assessmentComponent'])
-        ->get();
+            ->where('course_offering_id', $courseOffering->id)
+            ->whereNotNull('submitted_at')
+            ->with(['assessmentComponentDetail.assessmentComponent'])
+            ->get();
 
         if ($scores->isEmpty()) {
             return $this->getEmptySubmissionPatterns();
@@ -3063,7 +3078,7 @@ class AssessmentReportService
         // Find significant changes (day-to-day changes > 5%)
         $significantChanges = [];
         for ($i = 1; $i < count($dates); $i++) {
-            $prevScore = $dailyPerformance[$dates[$i-1]]['average'];
+            $prevScore = $dailyPerformance[$dates[$i - 1]]['average'];
             $currScore = $dailyPerformance[$dates[$i]]['average'];
             $change = $currScore - $prevScore;
 

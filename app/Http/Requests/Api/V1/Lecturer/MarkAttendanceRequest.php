@@ -31,7 +31,7 @@ class MarkAttendanceRequest extends FormRequest
                 'min:1',
                 'max:200' // Reasonable limit for class size
             ],
-            'attendance_data.*.student_id' => [
+            'attendance_data.*.student_code' => [
                 'required',
                 'integer',
                 'exists:students,id'
@@ -75,8 +75,8 @@ class MarkAttendanceRequest extends FormRequest
             'attendance_data.array' => 'Attendance data must be an array',
             'attendance_data.min' => 'At least one attendance record is required',
             'attendance_data.max' => 'Cannot process more than 200 attendance records at once',
-            'attendance_data.*.student_id.required' => 'Student ID is required for each attendance record',
-            'attendance_data.*.student_id.exists' => 'One or more student IDs do not exist',
+            'attendance_data.*.student_code.required' => 'Student ID is required for each attendance record',
+            'attendance_data.*.student_code.exists' => 'One or more student IDs do not exist',
             'attendance_data.*.status.required' => 'Attendance status is required for each record',
             'attendance_data.*.status.in' => 'Attendance status must be: present, absent, late, or excused',
             'attendance_data.*.check_in_time.date_format' => 'Check-in time must be in HH:MM:SS format',
@@ -115,15 +115,15 @@ class MarkAttendanceRequest extends FormRequest
                 if (isset($record['status']) && $record['status'] !== 'late') {
                     $record['minutes_late'] = 0;
                 }
-                
+
                 // Remove check_in_time if status is 'absent'
                 if (isset($record['status']) && $record['status'] === 'absent') {
                     unset($record['check_in_time']);
                 }
-                
+
                 return $record;
             })->toArray();
-            
+
             $this->merge(['attendance_data' => $attendanceData]);
         }
     }

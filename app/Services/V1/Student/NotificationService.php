@@ -20,7 +20,7 @@ class NotificationService
     public function getNotifications(Student $student, array $filters = []): array
     {
         $cacheKey = "notifications:student:{$student->id}:" . md5(serialize($filters));
-        
+
         return Cache::remember($cacheKey, 300, function () use ($student, $filters) {
             $query = $student->notifications()->with(['notificationType']);
 
@@ -28,7 +28,7 @@ class NotificationService
             $this->applyNotificationFilters($query, $filters);
 
             $notifications = $query->orderBy('created_at', 'desc')
-                                  ->paginate($filters['per_page'] ?? 20);
+                ->paginate($filters['per_page'] ?? 20);
 
             return [
                 'notifications' => $this->formatNotifications($notifications->items()),
@@ -65,7 +65,7 @@ class NotificationService
             'unread_notifications' => $unreadNotifications,
             'today_notifications' => $todayNotifications,
             'urgent_notifications' => $urgentNotifications,
-            'read_percentage' => $totalNotifications > 0 
+            'read_percentage' => $totalNotifications > 0
                 ? round((($totalNotifications - $unreadNotifications) / $totalNotifications) * 100, 1)
                 : 0,
         ];
@@ -99,7 +99,7 @@ class NotificationService
     public function markAsRead(Student $student, int $notificationId): bool
     {
         $notification = $student->notifications()->findOrFail($notificationId);
-        
+
         $updated = $notification->update([
             'is_read' => true,
             'read_at' => now(),
@@ -171,10 +171,10 @@ class NotificationService
      */
     public function getNotificationPreferences(Student $student): array
     {
-        $preferences = NotificationPreference::where('student_id', $student->id)->get();
-        
+        $preferences = NotificationPreference::where('student_code', $student->id)->get();
+
         $defaultPreferences = $this->getDefaultPreferences();
-        
+
         // Merge with existing preferences
         foreach ($preferences as $preference) {
             $key = $preference->notification_type . '.' . $preference->channel;
@@ -199,7 +199,7 @@ class NotificationService
                 foreach ($channels as $channel => $settings) {
                     NotificationPreference::updateOrCreate(
                         [
-                            'student_id' => $student->id,
+                            'student_code' => $student->id,
                             'notification_type' => $notificationType,
                             'channel' => $channel,
                         ],
@@ -256,7 +256,7 @@ class NotificationService
 
         foreach ($upcomingAssessments as $assessment) {
             $daysUntilDue = now()->diffInDays($assessment->due_date, false);
-            
+
             // Create notification based on urgency
             if (in_array($daysUntilDue, [7, 3, 1])) {
                 $urgency = match ($daysUntilDue) {
@@ -558,7 +558,7 @@ class NotificationService
     protected function clearNotificationCache(Student $student): void
     {
         $pattern = "notifications:student:{$student->id}:*";
-        
+
         // Clear all cached notification data for this student
         $keys = Cache::getRedis()->keys($pattern);
         if (!empty($keys)) {

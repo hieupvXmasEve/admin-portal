@@ -636,7 +636,7 @@ class AssessmentController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to retrieve student grading data', [
                 'course_offering_id' => $courseOffering->id,
-                'student_id' => $student->id,
+                'student_code' => $student->id,
                 'lecturer_id' => $lecturer->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -817,7 +817,7 @@ class AssessmentController extends Controller
                         $score->update($updateData);
                         $updatedScores[] = [
                             'id' => $score->id,
-                            'student_id' => $score->student_id,
+                            'student_code' => $score->student_code,
                             'assessment_component_detail_id' => $score->assessment_component_detail_id
                         ];
                     } catch (\Exception $e) {
@@ -949,7 +949,6 @@ class AssessmentController extends Controller
             return response()->download($filePath, basename($filePath), [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ])->deleteFileAfterSend(true);
-
         } catch (\Exception $e) {
             Log::error('Failed to export grade template', [
                 'course_offering_id' => $courseOffering->id,
@@ -1035,7 +1034,6 @@ class AssessmentController extends Controller
                 $importResults,
                 'Grade import completed successfully'
             );
-
         } catch (\Exception $e) {
             Log::error('Failed to import grades', [
                 'course_offering_id' => $courseOffering->id,
@@ -1094,9 +1092,9 @@ class AssessmentController extends Controller
         $gradedScoresCount = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) use ($assessmentComponent) {
             $query->where('assessment_component_id', $assessmentComponent->id);
         })
-        ->where('course_offering_id', $courseOffering->id)
-        ->where('score_status', 'final')
-        ->count();
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('score_status', 'final')
+            ->count();
 
         if ($gradedScoresCount > 0) {
             $dependencies[] = "Has {$gradedScoresCount} finalized grade(s)";

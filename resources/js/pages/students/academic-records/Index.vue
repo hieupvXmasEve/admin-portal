@@ -1,63 +1,63 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3'
-import DataPagination from '@/components/DataPagination.vue'
-import DataTable from '@/components/DataTable.vue'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Award, BookOpen, CheckCircle, FileText, TrendingUp } from 'lucide-vue-next'
-import type { PaginatedResponse } from '@/types'
-import type { ColumnDef } from '@tanstack/vue-table'
-import { computed, h, ref } from 'vue'
+import DataPagination from '@/components/DataPagination.vue';
+import DataTable from '@/components/DataTable.vue';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { PaginatedResponse } from '@/types';
+import { Head, router } from '@inertiajs/vue3';
+import type { ColumnDef } from '@tanstack/vue-table';
+import { Award, BookOpen, CheckCircle, FileText, TrendingUp } from 'lucide-vue-next';
+import { computed, h, ref } from 'vue';
 
 interface AcademicRecord {
-    id: number
+    id: number;
     semester: {
-        id: number
-        name: string
-    }
+        id: number;
+        name: string;
+    };
     unit: {
-        unit_code: string
-        unit_name: string
-        credit_points: number
-    }
-    final_grade: string
-    status: string
+        unit_code: string;
+        unit_name: string;
+        credit_points: number;
+    };
+    final_grade: string;
+    status: string;
 }
 
 interface Props {
     student: {
-        id: number
-        student_id: string
-        full_name: string
-        program?: { name: string }
-        specialization?: { name: string }
-    }
-    records: PaginatedResponse<AcademicRecord>
-    semesters: Array<{ id: number; name: string }>
+        id: number;
+        student_code: string;
+        full_name: string;
+        program?: { name: string };
+        specialization?: { name: string };
+    };
+    records: PaginatedResponse<AcademicRecord>;
+    semesters: Array<{ id: number; name: string }>;
     analytics: {
-        current_gpa: number
-        average_gpa: number
-        total_credits_completed: number
-        academic_standing: string
-        gpa_trends: any[]
-    }
+        current_gpa: number;
+        average_gpa: number;
+        total_credits_completed: number;
+        academic_standing: string;
+        gpa_trends: any[];
+    };
     filters: {
-        semester_id?: string
-        status?: string
-    }
+        semester_id?: string;
+        status?: string;
+    };
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
-const data = computed(() => props.records.data)
+const data = computed(() => props.records.data);
 
-const loading = ref(false)
+const loading = ref(false);
 const filters = ref({
     semester_id: props.filters.semester_id || '',
     status: props.filters.status || '',
-})
+});
 
 const columns: ColumnDef<AcademicRecord>[] = [
     {
@@ -70,8 +70,8 @@ const columns: ColumnDef<AcademicRecord>[] = [
         accessorKey: 'unit.unit_code',
         enableSorting: false,
         cell: ({ row }) => {
-            const unitCode = row.original.unit.unit_code
-            return h('span', { class: 'font-mono' }, unitCode)
+            const unitCode = row.original.unit.unit_code;
+            return h('span', { class: 'font-mono' }, unitCode);
         },
     },
     {
@@ -79,8 +79,8 @@ const columns: ColumnDef<AcademicRecord>[] = [
         accessorKey: 'unit.unit_name',
         enableSorting: false,
         cell: ({ row }) => {
-            const unitName = row.original.unit.unit_name
-            return h('div', { class: 'font-medium' }, unitName)
+            const unitName = row.original.unit.unit_name;
+            return h('div', { class: 'font-medium' }, unitName);
         },
     },
     {
@@ -88,8 +88,8 @@ const columns: ColumnDef<AcademicRecord>[] = [
         accessorKey: 'unit.credit_points',
         enableSorting: false,
         cell: ({ row }) => {
-            const credits = row.original.unit.credit_points
-            return h('span', { class: 'font-mono' }, credits.toString())
+            const credits = row.original.unit.credit_points;
+            return h('span', { class: 'font-mono' }, credits.toString());
         },
     },
     {
@@ -97,8 +97,8 @@ const columns: ColumnDef<AcademicRecord>[] = [
         accessorKey: 'final_grade',
         enableSorting: false,
         cell: ({ row }) => {
-            const grade = row.original.final_grade
-            return h('span', { class: 'font-mono font-bold' }, grade || 'N/A')
+            const grade = row.original.final_grade;
+            return h('span', { class: 'font-mono font-bold' }, grade || 'N/A');
         },
     },
     {
@@ -106,17 +106,17 @@ const columns: ColumnDef<AcademicRecord>[] = [
         accessorKey: 'status',
         enableSorting: false,
         cell: ({ row }) => {
-            const status = row.original.status
+            const status = row.original.status;
             const colors = {
                 completed: 'bg-green-100 text-green-800',
                 in_progress: 'bg-blue-100 text-blue-800',
                 withdrawn: 'bg-red-100 text-red-800',
-            }
-            const colorClass = colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800'
-            return h('span', { class: `inline-flex items-center px-2 py-1 rounded-full text-xs ${colorClass}` }, status)
+            };
+            const colorClass = colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+            return h('span', { class: `inline-flex items-center px-2 py-1 rounded-full text-xs ${colorClass}` }, status);
         },
     },
-]
+];
 
 const getStandingColor = (standing: string) => {
     const colors = {
@@ -158,17 +158,17 @@ const handlePaginationNavigate = (url: string) => {
         preserveState: true,
         preserveScroll: true,
         only: ['records'],
-    })
-}
+    });
+};
 
 const handlePageSizeChange = (pageSize: number) => {
-    console.log('Page size changed to:', pageSize)
-}
+    console.log('Page size changed to:', pageSize);
+};
 </script>
 
 <template>
     <Head title="Academic Records" />
-    
+
     <div class="space-y-6">
         <div class="bg-white shadow">
             <div class="px-4 py-5 sm:p-6">
@@ -176,7 +176,7 @@ const handlePageSizeChange = (pageSize: number) => {
                     <div>
                         <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Academic Records - {{ student.full_name }}</h2>
                         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            Student ID: {{ student.student_id }} |
+                            Student ID: {{ student.student_code }} |
                             {{ student.program?.name }}
                             <span v-if="student.specialization">- {{ student.specialization.name }}</span>
                         </p>
@@ -194,122 +194,118 @@ const handlePageSizeChange = (pageSize: number) => {
                 </div>
             </div>
         </div>
-            <!-- Performance Summary Cards -->
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-center">
-                            <Award class="h-8 w-8 text-blue-600" />
-                            <div class="ml-3">
-                                <p class="text-sm font-medium text-gray-600">Current GPA</p>
-                                <p class="text-2xl font-bold text-gray-900">
-                                    {{ analytics.current_gpa?.toFixed(2) || 'N/A' }}
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-center">
-                            <BookOpen class="h-8 w-8 text-green-600" />
-                            <div class="ml-3">
-                                <p class="text-sm font-medium text-gray-600">Credits Completed</p>
-                                <p class="text-2xl font-bold text-gray-900">
-                                    {{ analytics.total_credits_completed }}
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-center">
-                            <TrendingUp class="h-8 w-8 text-purple-600" />
-                            <div class="ml-3">
-                                <p class="text-sm font-medium text-gray-600">Average GPA</p>
-                                <p class="text-2xl font-bold text-gray-900">
-                                    {{ analytics.average_gpa?.toFixed(2) || 'N/A' }}
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent class="p-4">
-                        <div class="flex items-center">
-                            <CheckCircle :class="['h-8 w-8', getStandingColor(analytics.academic_standing)]" />
-                            <div class="ml-3">
-                                <p class="text-sm font-medium text-gray-600">Standing</p>
-                                <p class="text-sm font-bold text-gray-900 capitalize">
-                                    {{ analytics.academic_standing }}
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <!-- Filters -->
+        <!-- Performance Summary Cards -->
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
             <Card>
                 <CardContent class="p-4">
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div>
-                            <Label for="semester">Semester</Label>
-                            <Select v-model="filters.semester_id" @update:model-value="applyFilters">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Semesters" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="">All Semesters</SelectItem>
-                                    <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                        {{ semester.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <Label for="status">Status</Label>
-                            <Select v-model="filters.status" @update:model-value="applyFilters">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="All Statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="">All Statuses</SelectItem>
-                                    <SelectItem value="completed">Completed</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="withdrawn">Withdrawn</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div class="flex items-end">
-                            <Button variant="outline" @click="clearFilters" class="w-full"> Clear Filters </Button>
+                    <div class="flex items-center">
+                        <Award class="h-8 w-8 text-blue-600" />
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-600">Current GPA</p>
+                            <p class="text-2xl font-bold text-gray-900">
+                                {{ analytics.current_gpa?.toFixed(2) || 'N/A' }}
+                            </p>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            <!-- Academic Records Table -->
             <Card>
-                <CardHeader>
-                    <CardTitle>Academic Records</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <DataTable :data="data" :columns="columns" />
-
-                    <div class="mt-4">
-                        <DataPagination 
-                            :pagination-data="records" 
-                            @navigate="handlePaginationNavigate" 
-                            @page-size-change="handlePageSizeChange" 
-                        />
+                <CardContent class="p-4">
+                    <div class="flex items-center">
+                        <BookOpen class="h-8 w-8 text-green-600" />
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-600">Credits Completed</p>
+                            <p class="text-2xl font-bold text-gray-900">
+                                {{ analytics.total_credits_completed }}
+                            </p>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
+
+            <Card>
+                <CardContent class="p-4">
+                    <div class="flex items-center">
+                        <TrendingUp class="h-8 w-8 text-purple-600" />
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-600">Average GPA</p>
+                            <p class="text-2xl font-bold text-gray-900">
+                                {{ analytics.average_gpa?.toFixed(2) || 'N/A' }}
+                            </p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardContent class="p-4">
+                    <div class="flex items-center">
+                        <CheckCircle :class="['h-8 w-8', getStandingColor(analytics.academic_standing)]" />
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-600">Standing</p>
+                            <p class="text-sm font-bold text-gray-900 capitalize">
+                                {{ analytics.academic_standing }}
+                            </p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+
+        <!-- Filters -->
+        <Card>
+            <CardContent class="p-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                        <Label for="semester">Semester</Label>
+                        <Select v-model="filters.semester_id" @update:model-value="applyFilters">
+                            <SelectTrigger>
+                                <SelectValue placeholder="All Semesters" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="">All Semesters</SelectItem>
+                                <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                                    {{ semester.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <Label for="status">Status</Label>
+                        <Select v-model="filters.status" @update:model-value="applyFilters">
+                            <SelectTrigger>
+                                <SelectValue placeholder="All Statuses" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="">All Statuses</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="withdrawn">Withdrawn</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div class="flex items-end">
+                        <Button variant="outline" @click="clearFilters" class="w-full"> Clear Filters </Button>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Academic Records Table -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Academic Records</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <DataTable :data="data" :columns="columns" />
+
+                <div class="mt-4">
+                    <DataPagination :pagination-data="records" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+                </div>
+            </CardContent>
+        </Card>
     </div>
 </template>

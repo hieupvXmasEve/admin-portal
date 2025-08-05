@@ -65,7 +65,7 @@ class AttendanceService
             throw new \Exception('Student is not enrolled in this course');
         }
 
-        $attendanceRecords = Attendance::where('student_id', $student->id)
+        $attendanceRecords = Attendance::where('student_code', $student->id)
             ->where('course_offering_id', $courseOfferingId)
             ->with(['classSession'])
             ->orderBy('session_date', 'desc')
@@ -113,7 +113,7 @@ class AttendanceService
      */
     protected function getAttendanceRecords(Student $student, Semester $semester, array $filters = []): Collection
     {
-        $query = Attendance::where('student_id', $student->id)
+        $query = Attendance::where('student_code', $student->id)
             ->whereHas('courseOffering', function ($q) use ($semester) {
                 $q->where('semester_id', $semester->id);
             })
@@ -233,7 +233,7 @@ class AttendanceService
      */
     protected function calculateAttendanceTrends(Student $student, Semester $semester): array
     {
-        $weeklyAttendance = Attendance::where('student_id', $student->id)
+        $weeklyAttendance = Attendance::where('student_code', $student->id)
             ->whereHas('courseOffering', function ($q) use ($semester) {
                 $q->where('semester_id', $semester->id);
             })
@@ -312,7 +312,7 @@ class AttendanceService
         }
 
         // Check for consecutive absences
-        $recentAbsences = Attendance::where('student_id', $student->id)
+        $recentAbsences = Attendance::where('student_code', $student->id)
             ->whereHas('courseOffering', function ($q) use ($semester) {
                 $q->where('semester_id', $semester->id);
             })

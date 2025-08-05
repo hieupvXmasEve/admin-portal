@@ -90,7 +90,7 @@ class GPACalculationService
      */
     public function getGPATrend(Student $student, int $semesterCount = 6): array
     {
-        $gpaCalculations = GpaCalculation::where('student_id', $student->id)
+        $gpaCalculations = GpaCalculation::where('student_code', $student->id)
             ->where('calculation_type', 'semester')
             ->with('semester')
             ->orderBy('created_at', 'desc')
@@ -151,7 +151,7 @@ class GPACalculationService
      */
     public function getAcademicStanding(Student $student): array
     {
-        $latestGPA = GpaCalculation::where('student_id', $student->id)
+        $latestGPA = GpaCalculation::where('student_code', $student->id)
             ->orderBy('created_at', 'desc')
             ->first();
 
@@ -246,7 +246,7 @@ class GPACalculationService
     public function projectGPA(Student $student, array $projectedGrades): array
     {
         $currentGPA = $this->calculateCurrentGPA($student);
-        
+
         $currentQualityPoints = $currentGPA['quality_points'];
         $currentCreditHours = $currentGPA['credit_hours_attempted'];
 
@@ -256,7 +256,7 @@ class GPACalculationService
         foreach ($projectedGrades as $grade) {
             $gradePoints = $this->getGradePoints($grade['letter_grade']);
             $creditHours = $grade['credit_hours'];
-            
+
             $additionalQualityPoints += $gradePoints * $creditHours;
             $additionalCreditHours += $creditHours;
         }

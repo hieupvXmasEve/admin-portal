@@ -16,10 +16,10 @@ class SessionAttendanceResource extends JsonResource
     {
         return [
             'session' => $this->resource['session'],
-            
+
             'students' => collect($this->resource['students'])->map(function ($student) {
                 return [
-                    'student_id' => $student['student_id'],
+                    'student_code' => $student['student_code'],
                     'student_number' => $student['student_number'],
                     'full_name' => $student['full_name'],
                     'email' => $student['email'],
@@ -47,7 +47,7 @@ class SessionAttendanceResource extends JsonResource
                     ],
                 ];
             }),
-            
+
             'summary' => [
                 'total_enrolled' => $this->resource['summary']['total_enrolled'],
                 'attendance_counts' => $this->resource['summary']['attendance_counts'],
@@ -62,7 +62,7 @@ class SessionAttendanceResource extends JsonResource
                     'not_marked_percentage' => $this->getPercentageFromCounts('not_marked'),
                 ],
             ],
-            
+
             'actions' => [
                 'can_mark_all_present' => $this->resource['summary']['attendance_counts']['not_marked'] > 0,
                 'can_mark_all_absent' => $this->resource['summary']['attendance_counts']['not_marked'] > 0,
@@ -71,7 +71,7 @@ class SessionAttendanceResource extends JsonResource
                 'can_save_draft' => true,
                 'can_generate_report' => true,
             ],
-            
+
             'recommendations' => $this->getRecommendations(),
         ];
     }
@@ -113,7 +113,7 @@ class SessionAttendanceResource extends JsonResource
     {
         $total = $this->resource['summary']['total_enrolled'];
         $count = $this->resource['summary']['attendance_counts'][$status] ?? 0;
-        
+
         return $total > 0 ? round(($count / $total) * 100, 1) : 0;
     }
 
@@ -123,15 +123,15 @@ class SessionAttendanceResource extends JsonResource
     protected function needsAttention(): bool
     {
         $summary = $this->resource['summary'];
-        
+
         // Needs attention if:
         // 1. Low attendance rate (< 70%)
         // 2. High absence rate (> 30%)
         // 3. Many students not marked
-        
-        return $summary['attendance_rate'] < 70 || 
-               $this->getPercentageFromCounts('absent') > 30 ||
-               $summary['attendance_counts']['not_marked'] > ($summary['total_enrolled'] * 0.2);
+
+        return $summary['attendance_rate'] < 70 ||
+            $this->getPercentageFromCounts('absent') > 30 ||
+            $summary['attendance_counts']['not_marked'] > ($summary['total_enrolled'] * 0.2);
     }
 
     /**
@@ -142,7 +142,7 @@ class SessionAttendanceResource extends JsonResource
         $recommendations = [];
         $summary = $this->resource['summary'];
         $counts = $summary['attendance_counts'];
-        
+
         if ($counts['not_marked'] > 0) {
             $recommendations[] = [
                 'type' => 'action',
@@ -151,7 +151,7 @@ class SessionAttendanceResource extends JsonResource
                 'action' => 'mark_remaining_attendance'
             ];
         }
-        
+
         if ($summary['attendance_rate'] < 60) {
             $recommendations[] = [
                 'type' => 'alert',
@@ -167,7 +167,7 @@ class SessionAttendanceResource extends JsonResource
                 'action' => 'monitor_attendance'
             ];
         }
-        
+
         if ($counts['absent'] > 0) {
             $recommendations[] = [
                 'type' => 'action',
@@ -176,7 +176,7 @@ class SessionAttendanceResource extends JsonResource
                 'action' => 'contact_absent_students'
             ];
         }
-        
+
         if ($summary['attendance_rate'] >= 90) {
             $recommendations[] = [
                 'type' => 'positive',
@@ -185,7 +185,7 @@ class SessionAttendanceResource extends JsonResource
                 'action' => 'maintain_engagement'
             ];
         }
-        
+
         return $recommendations;
     }
 }

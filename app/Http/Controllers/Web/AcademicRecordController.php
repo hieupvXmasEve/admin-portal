@@ -48,7 +48,7 @@ class AcademicRecordController extends Controller
             $search = $validated['search'];
             $studentsQuery->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%")
+                    ->orWhere('student_code', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
         }

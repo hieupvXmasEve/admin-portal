@@ -61,8 +61,8 @@ class LecturerApiAuthorization
      */
     protected function isLecturerActive(Lecture $lecturer): bool
     {
-        return $lecturer->is_active && 
-               in_array($lecturer->employment_status, ['active', 'employed', 'contract_active']);
+        return $lecturer->is_active &&
+            in_array($lecturer->employment_status, ['active', 'employed', 'contract_active']);
     }
 
     /**
@@ -72,7 +72,7 @@ class LecturerApiAuthorization
     {
         // Block access for terminated, suspended, or inactive lecturers
         $restrictedStatuses = ['terminated', 'suspended', 'inactive', 'on_leave'];
-        
+
         if (in_array($lecturer->employment_status, $restrictedStatuses)) {
             return true;
         }
@@ -92,13 +92,13 @@ class LecturerApiAuthorization
                 'api/v1/lecturer/profile',
                 'api/v1/lecturer/profile/*'
             ];
-            
+
             foreach ($allowedRoutes as $pattern) {
                 if ($request->is($pattern)) {
                     return false;
                 }
             }
-            
+
             return true;
         }
 
@@ -163,7 +163,7 @@ class LecturerApiAuthorization
         if (in_array($permission, $seniorPermissions)) {
             return in_array($lecturer->academic_rank, [
                 'senior_lecturer',
-                'associate_professor', 
+                'associate_professor',
                 'professor',
                 'emeritus_professor'
             ]);
@@ -187,9 +187,9 @@ class LecturerApiAuthorization
     protected function canAccessCourse(Lecture $lecturer, int $courseOfferingId): bool
     {
         return $lecturer->courseOfferings()
-                       ->where('id', $courseOfferingId)
-                       ->where('is_active', true)
-                       ->exists();
+            ->where('id', $courseOfferingId)
+            ->where('is_active', true)
+            ->exists();
     }
 
     /**
@@ -199,10 +199,10 @@ class LecturerApiAuthorization
     {
         // Lecturer can access student data if they teach any course the student is enrolled in
         return $lecturer->courseOfferings()
-                       ->whereHas('courseRegistrations', function ($query) use ($studentId) {
-                           $query->where('student_id', $studentId)
-                                 ->where('registration_status', 'enrolled');
-                       })
-                       ->exists();
+            ->whereHas('courseRegistrations', function ($query) use ($studentId) {
+                $query->where('student_code', $studentId)
+                    ->where('registration_status', 'enrolled');
+            })
+            ->exists();
     }
 }

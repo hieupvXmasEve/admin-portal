@@ -2,18 +2,7 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Combobox,
-    ComboboxAnchor,
-    ComboboxEmpty,
-    ComboboxGroup,
-    ComboboxInput,
-    ComboboxItem,
-    ComboboxItemIndicator,
-    ComboboxList,
-    ComboboxTrigger,
-    ComboboxViewport,
-} from '@/components/ui/combobox';
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
 import { useApi } from '@/composables';
 import { cn } from '@/lib/utils';
 import type { Student } from '@/types/models';
@@ -69,7 +58,7 @@ const apiError = ref<string | null>(null);
 // Computed properties
 const displayValue = computed(() => {
     if (selectedStudent.value) {
-        return `${selectedStudent.value.full_name} (${selectedStudent.value.student_id})`;
+        return `${selectedStudent.value.full_name} (${selectedStudent.value.student_code})`;
     }
     return props.placeholder;
 });
@@ -213,33 +202,14 @@ onMounted(() => {
 
 <template>
     <div class="w-full space-y-1">
-        <Combobox
-            v-model="selectedStudent"
-            by="id"
-            v-model:open="open"
-            v-model:search-term="searchQuery"
-            @update:model-value="handleSelect"
-            :disabled="props.disabled"
-        >
+        <Combobox v-model="selectedStudent" by="id" v-model:open="open" v-model:search-term="searchQuery" @update:model-value="handleSelect" :disabled="props.disabled">
             <ComboboxAnchor as-child>
                 <ComboboxTrigger as-child>
-                    <Button
-                        variant="outline"
-                        class="w-full justify-between"
-                        :class="cn(props.errorMessage && 'border-destructive', props.class)"
-                        :disabled="props.disabled"
-                    >
+                    <Button variant="outline" class="w-full justify-between" :class="cn(props.errorMessage && 'border-destructive', props.class)" :disabled="props.disabled">
                         <span class="truncate">{{ displayValue }}</span>
 
                         <div class="flex items-center gap-1">
-                            <Button
-                                v-if="selectedStudent && !props.disabled"
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                class="hover:bg-muted-foreground/20 h-4 w-4"
-                                @click="handleClear"
-                            >
+                            <Button v-if="selectedStudent && !props.disabled" type="button" variant="ghost" size="icon" class="hover:bg-muted-foreground/20 h-4 w-4" @click="handleClear">
                                 <X class="h-3 w-3" />
                                 <span class="sr-only">Clear selection</span>
                             </Button>
@@ -252,12 +222,8 @@ onMounted(() => {
             <ComboboxList class="w-[var(--reka-combobox-trigger-width)]">
                 <!-- Search Input -->
                 <div class="relative w-full items-center">
-                    <ComboboxInput
-                        class="h-10 rounded-none border-0 border-b pl-10 pr-4 focus-visible:ring-0"
-                        placeholder="Search students..."
-                        @update:model-value="debouncedSearch"
-                    />
-                    <span class="absolute inset-y-0 left-0 flex items-center justify-center px-3 pointer-events-none">
+                    <ComboboxInput class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0" placeholder="Search students..." @update:model-value="debouncedSearch" />
+                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center px-3">
                         <Search class="text-muted-foreground size-4" />
                     </span>
                 </div>
@@ -287,9 +253,7 @@ onMounted(() => {
                     </div>
 
                     <!-- Empty states -->
-                    <ComboboxEmpty v-else-if="students.length === 0 && searchQuery.length >= 2">
-                        No students found for "{{ searchQuery }}".
-                    </ComboboxEmpty>
+                    <ComboboxEmpty v-else-if="students.length === 0 && searchQuery.length >= 2"> No students found for "{{ searchQuery }}". </ComboboxEmpty>
 
                     <!-- Student list -->
                     <ComboboxGroup v-else-if="students.length > 0">
@@ -308,7 +272,7 @@ onMounted(() => {
                                         </Badge>
                                     </div>
                                     <div class="text-muted-foreground flex items-center gap-2 text-xs">
-                                        <span>{{ student.student_id }}</span>
+                                        <span>{{ student.student_code }}</span>
                                         <span>•</span>
                                         <span class="truncate">{{ student.email }}</span>
                                     </div>
@@ -325,9 +289,7 @@ onMounted(() => {
 
                         <!-- Results count indicator -->
                         <div v-if="students.length === 20" class="border-t p-2 text-center">
-                            <span class="text-muted-foreground text-xs">
-                                Showing first 20 results. Refine your search for more specific results.
-                            </span>
+                            <span class="text-muted-foreground text-xs"> Showing first 20 results. Refine your search for more specific results. </span>
                         </div>
                     </ComboboxGroup>
                 </ComboboxViewport>

@@ -34,32 +34,32 @@ class OptimizedGradeTemplateExport implements FromCollection, WithHeadings, With
     {
         // Get the query for students
         $query = $this->service->getStudentsWithScores(
-            $this->assessmentComponentDetail, 
+            $this->assessmentComponentDetail,
             $this->courseOffering
         );
-        
+
         // Get all students in the class
         $students = $query->get();
-        
+
         // Load scores for all students at once (more efficient than N+1 queries)
         $students->each(function ($student) {
             $student->current_score = $this->service->getStudentScore(
-                $student, 
-                $this->assessmentComponentDetail, 
+                $student,
+                $this->assessmentComponentDetail,
                 $this->courseOffering
             );
         });
-        
+
         // If no students found, create a placeholder row
         if ($students->isEmpty()) {
             $emptyStudent = new \stdClass();
-            $emptyStudent->student_id = 'No students enrolled';
+            $emptyStudent->student_code = 'No students enrolled';
             $emptyStudent->full_name = '';
             $emptyStudent->email = '';
             $emptyStudent->current_score = null;
             $students = collect([$emptyStudent]);
         }
-        
+
         return $students;
     }
 
@@ -92,9 +92,9 @@ class OptimizedGradeTemplateExport implements FromCollection, WithHeadings, With
     public function map($student): array
     {
         $score = $student->current_score;
-        
+
         return [
-            $student->student_id,
+            $student->student_code,
             $student->full_name ?? '',
             $student->email ?? '',
             $score?->points_earned ?? 0,
@@ -141,5 +141,4 @@ class OptimizedGradeTemplateExport implements FromCollection, WithHeadings, With
         $assessmentName = str_replace(['/', '\\', '?', '*', '[', ']'], '_', $this->assessmentComponentDetail->name);
         return substr("Grades_{$assessmentName}", 0, 31);
     }
-
 }

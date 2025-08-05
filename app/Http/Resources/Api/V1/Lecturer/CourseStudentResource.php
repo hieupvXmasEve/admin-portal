@@ -15,19 +15,19 @@ class CourseStudentResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'student_id' => $this->resource['student_id'],
+            'student_code' => $this->resource['student_code'],
             'student_number' => $this->resource['student_number'],
             'full_name' => $this->resource['full_name'],
             'email' => $this->resource['email'],
             'registration_date' => $this->resource['registration_date'],
-            
+
             // Course Registration Information
             'registration' => [
                 'status' => $this->resource['registration_status'],
                 'attempt_number' => $this->resource['attempt_number'],
                 'is_retake' => $this->resource['is_retake'],
             ],
-            
+
             // Academic Scores and Grades
             'academics' => [
                 'final_score' => $this->resource['final_score'],
@@ -35,7 +35,7 @@ class CourseStudentResource extends JsonResource
                 'grade_status' => $this->resource['grade_status'],
                 'grade_status_label' => $this->getGradeStatusLabel($this->resource['grade_status']),
             ],
-            
+
             // Attendance Information
             'attendance' => [
                 'percentage' => $this->resource['attendance_percentage'],
@@ -47,21 +47,21 @@ class CourseStudentResource extends JsonResource
                 'status_label' => $this->getStatusLabel($this->resource['status']),
                 'status_color' => $this->getStatusColor($this->resource['status']),
             ],
-            
+
             // Academic Standing
             'academic_standing' => [
                 'status' => $this->resource['academic_standing'],
                 'label' => $this->resource['academic_standing_label'],
                 'color' => $this->getAcademicStandingColor($this->resource['academic_standing']),
             ],
-            
+
             // Risk Assessment
             'risk_assessment' => [
                 'level' => $this->getRiskLevel(),
                 'factors' => $this->getRiskFactors(),
                 'recommendations' => $this->getRecommendations(),
             ],
-            
+
             // Quick Actions
             'actions' => [
                 'can_contact' => true,
@@ -107,21 +107,21 @@ class CourseStudentResource extends JsonResource
     {
         $percentage = $this->resource['attendance_percentage'];
         $lastAttendance = $this->resource['last_attendance'];
-        
+
         // High risk if attendance below 60% or no attendance in last 2 weeks
         if ($percentage < 60) {
             return 'high';
         }
-        
+
         if ($lastAttendance && \Carbon\Carbon::parse($lastAttendance)->lt(now()->subWeeks(2))) {
             return 'high';
         }
-        
+
         // Medium risk if attendance below 75%
         if ($percentage < 75) {
             return 'medium';
         }
-        
+
         // Low risk otherwise
         return 'low';
     }
@@ -134,13 +134,13 @@ class CourseStudentResource extends JsonResource
         $factors = [];
         $percentage = $this->resource['attendance_percentage'];
         $lastAttendance = $this->resource['last_attendance'];
-        
+
         if ($percentage < 50) {
             $factors[] = 'Very low attendance rate';
         } elseif ($percentage < 75) {
             $factors[] = 'Below average attendance rate';
         }
-        
+
         if ($lastAttendance) {
             $daysSinceLastAttendance = \Carbon\Carbon::parse($lastAttendance)->diffInDays(now());
             if ($daysSinceLastAttendance > 14) {
@@ -151,11 +151,11 @@ class CourseStudentResource extends JsonResource
         } else {
             $factors[] = 'No attendance recorded';
         }
-        
+
         if ($this->resource['sessions_attended'] === 0 && $this->resource['total_sessions'] > 0) {
             $factors[] = 'Never attended any session';
         }
-        
+
         return $factors;
     }
 
@@ -167,7 +167,7 @@ class CourseStudentResource extends JsonResource
         $recommendations = [];
         $riskLevel = $this->getRiskLevel();
         $percentage = $this->resource['attendance_percentage'];
-        
+
         if ($riskLevel === 'high') {
             $recommendations[] = 'Contact student immediately';
             $recommendations[] = 'Schedule one-on-one meeting';
@@ -176,16 +176,16 @@ class CourseStudentResource extends JsonResource
             $recommendations[] = 'Send attendance reminder';
             $recommendations[] = 'Monitor closely';
         }
-        
+
         if ($percentage < 75) {
             $recommendations[] = 'Discuss attendance policy';
             $recommendations[] = 'Provide additional support resources';
         }
-        
+
         if (empty($recommendations)) {
             $recommendations[] = 'Continue monitoring';
         }
-        
+
         return $recommendations;
     }
 

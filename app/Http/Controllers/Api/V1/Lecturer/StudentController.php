@@ -28,14 +28,14 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $filters = $request->validated();
             $perPage = (int) $request->query('per_page', 15);
             $perPage = min(max($perPage, 5), 50);
-            
+
             $students = $this->studentService->getStudents($lecturer, $filters, $perPage);
-            
+
             return ApiResponse::paginated(
                 $students->through(fn($student) => new StudentResource($student)),
                 'Students retrieved successfully'
@@ -52,14 +52,14 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $studentDetails = $this->studentService->getStudentDetails($lecturer, $studentId);
-            
+
             if (!$studentDetails) {
                 return ApiResponse::notFound('Student not found or access denied');
             }
-            
+
             return ApiResponse::success(
                 new StudentDetailResource($studentDetails),
                 'Student details retrieved successfully'
@@ -76,12 +76,12 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $filters = $request->only(['course_offering_id', 'priority', 'type']);
-            
+
             $alerts = $this->studentService->getStudentAlerts($lecturer, $filters);
-            
+
             return ApiResponse::success(
                 $alerts,
                 'Student alerts retrieved successfully'
@@ -98,12 +98,12 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $noteData = $request->validated();
-            
+
             $result = $this->studentService->addStudentNote($lecturer, $studentId, $noteData);
-            
+
             return ApiResponse::success(
                 $result,
                 'Student note added successfully'
@@ -123,12 +123,12 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $updateData = $request->validated();
-            
+
             $result = $this->studentService->updateStudentNote($lecturer, $noteId, $updateData);
-            
+
             return ApiResponse::success(
                 $result,
                 'Student note updated successfully'
@@ -148,10 +148,10 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $result = $this->studentService->deleteStudentNote($lecturer, $noteId);
-            
+
             return ApiResponse::success(
                 $result,
                 'Student note deleted successfully'
@@ -171,12 +171,12 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $filters = $request->only(['course_offering_id', 'semester_id', 'date_from', 'date_to']);
-            
+
             $analytics = $this->studentService->getStudentPerformanceAnalytics($lecturer, $filters);
-            
+
             return ApiResponse::success(
                 $analytics,
                 'Student performance analytics retrieved successfully'
@@ -193,15 +193,15 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $filters = array_merge(
                 $request->only(['course_offering_id']),
                 ['requires_attention' => true]
             );
-            
+
             $students = $this->studentService->getStudents($lecturer, $filters, 50);
-            
+
             return ApiResponse::success(
                 StudentResource::collection($students->items()),
                 'Students requiring attention retrieved successfully'
@@ -218,14 +218,14 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $filters = $request->only(['course_offering_id', 'semester_id']);
-            
+
             // Get students for summary
             $students = $this->studentService->getStudents($lecturer, $filters, 1000);
             $alerts = $this->studentService->getStudentAlerts($lecturer, $filters);
-            
+
             $summary = [
                 'total_students' => $students->total(),
                 'active_students' => $students->count(),
@@ -240,7 +240,7 @@ class StudentController extends Controller
                 ],
                 'recent_alerts' => collect($alerts)->take(5)->values(),
             ];
-            
+
             return ApiResponse::success(
                 $summary,
                 'Student summary retrieved successfully'
@@ -257,12 +257,12 @@ class StudentController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $validated = $request->validate([
                 'action' => 'required|string|in:add_note,send_notification,mark_for_follow_up',
-                'student_ids' => 'required|array|min:1|max:50',
-                'student_ids.*' => 'integer',
+                'student_codes' => 'required|array|min:1|max:50',
+                'student_codes.*' => 'integer',
                 'data' => 'required|array',
             ]);
 
@@ -270,7 +270,7 @@ class StudentController extends Controller
             $successCount = 0;
             $errorCount = 0;
 
-            foreach ($validated['student_ids'] as $studentId) {
+            foreach ($validated['student_codes'] as $studentId) {
                 try {
                     $result = $this->processBulkAction(
                         $lecturer,
@@ -278,26 +278,26 @@ class StudentController extends Controller
                         $studentId,
                         $validated['data']
                     );
-                    
+
                     $results[] = [
-                        'student_id' => $studentId,
+                        'student_code' => $studentId,
                         'status' => 'success',
                         'result' => $result,
                     ];
                     $successCount++;
                 } catch (\Exception $e) {
                     $results[] = [
-                        'student_id' => $studentId,
+                        'student_code' => $studentId,
                         'status' => 'error',
                         'error' => $e->getMessage(),
                     ];
                     $errorCount++;
                 }
             }
-            
+
             return ApiResponse::success([
                 'action' => $validated['action'],
-                'total_processed' => count($validated['student_ids']),
+                'total_processed' => count($validated['student_codes']),
                 'successful_actions' => $successCount,
                 'failed_actions' => $errorCount,
                 'results' => $results,

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('program_change_requests', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('student_id')->constrained()->onDelete('cascade');
+            $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
             $table->foreignId('from_program_id')->constrained('programs')->onDelete('cascade');
             $table->foreignId('to_program_id')->constrained('programs')->onDelete('cascade');
             $table->foreignId('from_specialization_id')->nullable()->constrained('specializations')->onDelete('set null');
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->text('approval_notes')->nullable();
             $table->json('affected_credits')->nullable(); // Store credit mapping data
             $table->timestamps();
-            
+
             $table->index(['student_id', 'status']);
             $table->index('status');
         });

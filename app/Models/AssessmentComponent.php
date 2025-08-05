@@ -134,9 +134,9 @@ class AssessmentComponent extends Model
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) {
             $query->where('assessment_component_id', $this->id);
         })
-        ->where('course_offering_id', $courseOfferingId)
-        ->where('score_excluded', false)
-        ->get();
+            ->where('course_offering_id', $courseOfferingId)
+            ->where('score_excluded', false)
+            ->get();
 
         if ($scores->isEmpty()) {
             return $statistics;
@@ -242,8 +242,8 @@ class AssessmentComponent extends Model
         return AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) {
             $query->where('assessment_component_id', $this->id);
         })
-        ->where('student_id', $student->id)
-        ->with('assessmentComponentDetail')
-        ->get();
+            ->where('student_code', $student->id)
+            ->with('assessmentComponentDetail')
+            ->get();
     }
 }
