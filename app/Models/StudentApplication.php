@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StudentApplication extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'full_name',
         'gender',
@@ -44,6 +47,8 @@ class StudentApplication extends Model
         'sut_id',
         'is_international_applicant',
         'exception_units',
+        'status',
+        'student_id',
     ];
 
     protected $casts = [
@@ -57,5 +62,38 @@ class StudentApplication extends Model
         'speaking' => 'decimal:2',
         'overall' => 'decimal:2',
         'is_international_applicant' => 'boolean',
+        'status' => 'string',
     ];
+
+    /**
+     * Get the student that was created from this application
+     */
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
+    }
+
+    /**
+     * Check if this application has been converted to a student
+     */
+    public function isConverted(): bool
+    {
+        return !is_null($this->student_id);
+    }
+
+    /**
+     * Scope to get only unconverted applications
+     */
+    public function scopeUnconverted($query)
+    {
+        return $query->whereNull('student_id');
+    }
+
+    /**
+     * Scope to get only converted applications
+     */
+    public function scopeConverted($query)
+    {
+        return $query->whereNotNull('student_id');
+    }
 }

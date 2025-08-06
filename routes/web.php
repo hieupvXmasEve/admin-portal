@@ -78,6 +78,7 @@ require __DIR__ . '/web/student-management.php';
 require __DIR__ . '/web/class-sessions.php';
 require __DIR__ . '/web/attendance.php';
 require __DIR__ . '/web/class-schedule.php';
+require __DIR__ . '/web/student-application.php';
 
 // Admin Schedule API routes (using web auth for SPA)
 Route::middleware(['auth', 'verified'])->name('api.admin.')->group(function () {

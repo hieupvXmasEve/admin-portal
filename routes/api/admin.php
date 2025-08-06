@@ -25,7 +25,10 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     Route::get('students/{student}', [WebStudentController::class, 'apiShow'])->name('students.apiShow');
 
     // Student Applications
+    Route::get('/student-applications', [StudentApplicationController::class, 'index'])->name('student-applications.index');
+    Route::get('/student-applications/{studentApplication}', [StudentApplicationController::class, 'show'])->name('student-applications.show');
+    Route::patch('/student-applications/{studentApplication}/status', [StudentApplicationController::class, 'updateStatus'])->name('student-applications.updateStatus');
+    Route::post('/student-applications', [StudentApplicationController::class, 'store'])->name('student-applications.store');
 
     // Other admin API routes can go here if needed
 });
-Route::post('/student-applications', [StudentApplicationController::class, 'store'])->name('student-applications.store');
