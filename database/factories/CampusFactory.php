@@ -17,9 +17,9 @@ class CampusFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->company . ' Campus',
-            'code' => strtoupper($this->faker->unique()->lexify('CAMPUS??')),
-            'address' => $this->faker->address,
+            'name' => fake()->name() . ' Campus',
+            'code' => strtoupper(fake()->unique()->lexify('???')),
+            'address' => fake()->address(),
         ];
     }
 }

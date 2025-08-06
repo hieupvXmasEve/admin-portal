@@ -6,6 +6,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,7 +20,7 @@ import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
-import { ArrowLeft, Book, Edit, GraduationCap, Info, Plus, School, Target, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, Book, Edit, GraduationCap, Info, Plus, School, Target, Trash2, ChevronsUpDown } from 'lucide-vue-next';
 import { Form } from 'vee-validate';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
@@ -100,6 +101,10 @@ const calculateYearLevel = (semesterNumber: number): number => {
 const isAddSubmitting = ref(false);
 const isEditSubmitting = ref(false);
 
+// Unit search states
+const addUnitSearch = ref('');
+const editUnitSearch = ref('');
+
 // Computed data
 const curriculumUnits = computed(() => props.curriculumVersion.curriculum_units || []);
 
@@ -121,6 +126,26 @@ const editableUnits = computed(() => {
         .map((cu) => cu.unit_id);
 
     return props.units.filter((unit) => !existingUnitIds.includes(unit.id));
+});
+
+// Filtered units for add modal with search
+const filteredAvailableUnits = computed(() => {
+    if (!addUnitSearch.value.trim()) {
+        return availableUnits.value;
+    }
+
+    const searchTerm = addUnitSearch.value.toLowerCase().trim();
+    return availableUnits.value.filter((unit) => unit.code.toLowerCase().includes(searchTerm) || unit.name.toLowerCase().includes(searchTerm));
+});
+
+// Filtered units for edit modal with search
+const filteredEditableUnits = computed(() => {
+    if (!editUnitSearch.value.trim()) {
+        return editableUnits.value;
+    }
+
+    const searchTerm = editUnitSearch.value.toLowerCase().trim();
+    return editableUnits.value.filter((unit) => unit.code.toLowerCase().includes(searchTerm) || unit.name.toLowerCase().includes(searchTerm));
 });
 
 const filteredUnits = computed(() => {
@@ -325,13 +350,15 @@ const handlePageChange = (url: string) => {
 };
 
 const handleAddUnitClick = () => {
+    addUnitSearch.value = '';
     showAddUnitModal.value = true;
 };
 
 const onAddUnitSubmit = async (values: any) => {
+    // console.log('%c value', 'color: red', values);
     // Type assertion for better TypeScript experience
     const formData = values as AddUnitFormData;
-    console.log('Add form submitted with values:', formData);
+    // console.log('Add form submitted with values:', formData);
     isAddSubmitting.value = true;
 
     const submitData = {
@@ -353,6 +380,7 @@ const onAddUnitSubmit = async (values: any) => {
     if (statusCode.value === 201 && data.value?.success) {
         toast.success('Curriculum unit added successfully');
         showAddUnitModal.value = false;
+        addUnitSearch.value = '';
         router.reload({ only: ['curriculumVersion'] });
     } else {
         const errorMessage = data.value?.message || error.value || 'Failed to add curriculum unit';
@@ -364,6 +392,7 @@ const onAddUnitSubmit = async (values: any) => {
 };
 
 const editCurriculumUnit = (curriculumUnit: CurriculumUnit) => {
+    editUnitSearch.value = '';
     curriculumUnitToEdit.value = curriculumUnit;
     showEditUnitModal.value = true;
 };
@@ -397,6 +426,7 @@ const onEditUnitSubmit = async (values: any) => {
     if (statusCode.value === 200 && data.value?.success) {
         toast.success('Curriculum unit updated successfully');
         showEditUnitModal.value = false;
+        editUnitSearch.value = '';
         curriculumUnitToEdit.value = null;
         router.reload({ only: ['curriculumVersion'] });
     } else {
@@ -740,20 +770,38 @@ const getUnitScopeColor = (scope: string) => {
             </DialogHeader>
 
             <Form :validation-schema="addUnitFormSchema" @submit="onAddUnitSubmit" class="space-y-4">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-1">
                     <FormField v-slot="{ componentField }" name="unit_id">
                         <FormItem>
                             <FormLabel>Unit *</FormLabel>
                             <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a unit" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-if="availableUnits.length === 0" value="none" disabled> No available units to add </SelectItem>
-                                        <SelectItem v-for="unit in availableUnits" :key="unit.id" :value="unit.id.toString()"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP) </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Combobox v-bind="componentField">
+                                    <ComboboxAnchor>
+                                        <div class="relative w-full items-center">
+                                            <ComboboxInput
+                                                v-model="addUnitSearch"
+                                                placeholder="Search for a unit..."
+                                                :display-value="
+                                                    (value) => {
+                                                        const unit = availableUnits.find((u) => u.id.toString() === value?.toString());
+                                                        return unit ? `${unit.code} - ${unit.name} (${unit.credit_points} CP)` : '';
+                                                    }
+                                                "
+                                            />
+                                            <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                                <ChevronsUpDown class="text-muted-foreground size-4" />
+                                            </ComboboxTrigger>
+                                        </div>
+                                    </ComboboxAnchor>
+                                    <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                        <ComboboxViewport>
+                                            <ComboboxEmpty v-if="filteredAvailableUnits.length === 0">
+                                                {{ availableUnits.length === 0 ? 'No available units to add' : 'No units found' }}
+                                            </ComboboxEmpty>
+                                            <ComboboxItem v-for="unit in filteredAvailableUnits" :key="unit.id" :value="unit.id.toString()" class="cursor-pointer"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP) </ComboboxItem>
+                                        </ComboboxViewport>
+                                    </ComboboxList>
+                                </Combobox>
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -844,14 +892,27 @@ const getUnitScopeColor = (scope: string) => {
                         <FormItem>
                             <FormLabel>Unit *</FormLabel>
                             <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a unit" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="unit in editableUnits" :key="unit.id" :value="unit.id.toString()"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP) </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Combobox v-bind="componentField">
+                                    <ComboboxAnchor>
+                                        <ComboboxInput
+                                            v-model="editUnitSearch"
+                                            placeholder="Search for a unit..."
+                                            :display-value="
+                                                (value) => {
+                                                    const unit = editableUnits.find((u) => u.id.toString() === value?.toString());
+                                                    return unit ? `${unit.code} - ${unit.name} (${unit.credit_points} CP)` : '';
+                                                }
+                                            "
+                                        />
+                                        <ComboboxTrigger />
+                                    </ComboboxAnchor>
+                                    <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                        <ComboboxViewport>
+                                            <ComboboxEmpty v-if="filteredEditableUnits.length === 0"> No units found </ComboboxEmpty>
+                                            <ComboboxItem v-for="unit in filteredEditableUnits" :key="unit.id" :value="unit.id.toString()" class="cursor-pointer"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} CP) </ComboboxItem>
+                                        </ComboboxViewport>
+                                    </ComboboxList>
+                                </Combobox>
                             </FormControl>
                             <FormMessage />
                         </FormItem>

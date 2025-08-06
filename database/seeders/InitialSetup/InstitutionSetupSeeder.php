@@ -45,13 +45,13 @@ class InstitutionSetupSeeder extends Seeder
         $campuses = [
             [
                 'id' => 1,
-                'name' => 'Swinburne Hà Nội',
+                'name' => 'Asia Hà Nội',
                 'code' => 'HN',
                 'address' => 'Số 1 Đường Trần Đăng Ninh, Phường Dịch Vọng Hậu, Quận Cầu Giấy, Thành phố Hà Nội',
             ],
             [
                 'id' => 2,
-                'name' => 'Swinburne Hồ Chí Minh',
+                'name' => 'Asia Hồ Chí Minh',
                 'code' => 'HCM',
                 'address' => 'Số 123 Đường Nguyễn Văn Cừ, Phường An Hoà, Quận Ninh Kiều, Thành phố Hồ Chí Minh',
             ],

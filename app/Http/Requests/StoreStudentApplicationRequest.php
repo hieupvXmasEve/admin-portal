@@ -60,6 +60,7 @@ class StoreStudentApplicationRequest extends FormRequest
             'students.*.sut_id' => 'nullable|string|max:50',
             'students.*.is_international_applicant' => 'nullable|boolean',
             'students.*.exception_units' => 'nullable|string',
+            'students.*.status' => 'nullable|in:pending,reviewed,approved,rejected',
         ];
     }
 }

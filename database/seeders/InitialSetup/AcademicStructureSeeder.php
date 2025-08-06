@@ -30,16 +30,16 @@ class AcademicStructureSeeder extends Seeder
         $this->createProgram();
 
         // Create specialization
-        $this->createSpecialization();
+        //        $this->createSpecialization();
 
         // Create units
-        $this->createUnits();
+        //        $this->createUnits();
 
         // Create prerequisite relationships
-        $this->createPrerequisiteRelationships();
+        //        $this->createPrerequisiteRelationships();
 
         // Create equivalent units
-        $this->createEquivalentUnits();
+        //        $this->createEquivalentUnits();
 
         $this->command->info('✅ Academic structure created successfully!');
     }
@@ -73,12 +73,43 @@ class AcademicStructureSeeder extends Seeder
 
     private function createProgram(): void
     {
-        $program = Program::updateOrCreate(
-            ['code' => 'BIT'], // Find by code
+        // Bachelor of Semiconductor Engineering
+        $semiconductorProgram = Program::updateOrCreate(
+            ['code' => 'SE'],
             [
                 'id' => 1,
-                'name' => 'Bachelor of Information Technology',
-                'description' => 'A comprehensive program focusing on artificial intelligence and computing technologies, preparing students for careers in AI and advanced technology sectors.',
+                'name' => 'Semiconductor Engineering',
+                'description' => 'A specialized program designed to equip students with knowledge and skills in semiconductor technology, fabrication, and microelectronics for careers in the semiconductor industry.',
+            ]
+        );
+
+        // Artificial Intelligence
+        $aiProgram = Program::updateOrCreate(
+            ['code' => 'AI'],
+            [
+                'id' => 2,
+                'name' => 'Artificial Intelligence',
+                'description' => 'A focused program on artificial intelligence, machine learning, and intelligent systems, preparing students for advanced roles in AI research and industry.',
+            ]
+        );
+
+        // Finance
+        $financeProgram = Program::updateOrCreate(
+            ['code' => 'FN'],
+            [
+                'id' => 3,
+                'name' => 'Finance',
+                'description' => 'A program providing comprehensive knowledge in finance, investment, and financial management, preparing students for careers in banking, investment, and corporate finance.',
+            ]
+        );
+
+        // Business Administration
+        $businessProgram = Program::updateOrCreate(
+            ['code' => 'BA'],
+            [
+                'id' => 4,
+                'name' => 'Business Administration',
+                'description' => 'A broad-based program covering management, marketing, accounting, and entrepreneurship, preparing students for leadership roles in business and organizations.',
             ]
         );
 

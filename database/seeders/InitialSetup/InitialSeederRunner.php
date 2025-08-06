@@ -30,10 +30,10 @@ class InitialSeederRunner extends Seeder
 //            LecturerSeeder::class,
 
             // 005. Create programs, specializations, and units
-//            AcademicStructureSeeder::class,
+            AcademicStructureSeeder::class,
 
             // 006. Create academic semesters for the year
-//            SemesterSeeder::class,
+            SemesterSeeder::class,
 
             // 007. Link units to programs and graduation requirements
 //            CurriculumSeeder::class,

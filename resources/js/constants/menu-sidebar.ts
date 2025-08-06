@@ -9,6 +9,7 @@ import {
     Calendar,
     Calendar as CalendarIcon,
     CheckSquare,
+    ClipboardCheck,
     ClipboardList,
     Clock,
     DoorOpen,
@@ -187,6 +188,12 @@ export const mainNavItems: NavItem[] = [
                 href: studentRoutes.statusTracking(),
                 icon: UserCheck,
                 requiredPermissions: ['view_student'], // Will be implemented later
+            },
+            {
+                title: 'Student Applications',
+                href: '/student-applications',
+                icon: ClipboardCheck,
+                requiredPermissions: ['view_student_application'],
             },
         ],
     },

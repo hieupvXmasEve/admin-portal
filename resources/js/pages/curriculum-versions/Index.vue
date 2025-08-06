@@ -543,14 +543,14 @@ const navigateToCreate = () => {
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Curriculum Versions</h1>
         <div class="flex items-center gap-2">
-            <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">
-                <FileSpreadsheet class="h-4 w-4" />
-                {{ isExporting ? 'Exporting...' : 'Export Excel' }}
-            </Button>
-            <Button @click="router.visit('/curriculum-versions/import')" variant="outline" class="flex items-center gap-2">
-                <Upload class="h-4 w-4" />
-                Import Excel
-            </Button>
+<!--            <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">-->
+<!--                <FileSpreadsheet class="h-4 w-4" />-->
+<!--                {{ isExporting ? 'Exporting...' : 'Export Excel' }}-->
+<!--            </Button>-->
+<!--            <Button @click="router.visit('/curriculum-versions/import')" variant="outline" class="flex items-center gap-2">-->
+<!--                <Upload class="h-4 w-4" />-->
+<!--                Import Excel-->
+<!--            </Button>-->
 
             <Button v-if="can('create_curriculum_version')" size="sm" @click="navigateToCreate">
                 <Plus class="mr-2 h-4 w-4" />
