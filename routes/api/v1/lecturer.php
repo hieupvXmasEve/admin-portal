@@ -28,6 +28,10 @@ Route::prefix('auth')->name('auth.')->group(function () {
         ->middleware(['lecturer.api.rate:lecturer-auth'])
         ->name('login');
 
+    Route::post('/login/google', [AuthController::class, 'loginWithGoogle'])
+        ->middleware(['lecturer.api.rate:lecturer-auth'])
+        ->name('login.google');
+
     Route::post('/refresh', [AuthController::class, 'refresh'])
         ->middleware(['lecturer.api.rate:lecturer-auth'])
         ->name('refresh');

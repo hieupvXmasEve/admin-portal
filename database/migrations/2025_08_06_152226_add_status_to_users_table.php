@@ -11,10 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('student_applications', function (Blueprint $table) {
-            $table->enum('status', ['pending', 'reviewed', 'approved', 'rejected'])
-                  ->default('pending')
-                  ->after('exception_units');
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('status')->default('active')->after('password');
         });
     }
 
@@ -23,7 +21,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('student_applications', function (Blueprint $table) {
+        Schema::table('users', function (Blueprint $table) {
             $table->dropColumn('status');
         });
     }
