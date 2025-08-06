@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\AuthController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,15 +14,6 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-
-// Public authentication routes
-Route::name('api.')->group(function () {
-    Route::post('v1/auth/login', [AuthController::class, 'login'])->name('auth.login');
-    Route::post('v1/auth/login/google', [AuthController::class, 'loginWithGoogle'])->name('auth.login.google');
-    Route::post('v1/auth/register', [AuthController::class, 'register'])->name('auth.register');
-    Route::post('v1/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('auth.forgot-password');
-    Route::post('v1/auth/reset-password', [AuthController::class, 'resetPassword'])->name('auth.reset-password');
-});
 
 // Health check endpoint
 Route::get('/health', function () {

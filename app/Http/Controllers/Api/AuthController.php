@@ -7,15 +7,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\Lecture;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
-use Laravel\Sanctum\PersonalAccessToken;
-use Laravel\Socialite\Facades\Socialite;
-use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -38,9 +34,9 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $student = Student::where('email', $request->email)->first();
+        $user = User::where('email', $request->email)->first();
 
-        if (!$student || !Hash::check($request->password, $student->password ?? '')) {
+        if (!$user || !Hash::check($request->password, $user->password ?? '')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid credentials'
@@ -48,7 +44,7 @@ class AuthController extends Controller
         }
 
         // Check if student account is active
-        if ($student->status !== 'active') {
+        if ($user->status !== 'active') {
             return response()->json([
                 'success' => false,
                 'message' => 'Account is not active'
@@ -56,24 +52,22 @@ class AuthController extends Controller
         }
 
         // Update last login
-        $student->update(['last_login_at' => now()]);
+        $user->update(['last_login_at' => now()]);
 
         // Create token
         $deviceName = $request->device_name ?? 'Student Portal';
-        $token = $student->createToken($deviceName, ['student'])->plainTextToken;
+        $token = $user->createToken($deviceName, ['student'])->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
             'data' => [
-                'student' => [
-                    'id' => $student->id,
-                    'student_code' => $student->student_code,
-                    'full_name' => $student->full_name,
-                    'email' => $student->email,
-                    'status' => $student->status,
-                    'campus' => $student->campus->name ?? null,
-                    'program' => $student->program->name ?? null,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'status' => $user->status,
+                    'campus' => $user->campuses() ?? null,
                 ],
                 'token' => $token,
                 'token_type' => 'Bearer'
@@ -81,97 +75,6 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Unified Google OAuth Login (Students and Lecturers)
-     */
-    public function loginWithGoogle(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'access_token' => 'required|string',
-            'device_name' => 'nullable|string|max:255',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            // Validate Google access token
-            $response = Http::withToken($request->access_token)
-                ->get('https://www.googleapis.com/oauth2/v1/userinfo');
-
-            if ($response->failed()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid Google access token'
-                ], 401);
-            }
-
-            $googleUserData = $response->json();
-
-            if (!$googleUserData || !isset($googleUserData['email'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unable to retrieve user information from Google'
-                ], 401);
-            }
-
-            // Check for lecturer account first
-            $lecturer = Lecture::where('email', $googleUserData['email'])->first();
-
-            if ($lecturer) {
-                return $this->handleLecturerGoogleLogin($lecturer, $googleUserData, $request->device_name);
-            }
-
-            // Check for student account
-            $student = Student::where('email', $googleUserData['email'])->first();
-
-            if ($student) {
-                return $this->handleStudentGoogleLogin($student, $googleUserData, $request->device_name);
-            }
-
-            // No account found - handle student registration if allowed
-            if (config('app.allow_student_registration', false)) {
-                $student = Student::create([
-                    'full_name' => $googleUserData['name'] ?? $googleUserData['email'],
-                    'email' => $googleUserData['email'],
-                    'oauth_provider' => 'google',
-                    'oauth_provider_id' => $googleUserData['id'],
-                    'avatar_url' => $googleUserData['picture'] ?? null,
-                    'status' => 'inactive', // Requires admin activation
-                    'email_verified_at' => now(),
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Student account created successfully. Please wait for admin approval.',
-                    'data' => [
-                        'user_type' => 'student',
-                        'student' => [
-                            'id' => $student->id,
-                            'full_name' => $student->full_name,
-                            'email' => $student->email,
-                            'status' => $student->status,
-                        ]
-                    ]
-                ], 201);
-            }
-
-            return response()->json([
-                'success' => false,
-                'message' => 'No account found with this email. Please contact your administrator.'
-            ], 404);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to authenticate with Google: ' . $e->getMessage()
-            ], 500);
-        }
-    }
 
     /**
      * Student logout
@@ -365,112 +268,6 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Handle Google login for students
-     */
-    private function handleStudentGoogleLogin(Student $student, array $googleUserData, ?string $deviceName): JsonResponse
-    {
-        // Update OAuth provider data if not set
-        if (!$student->oauth_provider_id) {
-            $student->update([
-                'oauth_provider' => 'google',
-                'oauth_provider_id' => $googleUserData['id'],
-                'avatar_url' => $student->avatar_url ?: ($googleUserData['picture'] ?? null),
-                'email_verified_at' => $student->email_verified_at ?: now(),
-            ]);
-        }
-
-        // Check if student account is active
-        if ($student->status !== 'active') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Student account is not active'
-            ], 403);
-        }
-
-        // Update last login
-        $student->update(['last_login_at' => now()]);
-
-        // Create token
-        $deviceName = $deviceName ?? 'Student Portal (Google)';
-        $token = $student->createToken($deviceName, ['student'])->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Google login successful',
-            'data' => [
-                'user_type' => 'student',
-                'student' => [
-                    'id' => $student->id,
-                    'student_code' => $student->student_code,
-                    'full_name' => $student->full_name,
-                    'email' => $student->email,
-                    'status' => $student->status,
-                    'campus' => $student->campus->name ?? null,
-                    'program' => $student->program->name ?? null,
-                    'avatar_url' => $student->avatar_url,
-                ],
-                'token' => $token,
-                'token_type' => 'Bearer'
-            ]
-        ]);
-    }
-
-    /**
-     * Handle Google login for lecturers
-     */
-    private function handleLecturerGoogleLogin(Lecture $lecturer, array $googleUserData, ?string $deviceName): JsonResponse
-    {
-        // Update OAuth provider data if not set
-        if (!$lecturer->oauth_provider_id) {
-            $lecturer->update([
-                'oauth_provider' => 'google',
-                'oauth_provider_id' => $googleUserData['id'],
-                'avatar_url' => $lecturer->avatar_url ?: ($googleUserData['picture'] ?? null),
-                'email_verified_at' => $lecturer->email_verified_at ?: now(),
-            ]);
-        }
-
-        // Check if lecturer account is active
-        if (!$lecturer->isActive()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Lecturer account is not active'
-            ], 403);
-        }
-
-        // Update last login
-        $lecturer->update(['last_login_at' => now()]);
-
-        // Create token
-        $deviceName = $deviceName ?? 'Lecturer Portal (Google)';
-        $token = $lecturer->createToken($deviceName, ['lecturer'])->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Google login successful',
-            'data' => [
-                'user_type' => 'lecturer',
-                'lecturer' => [
-                    'id' => $lecturer->id,
-                    'employee_id' => $lecturer->employee_id,
-                    'full_name' => $lecturer->full_name,
-                    'display_name' => $lecturer->display_name,
-                    'email' => $lecturer->email,
-                    'academic_rank' => $lecturer->academic_rank,
-                    'academic_rank_label' => $lecturer->getAcademicRankLabel(),
-                    'employment_status' => $lecturer->employment_status,
-                    'employment_status_label' => $lecturer->getEmploymentStatusLabel(),
-                    'campus' => $lecturer->campus->name ?? null,
-                    'department' => $lecturer->department,
-                    'faculty' => $lecturer->faculty,
-                    'avatar_url' => $lecturer->avatar_url,
-                ],
-                'token' => $token,
-                'token_type' => 'Bearer'
-            ]
-        ]);
-    }
 
 
     /**

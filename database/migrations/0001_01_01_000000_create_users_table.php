@@ -18,6 +18,16 @@ return new class extends Migration {
             $table->string('address', 500)->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
+            $table->enum('status', [
+                'active',
+                'inactive', 
+                'pending',
+                'suspended',
+                'banned',
+                'locked',
+                'verified',
+                'unverified'
+            ])->default('active');
             $table->rememberToken();
             $table->timestamps();
         });

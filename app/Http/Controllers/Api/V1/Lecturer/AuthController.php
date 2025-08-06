@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
 {
@@ -143,5 +144,80 @@ class AuthController extends Controller
             new LecturerResource($lecturer),
             'Profile retrieved successfully'
         );
+    }
+
+    /**
+     * Lecturer Google OAuth Login
+     */
+    public function loginWithGoogle(Request $request): JsonResponse
+    {
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'access_token' => 'required|string',
+            'device_name' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return ApiResponse::validationError($validator->errors());
+        }
+
+        try {
+            // Validate Google access token
+            $response = Http::withToken($request->access_token)
+                ->get('https://www.googleapis.com/oauth2/v1/userinfo');
+
+            if ($response->failed()) {
+                return ApiResponse::authenticationError('Invalid Google access token');
+            }
+
+            $googleUserData = $response->json();
+
+            if (!$googleUserData || !isset($googleUserData['email'])) {
+                return ApiResponse::authenticationError('Unable to retrieve user information from Google');
+            }
+
+            // Check for lecturer account
+            $lecturer = Lecture::where('email', $googleUserData['email'])->first();
+
+            if (!$lecturer) {
+                return ApiResponse::notFoundError('No lecturer account found with this email. Please contact your administrator.');
+            }
+
+            // Update OAuth provider data if not set
+            if (!$lecturer->oauth_provider_id) {
+                $lecturer->update([
+                    'oauth_provider' => 'google',
+                    'oauth_provider_id' => $googleUserData['id'],
+                    'avatar_url' => $lecturer->avatar_url ?: ($googleUserData['picture'] ?? null),
+                    'email_verified_at' => $lecturer->email_verified_at ?: now(),
+                ]);
+            }
+
+            // Check if lecturer account is active
+            if (!$lecturer->is_active) {
+                return ApiResponse::authorizationError('Account is inactive. Please contact administration.');
+            }
+
+            // Check employment status
+            if (!in_array($lecturer->employment_status, ['active', 'employed', 'contract_active'])) {
+                return ApiResponse::authorizationError('Account access restricted. Please contact HR.');
+            }
+
+            // Update last login timestamp
+            $lecturer->update(['last_login_at' => now()]);
+
+            // Create token
+            $deviceName = $request->device_name ?? 'Lecturer Portal (Google)';
+            $token = $lecturer->createToken($deviceName, ['lecturer:access'])->plainTextToken;
+
+            return ApiResponse::success([
+                'lecturer' => new LecturerResource($lecturer),
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'expires_in' => config('sanctum.expiration', 525600) // minutes
+            ], 'Google login successful');
+
+        } catch (\Exception $e) {
+            return ApiResponse::serverError('Failed to authenticate with Google: ' . $e->getMessage());
+        }
     }
 }

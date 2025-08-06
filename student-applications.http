@@ -1,3 +1,21 @@
+### Health
+GET http://localhost:8000/api/health
+Content-Type: application/json
+
+### Login
+POST http://localhost:8000/api/v1/auth/login
+Content-Type: application/json
+
+{
+    "email": "hieupv2412@gmail.com",
+    "password": "123456"
+}
+
+### Get Student Applications
+GET http://localhost:8000/api/student-applications
+Content-Type: application/json
+
+
 ### Create Student Applications
 POST http://localhost:8000/api/student-applications
 Content-Type: application/json

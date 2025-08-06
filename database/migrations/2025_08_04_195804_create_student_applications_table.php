@@ -55,6 +55,8 @@ return new class extends Migration
             $table->string('sut_id', 50)->nullable();
             $table->boolean('is_international_applicant')->default(false);
             $table->text('exception_units')->nullable();
+            $table->enum('status', ['pending', 'reviewed', 'approved', 'rejected'])
+                  ->default('pending');
 
             $table->timestamps();
         });

@@ -27,6 +27,7 @@ class User extends Authenticatable
         'password',
         'phone',
         'address',
+        'status',
     ];
 
     /**
@@ -47,6 +48,15 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+    ];
+
+    /**
+     * The attributes that should have default values.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'status' => self::STATUS_ACTIVE,
     ];
 
     public function getInitialsAttribute()
@@ -88,5 +98,171 @@ class User extends Authenticatable
     {
         $campusId = $campusId ?? session('current_campus_id');
         return $this->campusRoles()->where('campus_id', $campusId)->get();
+    }
+
+    /**
+     * Check if the user is active
+     */
+    public function isActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
+    }
+
+    /**
+     * Check if the user is inactive
+     */
+    public function isInactive(): bool
+    {
+        return $this->status === self::STATUS_INACTIVE;
+    }
+
+    /**
+     * Check if the user is pending
+     */
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Check if the user is suspended
+     */
+    public function isSuspended(): bool
+    {
+        return $this->status === self::STATUS_SUSPENDED;
+    }
+
+    /**
+     * Check if the user is banned
+     */
+    public function isBanned(): bool
+    {
+        return $this->status === self::STATUS_BANNED;
+    }
+
+    /**
+     * Check if the user is locked
+     */
+    public function isLocked(): bool
+    {
+        return $this->status === self::STATUS_LOCKED;
+    }
+
+    /**
+     * Check if the user is verified
+     */
+    public function isVerified(): bool
+    {
+        return $this->status === self::STATUS_VERIFIED;
+    }
+
+    /**
+     * Check if the user is unverified
+     */
+    public function isUnverified(): bool
+    {
+        return $this->status === self::STATUS_UNVERIFIED;
+    }
+
+    /**
+     * Activate the user
+     */
+    public function activate(): bool
+    {
+        return $this->update(['status' => self::STATUS_ACTIVE]);
+    }
+
+    /**
+     * Deactivate the user
+     */
+    public function deactivate(): bool
+    {
+        return $this->update(['status' => self::STATUS_INACTIVE]);
+    }
+
+    /**
+     * Suspend the user
+     */
+    public function suspend(): bool
+    {
+        return $this->update(['status' => self::STATUS_SUSPENDED]);
+    }
+
+    /**
+     * Ban the user
+     */
+    public function ban(): bool
+    {
+        return $this->update(['status' => self::STATUS_BANNED]);
+    }
+
+    /**
+     * Lock the user account
+     */
+    public function lock(): bool
+    {
+        return $this->update(['status' => self::STATUS_LOCKED]);
+    }
+
+    /**
+     * Mark user as verified
+     */
+    public function markAsVerified(): bool
+    {
+        return $this->update(['status' => self::STATUS_VERIFIED]);
+    }
+
+    /**
+     * Mark user as unverified
+     */
+    public function markAsUnverified(): bool
+    {
+        return $this->update(['status' => self::STATUS_UNVERIFIED]);
+    }
+
+    /**
+     * Available user status constants
+     */
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_INACTIVE = 'inactive';
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_SUSPENDED = 'suspended';
+    public const STATUS_BANNED = 'banned';
+    public const STATUS_LOCKED = 'locked';
+    public const STATUS_VERIFIED = 'verified';
+    public const STATUS_UNVERIFIED = 'unverified';
+
+    /**
+     * Get available status options
+     */
+    public static function getStatusOptions(): array
+    {
+        return [
+            self::STATUS_ACTIVE => 'Active',
+            self::STATUS_INACTIVE => 'Inactive',
+            self::STATUS_PENDING => 'Pending',
+            self::STATUS_SUSPENDED => 'Suspended',
+            self::STATUS_BANNED => 'Banned',
+            self::STATUS_LOCKED => 'Locked',
+            self::STATUS_VERIFIED => 'Verified',
+            self::STATUS_UNVERIFIED => 'Unverified',
+        ];
+    }
+
+    /**
+     * Get all available status values
+     */
+    public static function getStatusValues(): array
+    {
+        return [
+            self::STATUS_ACTIVE,
+            self::STATUS_INACTIVE,
+            self::STATUS_PENDING,
+            self::STATUS_SUSPENDED,
+            self::STATUS_BANNED,
+            self::STATUS_LOCKED,
+            self::STATUS_VERIFIED,
+            self::STATUS_UNVERIFIED,
+        ];
     }
 }
