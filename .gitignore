@@ -26,6 +26,7 @@ yarn-error.log
 /.zed
 # /.cursor
 # prompt
+public/.user.ini
 
 /screenshots
 /prompt-template

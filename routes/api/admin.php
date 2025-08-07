@@ -23,10 +23,10 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     // Other admin API routes can go here if needed
 });
 
-Route::middleware(['api'])->group(function () {
+Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     // Student Applications
-    Route::get('/student-applications', [StudentApplicationController::class, 'index'])->name('student-applications.index');
-    Route::get('/student-applications/{studentApplication}', [StudentApplicationController::class, 'show'])->name('student-applications.show');
-    Route::patch('/student-applications/{studentApplication}/status', [StudentApplicationController::class, 'updateStatus'])->name('student-applications.updateStatus');
-    Route::post('/student-applications', [StudentApplicationController::class, 'store'])->name('student-applications.store');
+    Route::get('/student-applications', [StudentApplicationController::class, 'index']);
+    Route::get('/student-applications/{studentApplication}', [StudentApplicationController::class, 'show']);
+    Route::patch('/student-applications/{studentApplication}/status', [StudentApplicationController::class, 'updateStatus']);
+    Route::post('/student-applications', [StudentApplicationController::class, 'store']);
 });
