@@ -22,7 +22,7 @@ class UserService
             $userData['password'] = Hash::make($userData['password']);
         }
 
-        Log::info('Creating a new user', ['email' => $userData['email']]);
+        Log::info('Creating a new user', ['$userData' => $userData]);
         $user = User::create($userData);
 
         if (array_key_exists('selectedRoles', $data)) {

@@ -36,7 +36,7 @@ class CreateActiveStudentsSeeder extends Seeder
         // Get required data
         // get campus Hanoi
         $campus = Campus::where('code', 'HN')->first();
-        $programs = Program::with('specializations')->get();
+        $programs = Program::get();
         $curriculumVersions = CurriculumVersion::all();
 
         if ($programs->isEmpty() || $curriculumVersions->isEmpty()) {
@@ -50,11 +50,11 @@ class CreateActiveStudentsSeeder extends Seeder
         for ($i = 1; $i <= 100; $i++) {
             // $campus = $campuses->random();
             $program = $programs->random();
-            $specialization = $program->specializations->random();
+//            $specialization = $program->specializations->random();
 
             // Find curriculum version for this program/specialization
             $curriculumVersion = $curriculumVersions->where('program_id', $program->id)
-                ->where('specialization_id', $specialization->id)
+//                ->where('specialization_id', $specialization->id)
                 ->first();
 
             if (!$curriculumVersion) {
@@ -110,7 +110,7 @@ class CreateActiveStudentsSeeder extends Seeder
                 'address' => $faker->address,
                 'campus_id' => $campus->id,
                 'program_id' => $program->id,
-                'specialization_id' => $specialization->id,
+                'specialization_id' => null,
                 'curriculum_version_id' => $curriculumVersion->id,
                 'admission_date' => $admissionDate,
                 'expected_graduation_date' => $expectedGraduationDate,
