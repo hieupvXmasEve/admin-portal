@@ -28,13 +28,13 @@ class UserAccountSeeder extends Seeder
         $this->createSuperAdminUser();
 
         // Create campus admin users
-        $this->createCampusAdminUsers();
+//        $this->createCampusAdminUsers();
 
         // Create staff users
-        $this->createStaffUsers();
+//        $this->createStaffUsers();
 
         // Create additional test users in local environment
-        $this->createTestUsers();
+//        $this->createTestUsers();
 
         $this->command->info('✅ User accounts created successfully!');
     }
@@ -47,18 +47,39 @@ class UserAccountSeeder extends Seeder
 
     private function createSuperAdminUser(): void
     {
-        $superAdmin = User::create([
-            'id' => 2,
-            'name' => 'Super Admin 2',
-            'email' => 'hieupv2412@gmail.com',
-            'password' => Hash::make('123456'),
-            'email_verified_at' => now(),
-        ]);
+        $superAdminEmails = [
+            'hieupv2412@gmail.com',
+            'hienltt19@fpt.edu.vn',
+            'trangnk16@fpt.edu.vn',
+            'lienpt13@fpt.edu.vn',
+        ];
 
-        // Assign super admin to all campuses
-        $this->assignUserToAllCampuses($superAdmin, 'super_admin');
+        foreach ($superAdminEmails as $index => $email) {
+            $superAdmin = User::create([
+                'id' => $index === 0 ? 1 : null, // Keep original ID for first user
+                'name' => $this->generateSuperAdminName($email, $index),
+                'email' => $email,
+                'password' => Hash::make('123456'),
+                'email_verified_at' => now(),
+            ]);
 
-        $this->command->info('🔑 Created Super Admin user');
+            // Assign super admin to all campuses
+            $this->assignUserToAllCampuses($superAdmin, 'super_admin');
+
+            $this->command->info("🔑 Created Super Admin user: {$email}");
+        }
+    }
+
+    private function generateSuperAdminName(string $email, int $index): string
+    {
+        $emailToName = [
+            'hieupv2412@gmail.com' => 'hieupv',
+            'hienltt19@fpt.edu.vn' => 'hienltt',
+            'trangnk16@fpt.edu.vn' => 'trangnk',
+            'lienpt13@fpt.edu.vn' => 'lienpt',
+        ];
+
+        return $emailToName[$email] ?? "Super Admin " . ($index + 1);
     }
 
     private function createCampusAdminUsers(): void

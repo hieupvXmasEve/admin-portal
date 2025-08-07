@@ -54,7 +54,6 @@ This plan outlines the implementation of all functional modules based on the fix
 **Database**: `roles`, `permissions`, `role_permissions`, `campus_user_roles`
 
 **Features**:
-- ✅ Role CRUD with bitwise permissions
 - ✅ Campus-specific role assignments
 - Permission matrix management
 

@@ -97,7 +97,12 @@ const allSelectedPermissions = computed(() => {
 
 // Submit form
 const handleSubmit = () => {
-    form.post('/users', {
+    const formData = {
+        name: form.name.trim().toLowerCase(),
+        email: form.email.trim().toLowerCase(),
+        roles: form.selectedRoles,
+    };
+    form.transform(() => formData).post('/users', {
         onSuccess: () => {
             router.visit(systemRoutes.users.index());
         },
@@ -145,14 +150,7 @@ const goBack = () => {
 
                     <div class="space-y-2">
                         <Label for="email">Email Address</Label>
-                        <Input
-                            id="email"
-                            v-model="form.email"
-                            type="email"
-                            placeholder="Enter email address"
-                            required
-                            :class="{ 'border-red-500': form.errors.email }"
-                        />
+                        <Input id="email" v-model="form.email" type="email" placeholder="Enter email address" required :class="{ 'border-red-500': form.errors.email }" />
                         <p v-if="form.errors.email" class="text-sm text-red-500">
                             {{ form.errors.email }}
                         </p>
@@ -180,11 +178,7 @@ const goBack = () => {
                         <div>
                             <h4 class="mb-2 font-medium">Selected Roles ({{ selectedRolesWithPermissions.length }})</h4>
                             <div class="flex flex-wrap gap-2">
-                                <span
-                                    v-for="role in selectedRolesWithPermissions"
-                                    :key="role.id"
-                                    class="bg-secondary text-secondary-foreground inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                                >
+                                <span v-for="role in selectedRolesWithPermissions" :key="role.id" class="bg-secondary text-secondary-foreground inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">
                                     {{ role.name }}
                                 </span>
                             </div>
@@ -194,11 +188,7 @@ const goBack = () => {
                             <h4 class="mb-2 font-medium">Total Permissions ({{ allSelectedPermissions.length }})</h4>
                             <div class="max-h-32 overflow-y-auto">
                                 <div class="flex flex-wrap gap-1">
-                                    <span
-                                        v-for="permission in allSelectedPermissions"
-                                        :key="permission.id"
-                                        class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
-                                    >
+                                    <span v-for="permission in allSelectedPermissions" :key="permission.id" class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium">
                                         {{ permission.name }}
                                     </span>
                                 </div>
@@ -238,17 +228,10 @@ const goBack = () => {
                                     </TableCell>
                                     <TableCell>
                                         <div class="flex flex-wrap gap-1">
-                                            <span
-                                                v-for="permission in role.permissions.slice(0, 3)"
-                                                :key="permission.id"
-                                                class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
-                                            >
+                                            <span v-for="permission in role.permissions.slice(0, 3)" :key="permission.id" class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium">
                                                 {{ permission.name }}
                                             </span>
-                                            <span
-                                                v-if="role.permissions.length > 3"
-                                                class="bg-secondary text-secondary-foreground inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                                            >
+                                            <span v-if="role.permissions.length > 3" class="bg-secondary text-secondary-foreground inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">
                                                 +{{ role.permissions.length - 3 }} more
                                             </span>
                                         </div>
@@ -267,21 +250,13 @@ const goBack = () => {
                                         <div class="space-y-3 p-4">
                                             <h4 class="text-sm font-medium">Permissions for {{ role.name }}:</h4>
 
-                                            <div v-if="role.permissions.length === 0" class="text-muted-foreground text-sm">
-                                                No permissions assigned to this role.
-                                            </div>
+                                            <div v-if="role.permissions.length === 0" class="text-muted-foreground text-sm">No permissions assigned to this role.</div>
 
                                             <div v-else class="space-y-3">
                                                 <!-- Parent permissions with children -->
-                                                <div
-                                                    v-for="permission in role.permissions.filter((p) => p.parent_id === null)"
-                                                    :key="permission.id"
-                                                    class="space-y-2"
-                                                >
+                                                <div v-for="permission in role.permissions.filter((p) => p.parent_id === null)" :key="permission.id" class="space-y-2">
                                                     <div class="flex items-center gap-2">
-                                                        <span
-                                                            class="bg-primary text-primary-foreground inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                                                        >
+                                                        <span class="bg-primary text-primary-foreground inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">
                                                             {{ permission.name }}
                                                         </span>
                                                         <span v-if="permission.description" class="text-muted-foreground text-xs">
@@ -292,9 +267,7 @@ const goBack = () => {
                                                     <!-- Child permissions -->
                                                     <div v-if="permission.children && permission.children.length > 0" class="ml-4 space-y-1">
                                                         <div v-for="child in permission.children" :key="child.id" class="flex items-center gap-2">
-                                                            <span
-                                                                class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
-                                                            >
+                                                            <span class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium">
                                                                 {{ child.name }}
                                                             </span>
                                                             <span v-if="child.description" class="text-muted-foreground text-xs">
@@ -305,16 +278,8 @@ const goBack = () => {
                                                 </div>
 
                                                 <!-- Orphaned child permissions (those without parent in this role) -->
-                                                <div
-                                                    v-for="permission in role.permissions.filter(
-                                                        (p) => p.parent_id !== null && !role.permissions.some((parent) => parent.id === p.parent_id),
-                                                    )"
-                                                    :key="permission.id"
-                                                    class="flex items-center gap-2"
-                                                >
-                                                    <span
-                                                        class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium"
-                                                    >
+                                                <div v-for="permission in role.permissions.filter((p) => p.parent_id !== null && !role.permissions.some((parent) => parent.id === p.parent_id))" :key="permission.id" class="flex items-center gap-2">
+                                                    <span class="bg-muted text-muted-foreground inline-flex items-center rounded border px-2 py-1 text-xs font-medium">
                                                         {{ permission.name }}
                                                     </span>
                                                     <span v-if="permission.description" class="text-muted-foreground text-xs">
