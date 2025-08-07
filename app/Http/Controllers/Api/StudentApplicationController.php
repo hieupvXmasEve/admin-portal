@@ -68,7 +68,7 @@ class StudentApplicationController extends Controller
     public function store(StoreStudentApplicationRequest $request): JsonResponse
     {
         $students = $request->validated()['students'];
-        
+
         $created = 0;
         $updated = 0;
         $errors = [];

@@ -73,7 +73,7 @@ class StudentAcademicSummaryService
             return $academicSummary;
         } catch (\Exception $e) {
             Log::error('Error getting academic summary', [
-                'student_code' => $studentId,
+                'student_id' => $studentId,
                 'error' => $e->getMessage(),
             ]);
 
@@ -126,7 +126,7 @@ class StudentAcademicSummaryService
         return [
             'student_info' => [
                 'id' => $student->id,
-                'student_code' => $student->student_code,
+                'student_id' => $student->student_id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'phone' => $student->phone,
@@ -508,7 +508,7 @@ class StudentAcademicSummaryService
      */
     private function getScores(Student $student, int $limit = 100): array
     {
-        $scores = AssessmentComponentDetailScore::where('student_code', $student->id)
+        $scores = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->with([
                 'courseOffering.curriculumUnit.unit:id,name,code',
                 'courseOffering.semester:id,name,code',
@@ -582,7 +582,7 @@ class StudentAcademicSummaryService
      */
     public function getCourseScoresDetails(Student $student, int $courseOfferingId, int $offset = 0, int $limit = 20): array
     {
-        $scores = AssessmentComponentDetailScore::where('student_code', $student->id)
+        $scores = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->where('course_offering_id', $courseOfferingId)
             ->with([
                 'courseOffering.curriculumUnit.unit:id,name,code',
@@ -595,7 +595,7 @@ class StudentAcademicSummaryService
             ->limit($limit)
             ->get();
 
-        $totalCount = AssessmentComponentDetailScore::where('student_code', $student->id)
+        $totalCount = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->where('course_offering_id', $courseOfferingId)
             ->count();
 
@@ -641,7 +641,7 @@ class StudentAcademicSummaryService
             ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
             ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
             ->join('semesters', 'course_offerings.semester_id', '=', 'semesters.id')
-            ->where('attendances.student_code', $student->id)
+            ->where('attendances.student_id', $student->id)
             ->select([
                 'units.id as unit_id',
                 'units.name as unit_name',
@@ -1027,7 +1027,7 @@ class StudentAcademicSummaryService
             });
 
         // Filter scores by semester
-        $scores = AssessmentComponentDetailScore::where('student_code', $studentId)
+        $scores = AssessmentComponentDetailScore::where('student_id', $studentId)
             ->whereHas('courseOffering', function ($query) use ($semesterId) {
                 $query->where('semester_id', $semesterId);
             })
@@ -1084,7 +1084,7 @@ class StudentAcademicSummaryService
             ->first();
 
         // Get scores for this course offering
-        $scores = AssessmentComponentDetailScore::where('student_code', $studentId)
+        $scores = AssessmentComponentDetailScore::where('student_id', $studentId)
             ->where('course_offering_id', $courseOfferingId)
             ->with([
                 'assessmentComponentDetail.assessmentComponent:id,name,type,weight',
@@ -1151,7 +1151,7 @@ class StudentAcademicSummaryService
             ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
             ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
             ->join('semesters', 'course_offerings.semester_id', '=', 'semesters.id')
-            ->where('attendances.student_code', $studentId)
+            ->where('attendances.student_id', $studentId)
             ->where('units.id', $unitId);
 
         if ($semesterId) {
@@ -1225,7 +1225,7 @@ class StudentAcademicSummaryService
         $courseOffering = CourseOffering::with(['curriculumUnit.unit:id,name,code', 'semester:id,name,code'])
             ->findOrFail($courseOfferingId);
 
-        $scores = AssessmentComponentDetailScore::where('student_code', $studentId)
+        $scores = AssessmentComponentDetailScore::where('student_id', $studentId)
             ->where('course_offering_id', $courseOfferingId)
             ->with([
                 'assessmentComponentDetail.assessmentComponent:id,name,type,weight,description',
