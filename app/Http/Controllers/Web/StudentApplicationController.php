@@ -11,7 +11,10 @@ use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\StudentApplication;
 use App\Services\StudentApplicationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 
 class StudentApplicationController extends Controller
@@ -287,5 +290,49 @@ class StudentApplicationController extends Controller
         }
 
         return response()->json($data);
+    }
+
+    /**
+     * Update the status of multiple student applications
+     */
+    public function updateBulkStatus(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'application_ids' => 'required|array|min:1',
+            'application_ids.*' => 'required|integer|exists:student_applications,id',
+            'status' => 'required|in:pending,reviewed,approved,rejected'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $applicationIds = $request->application_ids;
+            $newStatus = $request->status;
+
+            $updated = DB::transaction(function () use ($applicationIds, $newStatus) {
+                return StudentApplication::whereIn('id', $applicationIds)
+                    ->update(['status' => $newStatus]);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully updated status for {$updated} application(s)",
+                'data' => [
+                    'updated_count' => $updated,
+                    'new_status' => $newStatus
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update application statuses: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

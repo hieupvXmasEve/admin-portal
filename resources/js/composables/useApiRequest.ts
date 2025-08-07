@@ -81,6 +81,20 @@ export function useApi() {
     };
 
     /**
+     * PATCH request with JSON payload
+     * @param url - API endpoint URL
+     * @param data - Request payload
+     * @returns Promise with standardized API response
+     */
+    const patch = async <T = any>(url: string, data: Record<string, any>) => {
+        return useApiRequest(url, {
+            method: 'PATCH',
+        })
+            .patch(data)
+            .json<ApiResponse<T>>();
+    };
+
+    /**
      * DELETE request
      * @param url - API endpoint URL
      * @returns Promise with standardized API response
@@ -113,6 +127,7 @@ export function useApi() {
     return {
         post,
         put,
+        patch,
         delete: del,
         get,
     };

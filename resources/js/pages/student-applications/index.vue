@@ -5,7 +5,6 @@ import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -18,6 +17,7 @@ import { AlertCircle, CheckCircle2, ChevronDown, Clock, Edit, Eye, FileCheck, Re
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { createColumns } from '@/lib/table-utils';
+import { useApi } from '@/composables/useApiRequest';
 
 // Types
 interface StudentApplication {
@@ -73,12 +73,19 @@ interface Props {
 
 const props = defineProps<Props>();
 
+// API
+const api = useApi();
+
 // State
 const selectedApplications = ref<StudentApplication[]>([]);
 const showBatchConversionDialog = ref(false);
 const showStatusUpdateDialog = ref(false);
+const showBulkStatusUpdateDialog = ref(false);
 const currentApplication = ref<StudentApplication | null>(null);
 const isLoading = ref(false);
+
+// Template refs
+const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null);
 
 // Form state for conversions
 const conversionForm = ref({
@@ -90,6 +97,10 @@ const conversionForm = ref({
 });
 
 const statusForm = ref({
+    status: '',
+});
+
+const bulkStatusForm = ref({
     status: '',
 });
 
@@ -322,13 +333,17 @@ const openConversionDialog = async (application?: StudentApplication) => {
     await loadConversionOptions();
 };
 
+const openBulkStatusDialog = () => {
+    bulkStatusForm.value.status = '';
+    showBulkStatusUpdateDialog.value = true;
+};
+
 // Load conversion options
 const loadConversionOptions = async () => {
     try {
         loadingOptions.value = true;
-        const response = await fetch('/student-applications/api/conversion-options');
-        const data = await response.json();
-        conversionOptions.value.programs = data.programs || [];
+        const { data } = await api.get('/student-applications/api/conversion-options');
+        conversionOptions.value.programs = data.value?.data?.programs || [];
     } catch (error) {
         console.error('Failed to load conversion options:', error);
         toast.error('Failed to load conversion options. Please try again.');
@@ -344,9 +359,8 @@ const loadCurriculumVersions = async (programId: string) => {
     }
 
     try {
-        const response = await fetch(`/student-applications/api/conversion-options?program_id=${programId}`);
-        const data = await response.json();
-        conversionOptions.value.curriculumVersions = data.curriculumVersions || [];
+        const { data } = await api.get('/student-applications/api/conversion-options', { program_id: programId });
+        conversionOptions.value.curriculumVersions = data.value?.data?.curriculumVersions || [];
     } catch (error) {
         console.error('Failed to load curriculum versions:', error);
         toast.error('Failed to load curriculum versions.');
@@ -360,9 +374,8 @@ const loadSpecializations = async (programId: string) => {
     }
 
     try {
-        const response = await fetch(`/student-applications/api/conversion-options?program_id=${programId}`);
-        const data = await response.json();
-        conversionOptions.value.specializations = data.specializations || [];
+        const { data } = await api.get('/student-applications/api/conversion-options', { program_id: programId });
+        conversionOptions.value.specializations = data.value?.data?.specializations || [];
     } catch (error) {
         console.error('Failed to load specializations:', error);
         toast.error('Failed to load specializations.');
@@ -388,6 +401,7 @@ watch(
 const closeDialogs = () => {
     showStatusUpdateDialog.value = false;
     showBatchConversionDialog.value = false;
+    showBulkStatusUpdateDialog.value = false;
     currentApplication.value = null;
     conversionForm.value = {
         program_id: '',
@@ -397,6 +411,7 @@ const closeDialogs = () => {
         expected_graduation_date: '',
     };
     statusForm.value.status = '';
+    bulkStatusForm.value.status = '';
 
     // Clear conversion options
     conversionOptions.value = {
@@ -452,6 +467,9 @@ const batchConvert = () => {
                 closeDialogs();
                 selectedApplications.value = [];
 
+                // Clear table selection
+                dataTableRef.value?.clearSelection();
+
                 // Check if there are any errors in the response
                 const flashMessages = page.props.flash as any;
                 if (flashMessages?.warning) {
@@ -470,6 +488,44 @@ const batchConvert = () => {
             },
         },
     );
+};
+
+const updateBulkStatus = async () => {
+    if (selectedApplications.value.length === 0 || !bulkStatusForm.value.status) return;
+
+    isLoading.value = true;
+    const count = selectedApplications.value.length;
+
+    try {
+        const { data: response } = await api.patch('/api/student-applications/bulk/status', {
+            application_ids: selectedApplications.value.map((app) => app.id),
+            status: bulkStatusForm.value.status,
+        });
+
+        if (response.value?.success) {
+            closeDialogs();
+            selectedApplications.value = [];
+
+            // Clear table selection
+            dataTableRef.value?.clearSelection();
+
+            // Refresh the page data
+            router.reload({
+                preserveState: true,
+                preserveScroll: true,
+                only: ['applications'],
+            });
+
+            toast.success(`Successfully updated status for ${count} application(s)!`);
+        } else {
+            throw new Error(response.value?.message || 'Failed to update application statuses');
+        }
+    } catch (error) {
+        console.error('Bulk status update error:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to update application statuses. Please try again.');
+    } finally {
+        isLoading.value = false;
+    }
 };
 
 const deleteApplication = (application: StudentApplication) => {
@@ -514,6 +570,11 @@ const clearFilters = () => {
                 <p class="text-muted-foreground">Manage and process student applications for admission</p>
             </div>
             <div class="flex items-center space-x-2">
+                <Button v-if="hasSelectedApplications" @click="openBulkStatusDialog()" variant="outline" class="border-blue-300 text-blue-600 hover:bg-blue-50">
+                    <RefreshCw class="mr-2 h-4 w-4" />
+                    Update Status ({{ selectedApplications.length }})
+                </Button>
+
                 <Button v-if="hasSelectedApplications && canConvertSelected" @click="openConversionDialog()" class="bg-green-600 hover:bg-green-700">
                     <Users class="mr-2 h-4 w-4" />
                     Convert {{ selectedApplications.length }} to Students
@@ -577,7 +638,7 @@ const clearFilters = () => {
 
         <!-- Applications Table -->
         <CardContent class="p-0">
-            <DataTable :data="applications.data" :columns="suggestedCoursesColumns" :enable-row-selection="true" @selection-change="onSelectionChange" empty-message="No applications found" />
+            <DataTable ref="dataTableRef" :data="applications.data" :columns="suggestedCoursesColumns" :enable-row-selection="true" @selection-change="onSelectionChange" empty-message="No applications found" />
 
             <div class="border-t px-6">
                 <DataPagination :pagination-data="applications" item-name="applications" @navigate="onNavigate" @page-size-change="onPageSizeChange" />
@@ -691,6 +752,40 @@ const clearFilters = () => {
                     <RefreshCw v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
                     <Users class="mr-2 h-4 w-4" />
                     Convert to Students
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Bulk Status Update Dialog -->
+    <Dialog v-model:open="showBulkStatusUpdateDialog">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Update Status for Multiple Applications</DialogTitle>
+                <DialogDescription> Change the status for {{ selectedApplications.length }} selected application(s) </DialogDescription>
+            </DialogHeader>
+
+            <div class="space-y-4">
+                <div>
+                    <Label for="bulk-status">New Status</Label>
+                    <Select v-model="bulkStatusForm.status">
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="closeDialogs" :disabled="isLoading"> Cancel </Button>
+                <Button @click="updateBulkStatus" :disabled="isLoading || !bulkStatusForm.status" class="bg-blue-600 hover:bg-blue-700">
+                    <RefreshCw v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
+                    Update Status
                 </Button>
             </DialogFooter>
         </DialogContent>

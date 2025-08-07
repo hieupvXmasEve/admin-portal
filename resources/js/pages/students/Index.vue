@@ -319,7 +319,7 @@ const handlePaginationNavigate = (url: string) => {
             <CardContent class="p-4">
                 <div class="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex w-full items-center gap-2 md:w-auto">
-                        <DebouncedInput v-model="filters.search" placeholder="Search by name, email or student ID..." class="w-full md:w-64" @update:model-value="handleSearch" />
+                        <DebouncedInput v-model="filters.search" placeholder="Search by name, email or student ID..." class="w-full md:w-64" @debounced="handleSearch" />
                         <!-- <Select v-model="filters.campus_id" @update:model-value="handleFilter">
                             <SelectTrigger class="w-full md:w-48">
                                 <SelectValue placeholder="Filter by campus..." />

@@ -55,23 +55,23 @@ class StudentController extends Controller
         $students = Student::query()
             ->with(['campus', 'program', 'specialization'])
             ->where('campus_id', $campusId)
-            // ->when($validated['search'] ?? null, function ($query, $search) {
-            //     $query->where(function ($q) use ($search) {
-            //         $q->where('student_code', 'like', "%{$search}%")
-            //             ->orWhere('full_name', 'like', "%{$search}%")
-            //             ->orWhere('email', 'like', "%{$search}%");
-            //     });
-            // })
-            // ->when($validated['program_id'] ?? null, function ($query, $programId) {
-            //     $query->where('program_id', $programId);
-            // })
-            // ->when($validated['status'] ?? null, function ($query, $status) {
-            //     $query->where('status', $status);
-            // })
-            // ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
-            //     $direction = $validated['direction'] ?? 'asc';
-            //     $query->orderBy($sort, $direction);
-            // })
+             ->when($validated['search'] ?? null, function ($query, $search) {
+                 $query->where(function ($q) use ($search) {
+                     $q->where('student_code', 'like', "%{$search}%")
+                         ->orWhere('full_name', 'like', "%{$search}%")
+                         ->orWhere('email', 'like', "%{$search}%");
+                 });
+             })
+             ->when($validated['program_id'] ?? null, function ($query, $programId) {
+                 $query->where('program_id', $programId);
+             })
+             ->when($validated['status'] ?? null, function ($query, $status) {
+                 $query->where('status', $status);
+             })
+             ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
+                 $direction = $validated['direction'] ?? 'asc';
+                 $query->orderBy($sort, $direction);
+             })
             ->orderBy('created_at', 'desc')
             ->paginate($per_page, ['*'], 'page', $page)
             ->withQueryString();
