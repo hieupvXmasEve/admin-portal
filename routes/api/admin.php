@@ -23,7 +23,7 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     // Other admin API routes can go here if needed
 });
 
-Route::middleware(['api'])->group(function () {
+Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     // Student Applications
     Route::get('/student-applications', [StudentApplicationController::class, 'index'])->name('student-applications.index');
     Route::get('/student-applications/{studentApplication}', [StudentApplicationController::class, 'show'])->name('student-applications.show');

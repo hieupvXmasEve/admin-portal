@@ -14,8 +14,6 @@ import { z } from 'zod';
 
 interface Props {
     courseOffering: CourseOffering;
-    semesters: Semester[];
-    units: Unit[];
     lectures: Lecture[];
 }
 
@@ -24,8 +22,6 @@ const props = defineProps<Props>();
 // Define validation schema following development standards
 const formSchema = toTypedSchema(
     z.object({
-        semester_id: z.string().min(1, 'Semester is required'),
-        curriculum_unit_id: z.string().min(1, 'Curriculum unit is required'),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(1000, 'Max capacity cannot exceed 1000'),
@@ -54,8 +50,6 @@ const formatDateForInput = (dateString: string | null): string => {
 const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
-        semester_id: props.courseOffering.semester_id.toString(),
-        curriculum_unit_id: props.courseOffering.curriculum_unit_id?.toString() || '',
         section_code: props.courseOffering.section_code || '',
         max_capacity: props.courseOffering.max_capacity,
         waitlist_capacity: props.courseOffering.waitlist_capacity || 0,
@@ -75,8 +69,6 @@ const { handleSubmit, isSubmitting } = useForm({
 console.log('schedule_time_start', props.courseOffering.schedule_time_start);
 const onSubmit = handleSubmit((values) => {
     const formData = {
-        semester_id: values.semester_id,
-        curriculum_unit_id: values.curriculum_unit_id,
         lecture_id: values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
         max_capacity: Number(values.max_capacity),
@@ -142,43 +134,49 @@ const enrollmentStatusOptions = [
                     <CardTitle>Basic Information</CardTitle>
                 </CardHeader>
                 <CardContent class="space-y-4">
-                    <FormField v-slot="{ componentField }" name="semester_id">
-                        <FormItem>
-                            <FormLabel>Semester</FormLabel>
-                            <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select semester" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                            {{ semester.name }} ({{ semester.code }})
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                    <!-- Read-only Semester Information -->
+                    <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3 flex-1">
+                                <h3 class="text-sm font-medium text-blue-800">Semester</h3>
+                                <div class="mt-1 text-sm text-blue-700">
+                                    <p><strong>{{ courseOffering.semester?.name }}</strong> ({{ courseOffering.semester?.code }})</p>
+                                    <p class="text-xs mt-1" v-if="courseOffering.semester">
+                                        {{ new Date(courseOffering.semester.start_date).toLocaleDateString() }} -
+                                        {{ new Date(courseOffering.semester.end_date).toLocaleDateString() }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                    <FormField v-slot="{ componentField }" name="curriculum_unit_id">
-                        <FormItem>
-                            <FormLabel>Curriculum Unit</FormLabel>
-                            <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select curriculum unit" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="unit in units" :key="unit.id" :value="unit.id.toString()">
-                                            {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} credits)
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                    <!-- Read-only Curriculum Unit Information -->
+                    <div class="rounded-lg border border-green-200 bg-green-50 p-4">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.93 3.618l2.42 2.42a.75.75 0 11-1.061 1.061l-2.42-2.42A7 7 0 012 9z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3 flex-1">
+                                <h3 class="text-sm font-medium text-green-800">Curriculum Unit</h3>
+                                <div class="mt-1 text-sm text-green-700">
+                                    <p><strong>{{ courseOffering.curriculum_unit?.unit?.code }} - {{ courseOffering.curriculum_unit?.unit?.name }}</strong></p>
+                                    <p class="text-xs mt-1" v-if="courseOffering.curriculum_unit?.unit">
+                                        {{ courseOffering.curriculum_unit.unit.credit_points }} credits
+                                        <template v-if="courseOffering.curriculum_unit.year_level && courseOffering.curriculum_unit.semester_number">
+                                            • Y{{ courseOffering.curriculum_unit.year_level }}S{{ courseOffering.curriculum_unit.semester_number }}
+                                        </template>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <FormField v-slot="{ componentField }" name="section_code">
                         <FormItem>
