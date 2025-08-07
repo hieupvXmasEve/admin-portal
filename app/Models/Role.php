@@ -3,11 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
 
-class Role extends Model
+class Role extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\RoleFactory> */
     use HasFactory;
@@ -69,5 +68,57 @@ class Role extends Model
 
         // Fallback: kiểm tra qua relationship
         return $this->permissions()->where('name', $permissionName)->exists();
+    }
+
+    /**
+     * Configure comprehensive logging for roles (security critical)
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get standard fields for logging
+     */
+    protected function getStandardLogFields(): array
+    {
+        return ['name', 'code'];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        return $this->name ?? $this->code ?? "Role ID {$this->getKey()}";
+    }
+
+    /**
+     * Custom activity descriptions for role events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created role: {$identifier}",
+            'updated' => "Updated role: {$identifier}",
+            'deleted' => "Deleted role: {$identifier}",
+            'restored' => "Restored role: {$identifier}",
+            default => "{$eventName} role: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        return [
+            'role_code' => $this->code,
+            'permissions_count' => $this->permissions()->count(),
+            'users_count' => $this->users()->count(),
+        ];
     }
 }

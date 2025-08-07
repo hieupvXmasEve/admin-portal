@@ -3,10 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class Permission extends Model
+class Permission extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\PermissionFactory> */
     use HasFactory;
@@ -56,5 +55,59 @@ class Permission extends Model
         }
 
         return $grouped;
+    }
+
+    /**
+     * Configure comprehensive logging for permissions (security critical)
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get standard fields for logging
+     */
+    protected function getStandardLogFields(): array
+    {
+        return ['name', 'code', 'description', 'parent_id', 'display_name', 'module'];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        return $this->display_name ?? $this->name ?? $this->code ?? "Permission ID {$this->getKey()}";
+    }
+
+    /**
+     * Custom activity descriptions for permission events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created permission: {$identifier}",
+            'updated' => "Updated permission: {$identifier}",
+            'deleted' => "Deleted permission: {$identifier}",
+            'restored' => "Restored permission: {$identifier}",
+            default => "{$eventName} permission: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        return [
+            'permission_code' => $this->code,
+            'module' => $this->module,
+            'has_parent' => !is_null($this->parent_id),
+            'children_count' => $this->children()->count(),
+            'roles_count' => $this->roles()->count(),
+        ];
     }
 }

@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class AcademicRecord extends Model
+class AcademicRecord extends AuditableModel
 {
     use HasFactory, SoftDeletes;
 
@@ -64,6 +63,69 @@ class AcademicRecord extends Model
         'last_grade_change_at',
         'last_changed_by_lecture_id',
     ];
+
+    /**
+     * Configure activity logging for academic records
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE; // Critical for academic records
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $student = $this->student;
+        $unit = $this->unit;
+        $semester = $this->semester;
+        
+        if ($student && $unit && $semester) {
+            return "Academic Record - Student: {$student->student_code} ({$student->full_name}) - Unit: {$unit->code} - Semester: {$semester->name}";
+        }
+        
+        return "Academic Record ID {$this->getKey()}";
+    }
+
+    /**
+     * Custom activity descriptions
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+        
+        return match ($eventName) {
+            'created' => "Academic record created: {$identifier}",
+            'updated' => "Academic record updated: {$identifier}",
+            'deleted' => "Academic record deleted: {$identifier}",
+            'restored' => "Academic record restored: {$identifier}",
+            default => "{$eventName} academic record: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    public function getExtraLogProperties(): array
+    {
+        return [
+            'student_code' => $this->student_code,
+            'course_offering_id' => $this->course_offering_id,
+            'semester_id' => $this->semester_id,
+            'unit_id' => $this->unit_id,
+            'program_id' => $this->program_id,
+            'campus_id' => $this->campus_id,
+            'final_percentage' => $this->final_percentage,
+            'final_letter_grade' => $this->final_letter_grade,
+            'grade_points' => $this->grade_points,
+            'completion_status' => $this->completion_status,
+            'is_transfer_credit' => $this->is_transfer_credit,
+            'is_repeat_course' => $this->is_repeat_course,
+            'affects_graduation_requirement' => $this->affects_graduation_requirement,
+            'excluded_from_gpa' => $this->excluded_from_gpa,
+        ];
+    }
 
     protected $casts = [
         'final_percentage' => 'decimal:2',

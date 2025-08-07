@@ -6,12 +6,11 @@ namespace App\Models;
 use App\Traits\LazyPermissions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Str;
 
-class User extends Authenticatable
+class User extends UserAuditableModel
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, LazyPermissions;
@@ -218,6 +217,10 @@ class User extends Authenticatable
     public function markAsUnverified(): bool
     {
         return $this->update(['status' => self::STATUS_UNVERIFIED]);
+    }
+    public function hasSystemRole(string $roleCode): bool
+    {
+        return $this->campusRoles()->where('code', $roleCode)->exists();
     }
 
     /**

@@ -28,10 +28,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Dev everything (starts server, queue, logs, vite)
 composer dev
 
-# Docker development (recommended)
-./dev.sh start
-./dev.sh stop
-
 # PHP tests
 composer test
 php artisan test
@@ -52,14 +48,6 @@ pnpm run format:check
 # PHP format
 ./vendor/bin/pint
 
-# Pre-push validation
-pnpm run pre-push
-./scripts/pre-push.sh
-./scripts/pre-push.sh --docker
-
-# Comprehensive testing
-pnpm run test:local
-./scripts/test-local.sh
 ```
 
 ## 3. Workflow You Must Follow
@@ -104,6 +92,17 @@ Controllers stay thin: call Service → return Resource/Redirect.
 * Zod schema ≙ Laravel validation. Keep them in sync.
 * Convert form data types before submit (string→number/null, etc.).
 * Use `preserveState` & `preserveScroll` in Inertia visits.
+
+**Table with Selection:**
+* Use `createColumns()` with `{ enableSelection: true }` for selectable tables
+* Handle selection changes via `@selection-change="onSelectionChange"`
+* Access selected rows via reactive ref: `const selected = ref<T[]>([])`
+* Clear selection: `dataTableRef.value?.clearSelection()`
+
+**API Calls:**
+* Use `useApi()` composable for API requests
+* Pattern: `const api = useApi(); const { data } = await api.get('/endpoint', params)`
+* Handle errors in try/catch with toast notifications
 
 **DataTable pattern (short):**
 
@@ -188,36 +187,3 @@ Before using any model field or relationship:
 - Use `::with('relation')` only for valid eager-loadable relations
 
 Always assume the schema is real, fixed, and authoritative.
-
-## 13. Test-Driven Workflow (REQUIRED)
-
-All new features MUST follow Test-Driven Development (TDD):
-
-1. **Write a test first** that defines the expected behavior.
-2. **Run test and confirm it fails** (red).
-3. **Write only enough code** to make the test pass (green).
-4. **Refactor if needed**, and ensure all tests still pass (green).
-5. **Update tests** if existing code is changed.
-
-Required test coverage includes:
-
-- ✅ Unit tests for Service methods
-- ✅ Feature tests for API endpoints
-- ✅ Permission tests for protected routes
-- ✅ Integration tests for data flow and DB integrity
-- ✅ Factory usage for test data
-
-Test Frameworks:
-
-- Use [Pest PHP](https://pestphp.com) for all PHP tests
-- Use model factories + `RefreshDatabase` trait
-- Use `@test` methods or `it()` syntax
-- Prefer `expect()` and `assertDatabaseHas()` for clarity
-
-DO NOT:
-
-- Skip test writing
-- Write code without a failing test
-- Leave broken or outdated tests behind
-
-ALL PRs must include passing tests for new features and bugfixes.

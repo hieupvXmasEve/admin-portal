@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -14,7 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Carbon\Carbon;
 
-class CourseOffering extends Model
+class CourseOffering extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\CourseOfferingFactory> */
     use HasFactory, SoftDeletes;
@@ -535,5 +534,69 @@ class CourseOffering extends Model
     public function getScheduleConflictsWith(Lecture $lecturer): Collection
     {
         return $lecturer->getConflictingCourses($this);
+    }
+
+    /**
+     * Configure comprehensive logging for course offerings
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get standard fields for logging
+     */
+    protected function getStandardLogFields(): array
+    {
+        return [
+            'semester_id', 'curriculum_unit_id', 'lecture_id', 'campus_id',
+            'section_code', 'max_capacity', 'current_enrollment',
+            'delivery_mode', 'schedule_days', 'schedule_time_start', 'schedule_time_end',
+            'location', 'is_active', 'enrollment_status'
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $courseCode = $this->curriculumUnit?->unit?->code ?? 'Unknown Course';
+        $section = $this->section_code ? " Section {$this->section_code}" : '';
+        $semester = $this->semester?->code ?? '';
+        
+        return "{$courseCode}{$section} ({$semester})";
+    }
+
+    /**
+     * Custom activity descriptions for course offering events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created course offering: {$identifier}",
+            'updated' => "Updated course offering: {$identifier}",
+            'deleted' => "Cancelled course offering: {$identifier}",
+            'restored' => "Restored course offering: {$identifier}",
+            default => "{$eventName} course offering: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        return [
+            'semester_id' => $this->semester_id,
+            'campus_id' => $this->campus_id,
+            'max_capacity' => $this->max_capacity,
+            'current_enrollment' => $this->current_enrollment,
+            'enrollment_status' => $this->enrollment_status,
+            'instructor_assigned' => !is_null($this->lecture_id),
+        ];
     }
 }

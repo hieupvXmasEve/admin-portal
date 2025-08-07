@@ -114,6 +114,45 @@ return [
             'view_student_summary' => 'view_student_summary',
         ],
 
+        // Student Applications
+        'student_applications' => [
+            'view_student_application' => 'view_student_application',
+            'create_student_application' => 'create_student_application',
+            'edit_student_application' => 'edit_student_application',
+            'delete_student_application' => 'delete_student_application',
+        ],
+
+        // Attendance Management
+        'attendance' => [
+            'view_attendance' => 'view_attendance',
+            'create_attendance' => 'create_attendance',
+            'edit_attendance' => 'edit_attendance',
+            'delete_attendance' => 'delete_attendance',
+        ],
+
+        // Grading System
+        'grades' => [
+            'view_grade' => 'view_grade',
+            'create_grade' => 'create_grade',
+            'edit_grade' => 'edit_grade',
+            'delete_grade' => 'delete_grade',
+        ],
+
+        // Course Syllabus
+        'syllabus' => [
+            'view_syllabus' => 'view_syllabus',
+            'create_syllabus' => 'create_syllabus',
+            'edit_syllabus' => 'edit_syllabus',
+            'delete_syllabus' => 'delete_syllabus',
+        ],
+
+        // Reports
+        'reports' => [
+            'view_report' => 'view_report',
+            'create_report' => 'create_report',
+            'export_report' => 'export_report',
+        ],
+
         // Student Activities
         'groups' => [
             'view_groups' => 'view_groups',
@@ -174,17 +213,25 @@ return [
             'grade_assessment' => 'grade_assessment',
             'export_assessment' => 'export_assessment',
         ],
+
+        // System Management
+        'system_logs' => [
+            'view_system_log' => 'view_system_log',
+        ],
     ],
 
     // Simplified module structure
     'modules' => [
         'user_management' => ['users', 'roles', 'permissions', 'campuses'],
-        'academic_management' => ['programs', 'units', 'curriculum_versions', 'curriculum_units'],
+        'academic_management' => ['programs', 'units', 'curriculum_versions', 'curriculum_units', 'syllabus'],
         'scheduling' => ['semesters', 'rooms', 'courses'],
+        'student_management' => ['students', 'student_applications'],
         'student_activities' => ['groups', 'events', 'clubs'],
+        'attendance_management' => ['attendance'],
+        'grading_system' => ['grades', 'assessments'],
         'financial' => ['fees'],
-        'reporting' => ['queries'],
-        'teaching' => ['assessments', 'teaching_assignments'],
+        'reporting' => ['queries', 'reports'],
+        'teaching' => ['teaching_assignments', 'lecturers'],
     ],
 
     'actions' => [

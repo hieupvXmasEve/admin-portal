@@ -16,6 +16,7 @@ import {
     UNIT_ROUTE_NAMES,
     USER_ROUTE_NAMES,
 } from '@/constants';
+import { SYSTEM_ACTIVITY_LOG_ROUTE_NAMES } from '@/constants/system-routes';
 import { route } from 'ziggy-js';
 
 /**
@@ -74,6 +75,10 @@ export const systemRoutes = {
         store: () => route(ROOM_ROUTE_NAMES.STORE),
         update: (id: number) => route(ROOM_ROUTE_NAMES.UPDATE, { room: id }),
         destroy: (id: number) => route(ROOM_ROUTE_NAMES.DESTROY, { room: id }),
+    },
+    // activity logs
+    activityLogs: {
+        index: () => route(SYSTEM_ACTIVITY_LOG_ROUTE_NAMES.INDEX),
     },
 } as const;
 

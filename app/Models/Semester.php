@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
-class Semester extends Model
+class Semester extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\SemesterFactory> */
     use HasFactory, SoftDeletes;
@@ -284,5 +283,62 @@ class Semester extends Model
         }
 
         return null;
+    }
+
+    /**
+     * Configure comprehensive logging for semesters
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get standard fields for logging
+     */
+    protected function getStandardLogFields(): array
+    {
+        return [
+            'code', 'name', 'start_date', 'end_date',
+            'enrollment_start_date', 'enrollment_end_date',
+            'is_active', 'is_archived'
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        return $this->name ?? $this->code ?? "ID {$this->getKey()}";
+    }
+
+    /**
+     * Custom activity descriptions for semester events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created semester: {$identifier}",
+            'updated' => "Updated semester: {$identifier}",
+            'deleted' => "Deleted semester: {$identifier}",
+            'restored' => "Restored semester: {$identifier}",
+            default => "{$eventName} semester: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        return [
+            'is_active' => $this->is_active,
+            'is_archived' => $this->is_archived,
+            'duration_weeks' => $this->getDurationInWeeks(),
+            'registration_open' => $this->isRegistrationOpen(),
+        ];
     }
 }

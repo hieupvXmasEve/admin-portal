@@ -1,6 +1,5 @@
 import type { NavItem } from '@/types';
 import {
-    ArrowUpRight,
     Award,
     BarChart3,
     BookMarked,
@@ -19,7 +18,6 @@ import {
     Layers,
     LayoutDashboard,
     LineChart,
-    MapPin,
     PieChart,
     Presentation,
     RefreshCw,
@@ -37,19 +35,7 @@ import {
     Users,
 } from 'lucide-vue-next';
 
-import {
-    academicSummaryRoutes,
-    assessmentRoutes,
-    attendanceRoutes,
-    courseRoutes,
-    curriculumRoutes,
-    lecturerRoutes,
-    reportRoutes,
-    studentRoutes,
-    syllabusRoutes,
-    systemRoutes,
-    transferRoutes,
-} from '@/utils/routes';
+import { academicSummaryRoutes, assessmentRoutes, attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, reportRoutes, studentRoutes, syllabusRoutes, systemRoutes } from '@/utils/routes';
 
 export const mainNavItems: NavItem[] = [
     {
@@ -455,6 +441,20 @@ export const mainNavItems: NavItem[] = [
                 href: syllabusRoutes.assessmentRubrics(),
                 icon: CheckSquare,
                 requiredPermissions: ['view_syllabus'], // Will be implemented later
+            },
+        ],
+    },
+    // System logs
+    {
+        title: 'System',
+        href: '#',
+        icon: FileText,
+        children: [
+            {
+                title: 'Activity Logs',
+                href: systemRoutes.activityLogs.index(),
+                icon: Clock,
+                requiredPermissions: ['view_system_log'],
             },
         ],
     },
