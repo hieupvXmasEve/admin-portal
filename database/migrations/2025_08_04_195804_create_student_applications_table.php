@@ -56,8 +56,8 @@ return new class extends Migration
             $table->boolean('is_international_applicant')->default(false);
             $table->text('exception_units')->nullable();
             $table->enum('status', ['pending', 'reviewed', 'approved', 'rejected'])
-                  ->default('pending');
-            
+                  ->default('approved');
+
             $table->unsignedBigInteger('student_id')->nullable();
             $table->foreign('student_id')->references('id')->on('students')->onDelete('set null');
             $table->index('student_id');

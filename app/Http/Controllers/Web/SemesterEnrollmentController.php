@@ -93,7 +93,7 @@ class SemesterEnrollmentController extends Controller
             foreach ($eligibleStudents as $student) {
                 try {
                     // Determine semester_number
-                    $latestEnrollment = Enrollment::where('student_code', $student->id)
+                    $latestEnrollment = Enrollment::where('student_id', $student->id)
                         ->orderBy('semester_number', 'desc')
                         ->first();
 
@@ -106,7 +106,7 @@ class SemesterEnrollmentController extends Controller
                     }
 
                     Enrollment::create([
-                        'student_code' => $student->id,
+                        'student_id' => $student->id,
                         'semester_id' => $semester->id,
                         'curriculum_version_id' => $student->curriculum_version_id,
                         'semester_number' => $semesterNumber,
@@ -115,9 +115,9 @@ class SemesterEnrollmentController extends Controller
 
                     $enrollmentsCreated++;
                 } catch (\Exception $e) {
-                    $errors[] = "Failed to enroll student {$student->student_code}: {$e->getMessage()}";
+                    $errors[] = "Failed to enroll student {$student->student_id}: {$e->getMessage()}";
                     Log::error('Enrollment creation failed', [
-                        'student_code' => $student->id,
+                        'student_id' => $student->id,
                         'semester_id' => $semester->id,
                         'error' => $e->getMessage(),
                     ]);
@@ -564,7 +564,7 @@ class SemesterEnrollmentController extends Controller
 
                     // Skip inactive students
                     if ($student->status !== 'active') {
-                        $warnings[] = "Skipped student {$student->student_code} - not active";
+                        $warnings[] = "Skipped student {$student->student_id} - not active";
                         $skipped++;
                         continue;
                     }
@@ -576,7 +576,7 @@ class SemesterEnrollmentController extends Controller
                         ->get();
 
                     if ($curriculumUnits->isEmpty()) {
-                        $warnings[] = "No curriculum units found for student {$student->student_code} in semester {$enrollment->semester_number}";
+                        $warnings[] = "No curriculum units found for student {$student->student_id} in semester {$enrollment->semester_number}";
                         $skipped++;
                         continue;
                     }
@@ -593,31 +593,31 @@ class SemesterEnrollmentController extends Controller
                                 ->first();
 
                             if (!$courseOffering) {
-                                $warnings[] = "No course offering found for unit {$curriculumUnit->unit->code} (Student: {$student->student_code})";
+                                $warnings[] = "No course offering found for unit {$curriculumUnit->unit->code} (Student: {$student->student_id})";
                                 continue;
                             }
 
                             // Check if student is already registered
-                            $existingRegistration = \App\Models\CourseRegistration::where('student_code', $student->id)
+                            $existingRegistration = \App\Models\CourseRegistration::where('student_id', $student->id)
                                 ->where('course_offering_id', $courseOffering->id)
                                 ->where('semester_id', $semester->id)
                                 ->whereIn('registration_status', ['registered', 'confirmed'])
                                 ->exists();
 
                             if ($existingRegistration) {
-                                $warnings[] = "Student {$student->student_code} already registered for {$curriculumUnit->unit->code}";
+                                $warnings[] = "Student {$student->student_id} already registered for {$curriculumUnit->unit->code}";
                                 continue;
                             }
 
                             // Check capacity (unless forced)
                             if (!$forceRegistration && $courseOffering->current_enrollment >= $courseOffering->max_capacity) {
-                                $warnings[] = "Course {$curriculumUnit->unit->code} is at capacity (Student: {$student->student_code})";
+                                $warnings[] = "Course {$curriculumUnit->unit->code} is at capacity (Student: {$student->student_id})";
                                 continue;
                             }
 
                             // Create registration
                             \App\Models\CourseRegistration::create([
-                                'student_code' => $student->id,
+                                'student_id' => $student->id,
                                 'course_offering_id' => $courseOffering->id,
                                 'semester_id' => $semester->id,
                                 'registration_status' => 'confirmed',
@@ -638,9 +638,9 @@ class SemesterEnrollmentController extends Controller
                             $registrationsCreated++;
                             $studentRegistrations++;
                         } catch (\Exception $e) {
-                            $errors[] = "Failed to register student {$student->student_code} for {$curriculumUnit->unit->code}: {$e->getMessage()}";
+                            $errors[] = "Failed to register student {$student->student_id} for {$curriculumUnit->unit->code}: {$e->getMessage()}";
                             Log::error('Course registration failed', [
-                                'student_code' => $student->id,
+                                'student_id' => $student->id,
                                 'course_offering_id' => $courseOffering->id ?? 'unknown',
                                 'unit_code' => $curriculumUnit->unit->code,
                                 'error' => $e->getMessage(),
@@ -649,14 +649,14 @@ class SemesterEnrollmentController extends Controller
                     }
 
                     if ($studentRegistrations === 0) {
-                        $warnings[] = "No registrations created for student {$student->student_code}";
+                        $warnings[] = "No registrations created for student {$student->student_id}";
                         $skipped++;
                     }
                 } catch (\Exception $e) {
                     $errors[] = "Failed to process enrollment for student {$student->student_code}: {$e->getMessage()}";
                     $skipped++;
                     Log::error('Student enrollment processing failed', [
-                        'student_code' => $student->id,
+                        'student_id' => $student->id,
                         'enrollment_id' => $enrollment->id,
                         'error' => $e->getMessage(),
                     ]);
@@ -751,7 +751,7 @@ class SemesterEnrollmentController extends Controller
                     }
 
                     // Check if student is already registered
-                    $alreadyRegistered = \App\Models\CourseRegistration::where('student_code', $student->id)
+                    $alreadyRegistered = \App\Models\CourseRegistration::where('student_id', $student->id)
                         ->where('course_offering_id', $courseOffering->id)
                         ->where('semester_id', $semester->id)
                         ->whereIn('registration_status', ['registered', 'confirmed'])

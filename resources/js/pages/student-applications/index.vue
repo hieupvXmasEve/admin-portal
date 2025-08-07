@@ -11,12 +11,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Head, router, usePage } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
 import { AlertCircle, CheckCircle2, ChevronDown, Clock, Edit, Eye, FileCheck, RefreshCw, Trash2, Users, XCircle } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+import { createColumns } from '@/lib/table-utils';
 
 // Types
 interface StudentApplication {
@@ -71,7 +72,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const page = usePage();
 
 // State
 const selectedApplications = ref<StudentApplication[]>([]);
@@ -84,7 +84,7 @@ const isLoading = ref(false);
 const conversionForm = ref({
     program_id: '',
     curriculum_version_id: '',
-    specialization_id: '',
+    specialization_id: 'none',
     admission_date: format(new Date(), 'yyyy-MM-dd'),
     expected_graduation_date: '',
 });
@@ -123,24 +123,7 @@ const getStatusBadge = (status: string) => {
 };
 
 // Table columns
-const columns: ColumnDef<StudentApplication>[] = [
-    {
-        id: 'select',
-        header: ({ table }) =>
-            h(Checkbox, {
-                checked: table.getIsAllPageRowsSelected(),
-                'onUpdate:checked': (value: boolean) => table.toggleAllPageRowsSelected(!!value),
-                ariaLabel: 'Select all',
-            }),
-        cell: ({ row }) =>
-            h(Checkbox, {
-                checked: row.getIsSelected(),
-                'onUpdate:checked': (value: boolean) => row.toggleSelected(!!value),
-                ariaLabel: 'Select row',
-            }),
-        enableSorting: false,
-        enableHiding: false,
-    },
+const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
     {
         accessorKey: 'full_name',
         header: 'Full Name',
@@ -274,7 +257,9 @@ const columns: ColumnDef<StudentApplication>[] = [
         enableHiding: false,
     },
 ];
-
+const suggestedCoursesColumns = createColumns(baseSuggestedCoursesColumns, {
+    enableSelection: true,
+});
 // Filter functions
 const applyFilters = (newFilters: Partial<typeof props.filters>) => {
     const params = new URLSearchParams();
@@ -318,6 +303,7 @@ const onNavigate = (url: string) => {
 
 // Selection handlers
 const onSelectionChange = (selected: StudentApplication[]) => {
+    console.log('%c selected', 'color: red', selected);
     selectedApplications.value = selected;
 };
 
@@ -388,7 +374,7 @@ watch(
     () => conversionForm.value.program_id,
     async (newProgramId) => {
         conversionForm.value.curriculum_version_id = '';
-        conversionForm.value.specialization_id = '';
+        conversionForm.value.specialization_id = 'none';
 
         if (newProgramId) {
             await Promise.all([loadCurriculumVersions(newProgramId), loadSpecializations(newProgramId)]);
@@ -406,7 +392,7 @@ const closeDialogs = () => {
     conversionForm.value = {
         program_id: '',
         curriculum_version_id: '',
-        specialization_id: '',
+        specialization_id: 'none',
         admission_date: format(new Date(), 'yyyy-MM-dd'),
         expected_graduation_date: '',
     };
@@ -428,7 +414,7 @@ const updateStatus = () => {
     router.patch(`/student-applications/${currentApplication.value.id}/status`, statusForm.value, {
         preserveState: true,
         preserveScroll: true,
-        onSuccess: (page) => {
+        onSuccess: () => {
             closeDialogs();
             toast.success('Application status updated successfully!');
         },
@@ -453,7 +439,11 @@ const batchConvert = () => {
         '/student-applications/batch-convert',
         {
             application_ids: selectedApplications.value.map((app) => app.id),
-            ...conversionForm.value,
+            program_id: conversionForm.value.program_id,
+            curriculum_version_id: conversionForm.value.curriculum_version_id,
+            specialization_id: conversionForm.value.specialization_id === 'none' ? null : conversionForm.value.specialization_id,
+            admission_date: conversionForm.value.admission_date,
+            expected_graduation_date: conversionForm.value.expected_graduation_date,
         },
         {
             preserveState: true,
@@ -587,7 +577,7 @@ const clearFilters = () => {
 
         <!-- Applications Table -->
         <CardContent class="p-0">
-            <DataTable :data="applications.data" :columns="columns" :enable-row-selection="true" @selection-change="onSelectionChange" empty-message="No applications found" />
+            <DataTable :data="applications.data" :columns="suggestedCoursesColumns" :enable-row-selection="true" @selection-change="onSelectionChange" empty-message="No applications found" />
 
             <div class="border-t px-6">
                 <DataPagination :pagination-data="applications" item-name="applications" @navigate="onNavigate" @page-size-change="onPageSizeChange" />
@@ -675,7 +665,7 @@ const clearFilters = () => {
                                 <SelectValue placeholder="Select specialization (optional)" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">No Specialization</SelectItem>
+                                <SelectItem value="none">No Specialization</SelectItem>
                                 <SelectItem v-for="specialization in conversionOptions.specializations" :key="specialization.id" :value="specialization.id.toString()">
                                     {{ specialization.name }}
                                 </SelectItem>

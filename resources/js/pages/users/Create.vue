@@ -100,7 +100,7 @@ const handleSubmit = () => {
     const formData = {
         name: form.name.trim().toLowerCase(),
         email: form.email.trim().toLowerCase(),
-        roles: form.selectedRoles,
+        selectedRoles: form.selectedRoles,
     };
     form.transform(() => formData).post('/users', {
         onSuccess: () => {
