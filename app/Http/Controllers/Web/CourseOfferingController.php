@@ -40,6 +40,7 @@ class CourseOfferingController extends Controller
     public function index(Request $request): Response
     {
         $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecture'])
+            ->where('campus_id', app('campus')->id)
             ->orderBy('semester_id', 'desc')
             ->orderBy('section_code');
         Log::info('CourseOffering: ' . json_encode(CourseOffering::select(['id', 'lecture_id', 'semester_id', 'curriculum_unit_id', 'section_code'])->get()));
@@ -97,21 +98,124 @@ class CourseOfferingController extends Controller
      */
     public function create(): Response
     {
-        $semesters = Semester::orderBy('start_date', 'desc')->get(['id', 'name', 'code', 'start_date', 'end_date']);
-        $curriculumUnits = \App\Models\CurriculumUnit::with('unit')
-            ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
-            ->orderBy('units.code')
-            ->select('curriculum_units.*')
-            ->get()
-            ->map(function ($curriculumUnit) {
-                return [
-                    'id' => $curriculumUnit->id,
+        // Get the currently active semester
+        $activeSemester = Semester::getActiveSemester();
+
+        // If no active semester, return with error state
+        if (!$activeSemester) {
+            return Inertia::render('course-offerings/Create', [
+                'activeSemester' => null,
+                'units' => [],
+                'lectures' => [],
+                'error' => 'No semester is currently active. Please activate a semester before creating course offerings.',
+            ]);
+        }
+
+        // Get curriculum units that should be offered in the active semester
+        // The system calculates the current semester_number for each curriculum version based on:
+        // 1. How many semesters have elapsed since the curriculum version started
+        // 2. Each curriculum version's effective starting semester
+        // This ensures proper academic progression for both new and continuing students
+
+        // Get all curriculum versions with their starting semesters
+        $allCurriculumVersions = \App\Models\CurriculumVersion::with(['curriculumUnits.unit', 'effectiveFromSemester'])
+            ->get();
+
+        // Get all semesters ordered by start date to calculate progression
+        $allSemesters = Semester::orderBy('start_date')->get(['id', 'start_date']);
+
+        // Create a mapping of semester_id to its sequential position
+        $semesterSequence = $allSemesters->pluck('id')->flip();
+
+        $availableUnits = collect();
+
+        foreach ($allCurriculumVersions as $curriculumVersion) {
+            // Get the starting semester position for this curriculum version
+            $startingSemesterPosition = $semesterSequence[$curriculumVersion->semester_id] ?? null;
+            $currentSemesterPosition = $semesterSequence[$activeSemester->id] ?? null;
+
+            if ($startingSemesterPosition === null || $currentSemesterPosition === null) {
+                continue;
+            }
+
+            // Calculate how many semesters have passed since this curriculum started
+            $elapsedSemesters = $currentSemesterPosition - $startingSemesterPosition;
+
+            // If curriculum hasn't started yet, skip it
+            if ($elapsedSemesters < 0) {
+                continue;
+            }
+
+            // Calculate the current semester number for this curriculum version
+            // Semester 1 starts when elapsedSemesters = 0, Semester 2 when elapsedSemesters = 1, etc.
+            $currentSemesterNumber = $elapsedSemesters + 1;
+
+            // Get units that should be offered in the current semester for this curriculum version
+            $currentSemesterUnits = $curriculumVersion->curriculumUnits()
+                ->where('semester_number', $currentSemesterNumber)
+                ->with('unit')
+                ->get();
+
+            foreach ($currentSemesterUnits as $curriculumUnit) {
+                $availableUnits->push([
+                    'curriculum_unit_id' => $curriculumUnit->id,
+                    'unit_id' => $curriculumUnit->unit->id,
                     'code' => $curriculumUnit->unit->code,
                     'name' => $curriculumUnit->unit->name,
                     'credit_points' => $curriculumUnit->unit->credit_points,
-                ];
-            });
-        $campuses = Campus::orderBy('name')->get(['id', 'name', 'code']);
+                    'year_level' => $curriculumUnit->year_level,
+                    'semester_number' => $curriculumUnit->semester_number,
+                    'curriculum_version_id' => $curriculumVersion->id,
+                    'curriculum_start_semester' => $curriculumVersion->effectiveFromSemester->name ?? 'Unknown',
+                    'elapsed_semesters' => $elapsedSemesters,
+                    'current_semester_in_curriculum' => $currentSemesterNumber,
+                    'source' => $elapsedSemesters === 0 ? 'new_curriculum' : 'continuing_curriculum',
+                ]);
+            }
+        }
+
+        // Add common curriculum units that are available regardless of semester progression
+        // These are foundational units with scope = 'common' and semester_number = null
+        $commonUnits = \App\Models\CurriculumUnit::with(['unit', 'curriculumVersion.effectiveFromSemester'])
+            ->where('unit_scope', 'common')
+            ->whereNull('semester_number')
+            ->get();
+
+        foreach ($commonUnits as $curriculumUnit) {
+            $availableUnits->push([
+                'curriculum_unit_id' => $curriculumUnit->id,
+                'unit_id' => $curriculumUnit->unit->id,
+                'code' => $curriculumUnit->unit->code,
+                'name' => $curriculumUnit->unit->name,
+                'credit_points' => $curriculumUnit->unit->credit_points,
+                'year_level' => $curriculumUnit->year_level ?? 0,
+                'semester_number' => null,
+                'curriculum_version_id' => $curriculumUnit->curriculum_version_id,
+                'curriculum_start_semester' => $curriculumUnit->curriculumVersion->effectiveFromSemester->name ?? 'Unknown',
+                'elapsed_semesters' => null,
+                'current_semester_in_curriculum' => null,
+                'source' => 'common_curriculum',
+            ]);
+        }
+
+        // Remove duplicates by unit_id (same unit can exist in multiple curriculum versions)
+        // Priority: common_curriculum > new_curriculum > continuing_curriculum
+        $unitPriority = [
+            'common_curriculum' => 1,
+            'new_curriculum' => 2,
+            'continuing_curriculum' => 3,
+        ];
+
+        $curriculumUnits = $availableUnits
+            ->groupBy('unit_id')
+            ->map(function ($unitGroup) use ($unitPriority) {
+                // Sort by priority and return the highest priority unit
+                return $unitGroup->sortBy(function ($unit) use ($unitPriority) {
+                    return $unitPriority[$unit['source']] ?? 999;
+                })->first();
+            })
+            ->sortBy('code')
+            ->values();
 
         // Get available lectures
         $lectures = Lecture::active()
@@ -120,10 +224,16 @@ class CourseOfferingController extends Controller
             ->get(['id', 'first_name', 'last_name', 'email', 'academic_rank']);
 
         return Inertia::render('course-offerings/Create', [
-            'semesters' => $semesters,
+            'activeSemester' => [
+                'id' => $activeSemester->id,
+                'name' => $activeSemester->name,
+                'code' => $activeSemester->code,
+                'start_date' => $activeSemester->start_date,
+                'end_date' => $activeSemester->end_date,
+            ],
             'units' => $curriculumUnits,
-            'campuses' => $campuses,
             'lectures' => $lectures,
+            'error' => null,
         ]);
     }
 
@@ -132,7 +242,10 @@ class CourseOfferingController extends Controller
      */
     public function store(StoreCourseOfferingRequest $request): RedirectResponse
     {
-        $courseOffering = CourseOffering::create($request->validated());
+        $validatedData = $request->validated();
+        $validatedData['campus_id'] = app('campus')->id;
+
+        CourseOffering::create($validatedData);
 
         return Redirect::route(CourseOfferingRoutes::INDEX)
             ->with('success', 'Course offering created successfully.');
@@ -177,20 +290,12 @@ class CourseOfferingController extends Controller
      */
     public function edit(CourseOffering $courseOffering): Response
     {
-        $semesters = Semester::orderBy('start_date', 'desc')->get(['id', 'name', 'code', 'start_date', 'end_date']);
-        $curriculumUnits = \App\Models\CurriculumUnit::with('unit')
-            ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
-            ->orderBy('units.code')
-            ->select('curriculum_units.*')
-            ->get()
-            ->map(function ($curriculumUnit) {
-                return [
-                    'id' => $curriculumUnit->id,
-                    'code' => $curriculumUnit->unit->code,
-                    'name' => $curriculumUnit->unit->name,
-                    'credit_points' => $curriculumUnit->unit->credit_points,
-                ];
-            });
+        // Load the course offering with its related semester and curriculum unit data
+        $courseOffering->load([
+            'semester:id,name,code,start_date,end_date',
+            'curriculumUnit:id,unit_id,year_level,semester_number',
+            'curriculumUnit.unit:id,code,name,credit_points',
+        ]);
 
         // Get available lectures
         $lectures = Lecture::active()
@@ -200,8 +305,6 @@ class CourseOfferingController extends Controller
 
         return Inertia::render('course-offerings/Edit', [
             'courseOffering' => $courseOffering,
-            'semesters' => $semesters,
-            'units' => $curriculumUnits,
             'lectures' => $lectures,
         ]);
     }
@@ -285,7 +388,7 @@ class CourseOfferingController extends Controller
     {
         $semesterId = $request->semester_id;
 
-        $query = CourseOffering::query();
+        $query = CourseOffering::query()->where('campus_id', app('campus')->id);
 
         if ($semesterId && $semesterId !== 'all') {
             $query->where('semester_id', $semesterId);
@@ -372,7 +475,7 @@ class CourseOfferingController extends Controller
             'sections.*.section_code' => 'required|string|max:10',
             'sections.*.max_capacity' => 'required|integer|min:1',
             'sections.*.lecture_id' => ['nullable', function ($attribute, $value, $fail) {
-                if ($value && $value !== 'none' && ! Lecture::find($value)) {
+                if ($value && $value !== 'none' && !Lecture::find($value)) {
                     $fail('The selected lecture does not exist.');
                 }
             }],
@@ -410,7 +513,7 @@ class CourseOfferingController extends Controller
                 // Handle lecture assignment - null if 'none' is selected
                 $lectureId = null;
                 if (isset($sectionData['lecture_id']) && $sectionData['lecture_id'] !== 'none') {
-                    $lectureId = (int) $sectionData['lecture_id'];
+                    $lectureId = (int)$sectionData['lecture_id'];
                 }
 
                 // Create new course offering for this section
@@ -541,7 +644,7 @@ class CourseOfferingController extends Controller
             $assignmentsCount = 0;
             foreach ($request->assignments as $assignment) {
                 $courseOffering = CourseOffering::find($assignment['course_offering_id']);
-                if ($courseOffering && ! $courseOffering->lecture_id) {
+                if ($courseOffering && !$courseOffering->lecture_id) {
                     $courseOffering->update(['lecture_id' => $assignment['lecture_id']]);
                     $assignmentsCount++;
                 }
@@ -585,12 +688,12 @@ class CourseOfferingController extends Controller
             // Update course offering enrollment counts if needed
             if (
                 in_array($request->from_status, ['registered', 'confirmed']) &&
-                ! in_array($request->to_status, ['registered', 'confirmed'])
+                !in_array($request->to_status, ['registered', 'confirmed'])
             ) {
                 // Students are being removed from active status
                 $courseOffering->decrement('current_enrollment', $updatedCount);
             } elseif (
-                ! in_array($request->from_status, ['registered', 'confirmed']) &&
+                !in_array($request->from_status, ['registered', 'confirmed']) &&
                 in_array($request->to_status, ['registered', 'confirmed'])
             ) {
                 // Students are being added to active status

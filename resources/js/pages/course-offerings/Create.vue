@@ -15,18 +15,36 @@ import { ref } from 'vue';
 import { z } from 'zod';
 
 interface Props {
-    semesters: Semester[];
-    units: Unit[];
+    activeSemester: {
+        id: number;
+        name: string;
+        code: string;
+        start_date: string;
+        end_date: string;
+    } | null;
+    units: Array<{
+        curriculum_unit_id: number;
+        unit_id: number;
+        code: string;
+        name: string;
+        credit_points: number;
+        year_level: number;
+        semester_number: number | null;
+        curriculum_version_id: number;
+        curriculum_start_semester: string;
+        elapsed_semesters: number | null;
+        current_semester_in_curriculum: number | null;
+        source: 'new_curriculum' | 'continuing_curriculum' | 'common_curriculum';
+    }>;
     lectures: Lecture[];
+    error: string | null;
 }
 
 const props = defineProps<Props>();
 const submitError = ref<string | null>(null);
-console.log(props.units);
 // Define validation schema that exactly matches backend CourseOffering validation rules
 const formSchema = toTypedSchema(
     z.object({
-        semester_id: z.string().min(1, 'Semester is required'),
         curriculum_unit_id: z.string().min(1, 'Curriculum unit is required'),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
@@ -55,7 +73,6 @@ const formSchema = toTypedSchema(
 const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
-        semester_id: '',
         curriculum_unit_id: '',
         lecture_id: '',
         section_code: '',
@@ -71,7 +88,7 @@ const { handleSubmit, isSubmitting } = useForm({
         registration_end_date: '',
         special_requirements: '',
         notes: '',
-    } satisfies CourseOfferingFormData,
+    } satisfies Omit<CourseOfferingFormData, 'semester_id'>,
 });
 
 const onSubmit = handleSubmit((values) => {
@@ -81,7 +98,7 @@ const onSubmit = handleSubmit((values) => {
 
     // Transform form data to match backend expectations
     const formData = {
-        semester_id: values.semester_id,
+        semester_id: props.activeSemester?.id,
         curriculum_unit_id: values.curriculum_unit_id,
         lecture_id: values.lecture_id === 'none' || values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
@@ -161,7 +178,70 @@ const dayOptions = [
         </Link>
     </div>
 
-    <form @submit="onSubmit" class="space-y-6">
+    <!-- No Active Semester State -->
+    <div v-if="!props.activeSemester" class="rounded-lg border border-red-200 bg-red-50 p-6">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">No Active Semester</h3>
+                <div class="mt-2 text-sm text-red-700">
+                    <p>{{ props.error }}</p>
+                </div>
+                <div class="mt-4">
+                    <Link href="/semesters">
+                        <Button size="sm" variant="outline" class="border-red-300 text-red-700 hover:bg-red-100">
+                            Manage Semesters
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Semester Info -->
+    <div v-if="props.activeSemester" class="rounded-lg border border-blue-200 bg-blue-50 p-4 mb-6">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3 flex-1">
+                <h3 class="text-sm font-medium text-blue-800">Active Semester</h3>
+                <div class="mt-1 text-sm text-blue-700">
+                    <p><strong>{{ props.activeSemester.name }}</strong> ({{ props.activeSemester.code }})</p>
+                    <p class="text-xs mt-1">
+                        {{ new Date(props.activeSemester.start_date).toLocaleDateString() }} - 
+                        {{ new Date(props.activeSemester.end_date).toLocaleDateString() }}
+                    </p>
+                </div>
+            </div>
+            <div class="text-right text-xs text-blue-600">
+                <p><strong>{{ props.units.length }}</strong> units available</p>
+                <div class="mt-1 space-y-1">
+                    <div>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 mr-2">
+                            {{ props.units.filter(u => u.source === 'new_curriculum').length }} New
+                        </span>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                            {{ props.units.filter(u => u.source === 'continuing_curriculum').length }} Continuing
+                        </span>
+                    </div>
+                    <div>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                            {{ props.units.filter(u => u.source === 'common_curriculum').length }} Common
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form v-if="props.activeSemester" @submit="onSubmit" class="space-y-6">
         <div class="grid gap-6 lg:grid-cols-2">
             <!-- Basic Information -->
             <Card>
@@ -169,25 +249,6 @@ const dayOptions = [
                     <CardTitle>Basic Information</CardTitle>
                 </CardHeader>
                 <CardContent class="space-y-4">
-                    <FormField v-slot="{ componentField }" name="semester_id">
-                        <FormItem>
-                            <FormLabel>Semester</FormLabel>
-                            <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select semester" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                                            {{ semester.name }} ({{ semester.code }})
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
                     <FormField v-slot="{ componentField }" name="curriculum_unit_id">
                         <FormItem>
                             <FormLabel>Curriculum Unit</FormLabel>
@@ -197,8 +258,35 @@ const dayOptions = [
                                         <SelectValue placeholder="Select curriculum unit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="unit in props.units" :key="unit.id" :value="unit.id.toString()">
-                                            {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} credits)
+                                        <SelectItem 
+                                            v-for="unit in props.units" 
+                                            :key="unit.curriculum_unit_id" 
+                                            :value="unit.curriculum_unit_id.toString()"
+                                        >
+                                            <div class="flex flex-col">
+                                                <span class="font-medium">{{ unit.code }} - {{ unit.name }}</span>
+                                                <span class="text-xs text-muted-foreground">
+                                                    {{ unit.credit_points }} credits • 
+                                                    <template v-if="unit.semester_number !== null">
+                                                        Y{{ unit.year_level }}S{{ unit.semester_number }} • 
+                                                    </template>
+                                                    <template v-else>
+                                                        <span class="text-purple-600">Common Unit</span> • 
+                                                    </template>
+                                                    <span :class="{
+                                                        'text-green-600': unit.source === 'new_curriculum',
+                                                        'text-blue-600': unit.source === 'continuing_curriculum',
+                                                        'text-purple-600': unit.source === 'common_curriculum'
+                                                    }">
+                                                        {{ 
+                                                            unit.source === 'new_curriculum' ? 'New Curriculum' :
+                                                            unit.source === 'continuing_curriculum' ? 'Continuing Curriculum' :
+                                                            'Common Curriculum'
+                                                        }}
+                                                    </span>
+                                                    • Started: {{ unit.curriculum_start_semester }}
+                                                </span>
+                                            </div>
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>

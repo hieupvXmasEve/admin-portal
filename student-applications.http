@@ -14,12 +14,12 @@ Content-Type: application/json
 ### Get Student Applications
 GET http://localhost:8000/api/student-applications
 Content-Type: application/json
-
+Authorization: {{TOKEN}}
 
 ### Create Student Applications
 POST http://localhost:8000/api/student-applications
 Content-Type: application/json
-#Authorization: Bearer {{token}}
+Authorization: {{TOKEN}}
 
 {
   "students": [
@@ -146,7 +146,7 @@ Content-Type: application/json
 ### Update Existing Student Application (using same email)
 POST http://localhost:8000/api/student-applications
 Content-Type: application/json
-#Authorization: Bearer {{token}}
+Authorization: {{TOKEN}}
 
 {
   "students": [
@@ -195,7 +195,7 @@ Content-Type: application/json
 ### Test Validation Errors
 POST http://localhost:8000/api/student-applications
 Content-Type: application/json
-#Authorization: Bearer {{token}}
+Authorization: {{TOKEN}}
 
 {
   "students": [
@@ -216,7 +216,7 @@ Content-Type: application/json
 ### Minimal Required Fields Only
 POST http://localhost:8000/api/student-applications
 Content-Type: application/json
-#Authorization: Bearer {{token}}
+Authorization: {{TOKEN}}
 
 {
   "students": [
