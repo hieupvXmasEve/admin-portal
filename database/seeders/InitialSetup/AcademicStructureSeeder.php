@@ -75,7 +75,7 @@ class AcademicStructureSeeder extends Seeder
     {
         // Bachelor of Semiconductor Engineering
         $semiconductorProgram = Program::updateOrCreate(
-            ['code' => 'SE'],
+            ['code' => 'SEMI'],
             [
                 'id' => 1,
                 'name' => 'Semiconductor Engineering',
@@ -95,7 +95,7 @@ class AcademicStructureSeeder extends Seeder
 
         // Finance
         $financeProgram = Program::updateOrCreate(
-            ['code' => 'FN'],
+            ['code' => 'FIN'],
             [
                 'id' => 3,
                 'name' => 'Finance',

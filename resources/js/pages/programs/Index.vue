@@ -262,6 +262,15 @@ const columns: ColumnDef<Program>[] = [
         },
     },
     {
+        header: 'Code',
+        accessorKey: 'code',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const program = row.original;
+            return h('code', { class: 'bg-gray-100 px-2 py-1 rounded text-sm font-mono' }, program.code);
+        },
+    },
+    {
         header: 'Program Name',
         accessorKey: 'name',
         enableSorting: true,

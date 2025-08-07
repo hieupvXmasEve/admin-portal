@@ -57,32 +57,34 @@ class CurriculumSeeder extends Seeder
 
     private function createAICurriculumVersion(): void
     {
-        // Get the AI specialization
-        $aiSpecialization = Specialization::where('code', 'AI')->first();
+        // Get All Programs
+        $programs = Program::get();
 
-        if (!$aiSpecialization) {
-            $this->command->error('AI specialization not found. Please run AcademicStructureSeeder first.');
+        if (!$programs) {
+            $this->command->error('Programs not found. Please run AcademicStructureSeeder first.');
             return;
         }
 
         // Create a default semester if none exists
-        $defaultSemester = Semester::where('is_active', true)->first();
+        $firstSemester = Semester::where('code', 'INT01SE01')->first();
 
-        // Create curriculum version
-        $curriculumVersion = CurriculumVersion::updateOrCreate(
-            [
-                'program_id' => $aiSpecialization->program_id,
-                'specialization_id' => $aiSpecialization->id,
-                'version_code' => '2025.1',
-            ],
-            [
-                'semester_id' => $defaultSemester->id,
-                'notes' => 'AI Specialization Curriculum - 3 years, 300 credit points (24 units) across 9 semesters: 8 core + 8 major + 8 electives',
-            ]
-        );
+        foreach ($programs as $program) {
+            // Create curriculum version
+            $curriculumVersion = CurriculumVersion::updateOrCreate(
+                [
+                    'program_id' => $program->id,
+                    'specialization_id' => null,
+                    'version_code' => '2025.1',
+                ],
+                [
+                    'semester_id' => $firstSemester->id,
+                    'notes' => 'AI Specialization Curriculum - 3 years, 300 credit points (24 units) across 9 semesters: 8 core + 8 major + 8 electives',
+                ]
+            );
+        }
 
         // Assign units to the AI curriculum
-        $this->assignUnitsToAICurriculum($curriculumVersion);
+        // $this->assignUnitsToAICurriculum($curriculumVersion);
 
         $this->command->info("📖 Created curriculum for AI specialization");
     }

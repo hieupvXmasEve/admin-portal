@@ -57,6 +57,10 @@ return new class extends Migration
             $table->text('exception_units')->nullable();
             $table->enum('status', ['pending', 'reviewed', 'approved', 'rejected'])
                   ->default('pending');
+            
+            $table->unsignedBigInteger('student_id')->nullable();
+            $table->foreign('student_id')->references('id')->on('students')->onDelete('set null');
+            $table->index('student_id');
 
             $table->timestamps();
         });
