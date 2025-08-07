@@ -13,6 +13,7 @@ export * from './settings-routes';
 export * from './specialization-routes';
 export * from './student-routes';
 export * from './syllabus-routes';
+export * from './system-routes';
 export * from './teaching-assignment-routes';
 export * from './unit-routes';
 export * from './user-routes';

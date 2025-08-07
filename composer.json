@@ -16,6 +16,7 @@
         "laravel/socialite": "^5.20",
         "laravel/tinker": "^2.10.1",
         "maatwebsite/excel": "^3.1",
+        "spatie/laravel-activitylog": "^4.10",
         "tightenco/ziggy": "^2.4"
     },
     "require-dev": {

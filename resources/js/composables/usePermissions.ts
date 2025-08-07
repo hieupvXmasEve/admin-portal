@@ -30,11 +30,35 @@ export function usePermissions() {
         return permissionList.every((permission) => can(permission));
     };
 
+    // Filter menu items based on user permissions
+    const filterMenuItems = <T extends { requiredPermissions?: string[]; children?: T[] }>(items: T[]): T[] => {
+        return items.filter(item => {
+            // Filter children recursively if they exist
+            if (item.children) {
+                item.children = filterMenuItems(item.children);
+            }
+            
+            // For items with children, only show if they have at least one visible child
+            if (item.children) {
+                return item.children.length > 0;
+            }
+            
+            // For items without children, check permissions
+            if (!item.requiredPermissions || item.requiredPermissions.length === 0) {
+                return true;
+            }
+            
+            // Check if user has any of the required permissions
+            return canAny(item.requiredPermissions);
+        });
+    };
+
     return {
         permissions,
         currentCampusId,
         can,
         canAny,
         canAll,
+        filterMenuItems,
     };
 }

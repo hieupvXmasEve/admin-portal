@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Program extends Model
+class Program extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\ProgramFactory> */
     use HasFactory;
@@ -46,5 +45,57 @@ class Program extends Model
     public function activeSpecializations(): HasMany
     {
         return $this->hasMany(Specialization::class)->where('is_active', true);
+    }
+
+    /**
+     * Configure standard logging for programs
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_STANDARD;
+    }
+
+    /**
+     * Get standard fields for logging
+     */
+    protected function getStandardLogFields(): array
+    {
+        return ['name', 'code', 'description'];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        return $this->name ?? $this->code ?? "Program ID {$this->getKey()}";
+    }
+
+    /**
+     * Custom activity descriptions for program events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created program: {$identifier}",
+            'updated' => "Updated program: {$identifier}",
+            'deleted' => "Deleted program: {$identifier}",
+            'restored' => "Restored program: {$identifier}",
+            default => "{$eventName} program: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        return [
+            'program_code' => $this->code,
+            'specializations_count' => $this->specializations()->count(),
+            'active_specializations_count' => $this->activeSpecializations()->count(),
+        ];
     }
 }

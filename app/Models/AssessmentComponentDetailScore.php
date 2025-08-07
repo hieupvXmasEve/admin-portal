@@ -6,11 +6,10 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class AssessmentComponentDetailScore extends Model
+class AssessmentComponentDetailScore extends AuditableModel
 {
     use HasFactory, SoftDeletes;
 
@@ -62,6 +61,65 @@ class AssessmentComponentDetailScore extends Model
         'appeal_reason',
         'appeal_status',
     ];
+
+    /**
+     * Configure activity logging for assessment scores
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE; // Critical for grade audit trail
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $student = $this->student;
+        $assessment = $this->assessmentComponentDetail;
+        
+        if ($student && $assessment) {
+            return "Assessment Score - Student: {$student->student_code} ({$student->full_name}) - Assessment: {$assessment->name}";
+        }
+        
+        return "Assessment Score ID {$this->getKey()}";
+    }
+
+    /**
+     * Custom activity descriptions
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+        
+        return match ($eventName) {
+            'created' => "Grade entry created: {$identifier}",
+            'updated' => "Grade updated: {$identifier}",
+            'deleted' => "Grade entry deleted: {$identifier}",
+            'restored' => "Grade entry restored: {$identifier}",
+            default => "{$eventName} grade entry: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    public function getExtraLogProperties(): array
+    {
+        return [
+            'student_code' => $this->student_code,
+            'course_offering_id' => $this->course_offering_id,
+            'assessment_component_detail_id' => $this->assessment_component_detail_id,
+            'points_earned' => $this->points_earned,
+            'percentage_score' => $this->percentage_score,
+            'letter_grade' => $this->letter_grade,
+            'is_late' => $this->is_late,
+            'has_bonus' => $this->bonus_points > 0,
+            'is_excluded' => $this->score_excluded,
+            'plagiarism_suspected' => $this->plagiarism_suspected,
+            'appeal_requested' => $this->appeal_requested,
+        ];
+    }
 
     protected $casts = [
         'points_earned' => 'decimal:2',

@@ -3,9 +3,17 @@ import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail } from '@/components/ui/sidebar';
 import { mainNavItems } from '@/constants/menu-sidebar';
+import { usePermissions } from '@/composables/usePermissions';
 import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import NavUser from './NavUser.vue';
+
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+const { filterMenuItems } = usePermissions();
+
+// Filter menu items based on user permissions
+const filteredMenuItems = computed(() => filterMenuItems(mainNavItems));
 </script>
 
 <template>
@@ -29,7 +37,7 @@ const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain :items="filteredMenuItems" />
         </SidebarContent>
 
         <SidebarFooter class="border-t border-gray-200 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-900/50">

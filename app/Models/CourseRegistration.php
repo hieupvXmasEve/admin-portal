@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 
-class CourseRegistration extends Model
+class CourseRegistration extends AuditableModel
 {
     use HasFactory;
 
@@ -173,5 +172,52 @@ class CourseRegistration extends Model
     public function scopeForStudent(Builder $query, int $studentId): void
     {
         $query->where('student_code', $studentId);
+    }
+
+    /**
+     * Configure comprehensive logging for course registrations
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $student = $this->student?->full_name ?? $this->student_code;
+        $course = $this->courseOffering?->curriculumUnit?->unit?->code ?? $this->course_offering_id;
+        
+        return "{$student} - {$course}";
+    }
+
+    /**
+     * Custom activity descriptions for course registration events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Student registered for course: {$identifier}",
+            'updated' => "Updated course registration: {$identifier}",
+            'deleted' => "Cancelled course registration: {$identifier}",
+            'restored' => "Restored course registration: {$identifier}",
+            default => "{$eventName} course registration: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        return [
+            'semester_id' => $this->semester_id,
+            'registration_status' => $this->registration_status,
+            'is_retake' => $this->is_retake,
+        ];
     }
 }
