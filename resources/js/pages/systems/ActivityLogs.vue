@@ -2,12 +2,12 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Eye, X } from 'lucide-vue-next';
@@ -127,10 +127,14 @@ const getEventBadgeVariant = (event: string | null): 'default' | 'secondary' | '
     if (!event) return 'outline';
 
     switch (event.toLowerCase()) {
-        case 'created': return 'default';
-        case 'updated': return 'secondary';
-        case 'deleted': return 'destructive';
-        default: return 'outline';
+        case 'created':
+            return 'default';
+        case 'updated':
+            return 'secondary';
+        case 'deleted':
+            return 'destructive';
+        default:
+            return 'outline';
     }
 };
 
@@ -240,10 +244,14 @@ const columns: ColumnDef<ActivityLog>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const description = row.original.description;
-            return h('div', {
-                class: 'text-sm max-w-xs truncate',
-                title: description
-            }, description);
+            return h(
+                'div',
+                {
+                    class: 'text-sm max-w-xs truncate',
+                    title: description,
+                },
+                description,
+            );
         },
     },
     {
@@ -413,9 +421,7 @@ const handlePageSizeChange = (pageSize: number) => {
                 <div class="flex items-center gap-3">
                     <h1 class="text-2xl font-semibold">Activity Logs</h1>
                     <div v-if="!is_system_admin" class="flex items-center gap-2">
-                        <Badge variant="outline" class="text-xs">
-                            {{ current_campus.name }} ({{ current_campus.code }})
-                        </Badge>
+                        <Badge variant="outline" class="text-xs"> {{ current_campus.name }} ({{ current_campus.code }}) </Badge>
                     </div>
                 </div>
                 <p class="text-sm text-gray-500">
@@ -430,12 +436,7 @@ const handlePageSizeChange = (pageSize: number) => {
             <CardContent class="p-4">
                 <div class="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex w-full items-center gap-2 md:w-auto">
-                        <DebouncedInput
-                            v-model="filters.search"
-                            placeholder="Search by description, log name, causer name..."
-                            class="w-full md:w-64"
-                            @debounced="handleSearch"
-                        />
+                        <DebouncedInput v-model="filters.search" placeholder="Search by description, log name, causer name..." class="w-full md:w-64" @debounced="handleSearch" />
 
                         <Select v-model="filters.subject_type" @update:model-value="handleFilter">
                             <SelectTrigger class="w-full md:w-48">
@@ -468,9 +469,7 @@ const handlePageSizeChange = (pageSize: number) => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Campuses</SelectItem>
-                                <SelectItem v-for="campus in campus_options" :key="campus.id" :value="campus.id.toString()">
-                                    {{ campus.name }} ({{ campus.code }})
-                                </SelectItem>
+                                <SelectItem v-for="campus in campus_options" :key="campus.id" :value="campus.id.toString()"> {{ campus.name }} ({{ campus.code }}) </SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -501,140 +500,141 @@ const handlePageSizeChange = (pageSize: number) => {
         </Card>
 
         <!-- Pagination -->
-        <DataPagination
-            :pagination-data="activities"
-            item-name="activities"
-            @navigate="handlePaginationNavigate"
-            @page-size-change="handlePageSizeChange"
-        />
+        <DataPagination :pagination-data="activities" item-name="activities" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
     </div>
 
     <!-- Activity Details Dialog -->
     <Dialog v-model:open="showActivityDialog">
-        <DialogContent class="max-w-6xl max-h-[90vh]">
+        <DialogContent class="max-h-[90vh] max-w-6xl">
             <DialogHeader>
                 <DialogTitle>Activity Log Details</DialogTitle>
             </DialogHeader>
-            <div v-if="selectedActivity" class="space-y-6">
-                <!-- Basic Information -->
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">ID</h4>
-                        <p class="font-mono">{{ selectedActivity.id }}</p>
-                    </div>
-                    <div>
-                        <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Log Name</h4>
-                        <p>{{ selectedActivity.log_name || 'Default' }}</p>
-                    </div>
-                    <div>
-                        <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Event</h4>
-                        <Badge v-if="selectedActivity.event" :variant="getEventBadgeVariant(selectedActivity.event)">
-                            {{ selectedActivity.event }}
-                        </Badge>
-                        <span v-else class="text-gray-400">N/A</span>
-                    </div>
-                    <div>
-                        <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Created At</h4>
-                        <p>{{ formatDate(selectedActivity.created_at) }}</p>
-                    </div>
-                    <div class="col-span-2">
-                        <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Description</h4>
-                        <p>{{ selectedActivity.description }}</p>
-                    </div>
-                </div>
-
-                <!-- Campus Context -->
-                <div v-if="selectedActivity.properties && (selectedActivity.properties.campus_name || selectedActivity.properties.campus_code)" class="border-t pt-4">
-                    <h3 class="font-semibold text-lg mb-3">Campus Context</h3>
+            <DialogDescription></DialogDescription>
+            <ScrollArea class="max-h-[70vh]">
+                <div v-if="selectedActivity" class="space-y-6">
+                    <!-- Basic Information -->
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Campus</h4>
-                            <p>{{ getCampusFromProperties(selectedActivity.properties) }}</p>
+                            <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">ID</h4>
+                            <p class="font-mono">{{ selectedActivity.id }}</p>
                         </div>
-                        <div v-if="selectedActivity.properties.academic_year">
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Academic Year</h4>
-                            <p>{{ selectedActivity.properties.academic_year }}</p>
+                        <div>
+                            <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Log Name</h4>
+                            <p>{{ selectedActivity.log_name || 'Default' }}</p>
                         </div>
-                        <div v-if="selectedActivity.properties.local_timestamp">
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Local Timestamp</h4>
-                            <p>{{ formatDate(selectedActivity.properties.local_timestamp) }}</p>
+                        <div>
+                            <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Event</h4>
+                            <Badge v-if="selectedActivity.event" :variant="getEventBadgeVariant(selectedActivity.event)">
+                                {{ selectedActivity.event }}
+                            </Badge>
+                            <span v-else class="text-gray-400">N/A</span>
                         </div>
-                        <div v-if="selectedActivity.properties.acting_campus && selectedActivity.properties.acting_campus !== getCampusFromProperties(selectedActivity.properties)">
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Acting Campus</h4>
-                            <Badge variant="secondary">{{ selectedActivity.properties.acting_campus }}</Badge>
+                        <div>
+                            <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Created At</h4>
+                            <p>{{ formatDate(selectedActivity.created_at) }}</p>
+                        </div>
+                        <div class="col-span-2">
+                            <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Description</h4>
+                            <p>{{ selectedActivity.description }}</p>
                         </div>
                     </div>
-                </div>
 
-                <!-- Subject & Causer Information -->
-                <div class="border-t pt-4">
-                    <h3 class="font-semibold text-lg mb-3">Subject & Causer</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Subject Type</h4>
-                            <p>{{ selectedActivity.subject_type || 'N/A' }}</p>
-                        </div>
-                        <div>
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Subject</h4>
-                            <p>{{ formatSubjectName(selectedActivity) }}</p>
-                        </div>
-                        <div>
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Causer Type</h4>
-                            <p>{{ selectedActivity.causer_type || 'N/A' }}</p>
-                        </div>
-                        <div>
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Causer</h4>
-                            <p>{{ formatCauserName(selectedActivity) }}</p>
-                        </div>
-                        <div v-if="selectedActivity.batch_uuid" class="col-span-2">
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Batch UUID</h4>
-                            <p class="font-mono text-sm">{{ selectedActivity.batch_uuid }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Change Information -->
-                <div v-if="selectedActivity.properties && (selectedActivity.properties.changed_fields || selectedActivity.properties.change_count || selectedActivity.properties.old || selectedActivity.properties.attributes)" class="border-t pt-4">
-                    <h3 class="font-semibold text-lg mb-3">Change Information</h3>
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div v-if="selectedActivity.properties.change_count">
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Changes Count</h4>
-                            <Badge variant="outline">{{ selectedActivity.properties.change_count }} field(s)</Badge>
-                        </div>
-                        <div v-if="selectedActivity.properties.changed_fields">
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Changed Fields</h4>
-                            <div class="flex flex-wrap gap-1">
-                                <Badge v-for="field in selectedActivity.properties.changed_fields" :key="field" variant="secondary" class="text-xs">
-                                    {{ field }}
-                                </Badge>
+                    <!-- Campus Context -->
+                    <div v-if="selectedActivity.properties && (selectedActivity.properties.campus_name || selectedActivity.properties.campus_code)" class="border-t pt-4">
+                        <h3 class="mb-3 text-lg font-semibold">Campus Context</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Campus</h4>
+                                <p>{{ getCampusFromProperties(selectedActivity.properties) }}</p>
+                            </div>
+                            <div v-if="selectedActivity.properties.academic_year">
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Academic Year</h4>
+                                <p>{{ selectedActivity.properties.academic_year }}</p>
+                            </div>
+                            <div v-if="selectedActivity.properties.local_timestamp">
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Local Timestamp</h4>
+                                <p>{{ formatDate(selectedActivity.properties.local_timestamp) }}</p>
+                            </div>
+                            <div v-if="selectedActivity.properties.acting_campus && selectedActivity.properties.acting_campus !== getCampusFromProperties(selectedActivity.properties)">
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Acting Campus</h4>
+                                <Badge variant="secondary">{{ selectedActivity.properties.acting_campus }}</Badge>
                             </div>
                         </div>
                     </div>
 
-                    <div v-if="selectedActivity.properties.old || selectedActivity.properties.attributes" class="grid grid-cols-2 gap-4">
-                        <div v-if="selectedActivity.properties.old">
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">Old Values</h4>
-                            <ScrollArea class="h-32 w-full rounded border">
-                                <pre class="p-2 text-xs">{{ JSON.stringify(selectedActivity.properties.old, null, 2) }}</pre>
-                            </ScrollArea>
-                        </div>
-                        <div v-if="selectedActivity.properties.attributes">
-                            <h4 class="font-medium text-sm text-gray-500 uppercase tracking-wide">New Values</h4>
-                            <ScrollArea class="h-32 w-full rounded border">
-                                <pre class="p-2 text-xs">{{ JSON.stringify(selectedActivity.properties.attributes, null, 2) }}</pre>
-                            </ScrollArea>
+                    <!-- Subject & Causer Information -->
+                    <div class="border-t pt-4">
+                        <h3 class="mb-3 text-lg font-semibold">Subject & Causer</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Subject Type</h4>
+                                <p>{{ selectedActivity.subject_type || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Subject</h4>
+                                <p>{{ formatSubjectName(selectedActivity) }}</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Causer Type</h4>
+                                <p>{{ selectedActivity.causer_type || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Causer</h4>
+                                <p>{{ formatCauserName(selectedActivity) }}</p>
+                            </div>
+                            <div v-if="selectedActivity.batch_uuid" class="col-span-2">
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Batch UUID</h4>
+                                <p class="font-mono text-sm">{{ selectedActivity.batch_uuid }}</p>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Full Properties -->
-                <div v-if="selectedActivity.properties" class="border-t pt-4">
-                    <h3 class="font-semibold text-lg mb-3">Full Properties</h3>
-                    <ScrollArea class="h-64 w-full rounded border">
-                        <pre class="p-4 text-sm">{{ formatProperties(selectedActivity.properties) }}</pre>
-                    </ScrollArea>
+                    <!-- Change Information -->
+                    <div
+                        v-if="selectedActivity.properties && (selectedActivity.properties.changed_fields || selectedActivity.properties.change_count || selectedActivity.properties.old || selectedActivity.properties.attributes)"
+                        class="border-t pt-4"
+                    >
+                        <h3 class="mb-3 text-lg font-semibold">Change Information</h3>
+                        <div class="mb-4 grid grid-cols-2 gap-4">
+                            <div v-if="selectedActivity.properties.change_count">
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Changes Count</h4>
+                                <Badge variant="outline">{{ selectedActivity.properties.change_count }} field(s)</Badge>
+                            </div>
+                            <div v-if="selectedActivity.properties.changed_fields">
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Changed Fields</h4>
+                                <div class="flex flex-wrap gap-1">
+                                    <Badge v-for="field in selectedActivity.properties.changed_fields" :key="field" variant="secondary" class="text-xs">
+                                        {{ field }}
+                                    </Badge>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="selectedActivity.properties.old || selectedActivity.properties.attributes" class="grid grid-cols-2 gap-4">
+                            <div v-if="selectedActivity.properties.old">
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">Old Values</h4>
+                                <ScrollArea class="h-32 w-full rounded border">
+                                    <pre class="p-2 text-xs">{{ JSON.stringify(selectedActivity.properties.old, null, 2) }}</pre>
+                                </ScrollArea>
+                            </div>
+                            <div v-if="selectedActivity.properties.attributes">
+                                <h4 class="text-sm font-medium tracking-wide text-gray-500 uppercase">New Values</h4>
+                                <ScrollArea class="h-32 w-full rounded border">
+                                    <pre class="p-2 text-xs">{{ JSON.stringify(selectedActivity.properties.attributes, null, 2) }}</pre>
+                                </ScrollArea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Full Properties -->
+                    <div v-if="selectedActivity.properties" class="border-t pt-4">
+                        <h3 class="mb-3 text-lg font-semibold">Full Properties</h3>
+                        <ScrollArea class="h-64 w-full rounded border">
+                            <pre class="p-4 text-sm">{{ formatProperties(selectedActivity.properties) }}</pre>
+                        </ScrollArea>
+                    </div>
                 </div>
-            </div>
+            </ScrollArea>
         </DialogContent>
     </Dialog>
 </template>

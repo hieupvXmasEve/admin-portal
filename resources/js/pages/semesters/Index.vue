@@ -318,10 +318,10 @@ const submitCreate = () => {
 
 const submitEdit = async () => {
     if (!selectedSemester.value) return;
-    
+
     editFormProcessing.value = true;
     editFormErrors.value = {};
-    
+
     try {
         // Transform date ranges to individual date fields for backend
         const formData = {
@@ -334,7 +334,7 @@ const submitEdit = async () => {
             is_active: editFormData.value.is_active,
             is_archived: editFormData.value.is_archived,
         };
-        
+
         const response = await fetch(systemRoutes.semesters.apiUpdate(selectedSemester.value.id), {
             method: 'PUT',
             headers: {
@@ -343,9 +343,9 @@ const submitEdit = async () => {
             },
             body: JSON.stringify(formData),
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
             toast.success(result.message);
             closeModals();
@@ -473,7 +473,8 @@ const handlePageSizeChange = (pageSize: number) => {
                 </SelectContent>
             </Select>
         </div>
-        <div class="flex h-full items-end">
+        <div class="flex flex-col gap-1">
+            <Label class="text-xs text-transparent">Clear</Label>
             <Button variant="outline" @click="clearFilters" :disabled="!hasActiveFilters">
                 <X class="h-4 w-4" />
                 Clear
