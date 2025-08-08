@@ -88,6 +88,7 @@ class ClassSession extends Model
     {
         return $this->belongsTo(Lecture::class, 'lecture_id');
     }
+
     // Rooms
     public function room(): BelongsTo
     {
@@ -128,7 +129,7 @@ class ClassSession extends Model
 
     public function getFormattedTimeAttribute(): string
     {
-        return $this->start_time->format('g:i A') . ' - ' . $this->end_time->format('g:i A');
+        return $this->start_time->format('g:i A').' - '.$this->end_time->format('g:i A');
     }
 
     public function getDurationInMinutesAttribute(): int

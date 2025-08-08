@@ -8,7 +8,7 @@ use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
-use App\Models\Student; 
+use App\Models\Student;
 use App\Services\AssessmentGradeExcelService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -21,23 +21,26 @@ class AssessmentGradeExcelServiceTest extends TestCase
     use RefreshDatabase;
 
     protected AssessmentGradeExcelService $service;
+
     protected Lecture $lecturer;
+
     protected CourseOffering $courseOffering;
+
     protected AssessmentComponentDetail $assessmentComponentDetail;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Set up fake storage
         Storage::fake('local');
-        
+
         // Create test data
         $this->lecturer = Lecture::factory()->create();
         $this->courseOffering = CourseOffering::factory()->create([
             'lecture_id' => $this->lecturer->id,
         ]);
-        
+
         $assessmentComponent = AssessmentComponent::factory()->create();
         $this->assessmentComponentDetail = AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $assessmentComponent->id,
@@ -45,8 +48,8 @@ class AssessmentGradeExcelServiceTest extends TestCase
             'max_points' => 100,
             'weight' => 20,
         ]);
-        
-        $this->service = new AssessmentGradeExcelService();
+
+        $this->service = new AssessmentGradeExcelService;
     }
 
     /** @test */
@@ -60,7 +63,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
         $this->assertIsString($filePath);
         $this->assertFileExists($filePath);
         $this->assertStringContains('.xlsx', $filePath);
-        
+
         // Clean up
         if (file_exists($filePath)) {
             unlink($filePath);
@@ -79,7 +82,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
         $this->assertStringStartsWith('grade_template_', $filename);
         $this->assertStringContains('Test_Assignment', $filename);
         $this->assertStringEndsWith('.xlsx', $filename);
-        
+
         // Clean up
         if (file_exists($filePath)) {
             unlink($filePath);
@@ -96,7 +99,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Failed to generate grade template');
-        
+
         $this->service->exportGradeTemplate(
             $this->assessmentComponentDetail,
             $this->courseOffering
@@ -109,7 +112,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
         // Create enrolled students
         $student1 = Student::factory()->create();
         $student2 = Student::factory()->create();
-        
+
         // Mock the Excel export to capture the data
         Excel::shouldReceive('store')
             ->once()
@@ -138,7 +141,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('File must be an Excel file');
-        
+
         $this->service->importGrades(
             $this->assessmentComponentDetail,
             $this->courseOffering,
@@ -156,7 +159,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('File size cannot exceed 10MB');
-        
+
         $this->service->importGrades(
             $this->assessmentComponentDetail,
             $this->courseOffering,
@@ -173,7 +176,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('The uploaded file is empty');
-        
+
         $this->service->importGrades(
             $this->assessmentComponentDetail,
             $this->courseOffering,
@@ -219,7 +222,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Failed to import grades');
-        
+
         $this->service->importGrades(
             $this->assessmentComponentDetail,
             $this->courseOffering,
@@ -236,7 +239,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('File must be an Excel file');
-        
+
         $this->service->previewImport(
             $this->assessmentComponentDetail,
             $this->courseOffering,
@@ -260,8 +263,9 @@ class AssessmentGradeExcelServiceTest extends TestCase
                             'total_rows' => 5,
                             'valid_rows' => 4,
                             'errors' => ['Row 2: Invalid student ID'],
-                            'warnings' => []
+                            'warnings' => [],
                         ]);
+
                     return $import instanceof \App\Imports\GradeImport;
                 }),
                 $validFile
@@ -329,23 +333,23 @@ class AssessmentGradeExcelServiceTest extends TestCase
     {
         // Create some old temp files
         $tempPath = storage_path('app/temp');
-        if (!is_dir($tempPath)) {
+        if (! is_dir($tempPath)) {
             mkdir($tempPath, 0755, true);
         }
 
-        $oldFile = $tempPath . '/grade_template_old_file.xlsx';
+        $oldFile = $tempPath.'/grade_template_old_file.xlsx';
         touch($oldFile);
         // Set file time to 25 hours ago (older than 24 hour cutoff)
         touch($oldFile, time() - (25 * 60 * 60));
 
-        $recentFile = $tempPath . '/grade_template_recent_file.xlsx';
+        $recentFile = $tempPath.'/grade_template_recent_file.xlsx';
         touch($recentFile);
 
         $deletedCount = $this->service->cleanupTempFiles();
 
         $this->assertIsInt($deletedCount);
         $this->assertFileExists($recentFile);
-        
+
         // Clean up test files
         if (file_exists($recentFile)) {
             unlink($recentFile);
@@ -358,7 +362,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
         $tempPath = storage_path('app/temp');
         if (is_dir($tempPath)) {
             // Remove directory for this test
-            $files = glob($tempPath . '/*');
+            $files = glob($tempPath.'/*');
             foreach ($files as $file) {
                 unlink($file);
             }
@@ -410,7 +414,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('File must be an Excel file');
-        
+
         $method->invoke($this->service, $invalidFile);
     }
 
@@ -421,7 +425,7 @@ class AssessmentGradeExcelServiceTest extends TestCase
         $assessmentComponent = AssessmentComponent::factory()->create();
         $specialAssessment = AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $assessmentComponent->id,
-            'name' => 'Test/Assignment*With?Special[Chars]'
+            'name' => 'Test/Assignment*With?Special[Chars]',
         ]);
 
         $reflection = new \ReflectionClass($this->service);

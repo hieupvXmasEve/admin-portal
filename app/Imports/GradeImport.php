@@ -10,28 +10,31 @@ use App\Models\CourseOffering;
 use App\Models\Student;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Concerns\ToCollection;
-use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Concerns\WithValidation;
 
-class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithBatchInserts, WithChunkReading
+class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, WithHeadingRow, WithValidation
 {
     protected AssessmentComponentDetail $assessmentComponentDetail;
+
     protected CourseOffering $courseOffering;
+
     protected array $options;
+
     protected array $importResults = [
         'total_rows' => 0,
         'successful_updates' => 0,
         'successful_creates' => 0,
         'errors' => [],
         'warnings' => [],
-        'skipped' => 0
+        'skipped' => 0,
     ];
+
     protected int $lecturerId;
 
     public function __construct(
@@ -48,7 +51,7 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
             'validate_only' => false,
             'skip_errors' => false,
             'default_status' => 'graded',
-            'default_score_status' => 'provisional'
+            'default_score_status' => 'provisional',
         ], $options);
         $this->lecturerId = $lecturerId;
     }
@@ -62,6 +65,7 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
 
         if ($this->options['validate_only']) {
             $this->validateRows($rows);
+
             return;
         }
 
@@ -80,35 +84,37 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
         try {
             // Validate row data
             $validatedData = $this->validateRowData($row, $rowNumber);
-            if (!$validatedData) {
+            if (! $validatedData) {
                 return; // Skip this row due to validation errors
             }
 
             // Find student
             $student = $this->findStudent($validatedData);
-            if (!$student) {
+            if (! $student) {
                 $this->addError($rowNumber, 'Student not found', $validatedData);
+
                 return;
             }
 
             // Check if student is enrolled in the course
-            if (!$this->isStudentEnrolled($student)) {
+            if (! $this->isStudentEnrolled($student)) {
                 $this->addError($rowNumber, 'Student is not enrolled in this course', $validatedData);
+
                 return;
             }
 
             // Find or create score record
             $score = $this->findOrCreateScore($student, $validatedData, $rowNumber);
-            if (!$score) {
+            if (! $score) {
                 return; // Error already logged
             }
 
             // Update score with validated data
             $this->updateScore($score, $validatedData, $rowNumber);
         } catch (\Exception $e) {
-            $this->addError($rowNumber, 'Unexpected error: ' . $e->getMessage(), $row->toArray());
+            $this->addError($rowNumber, 'Unexpected error: '.$e->getMessage(), $row->toArray());
 
-            if (!$this->options['skip_errors']) {
+            if (! $this->options['skip_errors']) {
                 throw $e;
             }
         }
@@ -149,7 +155,7 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
 
         // Add max points validation if available
         if ($this->assessmentComponentDetail->max_points) {
-            $rules['points_earned'] .= '|max:' . $this->assessmentComponentDetail->max_points;
+            $rules['points_earned'] .= '|max:'.$this->assessmentComponentDetail->max_points;
         }
 
         $validator = Validator::make($data, $rules);
@@ -158,6 +164,7 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
             foreach ($validator->errors()->all() as $error) {
                 $this->addError($rowNumber, $error, $data);
             }
+
             return null;
         }
 
@@ -172,7 +179,7 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
         // First try by student_code
         $student = Student::where('student_code', $data['student_code'])->first();
 
-        if (!$student) {
+        if (! $student) {
             // Try by email as fallback
             $student = Student::where('email', $data['student_code'])->first();
         }
@@ -205,11 +212,13 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
 
         if ($score) {
             // Check if we should update existing scores
-            if (!$this->options['overwrite_existing'] && $this->options['update_mode'] === 'create_missing') {
+            if (! $this->options['overwrite_existing'] && $this->options['update_mode'] === 'create_missing') {
                 $this->addWarning($rowNumber, 'Score already exists and overwrite is disabled', $data);
                 $this->importResults['skipped']++;
+
                 return null;
             }
+
             return $score;
         }
 
@@ -224,11 +233,13 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
                 'last_modified_by_lecture_id' => $this->lecturerId,
                 'last_modified_at' => now(),
             ]);
+
             return $score;
         }
 
         $this->addWarning($rowNumber, 'Score does not exist and create mode is disabled', $data);
         $this->importResults['skipped']++;
+
         return null;
     }
 
@@ -237,10 +248,10 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
      */
     protected function updateScore(AssessmentComponentDetailScore $score, array $data, int $rowNumber): void
     {
-        $isNewRecord = !$score->exists;
+        $isNewRecord = ! $score->exists;
 
         // Calculate percentage if points are provided but percentage is not
-        if (isset($data['points_earned']) && !isset($data['percentage_score']) && $this->assessmentComponentDetail->max_points) {
+        if (isset($data['points_earned']) && ! isset($data['percentage_score']) && $this->assessmentComponentDetail->max_points) {
             $data['percentage_score'] = ($data['points_earned'] / $this->assessmentComponentDetail->max_points) * 100;
         }
 
@@ -275,7 +286,7 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
         $this->importResults['errors'][] = [
             'row' => $row,
             'message' => $message,
-            'data' => $data
+            'data' => $data,
         ];
     }
 
@@ -287,7 +298,7 @@ class GradeImport implements ToCollection, WithHeadingRow, WithValidation, WithB
         $this->importResults['warnings'][] = [
             'row' => $row,
             'message' => $message,
-            'data' => $data
+            'data' => $data,
         ];
     }
 

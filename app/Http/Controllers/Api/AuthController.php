@@ -6,10 +6,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
-use App\Models\Lecture;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -30,16 +29,16 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password ?? '')) {
+        if (! $user || ! Hash::check($request->password, $user->password ?? '')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid credentials'
+                'message' => 'Invalid credentials',
             ], 401);
         }
 
@@ -47,7 +46,7 @@ class AuthController extends Controller
         if ($user->status !== 'active') {
             return response()->json([
                 'success' => false,
-                'message' => 'Account is not active'
+                'message' => 'Account is not active',
             ], 403);
         }
 
@@ -70,11 +69,10 @@ class AuthController extends Controller
                     'campus' => $user->campuses() ?? null,
                 ],
                 'token' => $token,
-                'token_type' => 'Bearer'
-            ]
+                'token_type' => 'Bearer',
+            ],
         ]);
     }
-
 
     /**
      * Student logout
@@ -85,7 +83,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Logout successful'
+            'message' => 'Logout successful',
         ]);
     }
 
@@ -129,8 +127,8 @@ class AuthController extends Controller
                     ] : null,
                     'can_register' => $student->canRegisterForCourses(),
                     'has_active_holds' => $student->hasActiveHolds(),
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 
@@ -154,8 +152,8 @@ class AuthController extends Controller
             'message' => 'Token refreshed successfully',
             'data' => [
                 'token' => $newToken,
-                'token_type' => 'Bearer'
-            ]
+                'token_type' => 'Bearer',
+            ],
         ]);
     }
 
@@ -166,10 +164,10 @@ class AuthController extends Controller
     {
         // This endpoint might be disabled in production
         // Only allow registration if explicitly enabled
-        if (!config('app.allow_student_registration', false)) {
+        if (! config('app.allow_student_registration', false)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Student registration is not available'
+                'message' => 'Student registration is not available',
             ], 403);
         }
 
@@ -185,7 +183,7 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -209,8 +207,8 @@ class AuthController extends Controller
                     'full_name' => $student->full_name,
                     'email' => $student->email,
                     'status' => $student->status,
-                ]
-            ]
+                ],
+            ],
         ], 201);
     }
 
@@ -227,7 +225,7 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -236,7 +234,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Password reset link sent to your email'
+            'message' => 'Password reset link sent to your email',
         ]);
     }
 
@@ -255,7 +253,7 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -264,11 +262,9 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Password reset successful'
+            'message' => 'Password reset successful',
         ]);
     }
-
-
 
     /**
      * Get authenticated lecturer
@@ -319,8 +315,8 @@ class AuthController extends Controller
                     'max_teaching_hours_per_week' => $lecturer->max_teaching_hours_per_week,
                     'current_course_load' => $lecturer->getCurrentCourseLoad(),
                     'is_available_for_assignment' => $lecturer->is_available_for_assignment,
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 
@@ -333,7 +329,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Lecturer logout successful'
+            'message' => 'Lecturer logout successful',
         ]);
     }
 }

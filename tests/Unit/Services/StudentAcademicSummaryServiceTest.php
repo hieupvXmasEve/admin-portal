@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Services;
 
 use App\Models\AssessmentComponentDetailScore;
-use App\Models\Attendance;
 use App\Models\Campus;
 use App\Models\CourseOffering;
-use App\Models\CourseRegistration;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
@@ -25,21 +23,29 @@ class StudentAcademicSummaryServiceTest extends TestCase
     use RefreshDatabase;
 
     private StudentAcademicSummaryService $service;
+
     private Student $student;
+
     private Campus $campus;
+
     private Program $program;
+
     private Specialization $specialization;
+
     private CurriculumVersion $curriculumVersion;
+
     private Semester $semester;
+
     private Unit $unit;
+
     private CourseOffering $courseOffering;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
-        $this->service = new StudentAcademicSummaryService();
-        
+
+        $this->service = new StudentAcademicSummaryService;
+
         // Create test data
         $this->campus = Campus::factory()->create();
         $this->program = Program::factory()->create();
@@ -53,7 +59,7 @@ class StudentAcademicSummaryServiceTest extends TestCase
         $this->courseOffering = CourseOffering::factory()->create([
             'semester_id' => $this->semester->id,
         ]);
-        
+
         $this->student = Student::factory()->create([
             'campus_id' => $this->campus->id,
             'program_id' => $this->program->id,
@@ -81,14 +87,14 @@ class StudentAcademicSummaryServiceTest extends TestCase
 
         // First call should cache the result
         $result1 = $this->service->getAcademicSummary($this->student->id, [], true);
-        
+
         // Second call should return cached result
         $result2 = $this->service->getAcademicSummary($this->student->id, [], true);
-        
+
         $this->assertEquals($result1, $result2);
-        
+
         // Verify cache exists
-        $cacheKey = "student_academic_summary_{$this->student->id}_" . md5(serialize([]));
+        $cacheKey = "student_academic_summary_{$this->student->id}_".md5(serialize([]));
         $this->assertTrue(Cache::has($cacheKey));
     }
 
@@ -96,13 +102,13 @@ class StudentAcademicSummaryServiceTest extends TestCase
     {
         // Cache some data
         $this->service->getAcademicSummary($this->student->id, [], true);
-        
-        $cacheKey = "student_academic_summary_{$this->student->id}_" . md5(serialize([]));
+
+        $cacheKey = "student_academic_summary_{$this->student->id}_".md5(serialize([]));
         $this->assertTrue(Cache::has($cacheKey));
-        
+
         // Clear cache
         $this->service->clearAcademicSummaryCache($this->student->id);
-        
+
         // Verify cache is cleared
         $this->assertFalse(Cache::has($cacheKey));
     }
@@ -154,7 +160,7 @@ class StudentAcademicSummaryServiceTest extends TestCase
     public function test_get_academic_summary_handles_missing_student(): void
     {
         $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-        
+
         $this->service->getAcademicSummary(99999, [], false);
     }
 

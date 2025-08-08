@@ -28,7 +28,7 @@ class GPAResource extends JsonResource
      */
     protected function formatCurrentGPA(?array $gpaData): ?array
     {
-        if (!$gpaData) {
+        if (! $gpaData) {
             return null;
         }
 
@@ -48,7 +48,7 @@ class GPAResource extends JsonResource
      */
     protected function formatGPATrend(?array $trendData): ?array
     {
-        if (!$trendData) {
+        if (! $trendData) {
             return null;
         }
 
@@ -64,7 +64,7 @@ class GPAResource extends JsonResource
      */
     protected function formatGradeDistribution(?array $distributionData): ?array
     {
-        if (!$distributionData) {
+        if (! $distributionData) {
             return null;
         }
 
@@ -81,7 +81,7 @@ class GPAResource extends JsonResource
      */
     protected function formatAcademicStanding(?array $standingData): ?array
     {
-        if (!$standingData) {
+        if (! $standingData) {
             return null;
         }
 
@@ -147,7 +147,7 @@ class GPAResource extends JsonResource
     protected function formatDistributionChartData(array $distributionData): array
     {
         $chartData = [];
-        
+
         foreach ($distributionData['distribution'] as $grade => $count) {
             $chartData[] = [
                 'label' => $grade,

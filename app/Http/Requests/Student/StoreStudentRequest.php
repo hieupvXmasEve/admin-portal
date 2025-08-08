@@ -34,7 +34,7 @@ class StoreStudentRequest extends FormRequest
             'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
             'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
             'high_school_name' => ['required', 'string', 'max:255'],
-            'high_school_graduation_year' => ['required', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
+            'high_school_graduation_year' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
         ];
@@ -80,7 +80,7 @@ class StoreStudentRequest extends FormRequest
         // Format dates
         if ($this->has('admission_date') && $this->admission_date) {
             $this->merge([
-                'admission_date' => date('Y-m-d', strtotime($this->admission_date))
+                'admission_date' => date('Y-m-d', strtotime($this->admission_date)),
             ]);
         }
 
@@ -92,15 +92,14 @@ class StoreStudentRequest extends FormRequest
 
         if ($this->has('date_of_birth') && $this->date_of_birth) {
             $this->merge([
-                'date_of_birth' => date('Y-m-d', strtotime($this->date_of_birth))
+                'date_of_birth' => date('Y-m-d', strtotime($this->date_of_birth)),
             ]);
         }
 
-
         // Use session campus_id if not provided
-        if (!$this->has('campus_id') || !$this->campus_id) {
+        if (! $this->has('campus_id') || ! $this->campus_id) {
             $this->merge([
-                'campus_id' => session()->get('current_campus_id')
+                'campus_id' => session()->get('current_campus_id'),
             ]);
         }
     }

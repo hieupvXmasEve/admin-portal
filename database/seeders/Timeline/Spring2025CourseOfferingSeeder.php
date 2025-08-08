@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Semester;
-use App\Models\Unit;
-use App\Models\Lecture;
-use App\Models\CourseOffering;
-use App\Models\CurriculumUnit;
-use App\Models\Syllabus;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
+use App\Models\CourseOffering;
+use App\Models\Lecture;
+use App\Models\Semester;
+use App\Models\Syllabus;
+use App\Models\Unit;
 use Illuminate\Database\Seeder;
 
 class Spring2025CourseOfferingSeeder extends Seeder
@@ -27,7 +26,7 @@ class Spring2025CourseOfferingSeeder extends Seeder
         // Get SPRING2025 semester
         $semester = Semester::where('code', 'SPRING2025')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('SPRING2025 semester not found. Please create semester first.');
         }
 
@@ -35,6 +34,7 @@ class Spring2025CourseOfferingSeeder extends Seeder
         $existingOfferings = CourseOffering::where('semester_id', $semester->id)->count();
         if ($existingOfferings > 0) {
             $this->command->info("✅ Course offerings already exist for SPRING2025 ({$existingOfferings} found). Skipping creation.");
+
             return;
         }
 
@@ -80,13 +80,13 @@ class Spring2025CourseOfferingSeeder extends Seeder
                     'enrollment_status' => 'open',
                     'registration_start_date' => $semester->enrollment_start_date?->toDateString(),
                     'registration_end_date' => $semester->enrollment_end_date?->toDateString(),
-                    'notes' => "SPRING2025 offering for second semester students",
+                    'notes' => 'SPRING2025 offering for second semester students',
                 ]);
 
                 $offeringCount++;
 
                 // Track units that have offerings
-                if (!$unitsWithOfferings->contains($unit->id)) {
+                if (! $unitsWithOfferings->contains($unit->id)) {
                     $unitsWithOfferings->push($unit->id);
                 }
             }
@@ -114,13 +114,13 @@ class Spring2025CourseOfferingSeeder extends Seeder
                 'enrollment_status' => 'open',
                 'registration_start_date' => $semester->enrollment_start_date?->toDateString(),
                 'registration_end_date' => $semester->enrollment_end_date?->toDateString(),
-                'notes' => "SPRING2025 retake offering for students who failed in FALL2024",
+                'notes' => 'SPRING2025 retake offering for students who failed in FALL2024',
             ]);
 
             $offeringCount++;
 
             // Track retake units
-            if (!$unitsWithOfferings->contains($unit->id)) {
+            if (! $unitsWithOfferings->contains($unit->id)) {
                 $unitsWithOfferings->push($unit->id);
             }
         }
@@ -254,7 +254,7 @@ class Spring2025CourseOfferingSeeder extends Seeder
         $campusName = $lecturer->campus->name ?? 'Main Campus';
         $roomNumbers = ['103', '104', '203', 'Lab C', 'Lab D', 'Tutorial Room 1'];
 
-        return "Room " . $roomNumbers[array_rand($roomNumbers)] . ", " . $campusName;
+        return 'Room '.$roomNumbers[array_rand($roomNumbers)].', '.$campusName;
     }
 
     private function createSyllabusForUnit(Unit $unit, Semester $semester): void
@@ -262,7 +262,7 @@ class Spring2025CourseOfferingSeeder extends Seeder
         // Find curriculum unit for this unit (simplified approach for test data)
         $curriculumUnit = \App\Models\CurriculumUnit::where('unit_id', $unit->id)->first();
 
-        if (!$curriculumUnit) {
+        if (! $curriculumUnit) {
             // Skip creating syllabus if no curriculum unit found
             return;
         }
@@ -294,15 +294,15 @@ class Spring2025CourseOfferingSeeder extends Seeder
     {
         // Extended descriptions for second semester units
         $descriptions = [
-            'COS10003' => "Web Application Development builds upon programming fundamentals to create dynamic web applications using modern frameworks and databases.",
-            'COS20007' => "Object Oriented Programming introduces advanced programming concepts including inheritance, polymorphism, and design patterns.",
-            'MAT10002' => "Advanced Mathematics for Computing covers calculus, probability, and statistical analysis for computer science applications.",
-            'ENG10004' => "Technical Communication develops professional communication skills for technical environments and project documentation.",
-            'HRM10002' => "Organizational Behavior examines individual and group behavior in organizational settings and leadership principles.",
-            'MKT10002' => "Consumer Behavior and Market Research explores consumer psychology and research methodologies in marketing.",
-            'ACC10008' => "Management Accounting focuses on internal reporting, cost analysis, and decision-making for business operations.",
-            'ENG10005' => "Engineering Design introduces systematic design processes and project management for engineering solutions.",
-            'ENG10006' => "Materials and Manufacturing covers material properties and manufacturing processes in engineering applications.",
+            'COS10003' => 'Web Application Development builds upon programming fundamentals to create dynamic web applications using modern frameworks and databases.',
+            'COS20007' => 'Object Oriented Programming introduces advanced programming concepts including inheritance, polymorphism, and design patterns.',
+            'MAT10002' => 'Advanced Mathematics for Computing covers calculus, probability, and statistical analysis for computer science applications.',
+            'ENG10004' => 'Technical Communication develops professional communication skills for technical environments and project documentation.',
+            'HRM10002' => 'Organizational Behavior examines individual and group behavior in organizational settings and leadership principles.',
+            'MKT10002' => 'Consumer Behavior and Market Research explores consumer psychology and research methodologies in marketing.',
+            'ACC10008' => 'Management Accounting focuses on internal reporting, cost analysis, and decision-making for business operations.',
+            'ENG10005' => 'Engineering Design introduces systematic design processes and project management for engineering solutions.',
+            'ENG10006' => 'Materials and Manufacturing covers material properties and manufacturing processes in engineering applications.',
         ];
 
         return $descriptions[$unit->code] ?? "This unit advances knowledge in {$unit->name} with practical applications and advanced concepts.";
@@ -310,7 +310,7 @@ class Spring2025CourseOfferingSeeder extends Seeder
 
     private function getTotalHours(Unit $unit): int
     {
-        return (int)($unit->credit_points * 10);
+        return (int) ($unit->credit_points * 10);
     }
 
     private function getHoursPerSession(Unit $unit): int

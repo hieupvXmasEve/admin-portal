@@ -16,18 +16,18 @@ class StudentMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         // Check if user is authenticated via Sanctum
-        if (!$request->user()) {
+        if (! $request->user()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated'
+                'message' => 'Unauthenticated',
             ], 401);
         }
 
         // Check if the authenticated user is a Student
-        if (!$request->user() instanceof \App\Models\Student) {
+        if (! $request->user() instanceof \App\Models\Student) {
             return response()->json([
                 'success' => false,
-                'message' => 'Access denied. Student account required.'
+                'message' => 'Access denied. Student account required.',
             ], 403);
         }
 
@@ -35,7 +35,7 @@ class StudentMiddleware
         if ($request->user()->status !== 'active') {
             return response()->json([
                 'success' => false,
-                'message' => 'Student account is not active'
+                'message' => 'Student account is not active',
             ], 403);
         }
 

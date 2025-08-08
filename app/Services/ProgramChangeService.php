@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Student;
-use App\Models\ProgramChangeRequest;
-use App\Models\Program;
-use App\Models\Specialization;
 use App\Models\CurriculumVersion;
+use App\Models\Program;
+use App\Models\ProgramChangeRequest;
+use App\Models\Specialization;
+use App\Models\Student;
 use App\Models\User;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class ProgramChangeService
 {
@@ -56,7 +56,7 @@ class ProgramChangeService
     public function approveChangeRequest(ProgramChangeRequest $request, User $approver, array $data = []): ProgramChangeRequest
     {
         return DB::transaction(function () use ($request, $approver, $data) {
-            if (!$request->canBeApproved()) {
+            if (! $request->canBeApproved()) {
                 throw new Exception('Program change request cannot be approved in its current status');
             }
 
@@ -87,7 +87,7 @@ class ProgramChangeService
     public function rejectChangeRequest(ProgramChangeRequest $request, User $approver, string $reason): ProgramChangeRequest
     {
         return DB::transaction(function () use ($request, $approver, $reason) {
-            if (!$request->canBeRejected()) {
+            if (! $request->canBeRejected()) {
                 throw new Exception('Program change request cannot be rejected in its current status');
             }
 
@@ -120,26 +120,26 @@ class ProgramChangeService
             'toProgram',
             'fromSpecialization',
             'toSpecialization',
-            'approvedBy'
+            'approvedBy',
         ])->orderBy('created_at', 'desc');
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
-        if (!empty($filters['student_code'])) {
+        if (! empty($filters['student_code'])) {
             $query->where('student_code', $filters['student_code']);
         }
 
-        if (!empty($filters['from_program_id'])) {
+        if (! empty($filters['from_program_id'])) {
             $query->where('from_program_id', $filters['from_program_id']);
         }
 
-        if (!empty($filters['to_program_id'])) {
+        if (! empty($filters['to_program_id'])) {
             $query->where('to_program_id', $filters['to_program_id']);
         }
 
-        if (!empty($filters['campus_id'])) {
+        if (! empty($filters['campus_id'])) {
             $query->whereHas('student', function ($q) use ($filters) {
                 $q->where('campus_id', $filters['campus_id']);
             });
@@ -255,7 +255,7 @@ class ProgramChangeService
 
         // Check if the target program exists
         $toProgram = Program::find($data['to_program_id']);
-        if (!$toProgram) {
+        if (! $toProgram) {
             throw new Exception('Target program does not exist');
         }
 
@@ -268,12 +268,12 @@ class ProgramChangeService
         }
 
         // Check if specialization belongs to the target program
-        if (!empty($data['to_specialization_id'])) {
+        if (! empty($data['to_specialization_id'])) {
             $specialization = Specialization::where('id', $data['to_specialization_id'])
                 ->where('program_id', $data['to_program_id'])
                 ->first();
 
-            if (!$specialization) {
+            if (! $specialization) {
                 throw new Exception('Selected specialization does not belong to the target program');
             }
         }
@@ -299,7 +299,7 @@ class ProgramChangeService
     /**
      * Find the current curriculum version for a program/specialization
      */
-    private function findCurrentCurriculumVersion(int $programId, int $specializationId = null): CurriculumVersion
+    private function findCurrentCurriculumVersion(int $programId, ?int $specializationId = null): CurriculumVersion
     {
         $query = CurriculumVersion::where('program_id', $programId)
             ->where('is_active', true)
@@ -313,7 +313,7 @@ class ProgramChangeService
 
         $curriculumVersion = $query->first();
 
-        if (!$curriculumVersion) {
+        if (! $curriculumVersion) {
             throw new Exception('No active curriculum version found for the target program/specialization');
         }
 
@@ -327,17 +327,17 @@ class ProgramChangeService
     {
         $query = ProgramChangeRequest::query();
 
-        if (!empty($filters['campus_id'])) {
+        if (! empty($filters['campus_id'])) {
             $query->whereHas('student', function ($q) use ($filters) {
                 $q->where('campus_id', $filters['campus_id']);
             });
         }
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->where('created_at', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->where('created_at', '<=', $filters['date_to']);
         }
 

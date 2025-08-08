@@ -49,7 +49,7 @@ return new class extends Migration
                 'professor',
                 'emeritus_professor',
                 'visiting_lecturer',
-                'adjunct_professor'
+                'adjunct_professor',
             ])->default('lecturer');
 
             // Educational Background
@@ -67,7 +67,7 @@ return new class extends Migration
                 'part_time',
                 'contract',
                 'visiting',
-                'emeritus'
+                'emeritus',
             ])->default('full_time');
             $table->enum('employment_status', [
                 'active',
@@ -75,7 +75,7 @@ return new class extends Migration
                 'sabbatical',
                 'retired',
                 'terminated',
-                'suspended'
+                'suspended',
             ])->default('active');
 
             // Teaching Preferences and Constraints

@@ -26,7 +26,7 @@ class LecturerResource extends JsonResource
             'phone' => $this->phone,
             'mobile_phone' => $this->mobile_phone,
             'avatar_url' => $this->avatar_url,
-            
+
             // Campus and Department Information
             'campus' => $this->whenLoaded('campus', function () {
                 return [
@@ -40,14 +40,14 @@ class LecturerResource extends JsonResource
             'faculty' => $this->faculty,
             'specialization' => $this->specialization,
             'expertise_areas' => $this->expertise_areas,
-            
+
             // Academic Information
             'academic_rank' => $this->academic_rank,
             'highest_degree' => $this->highest_degree,
             'degree_field' => $this->degree_field,
             'alma_mater' => $this->alma_mater,
             'graduation_year' => $this->graduation_year,
-            
+
             // Employment Information
             'employment_type' => $this->employment_type,
             'employment_status' => $this->employment_status,
@@ -56,7 +56,7 @@ class LecturerResource extends JsonResource
             'contract_end_date' => $this->contract_end_date?->format('Y-m-d'),
             'years_of_service' => $this->years_of_service,
             'is_contract_active' => $this->is_contract_active,
-            
+
             // Teaching Preferences
             'preferred_teaching_days' => $this->preferred_teaching_days,
             'preferred_start_time' => $this->preferred_start_time?->format('H:i'),
@@ -64,22 +64,22 @@ class LecturerResource extends JsonResource
             'max_teaching_hours_per_week' => $this->max_teaching_hours_per_week,
             'teaching_modalities' => $this->teaching_modalities,
             'can_teach_online' => $this->can_teach_online,
-            
+
             // Contact Information
             'office_address' => $this->office_address,
             'office_phone' => $this->office_phone,
-            
+
             // Professional Information
             'biography' => $this->biography,
             'certifications' => $this->certifications,
             'languages' => $this->languages,
-            
+
             // Status Information
             'is_active' => $this->is_active,
             'is_available_for_assignment' => $this->is_available_for_assignment,
             'last_login_at' => $this->last_login_at?->toISOString(),
             'email_verified_at' => $this->email_verified_at?->toISOString(),
-            
+
             // Course Offerings (when loaded)
             'current_courses' => $this->whenLoaded('courseOfferings', function () {
                 return $this->courseOfferings->map(function ($offering) {
@@ -105,7 +105,7 @@ class LecturerResource extends JsonResource
                     ];
                 });
             }),
-            
+
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

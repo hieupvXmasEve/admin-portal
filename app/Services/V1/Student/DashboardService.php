@@ -4,16 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
-use App\Models\Semester;
-use App\Models\Enrollment;
-use App\Models\GpaCalculation;
 use App\Models\AcademicHold;
 use App\Models\AssessmentComponentDetailScore;
-use App\Services\V1\Student\GPACalculationService;
-use App\Services\V1\Student\CreditProgressService;
+use App\Models\Enrollment;
+use App\Models\GpaCalculation;
+use App\Models\Semester;
+use App\Models\Student;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
@@ -49,7 +46,7 @@ class DashboardService
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return [
                 'semester' => null,
                 'enrollment' => null,
@@ -160,7 +157,7 @@ class DashboardService
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return ['assessments' => []];
         }
 
@@ -204,7 +201,7 @@ class DashboardService
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return ['status' => 'no_active_semester'];
         }
 
@@ -228,7 +225,7 @@ class DashboardService
                 ->where('completion_status', 'completed')
                 ->count(),
             'current_semester_courses' => $student->courseRegistrations()
-                ->whereHas('semester', fn($q) => $q->where('is_active', true))
+                ->whereHas('semester', fn ($q) => $q->where('is_active', true))
                 ->where('registration_status', 'registered')
                 ->count(),
             'attendance_rate' => $this->calculateOverallAttendanceRate($student),

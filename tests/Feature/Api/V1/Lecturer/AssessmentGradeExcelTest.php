@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Models\AcademicRecord;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
+use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
 use App\Models\Student;
-use App\Models\AcademicRecord;
-use App\Models\AssessmentComponentDetailScore;
 use App\Services\AssessmentGradeExcelService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -20,13 +20,13 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     // Set up fake storage
     Storage::fake('local');
-    
+
     // Create test data
     $this->lecturer = Lecture::factory()->create();
     $this->courseOffering = CourseOffering::factory()->create([
         'lecture_id' => $this->lecturer->id,
     ]);
-    
+
     $assessmentComponent = AssessmentComponent::factory()->create();
     $this->assessmentComponentDetail = AssessmentComponentDetail::factory()->create([
         'assessment_component_id' => $assessmentComponent->id,
@@ -34,7 +34,7 @@ beforeEach(function () {
         'max_points' => 100,
         'weight' => 30,
     ]);
-    
+
     // Create students enrolled in the course
     $this->students = Student::factory()->count(3)->create();
     foreach ($this->students as $student) {
@@ -56,7 +56,7 @@ describe('Export Grade Template API', function () {
 
         it('requires lecturer to own the course offering', function () {
             $otherLecturer = Lecture::factory()->create();
-            
+
             $response = $this->actingAs($otherLecturer, 'api')
                 ->postJson("/api/v1/lecturer/course-offerings/{$this->courseOffering->id}/assessment-details/{$this->assessmentComponentDetail->id}/export-grade-template");
 
@@ -64,7 +64,7 @@ describe('Export Grade Template API', function () {
                 ->assertJson([
                     'success' => false,
                     'message' => 'Unauthorized access to course offering',
-                    'error_code' => 'UNAUTHORIZED'
+                    'error_code' => 'UNAUTHORIZED',
                 ]);
         });
 
@@ -85,7 +85,7 @@ describe('Export Grade Template API', function () {
                 ->assertJson([
                     'success' => false,
                     'message' => 'Assessment component detail does not belong to this course offering',
-                    'error_code' => 'INVALID_ASSESSMENT'
+                    'error_code' => 'INVALID_ASSESSMENT',
                 ]);
         });
 
@@ -144,7 +144,7 @@ describe('Export Grade Template API', function () {
                 ->assertJson([
                     'success' => false,
                     'message' => 'Failed to export grade template',
-                    'error_code' => 'SERVER_ERROR'
+                    'error_code' => 'SERVER_ERROR',
                 ]);
         });
 
@@ -182,7 +182,7 @@ describe('Import Grades API', function () {
         it('requires lecturer to own the course offering', function () {
             $otherLecturer = Lecture::factory()->create();
             $file = UploadedFile::fake()->create('grades.xlsx', 100);
-            
+
             $response = $this->actingAs($otherLecturer, 'api')
                 ->postJson(
                     "/api/v1/lecturer/course-offerings/{$this->courseOffering->id}/assessment-details/{$this->assessmentComponentDetail->id}/import-grades",
@@ -193,7 +193,7 @@ describe('Import Grades API', function () {
                 ->assertJson([
                     'success' => false,
                     'message' => 'Unauthorized access to course offering',
-                    'error_code' => 'UNAUTHORIZED'
+                    'error_code' => 'UNAUTHORIZED',
                 ]);
         });
 
@@ -217,7 +217,7 @@ describe('Import Grades API', function () {
                 ->assertJson([
                     'success' => false,
                     'message' => 'Assessment component detail does not belong to this course offering',
-                    'error_code' => 'INVALID_ASSESSMENT'
+                    'error_code' => 'INVALID_ASSESSMENT',
                 ]);
         });
 
@@ -228,7 +228,7 @@ describe('Import Grades API', function () {
             $response->assertStatus(422)
                 ->assertJsonValidationErrors(['file'])
                 ->assertJsonFragment([
-                    'file' => ['An Excel file is required for grade import']
+                    'file' => ['An Excel file is required for grade import'],
                 ]);
         });
 
@@ -244,7 +244,7 @@ describe('Import Grades API', function () {
             $response->assertStatus(422)
                 ->assertJsonValidationErrors(['file'])
                 ->assertJsonFragment([
-                    'file' => ['The file must be an Excel file (.xlsx, .xls) or CSV file (.csv)']
+                    'file' => ['The file must be an Excel file (.xlsx, .xls) or CSV file (.csv)'],
                 ]);
         });
 
@@ -260,7 +260,7 @@ describe('Import Grades API', function () {
             $response->assertStatus(422)
                 ->assertJsonValidationErrors(['file'])
                 ->assertJsonFragment([
-                    'file' => ['The file size cannot exceed 10MB']
+                    'file' => ['The file size cannot exceed 10MB'],
                 ]);
         });
 
@@ -272,7 +272,7 @@ describe('Import Grades API', function () {
                     "/api/v1/lecturer/course-offerings/{$this->courseOffering->id}/assessment-details/{$this->assessmentComponentDetail->id}/import-grades",
                     [
                         'file' => $file,
-                        'update_mode' => 'invalid_mode'
+                        'update_mode' => 'invalid_mode',
                     ]
                 );
 
@@ -291,7 +291,7 @@ describe('Import Grades API', function () {
                         'successful_updates' => 1,
                         'errors' => [],
                         'warnings' => [],
-                        'total_rows' => 3
+                        'total_rows' => 3,
                     ]);
             });
 
@@ -309,8 +309,8 @@ describe('Import Grades API', function () {
                         'successful_creates' => 2,
                         'successful_updates' => 1,
                         'errors' => [],
-                        'warnings' => []
-                    ]
+                        'warnings' => [],
+                    ],
                 ]);
         });
 
@@ -325,7 +325,7 @@ describe('Import Grades API', function () {
                         'successful_updates' => 0,
                         'errors' => [],
                         'warnings' => ['Student S123456 score exceeds maximum points'],
-                        'total_rows' => 2
+                        'total_rows' => 2,
                     ]);
             });
 
@@ -341,8 +341,8 @@ describe('Import Grades API', function () {
                     'message' => 'Grade import completed with some issues',
                     'data' => [
                         'successful_creates' => 2,
-                        'warnings' => ['Student S123456 score exceeds maximum points']
-                    ]
+                        'warnings' => ['Student S123456 score exceeds maximum points'],
+                    ],
                 ]);
         });
 
@@ -357,7 +357,7 @@ describe('Import Grades API', function () {
                         'successful_updates' => 0,
                         'errors' => ['Row 2: Student not found'],
                         'warnings' => [],
-                        'total_rows' => 2
+                        'total_rows' => 2,
                     ]);
             });
 
@@ -370,7 +370,7 @@ describe('Import Grades API', function () {
             $response->assertStatus(200)
                 ->assertJson([
                     'success' => true,
-                    'message' => 'Grade import completed with some issues'
+                    'message' => 'Grade import completed with some issues',
                 ]);
         });
 
@@ -385,7 +385,7 @@ describe('Import Grades API', function () {
                         'successful_updates' => 0,
                         'errors' => ['Invalid file format', 'No valid rows found'],
                         'warnings' => [],
-                        'total_rows' => 0
+                        'total_rows' => 0,
                     ]);
             });
 
@@ -399,7 +399,7 @@ describe('Import Grades API', function () {
                 ->assertJson([
                     'success' => false,
                     'message' => 'Grade import failed',
-                    'error_code' => 'IMPORT_FAILED'
+                    'error_code' => 'IMPORT_FAILED',
                 ]);
         });
 
@@ -419,7 +419,7 @@ describe('Import Grades API', function () {
                             'validate_only' => false,
                             'skip_errors' => true,
                             'default_status' => 'graded',
-                            'default_score_status' => 'final'
+                            'default_score_status' => 'final',
                         ],
                         $this->lecturer->id
                     )
@@ -428,7 +428,7 @@ describe('Import Grades API', function () {
                         'successful_updates' => 2,
                         'errors' => [],
                         'warnings' => [],
-                        'total_rows' => 2
+                        'total_rows' => 2,
                     ]);
             });
 
@@ -440,7 +440,7 @@ describe('Import Grades API', function () {
                         'update_mode' => 'update_existing',
                         'overwrite_existing' => true,
                         'skip_errors' => true,
-                        'default_score_status' => 'final'
+                        'default_score_status' => 'final',
                     ]
                 );
 
@@ -466,7 +466,7 @@ describe('Import Grades API', function () {
                 ->assertJson([
                     'success' => false,
                     'message' => 'Failed to import grades',
-                    'error_code' => 'SERVER_ERROR'
+                    'error_code' => 'SERVER_ERROR',
                 ]);
         });
     });
@@ -499,7 +499,7 @@ describe('Grade Management Integration', function () {
                     'errors' => [],
                     'warnings' => [],
                     'total_rows' => 3,
-                    'default_scores_applied' => 3
+                    'default_scores_applied' => 3,
                 ]);
         });
 
@@ -512,7 +512,7 @@ describe('Grade Management Integration', function () {
         $importResponse->assertStatus(200)
             ->assertJsonFragment([
                 'successful_creates' => 3,
-                'default_scores_applied' => 3
+                'default_scores_applied' => 3,
             ]);
     });
 
@@ -536,7 +536,7 @@ describe('Grade Management Integration', function () {
                     'successful_updates' => 1, // One existing student updated
                     'errors' => [],
                     'warnings' => [],
-                    'total_rows' => 3
+                    'total_rows' => 3,
                 ]);
         });
 
@@ -551,8 +551,8 @@ describe('Grade Management Integration', function () {
                 'success' => true,
                 'data' => [
                     'successful_creates' => 2,
-                    'successful_updates' => 1
-                ]
+                    'successful_updates' => 1,
+                ],
             ]);
     });
 });

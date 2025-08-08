@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
+use App\Models\AcademicHold;
 use App\Models\CourseRegistration;
 use App\Models\Semester;
-use App\Models\AcademicHold;
-use Illuminate\Database\Seeder;
+use App\Models\Student;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class AcademicLeaveSeeder extends Seeder
 {
@@ -24,7 +24,7 @@ class AcademicLeaveSeeder extends Seeder
         // Get SPRING2025 semester
         $semester = Semester::where('code', 'SPRING2025')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('SPRING2025 semester not found.');
         }
 
@@ -62,7 +62,7 @@ class AcademicLeaveSeeder extends Seeder
         // Update student status to inactive for academic leave
         $student->update([
             'status' => 'inactive',
-            'admission_notes' => "Academic leave: {$leaveType['reason']} (effective {$leaveDate->format('Y-m-d')})"
+            'admission_notes' => "Academic leave: {$leaveType['reason']} (effective {$leaveDate->format('Y-m-d')})",
         ]);
 
         // Withdraw from all current registrations
@@ -131,9 +131,11 @@ class AcademicLeaveSeeder extends Seeder
         // 70% chance of leave in first half, 30% in second half
         if (rand(1, 100) <= 70) {
             $daysDiff = (int) $semesterStart->diffInDays($midSemester);
+
             return $semesterStart->copy()->addDays(rand(7, $daysDiff)); // At least 1 week in
         } else {
             $daysDiff = (int) $midSemester->diffInDays($semesterEnd);
+
             return $midSemester->copy()->addDays(rand(0, $daysDiff));
         }
     }
@@ -195,8 +197,8 @@ class AcademicLeaveSeeder extends Seeder
             'hold_type' => 'administrative',
             'hold_category' => 'registration',
             'title' => 'Academic Leave Documentation',
-            'description' => "Student on {$leaveType['reason']} leave. " .
-                ($leaveType['documentation_required'] ? 'Documentation required for return. ' : '') .
+            'description' => "Student on {$leaveType['reason']} leave. ".
+                ($leaveType['documentation_required'] ? 'Documentation required for return. ' : '').
                 "Expected return: {$expectedReturnDate->format('Y-m-d')}",
             'amount' => null,
             'priority' => 'medium',

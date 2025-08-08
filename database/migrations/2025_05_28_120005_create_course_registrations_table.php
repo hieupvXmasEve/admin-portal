@@ -24,14 +24,14 @@ return new class extends Migration
                 'confirmed',
                 'dropped',
                 'withdrawn',
-                'completed'
+                'completed',
             ])->default('registered');
 
             $table->timestamp('registration_date');
             $table->enum('registration_method', [
                 'online',
                 'advisor',
-                'admin_override'
+                'admin_override',
             ])->default('online');
 
             // Academic Record

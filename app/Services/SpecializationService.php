@@ -5,42 +5,41 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Specialization;
-use Illuminate\Support\Facades\Log;
 use Exception;
+use Illuminate\Support\Facades\Log;
 
 class SpecializationService
 {
     /**
      * Create a new specialization.
      *
-     * @param array $data Validated data.
-     * @return Specialization
+     * @param  array  $data  Validated data.
      */
     public function createSpecialization(array $data): Specialization
     {
         Log::info('Creating a new specialization', $data);
+
         return Specialization::create($data);
     }
 
     /**
      * Update an existing specialization.
      *
-     * @param Specialization $specialization The specialization to update.
-     * @param array $data Validated data.
-     * @return Specialization
+     * @param  Specialization  $specialization  The specialization to update.
+     * @param  array  $data  Validated data.
      */
     public function updateSpecialization(Specialization $specialization, array $data): Specialization
     {
         Log::info("Updating specialization {$specialization->id}", $data);
         $specialization->update($data);
+
         return $specialization;
     }
 
     /**
      * Delete a specialization.
      *
-     * @param Specialization $specialization The specialization to delete.
-     * @return void
+     * @param  Specialization  $specialization  The specialization to delete.
      */
     public function deleteSpecialization(Specialization $specialization): void
     {
@@ -55,7 +54,7 @@ class SpecializationService
     /**
      * Bulk delete specializations.
      *
-     * @param array $specializationIds Array of specialization IDs to delete.
+     * @param  array  $specializationIds  Array of specialization IDs to delete.
      * @return array Array containing deleted and failed specializations.
      */
     public function bulkDeleteSpecializations(array $specializationIds): array
@@ -68,7 +67,7 @@ class SpecializationService
             if ($specialization->curriculumVersions()->count() > 0) {
                 $failed[] = [
                     'name' => $specialization->name,
-                    'reason' => 'Has existing curriculum versions'
+                    'reason' => 'Has existing curriculum versions',
                 ];
             } else {
                 $deleted[] = $specialization->name;
@@ -78,12 +77,12 @@ class SpecializationService
 
         Log::info('Bulk delete specializations', [
             'deleted_count' => count($deleted),
-            'failed_count' => count($failed)
+            'failed_count' => count($failed),
         ]);
 
         return [
             'deleted' => $deleted,
-            'failed' => $failed
+            'failed' => $failed,
         ];
     }
 }

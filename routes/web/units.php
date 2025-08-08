@@ -1,9 +1,9 @@
 <?php
 
+use App\Constants\UnitRoutes;
 use App\Http\Controllers\Web\UnitController;
 use App\Http\Controllers\Web\Units\UnitExportController;
 use App\Http\Controllers\Web\Units\UnitImportController;
-use App\Constants\UnitRoutes;
 use Illuminate\Support\Facades\Route;
 
 // Web routes for Inertia.js pages
@@ -35,8 +35,8 @@ Route::middleware('auth')->group(function () {
     Route::get('units/create', [UnitController::class, 'create'])
         ->middleware('can:create_unit')
         ->name(UnitRoutes::CREATE);
-    
-    // Specific routes must come before parameterized routes  
+
+    // Specific routes must come before parameterized routes
     Route::get('units/search', [UnitController::class, 'search'])
         ->middleware('can:view_unit')
         ->name('units.search');
@@ -46,7 +46,7 @@ Route::middleware('auth')->group(function () {
         ->name('units.validate-prerequisite-expression');
     Route::delete('units/bulk-delete', [UnitController::class, 'bulkDelete'])
         ->name('units.bulk-delete');
-    
+
     Route::post('units', [UnitController::class, 'store'])
         ->middleware('can:create_unit')
         ->name(UnitRoutes::STORE);

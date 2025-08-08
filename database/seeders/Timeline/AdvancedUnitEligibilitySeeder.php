@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
+use App\Models\GpaCalculation;
+use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
-use App\Models\AcademicRecord;
-use App\Models\GpaCalculation;
-use App\Models\CurriculumUnit;
 use App\Models\UnitPrerequisiteGroup;
-use App\Models\Semester;
 use Illuminate\Database\Seeder;
 
 class AdvancedUnitEligibilitySeeder extends Seeder
@@ -71,7 +69,7 @@ class AdvancedUnitEligibilitySeeder extends Seeder
             ->latest('calculated_at')
             ->first();
 
-        if (!$latestGPA) {
+        if (! $latestGPA) {
             return $results;
         }
 
@@ -243,21 +241,21 @@ class AdvancedUnitEligibilitySeeder extends Seeder
 
         // Update student admission notes with eligibility information
         $currentNotes = $student->admission_notes ?? '';
-        $newNotes = trim($currentNotes . ' | Eligibility: ' . implode(', ', $eligibilityNotes));
+        $newNotes = trim($currentNotes.' | Eligibility: '.implode(', ', $eligibilityNotes));
 
         $student->update([
-            'admission_notes' => $newNotes
+            'admission_notes' => $newNotes,
         ]);
 
         // Log high-performing students
         if ($results['advanced_standing'] || $results['honors_eligible']) {
-            $this->command->info("  🌟 {$student->student_code}: " . implode(', ', $eligibilityNotes) . " (GPA: {$gpa->gpa})");
+            $this->command->info("  🌟 {$student->student_code}: ".implode(', ', $eligibilityNotes)." (GPA: {$gpa->gpa})");
         }
     }
 
     private function displayEligibilityResults(array $results): void
     {
-        $this->command->info("✅ Advanced unit eligibility assessment complete!");
+        $this->command->info('✅ Advanced unit eligibility assessment complete!');
         $this->command->info("  📚 Year 2 eligible: {$results['year2_eligible']} students");
         $this->command->info("  📖 Year 3 eligible: {$results['year3_eligible']} students");
         $this->command->info("  🏆 Honors eligible: {$results['honors_eligible']} students");

@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Constants\CurriculumRoutes;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreCurriculumUnitRequest;
+use App\Http\Requests\UpdateCurriculumUnitRequest;
 use App\Models\CurriculumUnit;
 use App\Models\CurriculumVersion;
 use App\Models\Semester;
 use App\Models\Unit;
-use App\Http\Requests\StoreCurriculumUnitRequest;
-use App\Http\Requests\UpdateCurriculumUnitRequest;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Constants\CurriculumRoutes;
 
 class CurriculumUnitController extends Controller
 {
@@ -68,7 +68,7 @@ class CurriculumUnitController extends Controller
                 ['value' => 'program', 'label' => 'Program'],
                 ['value' => 'common', 'label' => 'Common'],
                 ['value' => 'specialization_specific', 'label' => 'Specialization Specific'],
-//                ['value' => 'cross_program', 'label' => 'Cross Program'],
+                //                ['value' => 'cross_program', 'label' => 'Cross Program'],
             ],
         ]);
     }
@@ -87,7 +87,7 @@ class CurriculumUnitController extends Controller
                 ['value' => 'specialization_specific', 'label' => 'Specialization Specific'],
                 ['value' => 'cross_program', 'label' => 'Cross Program'],
             ],
-            'semesterOptions' => collect(range(1, 12))->map(fn($n) => ['value' => $n, 'label' => "Semester {$n}"]),
+            'semesterOptions' => collect(range(1, 12))->map(fn ($n) => ['value' => $n, 'label' => "Semester {$n}"]),
         ]);
     }
 
@@ -105,7 +105,7 @@ class CurriculumUnitController extends Controller
                 ->with('success', 'Curriculum unit created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Curriculum unit creation failed: ' . $e->getMessage());
+            Log::error('Curriculum unit creation failed: '.$e->getMessage());
 
             return back()
                 ->withInput()
@@ -119,7 +119,7 @@ class CurriculumUnitController extends Controller
             'curriculumVersion.program',
             'curriculumVersion.specialization',
             'unit',
-            'semester'
+            'semester',
         ]);
 
         return Inertia::render('curriculum-units/Show', [
@@ -144,7 +144,7 @@ class CurriculumUnitController extends Controller
                 ['value' => 'specialization_specific', 'label' => 'Specialization Specific'],
                 ['value' => 'cross_program', 'label' => 'Cross Program'],
             ],
-            'semesterOptions' => collect(range(1, 12))->map(fn($n) => ['value' => $n, 'label' => "Semester {$n}"]),
+            'semesterOptions' => collect(range(1, 12))->map(fn ($n) => ['value' => $n, 'label' => "Semester {$n}"]),
         ]);
     }
 
@@ -162,7 +162,7 @@ class CurriculumUnitController extends Controller
                 ->with('success', 'Curriculum unit updated successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Curriculum unit update failed: ' . $e->getMessage());
+            Log::error('Curriculum unit update failed: '.$e->getMessage());
 
             return back()
                 ->withInput()
@@ -184,7 +184,7 @@ class CurriculumUnitController extends Controller
                 ->with('success', 'Curriculum unit deleted successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Curriculum unit deletion failed: ' . $e->getMessage());
+            Log::error('Curriculum unit deletion failed: '.$e->getMessage());
 
             return back()->withErrors(['error' => 'Failed to delete curriculum unit. Please try again.']);
         }
@@ -213,14 +213,14 @@ class CurriculumUnitController extends Controller
             return response()->json([
                 'success' => true,
                 'deleted' => $deleted,
-                'message' => count($deleted) . ' curriculum units deleted successfully.'
+                'message' => count($deleted).' curriculum units deleted successfully.',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk delete failed: ' . $e->getMessage()
+                'message' => 'Bulk delete failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -246,7 +246,7 @@ class CurriculumUnitController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'This unit is already added to the curriculum version.',
-                'error' => 'duplicate_unit'
+                'error' => 'duplicate_unit',
             ], 422);
         }
 
@@ -260,15 +260,15 @@ class CurriculumUnitController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Curriculum unit created successfully.',
-                'data' => $curriculumUnit->load(['unit', 'semester'])
+                'data' => $curriculumUnit->load(['unit', 'semester']),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Curriculum unit API creation failed: ' . $e->getMessage());
+            Log::error('Curriculum unit API creation failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create curriculum unit. Please try again.'
+                'message' => 'Failed to create curriculum unit. Please try again.',
             ], 500);
         }
     }
@@ -295,15 +295,15 @@ class CurriculumUnitController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Curriculum unit updated successfully.',
-                'data' => $curriculumUnit->load(['unit', 'semester'])
+                'data' => $curriculumUnit->load(['unit', 'semester']),
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Curriculum unit API update failed: ' . $e->getMessage());
+            Log::error('Curriculum unit API update failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update curriculum unit. Please try again.'
+                'message' => 'Failed to update curriculum unit. Please try again.',
             ], 500);
         }
     }
@@ -338,11 +338,11 @@ class CurriculumUnitController extends Controller
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Curriculum unit API deletion failed: ' . $e->getMessage());
+            Log::error('Curriculum unit API deletion failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to remove curriculum unit. Please try again.'
+                'message' => 'Failed to remove curriculum unit. Please try again.',
             ], 500);
         }
     }

@@ -28,22 +28,22 @@ class DashboardFilterRequest extends FormRequest
             'semester_id' => [
                 'nullable',
                 'integer',
-                'exists:semesters,id'
+                'exists:semesters,id',
             ],
             'include_inactive' => [
                 'nullable',
-                'boolean'
+                'boolean',
             ],
             'date_from' => [
                 'nullable',
                 'date',
-                'before_or_equal:date_to'
+                'before_or_equal:date_to',
             ],
             'date_to' => [
                 'nullable',
                 'date',
-                'after_or_equal:date_from'
-            ]
+                'after_or_equal:date_from',
+            ],
         ];
     }
 
@@ -59,7 +59,7 @@ class DashboardFilterRequest extends FormRequest
             'date_from.date' => 'From date must be a valid date',
             'date_to.date' => 'To date must be a valid date',
             'date_from.before_or_equal' => 'From date must be before or equal to the to date',
-            'date_to.after_or_equal' => 'To date must be after or equal to the from date'
+            'date_to.after_or_equal' => 'To date must be after or equal to the from date',
         ];
     }
 
@@ -84,7 +84,7 @@ class DashboardFilterRequest extends FormRequest
         // Convert string 'true'/'false' to boolean for include_inactive
         if ($this->has('include_inactive')) {
             $this->merge([
-                'include_inactive' => filter_var($this->include_inactive, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+                'include_inactive' => filter_var($this->include_inactive, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE),
             ]);
         }
     }

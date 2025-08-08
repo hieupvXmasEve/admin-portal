@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
-use App\Models\GpaCalculation;
-use App\Models\AcademicRecord;
-use App\Models\CurriculumUnit;
 use App\Models\AcademicHold;
+use App\Models\Student;
 use Illuminate\Database\Seeder;
 
 class GraduationEligibilitySeeder extends Seeder
@@ -35,7 +32,7 @@ class GraduationEligibilitySeeder extends Seeder
                 'gpaCalculations' => function ($query) {
                     $query->where('calculation_type', 'cumulative')
                         ->latest('calculated_at');
-                }
+                },
             ])
             ->get();
 
@@ -74,35 +71,35 @@ class GraduationEligibilitySeeder extends Seeder
         // Check credit hour requirements
         $creditCheck = $this->checkCreditRequirements($student);
         $eligibilityChecks['credit_requirements'] = $creditCheck['eligible'];
-        if (!$creditCheck['eligible']) {
+        if (! $creditCheck['eligible']) {
             $issues[] = $creditCheck['issue'];
         }
 
         // Check GPA requirements
         $gpaCheck = $this->checkGPARequirements($student);
         $eligibilityChecks['gpa_requirements'] = $gpaCheck['eligible'];
-        if (!$gpaCheck['eligible']) {
+        if (! $gpaCheck['eligible']) {
             $issues[] = $gpaCheck['issue'];
         }
 
         // Check curriculum completion
         $curriculumCheck = $this->checkCurriculumRequirements($student);
         $eligibilityChecks['curriculum_requirements'] = $curriculumCheck['eligible'];
-        if (!$curriculumCheck['eligible']) {
+        if (! $curriculumCheck['eligible']) {
             $issues[] = $curriculumCheck['issue'];
         }
 
         // Check for active holds
         $holdsCheck = $this->checkActiveHolds($student);
         $eligibilityChecks['no_active_holds'] = $holdsCheck['eligible'];
-        if (!$holdsCheck['eligible']) {
+        if (! $holdsCheck['eligible']) {
             $issues[] = $holdsCheck['issue'];
         }
 
         // Check residency requirements (simplified)
         $residencyCheck = $this->checkResidencyRequirements($student);
         $eligibilityChecks['residency_requirements'] = $residencyCheck['eligible'];
-        if (!$residencyCheck['eligible']) {
+        if (! $residencyCheck['eligible']) {
             $issues[] = $residencyCheck['issue'];
         }
 
@@ -146,7 +143,7 @@ class GraduationEligibilitySeeder extends Seeder
         $latestGPA = $student->gpaCalculations->first();
         $minimumGPA = 2.0; // Standard graduation GPA requirement
 
-        if (!$latestGPA) {
+        if (! $latestGPA) {
             return [
                 'eligible' => false,
                 'issue' => 'No GPA calculation available',
@@ -189,21 +186,21 @@ class GraduationEligibilitySeeder extends Seeder
                 'met' => $met,
             ];
 
-            if (!$met) {
+            if (! $met) {
                 $allCategoriesMet = false;
             }
         }
 
         $issues = [];
         foreach ($categoryRequirements as $category => $req) {
-            if (!$req['met']) {
+            if (! $req['met']) {
                 $issues[] = "{$category}: {$req['completed']}/{$req['required']}";
             }
         }
 
         return [
             'eligible' => $allCategoriesMet,
-            'issue' => $allCategoriesMet ? null : 'Incomplete requirements: ' . implode(', ', $issues),
+            'issue' => $allCategoriesMet ? null : 'Incomplete requirements: '.implode(', ', $issues),
             'category_requirements' => $categoryRequirements,
         ];
     }
@@ -225,7 +222,7 @@ class GraduationEligibilitySeeder extends Seeder
 
         return [
             'eligible' => $eligible,
-            'issue' => $eligible ? null : 'Active holds blocking graduation: ' .
+            'issue' => $eligible ? null : 'Active holds blocking graduation: '.
                 $blockingHolds->pluck('title')->implode(', '),
             'blocking_holds' => $blockingHolds->count(),
         ];
@@ -262,15 +259,15 @@ class GraduationEligibilitySeeder extends Seeder
         }
 
         // Determine primary blocking issue
-        if (!$checks['gpa_requirements']) {
+        if (! $checks['gpa_requirements']) {
             return 'gpa_insufficient';
         }
 
-        if (!$checks['no_active_holds']) {
+        if (! $checks['no_active_holds']) {
             return 'holds_blocking';
         }
 
-        if (!$checks['credit_requirements']) {
+        if (! $checks['credit_requirements']) {
             return 'credits_insufficient';
         }
 
@@ -281,17 +278,17 @@ class GraduationEligibilitySeeder extends Seeder
     {
         $eligibilityNote = $eligible ?
             'ELIGIBLE FOR GRADUATION' :
-            'Graduation pending: ' . implode('; ', $issues);
+            'Graduation pending: '.implode('; ', $issues);
 
         $currentNotes = $student->admission_notes ?? '';
         $student->update([
-            'admission_notes' => trim($currentNotes . ' | ' . $eligibilityNote)
+            'admission_notes' => trim($currentNotes.' | '.$eligibilityNote),
         ]);
 
         if ($eligible) {
             $this->command->info("  🎓 {$student->student_code}: ELIGIBLE FOR GRADUATION!");
         } else {
-            $this->command->info("  📋 {$student->student_code}: Pending - " . implode(', ', array_slice($issues, 0, 2)));
+            $this->command->info("  📋 {$student->student_code}: Pending - ".implode(', ', array_slice($issues, 0, 2)));
         }
     }
 
@@ -299,7 +296,7 @@ class GraduationEligibilitySeeder extends Seeder
     {
         $total = array_sum($results);
 
-        $this->command->info("✅ Graduation eligibility assessment complete!");
+        $this->command->info('✅ Graduation eligibility assessment complete!');
         $this->command->info("  🎓 Eligible for graduation: {$results['eligible']} students");
         $this->command->info("  📋 Pending requirements: {$results['pending_requirements']} students");
         $this->command->info("  📉 GPA insufficient: {$results['gpa_insufficient']} students");

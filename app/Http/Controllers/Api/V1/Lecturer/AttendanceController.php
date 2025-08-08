@@ -37,7 +37,7 @@ class AttendanceController extends Controller
             $sessions = $this->attendanceService->getAttendanceSessions($lecturer, $filters, $perPage);
 
             return ApiResponse::paginated(
-                $sessions->through(fn($session) => new AttendanceSessionResource($session)),
+                $sessions->through(fn ($session) => new AttendanceSessionResource($session)),
                 'Attendance sessions retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -77,7 +77,7 @@ class AttendanceController extends Controller
             $attendanceData = $this->attendanceService->getSessionAttendance($lecturer, $sessionId);
 
             // Log::debug('attendanceData', ['attendanceData' => $attendanceData]);
-            if (!$attendanceData) {
+            if (! $attendanceData) {
                 return ApiResponse::success([]);
             }
 
@@ -87,6 +87,7 @@ class AttendanceController extends Controller
             );
         } catch (\Exception $e) {
             Log::error('Failed to retrieve session attendance', ['error' => $e->getMessage()]);
+
             return ApiResponse::serverError('Failed to retrieve session attendance');
         }
     }
@@ -123,6 +124,7 @@ class AttendanceController extends Controller
             if ($e->getMessage() === 'Session not found or access denied') {
                 return ApiResponse::notFound($e->getMessage());
             }
+
             return ApiResponse::serverError('Failed to mark attendance');
         }
     }
@@ -204,6 +206,7 @@ class AttendanceController extends Controller
             if ($e->getMessage() === 'Course offering not found or access denied') {
                 return ApiResponse::notFound($e->getMessage());
             }
+
             return ApiResponse::serverError('Failed to retrieve course attendance analytics');
         }
     }
@@ -241,7 +244,7 @@ class AttendanceController extends Controller
         try {
             $format = $request->query('format', 'csv');
 
-            if (!in_array($format, ['csv', 'excel', 'pdf'])) {
+            if (! in_array($format, ['csv', 'excel', 'pdf'])) {
                 return ApiResponse::validationError(
                     ['format' => ['Format must be csv, excel, or pdf']],
                     'Invalid export format'
@@ -262,10 +265,10 @@ class AttendanceController extends Controller
             if ($e->getMessage() === 'Course offering not found or access denied') {
                 return ApiResponse::notFound($e->getMessage());
             }
+
             return ApiResponse::serverError('Failed to export attendance data');
         }
     }
-
 
     /**
      * Generate attendance records for a session (new endpoint)
@@ -286,6 +289,7 @@ class AttendanceController extends Controller
             if ($e->getMessage() === 'Session not found or access denied') {
                 return ApiResponse::notFound($e->getMessage());
             }
+
             return ApiResponse::serverError('Failed to generate attendance records');
         }
     }

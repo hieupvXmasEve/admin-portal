@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\CourseOffering;
 use App\Models\ClassSession;
+use App\Models\CourseOffering;
 use App\Models\Semester;
 use App\Models\Unit;
-use Illuminate\Database\Seeder;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class ClassSessionSeeder extends Seeder
 {
@@ -24,7 +24,7 @@ class ClassSessionSeeder extends Seeder
         // Get FALL2024 semester
         $semester = Semester::where('code', 'FALL2024')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('FALL2024 semester not found.');
         }
 
@@ -44,6 +44,7 @@ class ClassSessionSeeder extends Seeder
 
         if ($existingSessions > 0) {
             $this->command->info("✅ Class sessions already exist for FALL2024 ({$existingSessions} found). Skipping creation.");
+
             return;
         }
 
@@ -78,7 +79,7 @@ class ClassSessionSeeder extends Seeder
 
             if (in_array($dayName, $scheduleDays)) {
                 // Skip holiday periods (mid-semester break, etc.)
-                if (!$this->isHolidayPeriod($currentDate)) {
+                if (! $this->isHolidayPeriod($currentDate)) {
                     $session = $this->createClassSession($courseOffering, $currentDate, $sessionNumber);
                     $sessions[] = $session;
                     $sessionNumber++;
@@ -88,7 +89,7 @@ class ClassSessionSeeder extends Seeder
             $currentDate->addDay();
         }
 
-        $this->command->info("  📚 {$unit->code}: Created " . count($sessions) . " sessions");
+        $this->command->info("  📚 {$unit->code}: Created ".count($sessions).' sessions');
 
         return $sessions;
     }
@@ -170,7 +171,7 @@ class ClassSessionSeeder extends Seeder
         if ($sessionNumber <= 2) {
             return "Introduction to {$unit->name}";
         } elseif ($sessionNumber >= 11) {
-            return "Review and Assessment";
+            return 'Review and Assessment';
         } else {
             return "Week {$sessionNumber}: Core Concepts";
         }
@@ -199,10 +200,10 @@ class ClassSessionSeeder extends Seeder
     private function getPreparationNotes(Unit $unit, int $sessionNumber): ?string
     {
         if ($sessionNumber === 1) {
-            return "Please review the unit outline and ensure you have access to required software/materials.";
+            return 'Please review the unit outline and ensure you have access to required software/materials.';
         }
 
-        return "Review previous session materials and complete assigned readings.";
+        return 'Review previous session materials and complete assigned readings.';
     }
 
     private function getLearningOutcomes(Unit $unit, int $sessionNumber): ?string
@@ -214,8 +215,8 @@ class ClassSessionSeeder extends Seeder
     {
         return [
             "Understand week {$sessionNumber} concepts in {$unit->name}",
-            "Apply theoretical knowledge to practical exercises",
-            "Demonstrate understanding through participation and activities"
+            'Apply theoretical knowledge to practical exercises',
+            'Demonstrate understanding through participation and activities',
         ];
     }
 
@@ -239,6 +240,7 @@ class ClassSessionSeeder extends Seeder
         ];
 
         $unitTopics = $topics[$unit->code] ?? [];
+
         return $unitTopics[$sessionNumber] ?? ["Week {$sessionNumber} topics"];
     }
 
@@ -255,10 +257,10 @@ class ClassSessionSeeder extends Seeder
         }
 
         if ($this->isAssessmentSession($sessionNumber)) {
-            return "This is an assessment session. Please arrive on time and bring required materials.";
+            return 'This is an assessment session. Please arrive on time and bring required materials.';
         }
 
-        return "Come prepared with completed readings and any questions from previous sessions.";
+        return 'Come prepared with completed readings and any questions from previous sessions.';
     }
 
     private function getSessionMaterials(Unit $unit, int $sessionNumber): array
@@ -278,7 +280,7 @@ class ClassSessionSeeder extends Seeder
 
     private function getHomeworkDescription(Unit $unit, int $sessionNumber): ?string
     {
-        if (!$this->hasHomework($sessionNumber)) {
+        if (! $this->hasHomework($sessionNumber)) {
             return null;
         }
 
@@ -343,6 +345,7 @@ class ClassSessionSeeder extends Seeder
         // If it's a datetime string, extract just the time part
         try {
             $carbon = Carbon::parse($timeField);
+
             return $carbon->format('H:i:s');
         } catch (\Exception $e) {
             // Fallback to default times ensuring start < end

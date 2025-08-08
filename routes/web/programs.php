@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\Web\ProgramController;
 use App\Constants\ProgramRoutes;
+use App\Http\Controllers\Web\ProgramController;
 use Illuminate\Support\Facades\Route;
 
 // Web routes for Inertia.js pages

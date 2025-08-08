@@ -23,8 +23,8 @@ class StudentApplicationService
     /**
      * Convert a single student application to a student record
      *
-     * @param int $applicationId The student application ID
-     * @param array $conversionData Additional data for student creation
+     * @param  int  $applicationId  The student application ID
+     * @param  array  $conversionData  Additional data for student creation
      * @return array Result with success status and data/errors
      */
     public function convertSingleApplication(int $applicationId, array $conversionData): array
@@ -33,10 +33,10 @@ class StudentApplicationService
             return DB::transaction(function () use ($applicationId, $conversionData) {
                 // Find the application
                 $application = StudentApplication::find($applicationId);
-                if (!$application) {
+                if (! $application) {
                     return [
                         'success' => false,
-                        'error' => 'Student application not found'
+                        'error' => 'Student application not found',
                     ];
                 }
 
@@ -44,16 +44,16 @@ class StudentApplicationService
                 if ($application->isConverted()) {
                     return [
                         'success' => false,
-                        'error' => 'Application has already been converted to a student'
+                        'error' => 'Application has already been converted to a student',
                     ];
                 }
 
                 // Find campus by code
                 $campus = Campus::where('code', $application->campus_code)->first();
-                if (!$campus) {
+                if (! $campus) {
                     return [
                         'success' => false,
-                        'error' => "Campus not found for code: {$application->campus_code}"
+                        'error' => "Campus not found for code: {$application->campus_code}",
                     ];
                 }
 
@@ -62,10 +62,10 @@ class StudentApplicationService
 
                 // Validate required relationships
                 $relationshipValidation = $this->validateRequiredRelationships($conversionData);
-                if (!$relationshipValidation['valid']) {
+                if (! $relationshipValidation['valid']) {
                     return [
                         'success' => false,
-                        'errors' => $relationshipValidation['errors']
+                        'errors' => $relationshipValidation['errors'],
                     ];
                 }
 
@@ -77,22 +77,22 @@ class StudentApplicationService
 
                 // Validate student data
                 $validator = Validator::make($studentData, Student::validationRules(), Student::validationMessages());
-                
+
                 // Remove unique validation for this conversion since we're creating new record
                 $rules = $validator->getRules();
                 if (isset($rules['email'])) {
-                    $rules['email'] = array_filter($rules['email'], fn($rule) => !str_contains($rule, 'unique'));
+                    $rules['email'] = array_filter($rules['email'], fn ($rule) => ! str_contains($rule, 'unique'));
                 }
                 if (isset($rules['national_id'])) {
-                    $rules['national_id'] = array_filter($rules['national_id'], fn($rule) => !str_contains($rule, 'unique'));
+                    $rules['national_id'] = array_filter($rules['national_id'], fn ($rule) => ! str_contains($rule, 'unique'));
                 }
-                
+
                 $validator = Validator::make($studentData, $rules, Student::validationMessages());
 
                 if ($validator->fails()) {
                     return [
                         'success' => false,
-                        'errors' => $validator->errors()->toArray()
+                        'errors' => $validator->errors()->toArray(),
                     ];
                 }
 
@@ -102,19 +102,19 @@ class StudentApplicationService
                 // Update the application
                 $application->update([
                     'status' => 'approved',
-                    'student_id' => $student->id
+                    'student_id' => $student->id,
                 ]);
 
                 return [
                     'success' => true,
                     'student' => $student,
-                    'application' => $application
+                    'application' => $application,
                 ];
             });
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'error' => 'Conversion failed: ' . $e->getMessage()
+                'error' => 'Conversion failed: '.$e->getMessage(),
             ];
         }
     }
@@ -122,8 +122,8 @@ class StudentApplicationService
     /**
      * Convert multiple student applications to student records
      *
-     * @param array $applicationIds Array of student application IDs
-     * @param array $conversionData Common data for all student creations
+     * @param  array  $applicationIds  Array of student application IDs
+     * @param  array  $conversionData  Common data for all student creations
      * @return array Result with success/error counts and details
      */
     public function convertBatchApplications(array $applicationIds, array $conversionData): array
@@ -135,7 +135,7 @@ class StudentApplicationService
 
         foreach ($applicationIds as $applicationId) {
             $result = $this->convertSingleApplication($applicationId, $conversionData);
-            
+
             if ($result['success']) {
                 $successful[] = $result;
                 $successCount++;
@@ -143,7 +143,7 @@ class StudentApplicationService
                 $failed[] = [
                     'application_id' => $applicationId,
                     'error' => $result['error'] ?? 'Unknown error',
-                    'errors' => $result['errors'] ?? []
+                    'errors' => $result['errors'] ?? [],
                 ];
                 $errorCount++;
             }
@@ -153,16 +153,12 @@ class StudentApplicationService
             'success_count' => $successCount,
             'error_count' => $errorCount,
             'successful' => $successful,
-            'failed' => $failed
+            'failed' => $failed,
         ];
     }
 
     /**
      * Map student application data to student model data
-     *
-     * @param StudentApplication $application
-     * @param array $additionalData
-     * @return array
      */
     public function mapApplicationToStudentData(StudentApplication $application, array $additionalData): array
     {
@@ -175,12 +171,12 @@ class StudentApplicationService
             'nationality' => $application->ethnicity, // Map ethnicity to nationality
             'national_id' => $application->national_id,
             'address' => $application->address,
-            
+
             // Emergency contact
             'emergency_contact_phone' => $application->parent_phone,
             'emergency_contact_name' => null, // Not available in application
             'emergency_contact_relationship' => 'Parent', // Default assumption
-            
+
             // Academic information
             'campus_id' => $additionalData['campus_id'],
             'program_id' => $additionalData['program_id'],
@@ -188,11 +184,11 @@ class StudentApplicationService
             'specialization_id' => $additionalData['specialization_id'] ?? null,
             'admission_date' => $additionalData['admission_date'] ?? now()->toDateString(),
             'expected_graduation_date' => $additionalData['expected_graduation_date'] ?? null,
-            
+
             // Status
             'status' => 'active',
             'academic_status' => 'active',
-            
+
             // Additional fields with defaults
             'high_school_name' => null,
             'high_school_graduation_year' => null,
@@ -220,9 +216,6 @@ class StudentApplicationService
 
     /**
      * Validate that required relationships exist
-     *
-     * @param array $data
-     * @return array
      */
     public function validateRequiredRelationships(array $data): array
     {
@@ -231,7 +224,7 @@ class StudentApplicationService
         // Validate campus exists
         if (isset($data['campus_id'])) {
             $campus = Campus::find($data['campus_id']);
-            if (!$campus) {
+            if (! $campus) {
                 $errors[] = "Campus with ID {$data['campus_id']} not found";
             }
         }
@@ -239,7 +232,7 @@ class StudentApplicationService
         // Validate program exists
         if (isset($data['program_id'])) {
             $program = Program::find($data['program_id']);
-            if (!$program) {
+            if (! $program) {
                 $errors[] = "Program with ID {$data['program_id']} not found";
             }
         }
@@ -249,7 +242,7 @@ class StudentApplicationService
             $curriculumVersion = CurriculumVersion::where('id', $data['curriculum_version_id'])
                 ->where('program_id', $data['program_id'])
                 ->first();
-            if (!$curriculumVersion) {
+            if (! $curriculumVersion) {
                 $errors[] = "Curriculum version with ID {$data['curriculum_version_id']} not found for program {$data['program_id']}";
             }
         }
@@ -259,22 +252,19 @@ class StudentApplicationService
             $specialization = Specialization::where('id', $data['specialization_id'])
                 ->where('program_id', $data['program_id'])
                 ->first();
-            if (!$specialization) {
+            if (! $specialization) {
                 $errors[] = "Specialization with ID {$data['specialization_id']} not found for program {$data['program_id']}";
             }
         }
 
         return [
             'valid' => empty($errors),
-            'errors' => $errors
+            'errors' => $errors,
         ];
     }
 
     /**
      * Generate admission notes from application data
-     *
-     * @param StudentApplication $application
-     * @return string|null
      */
     private function generateAdmissionNotes(StudentApplication $application): ?string
     {
@@ -283,7 +273,7 @@ class StudentApplicationService
         // Add English test information
         if ($application->english_test_type) {
             $englishInfo = "English Test: {$application->english_test_type}";
-            
+
             $scores = array_filter([
                 $application->listening ? "Listening: {$application->listening}" : null,
                 $application->reading ? "Reading: {$application->reading}" : null,
@@ -291,11 +281,11 @@ class StudentApplicationService
                 $application->speaking ? "Speaking: {$application->speaking}" : null,
                 $application->overall ? "Overall: {$application->overall}" : null,
             ]);
-            
-            if (!empty($scores)) {
-                $englishInfo .= " (" . implode(', ', $scores) . ")";
+
+            if (! empty($scores)) {
+                $englishInfo .= ' ('.implode(', ', $scores).')';
             }
-            
+
             $notes[] = $englishInfo;
         }
 
@@ -311,7 +301,7 @@ class StudentApplicationService
 
         // Add international applicant status
         if ($application->is_international_applicant) {
-            $notes[] = "International Applicant";
+            $notes[] = 'International Applicant';
         }
 
         // Add exception units if any
@@ -319,14 +309,13 @@ class StudentApplicationService
             $notes[] = "Exception Units: {$application->exception_units}";
         }
 
-        return empty($notes) ? null : "Application Notes:\n" . implode("\n", $notes);
+        return empty($notes) ? null : "Application Notes:\n".implode("\n", $notes);
     }
 
     /**
      * Get conversion statistics for applications
      *
-     * @param array $filters Optional filters
-     * @return array
+     * @param  array  $filters  Optional filters
      */
     public function getConversionStatistics(array $filters = []): array
     {
@@ -357,15 +346,12 @@ class StudentApplicationService
             'total_applications' => $total,
             'converted_applications' => $converted,
             'pending_applications' => $pending,
-            'conversion_rate' => $total > 0 ? round(($converted / $total) * 100, 2) : 0
+            'conversion_rate' => $total > 0 ? round(($converted / $total) * 100, 2) : 0,
         ];
     }
 
     /**
      * Get applications ready for conversion
-     *
-     * @param array $filters
-     * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getApplicationsReadyForConversion(array $filters = []): \Illuminate\Database\Eloquent\Collection
     {

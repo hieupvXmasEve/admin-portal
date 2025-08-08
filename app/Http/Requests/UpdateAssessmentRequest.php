@@ -35,7 +35,7 @@ class UpdateAssessmentRequest extends FormRequest
                 'sometimes',
                 'required',
                 'string',
-                'max:100'
+                'max:100',
             ],
             'code' => [
                 'sometimes',
@@ -44,12 +44,12 @@ class UpdateAssessmentRequest extends FormRequest
                 'max:20',
                 Rule::unique('assessment_components')->where(function ($query) use ($assessmentComponent) {
                     return $query->where('syllabus_id', $assessmentComponent->syllabus_id);
-                })->ignore($assessmentComponent->id ?? null)
+                })->ignore($assessmentComponent->id ?? null),
             ],
             'description' => [
                 'sometimes',
                 'nullable',
-                'string'
+                'string',
             ],
             'weight' => [
                 'sometimes',
@@ -57,89 +57,89 @@ class UpdateAssessmentRequest extends FormRequest
                 'numeric',
                 'min:0.01',
                 'max:100',
-                'decimal:0,2'
+                'decimal:0,2',
             ],
             'type' => [
                 'sometimes',
                 'required',
                 'string',
-                Rule::in(array_keys(AssessmentComponent::TYPES))
+                Rule::in(array_keys(AssessmentComponent::TYPES)),
             ],
             'is_required_to_sit_final_exam' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'due_date' => [
                 'sometimes',
                 'nullable',
                 'date',
-                'after:now'
+                'after:now',
             ],
             'available_from' => [
                 'sometimes',
                 'nullable',
                 'date',
-                'before_or_equal:due_date'
+                'before_or_equal:due_date',
             ],
             'late_submission_deadline' => [
                 'sometimes',
                 'nullable',
                 'date',
-                'after:due_date'
+                'after:due_date',
             ],
             'late_penalty_percentage' => [
                 'sometimes',
                 'numeric',
                 'min:0',
                 'max:100',
-                'decimal:0,2'
+                'decimal:0,2',
             ],
             'late_penalty_type' => [
                 'sometimes',
                 'string',
-                Rule::in(['per_day', 'per_hour', 'fixed', 'none'])
+                Rule::in(['per_day', 'per_hour', 'fixed', 'none']),
             ],
             'submission_type' => [
                 'sometimes',
                 'string',
-                Rule::in(['online', 'in_person', 'both', 'no_submission'])
+                Rule::in(['online', 'in_person', 'both', 'no_submission']),
             ],
             'allowed_file_types' => [
                 'sometimes',
                 'nullable',
-                'array'
+                'array',
             ],
             'allowed_file_types.*' => [
                 'string',
-                'max:10'
+                'max:10',
             ],
             'max_file_size_mb' => [
                 'sometimes',
                 'nullable',
                 'integer',
                 'min:1',
-                'max:1024'
+                'max:1024',
             ],
             'max_submissions' => [
                 'sometimes',
                 'integer',
                 'min:1',
-                'max:10'
+                'max:10',
             ],
             'allow_resubmission' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'is_group_work' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'min_group_size' => [
                 'sometimes',
                 'nullable',
                 'integer',
                 'min:1',
-                'required_if:is_group_work,true'
+                'required_if:is_group_work,true',
             ],
             'max_group_size' => [
                 'sometimes',
@@ -147,50 +147,50 @@ class UpdateAssessmentRequest extends FormRequest
                 'integer',
                 'min:1',
                 'gte:min_group_size',
-                'required_if:is_group_work,true'
+                'required_if:is_group_work,true',
             ],
             'students_form_groups' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'assessment_criteria' => [
                 'sometimes',
                 'nullable',
-                'array'
+                'array',
             ],
             'grading_instructions' => [
                 'sometimes',
                 'nullable',
-                'string'
+                'string',
             ],
             'is_published' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'scores_published' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'is_extra_credit' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'status' => [
                 'sometimes',
                 'string',
-                Rule::in(['draft', 'published', 'in_progress', 'grading', 'completed', 'cancelled'])
+                Rule::in(['draft', 'published', 'in_progress', 'grading', 'completed', 'cancelled']),
             ],
             'sort_order' => [
                 'sometimes',
                 'integer',
-                'min:0'
+                'min:0',
             ],
             'category' => [
                 'sometimes',
                 'nullable',
                 'string',
-                'max:50'
-            ]
+                'max:50',
+            ],
         ];
     }
 
@@ -220,7 +220,7 @@ class UpdateAssessmentRequest extends FormRequest
             'max_submissions.max' => 'Maximum submissions cannot exceed 10.',
             'min_group_size.required_if' => 'Minimum group size is required for group work.',
             'max_group_size.required_if' => 'Maximum group size is required for group work.',
-            'max_group_size.gte' => 'Maximum group size must be greater than or equal to minimum group size.'
+            'max_group_size.gte' => 'Maximum group size must be greater than or equal to minimum group size.',
         ];
     }
 
@@ -240,14 +240,14 @@ class UpdateAssessmentRequest extends FormRequest
      */
     protected function validateTotalWeight($validator): void
     {
-        if (!$this->has('weight')) {
+        if (! $this->has('weight')) {
             return;
         }
 
         $assessmentComponent = $this->route('assessment') ?? $this->route('assessmentComponent');
         $newWeight = (float) $this->input('weight');
 
-        if (!$assessmentComponent || !$newWeight) {
+        if (! $assessmentComponent || ! $newWeight) {
             return;
         }
 
@@ -271,14 +271,14 @@ class UpdateAssessmentRequest extends FormRequest
      */
     protected function validateStatusTransition($validator): void
     {
-        if (!$this->has('status')) {
+        if (! $this->has('status')) {
             return;
         }
 
         $assessmentComponent = $this->route('assessment') ?? $this->route('assessmentComponent');
         $newStatus = $this->input('status');
 
-        if (!$assessmentComponent) {
+        if (! $assessmentComponent) {
             return;
         }
 
@@ -291,10 +291,10 @@ class UpdateAssessmentRequest extends FormRequest
             'in_progress' => ['grading', 'cancelled'],
             'grading' => ['completed', 'in_progress'],
             'completed' => [], // Cannot transition from completed
-            'cancelled' => ['draft'] // Can only go back to draft
+            'cancelled' => ['draft'], // Can only go back to draft
         ];
 
-        if (!in_array($newStatus, $allowedTransitions[$currentStatus] ?? [])) {
+        if (! in_array($newStatus, $allowedTransitions[$currentStatus] ?? [])) {
             $validator->errors()->add(
                 'status',
                 "Cannot transition from '{$currentStatus}' to '{$newStatus}' status."
@@ -302,7 +302,7 @@ class UpdateAssessmentRequest extends FormRequest
         }
 
         // Additional validation: cannot publish without due date
-        if ($newStatus === 'published' && !$assessmentComponent->due_date && !$this->input('due_date')) {
+        if ($newStatus === 'published' && ! $assessmentComponent->due_date && ! $this->input('due_date')) {
             $validator->errors()->add(
                 'status',
                 'Cannot publish assessment without a due date.'

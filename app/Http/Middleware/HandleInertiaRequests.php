@@ -47,8 +47,8 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
-            'auth' => function () use ($request, $user, $currentCampusId) {
-                if (!$user) {
+            'auth' => function () use ($user, $currentCampusId) {
+                if (! $user) {
                     return null;
                 }
 
@@ -64,8 +64,8 @@ class HandleInertiaRequests extends Middleware
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
-            'sidebarOpen' => !$request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-            'permissions' => fn() => $user ? app(PermissionService::class)->getUserPermissions($user, $currentCampusId) : [],
+            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'permissions' => fn () => $user ? app(PermissionService::class)->getUserPermissions($user, $currentCampusId) : [],
             'flash' => function () {
                 return [
                     'success' => session('success'),

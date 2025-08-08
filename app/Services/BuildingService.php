@@ -10,34 +10,33 @@ class BuildingService
     /**
      * Create a new building.
      *
-     * @param array $data Validated data.
-     * @return Building
+     * @param  array  $data  Validated data.
      */
     public function createBuilding(array $data): Building
     {
         Log::info('Creating a new building', $data);
+
         return Building::create($data);
     }
 
     /**
      * Update an existing building.
      *
-     * @param Building $building The building to update.
-     * @param array $data Validated data.
-     * @return Building
+     * @param  Building  $building  The building to update.
+     * @param  array  $data  Validated data.
      */
     public function updateBuilding(Building $building, array $data): Building
     {
         Log::info("Updating building {$building->id}", $data);
         $building->update($data);
+
         return $building;
     }
 
     /**
      * Delete a building.
      *
-     * @param Building $building The building to delete.
-     * @return void
+     * @param  Building  $building  The building to delete.
      */
     public function deleteBuilding(Building $building): void
     {

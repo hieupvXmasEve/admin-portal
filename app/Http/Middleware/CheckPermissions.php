@@ -26,7 +26,7 @@ class CheckPermissions
             ? PermissionHelper::canAll($permissions)
             : PermissionHelper::canAny($permissions);
 
-        if (!$hasPermission) {
+        if (! $hasPermission) {
             abort(403, 'Unauthorized action.');
         }
 

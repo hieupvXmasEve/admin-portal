@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Constants\CurriculumRoutes;
 use App\Http\Controllers\Controller;
-use App\Models\CurriculumVersion;
-use App\Models\Program;
-use App\Models\Specialization;
-use App\Models\Semester;
-use App\Models\Unit;
 use App\Http\Requests\StoreCurriculumVersionRequest;
 use App\Http\Requests\UpdateCurriculumVersionRequest;
-use Illuminate\Http\Request;
+use App\Models\CurriculumVersion;
+use App\Models\Program;
+use App\Models\Semester;
+use App\Models\Specialization;
+use App\Models\Unit;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Constants\CurriculumRoutes;
 
 class CurriculumVersionController extends Controller
 {
@@ -46,8 +46,8 @@ class CurriculumVersionController extends Controller
             $query->where(function ($q) use ($request) {
                 $q->where('version_code', 'like', "%{$request->search}%")
                     ->orWhere('notes', 'like', "%{$request->search}%")
-                    ->orWhereHas('program', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"))
-                    ->orWhereHas('specialization', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"));
+                    ->orWhereHas('program', fn ($subQ) => $subQ->where('name', 'like', "%{$request->search}%"))
+                    ->orWhereHas('specialization', fn ($subQ) => $subQ->where('name', 'like', "%{$request->search}%"));
             });
         }
 
@@ -112,8 +112,8 @@ class CurriculumVersionController extends Controller
             $baseQuery->where(function ($q) use ($request) {
                 $q->where('version_code', 'like', "%{$request->search}%")
                     ->orWhere('notes', 'like', "%{$request->search}%")
-                    ->orWhereHas('program', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"))
-                    ->orWhereHas('specialization', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"));
+                    ->orWhereHas('program', fn ($subQ) => $subQ->where('name', 'like', "%{$request->search}%"))
+                    ->orWhereHas('specialization', fn ($subQ) => $subQ->where('name', 'like', "%{$request->search}%"));
             });
         }
 
@@ -143,7 +143,7 @@ class CurriculumVersionController extends Controller
         $byProgram = $baseQuery->with('program')
             ->get()
             ->groupBy('program.name')
-            ->map(fn($versions) => $versions->count())
+            ->map(fn ($versions) => $versions->count())
             ->toArray();
 
         return [
@@ -176,8 +176,8 @@ class CurriculumVersionController extends Controller
                 $query->where(function ($q) use ($request) {
                     $q->where('version_code', 'like', "%{$request->search}%")
                         ->orWhere('notes', 'like', "%{$request->search}%")
-                        ->orWhereHas('program', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"))
-                        ->orWhereHas('specialization', fn($subQ) => $subQ->where('name', 'like', "%{$request->search}%"));
+                        ->orWhereHas('program', fn ($subQ) => $subQ->where('name', 'like', "%{$request->search}%"))
+                        ->orWhereHas('specialization', fn ($subQ) => $subQ->where('name', 'like', "%{$request->search}%"));
                 });
             }
 
@@ -192,7 +192,7 @@ class CurriculumVersionController extends Controller
             $curriculumVersions = $query->orderBy('created_at', 'desc')->get();
 
             // Generate Excel file
-            $filename = 'curriculum_versions_' . now()->format('Y_m_d_H_i_s') . '.xlsx';
+            $filename = 'curriculum_versions_'.now()->format('Y_m_d_H_i_s').'.xlsx';
 
             // You would implement Excel export logic here
             // For now, return a JSON response
@@ -203,11 +203,11 @@ class CurriculumVersionController extends Controller
                 'total_records' => $curriculumVersions->count(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Curriculum versions export failed: ' . $e->getMessage());
+            Log::error('Curriculum versions export failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Export failed: ' . $e->getMessage(),
+                'message' => 'Export failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -237,6 +237,7 @@ class CurriculumVersionController extends Controller
 
                 default:
                     DB::rollBack();
+
                     return response()->json([
                         'success' => false,
                         'message' => 'Invalid bulk action specified.',
@@ -244,11 +245,11 @@ class CurriculumVersionController extends Controller
             }
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Bulk operation failed: ' . $e->getMessage());
+            Log::error('Bulk operation failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk operation failed: ' . $e->getMessage(),
+                'message' => 'Bulk operation failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -259,7 +260,7 @@ class CurriculumVersionController extends Controller
     private function bulkExport($curriculumVersions)
     {
         try {
-            $filename = 'selected_curriculum_versions_' . now()->format('Y_m_d_H_i_s') . '.xlsx';
+            $filename = 'selected_curriculum_versions_'.now()->format('Y_m_d_H_i_s').'.xlsx';
 
             // Export logic would go here
 
@@ -270,7 +271,7 @@ class CurriculumVersionController extends Controller
                 'total_records' => $curriculumVersions->count(),
             ]);
         } catch (\Exception $e) {
-            throw new \Exception('Export failed: ' . $e->getMessage());
+            throw new \Exception('Export failed: '.$e->getMessage());
         }
     }
 
@@ -306,7 +307,7 @@ class CurriculumVersionController extends Controller
             'program',
             'specialization',
             'effectiveFromSemester',
-            'curriculumUnits.unit'
+            'curriculumUnits.unit',
         ]);
 
         return Inertia::render('curriculum-versions/Show', [
@@ -468,7 +469,7 @@ class CurriculumVersionController extends Controller
                 if ($curriculumVersion->curriculumUnits()->count() > 0) {
                     $failed[] = [
                         'version_code' => $curriculumVersion->version_code,
-                        'reason' => 'Has existing curriculum units'
+                        'reason' => 'Has existing curriculum units',
                     ];
                 } else {
                     $curriculumVersion->delete();
@@ -482,14 +483,14 @@ class CurriculumVersionController extends Controller
                 'success' => true,
                 'deleted' => $deleted,
                 'failed' => $failed,
-                'message' => count($deleted) . ' curriculum versions deleted successfully.'
+                'message' => count($deleted).' curriculum versions deleted successfully.',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk delete failed: ' . $e->getMessage()
+                'message' => 'Bulk delete failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -505,21 +506,21 @@ class CurriculumVersionController extends Controller
             $curriculumVersion->load([
                 'program:id,name',
                 'specialization:id,name',
-                'effectiveFromSemester:id,name,code'
+                'effectiveFromSemester:id,name,code',
             ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Curriculum version created successfully.',
-                'data' => $curriculumVersion
+                'data' => $curriculumVersion,
             ], 201);
         } catch (\Exception $e) {
-            Log::error('Curriculum version creation failed: ' . $e->getMessage());
+            Log::error('Curriculum version creation failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create curriculum version. Please try again.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -532,7 +533,7 @@ class CurriculumVersionController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Cannot delete curriculum version with existing curriculum units.',
-                    'error' => 'HAS_CURRICULUM_UNITS'
+                    'error' => 'HAS_CURRICULUM_UNITS',
                 ], 400);
             }
 
@@ -545,12 +546,12 @@ class CurriculumVersionController extends Controller
                 'message' => 'Curriculum version deleted successfully.',
             ], 200);
         } catch (\Exception $e) {
-            Log::error('Curriculum version deletion failed: ' . $e->getMessage());
+            Log::error('Curriculum version deletion failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete curriculum version. Please try again.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

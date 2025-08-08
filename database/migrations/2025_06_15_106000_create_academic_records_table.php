@@ -37,7 +37,7 @@ return new class extends Migration
                 'failed',
                 'pass_no_credit',
                 'audit',
-                'transfer_credit'
+                'transfer_credit',
             ])->default('in_progress');
 
             $table->enum('completion_status', [
@@ -46,7 +46,7 @@ return new class extends Migration
                 'withdrawn',
                 'failed',
                 'incomplete',
-                'in_progress'
+                'in_progress',
             ])->default('enrolled');
 
             // Important dates

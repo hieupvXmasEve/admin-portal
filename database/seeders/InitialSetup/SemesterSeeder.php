@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Database\Seeders\InitialSetup;
 
 use App\Models\Semester;
-use Illuminate\Database\Seeder;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class SemesterSeeder extends Seeder
 {
@@ -69,6 +69,6 @@ class SemesterSeeder extends Seeder
             $this->command->info("  ✓ Created semester: {$semester->name} ({$semester->code})");
         }
 
-        $this->command->info("  📊 Total semesters created: " . count($semesters));
+        $this->command->info('  📊 Total semesters created: '.count($semesters));
     }
 }

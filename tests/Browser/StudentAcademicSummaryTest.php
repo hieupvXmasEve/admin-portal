@@ -27,13 +27,21 @@ class StudentAcademicSummaryTest extends DuskTestCase
     use DatabaseMigrations;
 
     private User $user;
+
     private Student $student;
+
     private Campus $campus;
+
     private Program $program;
+
     private Specialization $specialization;
+
     private CurriculumVersion $curriculumVersion;
+
     private Semester $semester;
+
     private Unit $unit;
+
     private CourseOffering $courseOffering;
 
     protected function setUp(): void

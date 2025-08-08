@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
 use App\Models\AcademicHold;
+use App\Models\CurriculumUnit;
 use App\Models\GpaCalculation;
 use App\Models\Semester;
-use App\Models\CourseOffering;
-use App\Models\Unit;
-use App\Models\CurriculumUnit;
+use App\Models\Student;
 use Illuminate\Database\Seeder;
 
 class Spring2025RegistrationEligibilitySeeder extends Seeder
@@ -26,7 +24,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
         // Get SPRING2025 semester
         $spring2025 = Semester::where('code', 'SPRING2025')->first();
 
-        if (!$spring2025) {
+        if (! $spring2025) {
             throw new \Exception('SPRING2025 semester not found. Please create semester first.');
         }
 
@@ -54,7 +52,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
             }
         }
 
-        $this->command->info("✅ Registration eligibility check complete!");
+        $this->command->info('✅ Registration eligibility check complete!');
         $this->command->info("  ✅ Eligible students: {$eligibleCount}");
         $this->command->info("  ❌ Ineligible students: {$ineligibleCount}");
         $this->command->info("  ⚠️ New holds created: {$holdCount}");
@@ -93,7 +91,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
 
         // Check prerequisite completion for second semester units
         $prerequisiteCheck = $this->checkPrerequisiteCompletion($student);
-        if (!$prerequisiteCheck['eligible']) {
+        if (! $prerequisiteCheck['eligible']) {
             $eligible = false;
             $reasons = array_merge($reasons, $prerequisiteCheck['reasons']);
         }
@@ -105,9 +103,9 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
         }
 
         // Update student notes if ineligible
-        if (!$eligible) {
+        if (! $eligible) {
             $student->update([
-                'admission_notes' => 'Registration eligibility issues: ' . implode(', ', $reasons)
+                'admission_notes' => 'Registration eligibility issues: '.implode(', ', $reasons),
             ]);
         }
 
@@ -137,7 +135,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
             foreach ($unit->prerequisiteGroups as $group) {
                 $groupSatisfied = $this->checkPrerequisiteGroup($student, $group);
 
-                if (!$groupSatisfied) {
+                if (! $groupSatisfied) {
                     $eligible = false;
                     $reasons[] = "Prerequisites not met for {$unit->code}";
                 }
@@ -195,7 +193,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
         // Update student status
         $student->update([
             'status' => 'suspended',
-            'admission_notes' => 'Academic suspension due to GPA below 0.5'
+            'admission_notes' => 'Academic suspension due to GPA below 0.5',
         ]);
     }
 }

@@ -17,7 +17,7 @@ class ApiLogging
     public function handle(Request $request, Closure $next): Response
     {
         $startTime = microtime(true);
-        
+
         // Log incoming request
         $this->logRequest($request);
 
@@ -45,15 +45,15 @@ class ApiLogging
         ];
 
         // Add request data for non-GET requests (excluding sensitive data)
-        if (!$request->isMethod('GET')) {
+        if (! $request->isMethod('GET')) {
             $requestData = $request->all();
-            
+
             // Remove sensitive fields
             $sensitiveFields = ['password', 'password_confirmation', 'token', 'api_key'];
             foreach ($sensitiveFields as $field) {
                 unset($requestData[$field]);
             }
-            
+
             $logData['request_data'] = $requestData;
         }
 
@@ -116,6 +116,7 @@ class ApiLogging
     protected function isJson(string $content): bool
     {
         json_decode($content);
+
         return json_last_error() === JSON_ERROR_NONE;
     }
 }

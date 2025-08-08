@@ -189,10 +189,19 @@ class GpaCalculation extends AuditableModel
 
     public function getGpaLevel(): string
     {
-        if ($this->gpa >= 3.5) return 'excellent';
-        if ($this->gpa >= 3.0) return 'good';
-        if ($this->gpa >= 2.5) return 'satisfactory';
-        if ($this->gpa >= 2.0) return 'probation';
+        if ($this->gpa >= 3.5) {
+            return 'excellent';
+        }
+        if ($this->gpa >= 3.0) {
+            return 'good';
+        }
+        if ($this->gpa >= 2.5) {
+            return 'satisfactory';
+        }
+        if ($this->gpa >= 2.0) {
+            return 'probation';
+        }
+
         return 'poor';
     }
 
@@ -219,10 +228,14 @@ class GpaCalculation extends AuditableModel
 
     public function getRankingSuffix(): string
     {
-        if (!$this->class_rank) return '';
+        if (! $this->class_rank) {
+            return '';
+        }
 
         $rank = $this->class_rank;
-        if ($rank % 100 >= 11 && $rank % 100 <= 13) return 'th';
+        if ($rank % 100 >= 11 && $rank % 100 <= 13) {
+            return 'th';
+        }
 
         return match ($rank % 10) {
             1 => 'st',
@@ -234,8 +247,10 @@ class GpaCalculation extends AuditableModel
 
     public function getFormattedRank(): string
     {
-        if (!$this->class_rank || !$this->class_size) return 'N/A';
+        if (! $this->class_rank || ! $this->class_size) {
+            return 'N/A';
+        }
 
-        return $this->class_rank . $this->getRankingSuffix() . ' of ' . $this->class_size;
+        return $this->class_rank.$this->getRankingSuffix().' of '.$this->class_size;
     }
 }

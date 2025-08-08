@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Student;
+use App\Models\AcademicHold;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Semester;
-use App\Models\AcademicHold;
-use Illuminate\Support\Facades\DB;
+use App\Models\Student;
 use Exception;
+use Illuminate\Support\Facades\DB;
 
 class RegistrationService
 {
@@ -62,7 +62,7 @@ class RegistrationService
     {
         return DB::transaction(function () use ($registration) {
             // Check if drop is allowed
-            if (!$registration->canDrop()) {
+            if (! $registration->canDrop()) {
                 throw new Exception('Course cannot be dropped at this time');
             }
 
@@ -87,7 +87,7 @@ class RegistrationService
     {
         return DB::transaction(function () use ($registration) {
             // Check if withdrawal is allowed
-            if (!$registration->canWithdraw()) {
+            if (! $registration->canWithdraw()) {
                 throw new Exception('Course cannot be withdrawn at this time');
             }
 
@@ -163,7 +163,7 @@ class RegistrationService
     private function validateRegistrationEligibility(Student $student, CourseOffering $courseOffering): void
     {
         // Check student status
-        if (!$student->canRegisterForCourses()) {
+        if (! $student->canRegisterForCourses()) {
             throw new Exception('Student is not eligible for course registration');
         }
 
@@ -182,20 +182,20 @@ class RegistrationService
         }
 
         // Check course availability
-        if (!$courseOffering->isAvailableForRegistration()) {
+        if (! $courseOffering->isAvailableForRegistration()) {
             throw new Exception('Course is not available for registration');
         }
 
         // Check prerequisites
         $eligibility = $this->checkCourseEligibility($student, $courseOffering);
-        if (!$eligibility['eligible']) {
-            throw new Exception('Prerequisites not met: ' . implode(', ', $eligibility['reasons']));
+        if (! $eligibility['eligible']) {
+            throw new Exception('Prerequisites not met: '.implode(', ', $eligibility['reasons']));
         }
 
         // Check schedule conflicts
         $conflicts = $this->checkScheduleConflicts($student, $courseOffering);
-        if (!empty($conflicts)) {
-            throw new Exception('Schedule conflict with: ' . implode(', ', $conflicts));
+        if (! empty($conflicts)) {
+            throw new Exception('Schedule conflict with: '.implode(', ', $conflicts));
         }
 
         // Check credit load limits
@@ -215,7 +215,7 @@ class RegistrationService
             $completedCourses = $this->getCompletedCourses($student);
 
             foreach ($courseOffering->prerequisites as $prerequisite) {
-                if (!$this->hasCompletedPrerequisite($completedCourses, $prerequisite)) {
+                if (! $this->hasCompletedPrerequisite($completedCourses, $prerequisite)) {
                     $eligible = false;
                     $reasons[] = "Missing prerequisite: {$prerequisite}";
                 }
@@ -295,9 +295,9 @@ class RegistrationService
     /**
      * Check if two schedules have time conflicts
      */
-    private function hasTimeConflict(array $schedule1 = null, array $schedule2 = null): bool
+    private function hasTimeConflict(?array $schedule1 = null, ?array $schedule2 = null): bool
     {
-        if (!$schedule1 || !$schedule2) {
+        if (! $schedule1 || ! $schedule2) {
             return false;
         }
 

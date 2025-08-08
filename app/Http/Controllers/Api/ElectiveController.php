@@ -8,8 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Models\CurriculumUnit;
 use App\Models\CurriculumVersion;
 use App\Models\Unit;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class ElectiveController extends Controller
@@ -81,7 +81,7 @@ class ElectiveController extends Controller
                     'general_electives' => [
                         'label' => 'General elective units',
                         'count' => $electives['general_electives']->count(),
-                    ]
+                    ],
                 ],
                 'units' => $units->map(function ($unit) {
                     return [
@@ -99,7 +99,7 @@ class ElectiveController extends Controller
                     'current_page' => $request->get('page', 1),
                     'last_page' => ceil($total / $perPage),
                 ],
-            ]
+            ],
         ]);
     }
 
@@ -134,7 +134,7 @@ class ElectiveController extends Controller
                     ];
                 }),
                 'total_elective_slots' => $electiveSlots->count(),
-            ]
+            ],
         ]);
     }
 
@@ -149,21 +149,21 @@ class ElectiveController extends Controller
         ]);
 
         // Validate that this is an elective slot
-        if (!$curriculumUnit->isElective()) {
+        if (! $curriculumUnit->isElective()) {
             throw ValidationException::withMessages([
-                'curriculum_unit' => 'This curriculum unit is not an elective slot.'
+                'curriculum_unit' => 'This curriculum unit is not an elective slot.',
             ]);
         }
 
         $newUnit = Unit::findOrFail($request->unit_id);
 
         // Validate that the unit can be used as elective
-        if (!$newUnit->canBeElectiveFor(
+        if (! $newUnit->canBeElectiveFor(
             $curriculumUnit->curriculumVersion->specialization_id,
             $curriculumUnit->curriculumVersion->program_id
         )) {
             throw ValidationException::withMessages([
-                'unit_id' => 'This unit cannot be used as an elective for this specialization.'
+                'unit_id' => 'This unit cannot be used as an elective for this specialization.',
             ]);
         }
 
@@ -171,8 +171,8 @@ class ElectiveController extends Controller
         $oldUnit = $curriculumUnit->unit;
         $curriculumUnit->update([
             'unit_id' => $newUnit->id,
-            'note' => $curriculumUnit->note .
-                ($request->reason ? " | Updated: {$request->reason}" : " | Updated via API"),
+            'note' => $curriculumUnit->note.
+                ($request->reason ? " | Updated: {$request->reason}" : ' | Updated via API'),
         ]);
 
         return response()->json([
@@ -190,7 +190,7 @@ class ElectiveController extends Controller
                     'name' => $newUnit->name,
                     'credit_points' => $newUnit->credit_points,
                 ],
-            ]
+            ],
         ]);
     }
 
@@ -237,7 +237,7 @@ class ElectiveController extends Controller
                     ->pluck('curriculumVersion.specialization.name')
                     ->unique()
                     ->values(),
-            ]
+            ],
         ]);
     }
 
@@ -246,9 +246,9 @@ class ElectiveController extends Controller
      */
     public function getElectiveRecommendations(CurriculumUnit $curriculumUnit): JsonResponse
     {
-        if (!$curriculumUnit->isElective()) {
+        if (! $curriculumUnit->isElective()) {
             throw ValidationException::withMessages([
-                'curriculum_unit' => 'This curriculum unit is not an elective slot.'
+                'curriculum_unit' => 'This curriculum unit is not an elective slot.',
             ]);
         }
 
@@ -304,7 +304,7 @@ class ElectiveController extends Controller
                         'total_count' => $recommendations['unassigned_units']->count(),
                     ],
                 ],
-            ]
+            ],
         ]);
     }
 }

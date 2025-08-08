@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Building;
 
-use App\Models\Building;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreBuildingRequest extends FormRequest

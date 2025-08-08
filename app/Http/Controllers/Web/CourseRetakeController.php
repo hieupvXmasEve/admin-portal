@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
 use App\Models\CourseRegistration;
+use App\Models\Student;
 use App\Services\CourseRetakeService;
 use Illuminate\Http\Request;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,7 +25,7 @@ class CourseRetakeController extends Controller
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
         }
@@ -45,7 +43,7 @@ class CourseRetakeController extends Controller
                 $q->where('campus_id', $campusId);
             });
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $search = $validated['search'];
             $retakesQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
@@ -53,7 +51,7 @@ class CourseRetakeController extends Controller
             });
         }
 
-        if (!empty($validated['unit_id'])) {
+        if (! empty($validated['unit_id'])) {
             $retakesQuery->whereHas('courseOffering', function ($q) use ($validated) {
                 $q->where('unit_id', $validated['unit_id']);
             });

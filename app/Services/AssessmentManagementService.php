@@ -9,24 +9,19 @@ use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\Student;
-use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class AssessmentManagementService
 {
     /**
      * Retrieve the complete assessment structure for a course offering.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function getAssessmentStructure(CourseOffering $courseOffering): array
     {
         // Get the syllabus for this course offering
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return [
                 'components' => [],
                 'total_weight' => 0,
@@ -35,8 +30,8 @@ class AssessmentManagementService
                     'total_components' => 0,
                     'total_details' => 0,
                     'graded_submissions' => 0,
-                    'pending_submissions' => 0
-                ]
+                    'pending_submissions' => 0,
+                ],
             ];
         }
 
@@ -45,7 +40,7 @@ class AssessmentManagementService
             ->with([
                 'details.scores' => function ($query) use ($courseOffering) {
                     $query->where('course_offering_id', $courseOffering->id);
-                }
+                },
             ])
             ->orderBy('created_at')
             ->get();
@@ -66,7 +61,7 @@ class AssessmentManagementService
                 'is_required_to_sit_final_exam' => $component->is_required_to_sit_final_exam,
                 'details' => [],
                 'grading_statistics' => $this->calculateComponentGradingStatistics($component, $courseOffering),
-                'submission_counts' => $this->calculateComponentSubmissionCounts($component, $courseOffering)
+                'submission_counts' => $this->calculateComponentSubmissionCounts($component, $courseOffering),
             ];
 
             // Add details if they exist
@@ -77,7 +72,7 @@ class AssessmentManagementService
                     'name' => $detail->name,
                     'weight' => $detail->weight,
                     'grading_statistics' => $this->calculateDetailGradingStatistics($detail, $courseOffering),
-                    'submission_counts' => $this->calculateDetailSubmissionCounts($detail, $courseOffering)
+                    'submission_counts' => $this->calculateDetailSubmissionCounts($detail, $courseOffering),
                 ];
 
                 // Count submissions for this detail
@@ -108,17 +103,13 @@ class AssessmentManagementService
                 'total_components' => $components->count(),
                 'total_details' => $totalDetails,
                 'graded_submissions' => $totalGradedSubmissions,
-                'pending_submissions' => $totalPendingSubmissions
-            ]
+                'pending_submissions' => $totalPendingSubmissions,
+            ],
         ];
     }
 
     /**
      * Calculate grading statistics for an assessment component.
-     *
-     * @param AssessmentComponent $component
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function calculateComponentGradingStatistics(AssessmentComponent $component, CourseOffering $courseOffering): array
     {
@@ -128,7 +119,7 @@ class AssessmentManagementService
             'lowest_score' => 0,
             'total_submissions' => 0,
             'graded_submissions' => 0,
-            'pending_submissions' => 0
+            'pending_submissions' => 0,
         ];
 
         // Get all scores for this component's details
@@ -162,10 +153,6 @@ class AssessmentManagementService
 
     /**
      * Calculate submission counts for an assessment component.
-     *
-     * @param AssessmentComponent $component
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function calculateComponentSubmissionCounts(AssessmentComponent $component, CourseOffering $courseOffering): array
     {
@@ -190,16 +177,12 @@ class AssessmentManagementService
             'graded' => $counts->graded ?? 0,
             'final' => $counts->final ?? 0,
             'late' => $counts->late ?? 0,
-            'plagiarism_flagged' => $counts->plagiarism_flagged ?? 0
+            'plagiarism_flagged' => $counts->plagiarism_flagged ?? 0,
         ];
     }
 
     /**
      * Calculate grading statistics for an assessment component detail.
-     *
-     * @param AssessmentComponentDetail $detail
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function calculateDetailGradingStatistics(AssessmentComponentDetail $detail, CourseOffering $courseOffering): array
     {
@@ -215,7 +198,7 @@ class AssessmentManagementService
                 'average_score' => 0,
                 'highest_score' => 0,
                 'lowest_score' => 0,
-                'total_graded' => 0
+                'total_graded' => 0,
             ];
         }
 
@@ -225,16 +208,12 @@ class AssessmentManagementService
             'average_score' => round($percentageScores->average(), 2),
             'highest_score' => $percentageScores->max(),
             'lowest_score' => $percentageScores->min(),
-            'total_graded' => $scores->count()
+            'total_graded' => $scores->count(),
         ];
     }
 
     /**
      * Calculate submission counts for an assessment component detail.
-     *
-     * @param AssessmentComponentDetail $detail
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function calculateDetailSubmissionCounts(AssessmentComponentDetail $detail, CourseOffering $courseOffering): array
     {
@@ -256,17 +235,15 @@ class AssessmentManagementService
             'graded' => $counts->graded ?? 0,
             'final' => $counts->final ?? 0,
             'late' => $counts->late ?? 0,
-            'plagiarism_flagged' => $counts->plagiarism_flagged ?? 0
+            'plagiarism_flagged' => $counts->plagiarism_flagged ?? 0,
         ];
     }
 
     /**
      * Validate weight constraints for assessment components.
      *
-     * @param int $syllabusId
-     * @param array $components Array of component data with weights
-     * @param int|null $excludeComponentId Component ID to exclude from validation (for updates)
-     * @return array
+     * @param  array  $components  Array of component data with weights
+     * @param  int|null  $excludeComponentId  Component ID to exclude from validation (for updates)
      */
     public function validateWeightConstraints(int $syllabusId, array $components, ?int $excludeComponentId = null): array
     {
@@ -289,11 +266,11 @@ class AssessmentManagementService
 
             // Validate individual component weight
             if ($weight <= 0) {
-                $errors[] = "Component weight must be greater than 0";
+                $errors[] = 'Component weight must be greater than 0';
             }
 
             if ($weight > 100) {
-                $errors[] = "Individual component weight cannot exceed 100%";
+                $errors[] = 'Individual component weight cannot exceed 100%';
             }
 
             $totalWeight += $weight;
@@ -308,17 +285,15 @@ class AssessmentManagementService
             'is_valid' => empty($errors),
             'errors' => $errors,
             'total_weight' => $totalWeight,
-            'remaining_weight' => max(0, 100 - $totalWeight)
+            'remaining_weight' => max(0, 100 - $totalWeight),
         ];
     }
 
     /**
      * Validate weight constraints for assessment component details within a component.
      *
-     * @param int $componentId
-     * @param array $details Array of detail data with weights
-     * @param int|null $excludeDetailId Detail ID to exclude from validation (for updates)
-     * @return array
+     * @param  array  $details  Array of detail data with weights
+     * @param  int|null  $excludeDetailId  Detail ID to exclude from validation (for updates)
      */
     public function validateDetailWeightConstraints(int $componentId, array $details, ?int $excludeDetailId = null): array
     {
@@ -327,12 +302,12 @@ class AssessmentManagementService
 
         // Get the parent component to check its weight
         $component = AssessmentComponent::find($componentId);
-        if (!$component) {
+        if (! $component) {
             return [
                 'is_valid' => false,
                 'errors' => ['Assessment component not found'],
                 'total_weight' => 0,
-                'remaining_weight' => 0
+                'remaining_weight' => 0,
             ];
         }
 
@@ -352,7 +327,7 @@ class AssessmentManagementService
 
             // Validate individual detail weight
             if ($weight <= 0) {
-                $errors[] = "Detail weight must be greater than 0";
+                $errors[] = 'Detail weight must be greater than 0';
             }
 
             $totalWeight += $weight;
@@ -368,15 +343,13 @@ class AssessmentManagementService
             'errors' => $errors,
             'total_weight' => $totalWeight,
             'remaining_weight' => max(0, $component->weight - $totalWeight),
-            'component_weight' => $component->weight
+            'component_weight' => $component->weight,
         ];
     }
 
     /**
      * Create a new assessment component.
      *
-     * @param array $data
-     * @return AssessmentComponent
      * @throws \Exception
      */
     public function createAssessmentComponent(array $data): AssessmentComponent
@@ -387,8 +360,8 @@ class AssessmentManagementService
             [['weight' => $data['weight']]]
         );
 
-        if (!$weightValidation['is_valid']) {
-            throw new \Exception('Weight validation failed: ' . implode(', ', $weightValidation['errors']));
+        if (! $weightValidation['is_valid']) {
+            throw new \Exception('Weight validation failed: '.implode(', ', $weightValidation['errors']));
         }
 
         return DB::transaction(function () use ($data) {
@@ -399,9 +372,6 @@ class AssessmentManagementService
     /**
      * Update an existing assessment component.
      *
-     * @param AssessmentComponent $component
-     * @param array $data
-     * @return AssessmentComponent
      * @throws \Exception
      */
     public function updateAssessmentComponent(AssessmentComponent $component, array $data): AssessmentComponent
@@ -414,13 +384,14 @@ class AssessmentManagementService
                 $component->id
             );
 
-            if (!$weightValidation['is_valid']) {
-                throw new \Exception('Weight validation failed: ' . implode(', ', $weightValidation['errors']));
+            if (! $weightValidation['is_valid']) {
+                throw new \Exception('Weight validation failed: '.implode(', ', $weightValidation['errors']));
             }
         }
 
         return DB::transaction(function () use ($component, $data) {
             $component->update($data);
+
             return $component->fresh();
         });
     }
@@ -428,8 +399,6 @@ class AssessmentManagementService
     /**
      * Create a new assessment component detail.
      *
-     * @param array $data
-     * @return AssessmentComponentDetail
      * @throws \Exception
      */
     public function createAssessmentComponentDetail(array $data): AssessmentComponentDetail
@@ -440,8 +409,8 @@ class AssessmentManagementService
             [['weight' => $data['weight']]]
         );
 
-        if (!$weightValidation['is_valid']) {
-            throw new \Exception('Detail weight validation failed: ' . implode(', ', $weightValidation['errors']));
+        if (! $weightValidation['is_valid']) {
+            throw new \Exception('Detail weight validation failed: '.implode(', ', $weightValidation['errors']));
         }
 
         return DB::transaction(function () use ($data) {
@@ -452,9 +421,6 @@ class AssessmentManagementService
     /**
      * Update an existing assessment component detail.
      *
-     * @param AssessmentComponentDetail $detail
-     * @param array $data
-     * @return AssessmentComponentDetail
      * @throws \Exception
      */
     public function updateAssessmentComponentDetail(AssessmentComponentDetail $detail, array $data): AssessmentComponentDetail
@@ -467,23 +433,20 @@ class AssessmentManagementService
                 $detail->id
             );
 
-            if (!$weightValidation['is_valid']) {
-                throw new \Exception('Detail weight validation failed: ' . implode(', ', $weightValidation['errors']));
+            if (! $weightValidation['is_valid']) {
+                throw new \Exception('Detail weight validation failed: '.implode(', ', $weightValidation['errors']));
             }
         }
 
         return DB::transaction(function () use ($detail, $data) {
             $detail->update($data);
+
             return $detail->fresh();
         });
     }
 
     /**
      * Get grading data for a specific student across all assessments.
-     *
-     * @param CourseOffering $courseOffering
-     * @param Student $student
-     * @return array
      */
     public function getGradingDataByStudent(CourseOffering $courseOffering, Student $student): array
     {
@@ -492,12 +455,12 @@ class AssessmentManagementService
             ->where('student_code', $student->id)
             ->exists();
 
-        if (!$isEnrolled) {
+        if (! $isEnrolled) {
             throw new \Exception('Student is not enrolled in this course offering');
         }
 
         $syllabus = $courseOffering->syllabus;
-        if (!$syllabus) {
+        if (! $syllabus) {
             return [
                 'student' => $this->formatStudentData($student),
                 'assessments' => [],
@@ -505,8 +468,8 @@ class AssessmentManagementService
                     'total_assessments' => 0,
                     'completed_assessments' => 0,
                     'pending_assessments' => 0,
-                    'overall_percentage' => 0
-                ]
+                    'overall_percentage' => 0,
+                ],
             ];
         }
 
@@ -538,7 +501,7 @@ class AssessmentManagementService
                 'due_date' => $component->due_date?->toISOString(),
                 'details' => [],
                 'component_average' => 0,
-                'component_status' => 'not_started'
+                'component_status' => 'not_started',
             ];
 
             $detailScores = [];
@@ -558,14 +521,14 @@ class AssessmentManagementService
                     'weight' => $detail->weight,
                     'max_points' => $detail->max_points,
                     'due_date' => $detail->due_date?->toISOString(),
-                    'score' => null
+                    'score' => null,
                 ];
 
                 if ($score) {
                     $hasAnyScore = true;
                     $detailData['score'] = $this->formatScoreData($score);
 
-                    if ($score->score_status === 'final' && !$score->score_excluded && $score->percentage_score !== null) {
+                    if ($score->score_status === 'final' && ! $score->score_excluded && $score->percentage_score !== null) {
                         $completedAssessments++;
                         $detailWeightedScore += ($score->percentage_score * $detail->weight);
                         $detailTotalWeight += $detail->weight;
@@ -587,7 +550,7 @@ class AssessmentManagementService
             }
 
             // Determine component status
-            if (!$hasAnyScore) {
+            if (! $hasAnyScore) {
                 $componentData['component_status'] = 'not_started';
             } elseif ($allScoresComplete) {
                 $componentData['component_status'] = 'completed';
@@ -609,17 +572,13 @@ class AssessmentManagementService
                 'completed_assessments' => $completedAssessments,
                 'pending_assessments' => $totalAssessments - $completedAssessments,
                 'overall_percentage' => $overallPercentage,
-                'total_weight_covered' => $totalWeight
-            ]
+                'total_weight_covered' => $totalWeight,
+            ],
         ];
     }
 
     /**
      * Get grading data for all students in a specific assessment component.
-     *
-     * @param CourseOffering $courseOffering
-     * @param AssessmentComponent $assessmentComponent
-     * @return array
      */
     public function getGradingDataByComponent(CourseOffering $courseOffering, AssessmentComponent $assessmentComponent): array
     {
@@ -650,7 +609,7 @@ class AssessmentManagementService
             'total_submissions' => 0,
             'graded_submissions' => 0,
             'average_score' => 0,
-            'completion_rate' => 0
+            'completion_rate' => 0,
         ];
 
         foreach ($assessmentDetails as $detail) {
@@ -663,7 +622,7 @@ class AssessmentManagementService
 
                 $studentData = [
                     'student' => $this->formatStudentData($student),
-                    'score' => $score ? $this->formatScoreData($score) : null
+                    'score' => $score ? $this->formatScoreData($score) : null,
                 ];
 
                 if ($score) {
@@ -671,7 +630,7 @@ class AssessmentManagementService
                     if ($score->score_status === 'final') {
                         $componentStatistics['graded_submissions']++;
                         $gradedCount++;
-                        if ($score->percentage_score !== null && !$score->score_excluded) {
+                        if ($score->percentage_score !== null && ! $score->score_excluded) {
                             $detailScores[] = $score->percentage_score;
                         }
                     }
@@ -684,10 +643,10 @@ class AssessmentManagementService
                 'total_students' => $enrolledStudents->count(),
                 'submitted_count' => $detail->scores->count(),
                 'graded_count' => $gradedCount,
-                'average_score' => !empty($detailScores) ? round(array_sum($detailScores) / count($detailScores), 2) : 0,
-                'highest_score' => !empty($detailScores) ? max($detailScores) : 0,
-                'lowest_score' => !empty($detailScores) ? min($detailScores) : 0,
-                'completion_rate' => $enrolledStudents->count() > 0 ? round(($gradedCount / $enrolledStudents->count()) * 100, 2) : 0
+                'average_score' => ! empty($detailScores) ? round(array_sum($detailScores) / count($detailScores), 2) : 0,
+                'highest_score' => ! empty($detailScores) ? max($detailScores) : 0,
+                'lowest_score' => ! empty($detailScores) ? min($detailScores) : 0,
+                'completion_rate' => $enrolledStudents->count() > 0 ? round(($gradedCount / $enrolledStudents->count()) * 100, 2) : 0,
             ];
 
             $formattedDetails[] = [
@@ -698,7 +657,7 @@ class AssessmentManagementService
                 'max_points' => $detail->max_points,
                 'due_date' => $detail->due_date?->toISOString(),
                 'student_scores' => $studentScores,
-                'statistics' => $detailStatistics
+                'statistics' => $detailStatistics,
             ];
         }
 
@@ -707,13 +666,13 @@ class AssessmentManagementService
             $allScores = [];
             foreach ($assessmentDetails as $detail) {
                 foreach ($detail->scores as $score) {
-                    if ($score->score_status === 'final' && $score->percentage_score !== null && !$score->score_excluded) {
+                    if ($score->score_status === 'final' && $score->percentage_score !== null && ! $score->score_excluded) {
                         $allScores[] = $score->percentage_score;
                     }
                 }
             }
 
-            if (!empty($allScores)) {
+            if (! empty($allScores)) {
                 $componentStatistics['average_score'] = round(array_sum($allScores) / count($allScores), 2);
             }
         }
@@ -731,18 +690,15 @@ class AssessmentManagementService
                 'type_name' => $assessmentComponent->type_name,
                 'weight' => $assessmentComponent->weight,
                 'due_date' => $assessmentComponent->due_date?->toISOString(),
-                'is_required_to_sit_final_exam' => $assessmentComponent->is_required_to_sit_final_exam
+                'is_required_to_sit_final_exam' => $assessmentComponent->is_required_to_sit_final_exam,
             ],
             'details' => $formattedDetails,
-            'statistics' => $componentStatistics
+            'statistics' => $componentStatistics,
         ];
     }
 
     /**
      * Format student data for API responses.
-     *
-     * @param Student $student
-     * @return array
      */
     private function formatStudentData(Student $student): array
     {
@@ -752,15 +708,12 @@ class AssessmentManagementService
             'name' => $student->display_name,
             'first_name' => $student->first_name,
             'last_name' => $student->last_name,
-            'email' => $student->email
+            'email' => $student->email,
         ];
     }
 
     /**
      * Format score data for API responses.
-     *
-     * @param AssessmentComponentDetailScore $score
-     * @return array
      */
     public function formatScoreData(AssessmentComponentDetailScore $score): array
     {
@@ -794,16 +747,12 @@ class AssessmentManagementService
             'last_modified_by_lecture_id' => $score->last_modified_by_lecture_id,
             'last_modified_at' => $score->last_modified_at?->toISOString(),
             'created_at' => $score->created_at->toISOString(),
-            'updated_at' => $score->updated_at->toISOString()
+            'updated_at' => $score->updated_at->toISOString(),
         ];
     }
 
     /**
      * Calculate late penalty for a submission based on assessment component rules.
-     *
-     * @param AssessmentComponentDetailScore $score
-     * @param \Carbon\Carbon $submissionTime
-     * @return array
      */
     public function calculateLatePenalty(AssessmentComponentDetailScore $score, \Carbon\Carbon $submissionTime): array
     {
@@ -812,13 +761,13 @@ class AssessmentManagementService
         // Get the deadline - try component detail first, then component
         $deadline = $score->assessmentComponentDetail->due_date ?? $assessmentComponent->due_date;
 
-        if (!$deadline) {
+        if (! $deadline) {
             return [
                 'is_late' => false,
                 'minutes_late' => 0,
                 'penalty_percentage' => 0.0,
                 'penalty_applied' => false,
-                'message' => 'No deadline set for this assessment'
+                'message' => 'No deadline set for this assessment',
             ];
         }
 
@@ -829,7 +778,7 @@ class AssessmentManagementService
                 'minutes_late' => 0,
                 'penalty_percentage' => 0.0,
                 'penalty_applied' => false,
-                'message' => 'Submission is on time'
+                'message' => 'Submission is on time',
             ];
         }
 
@@ -840,7 +789,7 @@ class AssessmentManagementService
             'type' => $assessmentComponent->late_penalty_type ?? 'none',
             'percentage' => $assessmentComponent->late_penalty_percentage ?? 0.0,
             'max_penalty' => 100.0, // Maximum penalty is 100%
-            'grace_period_minutes' => 0 // Could be configurable in the future
+            'grace_period_minutes' => 0, // Could be configurable in the future
         ];
 
         // Calculate penalty using the model method
@@ -854,28 +803,24 @@ class AssessmentManagementService
             'penalty_type' => $penaltyRules['type'],
             'deadline' => $deadline->toISOString(),
             'submission_time' => $submissionTime->toISOString(),
-            'message' => $this->formatLatePenaltyMessage($minutesLate, $penaltyPercentage, $penaltyRules['type'])
+            'message' => $this->formatLatePenaltyMessage($minutesLate, $penaltyPercentage, $penaltyRules['type']),
         ];
     }
 
     /**
      * Process late submission and apply penalty if applicable.
-     *
-     * @param AssessmentComponentDetailScore $score
-     * @param \Carbon\Carbon $submissionTime
-     * @return array
      */
     public function processLateSubmission(AssessmentComponentDetailScore $score, \Carbon\Carbon $submissionTime): array
     {
         $penaltyCalculation = $this->calculateLatePenalty($score, $submissionTime);
 
-        if (!$penaltyCalculation['is_late']) {
+        if (! $penaltyCalculation['is_late']) {
             // Update score to mark as on time
             $score->update([
                 'is_late' => false,
                 'minutes_late' => 0,
                 'late_penalty_applied' => 0.0,
-                'submitted_at' => $submissionTime
+                'submitted_at' => $submissionTime,
             ]);
 
             return $penaltyCalculation;
@@ -885,7 +830,7 @@ class AssessmentManagementService
         $score->update([
             'is_late' => true,
             'minutes_late' => $penaltyCalculation['minutes_late'],
-            'submitted_at' => $submissionTime
+            'submitted_at' => $submissionTime,
         ]);
 
         // Apply penalty if applicable
@@ -901,16 +846,10 @@ class AssessmentManagementService
 
     /**
      * Process late excuse approval workflow.
-     *
-     * @param AssessmentComponentDetailScore $score
-     * @param bool $approved
-     * @param string $reviewerNotes
-     * @param int|null $reviewerId
-     * @return array
      */
     public function processLateExcuseApproval(AssessmentComponentDetailScore $score, bool $approved, string $reviewerNotes = '', ?int $reviewerId = null): array
     {
-        if (!$score->hasLateExcusePending()) {
+        if (! $score->hasLateExcusePending()) {
             throw new \Exception('No late excuse pending for this submission');
         }
 
@@ -927,7 +866,7 @@ class AssessmentManagementService
             'processed_at' => now()->toISOString(),
             'processed_by' => $reviewerId,
             'penalty_removed' => false,
-            'message' => $approved ? 'Late excuse approved' : 'Late excuse denied'
+            'message' => $approved ? 'Late excuse approved' : 'Late excuse denied',
         ];
 
         if ($approved) {
@@ -940,9 +879,6 @@ class AssessmentManagementService
 
     /**
      * Get late submission statistics for a course offering.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function getLateSubmissionStatistics(CourseOffering $courseOffering): array
     {
@@ -971,15 +907,12 @@ class AssessmentManagementService
                 ? round(($stats->approved_excuses / $stats->excuse_requests) * 100, 2)
                 : 0,
             'avg_minutes_late' => $stats->avg_minutes_late ? round($stats->avg_minutes_late, 0) : 0,
-            'avg_penalty_applied' => $stats->avg_penalty_applied ? round($stats->avg_penalty_applied, 2) : 0
+            'avg_penalty_applied' => $stats->avg_penalty_applied ? round($stats->avg_penalty_applied, 2) : 0,
         ];
     }
 
     /**
      * Get students with pending late excuse requests.
-     *
-     * @param CourseOffering $courseOffering
-     * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getPendingLateExcuses(CourseOffering $courseOffering): \Illuminate\Database\Eloquent\Collection
     {
@@ -988,7 +921,7 @@ class AssessmentManagementService
             ->where('late_excuse_approved', false)
             ->with([
                 'student',
-                'assessmentComponentDetail.assessmentComponent'
+                'assessmentComponentDetail.assessmentComponent',
             ])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -996,11 +929,6 @@ class AssessmentManagementService
 
     /**
      * Format late penalty message for display.
-     *
-     * @param int $minutesLate
-     * @param float $penaltyPercentage
-     * @param string $penaltyType
-     * @return string
      */
     private function formatLatePenaltyMessage(int $minutesLate, float $penaltyPercentage, string $penaltyType): string
     {
@@ -1013,11 +941,13 @@ class AssessmentManagementService
         switch ($penaltyType) {
             case 'per_hour':
                 $hoursLate = ceil($minutesLate / 60);
-                return "Submission is {$timeDelay} late ({$hoursLate} hour" . ($hoursLate > 1 ? 's' : '') . "), penalty: {$penaltyPercentage}%";
+
+                return "Submission is {$timeDelay} late ({$hoursLate} hour".($hoursLate > 1 ? 's' : '')."), penalty: {$penaltyPercentage}%";
 
             case 'per_day':
                 $daysLate = ceil($minutesLate / (24 * 60));
-                return "Submission is {$timeDelay} late ({$daysLate} day" . ($daysLate > 1 ? 's' : '') . "), penalty: {$penaltyPercentage}%";
+
+                return "Submission is {$timeDelay} late ({$daysLate} day".($daysLate > 1 ? 's' : '')."), penalty: {$penaltyPercentage}%";
 
             case 'fixed':
                 return "Submission is {$timeDelay} late, fixed penalty: {$penaltyPercentage}%";
@@ -1029,49 +959,45 @@ class AssessmentManagementService
 
     /**
      * Format time delay in a human-readable format.
-     *
-     * @param int $minutes
-     * @return string
      */
     private function formatTimeDelay(int $minutes): string
     {
         if ($minutes < 60) {
-            return "{$minutes} minute" . ($minutes > 1 ? 's' : '');
+            return "{$minutes} minute".($minutes > 1 ? 's' : '');
         }
 
         if ($minutes < 1440) { // Less than 24 hours
             $hours = floor($minutes / 60);
             $remainingMinutes = $minutes % 60;
 
-            $result = "{$hours} hour" . ($hours > 1 ? 's' : '');
+            $result = "{$hours} hour".($hours > 1 ? 's' : '');
             if ($remainingMinutes > 0) {
-                $result .= " and {$remainingMinutes} minute" . ($remainingMinutes > 1 ? 's' : '');
+                $result .= " and {$remainingMinutes} minute".($remainingMinutes > 1 ? 's' : '');
             }
+
             return $result;
         }
 
         $days = floor($minutes / 1440);
         $remainingHours = floor(($minutes % 1440) / 60);
 
-        $result = "{$days} day" . ($days > 1 ? 's' : '');
+        $result = "{$days} day".($days > 1 ? 's' : '');
         if ($remainingHours > 0) {
-            $result .= " and {$remainingHours} hour" . ($remainingHours > 1 ? 's' : '');
+            $result .= " and {$remainingHours} hour".($remainingHours > 1 ? 's' : '');
         }
+
         return $result;
     }
 
     /**
      * Process academic integrity flag for a submission.
      *
-     * @param AssessmentComponentDetailScore $score
-     * @param array $data
-     * @return array
      * @throws \Exception
      */
     public function processAcademicIntegrityFlag(AssessmentComponentDetailScore $score, array $data): array
     {
         // Validate required data
-        if (!isset($data['plagiarism_suspected'])) {
+        if (! isset($data['plagiarism_suspected'])) {
             throw new \Exception('plagiarism_suspected flag is required');
         }
 
@@ -1082,7 +1008,7 @@ class AssessmentManagementService
 
         // Validate plagiarism score if provided
         if ($plagiarismScore !== null) {
-            if (!is_numeric($plagiarismScore) || $plagiarismScore < 0 || $plagiarismScore > 100) {
+            if (! is_numeric($plagiarismScore) || $plagiarismScore < 0 || $plagiarismScore > 100) {
                 throw new \Exception('Plagiarism score must be between 0 and 100');
             }
             $plagiarismScore = (float) $plagiarismScore;
@@ -1096,15 +1022,15 @@ class AssessmentManagementService
             'violation_dismissed',
             'pending_hearing',
             'hearing_completed',
-            'sanctions_applied'
+            'sanctions_applied',
         ];
 
-        if ($integrityStatus && !in_array($integrityStatus, $validIntegrityStatuses)) {
-            throw new \Exception('Invalid integrity status. Valid values: ' . implode(', ', $validIntegrityStatuses));
+        if ($integrityStatus && ! in_array($integrityStatus, $validIntegrityStatuses)) {
+            throw new \Exception('Invalid integrity status. Valid values: '.implode(', ', $validIntegrityStatuses));
         }
 
         // Set default integrity status based on plagiarism flag
-        if (!$integrityStatus) {
+        if (! $integrityStatus) {
             $integrityStatus = $plagiarismSuspected ? 'under_review' : 'clean';
         }
 
@@ -1153,15 +1079,12 @@ class AssessmentManagementService
             'flagged_by' => auth()->user()?->id,
             'message' => $plagiarismSuspected
                 ? 'Academic integrity concern flagged successfully'
-                : 'Academic integrity flag cleared successfully'
+                : 'Academic integrity flag cleared successfully',
         ];
     }
 
     /**
      * Get academic integrity statistics for a course offering.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function getAcademicIntegrityStatistics(CourseOffering $courseOffering): array
     {
@@ -1192,9 +1115,7 @@ class AssessmentManagementService
     /**
      * Get submissions flagged for academic integrity concerns.
      *
-     * @param CourseOffering $courseOffering
-     * @param string|null $status Filter by integrity status
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @param  string|null  $status  Filter by integrity status
      */
     public function getFlaggedSubmissions(CourseOffering $courseOffering, ?string $status = null): \Illuminate\Database\Eloquent\Collection
     {
@@ -1202,7 +1123,7 @@ class AssessmentManagementService
             ->where('plagiarism_suspected', true)
             ->with([
                 'student',
-                'assessmentComponentDetail.assessmentComponent'
+                'assessmentComponentDetail.assessmentComponent',
             ]);
 
         if ($status) {
@@ -1215,10 +1136,6 @@ class AssessmentManagementService
     /**
      * Update integrity status workflow.
      *
-     * @param AssessmentComponentDetailScore $score
-     * @param string $newStatus
-     * @param string $notes
-     * @return array
      * @throws \Exception
      */
     public function updateIntegrityStatus(AssessmentComponentDetailScore $score, string $newStatus, string $notes = ''): array
@@ -1230,11 +1147,11 @@ class AssessmentManagementService
             'violation_dismissed',
             'pending_hearing',
             'hearing_completed',
-            'sanctions_applied'
+            'sanctions_applied',
         ];
 
-        if (!in_array($newStatus, $validStatuses)) {
-            throw new \Exception('Invalid integrity status. Valid values: ' . implode(', ', $validStatuses));
+        if (! in_array($newStatus, $validStatuses)) {
+            throw new \Exception('Invalid integrity status. Valid values: '.implode(', ', $validStatuses));
         }
 
         $previousStatus = $score->integrity_status;
@@ -1266,16 +1183,13 @@ class AssessmentManagementService
             'notes' => $notes,
             'updated_at' => now()->toISOString(),
             'updated_by' => auth()->user()?->id,
-            'message' => "Integrity status updated from '{$previousStatus}' to '{$newStatus}'"
+            'message' => "Integrity status updated from '{$previousStatus}' to '{$newStatus}'",
         ];
     }
 
     /**
      * Process appeal request for a submission.
      *
-     * @param AssessmentComponentDetailScore $score
-     * @param string $appealReason
-     * @return array
      * @throws \Exception
      */
     public function processAppealRequest(AssessmentComponentDetailScore $score, string $appealReason): array
@@ -1287,7 +1201,7 @@ class AssessmentManagementService
 
         // Check if submission is eligible for appeal
         $eligibleStatuses = ['violation_confirmed', 'sanctions_applied'];
-        if (!in_array($score->integrity_status, $eligibleStatuses)) {
+        if (! in_array($score->integrity_status, $eligibleStatuses)) {
             throw new \Exception('Appeals can only be requested for confirmed violations or applied sanctions');
         }
 
@@ -1322,24 +1236,21 @@ class AssessmentManagementService
             'appeal_reason' => $appealReason,
             'appeal_status' => 'pending',
             'requested_at' => now()->toISOString(),
-            'message' => 'Appeal request submitted successfully'
+            'message' => 'Appeal request submitted successfully',
         ];
     }
 
     /**
      * Process appeal decision.
      *
-     * @param AssessmentComponentDetailScore $score
-     * @param string $decision 'approved' or 'denied'
-     * @param string $reviewerNotes
-     * @param string $instructorFeedback
-     * @return array
+     * @param  string  $decision  'approved' or 'denied'
+     *
      * @throws \Exception
      */
     public function processAppealDecision(AssessmentComponentDetailScore $score, string $decision, string $reviewerNotes = '', string $instructorFeedback = ''): array
     {
         // Validate appeal exists and is pending
-        if (!$score->appeal_requested) {
+        if (! $score->appeal_requested) {
             throw new \Exception('No appeal request found for this submission');
         }
 
@@ -1349,7 +1260,7 @@ class AssessmentManagementService
 
         // Validate decision
         $validDecisions = ['approved', 'denied'];
-        if (!in_array($decision, $validDecisions)) {
+        if (! in_array($decision, $validDecisions)) {
             throw new \Exception('Invalid appeal decision. Must be "approved" or "denied"');
         }
 
@@ -1376,7 +1287,7 @@ class AssessmentManagementService
         // Update score history
         $history = $score->score_history ?? [];
         $history[] = [
-            'action' => 'appeal_' . $decision,
+            'action' => 'appeal_'.$decision,
             'decision' => $decision,
             'reviewer_notes' => $reviewerNotes,
             'instructor_feedback' => $instructorFeedback,
@@ -1399,15 +1310,12 @@ class AssessmentManagementService
             'processed_by' => auth()->user()?->id,
             'message' => $decision === 'approved'
                 ? 'Appeal approved - integrity violation dismissed'
-                : 'Appeal denied - original decision stands'
+                : 'Appeal denied - original decision stands',
         ];
     }
 
     /**
      * Get appeal statistics for a course offering.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function getAppealStatistics(CourseOffering $courseOffering): array
     {
@@ -1440,9 +1348,6 @@ class AssessmentManagementService
 
     /**
      * Get pending appeals for a course offering.
-     *
-     * @param CourseOffering $courseOffering
-     * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getPendingAppeals(CourseOffering $courseOffering): \Illuminate\Database\Eloquent\Collection
     {
@@ -1451,7 +1356,7 @@ class AssessmentManagementService
             ->where('appeal_status', 'pending')
             ->with([
                 'student',
-                'assessmentComponentDetail.assessmentComponent'
+                'assessmentComponentDetail.assessmentComponent',
             ])
             ->orderBy('appeal_requested_at', 'asc')
             ->get();
@@ -1460,9 +1365,7 @@ class AssessmentManagementService
     /**
      * Get all appeals for a course offering.
      *
-     * @param CourseOffering $courseOffering
-     * @param string|null $status Filter by appeal status
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @param  string|null  $status  Filter by appeal status
      */
     public function getAppeals(CourseOffering $courseOffering, ?string $status = null): \Illuminate\Database\Eloquent\Collection
     {
@@ -1470,7 +1373,7 @@ class AssessmentManagementService
             ->where('appeal_requested', true)
             ->with([
                 'student',
-                'assessmentComponentDetail.assessmentComponent'
+                'assessmentComponentDetail.assessmentComponent',
             ]);
 
         if ($status) {
@@ -1482,11 +1385,6 @@ class AssessmentManagementService
 
     /**
      * Update instructor feedback and private notes.
-     *
-     * @param AssessmentComponentDetailScore $score
-     * @param string $instructorFeedback
-     * @param string $privateNotes
-     * @return array
      */
     public function updateInstructorFeedback(AssessmentComponentDetailScore $score, string $instructorFeedback = '', string $privateNotes = ''): array
     {
@@ -1521,17 +1419,13 @@ class AssessmentManagementService
             'private_notes' => $privateNotes,
             'updated_at' => now()->toISOString(),
             'updated_by' => auth()->user()?->id,
-            'message' => 'Instructor feedback and notes updated successfully'
+            'message' => 'Instructor feedback and notes updated successfully',
         ];
     }
 
     /**
      * Apply bonus points to a score with reasoning.
      *
-     * @param AssessmentComponentDetailScore $score
-     * @param float $bonusPoints
-     * @param string $reason
-     * @return array
      * @throws \Exception
      */
     public function applyBonusPoints(AssessmentComponentDetailScore $score, float $bonusPoints, string $reason): array
@@ -1558,16 +1452,12 @@ class AssessmentManagementService
             'reason' => $reason,
             'applied_at' => now()->toISOString(),
             'applied_by' => auth()->user()?->id,
-            'message' => "Bonus points ({$bonusPoints}) applied successfully: {$reason}"
+            'message' => "Bonus points ({$bonusPoints}) applied successfully: {$reason}",
         ];
     }
 
     /**
      * Remove bonus points from a score.
-     *
-     * @param AssessmentComponentDetailScore $score
-     * @param string $reason
-     * @return array
      */
     public function removeBonusPoints(AssessmentComponentDetailScore $score, string $reason = 'Bonus points removed'): array
     {
@@ -1587,16 +1477,13 @@ class AssessmentManagementService
             'removal_reason' => $reason,
             'removed_at' => now()->toISOString(),
             'removed_by' => auth()->user()?->id,
-            'message' => "Bonus points ({$previousBonus}) removed successfully"
+            'message' => "Bonus points ({$previousBonus}) removed successfully",
         ];
     }
 
     /**
      * Exclude a score from calculations with audit trail.
      *
-     * @param AssessmentComponentDetailScore $score
-     * @param string $reason
-     * @return array
      * @throws \Exception
      */
     public function excludeScore(AssessmentComponentDetailScore $score, string $reason): array
@@ -1617,16 +1504,13 @@ class AssessmentManagementService
             'reason' => $reason,
             'excluded_at' => now()->toISOString(),
             'excluded_by' => auth()->user()?->id,
-            'message' => "Score excluded from calculations: {$reason}"
+            'message' => "Score excluded from calculations: {$reason}",
         ];
     }
 
     /**
      * Include a score back in calculations.
      *
-     * @param AssessmentComponentDetailScore $score
-     * @param string $reason
-     * @return array
      * @throws \Exception
      */
     public function includeScore(AssessmentComponentDetailScore $score, string $reason): array
@@ -1635,7 +1519,7 @@ class AssessmentManagementService
             throw new \Exception('Inclusion reason is required');
         }
 
-        if (!$score->score_excluded) {
+        if (! $score->score_excluded) {
             throw new \Exception('Score is not currently excluded');
         }
 
@@ -1649,25 +1533,23 @@ class AssessmentManagementService
             'inclusion_reason' => $reason,
             'included_at' => now()->toISOString(),
             'included_by' => auth()->user()?->id,
-            'message' => "Score included back in calculations: {$reason}"
+            'message' => "Score included back in calculations: {$reason}",
         ];
     }
 
     /**
      * Calculate weighted scores for all students in a course offering.
      *
-     * @param CourseOffering $courseOffering
-     * @param bool $includeExcluded Whether to include excluded scores in the calculation
-     * @return array
+     * @param  bool  $includeExcluded  Whether to include excluded scores in the calculation
      */
     public function calculateWeightedScores(CourseOffering $courseOffering, bool $includeExcluded = false): array
     {
         $syllabus = $courseOffering->syllabus;
-        if (!$syllabus) {
+        if (! $syllabus) {
             return [
                 'students' => [],
                 'component_weights' => [],
-                'total_possible_weight' => 0
+                'total_possible_weight' => 0,
             ];
         }
 
@@ -1676,7 +1558,7 @@ class AssessmentManagementService
             ->with(['details.scores' => function ($query) use ($courseOffering, $includeExcluded) {
                 $query->where('course_offering_id', $courseOffering->id)
                     ->where('score_status', 'final')
-                    ->when(!$includeExcluded, function ($q) {
+                    ->when(! $includeExcluded, function ($q) {
                         $q->where('score_excluded', false);
                     });
             }])
@@ -1700,7 +1582,7 @@ class AssessmentManagementService
             $componentWeights[$component->id] = [
                 'name' => $component->name,
                 'weight' => $component->weight,
-                'type' => $component->type
+                'type' => $component->type,
             ];
             $totalPossibleWeight += $component->weight;
         }
@@ -1712,7 +1594,7 @@ class AssessmentManagementService
                 'component_scores' => [],
                 'weighted_total' => 0,
                 'total_weight_covered' => 0,
-                'percentage' => 0
+                'percentage' => 0,
             ];
 
             $totalWeightedScore = 0;
@@ -1730,7 +1612,7 @@ class AssessmentManagementService
                 foreach ($component->details as $detail) {
                     $score = $detail->scores->where('student_code', $student->id)->first();
 
-                    if ($score && ($includeExcluded || !$score->score_excluded)) {
+                    if ($score && ($includeExcluded || ! $score->score_excluded)) {
                         $finalScore = $score->calculateFinalScore();
                         if ($finalScore !== null) {
                             $detailScores[] = $finalScore;
@@ -1740,7 +1622,7 @@ class AssessmentManagementService
                 }
 
                 // Calculate weighted average for component details
-                if (!empty($detailScores)) {
+                if (! empty($detailScores)) {
                     $totalDetailWeight = array_sum($detailWeights);
                     if ($totalDetailWeight > 0) {
                         $weightedSum = 0;
@@ -1762,7 +1644,7 @@ class AssessmentManagementService
                     'has_excluded_scores' => $component->details->flatMap->scores
                         ->where('student_code', $student->id)
                         ->where('score_excluded', true)
-                        ->isNotEmpty()
+                        ->isNotEmpty(),
                 ];
 
                 $totalWeightedScore += $componentWeightedScore;
@@ -1784,16 +1666,13 @@ class AssessmentManagementService
             'total_possible_weight' => $totalPossibleWeight,
             'calculation_settings' => [
                 'include_excluded' => $includeExcluded,
-                'only_final_scores' => true
-            ]
+                'only_final_scores' => true,
+            ],
         ];
     }
 
     /**
      * Get score adjustment statistics for a course offering.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function getScoreAdjustmentStatistics(CourseOffering $courseOffering): array
     {
@@ -1825,23 +1704,21 @@ class AssessmentManagementService
                 : 0,
             'avg_bonus_points' => $stats->avg_bonus_points ? round($stats->avg_bonus_points, 2) : 0,
             'avg_penalty' => $stats->avg_penalty ? round($stats->avg_penalty, 2) : 0,
-            'total_bonus_points_awarded' => $stats->total_bonus_points_awarded ?? 0
+            'total_bonus_points_awarded' => $stats->total_bonus_points_awarded ?? 0,
         ];
     }
 
     /**
      * Get scores with adjustments for a course offering.
      *
-     * @param CourseOffering $courseOffering
-     * @param string|null $adjustmentType Filter by adjustment type: 'bonus', 'excluded', 'penalty'
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @param  string|null  $adjustmentType  Filter by adjustment type: 'bonus', 'excluded', 'penalty'
      */
     public function getScoresWithAdjustments(CourseOffering $courseOffering, ?string $adjustmentType = null): \Illuminate\Database\Eloquent\Collection
     {
         $query = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
             ->with([
                 'student',
-                'assessmentComponentDetail.assessmentComponent'
+                'assessmentComponentDetail.assessmentComponent',
             ]);
 
         switch ($adjustmentType) {
@@ -1873,9 +1750,7 @@ class AssessmentManagementService
     /**
      * Calculate final grades for all students in a course offering with proper adjustments.
      *
-     * @param CourseOffering $courseOffering
-     * @param array $options Calculation options
-     * @return array
+     * @param  array  $options  Calculation options
      */
     public function calculateFinalGrades(CourseOffering $courseOffering, array $options = []): array
     {
@@ -1883,19 +1758,19 @@ class AssessmentManagementService
             'include_excluded' => false,
             'only_final_scores' => true,
             'apply_adjustments' => true,
-            'generate_audit_trail' => true
+            'generate_audit_trail' => true,
         ], $options);
 
         $syllabus = $courseOffering->syllabus;
-        if (!$syllabus) {
+        if (! $syllabus) {
             return [
                 'students' => [],
                 'calculation_summary' => [
                     'total_students' => 0,
                     'components_used' => 0,
                     'total_weight' => 0,
-                    'calculation_options' => $options
-                ]
+                    'calculation_options' => $options,
+                ],
             ];
         }
 
@@ -1906,7 +1781,7 @@ class AssessmentManagementService
                 if ($options['only_final_scores']) {
                     $query->where('score_status', 'final');
                 }
-                if (!$options['include_excluded']) {
+                if (! $options['include_excluded']) {
                     $query->where('score_excluded', false);
                 }
             }])
@@ -1930,8 +1805,8 @@ class AssessmentManagementService
             'adjustments_applied' => [
                 'bonus_points' => 0,
                 'late_penalties' => 0,
-                'excluded_scores' => 0
-            ]
+                'excluded_scores' => 0,
+            ],
         ];
 
         foreach ($enrolledStudents as $student) {
@@ -1947,18 +1822,14 @@ class AssessmentManagementService
 
         return [
             'students' => $studentGrades,
-            'calculation_summary' => $calculationSummary
+            'calculation_summary' => $calculationSummary,
         ];
     }
 
     /**
      * Calculate final grade for a single student with proper adjustments.
      *
-     * @param Student $student
-     * @param \Illuminate\Database\Eloquent\Collection $components
-     * @param CourseOffering $courseOffering
-     * @param array $options
-     * @return array
+     * @param  \Illuminate\Database\Eloquent\Collection  $components
      */
     private function calculateStudentFinalGrade(Student $student, $components, CourseOffering $courseOffering, array $options): array
     {
@@ -1969,22 +1840,22 @@ class AssessmentManagementService
                 'raw_percentage' => 0,
                 'adjusted_percentage' => 0,
                 'letter_grade' => null,
-                'gpa_points' => null
+                'gpa_points' => null,
             ],
             'grade_breakdown' => [
                 'total_weighted_score' => 0,
                 'total_weight_used' => 0,
                 'components_completed' => 0,
-                'components_total' => $components->count()
+                'components_total' => $components->count(),
             ],
             'adjustments' => [
                 'bonus_count' => 0,
                 'penalty_count' => 0,
                 'excluded_count' => 0,
                 'total_bonus_points' => 0,
-                'total_penalty_points' => 0
+                'total_penalty_points' => 0,
             ],
-            'audit_trail' => []
+            'audit_trail' => [],
         ];
 
         $totalWeightedScore = 0;
@@ -2007,7 +1878,7 @@ class AssessmentManagementService
                 $studentData['adjustments']['total_penalty_points'] += $componentGrade['adjustments']['total_penalty'];
 
                 // Add to audit trail
-                if ($options['generate_audit_trail'] && !empty($componentGrade['audit_trail'])) {
+                if ($options['generate_audit_trail'] && ! empty($componentGrade['audit_trail'])) {
                     $auditTrail = array_merge($auditTrail, $componentGrade['audit_trail']);
                 }
             }
@@ -2038,11 +1909,6 @@ class AssessmentManagementService
 
     /**
      * Calculate grade for a single component for a student.
-     *
-     * @param Student $student
-     * @param AssessmentComponent $component
-     * @param array $options
-     * @return array
      */
     private function calculateComponentGrade(Student $student, AssessmentComponent $component, array $options): array
     {
@@ -2062,9 +1928,9 @@ class AssessmentManagementService
                 'penalty_count' => 0,
                 'excluded_count' => 0,
                 'total_bonus' => 0,
-                'total_penalty' => 0
+                'total_penalty' => 0,
             ],
-            'audit_trail' => []
+            'audit_trail' => [],
         ];
 
         $detailScores = [];
@@ -2082,7 +1948,7 @@ class AssessmentManagementService
                 'raw_score' => null,
                 'final_score' => null,
                 'is_excluded' => false,
-                'adjustments' => []
+                'adjustments' => [],
             ];
 
             if ($score) {
@@ -2098,7 +1964,7 @@ class AssessmentManagementService
                     $adjustments[] = [
                         'type' => 'exclusion',
                         'reason' => $score->exclusion_reason,
-                        'applied_at' => $score->last_modified_at?->toISOString()
+                        'applied_at' => $score->last_modified_at?->toISOString(),
                     ];
                 } else {
                     // Calculate final score with adjustments
@@ -2117,19 +1983,19 @@ class AssessmentManagementService
                                 'type' => 'bonus',
                                 'amount' => $score->bonus_points,
                                 'reason' => $score->bonus_reason,
-                                'applied_at' => $score->last_modified_at?->toISOString()
+                                'applied_at' => $score->last_modified_at?->toISOString(),
                             ];
                         }
 
                         // Track late penalties
-                        if ($score->is_late && $score->late_penalty_applied > 0 && !$score->late_excuse_approved) {
+                        if ($score->is_late && $score->late_penalty_applied > 0 && ! $score->late_excuse_approved) {
                             $componentData['adjustments']['penalty_count']++;
                             $componentData['adjustments']['total_penalty'] += $score->late_penalty_applied;
                             $adjustments[] = [
                                 'type' => 'late_penalty',
                                 'amount' => $score->late_penalty_applied,
                                 'minutes_late' => $score->minutes_late,
-                                'applied_at' => $score->last_modified_at?->toISOString()
+                                'applied_at' => $score->last_modified_at?->toISOString(),
                             ];
                         }
                     }
@@ -2138,13 +2004,13 @@ class AssessmentManagementService
                 $detailData['adjustments'] = $adjustments;
 
                 // Add to audit trail
-                if ($options['generate_audit_trail'] && !empty($adjustments)) {
+                if ($options['generate_audit_trail'] && ! empty($adjustments)) {
                     $auditTrail[] = [
                         'component' => $component->name,
                         'detail' => $detail->name,
                         'student_code' => $student->id,
                         'score_id' => $score->id,
-                        'adjustments' => $adjustments
+                        'adjustments' => $adjustments,
                     ];
                 }
             }
@@ -2153,7 +2019,7 @@ class AssessmentManagementService
         }
 
         // Calculate component score if we have valid detail scores
-        if (!empty($detailScores)) {
+        if (! empty($detailScores)) {
             $totalDetailWeight = array_sum($detailWeights);
             if ($totalDetailWeight > 0) {
                 // Calculate weighted average of detail scores
@@ -2177,44 +2043,52 @@ class AssessmentManagementService
 
     /**
      * Convert percentage score to letter grade.
-     *
-     * @param float $percentage
-     * @return string|null
      */
     private function convertToLetterGrade(float $percentage): ?string
     {
         // This would typically use institutional grading scale
         // For now, using a standard scale
-        if ($percentage >= 90) return 'A';
-        if ($percentage >= 80) return 'B';
-        if ($percentage >= 70) return 'C';
-        if ($percentage >= 60) return 'D';
+        if ($percentage >= 90) {
+            return 'A';
+        }
+        if ($percentage >= 80) {
+            return 'B';
+        }
+        if ($percentage >= 70) {
+            return 'C';
+        }
+        if ($percentage >= 60) {
+            return 'D';
+        }
+
         return 'F';
     }
 
     /**
      * Convert percentage score to GPA points.
-     *
-     * @param float $percentage
-     * @return float|null
      */
     private function convertToGpaPoints(float $percentage): ?float
     {
         // This would typically use institutional GPA scale
         // For now, using a standard 4.0 scale
-        if ($percentage >= 90) return 4.0;
-        if ($percentage >= 80) return 3.0;
-        if ($percentage >= 70) return 2.0;
-        if ($percentage >= 60) return 1.0;
+        if ($percentage >= 90) {
+            return 4.0;
+        }
+        if ($percentage >= 80) {
+            return 3.0;
+        }
+        if ($percentage >= 70) {
+            return 2.0;
+        }
+        if ($percentage >= 60) {
+            return 1.0;
+        }
+
         return 0.0;
     }
 
     /**
      * Generate comprehensive audit trail for grade calculations.
-     *
-     * @param CourseOffering $courseOffering
-     * @param array $options
-     * @return array
      */
     public function generateGradeCalculationAuditTrail(CourseOffering $courseOffering, array $options = []): array
     {
@@ -2227,15 +2101,15 @@ class AssessmentManagementService
             'calculation_options' => $options,
             'total_students_processed' => count($gradeData['students']),
             'total_adjustments' => $gradeData['calculation_summary']['adjustments_applied'],
-            'detailed_audit_trail' => []
+            'detailed_audit_trail' => [],
         ];
 
         // Collect all audit trail entries
         foreach ($gradeData['students'] as $studentGrade) {
-            if (!empty($studentGrade['audit_trail'])) {
+            if (! empty($studentGrade['audit_trail'])) {
                 $auditSummary['detailed_audit_trail'][] = [
                     'student' => $studentGrade['student'],
-                    'adjustments' => $studentGrade['audit_trail']
+                    'adjustments' => $studentGrade['audit_trail'],
                 ];
             }
         }
@@ -2245,10 +2119,6 @@ class AssessmentManagementService
 
     /**
      * Update score with proper audit trail for adjustments.
-     *
-     * @param AssessmentComponentDetailScore $score
-     * @param array $data
-     * @return AssessmentComponentDetailScore
      */
     public function updateScoreWithAuditTrail(AssessmentComponentDetailScore $score, array $data): AssessmentComponentDetailScore
     {
@@ -2258,7 +2128,7 @@ class AssessmentManagementService
             'bonus_reason' => $score->bonus_reason,
             'score_excluded' => $score->score_excluded,
             'exclusion_reason' => $score->exclusion_reason,
-            'late_penalty_applied' => $score->late_penalty_applied
+            'late_penalty_applied' => $score->late_penalty_applied,
         ];
 
         // Update the score
@@ -2271,19 +2141,19 @@ class AssessmentManagementService
                 $changes[] = [
                     'field' => $field,
                     'old_value' => $originalData[$field],
-                    'new_value' => $newValue
+                    'new_value' => $newValue,
                 ];
             }
         }
 
-        if (!empty($changes)) {
+        if (! empty($changes)) {
             $history = $score->score_history ?? [];
             $history[] = [
                 'action' => 'score_updated_with_adjustments',
                 'changes' => $changes,
                 'updated_at' => now()->toISOString(),
                 'updated_by' => auth()->user()?->id,
-                'calculation_context' => 'grade_calculation_update'
+                'calculation_context' => 'grade_calculation_update',
             ];
             $score->score_history = $history;
             $score->save();

@@ -39,7 +39,7 @@ return new class extends Migration
                 'maintenance',
                 'personal_study',
                 'workshop',
-                'other'
+                'other',
             ])->default('meeting');
 
             $table->enum('status', [
@@ -47,14 +47,14 @@ return new class extends Migration
                 'approved',
                 'rejected',
                 'cancelled',
-                'completed'
+                'completed',
             ])->default('pending');
 
             $table->enum('priority', [
                 'low',
                 'normal',
                 'high',
-                'urgent'
+                'urgent',
             ])->default('normal');
 
             // Recurring booking support
@@ -63,7 +63,7 @@ return new class extends Migration
                 'daily',
                 'weekly',
                 'biweekly',
-                'monthly'
+                'monthly',
             ])->nullable();
             $table->date('recurrence_end_date')->nullable();
             $table->json('recurrence_days')->nullable(); // ["Monday", "Wednesday", "Friday"]

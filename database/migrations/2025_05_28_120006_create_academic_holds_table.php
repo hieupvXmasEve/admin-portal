@@ -19,13 +19,13 @@ return new class extends Migration
                 'disciplinary',
                 'administrative',
                 'health',
-                'library'
+                'library',
             ]);
             $table->enum('hold_category', [
                 'registration',
                 'graduation',
                 'transcript',
-                'all'
+                'all',
             ])->default('registration');
 
             // Hold Details

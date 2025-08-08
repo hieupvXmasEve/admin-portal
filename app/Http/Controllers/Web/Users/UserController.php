@@ -2,15 +2,13 @@
 
 namespace App\Http\Controllers\Web\Users;
 
+use App\Constants\UserRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\User;
 use App\Services\UserService;
-use App\Constants\UserRoutes;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class UserController extends Controller
@@ -34,7 +32,7 @@ class UserController extends Controller
         $query = $user->newQuery()->orderBy('id', 'desc');
 
         // Global search
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $search = $validated['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -43,9 +41,9 @@ class UserController extends Controller
         }
 
         // Column filters
-        if (!empty($validated['filter'])) {
+        if (! empty($validated['filter'])) {
             foreach ($validated['filter'] as $column => $value) {
-                if (!empty($value) && in_array($column, ['name', 'email'])) {
+                if (! empty($value) && in_array($column, ['name', 'email'])) {
                     $query->where($column, 'like', "%{$value}%");
                 }
             }
@@ -66,23 +64,24 @@ class UserController extends Controller
 
     public function create()
     {
-        $roleController = new \App\Http\Controllers\Web\RoleController(new \App\Services\RoleService());
+        $roleController = new \App\Http\Controllers\Web\RoleController(new \App\Services\RoleService);
         $roles = $roleController->getRolesWithPermissions();
 
         return Inertia::render('users/Create', [
-            'roles' => $roles
+            'roles' => $roles,
         ]);
     }
 
     public function store(StoreUserRequest $request)
     {
         $this->userService->createUser($request->validated());
+
         return redirect()->route(UserRoutes::INDEX)->with('success', 'User created successfully!');
     }
 
     public function edit(User $user)
     {
-        $roleController = new \App\Http\Controllers\Web\RoleController(new \App\Services\RoleService());
+        $roleController = new \App\Http\Controllers\Web\RoleController(new \App\Services\RoleService);
         $roles = $roleController->getRolesWithPermissions();
 
         // Get current campus ID
@@ -97,20 +96,21 @@ class UserController extends Controller
         return Inertia::render('users/Edit', [
             'user' => $user,
             'roles' => $roles,
-            'userRoleIds' => $userRoleIds
+            'userRoleIds' => $userRoleIds,
         ]);
     }
 
     public function update(UpdateUserRequest $request, User $user)
     {
         $this->userService->updateUser($user, $request->validated());
+
         return redirect()->route(UserRoutes::INDEX)->with('success', 'User updated successfully!');
     }
-
 
     public function destroy(User $user)
     {
         $this->userService->deleteUser($user);
+
         return redirect()->route(UserRoutes::INDEX)->with('success', 'User removed or deleted successfully!');
     }
 }

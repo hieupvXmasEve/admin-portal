@@ -80,11 +80,11 @@ class AcademicRecord extends AuditableModel
         $student = $this->student;
         $unit = $this->unit;
         $semester = $this->semester;
-        
+
         if ($student && $unit && $semester) {
             return "Academic Record - Student: {$student->student_code} ({$student->full_name}) - Unit: {$unit->code} - Semester: {$semester->name}";
         }
-        
+
         return "Academic Record ID {$this->getKey()}";
     }
 
@@ -94,7 +94,7 @@ class AcademicRecord extends AuditableModel
     public function getDescriptionForEvent(string $eventName): string
     {
         $identifier = $this->getIdentifierForLog();
-        
+
         return match ($eventName) {
             'created' => "Academic record created: {$identifier}",
             'updated' => "Academic record updated: {$identifier}",
@@ -261,7 +261,7 @@ class AcademicRecord extends AuditableModel
 
     public function hasLetterGrade(): bool
     {
-        return !empty($this->final_letter_grade);
+        return ! empty($this->final_letter_grade);
     }
 
     public function calculateQualityPoints(): float

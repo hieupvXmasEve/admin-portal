@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Lecturer;
 
-use App\Models\Lecture;
 use App\Models\CourseOffering;
-use App\Models\Semester;
+use App\Models\Lecture;
 use App\Models\Unit;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 
 class LecturerCourseService
@@ -32,7 +31,7 @@ class LecturerCourseService
                 },
                 'classSessions' => function ($q) {
                     $q->orderBy('session_date', 'desc')->limit(5);
-                }
+                },
             ])
             ->where('is_active', true);
 
@@ -59,13 +58,13 @@ class LecturerCourseService
                     'courseRegistrations.student',
                     'classSessions' => function ($q) {
                         $q->orderBy('session_date', 'asc');
-                    }
+                    },
                 ])
                 ->where('id', $courseOfferingId)
                 ->where('is_active', true)
                 ->first();
 
-            if (!$courseOffering) {
+            if (! $courseOffering) {
                 return null;
             }
 
@@ -89,7 +88,7 @@ class LecturerCourseService
             ->where('is_active', true)
             ->first();
 
-        if (!$courseOffering) {
+        if (! $courseOffering) {
             return null;
         }
 
@@ -107,7 +106,7 @@ class LecturerCourseService
             ->where('is_active', true)
             ->first();
 
-        if (!$courseOffering) {
+        if (! $courseOffering) {
             throw new \Exception('Course offering not found or access denied');
         }
 
@@ -132,7 +131,7 @@ class LecturerCourseService
             ->where('id', $courseOfferingId)
             ->where('is_active', true)
             ->first();
-        if (!$courseOffering) {
+        if (! $courseOffering) {
             throw new \Exception('Course offering not found or access denied');
         }
 
@@ -151,7 +150,7 @@ class LecturerCourseService
                     $q->where('semester_id', $courseOffering->semester_id)
                         ->where('is_active', true)
                         ->latest('effective_date');
-                }
+                },
             ])
             ->where('registration_status', 'confirmed');
 
@@ -160,7 +159,7 @@ class LecturerCourseService
 
         $students = $studentsQuery->get();
 
-        return $students->map(function ($registration) use ($courseOfferingId, $courseOffering) {
+        return $students->map(function ($registration) use ($courseOfferingId) {
             $student = $registration->student;
             $attendanceStats = $this->calculateStudentAttendanceStats($student, $courseOfferingId);
             $academicRecord = $student->academicRecords->first();
@@ -248,15 +247,15 @@ class LecturerCourseService
      */
     protected function applyCourseFilters($query, array $filters): void
     {
-        if (!empty($filters['semester_id'])) {
+        if (! empty($filters['semester_id'])) {
             $query->where('semester_id', $filters['semester_id']);
         }
 
-        if (!empty($filters['delivery_mode'])) {
+        if (! empty($filters['delivery_mode'])) {
             $query->where('delivery_mode', $filters['delivery_mode']);
         }
 
-        if (!empty($filters['enrollment_status'])) {
+        if (! empty($filters['enrollment_status'])) {
             switch ($filters['enrollment_status']) {
                 case 'open':
                     $query->where('enrollment_status', 'open')
@@ -271,7 +270,7 @@ class LecturerCourseService
             }
         }
 
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->whereHas('curriculumUnit.unit', function ($q) use ($search) {
                 $q->where('code', 'like', "%{$search}%")
@@ -285,7 +284,7 @@ class LecturerCourseService
      */
     protected function applyStudentFilters($query, array $filters): void
     {
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->whereHas('student', function ($q) use ($search) {
                 $q->where('student_code', 'like', "%{$search}%")
@@ -294,7 +293,7 @@ class LecturerCourseService
             });
         }
 
-        if (!empty($filters['attendance_status'])) {
+        if (! empty($filters['attendance_status'])) {
             // This would require a complex subquery to filter by attendance percentage
             // Implementation depends on specific requirements
         }
@@ -415,7 +414,7 @@ class LecturerCourseService
             ->sortBy('session_date')
             ->first();
 
-        if (!$nextSession) {
+        if (! $nextSession) {
             return null;
         }
 
@@ -484,10 +483,10 @@ class LecturerCourseService
                         ->whereIn('score_status', ['final', 'graded'])
                         ->whereNotNull('percentage_score')
                         ->orderBy('graded_at', 'desc');
-                }
+                },
             ])->find($courseOfferingId);
 
-            if (!$courseOffering || !$courseOffering->syllabus) {
+            if (! $courseOffering || ! $courseOffering->syllabus) {
                 return null;
             }
 
@@ -520,8 +519,9 @@ class LecturerCourseService
             Log::error('Failed to calculate student final score', [
                 'student_code' => $studentId,
                 'course_offering_id' => $courseOfferingId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -557,7 +557,7 @@ class LecturerCourseService
             }
         }
 
-        if (!$hasAnyScores || $totalDetailWeight == 0) {
+        if (! $hasAnyScores || $totalDetailWeight == 0) {
             return null;
         }
 
@@ -571,9 +571,16 @@ class LecturerCourseService
     {
         $percentage = $attendanceStats['percentage'];
 
-        if ($percentage >= 90) return 'excellent';
-        if ($percentage >= 75) return 'good';
-        if ($percentage >= 60) return 'warning';
+        if ($percentage >= 90) {
+            return 'excellent';
+        }
+        if ($percentage >= 75) {
+            return 'good';
+        }
+        if ($percentage >= 60) {
+            return 'warning';
+        }
+
         return 'at_risk';
     }
 

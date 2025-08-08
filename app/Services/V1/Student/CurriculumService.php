@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
 use App\Models\CurriculumUnit;
-use App\Models\Unit;
 use App\Models\Prerequisite;
+use App\Models\Student;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 class CurriculumService
 {
@@ -20,7 +18,7 @@ class CurriculumService
     public function getCurriculumOverview(Student $student): array
     {
         $cacheKey = "curriculum:overview:student:{$student->id}";
-        
+
         return Cache::remember($cacheKey, 1800, function () use ($student) {
             $curriculumVersion = $student->curriculumVersion;
             $curriculumUnits = $this->getCurriculumUnits($student);
@@ -53,11 +51,11 @@ class CurriculumService
     public function getPrerequisiteTree(Student $student): array
     {
         $cacheKey = "curriculum:prerequisite_tree:student:{$student->id}";
-        
+
         return Cache::remember($cacheKey, 3600, function () use ($student) {
             $curriculumUnits = $this->getCurriculumUnits($student);
             $completedUnits = $this->getCompletedUnits($student);
-            
+
             return [
                 'prerequisite_tree' => $this->buildPrerequisiteTree($curriculumUnits, $completedUnits),
                 'prerequisite_chains' => $this->identifyPrerequisiteChains($curriculumUnits),
@@ -73,7 +71,7 @@ class CurriculumService
     public function getProgramRequirements(Student $student): array
     {
         $cacheKey = "curriculum:requirements:student:{$student->id}";
-        
+
         return Cache::remember($cacheKey, 1800, function () use ($student) {
             $curriculumUnits = $this->getCurriculumUnits($student);
             $completedUnits = $this->getCompletedUnits($student);
@@ -95,7 +93,7 @@ class CurriculumService
     public function getAcademicRoadmap(Student $student): array
     {
         $cacheKey = "curriculum:roadmap:student:{$student->id}";
-        
+
         return Cache::remember($cacheKey, 1800, function () use ($student) {
             $curriculumUnits = $this->getCurriculumUnits($student);
             $completedUnits = $this->getCompletedUnits($student);
@@ -139,8 +137,8 @@ class CurriculumService
     protected function getCurrentEnrollments(Student $student): Collection
     {
         $currentSemester = $student->getCurrentSemester();
-        
-        if (!$currentSemester) {
+
+        if (! $currentSemester) {
             return collect();
         }
 
@@ -204,11 +202,11 @@ class CurriculumService
     protected function calculateCompletionStatus(Collection $curriculumUnits, Collection $completedUnits): array
     {
         $completedUnitIds = $completedUnits->pluck('id');
-        
+
         return $curriculumUnits->groupBy('unit_category')->map(function ($categoryUnits, $category) use ($completedUnitIds) {
             $totalUnits = $categoryUnits->count();
             $completedCount = $categoryUnits->whereIn('unit_id', $completedUnitIds)->count();
-            
+
             return [
                 'category' => $category,
                 'total_units' => $totalUnits,
@@ -270,7 +268,7 @@ class CurriculumService
     protected function identifyPrerequisiteChains(Collection $curriculumUnits): array
     {
         $chains = [];
-        
+
         foreach ($curriculumUnits as $curriculumUnit) {
             if ($curriculumUnit->prerequisites->isNotEmpty()) {
                 $chain = $this->buildPrerequisiteChain($curriculumUnit, $curriculumUnits);
@@ -291,13 +289,13 @@ class CurriculumService
         $curriculumUnits = $this->getCurriculumUnits($student);
         $completedUnits = $this->getCompletedUnits($student);
         $currentEnrollments = $this->getCurrentEnrollments($student);
-        
+
         $completedUnitIds = $completedUnits->pluck('id');
         $enrolledUnitIds = $currentEnrollments->pluck('id');
 
         return $curriculumUnits->filter(function ($curriculumUnit) use ($completedUnitIds, $enrolledUnitIds) {
-            return !$completedUnitIds->contains($curriculumUnit->unit_id) &&
-                   !$enrolledUnitIds->contains($curriculumUnit->unit_id) &&
+            return ! $completedUnitIds->contains($curriculumUnit->unit_id) &&
+                   ! $enrolledUnitIds->contains($curriculumUnit->unit_id) &&
                    $this->isUnitAvailable($curriculumUnit, $completedUnitIds);
         })->map(function ($curriculumUnit) {
             return [
@@ -322,17 +320,17 @@ class CurriculumService
         $curriculumUnits = $this->getCurriculumUnits($student);
         $completedUnits = $this->getCompletedUnits($student);
         $currentEnrollments = $this->getCurrentEnrollments($student);
-        
+
         $completedUnitIds = $completedUnits->pluck('id');
         $enrolledUnitIds = $currentEnrollments->pluck('id');
 
         return $curriculumUnits->filter(function ($curriculumUnit) use ($completedUnitIds, $enrolledUnitIds) {
-            return !$completedUnitIds->contains($curriculumUnit->unit_id) &&
-                   !$enrolledUnitIds->contains($curriculumUnit->unit_id) &&
-                   !$this->isUnitAvailable($curriculumUnit, $completedUnitIds);
+            return ! $completedUnitIds->contains($curriculumUnit->unit_id) &&
+                   ! $enrolledUnitIds->contains($curriculumUnit->unit_id) &&
+                   ! $this->isUnitAvailable($curriculumUnit, $completedUnitIds);
         })->map(function ($curriculumUnit) use ($completedUnitIds) {
             $missingPrerequisites = $curriculumUnit->prerequisites->filter(function ($prerequisite) use ($completedUnitIds) {
-                return !$completedUnitIds->contains($prerequisite->prerequisite_unit_id);
+                return ! $completedUnitIds->contains($prerequisite->prerequisite_unit_id);
             });
 
             return [
@@ -478,11 +476,11 @@ class CurriculumService
     protected function getCreditDistribution(Collection $curriculumUnits, Collection $completedUnits): array
     {
         $completedUnitIds = $completedUnits->pluck('id');
-        
+
         return $curriculumUnits->groupBy('unit_category')->map(function ($categoryUnits, $category) use ($completedUnitIds) {
             $totalCredits = $categoryUnits->sum('credit_hours');
             $completedCredits = $categoryUnits->whereIn('unit_id', $completedUnitIds)->sum('credit_hours');
-            
+
             return [
                 'category' => $category,
                 'total_credits' => $totalCredits,
@@ -577,11 +575,11 @@ class CurriculumService
         $creditsCompleted = $completedUnits->sum(function ($unit) use ($curriculumUnits) {
             return $curriculumUnits->where('unit_id', $unit->id)->first()?->credit_hours ?? 0;
         });
-        
+
         $creditsRemaining = $totalCreditsRequired - $creditsCompleted;
         $averageCreditsPerSemester = 18; // Typical full-time load
-        
-        $semestersRemaining = $creditsRemaining > 0 
+
+        $semestersRemaining = $creditsRemaining > 0
             ? ceil($creditsRemaining / $averageCreditsPerSemester)
             : 0;
 
@@ -620,17 +618,18 @@ class CurriculumService
     protected function arePrerequisitesMet(Collection $prerequisites, Collection $completedUnitIds): bool
     {
         foreach ($prerequisites as $prerequisite) {
-            if (!$completedUnitIds->contains($prerequisite->prerequisite_unit_id)) {
+            if (! $completedUnitIds->contains($prerequisite->prerequisite_unit_id)) {
                 return false;
             }
         }
+
         return true;
     }
 
     protected function buildPrerequisiteChain(CurriculumUnit $curriculumUnit, Collection $allUnits): array
     {
         $chain = [$curriculumUnit->unit->code];
-        
+
         foreach ($curriculumUnit->prerequisites as $prerequisite) {
             $prereqUnit = $allUnits->where('unit_id', $prerequisite->prerequisite_unit_id)->first();
             if ($prereqUnit) {
@@ -638,7 +637,7 @@ class CurriculumService
                 $chain = array_merge($subChain, $chain);
             }
         }
-        
+
         return array_unique($chain);
     }
 
@@ -654,11 +653,12 @@ class CurriculumService
 
     protected function calculateCurrentYear(Student $student): int
     {
-        if (!$student->enrollment_date) {
+        if (! $student->enrollment_date) {
             return 1;
         }
 
         $yearsEnrolled = $student->enrollment_date->diffInYears(now()) + 1;
+
         return min($yearsEnrolled, $student->program->duration_years);
     }
 
@@ -674,7 +674,7 @@ class CurriculumService
     {
         $totalSemesters = $student->program->duration_years * 2; // Assuming 2 semesters per year
         $completedSemesters = $this->calculateSemestersCompleted($student);
-        
+
         return max(0, $totalSemesters - $completedSemesters);
     }
 
@@ -682,17 +682,18 @@ class CurriculumService
     {
         $expectedSemestersCompleted = $this->calculateExpectedSemestersCompleted($student);
         $actualSemestersCompleted = $this->calculateSemestersCompleted($student);
-        
+
         return $actualSemestersCompleted >= $expectedSemestersCompleted;
     }
 
     protected function calculateExpectedSemestersCompleted(Student $student): int
     {
-        if (!$student->enrollment_date) {
+        if (! $student->enrollment_date) {
             return 0;
         }
 
         $monthsEnrolled = $student->enrollment_date->diffInMonths(now());
+
         return floor($monthsEnrolled / 6); // Assuming 6 months per semester
     }
 
@@ -703,16 +704,18 @@ class CurriculumService
         }
 
         $monthsRemaining = $semestersRemaining * 6; // 6 months per semester
+
         return now()->addMonths($monthsRemaining)->format('Y-m-d');
     }
 
     protected function getExpectedSemestersRemaining(Student $student): int
     {
-        if (!$student->expected_graduation_date) {
+        if (! $student->expected_graduation_date) {
             return 0;
         }
 
         $monthsRemaining = now()->diffInMonths($student->expected_graduation_date);
+
         return ceil($monthsRemaining / 6);
     }
 

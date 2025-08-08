@@ -36,7 +36,7 @@ class UnitExportController extends Controller
             $filePath = $this->exportService->exportUnitsToExcel($validated);
 
             // Generate download filename
-            $downloadName = 'units_export_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            $downloadName = 'units_export_'.now()->format('Y-m-d_H-i-s').'.xlsx';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [
@@ -44,13 +44,13 @@ class UnitExportController extends Controller
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
             // Log the error
-            Log::error('Units Excel export failed: ' . $e->getMessage(), [
+            Log::error('Units Excel export failed: '.$e->getMessage(), [
                 'filters' => $validated,
                 'user_id' => Auth::id(),
             ]);
 
             return response()->json([
-                'error' => 'Export failed. Please try again later.'
+                'error' => 'Export failed. Please try again later.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -78,7 +78,7 @@ class UnitExportController extends Controller
             $filePath = $this->exportService->exportUnitsToExcel($filters);
 
             // Generate download filename
-            $downloadName = 'units_export_filtered_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            $downloadName = 'units_export_filtered_'.now()->format('Y-m-d_H-i-s').'.xlsx';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [
@@ -86,13 +86,13 @@ class UnitExportController extends Controller
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
             // Log the error
-            Log::error('Units Excel export with filters failed: ' . $e->getMessage(), [
+            Log::error('Units Excel export with filters failed: '.$e->getMessage(), [
                 'filters' => $filters,
                 'user_id' => Auth::id(),
             ]);
 
             return response()->json([
-                'error' => 'Export failed. Please try again later.'
+                'error' => 'Export failed. Please try again later.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

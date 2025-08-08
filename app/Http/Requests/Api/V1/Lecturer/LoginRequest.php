@@ -28,17 +28,17 @@ class LoginRequest extends FormRequest
             'email' => [
                 'required',
                 'email:rfc,dns',
-                'max:255'
+                'max:255',
             ],
             'password' => [
                 'required',
                 'string',
-                'min:6'
+                'min:6',
             ],
             'remember' => [
                 'nullable',
-                'boolean'
-            ]
+                'boolean',
+            ],
         ];
     }
 
@@ -53,7 +53,7 @@ class LoginRequest extends FormRequest
             'email.max' => 'Email address must not exceed 255 characters',
             'password.required' => 'Password is required',
             'password.min' => 'Password must be at least 6 characters',
-            'remember.boolean' => 'Remember me must be true or false'
+            'remember.boolean' => 'Remember me must be true or false',
         ];
     }
 

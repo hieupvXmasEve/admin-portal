@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Semester;
-use Illuminate\Database\Eloquent\Factories\Factory;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<Semester>
@@ -38,7 +38,7 @@ class SemesterFactory extends Factory
                 'Summer 2024',
                 'Spring 2025',
                 'Fall 2025',
-                'Summer 2025'
+                'Summer 2025',
             ]),
             'start_date' => $startDate,
             'end_date' => $endDate,
@@ -54,7 +54,7 @@ class SemesterFactory extends Factory
      */
     public function active(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'is_active' => true,
             'is_archived' => false,
         ]);
@@ -65,7 +65,7 @@ class SemesterFactory extends Factory
      */
     public function archived(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'is_active' => false,
             'is_archived' => true,
         ]);

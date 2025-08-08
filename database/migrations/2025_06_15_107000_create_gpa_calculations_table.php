@@ -24,7 +24,7 @@ return new class extends Migration
                 'program', // GPA for specific program
                 'year', // GPA for academic year
                 'transfer', // Transfer credit GPA
-                'institutional' // Institutional GPA (excluding transfer)
+                'institutional', // Institutional GPA (excluding transfer)
             ])->default('semester');
 
             // GPA values
@@ -56,7 +56,7 @@ return new class extends Migration
                 'probation', // Academic probation
                 'suspension', // Academic suspension
                 'dismissal', // Academic dismissal
-                'warning' // Academic warning
+                'warning', // Academic warning
             ])->nullable();
 
             $table->decimal('required_gpa', 3, 2)->nullable(); // Required GPA for program/level

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\V1\Student;
 
-use App\Models\Student;
 use App\Models\Campus;
-use App\Models\Program;
 use App\Models\CurriculumVersion;
+use App\Models\Program;
+use App\Models\Student;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -17,8 +17,11 @@ class AuthControllerTest extends TestCase
     use RefreshDatabase;
 
     protected Student $student;
+
     protected Campus $campus;
+
     protected Program $program;
+
     protected CurriculumVersion $curriculumVersion;
 
     protected function setUp(): void
@@ -28,7 +31,7 @@ class AuthControllerTest extends TestCase
         $this->campus = Campus::factory()->create();
         $this->program = Program::factory()->create(['campus_id' => $this->campus->id]);
         $this->curriculumVersion = CurriculumVersion::factory()->create(['program_id' => $this->program->id]);
-        
+
         $this->student = Student::factory()->create([
             'email' => 'test@student.edu',
             'password' => Hash::make('password123'),
@@ -48,29 +51,29 @@ class AuthControllerTest extends TestCase
         ]);
 
         $response->assertOk()
-                ->assertJsonStructure([
-                    'success',
-                    'message',
-                    'data' => [
-                        'student' => [
-                            'id',
-                            'student_id',
-                            'full_name',
-                            'email',
-                            'status',
-                            'campus',
-                            'program',
-                        ],
-                        'token',
-                        'token_type',
-                        'expires_at',
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'student' => [
+                        'id',
+                        'student_id',
+                        'full_name',
+                        'email',
+                        'status',
+                        'campus',
+                        'program',
                     ],
-                    'timestamp',
-                ])
-                ->assertJson([
-                    'success' => true,
-                    'message' => 'Login successful',
-                ]);
+                    'token',
+                    'token_type',
+                    'expires_at',
+                ],
+                'timestamp',
+            ])
+            ->assertJson([
+                'success' => true,
+                'message' => 'Login successful',
+            ]);
 
         $this->assertDatabaseHas('personal_access_tokens', [
             'tokenable_id' => $this->student->id,
@@ -86,11 +89,11 @@ class AuthControllerTest extends TestCase
         ]);
 
         $response->assertUnauthorized()
-                ->assertJson([
-                    'success' => false,
-                    'message' => 'Invalid credentials',
-                    'error_code' => 'AUTHENTICATION_ERROR',
-                ]);
+            ->assertJson([
+                'success' => false,
+                'message' => 'Invalid credentials',
+                'error_code' => 'AUTHENTICATION_ERROR',
+            ]);
     }
 
     public function test_inactive_student_cannot_login(): void
@@ -103,10 +106,10 @@ class AuthControllerTest extends TestCase
         ]);
 
         $response->assertForbidden()
-                ->assertJson([
-                    'success' => false,
-                    'error_code' => 'AUTHORIZATION_ERROR',
-                ]);
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'AUTHORIZATION_ERROR',
+            ]);
     }
 
     public function test_login_validation_errors(): void
@@ -117,11 +120,11 @@ class AuthControllerTest extends TestCase
         ]);
 
         $response->assertUnprocessableEntity()
-                ->assertJson([
-                    'success' => false,
-                    'error_code' => 'VALIDATION_ERROR',
-                ])
-                ->assertJsonValidationErrors(['email', 'password']);
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'VALIDATION_ERROR',
+            ])
+            ->assertJsonValidationErrors(['email', 'password']);
     }
 
     public function test_authenticated_student_can_get_profile(): void
@@ -133,21 +136,21 @@ class AuthControllerTest extends TestCase
         ])->getJson('/api/v1/student/auth/me');
 
         $response->assertOk()
-                ->assertJsonStructure([
-                    'success',
-                    'message',
-                    'data' => [
-                        'student' => [
-                            'id',
-                            'student_id',
-                            'full_name',
-                            'email',
-                            'campus',
-                            'program',
-                            'curriculum_version',
-                        ],
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'student' => [
+                        'id',
+                        'student_id',
+                        'full_name',
+                        'email',
+                        'campus',
+                        'program',
+                        'curriculum_version',
                     ],
-                ]);
+                ],
+            ]);
     }
 
     public function test_student_can_logout(): void
@@ -159,10 +162,10 @@ class AuthControllerTest extends TestCase
         ])->postJson('/api/v1/student/auth/logout');
 
         $response->assertOk()
-                ->assertJson([
-                    'success' => true,
-                    'message' => 'Logged out successfully',
-                ]);
+            ->assertJson([
+                'success' => true,
+                'message' => 'Logged out successfully',
+            ]);
 
         // Token should be deleted
         $this->assertDatabaseMissing('personal_access_tokens', [
@@ -182,15 +185,15 @@ class AuthControllerTest extends TestCase
         ]);
 
         $response->assertOk()
-                ->assertJsonStructure([
-                    'success',
-                    'message',
-                    'data' => [
-                        'token',
-                        'token_type',
-                        'expires_at',
-                    ],
-                ]);
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'token',
+                    'token_type',
+                    'expires_at',
+                ],
+            ]);
     }
 
     public function test_unauthenticated_request_returns_error(): void
@@ -198,9 +201,9 @@ class AuthControllerTest extends TestCase
         $response = $this->getJson('/api/v1/student/auth/me');
 
         $response->assertUnauthorized()
-                ->assertJson([
-                    'success' => false,
-                    'error_code' => 'AUTHENTICATION_ERROR',
-                ]);
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'AUTHENTICATION_ERROR',
+            ]);
     }
 }

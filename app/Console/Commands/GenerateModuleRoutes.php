@@ -24,20 +24,21 @@ class GenerateModuleRoutes extends Command
     public function handle(): int
     {
         $module = $this->argument('module');
-        $controller = $this->argument('controller') ?? Str::studly($module) . 'Controller';
+        $controller = $this->argument('controller') ?? Str::studly($module).'Controller';
 
         // Check if module exists in permission config
         $permissions = config("permission.access.{$module}");
-        if (!$permissions) {
+        if (! $permissions) {
             $this->error("Module '{$module}' not found in permission configuration.");
-            $this->info("Please add the module to config/permission.php first.");
+            $this->info('Please add the module to config/permission.php first.');
+
             return 1;
         }
 
         $routeFile = base_path("routes/{$module}.php");
 
         if (File::exists($routeFile)) {
-            if (!$this->confirm("Route file for '{$module}' already exists. Overwrite?")) {
+            if (! $this->confirm("Route file for '{$module}' already exists. Overwrite?")) {
                 return 0;
             }
         }
@@ -52,7 +53,7 @@ class GenerateModuleRoutes extends Command
         $webRoutes = File::get(base_path('routes/web.php'));
         $requireStatement = "require __DIR__ . '/{$module}.php';";
 
-        if (!str_contains($webRoutes, $requireStatement)) {
+        if (! str_contains($webRoutes, $requireStatement)) {
             $this->info("Don't forget to add this line to routes/web.php:");
             $this->line($requireStatement);
         }

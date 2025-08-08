@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Services\Examples;
 
-use App\Models\Student;
-use App\Models\CourseRegistration;
-use App\Models\AssessmentComponentDetailScore;
 use App\Models\AcademicRecord;
+use App\Models\AssessmentComponentDetailScore;
+use App\Models\CourseRegistration;
 use App\Models\GpaCalculation;
+use App\Models\Student;
 use App\Support\BusinessActionLogger;
 use Spatie\Activitylog\Facades\LogBatch;
 
 /**
  * Examples showing how to use BusinessActionLogger in various business scenarios
- * 
+ *
  * These examples demonstrate best practices for logging complex business operations
  * that involve multiple models or calculations.
  */
@@ -33,7 +33,7 @@ class BusinessActionLoggerExamples
                 'old_score' => $oldScore,
                 'new_score' => $newScore,
                 'score_change' => $newScore - ($oldScore ?? 0),
-                'has_feedback' => !empty($feedback),
+                'has_feedback' => ! empty($feedback),
                 'feedback_length' => $feedback ? strlen($feedback) : 0,
             ])
             ->execute(function () use ($score, $newScore, $feedback) {
@@ -80,7 +80,7 @@ class BusinessActionLoggerExamples
                     foreach ($gradeUpdates as $update) {
                         try {
                             $score = $assessments->firstWhere('id', $update['id']);
-                            if (!$score) {
+                            if (! $score) {
                                 throw new \Exception("Assessment not found: {$update['id']}");
                             }
 
@@ -178,7 +178,7 @@ class BusinessActionLoggerExamples
     public function calculateAndUpdateGPA(int $studentId, int $semesterId): array
     {
         $student = Student::findOrFail($studentId);
-        
+
         return BusinessActionLogger::gpaCalculation($student, 'semester')
             ->withProperties([
                 'semester_id' => $semesterId,
@@ -204,7 +204,7 @@ class BusinessActionLoggerExamples
                 $allRecords = AcademicRecord::where('student_code', $student->id)
                     ->where('completion_status', 'completed')
                     ->get();
-                
+
                 $cumulativeQualityPoints = $allRecords->sum('quality_points');
                 $cumulativeCreditHours = $allRecords->sum('credit_hours');
                 $cumulativeGPA = $cumulativeCreditHours > 0 ? $cumulativeQualityPoints / $cumulativeCreditHours : 0;
@@ -316,7 +316,7 @@ class BusinessActionLoggerExamples
                         'is_met' => $isMet,
                     ];
 
-                    if (!$isMet) {
+                    if (! $isMet) {
                         $allRequirementsMet = false;
                     }
                 }
@@ -338,7 +338,7 @@ class BusinessActionLoggerExamples
                     'total_credits_earned' => $totalCreditsEarned,
                     'cumulative_gpa' => $totalGPA,
                     'requirements_checked' => count($requirementChecks),
-                    'requirements_met' => count(array_filter($requirementChecks, fn($r) => $r['is_met'])),
+                    'requirements_met' => count(array_filter($requirementChecks, fn ($r) => $r['is_met'])),
                     'missing_requirements' => $missingRequirements,
                     'can_graduate' => $allRequirementsMet,
                     'evaluation_summary' => $requirementChecks,
@@ -438,9 +438,16 @@ class BusinessActionLoggerExamples
 
     private function determineAcademicStanding(float $gpa): string
     {
-        if ($gpa >= 3.5) return 'excellent';
-        if ($gpa >= 3.0) return 'good';
-        if ($gpa >= 2.0) return 'satisfactory';
+        if ($gpa >= 3.5) {
+            return 'excellent';
+        }
+        if ($gpa >= 3.0) {
+            return 'good';
+        }
+        if ($gpa >= 2.0) {
+            return 'satisfactory';
+        }
+
         return 'probation';
     }
 

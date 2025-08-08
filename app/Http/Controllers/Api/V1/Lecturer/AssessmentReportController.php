@@ -7,8 +7,8 @@ namespace App\Http\Controllers\Api\V1\Lecturer;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\ExportAssessmentRequest;
 use App\Models\CourseOffering;
-use App\Services\AssessmentReportService;
 use App\Services\AssessmentExportService;
+use App\Services\AssessmentReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -24,9 +24,6 @@ class AssessmentReportController extends Controller
 
     /**
      * Get overview statistics for assessment reporting.
-     *
-     * @param CourseOffering $courseOffering
-     * @return JsonResponse
      */
     public function overview(CourseOffering $courseOffering): JsonResponse
     {
@@ -68,10 +65,6 @@ class AssessmentReportController extends Controller
 
     /**
      * Get comprehensive grade matrix for all students and assessments.
-     *
-     * @param CourseOffering $courseOffering
-     * @param Request $request
-     * @return JsonResponse
      */
     public function gradeMatrix(CourseOffering $courseOffering, Request $request): JsonResponse
     {
@@ -113,10 +106,6 @@ class AssessmentReportController extends Controller
 
     /**
      * Get detailed analytics and statistics.
-     *
-     * @param CourseOffering $courseOffering
-     * @param Request $request
-     * @return JsonResponse
      */
     public function statistics(CourseOffering $courseOffering, Request $request): JsonResponse
     {
@@ -178,10 +167,6 @@ class AssessmentReportController extends Controller
 
     /**
      * Export assessment data to Excel format.
-     *
-     * @param CourseOffering $courseOffering
-     * @param ExportAssessmentRequest $request
-     * @return BinaryFileResponse
      */
     public function exportExcel(CourseOffering $courseOffering, ExportAssessmentRequest $request): BinaryFileResponse
     {
@@ -196,7 +181,7 @@ class AssessmentReportController extends Controller
             $filePath = $this->assessmentExportService->exportToExcel($courseOffering, $filters);
 
             // Generate download filename
-            $downloadName = 'assessment_export_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            $downloadName = 'assessment_export_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.xlsx';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [
@@ -219,10 +204,6 @@ class AssessmentReportController extends Controller
 
     /**
      * Export assessment data to PDF format.
-     *
-     * @param CourseOffering $courseOffering
-     * @param ExportAssessmentRequest $request
-     * @return BinaryFileResponse
      */
     public function exportPdf(CourseOffering $courseOffering, ExportAssessmentRequest $request): BinaryFileResponse
     {
@@ -237,7 +218,7 @@ class AssessmentReportController extends Controller
             $filePath = $this->assessmentExportService->exportToPdf($courseOffering, $options);
 
             // Generate download filename
-            $downloadName = 'assessment_report_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+            $downloadName = 'assessment_report_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.pdf';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [

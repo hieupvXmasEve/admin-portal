@@ -31,7 +31,7 @@ class AvatarUploadRequest extends FormRequest
                 'image',
                 'mimes:jpeg,jpg,png,gif,webp',
                 'max:5120', // 5MB max
-                'dimensions:min_width=100,min_height=100,max_width=2000,max_height=2000'
+                'dimensions:min_width=100,min_height=100,max_width=2000,max_height=2000',
             ],
         ];
     }

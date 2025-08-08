@@ -11,7 +11,6 @@ use App\Models\ClassSession;
 use App\Services\AdminScheduleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Log;
 
 class AdminScheduleController extends Controller

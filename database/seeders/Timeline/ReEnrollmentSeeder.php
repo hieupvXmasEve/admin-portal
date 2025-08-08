@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
 use App\Models\AcademicHold;
-use App\Models\Semester;
-use App\Models\CourseRegistration;
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
+use App\Models\Semester;
+use App\Models\Student;
 use Illuminate\Database\Seeder;
-use Carbon\Carbon;
 
 class ReEnrollmentSeeder extends Seeder
 {
@@ -132,9 +131,9 @@ class ReEnrollmentSeeder extends Seeder
         // Update student status
         $student->update([
             'status' => 'active',
-            'admission_notes' => ($student->admission_notes ?? '') .
-                " | Re-enrolled: " . now()->format('Y-m-d') .
-                " (Approved return from {$reEnrollmentType['leave_reason']})"
+            'admission_notes' => ($student->admission_notes ?? '').
+                ' | Re-enrolled: '.now()->format('Y-m-d').
+                " (Approved return from {$reEnrollmentType['leave_reason']})",
         ]);
 
         // Resolve academic holds
@@ -155,9 +154,9 @@ class ReEnrollmentSeeder extends Seeder
 
         $student->update([
             'status' => 'active',
-            'admission_notes' => ($student->admission_notes ?? '') .
-                " | Conditional re-enrollment: " . now()->format('Y-m-d') .
-                " (Conditions: {$conditions})"
+            'admission_notes' => ($student->admission_notes ?? '').
+                ' | Conditional re-enrollment: '.now()->format('Y-m-d').
+                " (Conditions: {$conditions})",
         ]);
 
         // Create conditional enrollment hold
@@ -175,9 +174,9 @@ class ReEnrollmentSeeder extends Seeder
     {
         // Keep student in current status, add denial note
         $student->update([
-            'admission_notes' => ($student->admission_notes ?? '') .
-                " | Re-enrollment denied: " . now()->format('Y-m-d') .
-                " (Reason: Insufficient academic progress)"
+            'admission_notes' => ($student->admission_notes ?? '').
+                ' | Re-enrollment denied: '.now()->format('Y-m-d').
+                ' (Reason: Insufficient academic progress)',
         ]);
 
         // Create denial hold
@@ -192,9 +191,9 @@ class ReEnrollmentSeeder extends Seeder
     {
         // Add pending review note
         $student->update([
-            'admission_notes' => ($student->admission_notes ?? '') .
-                " | Re-enrollment under review: " . now()->format('Y-m-d') .
-                " (Pending committee decision)"
+            'admission_notes' => ($student->admission_notes ?? '').
+                ' | Re-enrollment under review: '.now()->format('Y-m-d').
+                ' (Pending committee decision)',
         ]);
 
         // Create review hold
@@ -323,7 +322,7 @@ class ReEnrollmentSeeder extends Seeder
         // Get current semester
         $currentSemester = Semester::where('is_active', true)->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return;
         }
 
@@ -379,7 +378,7 @@ class ReEnrollmentSeeder extends Seeder
     {
         $total = array_sum($stats);
 
-        $this->command->info("✅ Re-enrollment processing complete!");
+        $this->command->info('✅ Re-enrollment processing complete!');
         $this->command->info("  ✅ Successful returns: {$stats['successful_returns']} students");
         $this->command->info("  ⚠️ Conditional returns: {$stats['conditional_returns']} students");
         $this->command->info("  ❌ Denied returns: {$stats['denied_returns']} students");

@@ -29,6 +29,7 @@ class BuildingController extends Controller
     public function store(StoreBuildingRequest $request): BuildingResource
     {
         $building = $this->buildingService->createBuilding($request->validated());
+
         return new BuildingResource($building);
     }
 
@@ -40,12 +41,14 @@ class BuildingController extends Controller
     public function update(UpdateBuildingRequest $request, Building $building): BuildingResource
     {
         $updatedBuilding = $this->buildingService->updateBuilding($building, $request->validated());
+
         return new BuildingResource($updatedBuilding);
     }
 
     public function destroy(Building $building): \Illuminate\Http\Response
     {
         $this->buildingService->deleteBuilding($building);
+
         return response()->noContent();
     }
 }

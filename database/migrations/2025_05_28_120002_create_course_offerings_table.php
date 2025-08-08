@@ -27,7 +27,7 @@ return new class extends Migration
                 'in_person',
                 'online',
                 'hybrid',
-                'blended'
+                'blended',
             ])->default('in_person');
 
             $table->json('schedule_days')->nullable(); // ["Monday", "Wednesday", "Friday"]
@@ -40,7 +40,7 @@ return new class extends Migration
                 'open',
                 'closed',
                 'waitlist_only',
-                'cancelled'
+                'cancelled',
             ])->default('open');
 
             // New registration date fields

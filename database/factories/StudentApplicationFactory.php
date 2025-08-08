@@ -107,11 +107,11 @@ class StudentApplicationFactory extends Factory
      * Create application with English test scores.
      */
     public function withEnglishScores(
-        float $listening = null,
-        float $reading = null,
-        float $writing = null,
-        float $speaking = null,
-        float $overall = null
+        ?float $listening = null,
+        ?float $reading = null,
+        ?float $writing = null,
+        ?float $speaking = null,
+        ?float $overall = null
     ): static {
         return $this->state(fn (array $attributes) => [
             'english_test_type' => 'IELTS',

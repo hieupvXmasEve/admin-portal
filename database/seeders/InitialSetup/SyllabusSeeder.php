@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Database\Seeders\InitialSetup;
 
-use App\Models\CourseOffering;
-use App\Models\Syllabus;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
-use App\Models\Unit;
 use App\Models\CurriculumUnit;
+use App\Models\Syllabus;
+use App\Models\Unit;
 use Illuminate\Database\Seeder;
 
 class SyllabusSeeder extends Seeder
@@ -57,7 +56,7 @@ class SyllabusSeeder extends Seeder
         $semester = $curriculumUnit->semester;
 
         // If no semester assigned to curriculum unit, use current active semester
-        if (!$semester) {
+        if (! $semester) {
             $semester = \App\Models\Semester::where('is_active', true)->first();
         }
 
@@ -82,30 +81,30 @@ class SyllabusSeeder extends Seeder
     private function generateSyllabusDescription(Unit $unit): string
     {
         $descriptions = [
-            'COS' => "This unit provides comprehensive coverage of computer science fundamentals with hands-on programming experience. Students will develop problem-solving skills and learn industry-standard practices.",
-            'TNE' => "This unit focuses on network engineering principles and practical implementation. Students will gain experience with network design, configuration, and troubleshooting.",
-            'MKT' => "This unit explores marketing concepts and strategies in the modern business environment. Students will learn to analyze markets, develop campaigns, and understand consumer behavior.",
-            'ACC' => "This unit covers fundamental accounting principles and practices. Students will learn financial reporting, analysis, and decision-making skills essential for business success.",
-            'HRM' => "This unit examines human resource management practices and organizational behavior. Students will develop skills in recruitment, performance management, and employee development.",
-            'ECO' => "This unit introduces economic principles and their application to business decisions. Students will analyze market structures, economic indicators, and policy implications.",
-            'FIN' => "This unit covers corporate finance principles and investment analysis. Students will learn financial planning, risk assessment, and capital budgeting techniques.",
-            'ENG' => "This unit develops engineering problem-solving skills and technical communication. Students will apply mathematical and scientific principles to real-world engineering challenges.",
-            'CIV' => "This unit focuses on civil engineering design and construction principles. Students will learn structural analysis, materials science, and project management.",
-            'MEC' => "This unit covers mechanical engineering fundamentals including thermodynamics and fluid mechanics. Students will design and analyze mechanical systems.",
-            'ELE' => "This unit introduces electrical engineering concepts including circuit analysis and electronic systems. Students will design and test electrical circuits.",
-            'MAT' => "This unit provides mathematical foundations essential for technical disciplines. Students will develop analytical and problem-solving skills through theoretical and applied mathematics.",
+            'COS' => 'This unit provides comprehensive coverage of computer science fundamentals with hands-on programming experience. Students will develop problem-solving skills and learn industry-standard practices.',
+            'TNE' => 'This unit focuses on network engineering principles and practical implementation. Students will gain experience with network design, configuration, and troubleshooting.',
+            'MKT' => 'This unit explores marketing concepts and strategies in the modern business environment. Students will learn to analyze markets, develop campaigns, and understand consumer behavior.',
+            'ACC' => 'This unit covers fundamental accounting principles and practices. Students will learn financial reporting, analysis, and decision-making skills essential for business success.',
+            'HRM' => 'This unit examines human resource management practices and organizational behavior. Students will develop skills in recruitment, performance management, and employee development.',
+            'ECO' => 'This unit introduces economic principles and their application to business decisions. Students will analyze market structures, economic indicators, and policy implications.',
+            'FIN' => 'This unit covers corporate finance principles and investment analysis. Students will learn financial planning, risk assessment, and capital budgeting techniques.',
+            'ENG' => 'This unit develops engineering problem-solving skills and technical communication. Students will apply mathematical and scientific principles to real-world engineering challenges.',
+            'CIV' => 'This unit focuses on civil engineering design and construction principles. Students will learn structural analysis, materials science, and project management.',
+            'MEC' => 'This unit covers mechanical engineering fundamentals including thermodynamics and fluid mechanics. Students will design and analyze mechanical systems.',
+            'ELE' => 'This unit introduces electrical engineering concepts including circuit analysis and electronic systems. Students will design and test electrical circuits.',
+            'MAT' => 'This unit provides mathematical foundations essential for technical disciplines. Students will develop analytical and problem-solving skills through theoretical and applied mathematics.',
         ];
 
         $unitPrefix = substr($unit->code, 0, 3);
-        $baseDescription = $descriptions[$unitPrefix] ?? "This unit provides comprehensive coverage of the subject matter with theoretical foundations and practical applications.";
+        $baseDescription = $descriptions[$unitPrefix] ?? 'This unit provides comprehensive coverage of the subject matter with theoretical foundations and practical applications.';
 
-        return $baseDescription . " Assessment includes a combination of assignments, projects, and examinations designed to evaluate understanding and application of key concepts.";
+        return $baseDescription.' Assessment includes a combination of assignments, projects, and examinations designed to evaluate understanding and application of key concepts.';
     }
 
     private function getTotalHours(Unit $unit): int
     {
         // Calculate based on credit points (typically 10 hours per credit point)
-        return (int)($unit->credit_points * 10);
+        return (int) ($unit->credit_points * 10);
     }
 
     private function getHoursPerSession(Unit $unit): int
@@ -156,7 +155,7 @@ class SyllabusSeeder extends Seeder
                     ['name' => 'Quiz 3', 'weight' => 4.00],
                     ['name' => 'Quiz 4', 'weight' => 4.00],
                     ['name' => 'Quiz 5', 'weight' => 4.00],
-                ]
+                ],
             ],
             [
                 'name' => 'Programming Assignments',
@@ -167,7 +166,7 @@ class SyllabusSeeder extends Seeder
                     ['name' => 'Assignment 1', 'weight' => 15.00],
                     ['name' => 'Assignment 2', 'weight' => 15.00],
                     ['name' => 'Assignment 3', 'weight' => 10.00],
-                ]
+                ],
             ],
             [
                 'name' => 'Mid-term Exam',
@@ -176,7 +175,7 @@ class SyllabusSeeder extends Seeder
                 'required_for_final' => true,
                 'details' => [
                     ['name' => 'Mid-term Exam', 'weight' => 15.00],
-                ]
+                ],
             ],
             [
                 'name' => 'Final Exam',
@@ -185,7 +184,7 @@ class SyllabusSeeder extends Seeder
                 'required_for_final' => true,
                 'details' => [
                     ['name' => 'Final Exam', 'weight' => 25.00],
-                ]
+                ],
             ],
         ];
     }

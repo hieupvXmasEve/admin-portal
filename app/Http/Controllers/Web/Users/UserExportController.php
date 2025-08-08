@@ -6,9 +6,9 @@ namespace App\Http\Controllers\Web\Users;
 
 use App\Http\Controllers\Controller;
 use App\Services\UserExcelExportService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Illuminate\Http\JsonResponse;
 
 class UserExportController extends Controller
 {
@@ -18,17 +18,17 @@ class UserExportController extends Controller
     public function exportExcel(): BinaryFileResponse|JsonResponse
     {
         try {
-            $exportService = new UserExcelExportService();
+            $exportService = new UserExcelExportService;
             $filePath = $exportService->exportUsersToExcel();
-            $fileName = 'users_export_' . now()->format('Y-m-d') . '.xlsx';
+            $fileName = 'users_export_'.now()->format('Y-m-d').'.xlsx';
 
             return response()->download($filePath, $fileName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Export failed: ' . $e->getMessage()
+                'error' => 'Export failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -51,10 +51,10 @@ class UserExportController extends Controller
             if ($request->has('filter')) {
                 $requestFilters = $request->get('filter');
                 if (is_array($requestFilters)) {
-                    if (!empty($requestFilters['name'])) {
+                    if (! empty($requestFilters['name'])) {
                         $filters['name'] = $requestFilters['name'];
                     }
-                    if (!empty($requestFilters['email'])) {
+                    if (! empty($requestFilters['email'])) {
                         $filters['email'] = $requestFilters['email'];
                     }
                 }
@@ -62,15 +62,15 @@ class UserExportController extends Controller
 
             $exportService = new UserExcelExportService($filters);
             $filePath = $exportService->exportUsersToExcel($filters);
-            $fileName = 'users_export_' . now()->format('Y-m-d') . '.xlsx';
+            $fileName = 'users_export_'.now()->format('Y-m-d').'.xlsx';
 
             return response()->download($filePath, $fileName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Export failed: ' . $e->getMessage()
+                'error' => 'Export failed: '.$e->getMessage(),
             ], 500);
         }
     }

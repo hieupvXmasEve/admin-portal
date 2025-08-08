@@ -7,24 +7,26 @@ namespace App\Exports;
 use App\Models\AssessmentComponentDetail;
 use App\Models\CourseOffering;
 use App\Services\AssessmentGradeExcelService;
+use Illuminate\Database\Eloquent\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithTitle;
-use Illuminate\Database\Eloquent\Collection;
 
-class OptimizedGradeTemplateExport implements FromCollection, WithHeadings, WithMapping, WithColumnWidths, WithTitle
+class OptimizedGradeTemplateExport implements FromCollection, WithColumnWidths, WithHeadings, WithMapping, WithTitle
 {
     protected AssessmentComponentDetail $assessmentComponentDetail;
+
     protected CourseOffering $courseOffering;
+
     protected AssessmentGradeExcelService $service;
 
     public function __construct(AssessmentComponentDetail $assessmentComponentDetail, CourseOffering $courseOffering)
     {
         $this->assessmentComponentDetail = $assessmentComponentDetail;
         $this->courseOffering = $courseOffering;
-        $this->service = new AssessmentGradeExcelService();
+        $this->service = new AssessmentGradeExcelService;
     }
 
     /**
@@ -52,7 +54,7 @@ class OptimizedGradeTemplateExport implements FromCollection, WithHeadings, With
 
         // If no students found, create a placeholder row
         if ($students->isEmpty()) {
-            $emptyStudent = new \stdClass();
+            $emptyStudent = new \stdClass;
             $emptyStudent->student_code = 'No students enrolled';
             $emptyStudent->full_name = '';
             $emptyStudent->email = '';
@@ -82,7 +84,7 @@ class OptimizedGradeTemplateExport implements FromCollection, WithHeadings, With
             // Hidden metadata columns
             'Assessment Detail ID',
             'Max Points',
-            'Current Score ID'
+            'Current Score ID',
         ];
     }
 
@@ -107,7 +109,7 @@ class OptimizedGradeTemplateExport implements FromCollection, WithHeadings, With
             // Metadata
             $this->assessmentComponentDetail->id,
             $this->assessmentComponentDetail->max_points ?? 100,
-            $score?->id ?? null
+            $score?->id ?? null,
         ];
     }
 
@@ -139,6 +141,7 @@ class OptimizedGradeTemplateExport implements FromCollection, WithHeadings, With
     public function title(): string
     {
         $assessmentName = str_replace(['/', '\\', '?', '*', '[', ']'], '_', $this->assessmentComponentDetail->name);
+
         return substr("Grades_{$assessmentName}", 0, 31);
     }
 }

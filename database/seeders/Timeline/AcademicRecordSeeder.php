@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\CourseRegistration;
 use App\Models\AcademicRecord;
-use App\Models\AssessmentComponentDetailScore;
+use App\Models\CourseRegistration;
 use App\Models\Semester;
 use App\Models\Syllabus;
 use Illuminate\Database\Seeder;
@@ -25,7 +24,7 @@ class AcademicRecordSeeder extends Seeder
         // Get FALL2024 semester
         $semester = Semester::where('code', 'FALL2024')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('FALL2024 semester not found.');
         }
 
@@ -43,6 +42,7 @@ class AcademicRecordSeeder extends Seeder
         $existingRecords = AcademicRecord::where('semester_id', $semester->id)->count();
         if ($existingRecords > 0) {
             $this->command->info("✅ Academic records already exist for FALL2024 ({$existingRecords} found). Skipping creation.");
+
             return;
         }
 
@@ -133,7 +133,7 @@ class AcademicRecordSeeder extends Seeder
             ->with('assessmentComponents.details.scores')
             ->first();
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             // If no syllabus found, return default passing grade
             return [
                 'percentage' => 75.0,
@@ -179,19 +179,37 @@ class AcademicRecordSeeder extends Seeder
 
     private function calculateLetterGrade(float $percentage): string
     {
-        if ($percentage >= 80) return 'HD'; // High Distinction
-        if ($percentage >= 70) return 'D';  // Distinction
-        if ($percentage >= 60) return 'C';  // Credit
-        if ($percentage >= 50) return 'P';  // Pass
+        if ($percentage >= 80) {
+            return 'HD';
+        } // High Distinction
+        if ($percentage >= 70) {
+            return 'D';
+        }  // Distinction
+        if ($percentage >= 60) {
+            return 'C';
+        }  // Credit
+        if ($percentage >= 50) {
+            return 'P';
+        }  // Pass
+
         return 'N'; // Fail
     }
 
     private function calculateGradePoints(float $percentage): float
     {
-        if ($percentage >= 80) return 4.0;
-        if ($percentage >= 70) return 3.0;
-        if ($percentage >= 60) return 2.0;
-        if ($percentage >= 50) return 1.0;
+        if ($percentage >= 80) {
+            return 4.0;
+        }
+        if ($percentage >= 70) {
+            return 3.0;
+        }
+        if ($percentage >= 60) {
+            return 2.0;
+        }
+        if ($percentage >= 50) {
+            return 1.0;
+        }
+
         return 0.0;
     }
 
@@ -239,9 +257,16 @@ class AcademicRecordSeeder extends Seeder
 
     private function getHonorsDesignation(float $percentage): ?string
     {
-        if ($percentage >= 90) return 'summa_cum_laude';
-        if ($percentage >= 85) return 'magna_cum_laude';
-        if ($percentage >= 80) return 'cum_laude';
+        if ($percentage >= 90) {
+            return 'summa_cum_laude';
+        }
+        if ($percentage >= 85) {
+            return 'magna_cum_laude';
+        }
+        if ($percentage >= 80) {
+            return 'cum_laude';
+        }
+
         return null;
     }
 

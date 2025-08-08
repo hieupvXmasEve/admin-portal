@@ -37,8 +37,8 @@ class RoomController extends Controller
     {
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
-            'type' => 'nullable|string|in:' . implode(',', Room::getTypes()),
-            'status' => 'nullable|string|in:' . implode(',', Room::getStatuses()),
+            'type' => 'nullable|string|in:'.implode(',', Room::getTypes()),
+            'status' => 'nullable|string|in:'.implode(',', Room::getStatuses()),
             'building' => 'nullable|string|max:255',
             'floor' => 'nullable|string|max:255',
             'is_bookable' => 'nullable|boolean',

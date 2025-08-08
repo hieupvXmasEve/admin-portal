@@ -29,7 +29,7 @@ class SemesterResource extends JsonResource
      */
     protected function formatCurrentSemester(?array $currentSemester): ?array
     {
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return null;
         }
 
@@ -38,7 +38,7 @@ class SemesterResource extends JsonResource
                 'id' => $currentSemester['id'],
                 'name' => $currentSemester['name'],
                 'code' => $currentSemester['code'],
-                'display_name' => $currentSemester['name'] . ' (' . $currentSemester['code'] . ')',
+                'display_name' => $currentSemester['name'].' ('.$currentSemester['code'].')',
             ],
             'dates' => [
                 'start_date' => $currentSemester['start_date'],
@@ -76,7 +76,7 @@ class SemesterResource extends JsonResource
                     'id' => $semester['id'],
                     'name' => $semester['name'],
                     'code' => $semester['code'],
-                    'display_name' => $semester['name'] . ' (' . $semester['code'] . ')',
+                    'display_name' => $semester['name'].' ('.$semester['code'].')',
                 ],
                 'dates' => [
                     'start_date' => $semester['start_date'],
@@ -113,7 +113,7 @@ class SemesterResource extends JsonResource
                     'id' => $semester['id'],
                     'name' => $semester['name'],
                     'code' => $semester['code'],
-                    'display_name' => $semester['name'] . ' (' . $semester['code'] . ')',
+                    'display_name' => $semester['name'].' ('.$semester['code'].')',
                 ],
                 'dates' => [
                     'start_date' => $semester['start_date'],
@@ -209,9 +209,9 @@ class SemesterResource extends JsonResource
         $end = \Carbon\Carbon::parse($endDate);
 
         if ($start->year === $end->year) {
-            return $start->format('M j') . ' - ' . $end->format('M j, Y');
+            return $start->format('M j').' - '.$end->format('M j, Y');
         } else {
-            return $start->format('M j, Y') . ' - ' . $end->format('M j, Y');
+            return $start->format('M j, Y').' - '.$end->format('M j, Y');
         }
     }
 
@@ -228,9 +228,11 @@ class SemesterResource extends JsonResource
             return "{$days} days remaining";
         } elseif ($days < 30) {
             $weeks = ceil($days / 7);
+
             return $weeks === 1 ? '1 week remaining' : "{$weeks} weeks remaining";
         } else {
             $months = ceil($days / 30);
+
             return $months === 1 ? '1 month remaining' : "{$months} months remaining";
         }
     }
@@ -248,9 +250,11 @@ class SemesterResource extends JsonResource
             return "Starts in {$days} days";
         } elseif ($days < 30) {
             $weeks = ceil($days / 7);
+
             return $weeks === 1 ? 'Starts in 1 week' : "Starts in {$weeks} weeks";
         } else {
             $months = ceil($days / 30);
+
             return $months === 1 ? 'Starts in 1 month' : "Starts in {$months} months";
         }
     }
@@ -260,7 +264,7 @@ class SemesterResource extends JsonResource
      */
     protected function calculateRegistrationCountdown(array $registrationPeriod): ?array
     {
-        if (!$registrationPeriod['start'] || $registrationPeriod['is_open']) {
+        if (! $registrationPeriod['start'] || $registrationPeriod['is_open']) {
             return null;
         }
 
@@ -309,7 +313,7 @@ class SemesterResource extends JsonResource
      */
     protected function getRegistrationStatus(array $registrationPeriod): string
     {
-        if (!$registrationPeriod['start'] || !$registrationPeriod['end']) {
+        if (! $registrationPeriod['start'] || ! $registrationPeriod['end']) {
             return 'not_available';
         }
 
@@ -345,12 +349,12 @@ class SemesterResource extends JsonResource
     {
         $carbon = \Carbon\Carbon::parse($date);
         $year = $carbon->year;
-        
+
         // If semester starts in second half of year, it's the start of academic year
         if ($carbon->month >= 7) {
-            return $year . '/' . ($year + 1);
+            return $year.'/'.($year + 1);
         } else {
-            return ($year - 1) . '/' . $year;
+            return ($year - 1).'/'.$year;
         }
     }
 
@@ -360,7 +364,7 @@ class SemesterResource extends JsonResource
     protected function getSemesterType(string $name): string
     {
         $name = strtolower($name);
-        
+
         if (str_contains($name, 'summer')) {
             return 'summer';
         } elseif (str_contains($name, 'spring') || str_contains($name, 'semester 1')) {
@@ -378,7 +382,7 @@ class SemesterResource extends JsonResource
     protected function getQuickActions(array $semester): array
     {
         $actions = [];
-        
+
         switch ($semester['status']) {
             case 'current':
                 $actions = [
@@ -388,7 +392,7 @@ class SemesterResource extends JsonResource
                     'manage_enrollment' => 'Manage Enrollment',
                 ];
                 break;
-                
+
             case 'upcoming':
                 $actions = [
                     'plan_enrollment' => 'Plan Enrollment',
@@ -396,7 +400,7 @@ class SemesterResource extends JsonResource
                     'set_reminders' => 'Set Reminders',
                 ];
                 break;
-                
+
             case 'completed':
                 $actions = [
                     'view_transcript' => 'View Transcript',
@@ -405,7 +409,7 @@ class SemesterResource extends JsonResource
                 ];
                 break;
         }
-        
+
         return $actions;
     }
 
@@ -415,10 +419,10 @@ class SemesterResource extends JsonResource
     protected function generateSemesterTimeline(): array
     {
         $timeline = [];
-        
+
         // This would generate a visual timeline of semesters
         // showing past, current, and future semesters
-        
+
         foreach ($this->resource['all_semesters'] as $semester) {
             $timeline[] = [
                 'id' => $semester['id'],
@@ -428,7 +432,7 @@ class SemesterResource extends JsonResource
                 'position' => $this->calculateTimelinePosition($semester['start_date']),
             ];
         }
-        
+
         return $timeline;
     }
 
@@ -439,7 +443,7 @@ class SemesterResource extends JsonResource
     {
         $semesterDate = \Carbon\Carbon::parse($date);
         $now = now();
-        
+
         if ($semesterDate < $now->subYear()) {
             return 'far_past';
         } elseif ($semesterDate < $now) {

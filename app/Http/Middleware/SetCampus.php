@@ -28,4 +28,3 @@ class SetCampus
         return $next($request);
     }
 }
-

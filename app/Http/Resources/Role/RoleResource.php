@@ -20,7 +20,7 @@ class RoleResource extends JsonResource
             'description' => $this->description,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
-            'permissions' => $this->whenLoaded('permissions', fn() => $this->permissions->pluck('name')),
+            'permissions' => $this->whenLoaded('permissions', fn () => $this->permissions->pluck('name')),
         ];
     }
 }

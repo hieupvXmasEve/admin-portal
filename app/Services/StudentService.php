@@ -4,21 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Student;
 use App\Models\Campus;
-use App\Models\Program;
-use App\Models\Specialization;
+use App\Models\CampusUserRole;
 use App\Models\CurriculumVersion;
 use App\Models\GraduationRequirement;
+use App\Models\Program;
+use App\Models\Role;
+use App\Models\Specialization;
+use App\Models\Student;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
-use Exception;
-use App\Models\Role;
-use App\Models\CampusUserRole;
-use App\Services\AutomatedEnrollmentService;
 
 class StudentService
 {
@@ -70,7 +67,7 @@ class StudentService
             $this->assignGraduationRequirements($student);
 
             // Calculate expected graduation date if not provided
-            if (!isset($data['expected_graduation_date']) || !$data['expected_graduation_date']) {
+            if (! isset($data['expected_graduation_date']) || ! $data['expected_graduation_date']) {
                 $this->calculateExpectedGraduationDate($student);
             }
 
@@ -104,7 +101,7 @@ class StudentService
             // Ensure campus_id from session if not provided
             $campusId = $data['campus_id'] ?? session()->get('current_campus_id');
 
-            if (!$campusId) {
+            if (! $campusId) {
                 throw new \InvalidArgumentException('Campus ID is required either in data or session');
             }
 
@@ -149,7 +146,7 @@ class StudentService
             $this->assignGraduationRequirements($student);
 
             // Calculate expected graduation date if not provided
-            if (!isset($data['expected_graduation_date']) || !$data['expected_graduation_date']) {
+            if (! isset($data['expected_graduation_date']) || ! $data['expected_graduation_date']) {
                 $this->calculateExpectedGraduationDate($student);
             }
 
@@ -174,7 +171,7 @@ class StudentService
             ->where('campus_id', $campusId);
 
         // Apply additional filters
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
@@ -183,11 +180,11 @@ class StudentService
             });
         }
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
-        if (!empty($filters['program_id'])) {
+        if (! empty($filters['program_id'])) {
             $query->where('program_id', $filters['program_id']);
         }
 
@@ -241,11 +238,11 @@ class StudentService
     /**
      * Assign program to student
      */
-    public function assignProgram(Student $student, int $programId, int $specializationId = null, int $curriculumVersionId = null): Student
+    public function assignProgram(Student $student, int $programId, ?int $specializationId = null, ?int $curriculumVersionId = null): Student
     {
         return DB::transaction(function () use ($student, $programId, $specializationId, $curriculumVersionId) {
             // Find appropriate curriculum version if not provided
-            if (!$curriculumVersionId) {
+            if (! $curriculumVersionId) {
                 $curriculumVersionId = $this->findCurrentCurriculumVersion($programId, $specializationId);
             }
 
@@ -270,10 +267,10 @@ class StudentService
      */
     private function generateStudentId(string $campusCode, string $year): string
     {
-        $prefix = strtoupper($campusCode) . $year;
+        $prefix = strtoupper($campusCode).$year;
 
         // Find the last student ID with this prefix
-        $lastStudent = Student::where('student_code', 'like', $prefix . '%')
+        $lastStudent = Student::where('student_code', 'like', $prefix.'%')
             ->orderBy('student_code', 'desc')
             ->first();
 
@@ -284,7 +281,7 @@ class StudentService
             $newNumber = 1;
         }
 
-        return $prefix . str_pad((string) $newNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $newNumber, 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -293,12 +290,12 @@ class StudentService
     private function validateStudentData(array $data): void
     {
         // Check if campus exists
-        if (!Campus::where('id', $data['campus_id'])->exists()) {
+        if (! Campus::where('id', $data['campus_id'])->exists()) {
             throw new Exception('Selected campus does not exist');
         }
 
         // Check if program exists
-        if (!Program::where('id', $data['program_id'])->exists()) {
+        if (! Program::where('id', $data['program_id'])->exists()) {
             throw new Exception('Selected program does not exist');
         }
 
@@ -308,14 +305,14 @@ class StudentService
                 ->where('program_id', $data['program_id'])
                 ->first();
 
-            if (!$specialization) {
+            if (! $specialization) {
                 throw new Exception('Selected specialization does not exist or does not belong to the program');
             }
         }
 
         // Check if curriculum version exists
         if (isset($data['curriculum_version_id']) && $data['curriculum_version_id']) {
-            if (!CurriculumVersion::where('id', $data['curriculum_version_id'])->exists()) {
+            if (! CurriculumVersion::where('id', $data['curriculum_version_id'])->exists()) {
                 throw new Exception('Selected curriculum version does not exist');
             }
         }
@@ -336,7 +333,7 @@ class StudentService
     /**
      * Find current curriculum version for program/specialization
      */
-    private function findCurrentCurriculumVersion(int $programId, int $specializationId = null): int
+    private function findCurrentCurriculumVersion(int $programId, ?int $specializationId = null): int
     {
         $query = CurriculumVersion::where('program_id', $programId)
             ->orderBy('created_at', 'desc');
@@ -349,7 +346,7 @@ class StudentService
 
         $curriculumVersion = $query->first();
 
-        if (!$curriculumVersion) {
+        if (! $curriculumVersion) {
             throw new Exception('No curriculum version found for the selected program/specialization');
         }
 
@@ -362,7 +359,7 @@ class StudentService
     private function assignGraduationRequirements(Student $student): void
     {
         // Check if GraduationRequirement model/table exists
-        if (!class_exists(GraduationRequirement::class)) {
+        if (! class_exists(GraduationRequirement::class)) {
             return; // Skip if graduation requirements not implemented yet
         }
 
@@ -372,7 +369,7 @@ class StudentService
                 ->where('is_active', true)
                 ->first();
 
-            if (!$requirement) {
+            if (! $requirement) {
                 // Create default graduation requirement if none exists
                 GraduationRequirement::create([
                     'program_id' => $student->program_id,
@@ -385,7 +382,7 @@ class StudentService
             }
         } catch (\Exception $e) {
             // Silently skip if graduation requirements table doesn't exist yet
-            \Illuminate\Support\Facades\Log::info('Graduation requirements not available: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::info('Graduation requirements not available: '.$e->getMessage());
         }
     }
 
@@ -434,7 +431,7 @@ class StudentService
     {
         $validStatuses = ['active', 'inactive', 'suspended', 'graduated'];
 
-        if (!in_array($status, $validStatuses)) {
+        if (! in_array($status, $validStatuses)) {
             throw new Exception('Invalid student status');
         }
 
@@ -446,7 +443,7 @@ class StudentService
     /**
      * Get student statistics
      */
-    public function getStudentStatistics(int $campusId = null): array
+    public function getStudentStatistics(?int $campusId = null): array
     {
         $query = Student::query();
 
@@ -500,7 +497,7 @@ class StudentService
                         ->where('semester_id', $semesterId)
                         ->first();
 
-                    if (!$existingEnrollment) {
+                    if (! $existingEnrollment) {
                         $student->semesterEnrollments()->create([
                             'semester_id' => $semesterId,
                             'enrollment_status' => 'enrolled',
@@ -509,11 +506,11 @@ class StudentService
                         $created++;
                     }
                 } catch (Exception $e) {
-                    $errors[] = "Student ID {$studentId}: " . $e->getMessage();
+                    $errors[] = "Student ID {$studentId}: ".$e->getMessage();
                 }
             }
 
-            Log::info("Bulk enrollment creation completed", [
+            Log::info('Bulk enrollment creation completed', [
                 'created' => $created,
                 'errors' => count($errors),
             ]);
@@ -531,7 +528,7 @@ class StudentService
      */
     public function bulkCreateCourseOfferings(array $studentIds, int $semesterId, array $unitIds): array
     {
-        return DB::transaction(function () use ($studentIds, $semesterId, $unitIds) {
+        return DB::transaction(function () use ($semesterId, $unitIds) {
             $created = 0;
             $errors = [];
 
@@ -542,7 +539,7 @@ class StudentService
                         ->where('semester_id', $semesterId)
                         ->first();
 
-                    if (!$existingOffering) {
+                    if (! $existingOffering) {
                         \App\Models\CourseOffering::create([
                             'unit_id' => $unitId,
                             'semester_id' => $semesterId,
@@ -554,11 +551,11 @@ class StudentService
                         $created++;
                     }
                 } catch (Exception $e) {
-                    $errors[] = "Unit ID {$unitId}: " . $e->getMessage();
+                    $errors[] = "Unit ID {$unitId}: ".$e->getMessage();
                 }
             }
 
-            Log::info("Bulk course offering creation completed", [
+            Log::info('Bulk course offering creation completed', [
                 'created' => $created,
                 'errors' => count($errors),
             ]);
@@ -590,7 +587,7 @@ class StudentService
                             ->where('course_offering_id', $courseOfferingId)
                             ->first();
 
-                        if (!$existingRegistration) {
+                        if (! $existingRegistration) {
                             $student->courseRegistrations()->create([
                                 'course_offering_id' => $courseOfferingId,
                                 'registration_status' => 'enrolled',
@@ -600,12 +597,12 @@ class StudentService
                             $created++;
                         }
                     } catch (Exception $e) {
-                        $errors[] = "Student ID {$studentId}, Course Offering ID {$courseOfferingId}: " . $e->getMessage();
+                        $errors[] = "Student ID {$studentId}, Course Offering ID {$courseOfferingId}: ".$e->getMessage();
                     }
                 }
             }
 
-            Log::info("Bulk course registration creation completed", [
+            Log::info('Bulk course registration creation completed', [
                 'created' => $created,
                 'errors' => count($errors),
             ]);
@@ -627,12 +624,12 @@ class StudentService
         // Get current campus ID from session
         $currentCampusId = session()->get('current_campus_id');
 
-        if (!$currentCampusId) {
+        if (! $currentCampusId) {
             throw new Exception('No campus selected. Please select a campus first.');
         }
 
         // Use the new AutomatedEnrollmentService
-        $automatedEnrollmentService = new AutomatedEnrollmentService();
+        $automatedEnrollmentService = new AutomatedEnrollmentService;
         $results = $automatedEnrollmentService->processAutomatedEnrollment(
             $studentIds,
             $semesterId,
@@ -643,17 +640,17 @@ class StudentService
         return [
             'enrollments' => [
                 'created' => $results['enrollments']['created'],
-                'errors' => $results['enrollments']['errors']
+                'errors' => $results['enrollments']['errors'],
             ],
             'course_offerings' => [
                 'created' => $results['course_offerings']['created'],
-                'errors' => $results['course_offerings']['errors']
+                'errors' => $results['course_offerings']['errors'],
             ],
             'course_registrations' => [
                 'created' => $results['course_registrations']['created'],
-                'errors' => $results['course_registrations']['errors']
+                'errors' => $results['course_registrations']['errors'],
             ],
-            'summary' => $results['summary'] ?? []
+            'summary' => $results['summary'] ?? [],
         ];
     }
 
@@ -692,7 +689,8 @@ class StudentService
             return $units;
         } catch (Exception $e) {
             // Fallback: return some default units or empty array
-            Log::warning('Could not determine first-year units: ' . $e->getMessage());
+            Log::warning('Could not determine first-year units: '.$e->getMessage());
+
             return [];
         }
     }

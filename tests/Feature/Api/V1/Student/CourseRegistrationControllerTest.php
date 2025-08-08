@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\V1\Student;
 
-use App\Models\Student;
 use App\Models\Campus;
-use App\Models\Program;
-use App\Models\CurriculumVersion;
-use App\Models\CurriculumUnit;
-use App\Models\Unit;
-use App\Models\Semester;
+use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\ClassSession;
-use App\Models\Room;
+use App\Models\CurriculumUnit;
+use App\Models\CurriculumVersion;
 use App\Models\Lecturer;
+use App\Models\Program;
+use App\Models\Room;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\Unit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,8 +24,11 @@ class CourseRegistrationControllerTest extends TestCase
     use RefreshDatabase;
 
     protected Student $student;
+
     protected CourseOffering $courseOffering;
+
     protected Semester $semester;
+
     protected string $token;
 
     protected function setUp(): void
@@ -41,7 +44,7 @@ class CourseRegistrationControllerTest extends TestCase
         $campus = Campus::factory()->create();
         $program = Program::factory()->create(['campus_id' => $campus->id]);
         $curriculumVersion = CurriculumVersion::factory()->create(['program_id' => $program->id]);
-        
+
         $this->student = Student::factory()->create([
             'status' => 'active',
             'campus_id' => $campus->id,
@@ -90,33 +93,33 @@ class CourseRegistrationControllerTest extends TestCase
         ])->getJson('/api/v1/student/course-registration/available-courses');
 
         $response->assertOk()
-                ->assertJsonStructure([
-                    'success',
-                    'message',
-                    'data' => [
-                        '*' => [
-                            'id',
-                            'unit' => [
-                                'code',
-                                'name',
-                                'description',
-                                'credit_hours',
-                            ],
-                            'lecturer' => [
-                                'id',
-                                'name',
-                                'email',
-                            ],
-                            'schedule',
-                            'enrollment',
-                            'registration_eligibility',
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    '*' => [
+                        'id',
+                        'unit' => [
+                            'code',
+                            'name',
+                            'description',
+                            'credit_hours',
                         ],
+                        'lecturer' => [
+                            'id',
+                            'name',
+                            'email',
+                        ],
+                        'schedule',
+                        'enrollment',
+                        'registration_eligibility',
                     ],
-                ])
-                ->assertJson([
-                    'success' => true,
-                    'message' => 'Available courses retrieved successfully',
-                ]);
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+                'message' => 'Available courses retrieved successfully',
+            ]);
     }
 
     public function test_student_can_filter_available_courses_by_unit_code(): void
@@ -137,24 +140,24 @@ class CourseRegistrationControllerTest extends TestCase
         ]);
 
         $response->assertCreated()
-                ->assertJsonStructure([
-                    'success',
-                    'message',
-                    'data' => [
-                        'id',
-                        'status',
-                        'registration_date',
-                        'credit_hours',
-                        'unit',
-                        'lecturer',
-                        'schedule',
-                        'semester',
-                    ],
-                ])
-                ->assertJson([
-                    'success' => true,
-                    'message' => 'Course registration successful',
-                ]);
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'id',
+                    'status',
+                    'registration_date',
+                    'credit_hours',
+                    'unit',
+                    'lecturer',
+                    'schedule',
+                    'semester',
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+                'message' => 'Course registration successful',
+            ]);
 
         $this->assertDatabaseHas('course_registrations', [
             'student_id' => $this->student->id,
@@ -172,10 +175,10 @@ class CourseRegistrationControllerTest extends TestCase
         ]);
 
         $response->assertUnprocessableEntity()
-                ->assertJson([
-                    'success' => false,
-                    'error_code' => 'VALIDATION_ERROR',
-                ]);
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'VALIDATION_ERROR',
+            ]);
     }
 
     public function test_student_cannot_register_twice_for_same_course(): void
@@ -196,10 +199,10 @@ class CourseRegistrationControllerTest extends TestCase
         ]);
 
         $response->assertUnprocessableEntity()
-                ->assertJson([
-                    'success' => false,
-                    'error_code' => 'BUSINESS_LOGIC_ERROR',
-                ]);
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'BUSINESS_LOGIC_ERROR',
+            ]);
     }
 
     public function test_student_can_drop_course(): void
@@ -216,10 +219,10 @@ class CourseRegistrationControllerTest extends TestCase
         ])->deleteJson("/api/v1/student/course-registration/drop/{$registration->id}");
 
         $response->assertOk()
-                ->assertJson([
-                    'success' => true,
-                    'message' => 'Course dropped successfully',
-                ]);
+            ->assertJson([
+                'success' => true,
+                'message' => 'Course dropped successfully',
+            ]);
 
         $registration->refresh();
         $this->assertEquals('dropped', $registration->registration_status);
@@ -240,10 +243,10 @@ class CourseRegistrationControllerTest extends TestCase
         ])->deleteJson("/api/v1/student/course-registration/drop/{$registration->id}");
 
         $response->assertUnprocessableEntity()
-                ->assertJson([
-                    'success' => false,
-                    'error_code' => 'BUSINESS_LOGIC_ERROR',
-                ]);
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'BUSINESS_LOGIC_ERROR',
+            ]);
     }
 
     public function test_student_can_get_their_registrations(): void
@@ -260,24 +263,24 @@ class CourseRegistrationControllerTest extends TestCase
         ])->getJson('/api/v1/student/course-registration/my-registrations');
 
         $response->assertOk()
-                ->assertJsonStructure([
-                    'success',
-                    'message',
-                    'data' => [
-                        '*' => [
-                            'id',
-                            'status',
-                            'unit',
-                            'lecturer',
-                            'schedule',
-                            'semester',
-                        ],
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    '*' => [
+                        'id',
+                        'status',
+                        'unit',
+                        'lecturer',
+                        'schedule',
+                        'semester',
                     ],
-                ])
-                ->assertJson([
-                    'success' => true,
-                    'message' => 'Student registrations retrieved successfully',
-                ]);
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+                'message' => 'Student registrations retrieved successfully',
+            ]);
     }
 
     public function test_student_can_validate_registration(): void
@@ -289,14 +292,14 @@ class CourseRegistrationControllerTest extends TestCase
         ]);
 
         $response->assertOk()
-                ->assertJsonStructure([
-                    'success',
-                    'message',
-                    'data' => [
-                        'can_register',
-                        'validation_passed',
-                    ],
-                ]);
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'can_register',
+                    'validation_passed',
+                ],
+            ]);
     }
 
     public function test_student_can_check_schedule_conflicts(): void
@@ -306,19 +309,19 @@ class CourseRegistrationControllerTest extends TestCase
         ])->getJson("/api/v1/student/course-registration/schedule-conflicts/{$this->courseOffering->id}");
 
         $response->assertOk()
-                ->assertJsonStructure([
-                    'success',
-                    'message',
-                    'data' => [
-                        'has_conflicts',
-                        'conflict_count',
-                        'conflicts',
-                    ],
-                ])
-                ->assertJson([
-                    'success' => true,
-                    'message' => 'Schedule conflicts checked successfully',
-                ]);
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'has_conflicts',
+                    'conflict_count',
+                    'conflicts',
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+                'message' => 'Schedule conflicts checked successfully',
+            ]);
     }
 
     public function test_unauthenticated_request_fails(): void
@@ -326,10 +329,10 @@ class CourseRegistrationControllerTest extends TestCase
         $response = $this->getJson('/api/v1/student/course-registration/available-courses');
 
         $response->assertUnauthorized()
-                ->assertJson([
-                    'success' => false,
-                    'error_code' => 'AUTHENTICATION_ERROR',
-                ]);
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'AUTHENTICATION_ERROR',
+            ]);
     }
 
     public function test_inactive_student_cannot_access_registration(): void
@@ -341,9 +344,9 @@ class CourseRegistrationControllerTest extends TestCase
         ])->getJson('/api/v1/student/course-registration/available-courses');
 
         $response->assertForbidden()
-                ->assertJson([
-                    'success' => false,
-                    'error_code' => 'AUTHORIZATION_ERROR',
-                ]);
+            ->assertJson([
+                'success' => false,
+                'error_code' => 'AUTHORIZATION_ERROR',
+            ]);
     }
 }

@@ -143,8 +143,8 @@ class TimetableResource extends JsonResource
     {
         $start = \Carbon\Carbon::createFromTimeString($startTime);
         $end = \Carbon\Carbon::createFromTimeString($endTime);
-        
-        return $start->format('g:i A') . ' - ' . $end->format('g:i A');
+
+        return $start->format('g:i A').' - '.$end->format('g:i A');
     }
 
     /**
@@ -194,8 +194,8 @@ class TimetableResource extends JsonResource
         $currentDay = strtolower(now()->format('l'));
         $currentTime = now()->format('H:i');
 
-        return $day === $currentDay && 
-               $currentTime >= $session['start_time'] && 
+        return $day === $currentDay &&
+               $currentTime >= $session['start_time'] &&
                $currentTime < $session['end_time'];
     }
 
@@ -216,7 +216,7 @@ class TimetableResource extends JsonResource
     protected function calculateDayDuration(array $sessions): array
     {
         $totalMinutes = array_sum(array_column($sessions, 'duration_minutes'));
-        
+
         return [
             'total_minutes' => $totalMinutes,
             'display' => $this->formatDuration($totalMinutes),
@@ -229,10 +229,11 @@ class TimetableResource extends JsonResource
     protected function hasAnySessions(array $sessions): bool
     {
         foreach ($sessions as $daySessions) {
-            if (!empty($daySessions)) {
+            if (! empty($daySessions)) {
                 return true;
             }
         }
+
         return false;
     }
 }

@@ -59,7 +59,7 @@ class RoleAndPermissionSeeder extends Seeder
             }
         }
 
-        $this->command->info("📋 Created " . ($permissionId - 1) . " permissions");
+        $this->command->info('📋 Created '.($permissionId - 1).' permissions');
     }
 
     private function createRoles(): void
@@ -75,7 +75,7 @@ class RoleAndPermissionSeeder extends Seeder
             Role::create($role);
         }
 
-        $this->command->info('👥 Created ' . count($roles) . ' roles');
+        $this->command->info('👥 Created '.count($roles).' roles');
     }
 
     private function assignPermissionsToRoles(): void
@@ -156,7 +156,9 @@ class RoleAndPermissionSeeder extends Seeder
 
         foreach ($rolePermissions as $roleCode => $permissionCodes) {
             $role = Role::where('code', $roleCode)->first();
-            if (!$role) continue;
+            if (! $role) {
+                continue;
+            }
 
             foreach ($permissionCodes as $permissionCode) {
                 $permission = Permission::where('code', $permissionCode)->first();
@@ -168,7 +170,7 @@ class RoleAndPermissionSeeder extends Seeder
                 }
             }
 
-            $this->command->info("🔐 Assigned " . count($permissionCodes) . " permissions to {$role->name}");
+            $this->command->info('🔐 Assigned '.count($permissionCodes)." permissions to {$role->name}");
         }
     }
 }

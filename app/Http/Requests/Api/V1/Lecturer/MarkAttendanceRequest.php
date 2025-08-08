@@ -29,39 +29,39 @@ class MarkAttendanceRequest extends FormRequest
                 'required',
                 'array',
                 'min:1',
-                'max:200' // Reasonable limit for class size
+                'max:200', // Reasonable limit for class size
             ],
             'attendance_data.*.student_code' => [
                 'required',
                 'integer',
-                'exists:students,id'
+                'exists:students,id',
             ],
             'attendance_data.*.status' => [
                 'required',
                 'string',
-                'in:present,absent,late,excused'
+                'in:present,absent,late,excused',
             ],
             'attendance_data.*.check_in_time' => [
                 'nullable',
-                'date_format:H:i:s'
+                'date_format:H:i:s',
             ],
             'attendance_data.*.minutes_late' => [
                 'nullable',
                 'integer',
                 'min:0',
-                'max:180' // Max 3 hours late
+                'max:180', // Max 3 hours late
             ],
             'attendance_data.*.participation_score' => [
                 'nullable',
                 'numeric',
                 'min:0',
-                'max:10'
+                'max:10',
             ],
             'attendance_data.*.notes' => [
                 'nullable',
                 'string',
-                'max:500'
-            ]
+                'max:500',
+            ],
         ];
     }
 
@@ -86,7 +86,7 @@ class MarkAttendanceRequest extends FormRequest
             'attendance_data.*.participation_score.numeric' => 'Participation score must be a number',
             'attendance_data.*.participation_score.min' => 'Participation score cannot be negative',
             'attendance_data.*.participation_score.max' => 'Participation score cannot exceed 10',
-            'attendance_data.*.notes.max' => 'Notes cannot exceed 500 characters'
+            'attendance_data.*.notes.max' => 'Notes cannot exceed 500 characters',
         ];
     }
 

@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\V1\Lecturer\AuthController;
-use App\Http\Controllers\Api\V1\Lecturer\DashboardController;
-use App\Http\Controllers\Api\V1\Lecturer\CourseController;
-use App\Http\Controllers\Api\V1\Lecturer\AttendanceController;
-use App\Http\Controllers\Api\V1\Lecturer\TimetableController;
-use App\Http\Controllers\Api\V1\Lecturer\StudentController;
 use App\Http\Controllers\Api\V1\Lecturer\AssessmentController;
 use App\Http\Controllers\Api\V1\Lecturer\AssessmentReportController;
+use App\Http\Controllers\Api\V1\Lecturer\AttendanceController;
+use App\Http\Controllers\Api\V1\Lecturer\AuthController;
+use App\Http\Controllers\Api\V1\Lecturer\CourseController;
+use App\Http\Controllers\Api\V1\Lecturer\DashboardController;
+use App\Http\Controllers\Api\V1\Lecturer\StudentController;
+use App\Http\Controllers\Api\V1\Lecturer\TimetableController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,7 +42,7 @@ Route::middleware([
     'auth:sanctum',
     'lecturer.api.auth',
     'lecturer.api.rate:lecturer-api',
-    'api.logging'
+    'api.logging',
 ])->group(function () {
 
     // Authentication management

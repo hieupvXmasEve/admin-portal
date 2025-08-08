@@ -10,8 +10,8 @@ use App\Models\Lecture;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class LecturerSeeder extends Seeder
 {
@@ -125,14 +125,14 @@ class LecturerSeeder extends Seeder
         $degrees = ['PhD', 'Master', 'Bachelor'];
 
         Lecture::create([
-            'employee_id' => 'LEC' . str_pad((string)$index, 4, '0', STR_PAD_LEFT),
+            'employee_id' => 'LEC'.str_pad((string) $index, 4, '0', STR_PAD_LEFT),
             'title' => $this->extractTitle($lecturerData['name']),
             'first_name' => $firstName,
             'last_name' => $lastName,
             'email' => $lecturerData['email'],
             'password' => Hash::make('1234'),
-            'phone' => '+84 ' . rand(100000000, 999999999),
-            'mobile_phone' => '+84 ' . rand(900000000, 999999999),
+            'phone' => '+84 '.rand(100000000, 999999999),
+            'mobile_phone' => '+84 '.rand(900000000, 999999999),
             'campus_id' => $campus->id,
             'department' => $lecturerData['department'],
             'faculty' => $this->getFacultyFromDepartment($lecturerData['department']),
@@ -153,10 +153,10 @@ class LecturerSeeder extends Seeder
             'preferred_end_time' => now()->setTime(17, 0),
             'max_teaching_hours_per_week' => rand(15, 25),
             'teaching_modalities' => ['in_person', 'online', 'hybrid'],
-            'office_address' => "Room " . rand(100, 999) . ", " . $campus->name,
-            'office_phone' => '+84 ' . rand(100000000, 999999999),
+            'office_address' => 'Room '.rand(100, 999).', '.$campus->name,
+            'office_phone' => '+84 '.rand(100000000, 999999999),
             'emergency_contact_name' => 'Emergency Contact',
-            'emergency_contact_phone' => '+84 ' . rand(900000000, 999999999),
+            'emergency_contact_phone' => '+84 '.rand(900000000, 999999999),
             'emergency_contact_relationship' => 'Spouse',
             'biography' => "Experienced educator in {$lecturerData['specialization']} with extensive research background.",
             'certifications' => ['Teaching Certificate', 'Professional Development'],
@@ -172,10 +172,19 @@ class LecturerSeeder extends Seeder
 
     private function extractTitle(string $name): ?string
     {
-        if (str_contains($name, 'Dr.')) return 'Dr.';
-        if (str_contains($name, 'Prof.')) return 'Prof.';
-        if (str_contains($name, 'Ms.')) return 'Ms.';
-        if (str_contains($name, 'Mr.')) return 'Mr.';
+        if (str_contains($name, 'Dr.')) {
+            return 'Dr.';
+        }
+        if (str_contains($name, 'Prof.')) {
+            return 'Prof.';
+        }
+        if (str_contains($name, 'Ms.')) {
+            return 'Ms.';
+        }
+        if (str_contains($name, 'Mr.')) {
+            return 'Mr.';
+        }
+
         return null;
     }
 

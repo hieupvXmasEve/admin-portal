@@ -53,7 +53,7 @@ class ClassSessionDetailResource extends JsonResource
             'code' => $course['code'],
             'name' => $course['name'],
             'credit_hours' => $course['credit_hours'],
-            'full_title' => $course['code'] . ' - ' . $course['name'],
+            'full_title' => $course['code'].' - '.$course['name'],
         ];
     }
 
@@ -62,7 +62,7 @@ class ClassSessionDetailResource extends JsonResource
      */
     protected function formatLecturer(?array $lecturer): ?array
     {
-        if (!$lecturer || !$lecturer['id']) {
+        if (! $lecturer || ! $lecturer['id']) {
             return null;
         }
 
@@ -80,7 +80,7 @@ class ClassSessionDetailResource extends JsonResource
      */
     protected function formatRoom(?array $room): ?array
     {
-        if (!$room || !$room['id']) {
+        if (! $room || ! $room['id']) {
             return null;
         }
 
@@ -128,7 +128,7 @@ class ClassSessionDetailResource extends JsonResource
                 'day_of_week' => $session['day_of_week'] ?? null,
                 'start_time' => $session['start_time'] ?? null,
                 'end_time' => $session['end_time'] ?? null,
-                'time_display' => isset($session['start_time'], $session['end_time']) 
+                'time_display' => isset($session['start_time'], $session['end_time'])
                     ? $this->formatTimeRange($session['start_time'], $session['end_time'])
                     : null,
             ];
@@ -149,6 +149,7 @@ class ClassSessionDetailResource extends JsonResource
         if ($currentDay === $sessionDay) {
             if ($currentTime < $startTime) {
                 $minutesUntil = $this->calculateMinutesUntil($startTime);
+
                 return [
                     'status' => 'upcoming_today',
                     'display' => 'Upcoming Today',
@@ -157,6 +158,7 @@ class ClassSessionDetailResource extends JsonResource
                 ];
             } elseif ($currentTime >= $startTime && $currentTime < $endTime) {
                 $minutesRemaining = $this->calculateMinutesRemaining($endTime);
+
                 return [
                     'status' => 'in_progress',
                     'display' => 'In Progress',
@@ -185,8 +187,8 @@ class ClassSessionDetailResource extends JsonResource
     {
         $start = \Carbon\Carbon::createFromTimeString($startTime);
         $end = \Carbon\Carbon::createFromTimeString($endTime);
-        
-        return $start->format('g:i A') . ' - ' . $end->format('g:i A');
+
+        return $start->format('g:i A').' - '.$end->format('g:i A');
     }
 
     /**
@@ -212,20 +214,20 @@ class ClassSessionDetailResource extends JsonResource
     protected function formatContactInfo(array $lecturer): array
     {
         $contact = [];
-        
+
         if ($lecturer['email']) {
             $contact[] = [
                 'type' => 'email',
                 'value' => $lecturer['email'],
-                'display' => 'Email: ' . $lecturer['email'],
+                'display' => 'Email: '.$lecturer['email'],
             ];
         }
-        
+
         if ($lecturer['phone']) {
             $contact[] = [
                 'type' => 'phone',
                 'value' => $lecturer['phone'],
-                'display' => 'Phone: ' . $lecturer['phone'],
+                'display' => 'Phone: '.$lecturer['phone'],
             ];
         }
 
@@ -281,12 +283,12 @@ class ClassSessionDetailResource extends JsonResource
     {
         $now = now();
         $sessionStart = \Carbon\Carbon::createFromTimeString($startTime);
-        
+
         // If session is tomorrow or later, calculate accordingly
         if ($sessionStart->lt($now)) {
             $sessionStart->addDay();
         }
-        
+
         return $now->diffInMinutes($sessionStart);
     }
 
@@ -297,7 +299,7 @@ class ClassSessionDetailResource extends JsonResource
     {
         $now = now();
         $sessionEnd = \Carbon\Carbon::createFromTimeString($endTime);
-        
+
         return $now->diffInMinutes($sessionEnd);
     }
 
@@ -309,14 +311,14 @@ class ClassSessionDetailResource extends JsonResource
         if ($minutes < 60) {
             return "{$minutes} minutes";
         }
-        
+
         $hours = intval($minutes / 60);
         $mins = $minutes % 60;
-        
+
         if ($mins > 0) {
             return "{$hours}h {$mins}m";
         }
-        
+
         return "{$hours}h";
     }
 
@@ -325,7 +327,7 @@ class ClassSessionDetailResource extends JsonResource
      */
     protected function formatTimeRemaining(int $minutes): string
     {
-        return $this->formatTimeUntil($minutes) . ' remaining';
+        return $this->formatTimeUntil($minutes).' remaining';
     }
 
     /**
@@ -336,12 +338,12 @@ class ClassSessionDetailResource extends JsonResource
         $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         $currentDayIndex = array_search(strtolower(now()->format('l')), $daysOfWeek);
         $sessionDayIndex = array_search($dayOfWeek, $daysOfWeek);
-        
+
         $daysUntil = ($sessionDayIndex - $currentDayIndex + 7) % 7;
         if ($daysUntil === 0) {
             $daysUntil = 7; // Next week
         }
-        
+
         return now()->addDays($daysUntil)->format('l, M j');
     }
 }

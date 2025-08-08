@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
+use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Semester;
 use App\Models\CurriculumUnit;
-use App\Models\AcademicHold;
-use App\Models\AcademicRecord;
-use Illuminate\Database\Seeder;
+use App\Models\Semester;
+use App\Models\Student;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class Spring2025RegistrationSeeder extends Seeder
 {
@@ -27,7 +26,7 @@ class Spring2025RegistrationSeeder extends Seeder
         // Get SPRING2025 semester
         $semester = Semester::where('code', 'SPRING2025')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('SPRING2025 semester not found.');
         }
 
@@ -61,6 +60,7 @@ class Spring2025RegistrationSeeder extends Seeder
         $existingRegistrations = CourseRegistration::where('semester_id', $semester->id)->count();
         if ($existingRegistrations > 0) {
             $this->command->info("✅ Course registrations already exist for SPRING2025 ({$existingRegistrations} found). Skipping creation.");
+
             return;
         }
 
@@ -77,7 +77,7 @@ class Spring2025RegistrationSeeder extends Seeder
             }
         }
 
-        $this->command->info("✅ Successfully registered students for SPRING2025!");
+        $this->command->info('✅ Successfully registered students for SPRING2025!');
         $this->command->info("  📚 Regular registrations: {$registrationCount}");
         $this->command->info("  🔄 Retake registrations: {$retakeCount}");
     }
@@ -241,7 +241,7 @@ class Spring2025RegistrationSeeder extends Seeder
             ->where('semester_id', $semester->id)
             ->first();
 
-        if (!$existingEnrollment) {
+        if (! $existingEnrollment) {
             \App\Models\Enrollment::create([
                 'student_code' => $student->id,
                 'semester_id' => $semester->id,
@@ -261,6 +261,7 @@ class Spring2025RegistrationSeeder extends Seeder
 
         // Random date within enrollment period
         $daysDiff = (int) $startDate->diffInDays($endDate);
+
         return $startDate->copy()->addDays(rand(0, $daysDiff));
     }
 

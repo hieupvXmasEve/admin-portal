@@ -27,7 +27,7 @@ class InitialSeederRunner extends Seeder
             UserAccountSeeder::class,
 
             // 004. Create lecturer user accounts and profiles
-//            LecturerSeeder::class,
+            //            LecturerSeeder::class,
 
             // 005. Create programs, specializations, and units
             AcademicStructureSeeder::class,
@@ -36,10 +36,10 @@ class InitialSeederRunner extends Seeder
             SemesterSeeder::class,
 
             // 007. Link units to programs and graduation requirements
-//            CurriculumSeeder::class,
+            //            CurriculumSeeder::class,
 
             // // 008. Create syllabus and assessment components for each class
-//            SyllabusSeeder::class,
+            //            SyllabusSeeder::class,
         ]);
 
         $this->command->info('✅ Initial Setup Seeders completed successfully!');

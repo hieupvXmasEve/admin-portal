@@ -43,11 +43,11 @@ class RoomResource extends JsonResource
             'created_at' => $this->created_at->toISOString(),
             'updated_at' => $this->updated_at->toISOString(),
             'deleted_at' => $this->deleted_at?->toISOString(),
-            
+
             // Computed properties
             'is_available' => $this->isAvailable(),
             'requires_approval_status' => $this->requiresApproval(),
-            
+
             // Type and status labels for UI
             'type_label' => $this->getTypeLabel(),
             'status_label' => $this->getStatusLabel(),

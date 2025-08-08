@@ -125,9 +125,9 @@ class CourseRegistrationController extends Controller
                 ->orderBy('course_offerings.section_code')
                 ->select('course_offerings.*')
                 ->get()
-                ->map(fn($offering) => [
+                ->map(fn ($offering) => [
                     'value' => $offering->id,
-                    'label' => "{$offering->course_code} - {$offering->course_title}" .
+                    'label' => "{$offering->course_code} - {$offering->course_title}".
                         ($offering->section_code ? " (Section {$offering->section_code})" : ''),
                 ]);
         }
@@ -245,7 +245,7 @@ class CourseRegistrationController extends Controller
 
                         $registeredCount++;
                     } catch (\Exception $e) {
-                        $errors[] = "Unit ID {$unitId}: " . $e->getMessage();
+                        $errors[] = "Unit ID {$unitId}: ".$e->getMessage();
                     }
                 }
             });
@@ -253,7 +253,7 @@ class CourseRegistrationController extends Controller
             if ($registeredCount > 0) {
                 $message = "Successfully registered student for {$registeredCount} unit(s).";
                 if (! empty($errors)) {
-                    $message .= ' Some units could not be registered: ' . implode('; ', $errors);
+                    $message .= ' Some units could not be registered: '.implode('; ', $errors);
                 }
 
                 return Redirect::route(CourseRegistrationRoutes::INDEX)
@@ -261,7 +261,7 @@ class CourseRegistrationController extends Controller
             } else {
                 return Redirect::back()
                     ->withInput()
-                    ->with('error', 'No units were registered. Errors: ' . implode('; ', $errors));
+                    ->with('error', 'No units were registered. Errors: '.implode('; ', $errors));
             }
         } catch (\Exception $e) {
             return Redirect::back()
@@ -322,7 +322,7 @@ class CourseRegistrationController extends Controller
             $courseOffering = $adminCourseRegistration->courseOffering;
             $canEditStatus = $this->canEditRegistrationStatus($courseOffering);
 
-            if (!$canEditStatus && $request->registration_status !== $adminCourseRegistration->registration_status) {
+            if (! $canEditStatus && $request->registration_status !== $adminCourseRegistration->registration_status) {
                 return Redirect::back()
                     ->withInput()
                     ->with('error', 'Registration status can only be changed during the course registration period.');
@@ -338,7 +338,7 @@ class CourseRegistrationController extends Controller
         } catch (\Exception $e) {
             return Redirect::back()
                 ->withInput()
-                ->with('error', 'Failed to update course registration: ' . $e->getMessage());
+                ->with('error', 'Failed to update course registration: '.$e->getMessage());
         }
     }
 
@@ -361,7 +361,7 @@ class CourseRegistrationController extends Controller
                 ->with('success', 'Course registration deleted successfully.');
         } catch (\Exception $e) {
             return Redirect::back()
-                ->with('error', 'Failed to delete course registration: ' . $e->getMessage());
+                ->with('error', 'Failed to delete course registration: '.$e->getMessage());
         }
     }
 
@@ -395,7 +395,7 @@ class CourseRegistrationController extends Controller
                 ->with('success', 'Selected course registrations deleted successfully.');
         } catch (\Exception $e) {
             return Redirect::back()
-                ->with('error', 'Failed to delete course registrations: ' . $e->getMessage());
+                ->with('error', 'Failed to delete course registrations: '.$e->getMessage());
         }
     }
 
@@ -711,13 +711,13 @@ class CourseRegistrationController extends Controller
         $now = now()->toDateString();
 
         // If no registration dates are set, allow editing
-        if (!$courseOffering->registration_start_date && !$courseOffering->registration_end_date) {
+        if (! $courseOffering->registration_start_date && ! $courseOffering->registration_end_date) {
             return true;
         }
 
         // Check if current date is within registration period
-        $startOk = !$courseOffering->registration_start_date || $courseOffering->registration_start_date <= $now;
-        $endOk = !$courseOffering->registration_end_date || $courseOffering->registration_end_date >= $now;
+        $startOk = ! $courseOffering->registration_start_date || $courseOffering->registration_start_date <= $now;
+        $endOk = ! $courseOffering->registration_end_date || $courseOffering->registration_end_date >= $now;
 
         return $startOk && $endOk;
     }

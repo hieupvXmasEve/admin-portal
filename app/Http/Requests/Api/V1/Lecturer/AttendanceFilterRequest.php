@@ -28,39 +28,39 @@ class AttendanceFilterRequest extends FormRequest
             'course_offering_id' => [
                 'nullable',
                 'integer',
-                'exists:course_offerings,id'
+                'exists:course_offerings,id',
             ],
             'semester_id' => [
                 'nullable',
                 'integer',
-                'exists:semesters,id'
+                'exists:semesters,id',
             ],
             'status' => [
                 'nullable',
                 'string',
-                'in:scheduled,completed,cancelled,in_progress'
+                'in:scheduled,completed,cancelled,in_progress',
             ],
             'attendance_status' => [
                 'nullable',
                 'string',
-                'in:marked,unmarked,all'
+                'in:marked,unmarked,all',
             ],
             'date_from' => [
                 'nullable',
                 'date',
-                'before_or_equal:date_to'
+                'before_or_equal:date_to',
             ],
             'date_to' => [
                 'nullable',
                 'date',
-                'after_or_equal:date_from'
+                'after_or_equal:date_from',
             ],
             'per_page' => [
                 'nullable',
                 'integer',
                 'min:5',
-                'max:50'
-            ]
+                'max:50',
+            ],
         ];
     }
 
@@ -79,7 +79,7 @@ class AttendanceFilterRequest extends FormRequest
             'date_from.before_or_equal' => 'From date must be before or equal to the to date',
             'date_to.after_or_equal' => 'To date must be after or equal to the from date',
             'per_page.min' => 'Per page must be at least 5',
-            'per_page.max' => 'Per page must not exceed 50'
+            'per_page.max' => 'Per page must not exceed 50',
         ];
     }
 

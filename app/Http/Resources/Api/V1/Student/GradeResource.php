@@ -75,7 +75,7 @@ class GradeResource extends JsonResource
             'credit_summary' => [
                 'total_credits_attempted' => $summary['total_credits_attempted'],
                 'total_credits_earned' => $summary['total_credits_earned'],
-                'credit_efficiency' => $summary['total_credits_attempted'] > 0 
+                'credit_efficiency' => $summary['total_credits_attempted'] > 0
                     ? round(($summary['total_credits_earned'] / $summary['total_credits_attempted']) * 100, 1)
                     : 0,
             ],
@@ -131,6 +131,7 @@ class GradeResource extends JsonResource
         if ($numericGrade !== null) {
             return "{$letterGrade} ({$numericGrade}%)";
         }
+
         return $letterGrade;
     }
 
@@ -170,7 +171,7 @@ class GradeResource extends JsonResource
         return [
             'semester_performance' => $this->getSemesterPerformance($summary['semester_gpa']),
             'credit_load' => $this->getCreditLoadStatus($summary['total_credits']),
-            'success_rate' => $summary['total_courses'] > 0 
+            'success_rate' => $summary['total_courses'] > 0
                 ? round(($summary['completed_courses'] / $summary['total_courses']) * 100, 1)
                 : 0,
         ];

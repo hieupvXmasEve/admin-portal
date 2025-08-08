@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 use App\Constants\StudentRoutes;
 use App\Http\Controllers\Web\AcademicRecordController;
-use App\Http\Controllers\Web\ProgramChangeController;
-use App\Http\Controllers\Web\CourseRetakeController;
 use App\Http\Controllers\Web\AcademicStandingController;
+use App\Http\Controllers\Web\CourseRetakeController;
+use App\Http\Controllers\Web\ProgramChangeController;
+use App\Http\Controllers\Web\StudentAcademicSummaryController;
 use App\Http\Controllers\Web\StudentController;
 use App\Http\Controllers\Web\StudentStatusController;
-use App\Http\Controllers\Web\StudentAcademicSummaryController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -96,7 +96,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:view_student_summary')
         ->name(StudentRoutes::ACADEMIC_SUMMARY_COURSE_SCORES);
 });
-
 
 // Academic Records Management - General Access (for menu)
 Route::prefix('academic-records')->name('academic-records.')->group(function () {

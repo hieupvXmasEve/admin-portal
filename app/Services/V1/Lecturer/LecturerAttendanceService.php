@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Lecturer;
 
-use App\Models\Lecture;
-use App\Models\ClassSession;
 use App\Models\Attendance;
+use App\Models\ClassSession;
 use App\Models\CourseOffering;
+use App\Models\Lecture;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 
 class LecturerAttendanceService
@@ -27,7 +27,7 @@ class LecturerAttendanceService
             ->with([
                 'courseOffering.curriculumUnit',
                 'courseOffering.semester',
-                'attendances.student'
+                'attendances.student',
             ])
             ->orderBy('session_date', 'desc');
 
@@ -50,12 +50,12 @@ class LecturerAttendanceService
                 'courseOffering.courseRegistrations.student.specialization',
                 'courseOffering.courseRegistrations.student.campus',
                 'attendances.student',
-                'attendances.recordedBy'
+                'attendances.recordedBy',
             ])
             ->where('id', $sessionId)
             ->first();
 
-        if (!$session) {
+        if (! $session) {
             return null;
         }
 
@@ -146,7 +146,7 @@ class LecturerAttendanceService
             ->where('id', $sessionId)
             ->first();
 
-        if (!$session) {
+        if (! $session) {
             throw new \Exception('Session not found or access denied');
         }
 
@@ -196,12 +196,12 @@ class LecturerAttendanceService
             ->with([
                 'courseOffering.courseRegistrations' => function ($query) {
                     $query->where('registration_status', 'confirmed');
-                }
+                },
             ])
             ->where('id', $sessionId)
             ->first();
         Log::debug('session', ['session' => $session]);
-        if (!$session) {
+        if (! $session) {
             throw new \Exception('Session not found or access denied');
         }
 
@@ -216,7 +216,7 @@ class LecturerAttendanceService
             ];
         }
 
-        return DB::transaction(function () use ($session, $enrolledStudents, $lecturer, $sessionId) {
+        return DB::transaction(function () use ($enrolledStudents, $lecturer, $sessionId) {
             $createdRecords = [];
             $existingCount = 0;
 
@@ -227,6 +227,7 @@ class LecturerAttendanceService
 
                 if ($existingAttendance) {
                     $existingCount++;
+
                     continue;
                 }
 
@@ -278,11 +279,11 @@ class LecturerAttendanceService
             ->where('id', $courseOfferingId)
             ->first();
 
-        if (!$courseOffering) {
+        if (! $courseOffering) {
             throw new \Exception('Course offering not found or access denied');
         }
 
-        $cacheKey = "lecturer-attendance-analytics:{$lecturer->id}:{$courseOfferingId}:" . md5(serialize($filters));
+        $cacheKey = "lecturer-attendance-analytics:{$lecturer->id}:{$courseOfferingId}:".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($courseOffering, $filters) {
             return [
@@ -351,7 +352,7 @@ class LecturerAttendanceService
             ->where('id', $courseOfferingId)
             ->first();
 
-        if (!$courseOffering) {
+        if (! $courseOffering) {
             throw new \Exception('Course offering not found or access denied');
         }
 
@@ -371,21 +372,21 @@ class LecturerAttendanceService
      */
     protected function applySessionFilters($query, array $filters): void
     {
-        if (!empty($filters['course_offering_id'])) {
+        if (! empty($filters['course_offering_id'])) {
             $query->where('course_offering_id', $filters['course_offering_id']);
         }
 
-        if (!empty($filters['semester_id'])) {
+        if (! empty($filters['semester_id'])) {
             $query->whereHas('courseOffering', function ($q) use ($filters) {
                 $q->where('semester_id', $filters['semester_id']);
             });
         }
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
-        if (!empty($filters['attendance_status'])) {
+        if (! empty($filters['attendance_status'])) {
             if ($filters['attendance_status'] === 'marked') {
                 $query->where('attendance_marked', true);
             } elseif ($filters['attendance_status'] === 'unmarked') {
@@ -393,11 +394,11 @@ class LecturerAttendanceService
             }
         }
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->where('session_date', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->where('session_date', '<=', $filters['date_to']);
         }
     }

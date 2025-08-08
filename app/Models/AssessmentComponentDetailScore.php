@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -77,11 +76,11 @@ class AssessmentComponentDetailScore extends AuditableModel
     {
         $student = $this->student;
         $assessment = $this->assessmentComponentDetail;
-        
+
         if ($student && $assessment) {
             return "Assessment Score - Student: {$student->student_code} ({$student->full_name}) - Assessment: {$assessment->name}";
         }
-        
+
         return "Assessment Score ID {$this->getKey()}";
     }
 
@@ -91,7 +90,7 @@ class AssessmentComponentDetailScore extends AuditableModel
     public function getDescriptionForEvent(string $eventName): string
     {
         $identifier = $this->getIdentifierForLog();
-        
+
         return match ($eventName) {
             'created' => "Grade entry created: {$identifier}",
             'updated' => "Grade updated: {$identifier}",
@@ -238,7 +237,7 @@ class AssessmentComponentDetailScore extends AuditableModel
         $score = $this->percentage_score ?? 0;
 
         // Apply late penalty only if not excused
-        if ($this->is_late && $this->late_penalty_applied > 0 && !$this->late_excuse_approved) {
+        if ($this->is_late && $this->late_penalty_applied > 0 && ! $this->late_excuse_approved) {
             $score -= $this->late_penalty_applied;
         }
 
@@ -253,9 +252,6 @@ class AssessmentComponentDetailScore extends AuditableModel
     /**
      * Calculate late penalty based on submission time and assessment deadline.
      *
-     * @param \Carbon\Carbon $submissionTime
-     * @param \Carbon\Carbon $deadline
-     * @param array $penaltyRules
      * @return float Penalty percentage to apply
      */
     public function calculateLatePenalty(\Carbon\Carbon $submissionTime, \Carbon\Carbon $deadline, array $penaltyRules = []): float
@@ -306,10 +302,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Apply late penalty to the score.
-     *
-     * @param float $penaltyPercentage
-     * @param string $reason
-     * @return void
      */
     public function applyLatePenalty(float $penaltyPercentage, string $reason = ''): void
     {
@@ -336,9 +328,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Request late excuse for this submission.
-     *
-     * @param string $excuse
-     * @return void
      */
     public function requestLateExcuse(string $excuse): void
     {
@@ -360,10 +349,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Approve or deny late excuse.
-     *
-     * @param bool $approved
-     * @param string $reviewerNotes
-     * @return void
      */
     public function processLateExcuse(bool $approved, string $reviewerNotes = ''): void
     {
@@ -394,30 +379,24 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Check if late excuse can be requested.
-     *
-     * @return bool
      */
     public function canRequestLateExcuse(): bool
     {
         return $this->is_late &&
             empty($this->late_excuse) &&
-            !$this->late_excuse_approved;
+            ! $this->late_excuse_approved;
     }
 
     /**
      * Check if late excuse is pending approval.
-     *
-     * @return bool
      */
     public function hasLateExcusePending(): bool
     {
-        return !empty($this->late_excuse) && !$this->late_excuse_approved;
+        return ! empty($this->late_excuse) && ! $this->late_excuse_approved;
     }
 
     /**
      * Get late submission status information.
-     *
-     * @return array
      */
     public function getLateSubmissionStatus(): array
     {
@@ -425,7 +404,7 @@ class AssessmentComponentDetailScore extends AuditableModel
             'is_late' => $this->is_late,
             'minutes_late' => $this->minutes_late,
             'penalty_applied' => $this->late_penalty_applied,
-            'has_excuse' => !empty($this->late_excuse),
+            'has_excuse' => ! empty($this->late_excuse),
             'excuse_approved' => $this->late_excuse_approved,
             'excuse_text' => $this->late_excuse,
             'can_request_excuse' => $this->canRequestLateExcuse(),
@@ -435,10 +414,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Flag submission for plagiarism concerns.
-     *
-     * @param float|null $plagiarismScore
-     * @param string $notes
-     * @return void
      */
     public function flagForPlagiarism(?float $plagiarismScore = null, string $notes = ''): void
     {
@@ -467,9 +442,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Clear plagiarism flag.
-     *
-     * @param string $reason
-     * @return void
      */
     public function clearPlagiarismFlag(string $reason = ''): void
     {
@@ -497,10 +469,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Update integrity status.
-     *
-     * @param string $status
-     * @param string $notes
-     * @return void
      */
     public function updateIntegrityStatus(string $status, string $notes = ''): void
     {
@@ -511,11 +479,11 @@ class AssessmentComponentDetailScore extends AuditableModel
             'violation_dismissed',
             'pending_hearing',
             'hearing_completed',
-            'sanctions_applied'
+            'sanctions_applied',
         ];
 
-        if (!in_array($status, $validStatuses)) {
-            throw new \InvalidArgumentException('Invalid integrity status: ' . $status);
+        if (! in_array($status, $validStatuses)) {
+            throw new \InvalidArgumentException('Invalid integrity status: '.$status);
         }
 
         $previousStatus = $this->integrity_status;
@@ -542,8 +510,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Get academic integrity status information.
-     *
-     * @return array
      */
     public function getAcademicIntegrityStatus(): array
     {
@@ -556,14 +522,12 @@ class AssessmentComponentDetailScore extends AuditableModel
                 in_array($this->integrity_status, ['under_review', 'violation_confirmed', 'pending_hearing']),
             'is_under_review' => $this->integrity_status === 'under_review',
             'violation_confirmed' => $this->integrity_status === 'violation_confirmed',
-            'can_appeal' => in_array($this->integrity_status, ['violation_confirmed']) && !$this->appeal_requested,
+            'can_appeal' => in_array($this->integrity_status, ['violation_confirmed']) && ! $this->appeal_requested,
         ];
     }
 
     /**
      * Check if submission has academic integrity concerns.
-     *
-     * @return bool
      */
     public function hasIntegrityConcerns(): bool
     {
@@ -573,8 +537,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Check if integrity violation is confirmed.
-     *
-     * @return bool
      */
     public function hasConfirmedViolation(): bool
     {
@@ -583,8 +545,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Check if submission is under integrity review.
-     *
-     * @return bool
      */
     public function isUnderIntegrityReview(): bool
     {
@@ -594,8 +554,6 @@ class AssessmentComponentDetailScore extends AuditableModel
     /**
      * Request an appeal for this submission.
      *
-     * @param string $reason
-     * @return void
      * @throws \Exception
      */
     public function requestAppeal(string $reason): void
@@ -605,7 +563,7 @@ class AssessmentComponentDetailScore extends AuditableModel
         }
 
         $eligibleStatuses = ['violation_confirmed', 'sanctions_applied'];
-        if (!in_array($this->integrity_status, $eligibleStatuses)) {
+        if (! in_array($this->integrity_status, $eligibleStatuses)) {
             throw new \Exception('Appeals can only be requested for confirmed violations or applied sanctions');
         }
 
@@ -638,15 +596,13 @@ class AssessmentComponentDetailScore extends AuditableModel
     /**
      * Process appeal decision.
      *
-     * @param string $decision 'approved' or 'denied'
-     * @param string $reviewerNotes
-     * @param string $instructorFeedback
-     * @return void
+     * @param  string  $decision  'approved' or 'denied'
+     *
      * @throws \Exception
      */
     public function processAppeal(string $decision, string $reviewerNotes = '', string $instructorFeedback = ''): void
     {
-        if (!$this->appeal_requested) {
+        if (! $this->appeal_requested) {
             throw new \Exception('No appeal request found for this submission');
         }
 
@@ -655,7 +611,7 @@ class AssessmentComponentDetailScore extends AuditableModel
         }
 
         $validDecisions = ['approved', 'denied'];
-        if (!in_array($decision, $validDecisions)) {
+        if (! in_array($decision, $validDecisions)) {
             throw new \Exception('Invalid appeal decision. Must be "approved" or "denied"');
         }
 
@@ -675,7 +631,7 @@ class AssessmentComponentDetailScore extends AuditableModel
         // Update score history
         $history = $this->score_history ?? [];
         $history[] = [
-            'action' => 'appeal_' . $decision,
+            'action' => 'appeal_'.$decision,
             'decision' => $decision,
             'reviewer_notes' => $reviewerNotes,
             'instructor_feedback' => $instructorFeedback,
@@ -695,19 +651,15 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Check if appeal can be requested.
-     *
-     * @return bool
      */
     public function canRequestAppeal(): bool
     {
-        return !$this->appeal_requested &&
+        return ! $this->appeal_requested &&
             in_array($this->integrity_status, ['violation_confirmed', 'sanctions_applied']);
     }
 
     /**
      * Check if appeal is pending.
-     *
-     * @return bool
      */
     public function hasAppealPending(): bool
     {
@@ -716,8 +668,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Check if appeal was approved.
-     *
-     * @return bool
      */
     public function isAppealApproved(): bool
     {
@@ -726,8 +676,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Check if appeal was denied.
-     *
-     * @return bool
      */
     public function isAppealDenied(): bool
     {
@@ -736,8 +684,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Get appeal status information.
-     *
-     * @return array
      */
     public function getAppealStatus(): array
     {
@@ -757,10 +703,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Update instructor feedback and private notes.
-     *
-     * @param string $instructorFeedback
-     * @param string $privateNotes
-     * @return void
      */
     public function updateFeedback(string $instructorFeedback = '', string $privateNotes = ''): void
     {
@@ -793,9 +735,6 @@ class AssessmentComponentDetailScore extends AuditableModel
     /**
      * Apply bonus points to the score with reasoning.
      *
-     * @param float $bonusPoints
-     * @param string $reason
-     * @return void
      * @throws \Exception
      */
     public function applyBonusPoints(float $bonusPoints, string $reason): void
@@ -833,9 +772,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Remove bonus points from the score.
-     *
-     * @param string $reason
-     * @return void
      */
     public function removeBonusPoints(string $reason = 'Bonus points removed'): void
     {
@@ -867,8 +803,6 @@ class AssessmentComponentDetailScore extends AuditableModel
     /**
      * Exclude score from calculations with audit trail.
      *
-     * @param string $reason
-     * @return void
      * @throws \Exception
      */
     public function excludeScore(string $reason): void
@@ -904,8 +838,6 @@ class AssessmentComponentDetailScore extends AuditableModel
     /**
      * Include score back in calculations.
      *
-     * @param string $reason
-     * @return void
      * @throws \Exception
      */
     public function includeScore(string $reason): void
@@ -914,7 +846,7 @@ class AssessmentComponentDetailScore extends AuditableModel
             throw new \Exception('Inclusion reason is required');
         }
 
-        if (!$this->score_excluded) {
+        if (! $this->score_excluded) {
             throw new \Exception('Score is not currently excluded');
         }
 
@@ -943,7 +875,7 @@ class AssessmentComponentDetailScore extends AuditableModel
     /**
      * Calculate weighted score considering all adjustments.
      *
-     * @param float $componentWeight The weight of the assessment component (0-100)
+     * @param  float  $componentWeight  The weight of the assessment component (0-100)
      * @return float|null The weighted score or null if excluded
      */
     public function calculateWeightedScore(float $componentWeight): ?float
@@ -957,7 +889,7 @@ class AssessmentComponentDetailScore extends AuditableModel
         $score = $this->percentage_score ?? 0;
 
         // Apply late penalty if applicable
-        if ($this->is_late && $this->late_penalty_applied > 0 && !$this->late_excuse_approved) {
+        if ($this->is_late && $this->late_penalty_applied > 0 && ! $this->late_excuse_approved) {
             $score -= $this->late_penalty_applied;
         }
 
@@ -975,8 +907,6 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     /**
      * Get bonus points information.
-     *
-     * @return array
      */
     public function getBonusPointsInfo(): array
     {
@@ -984,35 +914,31 @@ class AssessmentComponentDetailScore extends AuditableModel
             'has_bonus' => $this->bonus_points > 0,
             'bonus_points' => $this->bonus_points ?? 0,
             'bonus_reason' => $this->bonus_reason,
-            'can_apply_bonus' => !$this->score_excluded,
+            'can_apply_bonus' => ! $this->score_excluded,
         ];
     }
 
     /**
      * Get score exclusion information.
-     *
-     * @return array
      */
     public function getExclusionInfo(): array
     {
         return [
             'is_excluded' => $this->score_excluded,
             'exclusion_reason' => $this->exclusion_reason,
-            'can_exclude' => !$this->score_excluded,
+            'can_exclude' => ! $this->score_excluded,
             'can_include' => $this->score_excluded,
         ];
     }
 
     /**
      * Get comprehensive score adjustment information.
-     *
-     * @return array
      */
     public function getScoreAdjustments(): array
     {
         return [
             'base_score' => $this->percentage_score ?? 0,
-            'late_penalty' => $this->is_late && !$this->late_excuse_approved ? $this->late_penalty_applied : 0,
+            'late_penalty' => $this->is_late && ! $this->late_excuse_approved ? $this->late_penalty_applied : 0,
             'bonus_points' => $this->bonus_points ?? 0,
             'is_excluded' => $this->score_excluded,
             'final_score' => $this->score_excluded ? null : $this->calculateFinalScore(),

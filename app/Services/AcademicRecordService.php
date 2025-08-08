@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Student;
 use App\Models\AcademicRecord;
 use App\Models\GpaCalculation;
 use App\Models\Semester;
+use App\Models\Student;
 use App\Models\Unit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class AcademicRecordService
 {
@@ -24,15 +23,15 @@ class AcademicRecordService
             ->with(['unit', 'semester'])
             ->orderBy('semester_id', 'desc');
 
-        if (!empty($filters['semester_id'])) {
+        if (! empty($filters['semester_id'])) {
             $query->where('semester_id', $filters['semester_id']);
         }
 
-        if (!empty($filters['unit_id'])) {
+        if (! empty($filters['unit_id'])) {
             $query->where('unit_id', $filters['unit_id']);
         }
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
@@ -310,7 +309,7 @@ class AcademicRecordService
     /**
      * Get grade distribution for a unit
      */
-    public function getGradeDistribution(Unit $unit, Semester $semester = null): array
+    public function getGradeDistribution(Unit $unit, ?Semester $semester = null): array
     {
         $query = AcademicRecord::where('unit_id', $unit->id)
             ->whereNotNull('final_grade');
@@ -361,7 +360,7 @@ class AcademicRecordService
     /**
      * Calculate average GPA for a unit
      */
-    private function calculateUnitAverageGPA(Unit $unit, Semester $semester = null): float
+    private function calculateUnitAverageGPA(Unit $unit, ?Semester $semester = null): float
     {
         $query = AcademicRecord::where('unit_id', $unit->id)
             ->whereNotNull('final_grade');

@@ -1,8 +1,8 @@
 <?php
 
+use App\Constants\SemesterRoutes;
 use App\Http\Controllers\Web\SemesterController;
 use App\Http\Controllers\Web\SemesterEnrollmentController;
-use App\Constants\SemesterRoutes;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {

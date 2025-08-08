@@ -31,19 +31,19 @@ class UpdateAssessmentDetailRequest extends FormRequest
                 'sometimes',
                 'required',
                 'string',
-                'max:100'
+                'max:100',
             ],
             'description' => [
                 'sometimes',
                 'nullable',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'due_date' => [
                 'sometimes',
                 'nullable',
                 'date',
-                'after:now'
+                'after:now',
             ],
             'max_points' => [
                 'sometimes',
@@ -51,7 +51,7 @@ class UpdateAssessmentDetailRequest extends FormRequest
                 'numeric',
                 'min:0.01',
                 'max:999.99',
-                'decimal:0,2'
+                'decimal:0,2',
             ],
             'weight' => [
                 'sometimes',
@@ -59,8 +59,8 @@ class UpdateAssessmentDetailRequest extends FormRequest
                 'numeric',
                 'min:0.01',
                 'max:100',
-                'decimal:0,2'
-            ]
+                'decimal:0,2',
+            ],
         ];
     }
 
@@ -80,7 +80,7 @@ class UpdateAssessmentDetailRequest extends FormRequest
             'weight.required' => 'Weight is required.',
             'weight.min' => 'Weight must be at least 0.01%.',
             'weight.max' => 'Weight cannot exceed 100%.',
-            'weight.decimal' => 'Weight must have at most 2 decimal places.'
+            'weight.decimal' => 'Weight must have at most 2 decimal places.',
         ];
     }
 
@@ -99,21 +99,21 @@ class UpdateAssessmentDetailRequest extends FormRequest
      */
     protected function validateDetailWeight($validator): void
     {
-        if (!$this->has('weight')) {
+        if (! $this->has('weight')) {
             return;
         }
 
         $assessmentDetail = $this->route('assessmentDetail') ?? $this->route('detail');
         $newWeight = (float) $this->input('weight');
 
-        if (!$assessmentDetail || !$newWeight) {
+        if (! $assessmentDetail || ! $newWeight) {
             return;
         }
 
         // Get the parent assessment component
         $assessmentComponent = $assessmentDetail->assessmentComponent;
 
-        if (!$assessmentComponent) {
+        if (! $assessmentComponent) {
             return;
         }
 

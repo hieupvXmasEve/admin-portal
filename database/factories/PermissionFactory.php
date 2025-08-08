@@ -17,9 +17,10 @@ class PermissionFactory extends Factory
     public function definition(): array
     {
         $name = $this->faker->unique()->word;
+
         return [
             'name' => ucfirst($name),
-            'code' => $name . '.access',
+            'code' => $name.'.access',
             'description' => $this->faker->sentence,
         ];
     }

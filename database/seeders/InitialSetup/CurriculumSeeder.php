@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Seeders\InitialSetup;
 
+use App\Models\CurriculumUnit;
+use App\Models\CurriculumVersion;
 use App\Models\Program;
+use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\Unit;
-use App\Models\CurriculumVersion;
-use App\Models\CurriculumUnit;
-use App\Models\Semester;
 use Illuminate\Database\Seeder;
 
 class CurriculumSeeder extends Seeder
@@ -41,17 +41,18 @@ class CurriculumSeeder extends Seeder
 
         if ($studentsCount > 0 || $enrollmentsCount > 0) {
             $this->command->warn("⚠️  Found {$studentsCount} students and {$enrollmentsCount} enrollments. Skipping curriculum cleanup to preserve foreign key relationships.");
-            $this->command->info("📝 Will update existing curriculum records instead of recreating them.");
+            $this->command->info('📝 Will update existing curriculum records instead of recreating them.');
+
             return;
         }
 
         try {
             CurriculumUnit::query()->delete();
             CurriculumVersion::query()->delete();
-            $this->command->info("🧹 Cleaned existing curriculum data successfully.");
+            $this->command->info('🧹 Cleaned existing curriculum data successfully.');
         } catch (\Exception $e) {
-            $this->command->warn("⚠️  Could not clean existing curriculum data due to foreign key constraints. Will update existing records instead.");
-            $this->command->info("Error: " . $e->getMessage());
+            $this->command->warn('⚠️  Could not clean existing curriculum data due to foreign key constraints. Will update existing records instead.');
+            $this->command->info('Error: '.$e->getMessage());
         }
     }
 
@@ -60,8 +61,9 @@ class CurriculumSeeder extends Seeder
         // Get All Programs
         $programs = Program::get();
 
-        if (!$programs) {
+        if (! $programs) {
             $this->command->error('Programs not found. Please run AcademicStructureSeeder first.');
+
             return;
         }
 
@@ -86,7 +88,7 @@ class CurriculumSeeder extends Seeder
         // Assign units to the AI curriculum
         // $this->assignUnitsToAICurriculum($curriculumVersion);
 
-        $this->command->info("📖 Created curriculum for AI specialization");
+        $this->command->info('📖 Created curriculum for AI specialization');
     }
 
     private function assignUnitsToAICurriculum(CurriculumVersion $curriculumVersion): void
@@ -96,7 +98,6 @@ class CurriculumSeeder extends Seeder
             // Semester 1 - Year 1
             ['code' => 'COS10004', 'year' => 1, 'semester' => 1, 'type' => 'core'],
             ['code' => 'COS10009', 'year' => 1, 'semester' => 1, 'type' => 'core'],
-
 
             // Semester 2 - Year 1
             ['code' => 'TNE10006', 'year' => 1, 'semester' => 2, 'type' => 'core'],
@@ -161,9 +162,10 @@ class CurriculumSeeder extends Seeder
 
         foreach ($unitData as $unitInfo) {
             $unit = Unit::where('code', $unitInfo['code'])->first();
-            if (!$unit) {
+            if (! $unit) {
                 $this->command->warn("Unit {$unitInfo['code']} not found, skipping...");
                 $skippedUnits++;
+
                 continue;
             }
 
@@ -220,17 +222,17 @@ class CurriculumSeeder extends Seeder
             $totalCredits += 12.5; // Each unit is 12.5 credit points
         }
 
-        $this->command->info("📊 Unit Distribution Validation:");
-        $this->command->info("   Core units: {$coreCount}/8 " . ($coreCount === 8 ? '✅' : '❌'));
-        $this->command->info("   Major units: {$majorCount}/8 " . ($majorCount === 8 ? '✅' : '❌'));
-        $this->command->info("   Elective units: {$electiveCount}/8 " . ($electiveCount === 8 ? '✅' : '❌'));
-        $this->command->info("   Total units: " . ($coreCount + $majorCount + $electiveCount) . "/24");
-        $this->command->info("   Total credits: {$totalCredits}/300 " . ($totalCredits == 300.0 ? '✅' : '❌'));
+        $this->command->info('📊 Unit Distribution Validation:');
+        $this->command->info("   Core units: {$coreCount}/8 ".($coreCount === 8 ? '✅' : '❌'));
+        $this->command->info("   Major units: {$majorCount}/8 ".($majorCount === 8 ? '✅' : '❌'));
+        $this->command->info("   Elective units: {$electiveCount}/8 ".($electiveCount === 8 ? '✅' : '❌'));
+        $this->command->info('   Total units: '.($coreCount + $majorCount + $electiveCount).'/24');
+        $this->command->info("   Total credits: {$totalCredits}/300 ".($totalCredits == 300.0 ? '✅' : '❌'));
 
         if ($coreCount === 8 && $majorCount === 8 && $electiveCount === 8 && $totalCredits == 300.0) {
-            $this->command->info("🎉 Curriculum structure matches cs.txt requirements perfectly!");
+            $this->command->info('🎉 Curriculum structure matches cs.txt requirements perfectly!');
         } else {
-            $this->command->warn("⚠️  Curriculum structure does not match expected requirements from cs.txt");
+            $this->command->warn('⚠️  Curriculum structure does not match expected requirements from cs.txt');
         }
     }
 }

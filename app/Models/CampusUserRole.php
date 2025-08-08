@@ -52,7 +52,7 @@ class CampusUserRole extends AuditableModel
         $userName = $this->user?->name ?? "User ID {$this->user_id}";
         $roleName = $this->role?->name ?? "Role ID {$this->role_id}";
         $campusName = $this->campus?->name ?? "Campus ID {$this->campus_id}";
-        
+
         return "{$userName} -> {$roleName} at {$campusName}";
     }
 

@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
 use App\Models\CurriculumUnit;
-use App\Models\AcademicRecord;
+use App\Models\Student;
 use Illuminate\Support\Collection;
 
 class CreditProgressService
@@ -46,12 +45,12 @@ class CreditProgressService
             ->map(function ($units, $typeId) use ($completedRecords) {
                 $requiredCredits = $units->sum('credit_hours');
                 $unitCodes = $units->pluck('unit.code')->toArray();
-                
+
                 $completedCredits = $completedRecords
                     ->whereIn('unit.code', $unitCodes)
                     ->sum('credit_hours_earned');
 
-                $completionPercentage = $requiredCredits > 0 
+                $completionPercentage = $requiredCredits > 0
                     ? round(($completedCredits / $requiredCredits) * 100, 1)
                     : 0;
 
@@ -68,7 +67,7 @@ class CreditProgressService
 
         // Calculate remaining requirements
         $remaining = $curriculumUnits->filter(function ($unit) use ($completedRecords) {
-            return !$completedRecords->contains('unit.code', $unit->unit->code);
+            return ! $completedRecords->contains('unit.code', $unit->unit->code);
         })->map(function ($unit) {
             return [
                 'unit_code' => $unit->unit->code,
@@ -84,8 +83,8 @@ class CreditProgressService
                 'total_required' => $totalRequired,
                 'total_completed' => $totalCompleted,
                 'total_remaining' => max(0, $totalRequired - $totalCompleted),
-                'completion_percentage' => $totalRequired > 0 
-                    ? round(($totalCompleted / $totalRequired) * 100, 1) 
+                'completion_percentage' => $totalRequired > 0
+                    ? round(($totalCompleted / $totalRequired) * 100, 1)
                     : 0,
             ],
             'by_category' => $progressByCategory->values(),
@@ -116,7 +115,7 @@ class CreditProgressService
                     'credits_earned' => $earnedCredits,
                     'courses_completed' => $records->where('completion_status', 'completed')->count(),
                     'courses_failed' => $records->where('completion_status', 'failed')->count(),
-                    'success_rate' => $records->count() > 0 
+                    'success_rate' => $records->count() > 0
                         ? round(($records->where('completion_status', 'completed')->count() / $records->count()) * 100, 1)
                         : 0,
                 ];
@@ -151,8 +150,8 @@ class CreditProgressService
         $readinessScore = min(100, $overall['completion_percentage']);
 
         $blockers = [];
-        
-        if (!$overallComplete) {
+
+        if (! $overallComplete) {
             $blockers[] = "Need {$overall['total_remaining']} more credits";
         }
 
@@ -192,7 +191,7 @@ class CreditProgressService
     {
         // Assume average of 15 credits per semester
         $averageCreditsPerSemester = 15;
-        
+
         if ($remainingCredits <= 0) {
             return 0;
         }
@@ -211,7 +210,7 @@ class CreditProgressService
             ->groupBy('curriculum_unit_type_id')
             ->map(function ($units, $typeId) {
                 $type = $units->first()->curriculumUnitType;
-                
+
                 return [
                     'type_id' => $typeId,
                     'type_name' => $type->name,

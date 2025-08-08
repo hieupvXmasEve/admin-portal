@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
-use Carbon\Carbon;
 
 class CourseOffering extends AuditableModel
 {
@@ -239,7 +239,7 @@ class CourseOffering extends AuditableModel
     {
         return $this->is_active
             && $this->enrollment_status === 'open'
-            && !$this->isFull()
+            && ! $this->isFull()
             && $this->isRegistrationOpen();
     }
 
@@ -248,7 +248,7 @@ class CourseOffering extends AuditableModel
         return $this->is_active
             && in_array($this->enrollment_status, ['open', 'waitlist_only'])
             && $this->isFull()
-            && !$this->isWaitlistFull()
+            && ! $this->isWaitlistFull()
             && $this->isRegistrationOpen();
     }
 
@@ -256,15 +256,15 @@ class CourseOffering extends AuditableModel
     {
         $now = Carbon::now()->toDateString();
 
-        $startOk = !$this->registration_start_date || $this->registration_start_date <= $now;
-        $endOk = !$this->registration_end_date || $this->registration_end_date >= $now;
+        $startOk = ! $this->registration_start_date || $this->registration_start_date <= $now;
+        $endOk = ! $this->registration_end_date || $this->registration_end_date >= $now;
 
         return $startOk && $endOk;
     }
 
     public function getEnrollmentStatusText(): string
     {
-        if (!$this->isRegistrationOpen()) {
+        if (! $this->isRegistrationOpen()) {
             return 'Registration Closed';
         }
 
@@ -360,7 +360,7 @@ class CourseOffering extends AuditableModel
     // Helper methods for instructor assignment
     public function hasInstructor(): bool
     {
-        return !is_null($this->lecture_id);
+        return ! is_null($this->lecture_id);
     }
 
     public function needsInstructorBeforeClasses(): bool
@@ -370,7 +370,7 @@ class CourseOffering extends AuditableModel
         }
 
         // Check if semester has started
-        if (!$this->semester) {
+        if (! $this->semester) {
             return true; // Default to needing instructor if no semester info
         }
 
@@ -441,7 +441,7 @@ class CourseOffering extends AuditableModel
         $creditHours = $this->getCreditHoursAttribute();
         $tuitionPerCredit = $this->getTuitionPerCreditAttribute();
         $additionalFees = $this->getAdditionalFeesAttribute();
-        
+
         return ($creditHours * $tuitionPerCredit) + $additionalFees;
     }
 
@@ -452,7 +452,7 @@ class CourseOffering extends AuditableModel
             'semester:id,name,code,start_date,end_date',
             'curriculumUnit.unit:id,code,name,credit_points',
             'lecture:id,employee_id,first_name,last_name,title,department,faculty,campus_id',
-            'lecture.campus:id,name,code'
+            'lecture.campus:id,name,code',
         ]);
     }
 
@@ -511,7 +511,7 @@ class CourseOffering extends AuditableModel
     public function canBeAssignedTo(Lecture $lecturer): bool
     {
         // Check if lecturer is available for assignment
-        if (!$lecturer->isAvailableForAssignment()) {
+        if (! $lecturer->isAvailableForAssignment()) {
             return false;
         }
 
@@ -553,7 +553,7 @@ class CourseOffering extends AuditableModel
             'semester_id', 'curriculum_unit_id', 'lecture_id', 'campus_id',
             'section_code', 'max_capacity', 'current_enrollment',
             'delivery_mode', 'schedule_days', 'schedule_time_start', 'schedule_time_end',
-            'location', 'is_active', 'enrollment_status'
+            'location', 'is_active', 'enrollment_status',
         ];
     }
 
@@ -565,7 +565,7 @@ class CourseOffering extends AuditableModel
         $courseCode = $this->curriculumUnit?->unit?->code ?? 'Unknown Course';
         $section = $this->section_code ? " Section {$this->section_code}" : '';
         $semester = $this->semester?->code ?? '';
-        
+
         return "{$courseCode}{$section} ({$semester})";
     }
 
@@ -596,7 +596,7 @@ class CourseOffering extends AuditableModel
             'max_capacity' => $this->max_capacity,
             'current_enrollment' => $this->current_enrollment,
             'enrollment_status' => $this->enrollment_status,
-            'instructor_assigned' => !is_null($this->lecture_id),
+            'instructor_assigned' => ! is_null($this->lecture_id),
         ];
     }
 }

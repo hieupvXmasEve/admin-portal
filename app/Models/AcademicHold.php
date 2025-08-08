@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 
 class AcademicHold extends AuditableModel
 {
@@ -118,7 +118,7 @@ class AcademicHold extends AuditableModel
         return $this->isActive() && in_array($this->hold_category, ['transcript', 'all']);
     }
 
-    public function resolve(int $resolvedByUserId, string $notes = null): bool
+    public function resolve(int $resolvedByUserId, ?string $notes = null): bool
     {
         return $this->update([
             'status' => 'resolved',
@@ -128,7 +128,7 @@ class AcademicHold extends AuditableModel
         ]);
     }
 
-    public function waive(int $resolvedByUserId, string $notes = null): bool
+    public function waive(int $resolvedByUserId, ?string $notes = null): bool
     {
         return $this->update([
             'status' => 'waived',

@@ -14,14 +14,14 @@ class CampusLogContext
     public static function getCampusContext(?int $campusId = null): array
     {
         $campusId = $campusId ?? static::getCurrentCampusId();
-        
-        if (!$campusId) {
+
+        if (! $campusId) {
             return static::getSystemContext();
         }
 
         $campus = static::getCampusData($campusId);
-        
-        if (!$campus) {
+
+        if (! $campus) {
             return static::getUnknownCampusContext($campusId);
         }
 
@@ -146,6 +146,7 @@ class CampusLogContext
                     ->select('code', 'name')
                     ->first();
             }
+
             return null;
         });
 
@@ -156,12 +157,12 @@ class CampusLogContext
         // Fallback to calendar year calculation
         $year = Carbon::now()->year;
         $month = Carbon::now()->month;
-        
+
         // Academic year typically starts in August/September
         if ($month >= 8) {
-            return "{$year}-" . ($year + 1);
+            return "{$year}-".($year + 1);
         } else {
-            return ($year - 1) . "-{$year}";
+            return ($year - 1)."-{$year}";
         }
     }
 
@@ -170,7 +171,7 @@ class CampusLogContext
      */
     public static function isSystemAdmin(): bool
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return false;
         }
 
@@ -187,7 +188,7 @@ class CampusLogContext
      */
     public static function getAccessibleCampusIds(): array
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return [];
         }
 
@@ -203,6 +204,7 @@ class CampusLogContext
 
         // Fallback to current campus
         $currentCampus = static::getCurrentCampusId();
+
         return $currentCampus ? [$currentCampus] : [];
     }
 
@@ -212,7 +214,7 @@ class CampusLogContext
     public static function enhanceLogProperties(array $existingProperties = [], ?int $targetCampusId = null): array
     {
         $campusContext = static::getCampusContext($targetCampusId);
-        
+
         // Add user context
         $userContext = [];
         if (auth()->check()) {

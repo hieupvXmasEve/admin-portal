@@ -2,22 +2,22 @@
 
 namespace Tests\Unit\Services\AcademicLifecycleSeeder;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Services\AcademicLifecycleSeeder\Processors\GroupAssignmentProcessor;
-use App\Services\AcademicLifecycleSeeder\SeederConfiguration;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Student;
-use App\Models\Semester;
 use App\Models\CurriculumUnit;
-use App\Models\Unit;
 use App\Models\CurriculumVersion;
 use App\Models\Lecture;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\Unit;
+use App\Services\AcademicLifecycleSeeder\Processors\GroupAssignmentProcessor;
+use App\Services\AcademicLifecycleSeeder\SeederConfiguration;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 /**
  * Test the critical round-robin distribution algorithm
- * 
+ *
  * This tests the core requirement that students are distributed evenly
  * across course sections with maximum 1 student difference between sections.
  */
@@ -26,13 +26,14 @@ class GroupAssignmentProcessorTest extends TestCase
     use RefreshDatabase;
 
     private GroupAssignmentProcessor $processor;
+
     private SeederConfiguration $configuration;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
-        $this->processor = new GroupAssignmentProcessor();
+
+        $this->processor = new GroupAssignmentProcessor;
         $this->configuration = new SeederConfiguration([
             'maxStudentsPerSection' => 55,
         ]);
@@ -71,7 +72,7 @@ class GroupAssignmentProcessorTest extends TestCase
         // With 100 students split into 2 sections: 50 each
         $this->assertEquals(50, $originalCount, 'Original section should have 50 students');
         $this->assertEquals(50, $newSectionCount, 'New section should have 50 students');
-        
+
         // Verify maximum difference is 0 (perfect distribution)
         $difference = abs($originalCount - $newSectionCount);
         $this->assertLessThanOrEqual(1, $difference, 'Difference between sections should be at most 1');
@@ -92,7 +93,7 @@ class GroupAssignmentProcessorTest extends TestCase
 
         // With 101 students: one section gets 51, other gets 50
         $this->assertTrue(
-            ($originalCount === 51 && $newSectionCount === 50) || 
+            ($originalCount === 51 && $newSectionCount === 50) ||
             ($originalCount === 50 && $newSectionCount === 51),
             'Sections should have 50 and 51 students respectively'
         );
@@ -116,11 +117,11 @@ class GroupAssignmentProcessorTest extends TestCase
 
         // Get all sections
         $allSections = collect([$courseOffering])->merge($result['sections']);
-        
+
         // Verify each section has exactly 50 students
         foreach ($allSections as $section) {
             $count = CourseRegistration::where('course_offering_id', $section->id)->count();
-            $this->assertEquals(50, $count, "Each section should have exactly 50 students");
+            $this->assertEquals(50, $count, 'Each section should have exactly 50 students');
         }
     }
 
@@ -191,11 +192,11 @@ class GroupAssignmentProcessorTest extends TestCase
 
         // Assert
         $this->assertCount(1, $result['sections'], 'Should create 1 additional section');
-        
+
         // Verify distribution: 28 and 28
         $originalCount = CourseRegistration::where('course_offering_id', $courseOffering->id)->count();
         $newSectionCount = CourseRegistration::where('course_offering_id', $result['sections']->first()->id)->count();
-        
+
         $this->assertEquals(28, $originalCount, 'Each section should have 28 students');
         $this->assertEquals(28, $newSectionCount, 'Each section should have 28 students');
     }

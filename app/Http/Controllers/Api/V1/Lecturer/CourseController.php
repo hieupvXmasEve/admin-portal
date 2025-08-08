@@ -7,14 +7,13 @@ namespace App\Http\Controllers\Api\V1\Lecturer;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\CourseFilterRequest;
 use App\Http\Requests\Api\V1\Lecturer\StudentFilterRequest;
-use App\Http\Resources\Api\V1\Lecturer\CourseOfferingResource;
 use App\Http\Resources\Api\V1\Lecturer\CourseDetailResource;
+use App\Http\Resources\Api\V1\Lecturer\CourseOfferingResource;
 use App\Http\Resources\Api\V1\Lecturer\CourseStudentResource;
 use App\Http\Responses\ApiResponse;
 use App\Services\V1\Lecturer\LecturerCourseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class CourseController extends Controller
 {
@@ -38,7 +37,7 @@ class CourseController extends Controller
             $courseOfferings = $this->courseService->getCourseOfferings($lecturer, $filters, $perPage);
 
             return ApiResponse::paginated(
-                $courseOfferings->through(fn($offering) => new CourseOfferingResource($offering)),
+                $courseOfferings->through(fn ($offering) => new CourseOfferingResource($offering)),
                 'Course offerings retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -57,7 +56,7 @@ class CourseController extends Controller
         try {
             $courseDetails = $this->courseService->getCourseOfferingDetails($lecturer, $courseOfferingId);
 
-            if (!$courseDetails) {
+            if (! $courseDetails) {
                 return ApiResponse::success([]);
             }
 
@@ -109,6 +108,7 @@ class CourseController extends Controller
             if ($e->getMessage() === 'Course offering not found or access denied') {
                 return ApiResponse::notFound($e->getMessage());
             }
+
             return ApiResponse::serverError('Failed to retrieve course statistics');
         }
     }
@@ -124,6 +124,7 @@ class CourseController extends Controller
         try {
             $filters = $request->validated();
             $students = $this->courseService->getCourseStudents($lecturer, $courseOfferingId, $filters);
+
             return ApiResponse::success(
                 CourseStudentResource::collection($students),
                 'Course students retrieved successfully'
@@ -132,6 +133,7 @@ class CourseController extends Controller
             if ($e->getMessage() === 'Course offering not found or access denied') {
                 return ApiResponse::notFound($e->getMessage());
             }
+
             return ApiResponse::serverError('Failed to retrieve course students');
         }
     }
@@ -150,13 +152,13 @@ class CourseController extends Controller
                 ->with([
                     'classSessions' => function ($q) {
                         $q->orderBy('session_date', 'asc');
-                    }
+                    },
                 ])
                 ->where('id', $courseOfferingId)
                 ->where('is_active', true)
                 ->first();
 
-            if (!$courseOffering) {
+            if (! $courseOffering) {
                 return ApiResponse::success([]);
             }
 
@@ -233,7 +235,7 @@ class CourseController extends Controller
                     ? round($courseOfferings->avg('current_enrollment'), 1)
                     : 0,
                 'delivery_mode_breakdown' => $courseOfferings->groupBy('delivery_mode')
-                    ->map(fn($group) => $group->count()),
+                    ->map(fn ($group) => $group->count()),
                 'capacity_utilization' => $courseOfferings->sum('max_capacity') > 0
                     ? round(($courseOfferings->sum('current_enrollment') / $courseOfferings->sum('max_capacity')) * 100, 1)
                     : 0,

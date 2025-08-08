@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Student;
-use App\Models\CourseRegistration;
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
+use App\Models\Student;
 use App\Models\Unit;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class CourseRetakeService
 {
@@ -63,7 +63,7 @@ class CourseRetakeService
      */
     private function validateRetakeEligibility(Student $student, CourseOffering $offering): void
     {
-        if (!$student->canRetakeCourse()) {
+        if (! $student->canRetakeCourse()) {
             throw new Exception('Student is not eligible for course retakes');
         }
 

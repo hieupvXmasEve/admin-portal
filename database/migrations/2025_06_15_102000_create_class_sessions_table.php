@@ -38,14 +38,14 @@ return new class extends Migration
                 'field_trip',
                 'guest_lecture',
                 'review',
-                'other'
+                'other',
             ])->default('lecture');
 
             $table->enum('delivery_mode', [
                 'in_person',
                 'online',
                 'hybrid',
-                'blended'
+                'blended',
             ])->default('in_person');
 
             $table->enum('status', [
@@ -54,7 +54,7 @@ return new class extends Migration
                 'completed',
                 'cancelled',
                 'postponed',
-                'moved'
+                'moved',
             ])->default('scheduled');
 
             // Online session details

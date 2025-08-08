@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
-use App\Models\Semester;
 use App\Models\Attendance;
-use App\Models\ClassSession;
 use App\Models\CourseOffering;
+use App\Models\Semester;
+use App\Models\Student;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class AttendanceService
 {
@@ -23,11 +21,11 @@ class AttendanceService
     {
         $semester = $this->resolveSemester($semesterId);
 
-        if (!$semester) {
+        if (! $semester) {
             return $this->getEmptyAttendanceSummary();
         }
 
-        $cacheKey = "attendance:summary:student:{$student->id}:semester:{$semester->id}:" . md5(serialize($filters));
+        $cacheKey = "attendance:summary:student:{$student->id}:semester:{$semester->id}:".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($student, $semester, $filters) {
             $attendanceRecords = $this->getAttendanceRecords($student, $semester, $filters);
@@ -61,7 +59,7 @@ class AttendanceService
             ->where('registration_status', 'registered')
             ->exists();
 
-        if (!$isEnrolled) {
+        if (! $isEnrolled) {
             throw new \Exception('Student is not enrolled in this course');
         }
 
@@ -93,7 +91,7 @@ class AttendanceService
     {
         $semester = $this->resolveSemester($semesterId);
 
-        if (!$semester) {
+        if (! $semester) {
             return [];
         }
 
@@ -130,25 +128,25 @@ class AttendanceService
      */
     protected function applyAttendanceFilters($query, array $filters): void
     {
-        if (!empty($filters['course_code'])) {
+        if (! empty($filters['course_code'])) {
             $query->whereHas('courseOffering.curriculumUnit.unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%' . $filters['course_code'] . '%');
+                $q->where('code', 'like', '%'.$filters['course_code'].'%');
             });
         }
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->where('session_date', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->where('session_date', '<=', $filters['date_to']);
         }
 
-        if (!empty($filters['day_of_week'])) {
+        if (! empty($filters['day_of_week'])) {
             $query->whereHas('classSession', function ($q) use ($filters) {
                 $q->where('day_of_week', $filters['day_of_week']);
             });
@@ -274,7 +272,7 @@ class AttendanceService
                 'course_name' => $record->courseOffering->curriculumUnit->unit->name,
                 'session_date' => $record->session_date->toDateString(),
                 'session_time' => $record->classSession ?
-                    $record->classSession->start_time . ' - ' . $record->classSession->end_time : null,
+                    $record->classSession->start_time.' - '.$record->classSession->end_time : null,
                 'status' => $record->status,
                 'status_display' => $this->getStatusDisplay($record->status),
                 'marked_at' => $record->marked_at?->toDateTimeString(),
@@ -553,7 +551,7 @@ class AttendanceService
         $start = Carbon::createFromTimeString($startTime);
         $end = Carbon::createFromTimeString($endTime);
 
-        return $start->format('g:i A') . ' - ' . $end->format('g:i A');
+        return $start->format('g:i A').' - '.$end->format('g:i A');
     }
 
     /**
@@ -655,7 +653,7 @@ class AttendanceService
     protected function calculateStandardDeviation(Collection $values): float
     {
         $mean = $values->avg();
-        $variance = $values->map(fn($value) => pow($value - $mean, 2))->avg();
+        $variance = $values->map(fn ($value) => pow($value - $mean, 2))->avg();
 
         return sqrt($variance);
     }
@@ -706,7 +704,7 @@ class AttendanceService
     protected function getPerfectAttendanceCourses(Collection $records): array
     {
         return $records->groupBy('course_offering_id')->filter(function ($courseRecords) {
-            return $courseRecords->every(fn($record) => in_array($record->status, ['present', 'late']));
+            return $courseRecords->every(fn ($record) => in_array($record->status, ['present', 'late']));
         })->map(function ($courseRecords) {
             $courseOffering = $courseRecords->first()->courseOffering;
 

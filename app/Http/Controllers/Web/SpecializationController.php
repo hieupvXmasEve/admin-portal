@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Constants\ProgramRoutes;
+use App\Constants\SpecializationRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSpecializationRequest;
 use App\Http\Requests\UpdateSpecializationRequest;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Specialization;
-use App\Models\CurriculumVersion;
 use App\Services\SpecializationService;
-use App\Constants\SpecializationRoutes;
-use App\Constants\ProgramRoutes;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -39,7 +38,7 @@ class SpecializationController extends Controller
             ->withCount('curriculumVersions');
 
         // Search functionality
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $searchTerm = $validated['search'];
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'like', "%{$searchTerm}%")
@@ -51,7 +50,7 @@ class SpecializationController extends Controller
         }
 
         // Filter by program
-        if (!empty($validated['program_id'])) {
+        if (! empty($validated['program_id'])) {
             $query->where('program_id', $validated['program_id']);
         }
 
@@ -78,7 +77,7 @@ class SpecializationController extends Controller
             'by_program' => Specialization::with('program:id,name')
                 ->get()
                 ->groupBy('program.name')
-                ->map(fn($group) => $group->count())
+                ->map(fn ($group) => $group->count())
                 ->toArray(),
         ];
 
@@ -134,7 +133,7 @@ class SpecializationController extends Controller
             }
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Specialization creation failed: ' . $e->getMessage());
+            Log::error('Specialization creation failed: '.$e->getMessage());
 
             return back()
                 ->withInput()
@@ -150,7 +149,7 @@ class SpecializationController extends Controller
                 $query->with('effectiveFromSemester:id,name,code')
                     ->withCount('curriculumUnits')
                     ->orderBy('created_at', 'desc');
-            }
+            },
         ]);
 
         // Statistics for this specialization
@@ -210,7 +209,7 @@ class SpecializationController extends Controller
             }
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Specialization update failed: ' . $e->getMessage());
+            Log::error('Specialization update failed: '.$e->getMessage());
 
             return back()
                 ->withInput()
@@ -233,7 +232,7 @@ class SpecializationController extends Controller
                 ->with('success', "Specialization '{$specializationName}' deleted successfully.");
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Specialization deletion failed: ' . $e->getMessage());
+            Log::error('Specialization deletion failed: '.$e->getMessage());
 
             return back()->withErrors(['error' => $e->getMessage()]);
         }
@@ -251,15 +250,15 @@ class SpecializationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Specialization '{$specializationName}' deleted successfully."
+                'message' => "Specialization '{$specializationName}' deleted successfully.",
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Specialization API deletion failed: ' . $e->getMessage());
+            Log::error('Specialization API deletion failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -282,14 +281,14 @@ class SpecializationController extends Controller
                 'success' => true,
                 'deleted' => $result['deleted'],
                 'failed' => $result['failed'],
-                'message' => count($result['deleted']) . ' specializations deleted successfully.'
+                'message' => count($result['deleted']).' specializations deleted successfully.',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk delete failed: ' . $e->getMessage()
+                'message' => 'Bulk delete failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -304,7 +303,7 @@ class SpecializationController extends Controller
             if ($specializationId && $curriculumVersion->specialization_id != $specializationId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Curriculum version does not belong to this specialization.'
+                    'message' => 'Curriculum version does not belong to this specialization.',
                 ], 403);
             }
 
@@ -317,15 +316,15 @@ class SpecializationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Curriculum version '{$versionCode}' deleted successfully."
+                'message' => "Curriculum version '{$versionCode}' deleted successfully.",
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Curriculum version deletion failed: ' . $e->getMessage());
+            Log::error('Curriculum version deletion failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete curriculum version. Please try again.'
+                'message' => 'Failed to delete curriculum version. Please try again.',
             ], 500);
         }
     }
@@ -346,7 +345,7 @@ class SpecializationController extends Controller
             if ($specializationId && $curriculumVersion->specialization_id != $specializationId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Curriculum version does not belong to this specialization.'
+                    'message' => 'Curriculum version does not belong to this specialization.',
                 ], 403);
             }
 
@@ -363,15 +362,15 @@ class SpecializationController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Curriculum version updated successfully.',
-                'data' => $curriculumVersion->fresh()
+                'data' => $curriculumVersion->fresh(),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Curriculum version update failed: ' . $e->getMessage());
+            Log::error('Curriculum version update failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update curriculum version. Please try again.'
+                'message' => 'Failed to update curriculum version. Please try again.',
             ], 500);
         }
     }

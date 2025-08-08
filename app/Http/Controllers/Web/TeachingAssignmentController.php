@@ -8,10 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignLecturerRequest;
 use App\Http\Requests\ConflictCheckRequest;
 use App\Http\Requests\ExportTeachingAssignmentsRequest;
-use App\Http\Resources\TeachingAssignmentResource;
 use App\Http\Resources\AvailableLecturerResource;
+use App\Http\Resources\TeachingAssignmentResource;
 use App\Services\TeachingAssignmentService;
-use App\Constants\TeachingAssignmentRoutes;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -45,7 +44,7 @@ class TeachingAssignmentController extends Controller
                     'department',
                     'assignment_status',
                     'search',
-                    'per_page'
+                    'per_page',
                 ]);
 
                 $assignments = $this->teachingAssignmentService->getAssignments($filters);
@@ -57,17 +56,17 @@ class TeachingAssignmentController extends Controller
                         'last_page' => $assignments->lastPage(),
                         'per_page' => $assignments->perPage(),
                         'total' => $assignments->total(),
-                    ]
+                    ],
                 ]);
             } catch (\Exception $e) {
                 Log::error('Failed to fetch teaching assignments', [
                     'error' => $e->getMessage(),
-                    'filters' => $request->all()
+                    'filters' => $request->all(),
                 ]);
 
                 return response()->json([
                     'message' => 'Failed to fetch teaching assignments',
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ], 500);
             }
         }
@@ -92,23 +91,23 @@ class TeachingAssignmentController extends Controller
             if ($success) {
                 return response()->json([
                     'message' => 'Lecturer assigned successfully',
-                    'success' => true
+                    'success' => true,
                 ]);
             }
 
             return response()->json([
                 'message' => 'Failed to assign lecturer',
-                'success' => false
+                'success' => false,
             ], 422);
         } catch (\Exception $e) {
             Log::error('Failed to assign lecturer', [
                 'error' => $e->getMessage(),
-                'request_data' => $request->validated()
+                'request_data' => $request->validated(),
             ]);
 
             return response()->json([
                 'message' => $e->getMessage(),
-                'success' => false
+                'success' => false,
             ], 422);
         }
     }
@@ -124,23 +123,23 @@ class TeachingAssignmentController extends Controller
             if ($success) {
                 return response()->json([
                     'message' => 'Lecturer unassigned successfully',
-                    'success' => true
+                    'success' => true,
                 ]);
             }
 
             return response()->json([
                 'message' => 'Failed to unassign lecturer',
-                'success' => false
+                'success' => false,
             ], 422);
         } catch (\Exception $e) {
             Log::error('Failed to unassign lecturer', [
                 'error' => $e->getMessage(),
-                'course_offering_id' => $courseOfferingId
+                'course_offering_id' => $courseOfferingId,
             ]);
 
             return response()->json([
                 'message' => $e->getMessage(),
-                'success' => false
+                'success' => false,
             ], 422);
         }
     }
@@ -156,19 +155,19 @@ class TeachingAssignmentController extends Controller
 
             return response()->json([
                 'data' => AvailableLecturerResource::collection($lecturers),
-                'success' => true
+                'success' => true,
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to fetch available lecturers', [
                 'error' => $e->getMessage(),
                 'course_offering_id' => $courseOfferingId,
-                'filters' => $request->all()
+                'filters' => $request->all(),
             ]);
 
             return response()->json([
                 'message' => 'Failed to fetch available lecturers',
                 'error' => $e->getMessage(),
-                'success' => false
+                'success' => false,
             ], 500);
         }
     }
@@ -186,19 +185,19 @@ class TeachingAssignmentController extends Controller
 
             return response()->json([
                 'conflicts' => $conflicts,
-                'has_conflicts' => !empty($conflicts),
-                'success' => true
+                'has_conflicts' => ! empty($conflicts),
+                'success' => true,
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to check conflicts', [
                 'error' => $e->getMessage(),
-                'request_data' => $request->validated()
+                'request_data' => $request->validated(),
             ]);
 
             return response()->json([
                 'message' => 'Failed to check conflicts',
                 'error' => $e->getMessage(),
-                'success' => false
+                'success' => false,
             ], 500);
         }
     }
@@ -214,17 +213,17 @@ class TeachingAssignmentController extends Controller
 
             $filePath = $this->teachingAssignmentService->exportAssignments($filters, $format);
 
-            $fileName = 'teaching-assignments-' . now()->format('Y-m-d-H-i-s') . '.' . $format;
+            $fileName = 'teaching-assignments-'.now()->format('Y-m-d-H-i-s').'.'.$format;
 
             return response()->download($filePath, $fileName)->deleteFileAfterSend();
         } catch (\Exception $e) {
             Log::error('Failed to export teaching assignments', [
                 'error' => $e->getMessage(),
-                'request_data' => $request->validated()
+                'request_data' => $request->validated(),
             ]);
 
             return response([
-                'message' => 'Failed to export teaching assignments: ' . $e->getMessage()
+                'message' => 'Failed to export teaching assignments: '.$e->getMessage(),
             ], 500);
         }
     }

@@ -110,7 +110,7 @@ class CourseOfferingResource extends JsonResource
      */
     protected function hasSessionsNeedingAttendance(): bool
     {
-        if (!$this->relationLoaded('classSessions')) {
+        if (! $this->relationLoaded('classSessions')) {
             return false;
         }
 
@@ -126,7 +126,7 @@ class CourseOfferingResource extends JsonResource
      */
     protected function hasUpcomingSessions(): bool
     {
-        if (!$this->relationLoaded('classSessions')) {
+        if (! $this->relationLoaded('classSessions')) {
             return false;
         }
 

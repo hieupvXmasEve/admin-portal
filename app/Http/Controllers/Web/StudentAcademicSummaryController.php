@@ -33,7 +33,7 @@ class StudentAcademicSummaryController extends Controller
     /**
      * Display the academic summary for a specific student
      *
-     * @param Student $student The student to display summary for
+     * @param  Student  $student  The student to display summary for
      * @return Response Inertia response with academic summary data
      */
     public function show(Student $student): Response
@@ -60,8 +60,8 @@ class StudentAcademicSummaryController extends Controller
     /**
      * Filter academic data by semester
      *
-     * @param Student $student The student to filter data for
-     * @param Request $request Request containing semester filter
+     * @param  Student  $student  The student to filter data for
+     * @param  Request  $request  Request containing semester filter
      * @return JsonResponse Filtered academic data
      */
     public function filterBySemester(Student $student, Request $request): JsonResponse
@@ -86,8 +86,8 @@ class StudentAcademicSummaryController extends Controller
     /**
      * Filter academic data by course offering
      *
-     * @param Student $student The student to filter data for
-     * @param Request $request Request containing course offering filter
+     * @param  Student  $student  The student to filter data for
+     * @param  Request  $request  Request containing course offering filter
      * @return JsonResponse Filtered academic data
      */
     public function filterByCourseOffering(Student $student, Request $request): JsonResponse
@@ -112,8 +112,8 @@ class StudentAcademicSummaryController extends Controller
     /**
      * Get attendance details for a specific unit
      *
-     * @param Student $student The student to get attendance for
-     * @param Request $request Request containing unit filter
+     * @param  Student  $student  The student to get attendance for
+     * @param  Request  $request  Request containing unit filter
      * @return JsonResponse Detailed attendance data
      */
     public function getAttendanceDetails(Student $student, Request $request): JsonResponse
@@ -140,8 +140,8 @@ class StudentAcademicSummaryController extends Controller
     /**
      * Get detailed scores for a specific course offering
      *
-     * @param Student $student The student to get scores for
-     * @param Request $request Request containing course offering filter
+     * @param  Student  $student  The student to get scores for
+     * @param  Request  $request  Request containing course offering filter
      * @return JsonResponse Detailed score breakdown
      */
     public function getScoreDetails(Student $student, Request $request): JsonResponse
@@ -166,9 +166,9 @@ class StudentAcademicSummaryController extends Controller
     /**
      * Get paginated scores for a specific course offering (for lazy loading)
      *
-     * @param Student $student The student to get scores for
-     * @param int $courseOfferingId The course offering ID
-     * @param Request $request Request containing pagination parameters
+     * @param  Student  $student  The student to get scores for
+     * @param  int  $courseOfferingId  The course offering ID
+     * @param  Request  $request  Request containing pagination parameters
      * @return JsonResponse Paginated scores data
      */
     public function getCourseScores(Student $student, int $courseOfferingId, Request $request): JsonResponse

@@ -19,14 +19,16 @@ class RoomServiceTest extends TestCase
     use RefreshDatabase;
 
     protected RoomService $service;
+
     protected Campus $campus;
+
     protected Room $room;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->service = new RoomService();
+        $this->service = new RoomService;
         $this->campus = Campus::factory()->create([
             'name' => 'Test Campus',
             'code' => 'TC',
@@ -62,7 +64,7 @@ class RoomServiceTest extends TestCase
         expect($result)->toBeInstanceOf(LengthAwarePaginator::class);
         expect($result->total())->toBe(2); // Only rooms from current campus
         expect($result->items())->toHaveCount(2);
-        
+
         foreach ($result->items() as $room) {
             expect($room->campus_id)->toBe($this->campus->id);
         }
@@ -203,7 +205,7 @@ class RoomServiceTest extends TestCase
 
         expect($result)->toBeInstanceOf(Collection::class);
         expect($result)->toHaveCount(2); // Only rooms from current campus
-        
+
         foreach ($result as $room) {
             expect($room->campus_id)->toBe($this->campus->id);
         }
@@ -365,7 +367,7 @@ class RoomServiceTest extends TestCase
 
         expect($result)->toBeInstanceOf(Collection::class);
         expect($result)->toHaveCount(2);
-        
+
         foreach ($result as $room) {
             expect($room->type)->toBe(Room::TYPE_LABORATORY);
             expect($room->campus_id)->toBe($this->campus->id);

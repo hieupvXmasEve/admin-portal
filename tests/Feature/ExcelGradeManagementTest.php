@@ -20,28 +20,31 @@ class ExcelGradeManagementTest extends TestCase
     use RefreshDatabase;
 
     protected Lecture $lecturer;
+
     protected CourseOffering $courseOffering;
+
     protected AssessmentComponentDetail $assessmentComponentDetail;
+
     protected Student $student;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Create test data
         $this->lecturer = Lecture::factory()->create();
         $this->courseOffering = CourseOffering::factory()->create([
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
-        
+
         $assessmentComponent = AssessmentComponent::factory()->create();
         $this->assessmentComponentDetail = AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $assessmentComponent->id,
-            'max_points' => 100
+            'max_points' => 100,
         ]);
-        
+
         $this->student = Student::factory()->create();
-        
+
         // Set up storage for testing
         Storage::fake('local');
     }
@@ -53,7 +56,7 @@ class ExcelGradeManagementTest extends TestCase
 
         $response = $this->get(route('api.v1.lecturer.assessments.export-grade-template', [
             'courseOffering' => $this->courseOffering->id,
-            'assessmentComponentDetail' => $this->assessmentComponentDetail->id
+            'assessmentComponentDetail' => $this->assessmentComponentDetail->id,
         ]));
 
         $response->assertStatus(200);
@@ -70,9 +73,9 @@ class ExcelGradeManagementTest extends TestCase
 
         $response = $this->post(route('api.v1.lecturer.assessments.import-grades', [
             'courseOffering' => $this->courseOffering->id,
-            'assessmentComponentDetail' => $this->assessmentComponentDetail->id
+            'assessmentComponentDetail' => $this->assessmentComponentDetail->id,
         ]), [
-            'file' => $invalidFile
+            'file' => $invalidFile,
         ]);
 
         $response->assertStatus(422);
@@ -89,9 +92,9 @@ class ExcelGradeManagementTest extends TestCase
 
         $response = $this->post(route('api.v1.lecturer.assessments.import-grades', [
             'courseOffering' => $this->courseOffering->id,
-            'assessmentComponentDetail' => $this->assessmentComponentDetail->id
+            'assessmentComponentDetail' => $this->assessmentComponentDetail->id,
         ]), [
-            'file' => $largeFile
+            'file' => $largeFile,
         ]);
 
         $response->assertStatus(422);
@@ -103,7 +106,7 @@ class ExcelGradeManagementTest extends TestCase
     {
         $response = $this->get(route('api.v1.lecturer.assessments.export-grade-template', [
             'courseOffering' => $this->courseOffering->id,
-            'assessmentComponentDetail' => $this->assessmentComponentDetail->id
+            'assessmentComponentDetail' => $this->assessmentComponentDetail->id,
         ]));
 
         $response->assertStatus(401);
@@ -117,21 +120,21 @@ class ExcelGradeManagementTest extends TestCase
 
         $response = $this->get(route('api.v1.lecturer.assessments.export-grade-template', [
             'courseOffering' => $this->courseOffering->id,
-            'assessmentComponentDetail' => $this->assessmentComponentDetail->id
+            'assessmentComponentDetail' => $this->assessmentComponentDetail->id,
         ]));
 
         $response->assertStatus(403);
         $response->assertJson([
             'success' => false,
-            'error_code' => 'UNAUTHORIZED'
+            'error_code' => 'UNAUTHORIZED',
         ]);
     }
 
     /** @test */
     public function excel_service_can_generate_template()
     {
-        $service = new AssessmentGradeExcelService();
-        
+        $service = new AssessmentGradeExcelService;
+
         $filePath = $service->exportGradeTemplate(
             $this->assessmentComponentDetail,
             $this->courseOffering
@@ -139,7 +142,7 @@ class ExcelGradeManagementTest extends TestCase
 
         $this->assertFileExists($filePath);
         $this->assertStringContainsString('.xlsx', $filePath);
-        
+
         // Clean up
         if (file_exists($filePath)) {
             unlink($filePath);
@@ -149,14 +152,14 @@ class ExcelGradeManagementTest extends TestCase
     /** @test */
     public function excel_service_validates_import_file()
     {
-        $service = new AssessmentGradeExcelService();
-        
+        $service = new AssessmentGradeExcelService;
+
         // Test with invalid file
         $invalidFile = UploadedFile::fake()->create('invalid.txt', 100);
-        
+
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('File must be an Excel file');
-        
+
         $service->importGrades(
             $this->assessmentComponentDetail,
             $this->courseOffering,
@@ -169,8 +172,8 @@ class ExcelGradeManagementTest extends TestCase
     /** @test */
     public function it_provides_import_statistics()
     {
-        $service = new AssessmentGradeExcelService();
-        
+        $service = new AssessmentGradeExcelService;
+
         $statistics = $service->getImportStatistics(
             $this->assessmentComponentDetail,
             $this->courseOffering

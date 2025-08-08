@@ -1,10 +1,10 @@
 <?php
 
+use App\Constants\UserRoutes;
 use App\Http\Controllers\Web\Users\UserController;
 use App\Http\Controllers\Web\Users\UserExportController;
 use App\Http\Controllers\Web\Users\UserImportController;
 use Illuminate\Support\Facades\Route;
-use App\Constants\UserRoutes;
 
 Route::middleware('auth')->group(function () {
 

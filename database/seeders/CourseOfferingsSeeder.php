@@ -7,9 +7,9 @@ namespace Database\Seeders;
 use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CurriculumUnit;
-use App\Models\Semester;
-use App\Models\Lecture;
 use App\Models\Enrollment;
+use App\Models\Lecture;
+use App\Models\Semester;
 use Illuminate\Database\Seeder;
 
 class CourseOfferingsSeeder extends Seeder
@@ -24,18 +24,18 @@ class CourseOfferingsSeeder extends Seeder
 
         // Verify lecturer exists
         $lecturer = Lecture::find(1);
-        if (!$lecturer) {
+        if (! $lecturer) {
             throw new \Exception('Lecturer with ID 1 not found. Please ensure lecturer exists before running this seeder.');
         }
         // Verify campus exists
         $campus = Campus::where('code', 'HN')->first();
-        if (!$campus) {
+        if (! $campus) {
             throw new \Exception('Campus with code HN not found. Please ensure campus exists before running this seeder.');
         }
 
         // Get the current active semester
         $activeSemester = Semester::where('is_active', true)->first();
-        if (!$activeSemester) {
+        if (! $activeSemester) {
             throw new \Exception('No active semester found.');
         }
 
@@ -77,6 +77,7 @@ class CourseOfferingsSeeder extends Seeder
 
             if ($existingOffering) {
                 $skippedCount++;
+
                 continue;
             }
 
@@ -110,13 +111,13 @@ class CourseOfferingsSeeder extends Seeder
                 'location' => $this->getLocation(),
                 'is_active' => true,
                 'enrollment_status' => 'open',
-                'notes' => 'Generated course offering for ' . $curriculumUnit->unit->code . ' - Section ' . $sectionCode
+                'notes' => 'Generated course offering for '.$curriculumUnit->unit->code.' - Section '.$sectionCode,
             ]);
 
             $offeringCount++;
         }
 
-        $this->command->info("✅ Course offerings creation completed!");
+        $this->command->info('✅ Course offerings creation completed!');
         $this->command->info("📊 Created: {$offeringCount} new offerings");
         $this->command->info("⏭️  Skipped: {$skippedCount} existing offerings");
     }
@@ -129,7 +130,7 @@ class CourseOfferingsSeeder extends Seeder
         $unit = $curriculumUnit->unit;
 
         // Base capacity on unit type and level
-        if (!$unit) {
+        if (! $unit) {
             return 40; // Default capacity
         }
 
@@ -227,7 +228,7 @@ class CourseOfferingsSeeder extends Seeder
         $unitName = $unit?->name ?? 'Unknown Unit';
         $semesterNumber = $curriculumUnit->semester_number;
 
-        return "Course offering for {$unitCode} - {$unitName} in {$semester->code}. " .
+        return "Course offering for {$unitCode} - {$unitName} in {$semester->code}. ".
             "This is a semester {$semesterNumber} unit with one section available.";
     }
 }

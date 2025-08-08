@@ -23,13 +23,13 @@ class UpdateProgramRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('programs', 'name')->ignore($program->id)
+                Rule::unique('programs', 'name')->ignore($program->id),
             ],
             'code' => [
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('programs', 'code')->ignore($program->id)
+                Rule::unique('programs', 'code')->ignore($program->id),
             ],
             'description' => ['nullable', 'string', 'max:255'],
         ];

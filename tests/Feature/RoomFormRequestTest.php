@@ -20,7 +20,9 @@ class RoomFormRequestTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Campus $campus;
+
     protected Room $room;
 
     protected function setUp(): void
@@ -58,7 +60,7 @@ class RoomFormRequestTest extends TestCase
     /** @test */
     public function it_requires_create_room_permission_for_authorization(): void
     {
-        $request = new StoreRoomRequest();
+        $request = new StoreRoomRequest;
         $request->setUserResolver(fn () => $this->user);
 
         expect($request->authorize())->toBe(false);
@@ -73,7 +75,7 @@ class RoomFormRequestTest extends TestCase
     {
         $data = $this->getValidStoreData(['name' => null]);
 
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
 
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('name'))->toBe(true);
@@ -83,17 +85,17 @@ class RoomFormRequestTest extends TestCase
     public function it_validates_name_is_string_and_max_length(): void
     {
         $data = $this->getValidStoreData(['name' => 123]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('name'))->toBe(true);
 
         $data = $this->getValidStoreData(['name' => str_repeat('a', 256)]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('name'))->toBe(true);
 
         $data = $this->getValidStoreData(['name' => str_repeat('a', 255)]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->passes())->toBe(true);
     }
 
@@ -102,7 +104,7 @@ class RoomFormRequestTest extends TestCase
     {
         $data = $this->getValidStoreData(['code' => null]);
 
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
 
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('code'))->toBe(true);
@@ -112,17 +114,17 @@ class RoomFormRequestTest extends TestCase
     public function it_validates_code_is_string_and_max_length(): void
     {
         $data = $this->getValidStoreData(['code' => 123]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('code'))->toBe(true);
 
         $data = $this->getValidStoreData(['code' => str_repeat('a', 51)]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('code'))->toBe(true);
 
         $data = $this->getValidStoreData(['code' => str_repeat('a', 50)]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->passes())->toBe(true);
     }
 
@@ -131,7 +133,7 @@ class RoomFormRequestTest extends TestCase
     {
         $data = $this->getValidStoreData(['code' => $this->room->code]);
 
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
 
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('code'))->toBe(true);
@@ -149,7 +151,7 @@ class RoomFormRequestTest extends TestCase
 
         $data = $this->getValidStoreData(['code' => 'SAME-CODE']);
 
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
 
         expect($validator->passes())->toBe(true);
     }
@@ -159,7 +161,7 @@ class RoomFormRequestTest extends TestCase
     {
         $data = $this->getValidStoreData(['building' => null]);
 
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
 
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('building'))->toBe(true);
@@ -169,12 +171,12 @@ class RoomFormRequestTest extends TestCase
     public function it_validates_building_is_string_and_max_length(): void
     {
         $data = $this->getValidStoreData(['building' => str_repeat('a', 256)]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('building'))->toBe(true);
 
         $data = $this->getValidStoreData(['building' => str_repeat('a', 255)]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->passes())->toBe(true);
     }
 
@@ -183,7 +185,7 @@ class RoomFormRequestTest extends TestCase
     {
         $data = $this->getValidStoreData(['floor' => null]);
 
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
 
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('floor'))->toBe(true);
@@ -193,12 +195,12 @@ class RoomFormRequestTest extends TestCase
     public function it_validates_floor_is_string_and_max_length(): void
     {
         $data = $this->getValidStoreData(['floor' => str_repeat('a', 51)]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('floor'))->toBe(true);
 
         $data = $this->getValidStoreData(['floor' => str_repeat('a', 50)]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->passes())->toBe(true);
     }
 
@@ -207,7 +209,7 @@ class RoomFormRequestTest extends TestCase
     {
         $data = $this->getValidStoreData(['type' => null]);
 
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
 
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('type'))->toBe(true);
@@ -217,14 +219,14 @@ class RoomFormRequestTest extends TestCase
     public function it_validates_type_is_in_allowed_types(): void
     {
         $data = $this->getValidStoreData(['type' => 'invalid_type']);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('type'))->toBe(true);
         expect($validator->errors()->first('type'))->toContain('invalid');
 
         foreach (Room::getTypes() as $type) {
             $data = $this->getValidStoreData(['type' => $type]);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->passes())->toBe(true);
         }
     }
@@ -234,7 +236,7 @@ class RoomFormRequestTest extends TestCase
     {
         $data = $this->getValidStoreData(['capacity' => null]);
 
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
 
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('capacity'))->toBe(true);
@@ -244,26 +246,26 @@ class RoomFormRequestTest extends TestCase
     public function it_validates_capacity_is_integer_with_min_max(): void
     {
         $data = $this->getValidStoreData(['capacity' => 'not_integer']);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('capacity'))->toBe(true);
 
         $data = $this->getValidStoreData(['capacity' => 0]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('capacity'))->toBe(true);
 
         $data = $this->getValidStoreData(['capacity' => 10001]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('capacity'))->toBe(true);
 
         $data = $this->getValidStoreData(['capacity' => 1]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->passes())->toBe(true);
 
         $data = $this->getValidStoreData(['capacity' => 10000]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->passes())->toBe(true);
     }
 
@@ -272,7 +274,7 @@ class RoomFormRequestTest extends TestCase
     {
         $data = $this->getValidStoreData(['status' => null]);
 
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
 
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('status'))->toBe(true);
@@ -282,14 +284,14 @@ class RoomFormRequestTest extends TestCase
     public function it_validates_status_is_in_allowed_statuses(): void
     {
         $data = $this->getValidStoreData(['status' => 'invalid_status']);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('status'))->toBe(true);
         expect($validator->errors()->first('status'))->toContain('invalid');
 
         foreach (Room::getStatuses() as $status) {
             $data = $this->getValidStoreData(['status' => $status]);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->passes())->toBe(true);
         }
     }
@@ -301,16 +303,16 @@ class RoomFormRequestTest extends TestCase
 
         foreach ($booleanFields as $field) {
             $data = $this->getValidStoreData([$field => 'not_boolean']);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->fails())->toBe(true);
             expect($validator->errors()->has($field))->toBe(true);
 
             $data = $this->getValidStoreData([$field => true]);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->passes())->toBe(true);
 
             $data = $this->getValidStoreData([$field => false]);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->passes())->toBe(true);
         }
     }
@@ -322,17 +324,17 @@ class RoomFormRequestTest extends TestCase
 
         foreach ($timeFields as $field) {
             $data = $this->getValidStoreData([$field => 'invalid_time']);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->fails())->toBe(true);
             expect($validator->errors()->has($field))->toBe(true);
             expect($validator->errors()->first($field))->toContain('HH:MM:SS');
 
             $data = $this->getValidStoreData([$field => '09:00:00']);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->passes())->toBe(true);
 
             $data = $this->getValidStoreData([$field => null]);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->passes())->toBe(true);
         }
     }
@@ -341,21 +343,21 @@ class RoomFormRequestTest extends TestCase
     public function it_validates_blocked_days_array(): void
     {
         $data = $this->getValidStoreData(['blocked_days' => 'not_array']);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('blocked_days'))->toBe(true);
 
         $data = $this->getValidStoreData(['blocked_days' => ['InvalidDay']]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->fails())->toBe(true);
         expect($validator->errors()->has('blocked_days.0'))->toBe(true);
 
         $data = $this->getValidStoreData(['blocked_days' => ['Monday', 'Tuesday']]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->passes())->toBe(true);
 
         $data = $this->getValidStoreData(['blocked_days' => null]);
-        $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+        $validator = Validator::make($data, (new StoreRoomRequest)->rules());
         expect($validator->passes())->toBe(true);
     }
 
@@ -370,16 +372,16 @@ class RoomFormRequestTest extends TestCase
 
         foreach ($textFields as $field => $maxLength) {
             $data = $this->getValidStoreData([$field => str_repeat('a', $maxLength + 1)]);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->fails())->toBe(true);
             expect($validator->errors()->has($field))->toBe(true);
 
             $data = $this->getValidStoreData([$field => str_repeat('a', $maxLength)]);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->passes())->toBe(true);
 
             $data = $this->getValidStoreData([$field => null]);
-            $validator = Validator::make($data, (new StoreRoomRequest())->rules());
+            $validator = Validator::make($data, (new StoreRoomRequest)->rules());
             expect($validator->passes())->toBe(true);
         }
     }
@@ -387,7 +389,7 @@ class RoomFormRequestTest extends TestCase
     /** @test */
     public function it_has_custom_attribute_names(): void
     {
-        $request = new StoreRoomRequest();
+        $request = new StoreRoomRequest;
         $attributes = $request->attributes();
 
         expect($attributes)->toHaveKey('name');
@@ -401,7 +403,7 @@ class RoomFormRequestTest extends TestCase
     /** @test */
     public function it_has_custom_validation_messages(): void
     {
-        $request = new StoreRoomRequest();
+        $request = new StoreRoomRequest;
         $messages = $request->messages();
 
         expect($messages)->toHaveKey('code.unique');
@@ -417,7 +419,7 @@ class RoomFormRequestTest extends TestCase
     /** @test */
     public function it_requires_edit_room_permission_for_update_authorization(): void
     {
-        $request = new UpdateRoomRequest();
+        $request = new UpdateRoomRequest;
         $request->setUserResolver(fn () => $this->user);
 
         expect($request->authorize())->toBe(false);
@@ -530,8 +532,8 @@ class RoomFormRequestTest extends TestCase
     /** @test */
     public function it_has_same_custom_attributes_and_messages_as_store(): void
     {
-        $storeRequest = new StoreRoomRequest();
-        $updateRequest = new UpdateRoomRequest();
+        $storeRequest = new StoreRoomRequest;
+        $updateRequest = new UpdateRoomRequest;
 
         expect($updateRequest->attributes())->toBe($storeRequest->attributes());
         expect($updateRequest->messages())->toBe($storeRequest->messages());
@@ -575,12 +577,13 @@ class RoomFormRequestTest extends TestCase
 
     private function getUpdateValidator(array $data, Room $room): \Illuminate\Validation\Validator
     {
-        $request = new UpdateRoomRequest();
-        
+        $request = new UpdateRoomRequest;
+
         // Mock the route method to return the room
         $request->setRouteResolver(function () use ($room) {
             $route = \Mockery::mock();
             $route->shouldReceive('parameter')->with('room')->andReturn($room);
+
             return $route;
         });
 

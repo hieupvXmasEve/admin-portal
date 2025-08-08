@@ -25,41 +25,41 @@ class StudentNoteRequest extends FormRequest
     public function rules(): array
     {
         $isUpdate = $this->isMethod('PUT') || $this->isMethod('PATCH');
-        
+
         return [
             'course_offering_id' => [
                 $isUpdate ? 'sometimes' : 'nullable',
                 'integer',
-                'exists:course_offerings,id'
+                'exists:course_offerings,id',
             ],
             'note_type' => [
                 $isUpdate ? 'sometimes' : 'nullable',
                 'string',
-                'in:general,academic,behavioral,attendance,performance,personal,alert'
+                'in:general,academic,behavioral,attendance,performance,personal,alert',
             ],
             'title' => [
                 $isUpdate ? 'sometimes' : 'required',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'content' => [
                 $isUpdate ? 'sometimes' : 'required',
                 'string',
-                'max:2000'
+                'max:2000',
             ],
             'is_private' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'is_alert' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'priority' => [
                 'sometimes',
                 'string',
-                'in:low,medium,high,urgent'
-            ]
+                'in:low,medium,high,urgent',
+            ],
         ];
     }
 
@@ -77,7 +77,7 @@ class StudentNoteRequest extends FormRequest
             'content.max' => 'Note content must not exceed 2000 characters',
             'is_private.boolean' => 'Is private must be true or false',
             'is_alert.boolean' => 'Is alert must be true or false',
-            'priority.in' => 'Priority must be one of: low, medium, high, urgent'
+            'priority.in' => 'Priority must be one of: low, medium, high, urgent',
         ];
     }
 
@@ -108,7 +108,7 @@ class StudentNoteRequest extends FormRequest
         ];
 
         foreach ($defaults as $key => $value) {
-            if (!$this->has($key)) {
+            if (! $this->has($key)) {
                 $this->merge([$key => $value]);
             }
         }
@@ -117,7 +117,7 @@ class StudentNoteRequest extends FormRequest
         foreach (['is_private', 'is_alert'] as $field) {
             if ($this->has($field)) {
                 $this->merge([
-                    $field => filter_var($this->$field, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+                    $field => filter_var($this->$field, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE),
                 ]);
             }
         }

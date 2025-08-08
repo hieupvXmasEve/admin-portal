@@ -16,7 +16,7 @@ class StudentDetailResource extends JsonResource
     {
         return [
             'student' => $this->resource['student'],
-            
+
             'course_enrollments' => collect($this->resource['course_enrollments'])->map(function ($enrollment) {
                 return [
                     'course_offering_id' => $enrollment['course_offering_id'],
@@ -30,7 +30,7 @@ class StudentDetailResource extends JsonResource
                     'status_color' => $this->getRegistrationStatusColor($enrollment['registration_status']),
                 ];
             }),
-            
+
             'attendance_summary' => [
                 'total_sessions' => $this->resource['attendance_summary']['total_sessions'],
                 'present_sessions' => $this->resource['attendance_summary']['present_sessions'],
@@ -41,7 +41,7 @@ class StudentDetailResource extends JsonResource
                 'attendance_status' => $this->getAttendanceStatus($this->resource['attendance_summary']['attendance_percentage']),
                 'attendance_trend' => $this->getAttendanceTrend(),
             ],
-            
+
             'performance_indicators' => [
                 'attendance_status' => $this->resource['performance_indicators']['attendance_status'],
                 'risk_level' => $this->resource['performance_indicators']['risk_level'],
@@ -50,7 +50,7 @@ class StudentDetailResource extends JsonResource
                 'risk_factors' => $this->getRiskFactors(),
                 'strengths' => $this->getStrengths(),
             ],
-            
+
             'alerts' => collect($this->resource['alerts'])->map(function ($alert) {
                 return [
                     'type' => $alert['type'],
@@ -62,7 +62,7 @@ class StudentDetailResource extends JsonResource
                     'type_label' => $this->getAlertTypeLabel($alert['type']),
                 ];
             }),
-            
+
             'notes' => collect($this->resource['notes'])->map(function ($note) {
                 return [
                     'id' => $note['id'],
@@ -79,7 +79,7 @@ class StudentDetailResource extends JsonResource
                     'priority_color' => $this->getPriorityColor($note['priority']),
                 ];
             }),
-            
+
             'recent_activity' => collect($this->resource['recent_activity'])->map(function ($activity) {
                 return [
                     'type' => $activity['type'],
@@ -91,7 +91,7 @@ class StudentDetailResource extends JsonResource
                     'status_color' => $this->getActivityStatusColor($activity),
                 ];
             }),
-            
+
             'summary_stats' => [
                 'total_courses' => count($this->resource['course_enrollments']),
                 'attendance_rate' => $this->resource['attendance_summary']['attendance_percentage'],
@@ -100,9 +100,9 @@ class StudentDetailResource extends JsonResource
                 'high_priority_alerts' => collect($this->resource['alerts'])->where('priority', 'high')->count(),
                 'days_since_last_attendance' => $this->getDaysSinceLastAttendance(),
             ],
-            
+
             'recommendations' => $this->getRecommendations(),
-            
+
             'action_items' => $this->getActionItems(),
         ];
     }
@@ -140,9 +140,16 @@ class StudentDetailResource extends JsonResource
      */
     protected function getAttendanceStatus(float $percentage): string
     {
-        if ($percentage >= 90) return 'excellent';
-        if ($percentage >= 75) return 'good';
-        if ($percentage >= 60) return 'warning';
+        if ($percentage >= 90) {
+            return 'excellent';
+        }
+        if ($percentage >= 75) {
+            return 'good';
+        }
+        if ($percentage >= 60) {
+            return 'warning';
+        }
+
         return 'at_risk';
     }
 
@@ -162,24 +169,24 @@ class StudentDetailResource extends JsonResource
     {
         $factors = [];
         $attendancePercentage = $this->resource['attendance_summary']['attendance_percentage'];
-        
+
         if ($attendancePercentage < 50) {
             $factors[] = 'Very low attendance rate';
         } elseif ($attendancePercentage < 75) {
             $factors[] = 'Below average attendance rate';
         }
-        
+
         $daysSinceLastAttendance = $this->getDaysSinceLastAttendance();
         if ($daysSinceLastAttendance > 14) {
             $factors[] = 'No recent attendance';
         } elseif ($daysSinceLastAttendance > 7) {
             $factors[] = 'Missing recent sessions';
         }
-        
+
         if ($this->resource['attendance_summary']['present_sessions'] === 0) {
             $factors[] = 'Never attended any session';
         }
-        
+
         return $factors;
     }
 
@@ -190,21 +197,21 @@ class StudentDetailResource extends JsonResource
     {
         $strengths = [];
         $attendancePercentage = $this->resource['attendance_summary']['attendance_percentage'];
-        
+
         if ($attendancePercentage >= 95) {
             $strengths[] = 'Excellent attendance record';
         } elseif ($attendancePercentage >= 85) {
             $strengths[] = 'Good attendance record';
         }
-        
+
         if ($this->resource['attendance_summary']['excused_sessions'] > 0) {
             $strengths[] = 'Communicates absences appropriately';
         }
-        
+
         if (count($this->resource['course_enrollments']) > 1) {
             $strengths[] = 'Enrolled in multiple courses';
         }
-        
+
         return $strengths;
     }
 
@@ -274,8 +281,8 @@ class StudentDetailResource extends JsonResource
     {
         return match ($activity['type']) {
             'attendance' => "Marked {$activity['status']} for {$activity['course']}",
-            'note' => "Note added",
-            'alert' => "Alert generated",
+            'note' => 'Note added',
+            'alert' => 'Alert generated',
             default => 'Activity recorded',
         };
     }
@@ -294,7 +301,7 @@ class StudentDetailResource extends JsonResource
                 default => 'gray',
             };
         }
-        
+
         return 'blue';
     }
 
@@ -304,11 +311,11 @@ class StudentDetailResource extends JsonResource
     protected function getDaysSinceLastAttendance(): ?int
     {
         $lastAttendance = $this->resource['attendance_summary']['last_attendance'];
-        
-        if (!$lastAttendance) {
+
+        if (! $lastAttendance) {
             return null;
         }
-        
+
         return now()->diffInDays(\Carbon\Carbon::parse($lastAttendance));
     }
 
@@ -320,7 +327,7 @@ class StudentDetailResource extends JsonResource
         $recommendations = [];
         $attendancePercentage = $this->resource['attendance_summary']['attendance_percentage'];
         $riskLevel = $this->resource['performance_indicators']['risk_level'];
-        
+
         if ($riskLevel === 'high') {
             $recommendations[] = [
                 'type' => 'urgent_action',
@@ -339,7 +346,7 @@ class StudentDetailResource extends JsonResource
                 'priority' => 'medium',
             ];
         }
-        
+
         if ($attendancePercentage < 75) {
             $recommendations[] = [
                 'type' => 'communication',
@@ -347,7 +354,7 @@ class StudentDetailResource extends JsonResource
                 'priority' => 'medium',
             ];
         }
-        
+
         if (empty($recommendations)) {
             $recommendations[] = [
                 'type' => 'maintenance',
@@ -355,7 +362,7 @@ class StudentDetailResource extends JsonResource
                 'priority' => 'low',
             ];
         }
-        
+
         return $recommendations;
     }
 
@@ -367,7 +374,7 @@ class StudentDetailResource extends JsonResource
         $actionItems = [];
         $alertCount = count($this->resource['alerts']);
         $noteCount = count($this->resource['notes']);
-        
+
         if ($alertCount > 0) {
             $actionItems[] = [
                 'action' => 'review_alerts',
@@ -376,7 +383,7 @@ class StudentDetailResource extends JsonResource
                 'due_date' => now()->addDays(1)->format('Y-m-d'),
             ];
         }
-        
+
         if ($this->resource['performance_indicators']['needs_attention']) {
             $actionItems[] = [
                 'action' => 'contact_student',
@@ -385,7 +392,7 @@ class StudentDetailResource extends JsonResource
                 'due_date' => now()->addDays(3)->format('Y-m-d'),
             ];
         }
-        
+
         if ($noteCount === 0) {
             $actionItems[] = [
                 'action' => 'add_initial_note',
@@ -394,7 +401,7 @@ class StudentDetailResource extends JsonResource
                 'due_date' => now()->addWeek()->format('Y-m-d'),
             ];
         }
-        
+
         return $actionItems;
     }
 }

@@ -16,7 +16,7 @@ class SessionResource extends JsonResource
     {
         // Handle both array and model data
         $data = is_array($this->resource) ? $this->resource : $this->resource->toArray();
-        
+
         return [
             'id' => $data['id'],
             'title' => $data['title'] ?? $data['session_title'] ?? null,
@@ -28,25 +28,25 @@ class SessionResource extends JsonResource
             'session_type' => $data['session_type'] ?? 'lecture',
             'delivery_mode' => $data['delivery_mode'] ?? 'in_person',
             'status' => $data['status'] ?? 'scheduled',
-            
+
             // Course Information
             'course' => $data['course'] ?? null,
-            
+
             // Room Information
             'room' => $data['room'] ?? null,
-            
+
             // Attendance Information
             'attendance_marked' => $data['attendance_marked'] ?? false,
             'expected_attendees' => $data['expected_attendees'] ?? 0,
             'actual_attendees' => $data['actual_attendees'] ?? null,
             'attendance_percentage' => $data['attendance_percentage'] ?? null,
-            
+
             // Academic Content
             'learning_objectives' => $data['learning_objectives'] ?? [],
             'topics_covered' => $data['topics_covered'] ?? [],
             'required_materials' => $data['required_materials'] ?? [],
             'preparation_notes' => $data['preparation_notes'] ?? null,
-            
+
             // Status and Actions
             'status_info' => [
                 'status' => $data['status'] ?? 'scheduled',
@@ -56,7 +56,7 @@ class SessionResource extends JsonResource
                 'can_cancel' => $this->canCancel($data),
                 'can_mark_attendance' => $this->canMarkAttendance($data),
             ],
-            
+
             // Time Information
             'time_info' => [
                 'is_today' => $this->isToday($data['date'] ?? $data['session_date']),
@@ -67,17 +67,17 @@ class SessionResource extends JsonResource
                 'formatted_time' => $this->getFormattedTime($data['start_time'], $data['end_time']),
                 'relative_time' => $this->getRelativeTime($data['date'] ?? $data['session_date'], $data['start_time']),
             ],
-            
+
             // Quick Stats
             'quick_stats' => [
                 'duration_hours' => round(($data['duration_minutes'] ?? 0) / 60, 1),
                 'attendance_status' => $this->getAttendanceStatus($data),
                 'preparation_status' => $this->getPreparationStatus($data),
             ],
-            
+
             // Actions Available
             'available_actions' => $this->getAvailableActions($data),
-            
+
             // Timestamps
             'created_at' => $data['created_at'] ?? null,
             'updated_at' => $data['updated_at'] ?? null,
@@ -92,6 +92,7 @@ class SessionResource extends JsonResource
         try {
             $start = \Carbon\Carbon::createFromFormat('H:i', $startTime);
             $end = \Carbon\Carbon::createFromFormat('H:i', $endTime);
+
             return $start->diffInMinutes($end);
         } catch (\Exception $e) {
             return 0;
@@ -133,16 +134,17 @@ class SessionResource extends JsonResource
     {
         $status = $data['status'] ?? 'scheduled';
         $date = $data['date'] ?? $data['session_date'] ?? null;
-        
+
         if ($status === 'completed') {
             return false;
         }
-        
+
         if ($date) {
             $sessionDate = \Carbon\Carbon::parse($date);
+
             return $sessionDate->isFuture() || $sessionDate->isToday();
         }
-        
+
         return true;
     }
 
@@ -152,6 +154,7 @@ class SessionResource extends JsonResource
     protected function canCancel(array $data): bool
     {
         $status = $data['status'] ?? 'scheduled';
+
         return in_array($status, ['scheduled', 'in_progress']);
     }
 
@@ -162,13 +165,13 @@ class SessionResource extends JsonResource
     {
         $status = $data['status'] ?? 'scheduled';
         $date = $data['date'] ?? $data['session_date'] ?? null;
-        
-        if (!$date) {
+
+        if (! $date) {
             return false;
         }
-        
+
         $sessionDate = \Carbon\Carbon::parse($date);
-        
+
         return in_array($status, ['completed', 'in_progress']) ||
                ($status === 'scheduled' && $sessionDate->lte(now()));
     }
@@ -178,7 +181,10 @@ class SessionResource extends JsonResource
      */
     protected function isToday(?string $date): bool
     {
-        if (!$date) return false;
+        if (! $date) {
+            return false;
+        }
+
         return \Carbon\Carbon::parse($date)->isToday();
     }
 
@@ -187,9 +193,12 @@ class SessionResource extends JsonResource
      */
     protected function isPast(?string $date, string $startTime): bool
     {
-        if (!$date) return false;
-        
-        $sessionDateTime = \Carbon\Carbon::parse($date . ' ' . $startTime);
+        if (! $date) {
+            return false;
+        }
+
+        $sessionDateTime = \Carbon\Carbon::parse($date.' '.$startTime);
+
         return $sessionDateTime->isPast();
     }
 
@@ -198,9 +207,12 @@ class SessionResource extends JsonResource
      */
     protected function isUpcoming(?string $date, string $startTime): bool
     {
-        if (!$date) return false;
-        
-        $sessionDateTime = \Carbon\Carbon::parse($date . ' ' . $startTime);
+        if (! $date) {
+            return false;
+        }
+
+        $sessionDateTime = \Carbon\Carbon::parse($date.' '.$startTime);
+
         return $sessionDateTime->isFuture();
     }
 
@@ -209,14 +221,16 @@ class SessionResource extends JsonResource
      */
     protected function getStartsInMinutes(?string $date, string $startTime): ?int
     {
-        if (!$date) return null;
-        
-        $sessionDateTime = \Carbon\Carbon::parse($date . ' ' . $startTime);
-        
+        if (! $date) {
+            return null;
+        }
+
+        $sessionDateTime = \Carbon\Carbon::parse($date.' '.$startTime);
+
         if ($sessionDateTime->isPast()) {
             return null;
         }
-        
+
         return now()->diffInMinutes($sessionDateTime);
     }
 
@@ -225,10 +239,12 @@ class SessionResource extends JsonResource
      */
     protected function getFormattedDate(?string $date): ?string
     {
-        if (!$date) return null;
-        
+        if (! $date) {
+            return null;
+        }
+
         $carbonDate = \Carbon\Carbon::parse($date);
-        
+
         if ($carbonDate->isToday()) {
             return 'Today';
         } elseif ($carbonDate->isTomorrow()) {
@@ -245,7 +261,7 @@ class SessionResource extends JsonResource
      */
     protected function getFormattedTime(string $startTime, string $endTime): string
     {
-        return $startTime . ' - ' . $endTime;
+        return $startTime.' - '.$endTime;
     }
 
     /**
@@ -253,9 +269,12 @@ class SessionResource extends JsonResource
      */
     protected function getRelativeTime(?string $date, string $startTime): ?string
     {
-        if (!$date) return null;
-        
-        $sessionDateTime = \Carbon\Carbon::parse($date . ' ' . $startTime);
+        if (! $date) {
+            return null;
+        }
+
+        $sessionDateTime = \Carbon\Carbon::parse($date.' '.$startTime);
+
         return $sessionDateTime->diffForHumans();
     }
 
@@ -266,8 +285,8 @@ class SessionResource extends JsonResource
     {
         $attendanceMarked = $data['attendance_marked'] ?? false;
         $status = $data['status'] ?? 'scheduled';
-        
-        if ($status === 'completed' && !$attendanceMarked) {
+
+        if ($status === 'completed' && ! $attendanceMarked) {
             return 'pending';
         } elseif ($attendanceMarked) {
             return 'marked';
@@ -281,12 +300,12 @@ class SessionResource extends JsonResource
      */
     protected function getPreparationStatus(array $data): string
     {
-        $hasObjectives = !empty($data['learning_objectives']);
-        $hasTopics = !empty($data['topics_covered']);
-        $hasNotes = !empty($data['preparation_notes']);
-        
+        $hasObjectives = ! empty($data['learning_objectives']);
+        $hasTopics = ! empty($data['topics_covered']);
+        $hasNotes = ! empty($data['preparation_notes']);
+
         $preparationScore = ($hasObjectives ? 1 : 0) + ($hasTopics ? 1 : 0) + ($hasNotes ? 1 : 0);
-        
+
         return match ($preparationScore) {
             3 => 'complete',
             2 => 'good',

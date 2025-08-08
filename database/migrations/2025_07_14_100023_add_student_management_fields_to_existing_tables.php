@@ -13,26 +13,26 @@ return new class extends Migration
     {
         // Add retake tracking to course_registrations (check if columns don't exist first)
         Schema::table('course_registrations', function (Blueprint $table) {
-            if (!Schema::hasColumn('course_registrations', 'original_registration_id')) {
+            if (! Schema::hasColumn('course_registrations', 'original_registration_id')) {
                 $table->foreignId('original_registration_id')->nullable()->constrained('course_registrations')->onDelete('set null');
             }
-            if (!Schema::hasColumn('course_registrations', 'retake_reason')) {
+            if (! Schema::hasColumn('course_registrations', 'retake_reason')) {
                 $table->text('retake_reason')->nullable();
             }
         });
 
         // Add status tracking to students (check if columns don't exist first)
         Schema::table('students', function (Blueprint $table) {
-            if (!Schema::hasColumn('students', 'academic_status')) {
+            if (! Schema::hasColumn('students', 'academic_status')) {
                 $table->enum('academic_status', ['active', 'inactive', 'graduated', 'suspended', 'withdrawn'])->default('active');
             }
-            if (!Schema::hasColumn('students', 'status_change_date')) {
+            if (! Schema::hasColumn('students', 'status_change_date')) {
                 $table->date('status_change_date')->nullable();
             }
-            if (!Schema::hasColumn('students', 'status_reason')) {
+            if (! Schema::hasColumn('students', 'status_reason')) {
                 $table->text('status_reason')->nullable();
             }
-            if (!Schema::hasColumn('students', 'status_changed_by')) {
+            if (! Schema::hasColumn('students', 'status_changed_by')) {
                 $table->foreignId('status_changed_by')->nullable()->constrained('users')->onDelete('set null');
             }
         });

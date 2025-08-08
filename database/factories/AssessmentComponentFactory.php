@@ -47,7 +47,7 @@ class AssessmentComponentFactory extends Factory
      */
     public function exam(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'type' => 'exam',
             'name' => 'Final Exam',
             'weight' => $this->faker->numberBetween(40, 60),
@@ -60,7 +60,7 @@ class AssessmentComponentFactory extends Factory
      */
     public function quiz(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'type' => 'quiz',
             'name' => $this->faker->randomElement(['Mid-term Quiz', 'Weekly Quiz', 'Pop Quiz']),
             'weight' => $this->faker->numberBetween(10, 25),
@@ -73,7 +73,7 @@ class AssessmentComponentFactory extends Factory
      */
     public function project(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'type' => 'project',
             'name' => $this->faker->randomElement(['Group Project', 'Final Project', 'Individual Project']),
             'weight' => $this->faker->numberBetween(20, 40),

@@ -35,7 +35,7 @@ class StudentAcademicSummaryService
     {
         try {
             // Create cache key based on student ID and filters
-            $cacheKey = "student_academic_summary_{$studentId}_" . md5(serialize($filters));
+            $cacheKey = "student_academic_summary_{$studentId}_".md5(serialize($filters));
             $cacheTtl = 3600; // 1 hour cache
 
             // Check cache if enabled and no specific filters (for performance)
@@ -85,14 +85,13 @@ class StudentAcademicSummaryService
      * Clear cached academic summary data for a student
      *
      * @param  int  $studentId  The student ID
-     * @return void
      */
     public function clearAcademicSummaryCache(int $studentId): void
     {
         $cachePattern = "student_academic_summary_{$studentId}_*";
 
         // Clear the main cache entry (no filters)
-        $mainCacheKey = "student_academic_summary_{$studentId}_" . md5(serialize([]));
+        $mainCacheKey = "student_academic_summary_{$studentId}_".md5(serialize([]));
         Cache::forget($mainCacheKey);
 
         // Note: In production, you might want to use a more sophisticated cache tagging system
@@ -235,14 +234,14 @@ class StudentAcademicSummaryService
                         // Match semesters that could belong to this academic year
                         $subQuery->where(function ($q) use ($endYear) {
                             // Spring semester of the academic year (contains end year)
-                            $q->where('code', 'LIKE', '%SPR' . $endYear . '%')
-                                ->orWhere('name', 'LIKE', '%Spring ' . $endYear . '%')
-                                ->orWhere('name', 'LIKE', '%Spring' . $endYear . '%');
+                            $q->where('code', 'LIKE', '%SPR'.$endYear.'%')
+                                ->orWhere('name', 'LIKE', '%Spring '.$endYear.'%')
+                                ->orWhere('name', 'LIKE', '%Spring'.$endYear.'%');
                         })->orWhere(function ($q) use ($startYear) {
                             // Fall semester of the academic year (contains start year)
-                            $q->where('code', 'LIKE', '%FALL' . $startYear . '%')
-                                ->orWhere('name', 'LIKE', '%Fall ' . $startYear . '%')
-                                ->orWhere('name', 'LIKE', '%Fall' . $startYear . '%');
+                            $q->where('code', 'LIKE', '%FALL'.$startYear.'%')
+                                ->orWhere('name', 'LIKE', '%Fall '.$startYear.'%')
+                                ->orWhere('name', 'LIKE', '%Fall'.$startYear.'%');
                         });
                     }
                 });
@@ -460,11 +459,11 @@ class StudentAcademicSummaryService
                 $year = (int) $matches[1];
                 // If it's a spring semester, it's the second year of the academic year
                 if (str_contains(strtolower($semester->code), 'spr')) {
-                    return ($year - 1) . '-' . $year;
+                    return ($year - 1).'-'.$year;
                 }
 
                 // If it's a fall semester, it's the first year of the academic year
-                return $year . '-' . ($year + 1);
+                return $year.'-'.($year + 1);
             }
         }
 
@@ -474,11 +473,11 @@ class StudentAcademicSummaryService
                 $year = (int) $matches[1];
                 // If it's a spring semester, it's the second year of the academic year
                 if (str_contains(strtolower($semester->name), 'spring')) {
-                    return ($year - 1) . '-' . $year;
+                    return ($year - 1).'-'.$year;
                 }
 
                 // If it's a fall semester, it's the first year of the academic year
-                return $year . '-' . ($year + 1);
+                return $year.'-'.($year + 1);
             }
         }
 
@@ -489,11 +488,11 @@ class StudentAcademicSummaryService
 
             // If semester starts in Jan-Jul, it's likely the second year of the academic year
             if ($startMonth <= 7) {
-                return ($startYear - 1) . '-' . $startYear;
+                return ($startYear - 1).'-'.$startYear;
             }
 
             // If semester starts in Aug-Dec, it's likely the first year of the academic year
-            return $startYear . '-' . ($startYear + 1);
+            return $startYear.'-'.($startYear + 1);
         }
 
         return 'Unknown';

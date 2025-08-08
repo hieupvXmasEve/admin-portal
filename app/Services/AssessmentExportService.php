@@ -4,30 +4,30 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\CourseOffering;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetailScore;
+use App\Models\CourseOffering;
 use App\Models\Student;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Storage;
-use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
-use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class AssessmentExportService implements WithMultipleSheets
 {
     private CourseOffering $courseOffering;
+
     private array $filters;
+
     private AssessmentReportService $reportService;
 
     public function __construct(AssessmentReportService $reportService)
@@ -37,10 +37,6 @@ class AssessmentExportService implements WithMultipleSheets
 
     /**
      * Export assessment data to Excel format with proper formatting.
-     *
-     * @param CourseOffering $courseOffering
-     * @param array $filters
-     * @return string
      */
     public function exportToExcel(CourseOffering $courseOffering, array $filters = []): string
     {
@@ -55,21 +51,17 @@ class AssessmentExportService implements WithMultipleSheets
         ], $filters);
 
         // Create temporary file
-        $fileName = 'assessment_export_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+        $fileName = 'assessment_export_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.xlsx';
 
         // Use Laravel Excel to export to the local disk
-        Excel::store($this, 'temp/' . $fileName, 'local');
+        Excel::store($this, 'temp/'.$fileName, 'local');
 
         // Return the actual file path where it was stored
-        return Storage::disk('local')->path('temp/' . $fileName);
+        return Storage::disk('local')->path('temp/'.$fileName);
     }
 
     /**
      * Export assessment data to PDF format with charts and statistics.
-     *
-     * @param CourseOffering $courseOffering
-     * @param array $options
-     * @return string
      */
     public function exportToPdf(CourseOffering $courseOffering, array $options = []): string
     {
@@ -83,21 +75,17 @@ class AssessmentExportService implements WithMultipleSheets
         ], $options);
 
         // Create temporary file name
-        $fileName = 'assessment_report_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.pdf';
+        $fileName = 'assessment_report_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.pdf';
 
         // Create PDF export using Excel package with DOMPDF
-        Excel::store(new PdfReportSheet($courseOffering, $this->reportService, $this->filters), 'temp/' . $fileName, 'local', \Maatwebsite\Excel\Excel::DOMPDF);
+        Excel::store(new PdfReportSheet($courseOffering, $this->reportService, $this->filters), 'temp/'.$fileName, 'local', \Maatwebsite\Excel\Excel::DOMPDF);
 
         // Return the actual file path where it was stored
-        return Storage::disk('local')->path('temp/' . $fileName);
+        return Storage::disk('local')->path('temp/'.$fileName);
     }
 
     /**
      * Format export data for transformation.
-     *
-     * @param SupportCollection $scores
-     * @param array $components
-     * @return array
      */
     public function formatExportData(SupportCollection $scores, array $components): array
     {
@@ -148,8 +136,6 @@ class AssessmentExportService implements WithMultipleSheets
 
     /**
      * Get sheets for Excel export.
-     *
-     * @return array
      */
     public function sheets(): array
     {
@@ -180,13 +166,11 @@ class AssessmentExportService implements WithMultipleSheets
 
     /**
      * Get detailed scores data for export.
-     *
-     * @return SupportCollection
      */
     private function getDetailedScoresData(): SupportCollection
     {
         $syllabus = $this->courseOffering->syllabus;
-        if (!$syllabus) {
+        if (! $syllabus) {
             return collect();
         }
 
@@ -197,23 +181,23 @@ class AssessmentExportService implements WithMultipleSheets
             ->with([
                 'student.user',
                 'assessmentComponentDetail.assessmentComponent',
-                'gradedByLecture'
+                'gradedByLecture',
             ]);
 
         // Apply filters
-        if (!$this->filters['include_excluded']) {
+        if (! $this->filters['include_excluded']) {
             $query->where('score_excluded', false);
         }
 
-        if (!empty($this->filters['score_status'])) {
+        if (! empty($this->filters['score_status'])) {
             $query->where('score_status', $this->filters['score_status']);
         }
 
-        if (!empty($this->filters['student_codes'])) {
+        if (! empty($this->filters['student_codes'])) {
             $query->whereIn('student_code', $this->filters['student_codes']);
         }
 
-        if (!empty($this->filters['component_ids'])) {
+        if (! empty($this->filters['component_ids'])) {
             $query->whereHas('assessmentComponentDetail', function ($q) {
                 $q->whereIn('assessment_component_id', $this->filters['component_ids']);
             });
@@ -226,13 +210,11 @@ class AssessmentExportService implements WithMultipleSheets
 
     /**
      * Get component breakdown data for export.
-     *
-     * @return array
      */
     private function getComponentBreakdownData(): array
     {
         $syllabus = $this->courseOffering->syllabus;
-        if (!$syllabus) {
+        if (! $syllabus) {
             return [];
         }
 
@@ -259,9 +241,10 @@ class AssessmentExportService implements WithMultipleSheets
 /**
  * Grade Matrix Sheet for Excel export.
  */
-class GradeMatrixSheet implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class GradeMatrixSheet implements FromCollection, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     private array $gradeMatrix;
+
     private CourseOffering $courseOffering;
 
     public function __construct(array $gradeMatrix, CourseOffering $courseOffering)
@@ -287,7 +270,7 @@ class GradeMatrixSheet implements FromCollection, WithHeadings, WithStyles, With
             // Add component scores
             foreach ($this->gradeMatrix['components'] as $component) {
                 $score = $student['component_scores'][$component['id']] ?? null;
-                $row['component_' . $component['id']] = $score !== null ? $score : '';
+                $row['component_'.$component['id']] = $score !== null ? $score : '';
             }
 
             // Add weighted total
@@ -309,7 +292,7 @@ class GradeMatrixSheet implements FromCollection, WithHeadings, WithStyles, With
 
         // Add component headings
         foreach ($this->gradeMatrix['components'] as $component) {
-            $headings[] = $component['name'] . ' (' . $component['weight'] . '%)';
+            $headings[] = $component['name'].' ('.$component['weight'].'%)';
         }
 
         $headings[] = 'Weighted Total (%)';
@@ -325,15 +308,15 @@ class GradeMatrixSheet implements FromCollection, WithHeadings, WithStyles, With
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4472C4']
+                    'startColor' => ['rgb' => '4472C4'],
                 ],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
             ],
         ];
     }
@@ -372,9 +355,10 @@ class GradeMatrixSheet implements FromCollection, WithHeadings, WithStyles, With
 /**
  * Detailed Scores Sheet for Excel export.
  */
-class DetailedScoresSheet implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class DetailedScoresSheet implements FromCollection, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     private SupportCollection $scores;
+
     private CourseOffering $courseOffering;
 
     public function __construct(SupportCollection $scores, CourseOffering $courseOffering)
@@ -462,15 +446,15 @@ class DetailedScoresSheet implements FromCollection, WithHeadings, WithStyles, W
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4472C4']
+                    'startColor' => ['rgb' => '4472C4'],
                 ],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
             ],
         ];
     }
@@ -519,9 +503,10 @@ class DetailedScoresSheet implements FromCollection, WithHeadings, WithStyles, W
 /**
  * Statistics Sheet for Excel export.
  */
-class StatisticsSheet implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class StatisticsSheet implements FromCollection, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     private array $statistics;
+
     private CourseOffering $courseOffering;
 
     public function __construct(array $statistics, CourseOffering $courseOffering)
@@ -543,19 +528,19 @@ class StatisticsSheet implements FromCollection, WithHeadings, WithStyles, WithC
         // Assessment Structure
         $data[] = ['Assessment Structure', 'Total Components', $this->statistics['assessment_structure']['total_components'], ''];
         $data[] = ['Assessment Structure', 'Total Details', $this->statistics['assessment_structure']['total_details'], ''];
-        $data[] = ['Assessment Structure', 'Total Weight', $this->statistics['assessment_structure']['total_weight'] . '%', ''];
+        $data[] = ['Assessment Structure', 'Total Weight', $this->statistics['assessment_structure']['total_weight'].'%', ''];
         $data[] = ['Assessment Structure', 'Weight Complete', $this->statistics['assessment_structure']['weight_complete'] ? 'Yes' : 'No', ''];
         $data[] = ['', '', '', ''];
 
         // Score Statistics
-        $data[] = ['Score Statistics', 'Average Score', $this->statistics['score_statistics']['average_score'] . '%', ''];
-        $data[] = ['Score Statistics', 'Highest Score', $this->statistics['score_statistics']['highest_score'] . '%', ''];
-        $data[] = ['Score Statistics', 'Lowest Score', $this->statistics['score_statistics']['lowest_score'] . '%', ''];
+        $data[] = ['Score Statistics', 'Average Score', $this->statistics['score_statistics']['average_score'].'%', ''];
+        $data[] = ['Score Statistics', 'Highest Score', $this->statistics['score_statistics']['highest_score'].'%', ''];
+        $data[] = ['Score Statistics', 'Lowest Score', $this->statistics['score_statistics']['lowest_score'].'%', ''];
         $data[] = ['Score Statistics', 'Total Graded Submissions', $this->statistics['score_statistics']['total_graded_submissions'], ''];
         $data[] = ['', '', '', ''];
 
         // Completion Statistics
-        $data[] = ['Completion', 'Completion Rate', $this->statistics['completion_statistics']['completion_rate'] . '%', ''];
+        $data[] = ['Completion', 'Completion Rate', $this->statistics['completion_statistics']['completion_rate'].'%', ''];
         $data[] = ['Completion', 'Completed Assessments', $this->statistics['completion_statistics']['completed_assessments'], ''];
         $data[] = ['Completion', 'Pending Assessments', $this->statistics['completion_statistics']['pending_assessments'], ''];
         $data[] = ['Completion', 'Total Assessments', $this->statistics['completion_statistics']['total_assessments'], ''];
@@ -578,7 +563,7 @@ class StatisticsSheet implements FromCollection, WithHeadings, WithStyles, WithC
             'Category',
             'Metric',
             'Value',
-            'Notes'
+            'Notes',
         ];
     }
 
@@ -589,15 +574,15 @@ class StatisticsSheet implements FromCollection, WithHeadings, WithStyles, WithC
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4472C4']
+                    'startColor' => ['rgb' => '4472C4'],
                 ],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
             ],
         ];
     }
@@ -621,9 +606,10 @@ class StatisticsSheet implements FromCollection, WithHeadings, WithStyles, WithC
 /**
  * Component Breakdown Sheet for Excel export.
  */
-class ComponentBreakdownSheet implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class ComponentBreakdownSheet implements FromCollection, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     private array $componentBreakdown;
+
     private CourseOffering $courseOffering;
 
     public function __construct(array $componentBreakdown, CourseOffering $courseOffering)
@@ -685,15 +671,15 @@ class ComponentBreakdownSheet implements FromCollection, WithHeadings, WithStyle
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4472C4']
+                    'startColor' => ['rgb' => '4472C4'],
                 ],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
             ],
         ];
     }
@@ -727,10 +713,12 @@ class ComponentBreakdownSheet implements FromCollection, WithHeadings, WithStyle
 /**
  * PDF Report Sheet for generating PDF reports.
  */
-class PdfReportSheet implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class PdfReportSheet implements FromCollection, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     private CourseOffering $courseOffering;
+
     private AssessmentReportService $reportService;
+
     private array $filters;
 
     public function __construct(CourseOffering $courseOffering, AssessmentReportService $reportService, array $filters = [])
@@ -750,9 +738,9 @@ class PdfReportSheet implements FromCollection, WithHeadings, WithStyles, WithCo
 
         // Course Information
         $data[] = ['ASSESSMENT REPORT', '', '', ''];
-        $data[] = ['Course:', $this->courseOffering->course_code . ' - ' . $this->courseOffering->course_title, '', ''];
+        $data[] = ['Course:', $this->courseOffering->course_code.' - '.$this->courseOffering->course_title, '', ''];
         $data[] = ['Section:', $this->courseOffering->section_code, '', ''];
-        $data[] = ['Semester:', $this->courseOffering->semester->name . ' ' . $this->courseOffering->semester->year, '', ''];
+        $data[] = ['Semester:', $this->courseOffering->semester->name.' '.$this->courseOffering->semester->year, '', ''];
         $data[] = ['Instructor:', $this->courseOffering->lecture?->display_name ?? 'Not assigned', '', ''];
         $data[] = ['Generated:', now()->format('F j, Y \a\t g:i A'), '', ''];
         $data[] = ['', '', '', ''];
@@ -761,19 +749,19 @@ class PdfReportSheet implements FromCollection, WithHeadings, WithStyles, WithCo
         $data[] = ['STATISTICS SUMMARY', '', '', ''];
         $data[] = ['Enrolled Students:', $statistics['enrollment_statistics']['total_enrolled_students'], '', ''];
         $data[] = ['Assessment Components:', $statistics['assessment_structure']['total_components'], '', ''];
-        $data[] = ['Total Weight:', $statistics['assessment_structure']['total_weight'] . '%', '', ''];
-        $data[] = ['Average Score:', $statistics['score_statistics']['average_score'] . '%', '', ''];
-        $data[] = ['Completion Rate:', $statistics['completion_statistics']['completion_rate'] . '%', '', ''];
+        $data[] = ['Total Weight:', $statistics['assessment_structure']['total_weight'].'%', '', ''];
+        $data[] = ['Average Score:', $statistics['score_statistics']['average_score'].'%', '', ''];
+        $data[] = ['Completion Rate:', $statistics['completion_statistics']['completion_rate'].'%', '', ''];
         $data[] = ['', '', '', ''];
 
         // Grade Matrix Header
-        if ($this->filters['include_grade_matrix'] && !empty($gradeMatrix['students'])) {
+        if ($this->filters['include_grade_matrix'] && ! empty($gradeMatrix['students'])) {
             $data[] = ['GRADE MATRIX', '', '', ''];
 
             // Component headers
             $headerRow = ['Student Name'];
             foreach ($gradeMatrix['components'] as $component) {
-                $headerRow[] = $component['name'] . ' (' . $component['weight'] . '%)';
+                $headerRow[] = $component['name'].' ('.$component['weight'].'%)';
             }
             $headerRow[] = 'Total (%)';
             $data[] = $headerRow;
@@ -803,7 +791,7 @@ class PdfReportSheet implements FromCollection, WithHeadings, WithStyles, WithCo
         return [
             1 => [
                 'font' => ['bold' => true, 'size' => 16],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
             ],
             9 => [
                 'font' => ['bold' => true, 'size' => 14],

@@ -26,13 +26,14 @@ class ClassSessionSeeder extends Seeder
         $courseOfferings = CourseOffering::with([
             'curriculumUnit.unit',
             'curriculumUnit.syllabus',
-            'semester'
+            'semester',
         ])
             ->where('is_active', true)
             ->get();
 
         if ($courseOfferings->isEmpty()) {
             $this->command->warn('⚠️  No active course offerings found. Skipping class session generation.');
+
             return;
         }
 
@@ -41,8 +42,9 @@ class ClassSessionSeeder extends Seeder
 //            ->where('status', 'active')
             ->first();
 
-        if (!$defaultRoom) {
+        if (! $defaultRoom) {
             $this->command->error('❌ No bookable rooms found. Please ensure rooms exist before generating class sessions.');
+
             return;
         }
 
@@ -75,7 +77,7 @@ class ClassSessionSeeder extends Seeder
                 // Log the detailed error for debugging
                 Log::error("ClassSessionSeeder error for CourseOffering {$courseOffering->id}", [
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'trace' => $e->getTraceAsString(),
                 ]);
             }
         }

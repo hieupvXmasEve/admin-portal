@@ -35,7 +35,7 @@ class CurriculumOverviewResource extends JsonResource
                 'version' => $curriculumInfo['version'],
                 'effective_date' => $curriculumInfo['effective_date'],
                 'total_credit_hours' => $curriculumInfo['total_credit_hours'],
-                'display_name' => 'Version ' . $curriculumInfo['version'],
+                'display_name' => 'Version '.$curriculumInfo['version'],
             ],
             'program_details' => [
                 'id' => $curriculumInfo['program']['id'],
@@ -43,7 +43,7 @@ class CurriculumOverviewResource extends JsonResource
                 'code' => $curriculumInfo['program']['code'],
                 'degree_type' => $curriculumInfo['program']['degree_type'],
                 'degree_type_display' => $this->getDegreeTypeDisplay($curriculumInfo['program']['degree_type']),
-                'full_title' => $curriculumInfo['program']['code'] . ' - ' . $curriculumInfo['program']['name'],
+                'full_title' => $curriculumInfo['program']['code'].' - '.$curriculumInfo['program']['name'],
             ],
             'curriculum_metadata' => [
                 'is_current_version' => true, // This would be determined by comparing with latest version
@@ -67,7 +67,7 @@ class CurriculumOverviewResource extends JsonResource
             'totals' => [
                 'total_units' => $structure['total_units'],
                 'total_credit_hours' => $structure['total_credit_hours'],
-                'average_credits_per_unit' => $structure['total_units'] > 0 
+                'average_credits_per_unit' => $structure['total_units'] > 0
                     ? round($structure['total_credit_hours'] / $structure['total_units'], 1)
                     : 0,
             ],
@@ -85,10 +85,10 @@ class CurriculumOverviewResource extends JsonResource
                 'overview' => $progress['units'],
                 'visual_progress' => [
                     'completed_percentage' => $progress['units']['completion_percentage'],
-                    'current_percentage' => $progress['units']['total'] > 0 
+                    'current_percentage' => $progress['units']['total'] > 0
                         ? round(($progress['units']['current'] / $progress['units']['total']) * 100, 1)
                         : 0,
-                    'remaining_percentage' => $progress['units']['total'] > 0 
+                    'remaining_percentage' => $progress['units']['total'] > 0
                         ? round(($progress['units']['remaining'] / $progress['units']['total']) * 100, 1)
                         : 0,
                 ],
@@ -102,10 +102,10 @@ class CurriculumOverviewResource extends JsonResource
                 'overview' => $progress['credits'],
                 'visual_progress' => [
                     'completed_percentage' => $progress['credits']['completion_percentage'],
-                    'current_percentage' => $progress['credits']['total'] > 0 
+                    'current_percentage' => $progress['credits']['total'] > 0
                         ? round(($progress['credits']['current'] / $progress['credits']['total']) * 100, 1)
                         : 0,
-                    'remaining_percentage' => $progress['credits']['total'] > 0 
+                    'remaining_percentage' => $progress['credits']['total'] > 0
                         ? round(($progress['credits']['remaining'] / $progress['credits']['total']) * 100, 1)
                         : 0,
                 ],
@@ -200,7 +200,7 @@ class CurriculumOverviewResource extends JsonResource
         return collect($yearLevels)->map(function ($count, $yearLevel) {
             return [
                 'year_level' => $yearLevel,
-                'year_display' => 'Year ' . $yearLevel,
+                'year_display' => 'Year '.$yearLevel,
                 'unit_count' => $count,
                 'difficulty_level' => $this->getDifficultyLevel($yearLevel),
             ];
@@ -215,7 +215,7 @@ class CurriculumOverviewResource extends JsonResource
         return collect($semesters)->map(function ($count, $semester) {
             return [
                 'semester' => $semester,
-                'semester_display' => 'Semester ' . $semester,
+                'semester_display' => 'Semester '.$semester,
                 'unit_count' => $count,
                 'typical_timing' => $this->getTypicalTiming($semester),
             ];
@@ -240,14 +240,14 @@ class CurriculumOverviewResource extends JsonResource
      */
     protected function calculateCreditEfficiency(array $credits): array
     {
-        $efficiency = $credits['total'] > 0 
+        $efficiency = $credits['total'] > 0
             ? round(($credits['completed'] / $credits['total']) * 100, 1)
             : 0;
 
         return [
             'efficiency_percentage' => $efficiency,
             'efficiency_status' => $this->getEfficiencyStatus($efficiency),
-            'credits_per_unit_average' => $credits['completed'] > 0 
+            'credits_per_unit_average' => $credits['completed'] > 0
                 ? round($credits['completed'] / max(1, $this->resource['progress_summary']['units']['completed']), 1)
                 : 0,
         ];
@@ -371,8 +371,9 @@ class CurriculumOverviewResource extends JsonResource
         if ($categoryStatus['is_complete']) {
             return 'complete';
         }
-        
+
         $percentage = $categoryStatus['completion_percentage'];
+
         return match (true) {
             $percentage >= 75 => 'nearly_complete',
             $percentage >= 50 => 'in_progress',
@@ -386,7 +387,7 @@ class CurriculumOverviewResource extends JsonResource
         if ($categoryStatus['is_complete']) {
             return '#22c55e'; // Green
         }
-        
+
         return $this->getProgressColor($categoryStatus['completion_percentage']);
     }
 
@@ -438,9 +439,9 @@ class CurriculumOverviewResource extends JsonResource
         $coreCount = $categories['core'] ?? 0;
         $electiveCount = $categories['elective'] ?? 0;
         $total = array_sum($categories);
-        
+
         $corePercentage = $total > 0 ? ($coreCount / $total) * 100 : 0;
-        
+
         return match (true) {
             $corePercentage >= 70 => 'core_heavy',
             $corePercentage >= 50 => 'balanced',
@@ -452,14 +453,14 @@ class CurriculumOverviewResource extends JsonResource
     {
         $counts = array_values($yearLevels);
         $isIncreasing = true;
-        
+
         for ($i = 1; $i < count($counts); $i++) {
             if ($counts[$i] <= $counts[$i - 1]) {
                 $isIncreasing = false;
                 break;
             }
         }
-        
+
         return $isIncreasing ? 'progressive' : 'distributed';
     }
 
@@ -467,7 +468,7 @@ class CurriculumOverviewResource extends JsonResource
     {
         $counts = array_values($semesters);
         $variance = $this->calculateVariance($counts);
-        
+
         return $variance < 2 ? 'even' : 'uneven';
     }
 
@@ -504,7 +505,7 @@ class CurriculumOverviewResource extends JsonResource
     protected function getNextMilestones(float $progress): array
     {
         $milestones = [];
-        
+
         if ($progress < 25) {
             $milestones[] = 'Complete 25% of your program';
         } elseif ($progress < 50) {
@@ -514,7 +515,7 @@ class CurriculumOverviewResource extends JsonResource
         } else {
             $milestones[] = 'Prepare for graduation';
         }
-        
+
         return $milestones;
     }
 
@@ -522,14 +523,14 @@ class CurriculumOverviewResource extends JsonResource
     {
         $unitsRemaining = $progress['units']['remaining'];
         $averageUnitsPerSemester = 4; // Typical full-time load
-        
-        $semestersRemaining = $unitsRemaining > 0 
+
+        $semestersRemaining = $unitsRemaining > 0
             ? ceil($unitsRemaining / $averageUnitsPerSemester)
             : 0;
 
         return [
             'estimated_semesters_remaining' => $semestersRemaining,
-            'estimated_completion_date' => $semestersRemaining > 0 
+            'estimated_completion_date' => $semestersRemaining > 0
                 ? now()->addMonths($semestersRemaining * 6)->format('Y-m-d')
                 : null,
             'on_track_for_expected_graduation' => $semestersRemaining <= 4, // Assuming 2 years is typical remaining
@@ -539,8 +540,8 @@ class CurriculumOverviewResource extends JsonResource
     protected function calculateVariance(array $values): float
     {
         $mean = array_sum($values) / count($values);
-        $variance = array_sum(array_map(fn($x) => pow($x - $mean, 2), $values)) / count($values);
-        
+        $variance = array_sum(array_map(fn ($x) => pow($x - $mean, 2), $values)) / count($values);
+
         return $variance;
     }
 }

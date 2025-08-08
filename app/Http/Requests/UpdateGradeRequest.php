@@ -35,103 +35,103 @@ class UpdateGradeRequest extends FormRequest
                             $fail("Points earned cannot exceed maximum points ({$score->assessmentComponentDetail->max_points})");
                         }
                     }
-                }
+                },
             ],
             'percentage_score' => [
                 'sometimes',
                 'numeric',
                 'min:0',
-                'max:100'
+                'max:100',
             ],
             'letter_grade' => [
                 'sometimes',
                 'string',
                 'max:5',
-                Rule::in(['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F', 'I', 'W', 'P', 'NP'])
+                Rule::in(['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F', 'I', 'W', 'P', 'NP']),
             ],
             'status' => [
                 'sometimes',
-                Rule::in(['not_submitted', 'submitted', 'grading', 'graded', 'returned'])
+                Rule::in(['not_submitted', 'submitted', 'grading', 'graded', 'returned']),
             ],
             'score_status' => [
                 'sometimes',
-                Rule::in(['draft', 'provisional', 'final'])
+                Rule::in(['draft', 'provisional', 'final']),
             ],
             'instructor_feedback' => [
                 'sometimes',
                 'string',
-                'max:1000'
+                'max:1000',
             ],
             'private_notes' => [
                 'sometimes',
                 'string',
-                'max:1000'
+                'max:1000',
             ],
             'bonus_points' => [
                 'sometimes',
                 'numeric',
                 'min:0',
-                'max:100' // Reasonable limit for bonus points
+                'max:100', // Reasonable limit for bonus points
             ],
             'bonus_reason' => [
                 'sometimes',
                 'string',
                 'max:255',
-                'required_with:bonus_points'
+                'required_with:bonus_points',
             ],
             'score_excluded' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'exclusion_reason' => [
                 'sometimes',
                 'string',
                 'max:255',
-                'required_if:score_excluded,true'
+                'required_if:score_excluded,true',
             ],
             'late_excuse_approved' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'late_excuse_reason' => [
                 'sometimes',
                 'string',
-                'max:500'
+                'max:500',
             ],
             'plagiarism_suspected' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'plagiarism_score' => [
                 'sometimes',
                 'numeric',
                 'min:0',
                 'max:100',
-                'required_if:plagiarism_suspected,true'
+                'required_if:plagiarism_suspected,true',
             ],
             'plagiarism_notes' => [
                 'sometimes',
                 'string',
-                'max:1000'
+                'max:1000',
             ],
             'integrity_status' => [
                 'sometimes',
-                Rule::in(['clean', 'flagged', 'under_review', 'violation_confirmed', 'cleared'])
+                Rule::in(['clean', 'flagged', 'under_review', 'violation_confirmed', 'cleared']),
             ],
             'appeal_requested' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'appeal_reason' => [
                 'sometimes',
                 'string',
                 'max:500',
-                'required_if:appeal_requested,true'
+                'required_if:appeal_requested,true',
             ],
             'appeal_status' => [
                 'sometimes',
-                Rule::in(['pending', 'under_review', 'approved', 'denied'])
-            ]
+                Rule::in(['pending', 'under_review', 'approved', 'denied']),
+            ],
         ];
     }
 
@@ -151,7 +151,7 @@ class UpdateGradeRequest extends FormRequest
             'bonus_reason.required_with' => 'Bonus reason is required when awarding bonus points',
             'exclusion_reason.required_if' => 'Exclusion reason is required when excluding a score',
             'plagiarism_score.required_if' => 'Plagiarism score is required when flagging for plagiarism',
-            'appeal_reason.required_if' => 'Appeal reason is required when requesting an appeal'
+            'appeal_reason.required_if' => 'Appeal reason is required when requesting an appeal',
         ];
     }
 
@@ -174,7 +174,7 @@ class UpdateGradeRequest extends FormRequest
 
             // Validate that final scores have required fields
             if ($this->score_status === 'final') {
-                if (!$this->has('points_earned') && !$this->has('percentage_score')) {
+                if (! $this->has('points_earned') && ! $this->has('percentage_score')) {
                     $validator->errors()->add('score_status', 'Final scores must have either points earned or percentage score');
                 }
             }

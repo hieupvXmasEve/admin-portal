@@ -23,7 +23,7 @@ class AssessmentScoreSeeder extends Seeder
         // Get FALL2024 semester
         $semester = Semester::where('code', 'FALL2024')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('FALL2024 semester not found.');
         }
 
@@ -41,6 +41,7 @@ class AssessmentScoreSeeder extends Seeder
         $existingScores = AssessmentComponentDetailScore::count();
         if ($existingScores > 0) {
             $this->command->info("✅ Assessment scores already exist ({$existingScores} found). Skipping creation.");
+
             return;
         }
 

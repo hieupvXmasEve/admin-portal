@@ -21,9 +21,13 @@ class AcademicIntegrityTest extends TestCase
     use RefreshDatabase;
 
     private AssessmentManagementService $service;
+
     private Lecture $lecturer;
+
     private CourseOffering $courseOffering;
+
     private Student $student;
+
     private AssessmentComponentDetailScore $score;
 
     protected function setUp(): void
@@ -35,7 +39,7 @@ class AcademicIntegrityTest extends TestCase
         // Create test data
         $this->lecturer = Lecture::factory()->create();
         $this->courseOffering = CourseOffering::factory()->create([
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
 
         $syllabus = Syllabus::factory()->create();
@@ -46,18 +50,18 @@ class AcademicIntegrityTest extends TestCase
         // Enroll student in course
         CourseRegistration::factory()->create([
             'course_offering_id' => $this->courseOffering->id,
-            'student_id' => $this->student->id
+            'student_id' => $this->student->id,
         ]);
 
         $assessmentComponent = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'weight' => 30.0
+            'weight' => 30.0,
         ]);
 
         $assessmentDetail = AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $assessmentComponent->id,
             'weight' => 100.0,
-            'max_points' => 100
+            'max_points' => 100,
         ]);
 
         $this->score = AssessmentComponentDetailScore::factory()->create([
@@ -66,7 +70,7 @@ class AcademicIntegrityTest extends TestCase
             'student_id' => $this->student->id,
             'points_earned' => 85,
             'percentage_score' => 85.0,
-            'score_status' => 'final'
+            'score_status' => 'final',
         ]);
     }
 
@@ -78,7 +82,7 @@ class AcademicIntegrityTest extends TestCase
             'plagiarism_suspected' => true,
             'plagiarism_score' => 75.5,
             'plagiarism_notes' => 'Detected similarities with another submission',
-            'integrity_status' => 'under_review'
+            'integrity_status' => 'under_review',
         ];
 
         $result = $this->service->processAcademicIntegrityFlag($this->score, $flagData);
@@ -93,7 +97,7 @@ class AcademicIntegrityTest extends TestCase
             'plagiarism_suspected' => true,
             'plagiarism_score' => 75.5,
             'plagiarism_notes' => 'Detected similarities with another submission',
-            'integrity_status' => 'under_review'
+            'integrity_status' => 'under_review',
         ]);
     }
 
@@ -107,7 +111,7 @@ class AcademicIntegrityTest extends TestCase
         // Then clear the flag
         $flagData = [
             'plagiarism_suspected' => false,
-            'integrity_status' => 'clean'
+            'integrity_status' => 'clean',
         ];
 
         $result = $this->service->processAcademicIntegrityFlag($this->score, $flagData);
@@ -119,7 +123,7 @@ class AcademicIntegrityTest extends TestCase
         $this->assertDatabaseHas('assessment_component_detail_scores', [
             'id' => $this->score->id,
             'plagiarism_suspected' => false,
-            'integrity_status' => 'clean'
+            'integrity_status' => 'clean',
         ]);
     }
 
@@ -130,7 +134,7 @@ class AcademicIntegrityTest extends TestCase
         // First confirm a violation
         $this->score->update([
             'plagiarism_suspected' => true,
-            'integrity_status' => 'violation_confirmed'
+            'integrity_status' => 'violation_confirmed',
         ]);
 
         $appealReason = 'I believe this is a false positive due to common reference material';
@@ -146,7 +150,7 @@ class AcademicIntegrityTest extends TestCase
             'id' => $this->score->id,
             'appeal_requested' => true,
             'appeal_status' => 'pending',
-            'appeal_reason' => $appealReason
+            'appeal_reason' => $appealReason,
         ]);
     }
 
@@ -160,7 +164,7 @@ class AcademicIntegrityTest extends TestCase
             'integrity_status' => 'violation_confirmed',
             'appeal_requested' => true,
             'appeal_status' => 'pending',
-            'appeal_reason' => 'False positive'
+            'appeal_reason' => 'False positive',
         ]);
 
         $reviewerNotes = 'After review, this appears to be legitimate common knowledge';
@@ -183,7 +187,7 @@ class AcademicIntegrityTest extends TestCase
             'integrity_status' => 'violation_dismissed',
             'plagiarism_suspected' => false,
             'instructor_feedback' => $instructorFeedback,
-            'private_notes' => $reviewerNotes
+            'private_notes' => $reviewerNotes,
         ]);
     }
 
@@ -197,7 +201,7 @@ class AcademicIntegrityTest extends TestCase
             'integrity_status' => 'violation_confirmed',
             'appeal_requested' => true,
             'appeal_status' => 'pending',
-            'appeal_reason' => 'Claim of false positive'
+            'appeal_reason' => 'Claim of false positive',
         ]);
 
         $reviewerNotes = 'Evidence clearly shows plagiarism';
@@ -220,7 +224,7 @@ class AcademicIntegrityTest extends TestCase
             'integrity_status' => 'violation_confirmed',
             'plagiarism_suspected' => true,
             'instructor_feedback' => $instructorFeedback,
-            'private_notes' => $reviewerNotes
+            'private_notes' => $reviewerNotes,
         ]);
     }
 
@@ -233,7 +237,7 @@ class AcademicIntegrityTest extends TestCase
 
         $flagData = [
             'plagiarism_suspected' => true,
-            'plagiarism_score' => 150.0 // Invalid score
+            'plagiarism_score' => 150.0, // Invalid score
         ];
 
         $this->service->processAcademicIntegrityFlag($this->score, $flagData);
@@ -248,7 +252,7 @@ class AcademicIntegrityTest extends TestCase
 
         $flagData = [
             'plagiarism_suspected' => true,
-            'integrity_status' => 'invalid_status'
+            'integrity_status' => 'invalid_status',
         ];
 
         $this->service->processAcademicIntegrityFlag($this->score, $flagData);
@@ -271,7 +275,7 @@ class AcademicIntegrityTest extends TestCase
         // Set up confirmed violation with existing appeal
         $this->score->update([
             'integrity_status' => 'violation_confirmed',
-            'appeal_requested' => true
+            'appeal_requested' => true,
         ]);
 
         $this->expectException(\Exception::class);
@@ -288,13 +292,13 @@ class AcademicIntegrityTest extends TestCase
         $score2 = AssessmentComponentDetailScore::factory()->create([
             'course_offering_id' => $this->courseOffering->id,
             'plagiarism_suspected' => true,
-            'integrity_status' => 'violation_confirmed'
+            'integrity_status' => 'violation_confirmed',
         ]);
 
         $score3 = AssessmentComponentDetailScore::factory()->create([
             'course_offering_id' => $this->courseOffering->id,
             'plagiarism_suspected' => true,
-            'integrity_status' => 'under_review'
+            'integrity_status' => 'under_review',
         ]);
 
         $stats = $this->service->getAcademicIntegrityStatistics($this->courseOffering);
@@ -335,7 +339,7 @@ class AcademicIntegrityTest extends TestCase
         $this->assertDatabaseHas('assessment_component_detail_scores', [
             'id' => $this->score->id,
             'instructor_feedback' => $feedback,
-            'private_notes' => $notes
+            'private_notes' => $notes,
         ]);
     }
 }

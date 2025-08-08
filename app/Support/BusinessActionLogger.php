@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +12,7 @@ use Spatie\Activitylog\Models\Activity as ActivityModel;
 
 /**
  * BusinessActionLogger - Centralized logging for complex business operations
- * 
+ *
  * This class provides a consistent interface for logging complex business actions
  * that involve multiple models, calculations, or operations that go beyond
  * simple CRUD operations on individual models.
@@ -21,13 +20,21 @@ use Spatie\Activitylog\Models\Activity as ActivityModel;
 class BusinessActionLogger
 {
     protected ?Model $subject = null;
+
     protected ?Model $causer = null;
+
     protected string $actionType;
+
     protected string $description;
+
     protected array $properties = [];
+
     protected ?string $logName = null;
+
     protected ?string $event = null;
+
     protected array $affectedModels = [];
+
     protected ?string $batchUuid = null;
 
     /**
@@ -54,6 +61,7 @@ class BusinessActionLogger
     public function on(Model $subject): self
     {
         $this->subject = $subject;
+
         return $this;
     }
 
@@ -63,6 +71,7 @@ class BusinessActionLogger
     public function by(?Model $causer): self
     {
         $this->causer = $causer;
+
         return $this;
     }
 
@@ -72,6 +81,7 @@ class BusinessActionLogger
     public function withProperties(array $properties): self
     {
         $this->properties = array_merge($this->properties, $properties);
+
         return $this;
     }
 
@@ -81,6 +91,7 @@ class BusinessActionLogger
     public function logName(string $logName): self
     {
         $this->logName = $logName;
+
         return $this;
     }
 
@@ -90,6 +101,7 @@ class BusinessActionLogger
     public function event(string $event): self
     {
         $this->event = $event;
+
         return $this;
     }
 
@@ -100,6 +112,7 @@ class BusinessActionLogger
     {
         $models = is_array($models) ? $models : [$models];
         $this->affectedModels = array_merge($this->affectedModels, $models);
+
         return $this;
     }
 
@@ -109,6 +122,7 @@ class BusinessActionLogger
     public function batch(string $batchUuid): self
     {
         $this->batchUuid = $batchUuid;
+
         return $this;
     }
 
@@ -230,9 +244,9 @@ class BusinessActionLogger
 
         // Add affected models information
         $affectedModelsProperties = [];
-        if (!empty($this->affectedModels)) {
+        if (! empty($this->affectedModels)) {
             $affectedModelsProperties['affected_models'] = collect($this->affectedModels)
-                ->map(fn($model) => [
+                ->map(fn ($model) => [
                     'type' => get_class($model),
                     'id' => $model->getKey(),
                     'identifier' => $this->getModelIdentifier($model),
@@ -261,6 +275,7 @@ class BusinessActionLogger
         }
 
         $campusId = $this->subject?->campus_id ?? CampusLogContext::getCurrentCampusId();
+
         return CampusLogContext::getLogName("business_{$this->actionType}", $campusId);
     }
 
@@ -271,9 +286,9 @@ class BusinessActionLogger
     {
         // Try common identifier fields
         $identifierFields = ['name', 'title', 'full_name', 'email', 'student_code', 'code'];
-        
+
         foreach ($identifierFields as $field) {
-            if (isset($model->$field) && !empty($model->$field)) {
+            if (isset($model->$field) && ! empty($model->$field)) {
                 return (string) $model->$field;
             }
         }
@@ -354,7 +369,7 @@ class BusinessActionLogger
     /**
      * Log a course withdrawal
      */
-    public static function courseWithdrawal(Model $registration, string $reason = null): self
+    public static function courseWithdrawal(Model $registration, ?string $reason = null): self
     {
         $description = 'Processed course withdrawal';
         if ($reason) {
@@ -383,6 +398,7 @@ class BusinessActionLogger
     public static function bulkGradeEntry(array $assessments, string $operation = 'update'): self
     {
         $count = count($assessments);
+
         return self::for('bulk_grade_entry', "Bulk grade {$operation} processed ({$count} assessments)")
             ->affecting($assessments)
             ->event("bulk_grade_{$operation}")
@@ -420,7 +436,7 @@ class BusinessActionLogger
     public static function enrollment(string $operation, Model $student, ?Model $semester = null): self
     {
         $description = "Student enrollment {$operation}";
-        
+
         $logger = self::for('enrollment', $description)
             ->on($student)
             ->event("enrollment_{$operation}");

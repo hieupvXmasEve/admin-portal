@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class StudentApplication extends AuditableModel
 {
     use HasFactory;
+
     protected $fillable = [
         'full_name',
         'gender',
-        'ethnicity', 
+        'ethnicity',
         'birth_day',
         'birth_month',
         'birth_year',
@@ -77,7 +78,7 @@ class StudentApplication extends AuditableModel
      */
     public function isConverted(): bool
     {
-        return !is_null($this->student_id);
+        return ! is_null($this->student_id);
     }
 
     /**
@@ -114,7 +115,7 @@ class StudentApplication extends AuditableModel
             'campus_code', 'intended_program', 'intended_specialization', 'intake',
             'exam_date', 'english_test_type', 'overall',
             'study_link_status', 'is_international_applicant',
-            'status', 'student_id'
+            'status', 'student_id',
         ];
     }
 
@@ -136,16 +137,17 @@ class StudentApplication extends AuditableModel
      */
     protected function getIdentifierForLog(): string
     {
-        if (!empty($this->full_name)) {
+        if (! empty($this->full_name)) {
             $campus = $this->campus_code ? " ({$this->campus_code})" : '';
-            return $this->full_name . $campus;
+
+            return $this->full_name.$campus;
         }
 
-        if (!empty($this->email)) {
+        if (! empty($this->email)) {
             return $this->email;
         }
 
-        if (!empty($this->sut_id)) {
+        if (! empty($this->sut_id)) {
             return "SUT ID: {$this->sut_id}";
         }
 

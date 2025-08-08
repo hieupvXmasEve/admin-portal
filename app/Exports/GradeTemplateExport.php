@@ -8,23 +8,24 @@ use App\Models\AssessmentComponentDetail;
 use App\Models\CourseOffering;
 use Illuminate\Database\Eloquent\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithTitle;
-use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Font;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithTitle, WithEvents
+class GradeTemplateExport implements FromCollection, WithColumnWidths, WithEvents, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     protected AssessmentComponentDetail $assessmentComponentDetail;
+
     protected CourseOffering $courseOffering;
+
     protected Collection $studentsWithScores;
 
     public function __construct(AssessmentComponentDetail $assessmentComponentDetail, CourseOffering $courseOffering, Collection $studentsWithScores)
@@ -65,7 +66,7 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
             // Metadata columns for validation (hidden/protected)
             'Assessment Detail ID',
             'Max Points',
-            'Current Score ID'
+            'Current Score ID',
         ];
     }
 
@@ -94,7 +95,7 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
             // Metadata
             $this->assessmentComponentDetail->id,
             $this->assessmentComponentDetail->max_points ?? 100,
-            $score?->id ?? null
+            $score?->id ?? null,
         ];
     }
 
@@ -166,6 +167,7 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
     public function title(): string
     {
         $assessmentName = str_replace(['/', '\\', '?', '*', '[', ']'], '_', $this->assessmentComponentDetail->name);
+
         return substr("Grades_{$assessmentName}", 0, 31); // Excel sheet name limit
     }
 
@@ -249,12 +251,12 @@ class GradeTemplateExport implements FromCollection, WithHeadings, WithMapping, 
 
         $instructions = [
             '1. Do not modify Student ID, Student Name, or Email columns',
-            '2. Points Earned should not exceed Max Points (' . ($this->assessmentComponentDetail->max_points ?? 100) . ')',
+            '2. Points Earned should not exceed Max Points ('.($this->assessmentComponentDetail->max_points ?? 100).')',
             '3. Percentage Score will be calculated automatically if Points Earned is provided',
             '4. Use the dropdown menus for Letter Grade, Status, and Score Status',
             '5. Bonus Points and Late Penalty Applied should be positive numbers',
             '6. Do not modify or unhide the hidden columns (Assessment Detail ID, Max Points, Current Score ID)',
-            '7. Save the file and upload it back to the system for import'
+            '7. Save the file and upload it back to the system for import',
         ];
 
         foreach ($instructions as $index => $instruction) {

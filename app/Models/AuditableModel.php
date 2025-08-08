@@ -4,8 +4,8 @@ namespace App\Models;
 
 use App\Support\CampusLogContext;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 abstract class AuditableModel extends Model
 {
@@ -15,7 +15,9 @@ abstract class AuditableModel extends Model
      * Logging level constants
      */
     public const LOG_LEVEL_MINIMAL = 'minimal';
+
     public const LOG_LEVEL_STANDARD = 'standard';
+
     public const LOG_LEVEL_COMPREHENSIVE = 'comprehensive';
 
     /**
@@ -160,7 +162,7 @@ abstract class AuditableModel extends Model
         $identifierFields = ['name', 'title', 'code', 'full_name', 'student_code', 'email'];
 
         foreach ($identifierFields as $field) {
-            if (isset($this->attributes[$field]) && !empty($this->attributes[$field])) {
+            if (isset($this->attributes[$field]) && ! empty($this->attributes[$field])) {
                 return $this->attributes[$field];
             }
         }
@@ -202,7 +204,7 @@ abstract class AuditableModel extends Model
         }
 
         // Add creation context
-        if (!$this->exists) {
+        if (! $this->exists) {
             $context['operation'] = 'create';
         } elseif ($this->isDirty()) {
             $context['operation'] = 'update';

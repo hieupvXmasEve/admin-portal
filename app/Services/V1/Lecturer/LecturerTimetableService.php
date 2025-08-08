@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Lecturer;
 
-use App\Models\Lecture;
 use App\Models\ClassSession;
-use App\Models\CourseOffering;
+use App\Models\Lecture;
 use App\Models\Room;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class LecturerTimetableService
 {
@@ -18,24 +17,24 @@ class LecturerTimetableService
      * Get lecturer's timetable for a specific period
      */
     public function getTimetable(
-        Lecture $lecturer, 
+        Lecture $lecturer,
         array $filters = []
     ): array {
-        $startDate = isset($filters['start_date']) 
-            ? Carbon::parse($filters['start_date']) 
+        $startDate = isset($filters['start_date'])
+            ? Carbon::parse($filters['start_date'])
             : now()->startOfWeek();
-        
-        $endDate = isset($filters['end_date']) 
-            ? Carbon::parse($filters['end_date']) 
+
+        $endDate = isset($filters['end_date'])
+            ? Carbon::parse($filters['end_date'])
             : $startDate->copy()->endOfWeek();
 
         $view = $filters['view'] ?? 'week'; // week, month, day
 
         $cacheKey = "lecturer-timetable:{$lecturer->id}:{$startDate->format('Y-m-d')}:{$endDate->format('Y-m-d')}:{$view}";
-        
+
         return Cache::remember($cacheKey, 300, function () use ($lecturer, $startDate, $endDate, $view) {
             $sessions = $this->getSessionsInPeriod($lecturer, $startDate, $endDate);
-            
+
             return [
                 'period' => [
                     'start_date' => $startDate->format('Y-m-d'),
@@ -54,12 +53,12 @@ class LecturerTimetableService
      * Get upcoming sessions for lecturer
      */
     public function getUpcomingSessions(
-        Lecture $lecturer, 
-        int $days = 7, 
+        Lecture $lecturer,
+        int $days = 7,
         int $limit = 20
     ): array {
         $endDate = now()->addDays($days);
-        
+
         $sessions = $lecturer->classSessions()
             ->with(['courseOffering.curriculumUnit', 'room'])
             ->where('session_date', '>=', now())
@@ -79,7 +78,7 @@ class LecturerTimetableService
      * Create a new session
      */
     public function createSession(
-        Lecture $lecturer, 
+        Lecture $lecturer,
         array $sessionData
     ): array {
         return DB::transaction(function () use ($lecturer, $sessionData) {
@@ -88,7 +87,7 @@ class LecturerTimetableService
                 ->where('id', $sessionData['course_offering_id'])
                 ->first();
 
-            if (!$courseOffering) {
+            if (! $courseOffering) {
                 throw new \Exception('Course offering not found or access denied');
             }
 
@@ -101,8 +100,8 @@ class LecturerTimetableService
                 $sessionData['room_id'] ?? null
             );
 
-            if (!empty($conflicts)) {
-                throw new \Exception('Scheduling conflict detected: ' . implode(', ', $conflicts));
+            if (! empty($conflicts)) {
+                throw new \Exception('Scheduling conflict detected: '.implode(', ', $conflicts));
             }
 
             // Create the session
@@ -115,7 +114,7 @@ class LecturerTimetableService
                 'start_time' => $sessionData['start_time'],
                 'end_time' => $sessionData['end_time'],
                 'duration_minutes' => $this->calculateDuration(
-                    $sessionData['start_time'], 
+                    $sessionData['start_time'],
                     $sessionData['end_time']
                 ),
                 'session_type' => $sessionData['session_type'] ?? 'lecture',
@@ -143,8 +142,8 @@ class LecturerTimetableService
      * Update an existing session
      */
     public function updateSession(
-        Lecture $lecturer, 
-        int $sessionId, 
+        Lecture $lecturer,
+        int $sessionId,
         array $updateData
     ): array {
         return DB::transaction(function () use ($lecturer, $sessionId, $updateData) {
@@ -152,7 +151,7 @@ class LecturerTimetableService
                 ->where('id', $sessionId)
                 ->first();
 
-            if (!$session) {
+            if (! $session) {
                 throw new \Exception('Session not found or access denied');
             }
 
@@ -172,8 +171,8 @@ class LecturerTimetableService
                     $sessionId // Exclude current session from conflict check
                 );
 
-                if (!empty($conflicts)) {
-                    throw new \Exception('Scheduling conflict detected: ' . implode(', ', $conflicts));
+                if (! empty($conflicts)) {
+                    throw new \Exception('Scheduling conflict detected: '.implode(', ', $conflicts));
                 }
             }
 
@@ -201,16 +200,16 @@ class LecturerTimetableService
      * Cancel a session
      */
     public function cancelSession(
-        Lecture $lecturer, 
-        int $sessionId, 
-        string $reason = null
+        Lecture $lecturer,
+        int $sessionId,
+        ?string $reason = null
     ): array {
         return DB::transaction(function () use ($lecturer, $sessionId, $reason) {
             $session = $lecturer->classSessions()
                 ->where('id', $sessionId)
                 ->first();
 
-            if (!$session) {
+            if (! $session) {
                 throw new \Exception('Session not found or access denied');
             }
 
@@ -238,9 +237,9 @@ class LecturerTimetableService
      * Get available rooms for a time slot
      */
     public function getAvailableRooms(
-        string $date, 
-        string $startTime, 
-        string $endTime, 
+        string $date,
+        string $startTime,
+        string $endTime,
         ?int $excludeSessionId = null
     ): array {
         $conflictingRoomIds = ClassSession::where('session_date', $date)
@@ -252,15 +251,15 @@ class LecturerTimetableService
                 $query->where(function ($q) use ($startTime, $endTime) {
                     // Session starts during the requested time
                     $q->where('start_time', '>=', $startTime)
-                      ->where('start_time', '<', $endTime);
+                        ->where('start_time', '<', $endTime);
                 })->orWhere(function ($q) use ($startTime, $endTime) {
                     // Session ends during the requested time
                     $q->where('end_time', '>', $startTime)
-                      ->where('end_time', '<=', $endTime);
+                        ->where('end_time', '<=', $endTime);
                 })->orWhere(function ($q) use ($startTime, $endTime) {
                     // Session encompasses the requested time
                     $q->where('start_time', '<=', $startTime)
-                      ->where('end_time', '>=', $endTime);
+                        ->where('end_time', '>=', $endTime);
                 });
             })
             ->whereNotNull('room_id')
@@ -289,8 +288,8 @@ class LecturerTimetableService
      * Get sessions in a specific period
      */
     protected function getSessionsInPeriod(
-        Lecture $lecturer, 
-        Carbon $startDate, 
+        Lecture $lecturer,
+        Carbon $startDate,
         Carbon $endDate
     ): \Illuminate\Database\Eloquent\Collection {
         return $lecturer->classSessions()
@@ -310,7 +309,7 @@ class LecturerTimetableService
             return $this->formatSessionDetails($session);
         })->groupBy(function ($session) use ($view) {
             $date = Carbon::parse($session['date']);
-            
+
             return match ($view) {
                 'day' => $session['date'],
                 'week' => $date->format('Y-m-d'),
@@ -385,11 +384,11 @@ class LecturerTimetableService
 
         foreach ($sessionsByDate as $date => $dateSessions) {
             $sortedSessions = $dateSessions->sortBy('start_time');
-            
+
             for ($i = 0; $i < $sortedSessions->count() - 1; $i++) {
                 $current = $sortedSessions->values()[$i];
                 $next = $sortedSessions->values()[$i + 1];
-                
+
                 if ($current->end_time > $next->start_time) {
                     $conflicts[] = [
                         'type' => 'time_overlap',
@@ -444,7 +443,7 @@ class LecturerTimetableService
             ->where(function ($query) use ($startTime, $endTime) {
                 $query->where(function ($q) use ($startTime, $endTime) {
                     $q->where('start_time', '<', $endTime)
-                      ->where('end_time', '>', $startTime);
+                        ->where('end_time', '>', $startTime);
                 });
             })
             ->exists();
@@ -464,7 +463,7 @@ class LecturerTimetableService
                 ->where(function ($query) use ($startTime, $endTime) {
                     $query->where(function ($q) use ($startTime, $endTime) {
                         $q->where('start_time', '<', $endTime)
-                          ->where('end_time', '>', $startTime);
+                            ->where('end_time', '>', $startTime);
                     });
                 })
                 ->exists();
@@ -484,7 +483,7 @@ class LecturerTimetableService
     {
         $start = Carbon::createFromFormat('H:i:s', $startTime);
         $end = Carbon::createFromFormat('H:i:s', $endTime);
-        
+
         return $start->diffInMinutes($end);
     }
 

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Models\Lecture;
-use App\Models\CourseOffering;
-use App\Models\Syllabus;
 use App\Models\AssessmentComponent;
+use App\Models\CourseOffering;
+use App\Models\Lecture;
+use App\Models\Syllabus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

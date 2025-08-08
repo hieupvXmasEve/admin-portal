@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Semester;
-use Illuminate\Console\Command;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
 
 class DeactivateExpiredSemesters extends Command
 {
@@ -39,6 +39,7 @@ class DeactivateExpiredSemesters extends Command
 
         if ($expiredSemesters->isEmpty()) {
             $this->info('No expired active semesters found.');
+
             return 0;
         }
 
@@ -50,18 +51,20 @@ class DeactivateExpiredSemesters extends Command
                     $semester->code,
                     $semester->name,
                     $semester->end_date->format('Y-m-d H:i:s'),
-                    $now->diffInDays($semester->end_date) . ' days'
+                    $now->diffInDays($semester->end_date).' days',
                 ];
             })
         );
 
         if ($isDryRun) {
             $this->warn('DRY RUN: The above semesters would be deactivated.');
+
             return 0;
         }
 
-        if (!$this->confirm('Do you want to deactivate these expired semesters?')) {
+        if (! $this->confirm('Do you want to deactivate these expired semesters?')) {
             $this->info('Operation cancelled.');
+
             return 0;
         }
 

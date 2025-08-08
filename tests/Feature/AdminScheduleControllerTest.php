@@ -23,7 +23,7 @@ class AdminScheduleControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $this->user = User::factory()->create();
         Sanctum::actingAs($this->user);
     }
@@ -36,7 +36,7 @@ class AdminScheduleControllerTest extends TestCase
         $courseOffering = CourseOffering::factory()->create([
             'lecture_id' => $lecture->id,
         ]);
-        
+
         ClassSession::factory()->count(3)->create([
             'course_offering_id' => $courseOffering->id,
             'lecture_id' => $lecture->id,
@@ -77,12 +77,12 @@ class AdminScheduleControllerTest extends TestCase
         // Arrange
         $lecture1 = Lecture::factory()->create();
         $lecture2 = Lecture::factory()->create();
-        
+
         ClassSession::factory()->create([
             'lecture_id' => $lecture1->id,
             'session_date' => Carbon::today()->addDays(1),
         ]);
-        
+
         ClassSession::factory()->create([
             'lecture_id' => $lecture2->id,
             'session_date' => Carbon::today()->addDays(1),
@@ -146,9 +146,9 @@ class AdminScheduleControllerTest extends TestCase
             'start_time' => Carbon::createFromTime(9, 0),
             'end_time' => Carbon::createFromTime(11, 0),
         ]);
-        
+
         $newRoom = Room::factory()->create();
-        
+
         $updateData = [
             'session_date' => Carbon::today()->addDays(2)->toDateString(),
             'start_time' => '10:00',
@@ -240,7 +240,7 @@ class AdminScheduleControllerTest extends TestCase
     {
         // Arrange
         $room = Room::factory()->create();
-        
+
         // Existing session
         ClassSession::factory()->create([
             'room_id' => $room->id,
@@ -248,7 +248,7 @@ class AdminScheduleControllerTest extends TestCase
             'start_time' => Carbon::createFromTime(9, 0),
             'end_time' => Carbon::createFromTime(11, 0),
         ]);
-        
+
         // Session to update
         $sessionToUpdate = ClassSession::factory()->create([
             'room_id' => Room::factory()->create()->id,

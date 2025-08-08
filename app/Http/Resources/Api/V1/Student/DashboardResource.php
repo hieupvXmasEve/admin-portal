@@ -131,7 +131,7 @@ class DashboardResource extends JsonResource
      */
     protected function calculateUrgency(?string $dueDate): string
     {
-        if (!$dueDate) {
+        if (! $dueDate) {
             return 'unknown';
         }
 

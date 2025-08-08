@@ -6,21 +6,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Student\StoreStudentRequest;
-use App\Http\Requests\Student\UpdateStudentRequest;
 use App\Http\Resources\Student\StudentResource;
-use App\Models\Student;
 use App\Models\CourseRegistration;
 use App\Models\GraduationRequirement;
+use App\Models\Student;
 use App\Services\StudentService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-
 
 class StudentController extends Controller
 {
     public function __construct(protected StudentService $studentService) {}
+
     /**
      * Display a listing of students for current campus
      */
@@ -28,7 +26,7 @@ class StudentController extends Controller
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return response()->json([
                 'success' => false,
                 'message' => 'No campus selected',
@@ -65,12 +63,12 @@ class StudentController extends Controller
                 'message' => 'Student created and admitted successfully',
                 'data' => [
                     'student' => new StudentResource($student),
-                ]
+                ],
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create student: ' . $e->getMessage(),
+                'message' => 'Failed to create student: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -82,7 +80,7 @@ class StudentController extends Controller
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return response()->json([
                 'success' => false,
                 'message' => 'No campus selected',
@@ -115,7 +113,7 @@ class StudentController extends Controller
             'campus',
             'program',
             'specialization',
-            'curriculumVersion'
+            'curriculumVersion',
         ]);
 
         return response()->json([
@@ -168,8 +166,8 @@ class StudentController extends Controller
                         'entrance_exam_score' => $student->entrance_exam_score,
                         'admission_notes' => $student->admission_notes,
                     ],
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 
@@ -192,7 +190,7 @@ class StudentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -207,8 +205,8 @@ class StudentController extends Controller
                     'full_name' => $student->full_name,
                     'phone' => $student->phone,
                     'address' => $student->address,
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 
@@ -221,7 +219,7 @@ class StudentController extends Controller
 
         $registrations = CourseRegistration::with([
             'courseOffering.curriculumUnit.unit',
-            'semester'
+            'semester',
         ])
             ->where('student_code', $student->id)
             ->orderBy('semester_id', 'desc')
@@ -304,8 +302,8 @@ class StudentController extends Controller
                     'total_credits_earned' => $allCompleted->sum('credit_hours'),
                     'total_courses' => $registrations->count(),
                     'completed_courses' => $allCompleted->count(),
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 
@@ -353,8 +351,8 @@ class StudentController extends Controller
                     'registration_blocks' => $registrationBlocks->count(),
                     'total_amount_owed' => $activeHolds->sum('amount'),
                     'can_register' => $registrationBlocks->isEmpty(),
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 
@@ -371,10 +369,10 @@ class StudentController extends Controller
             ->currentlyEffective()
             ->first();
 
-        if (!$requirement) {
+        if (! $requirement) {
             return response()->json([
                 'success' => false,
-                'message' => 'No graduation requirements found for your program'
+                'message' => 'No graduation requirements found for your program',
             ], 404);
         }
 
@@ -420,8 +418,8 @@ class StudentController extends Controller
                     'expected_graduation_date' => $student->expected_graduation_date?->format('Y-m-d'),
                     'years_enrolled' => $student->admission_date ?
                         $student->admission_date->diffInYears(now()) : 0,
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 }

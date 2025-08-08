@@ -115,9 +115,6 @@ class AssessmentComponent extends Model
 
     /**
      * Get grading statistics for this assessment component.
-     *
-     * @param int $courseOfferingId
-     * @return array
      */
     public function getGradingStatistics(int $courseOfferingId): array
     {
@@ -127,7 +124,7 @@ class AssessmentComponent extends Model
             'lowest_score' => 0,
             'total_submissions' => 0,
             'graded_submissions' => 0,
-            'pending_submissions' => 0
+            'pending_submissions' => 0,
         ];
 
         // Get all scores for this component's details
@@ -161,9 +158,6 @@ class AssessmentComponent extends Model
 
     /**
      * Get submission counts for this assessment component.
-     *
-     * @param int $courseOfferingId
-     * @return array
      */
     public function getSubmissionCounts(int $courseOfferingId): array
     {
@@ -188,15 +182,14 @@ class AssessmentComponent extends Model
             'graded' => $counts->graded ?? 0,
             'final' => $counts->final ?? 0,
             'late' => $counts->late ?? 0,
-            'plagiarism_flagged' => $counts->plagiarism_flagged ?? 0
+            'plagiarism_flagged' => $counts->plagiarism_flagged ?? 0,
         ];
     }
 
     /**
      * Validate total weight constraint for this component's syllabus.
      *
-     * @param float $newWeight The new weight for this component
-     * @return array
+     * @param  float  $newWeight  The new weight for this component
      */
     public function validateTotalWeight(float $newWeight): array
     {
@@ -211,11 +204,11 @@ class AssessmentComponent extends Model
 
         // Validate individual weight
         if ($newWeight <= 0) {
-            $errors[] = "Component weight must be greater than 0";
+            $errors[] = 'Component weight must be greater than 0';
         }
 
         if ($newWeight > 100) {
-            $errors[] = "Individual component weight cannot exceed 100%";
+            $errors[] = 'Individual component weight cannot exceed 100%';
         }
 
         // Validate total weight
@@ -227,15 +220,12 @@ class AssessmentComponent extends Model
             'is_valid' => empty($errors),
             'errors' => $errors,
             'total_weight' => $totalWeight,
-            'remaining_weight' => max(0, 100 - $totalWeight)
+            'remaining_weight' => max(0, 100 - $totalWeight),
         ];
     }
 
     /**
      * Get all student scores for this component.
-     *
-     * @param Student $student
-     * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getStudentScores(Student $student): \Illuminate\Database\Eloquent\Collection
     {

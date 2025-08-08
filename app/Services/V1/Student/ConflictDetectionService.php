@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
-use App\Models\CourseOffering;
 use App\Models\ClassSession;
+use App\Models\CourseOffering;
 use App\Models\Semester;
-use Illuminate\Support\Collection;
+use App\Models\Student;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 class ConflictDetectionService
 {
@@ -19,8 +19,8 @@ class ConflictDetectionService
     public function detectConflicts(Student $student, CourseOffering $newCourseOffering): Collection
     {
         $currentSemester = Semester::where('is_active', true)->first();
-        
-        if (!$currentSemester) {
+
+        if (! $currentSemester) {
             return collect();
         }
 
@@ -193,11 +193,11 @@ class ConflictDetectionService
      */
     public function getStudentSchedule(Student $student, ?int $semesterId = null): array
     {
-        $semester = $semesterId 
+        $semester = $semesterId
             ? Semester::find($semesterId)
             : Semester::where('is_active', true)->first();
 
-        if (!$semester) {
+        if (! $semester) {
             return [];
         }
 
@@ -249,8 +249,8 @@ class ConflictDetectionService
     public function detectTravelTimeConflicts(Student $student, CourseOffering $newCourseOffering, int $minimumBreakMinutes = 15): Collection
     {
         $currentSemester = Semester::where('is_active', true)->first();
-        
-        if (!$currentSemester) {
+
+        if (! $currentSemester) {
             return collect();
         }
 

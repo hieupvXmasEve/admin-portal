@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Student;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Student\MarkNotificationsRequest;
 use App\Http\Requests\Api\V1\Student\NotificationFilterRequest;
 use App\Http\Requests\Api\V1\Student\NotificationPreferenceRequest;
-use App\Http\Requests\Api\V1\Student\MarkNotificationsRequest;
 use App\Http\Resources\Api\V1\Student\NotificationResource;
 use App\Http\Responses\ApiResponse;
 use App\Services\V1\Student\NotificationService;
@@ -27,11 +27,11 @@ class NotificationController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $filters = $request->validated();
             $notifications = $this->notificationService->getNotifications($student, $filters);
-            
+
             return ApiResponse::success(
                 new NotificationResource($notifications),
                 'Notifications retrieved successfully'
@@ -48,10 +48,10 @@ class NotificationController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $summary = $this->notificationService->getNotificationSummary($student);
-            
+
             return ApiResponse::success(
                 $summary,
                 'Notification summary retrieved successfully'
@@ -68,10 +68,10 @@ class NotificationController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $success = $this->notificationService->markAsRead($student, $notificationId);
-            
+
             if ($success) {
                 return ApiResponse::success(
                     null,
@@ -92,11 +92,11 @@ class NotificationController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $notificationIds = $request->validated()['notification_ids'];
             $updated = $this->notificationService->markMultipleAsRead($student, $notificationIds);
-            
+
             return ApiResponse::success(
                 ['updated_count' => $updated],
                 "Marked {$updated} notifications as read"
@@ -113,10 +113,10 @@ class NotificationController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $updated = $this->notificationService->markAllAsRead($student);
-            
+
             return ApiResponse::success(
                 ['updated_count' => $updated],
                 "Marked all {$updated} notifications as read"
@@ -133,10 +133,10 @@ class NotificationController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $success = $this->notificationService->deleteNotification($student, $notificationId);
-            
+
             if ($success) {
                 return ApiResponse::success(
                     null,
@@ -157,10 +157,10 @@ class NotificationController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $preferences = $this->notificationService->getNotificationPreferences($student);
-            
+
             return ApiResponse::success(
                 $preferences,
                 'Notification preferences retrieved successfully'
@@ -177,11 +177,11 @@ class NotificationController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $preferences = $request->validated()['preferences'];
             $success = $this->notificationService->updateNotificationPreferences($student, $preferences);
-            
+
             if ($success) {
                 return ApiResponse::success(
                     null,

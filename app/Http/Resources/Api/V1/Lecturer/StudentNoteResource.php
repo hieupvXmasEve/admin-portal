@@ -79,7 +79,7 @@ class StudentNoteResource extends JsonResource
                 'can_edit' => $this->canEdit(),
                 'can_delete' => $this->canDelete(),
                 'can_share' => $this->canShare(),
-                'can_convert_to_alert' => !$this->is_alert,
+                'can_convert_to_alert' => ! $this->is_alert,
                 'can_change_priority' => true,
             ],
 
@@ -151,7 +151,7 @@ class StudentNoteResource extends JsonResource
     {
         // Notes can be deleted by the lecturer who created them
         // May want to restrict deletion of certain types or old notes
-        return !$this->is_alert || $this->created_at->gt(now()->subDays(30));
+        return ! $this->is_alert || $this->created_at->gt(now()->subDays(30));
     }
 
     /**
@@ -161,6 +161,6 @@ class StudentNoteResource extends JsonResource
     {
         // Private notes can potentially be made public
         // Alert notes might have different sharing rules
-        return $this->is_private && !$this->is_alert;
+        return $this->is_private && ! $this->is_alert;
     }
 }

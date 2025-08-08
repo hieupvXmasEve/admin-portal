@@ -50,7 +50,7 @@ return new class extends Migration
                 'resubmit_required',
                 'excused',
                 'incomplete',
-                'cancelled'
+                'cancelled',
             ])->default('not_submitted');
 
             $table->enum('score_status', [
@@ -58,7 +58,7 @@ return new class extends Migration
                 'provisional',
                 'final',
                 'disputed',
-                'under_review'
+                'under_review',
             ])->default('draft');
 
             // Feedback and comments
@@ -77,7 +77,7 @@ return new class extends Migration
                 'under_investigation',
                 'violation_confirmed',
                 'violation_minor',
-                'violation_major'
+                'violation_major',
             ])->default('clear');
 
             // Score history and auditing
@@ -103,7 +103,7 @@ return new class extends Migration
                 'pending',
                 'under_review',
                 'approved',
-                'denied'
+                'denied',
             ])->default('none');
 
             $table->timestamps();

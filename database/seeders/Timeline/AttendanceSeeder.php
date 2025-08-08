@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
+use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\CourseRegistration;
-use App\Models\Attendance;
 use App\Models\Semester;
 use Illuminate\Database\Seeder;
 
@@ -23,7 +23,7 @@ class AttendanceSeeder extends Seeder
         // Get FALL2024 semester
         $semester = Semester::where('code', 'FALL2024')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('FALL2024 semester not found.');
         }
 
@@ -40,6 +40,7 @@ class AttendanceSeeder extends Seeder
         $existingAttendance = Attendance::whereIn('class_session_id', $classSessions->pluck('id'))->count();
         if ($existingAttendance > 0) {
             $this->command->info("✅ Attendance records already exist for FALL2024 ({$existingAttendance} found). Skipping creation.");
+
             return;
         }
 
@@ -139,15 +140,18 @@ class AttendanceSeeder extends Seeder
         if ($status === 'late') {
             // Late by 5-20 minutes
             $lateMinutes = rand(5, 20);
+
             return $startTime->addMinutes($lateMinutes)->format('H:i:s');
         } elseif ($status === 'partial') {
             // Arrives very late
             $lateMinutes = rand(30, 60);
+
             return $startTime->addMinutes($lateMinutes)->format('H:i:s');
         }
 
         // Present - arrives on time or slightly early
         $earlyMinutes = rand(-5, 5);
+
         return $startTime->addMinutes($earlyMinutes)->format('H:i:s');
     }
 
@@ -162,11 +166,13 @@ class AttendanceSeeder extends Seeder
         if ($status === 'partial') {
             // Leaves early
             $earlyMinutes = rand(15, 45);
+
             return $endTime->subMinutes($earlyMinutes)->format('H:i:s');
         }
 
         // Most students stay until the end
         $variationMinutes = rand(-5, 10);
+
         return $endTime->addMinutes($variationMinutes)->format('H:i:s');
     }
 
@@ -198,6 +204,7 @@ class AttendanceSeeder extends Seeder
         ];
 
         $statusNotes = $notes[$status] ?? [null];
+
         return $statusNotes[array_rand($statusNotes)];
     }
 
@@ -208,7 +215,7 @@ class AttendanceSeeder extends Seeder
 
     private function getExcuseReason(string $status): ?string
     {
-        if (!$this->isExcused($status)) {
+        if (! $this->isExcused($status)) {
             return null;
         }
 
@@ -226,7 +233,7 @@ class AttendanceSeeder extends Seeder
 
     private function hasExcuseDocumentation(string $status): bool
     {
-        if (!$this->isExcused($status)) {
+        if (! $this->isExcused($status)) {
             return false;
         }
 

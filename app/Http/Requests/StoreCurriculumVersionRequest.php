@@ -60,11 +60,11 @@ class StoreCurriculumVersionRequest extends FormRequest
                 $baseCode = $specialization ? $specialization->code : $program->code;
                 $year = now()->year;
                 $count = \App\Models\CurriculumVersion::where('program_id', $this->program_id)
-                    ->when($this->specialization_id, fn($q) => $q->where('specialization_id', $this->specialization_id))
+                    ->when($this->specialization_id, fn ($q) => $q->where('specialization_id', $this->specialization_id))
                     ->count() + 1;
 
                 $this->merge([
-                    'version_code' => "{$baseCode}-V{$count}-{$year}"
+                    'version_code' => "{$baseCode}-V{$count}-{$year}",
                 ]);
             }
         }

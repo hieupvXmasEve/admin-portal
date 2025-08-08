@@ -21,7 +21,9 @@ class PermissionHelper
     public static function canAtCampus($permission, $campusId)
     {
         $user = Auth::user();
-        if (!$user) return false;
+        if (! $user) {
+            return false;
+        }
 
         return $user->hasPermission($permission, $campusId);
     }
@@ -46,7 +48,7 @@ class PermissionHelper
     public static function canAll(array $permissions)
     {
         foreach ($permissions as $permission) {
-            if (!self::can($permission)) {
+            if (! self::can($permission)) {
                 return false;
             }
         }

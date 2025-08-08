@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AssessmentComponent;
-use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
-use App\Models\CourseRegistration;
 use App\Models\Student;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -17,15 +15,12 @@ class AssessmentReportService
 {
     /**
      * Generate overview statistics for assessment reporting.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function generateOverviewStatistics(CourseOffering $courseOffering): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyOverviewStatistics();
         }
 
@@ -73,15 +68,12 @@ class AssessmentReportService
 
     /**
      * Calculate score distribution for performance analytics.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function calculateScoreDistribution(CourseOffering $courseOffering): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyScoreDistribution();
         }
 
@@ -122,7 +114,7 @@ class AssessmentReportService
         // Calculate histogram data (10-point intervals)
         $histogram = [];
         for ($i = 0; $i < 100; $i += 10) {
-            $rangeLabel = $i . '-' . ($i + 9);
+            $rangeLabel = $i.'-'.($i + 9);
             $count = $percentageScores->filter(function ($score) use ($i) {
                 return $score >= $i && $score < ($i + 10);
             })->count();
@@ -132,7 +124,7 @@ class AssessmentReportService
                 'min' => $i,
                 'max' => $i + 9,
                 'count' => $count,
-                'percentage' => $scores->count() > 0 ? round(($count / $scores->count()) * 100, 2) : 0
+                'percentage' => $scores->count() > 0 ? round(($count / $scores->count()) * 100, 2) : 0,
             ];
         }
 
@@ -161,15 +153,12 @@ class AssessmentReportService
 
     /**
      * Get completion statistics for tracking submission status.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function getCompletionStatistics(CourseOffering $courseOffering): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyCompletionStatistics();
         }
 
@@ -247,10 +236,6 @@ class AssessmentReportService
 
     /**
      * Calculate overall score statistics.
-     *
-     * @param CourseOffering $courseOffering
-     * @param Collection $assessmentComponents
-     * @return array
      */
     private function calculateOverallScoreStatistics(CourseOffering $courseOffering, Collection $assessmentComponents): array
     {
@@ -295,10 +280,6 @@ class AssessmentReportService
 
     /**
      * Calculate completion statistics.
-     *
-     * @param CourseOffering $courseOffering
-     * @param Collection $assessmentComponents
-     * @return array
      */
     private function calculateCompletionStatistics(CourseOffering $courseOffering, Collection $assessmentComponents): array
     {
@@ -347,10 +328,6 @@ class AssessmentReportService
 
     /**
      * Calculate submission statistics.
-     *
-     * @param CourseOffering $courseOffering
-     * @param Collection $assessmentComponents
-     * @return array
      */
     private function calculateSubmissionStatistics(CourseOffering $courseOffering, Collection $assessmentComponents): array
     {
@@ -393,10 +370,6 @@ class AssessmentReportService
 
     /**
      * Get component breakdown statistics.
-     *
-     * @param CourseOffering $courseOffering
-     * @param Collection $assessmentComponents
-     * @return array
      */
     private function getComponentBreakdown(CourseOffering $courseOffering, Collection $assessmentComponents): array
     {
@@ -422,11 +395,6 @@ class AssessmentReportService
 
     /**
      * Calculate completion rate for a specific component.
-     *
-     * @param CourseOffering $courseOffering
-     * @param AssessmentComponent $component
-     * @param int $totalEnrolledStudents
-     * @return array
      */
     private function calculateComponentCompletionRate(CourseOffering $courseOffering, AssessmentComponent $component, int $totalEnrolledStudents): array
     {
@@ -457,9 +425,6 @@ class AssessmentReportService
 
     /**
      * Calculate median value from array of numbers.
-     *
-     * @param array $numbers
-     * @return float
      */
     private function calculateMedian(array $numbers): float
     {
@@ -480,9 +445,6 @@ class AssessmentReportService
 
     /**
      * Calculate standard deviation from array of numbers.
-     *
-     * @param array $numbers
-     * @return float
      */
     private function calculateStandardDeviation(array $numbers): float
     {
@@ -496,14 +458,12 @@ class AssessmentReportService
         }, $numbers);
 
         $variance = array_sum($squaredDifferences) / count($numbers);
+
         return round(sqrt($variance), 2);
     }
 
     /**
      * Calculate quartiles from array of numbers.
-     *
-     * @param array $numbers
-     * @return array
      */
     private function calculateQuartiles(array $numbers): array
     {
@@ -527,8 +487,6 @@ class AssessmentReportService
 
     /**
      * Get empty overview statistics structure.
-     *
-     * @return array
      */
     private function getEmptyOverviewStatistics(): array
     {
@@ -569,8 +527,6 @@ class AssessmentReportService
 
     /**
      * Get empty score distribution structure.
-     *
-     * @return array
      */
     private function getEmptyScoreDistribution(): array
     {
@@ -595,11 +551,6 @@ class AssessmentReportService
 
     /**
      * Calculate comprehensive performance metrics for a student.
-     *
-     * @param CourseOffering $courseOffering
-     * @param Student $student
-     * @param Collection $assessmentComponents
-     * @return array
      */
     private function calculateStudentPerformanceMetrics(CourseOffering $courseOffering, Student $student, Collection $assessmentComponents): array
     {
@@ -632,15 +583,21 @@ class AssessmentReportService
             foreach ($component->details as $detail) {
                 $score = $scores->where('assessment_component_detail_id', $detail->id)->first();
 
-                if ($score && $score->score_status === 'final' && !$score->score_excluded) {
+                if ($score && $score->score_status === 'final' && ! $score->score_excluded) {
                     $componentScores[$component->id][] = $score->percentage_score;
                     $componentTotalScore += $score->percentage_score * ($detail->weight / 100);
                     $componentTotalWeight += $detail->weight / 100;
                     $componentHasScores = true;
 
-                    if ($score->is_late) $lateSubmissions++;
-                    if ($score->plagiarism_suspected) $integrityConcerns++;
-                    if ($score->appeal_requested) $appealRequests++;
+                    if ($score->is_late) {
+                        $lateSubmissions++;
+                    }
+                    if ($score->plagiarism_suspected) {
+                        $integrityConcerns++;
+                    }
+                    if ($score->appeal_requested) {
+                        $appealRequests++;
+                    }
                 } else {
                     $missingSubmissions++;
                 }
@@ -677,11 +634,6 @@ class AssessmentReportService
 
     /**
      * Calculate performance trend for a student.
-     *
-     * @param CourseOffering $courseOffering
-     * @param Student $student
-     * @param Collection $assessmentComponents
-     * @return array
      */
     private function calculatePerformanceTrend(CourseOffering $courseOffering, Student $student, Collection $assessmentComponents): array
     {
@@ -747,9 +699,6 @@ class AssessmentReportService
 
     /**
      * Determine risk level based on risk score.
-     *
-     * @param int $riskScore
-     * @return string
      */
     private function determineRiskLevel(int $riskScore): string
     {
@@ -768,9 +717,6 @@ class AssessmentReportService
 
     /**
      * Calculate risk distribution among at-risk students.
-     *
-     * @param array $atRiskStudents
-     * @return array
      */
     private function calculateRiskDistribution(array $atRiskStudents): array
     {
@@ -791,10 +737,6 @@ class AssessmentReportService
 
     /**
      * Generate intervention recommendations based on risk factors.
-     *
-     * @param array $riskFactors
-     * @param array $performanceMetrics
-     * @return array
      */
     private function generateInterventionRecommendations(array $riskFactors, array $performanceMetrics): array
     {
@@ -863,10 +805,6 @@ class AssessmentReportService
 
     /**
      * Generate recognition suggestions for exceptional students.
-     *
-     * @param array $excellenceFactors
-     * @param array $performanceMetrics
-     * @return array
      */
     private function generateRecognitionSuggestions(array $excellenceFactors, array $performanceMetrics): array
     {
@@ -913,9 +851,6 @@ class AssessmentReportService
 
     /**
      * Calculate integrity risk level for a student.
-     *
-     * @param array $studentData
-     * @return string
      */
     private function calculateIntegrityRiskLevel(array $studentData): string
     {
@@ -940,10 +875,6 @@ class AssessmentReportService
 
     /**
      * Generate integrity monitoring recommendations.
-     *
-     * @param array $overallStats
-     * @param array $studentIssues
-     * @return array
      */
     private function generateIntegrityRecommendations(array $overallStats, array $studentIssues): array
     {
@@ -976,29 +907,22 @@ class AssessmentReportService
 
     /**
      * Calculate lowest component score for a student.
-     *
-     * @param array $componentScores
-     * @return float
      */
     private function calculateLowestComponentScore(array $componentScores): float
     {
         $componentAverages = [];
 
         foreach ($componentScores as $scores) {
-            if (!empty($scores)) {
+            if (! empty($scores)) {
                 $componentAverages[] = array_sum($scores) / count($scores);
             }
         }
 
-        return !empty($componentAverages) ? round(min($componentAverages), 2) : 0;
+        return ! empty($componentAverages) ? round(min($componentAverages), 2) : 0;
     }
 
     /**
      * Generate trend analysis description.
-     *
-     * @param string $trend
-     * @param float $changePercentage
-     * @return string
      */
     private function generateTrendAnalysis(string $trend, float $changePercentage): string
     {
@@ -1008,16 +932,14 @@ class AssessmentReportService
             case 'declining':
                 return "Student performance is declining with an average decrease of {$changePercentage}% in recent assessments.";
             case 'stable':
-                return "Student performance remains stable with minimal variation in recent assessments.";
+                return 'Student performance remains stable with minimal variation in recent assessments.';
             default:
-                return "Insufficient data available for trend analysis.";
+                return 'Insufficient data available for trend analysis.';
         }
     }
 
     /**
      * Get empty at-risk students structure.
-     *
-     * @return array
      */
     private function getEmptyAtRiskStudents(): array
     {
@@ -1039,8 +961,6 @@ class AssessmentReportService
 
     /**
      * Get empty exceptional students structure.
-     *
-     * @return array
      */
     private function getEmptyExceptionalStudents(): array
     {
@@ -1055,8 +975,6 @@ class AssessmentReportService
 
     /**
      * Get empty integrity monitoring structure.
-     *
-     * @return array
      */
     private function getEmptyIntegrityMonitoring(): array
     {
@@ -1078,16 +996,12 @@ class AssessmentReportService
 
     /**
      * Generate comprehensive grade matrix for all students and assessments.
-     *
-     * @param CourseOffering $courseOffering
-     * @param array $filters
-     * @return array
      */
     public function generateGradeMatrix(CourseOffering $courseOffering, array $filters = []): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyGradeMatrix();
         }
 
@@ -1100,14 +1014,14 @@ class AssessmentReportService
             ->sortBy('display_name');
 
         // Apply student filter if provided
-        if (!empty($filters['student_codes'])) {
+        if (! empty($filters['student_codes'])) {
             $students = $students->whereIn('id', $filters['student_codes']);
         }
 
         // Get assessment components
         $assessmentComponents = $syllabus->assessmentComponents()
             ->with(['details'])
-            ->when(!empty($filters['component_ids']), function ($query) use ($filters) {
+            ->when(! empty($filters['component_ids']), function ($query) use ($filters) {
                 return $query->whereIn('id', $filters['component_ids']);
             })
             ->orderBy('sort_order')
@@ -1142,14 +1056,14 @@ class AssessmentReportService
             ->where('ac.syllabus_id', $syllabus->id)
             ->where('acds.course_offering_id', $courseOffering->id)
             ->where('acds.score_status', $filters['score_status'] ?? 'final')
-            ->when(!($filters['include_excluded'] ?? false), function ($query) {
+            ->when(! ($filters['include_excluded'] ?? false), function ($query) {
                 return $query->where('acds.score_excluded', false);
             })
             ->whereNull('acds.deleted_at')
-            ->when(!empty($filters['student_codes']), function ($query) use ($filters) {
+            ->when(! empty($filters['student_codes']), function ($query) use ($filters) {
                 return $query->whereIn('acds.student_code', $filters['student_codes']);
             })
-            ->when(!empty($filters['component_ids']), function ($query) use ($filters) {
+            ->when(! empty($filters['component_ids']), function ($query) use ($filters) {
                 return $query->whereIn('ac.id', $filters['component_ids']);
             })
             ->select([
@@ -1172,7 +1086,7 @@ class AssessmentReportService
                 'acds.appeal_requested',
                 'acds.graded_at',
                 'acd.weight as detail_weight',
-                'ac.weight as component_weight'
+                'ac.weight as component_weight',
             ])
             ->get();
 
@@ -1188,7 +1102,7 @@ class AssessmentReportService
             'total_weighted_scores' => [],
             'component_averages' => [],
             'missing_scores_count' => 0,
-            'excluded_scores_count' => 0
+            'excluded_scores_count' => 0,
         ];
 
         foreach ($students as $student) {
@@ -1210,7 +1124,7 @@ class AssessmentReportService
                 'late_submissions' => 0,
                 'bonus_points_total' => 0,
                 'has_integrity_concerns' => false,
-                'has_appeals' => false
+                'has_appeals' => false,
             ];
 
             $totalWeightedScore = 0;
@@ -1255,18 +1169,28 @@ class AssessmentReportService
                             'plagiarism_suspected' => (bool) $score->plagiarism_suspected,
                             'appeal_requested' => (bool) $score->appeal_requested,
                             'graded_at' => $score->graded_at,
-                            'has_adjustments' => $this->scoreHasAdjustments($score)
+                            'has_adjustments' => $this->scoreHasAdjustments($score),
                         ];
 
                         // Track student-level statistics
-                        if ($score->is_late) $studentLateCount++;
-                        if ($score->score_excluded) $studentExcludedCount++;
-                        if ($score->bonus_points > 0) $studentBonusTotal += $score->bonus_points;
-                        if ($score->plagiarism_suspected) $hasIntegrityConcerns = true;
-                        if ($score->appeal_requested) $hasAppeals = true;
+                        if ($score->is_late) {
+                            $studentLateCount++;
+                        }
+                        if ($score->score_excluded) {
+                            $studentExcludedCount++;
+                        }
+                        if ($score->bonus_points > 0) {
+                            $studentBonusTotal += $score->bonus_points;
+                        }
+                        if ($score->plagiarism_suspected) {
+                            $hasIntegrityConcerns = true;
+                        }
+                        if ($score->appeal_requested) {
+                            $hasAppeals = true;
+                        }
 
                         // Calculate weighted score for this detail (only if not excluded)
-                        if ($finalScore !== null && !$score->score_excluded) {
+                        if ($finalScore !== null && ! $score->score_excluded) {
                             $componentWeightedScore += ($finalScore * $detail->weight);
                             $componentTotalWeight += $detail->weight;
                         }
@@ -1290,7 +1214,7 @@ class AssessmentReportService
                             'plagiarism_suspected' => false,
                             'appeal_requested' => false,
                             'graded_at' => null,
-                            'has_adjustments' => false
+                            'has_adjustments' => false,
                         ];
                     }
 
@@ -1312,7 +1236,7 @@ class AssessmentReportService
                     $totalWeight += $component->weight;
 
                     // Track for class statistics
-                    if (!isset($classStatistics['component_averages'][$component->id])) {
+                    if (! isset($classStatistics['component_averages'][$component->id])) {
                         $classStatistics['component_averages'][$component->id] = [];
                     }
                     $classStatistics['component_averages'][$component->id][] = $componentAverage;
@@ -1366,31 +1290,48 @@ class AssessmentReportService
 
     /**
      * Calculate letter grade from percentage.
-     *
-     * @param float $percentage
-     * @return string|null
      */
     private function calculateLetterGrade(float $percentage): ?string
     {
-        if ($percentage >= 97) return 'A+';
-        if ($percentage >= 93) return 'A';
-        if ($percentage >= 90) return 'A-';
-        if ($percentage >= 87) return 'B+';
-        if ($percentage >= 83) return 'B';
-        if ($percentage >= 80) return 'B-';
-        if ($percentage >= 77) return 'C+';
-        if ($percentage >= 73) return 'C';
-        if ($percentage >= 70) return 'C-';
-        if ($percentage >= 67) return 'D+';
-        if ($percentage >= 60) return 'D';
+        if ($percentage >= 97) {
+            return 'A+';
+        }
+        if ($percentage >= 93) {
+            return 'A';
+        }
+        if ($percentage >= 90) {
+            return 'A-';
+        }
+        if ($percentage >= 87) {
+            return 'B+';
+        }
+        if ($percentage >= 83) {
+            return 'B';
+        }
+        if ($percentage >= 80) {
+            return 'B-';
+        }
+        if ($percentage >= 77) {
+            return 'C+';
+        }
+        if ($percentage >= 73) {
+            return 'C';
+        }
+        if ($percentage >= 70) {
+            return 'C-';
+        }
+        if ($percentage >= 67) {
+            return 'D+';
+        }
+        if ($percentage >= 60) {
+            return 'D';
+        }
+
         return 'F';
     }
 
     /**
      * Calculate class average from grade matrix.
-     *
-     * @param array $gradeMatrix
-     * @return float
      */
     private function calculateClassAverage(array $gradeMatrix): float
     {
@@ -1399,14 +1340,12 @@ class AssessmentReportService
         }
 
         $totalPercentage = array_sum(array_column($gradeMatrix, 'final_percentage'));
+
         return round($totalPercentage / count($gradeMatrix), 2);
     }
 
     /**
      * Calculate grade distribution from grade matrix.
-     *
-     * @param array $gradeMatrix
-     * @return array
      */
     private function calculateGradeDistributionFromMatrix(array $gradeMatrix): array
     {
@@ -1437,8 +1376,6 @@ class AssessmentReportService
 
     /**
      * Get empty grade matrix structure.
-     *
-     * @return array
      */
     private function getEmptyGradeMatrix(): array
     {
@@ -1458,8 +1395,7 @@ class AssessmentReportService
     /**
      * Calculate final score for a detail with all adjustments.
      *
-     * @param object $score Database score object
-     * @return float|null
+     * @param  object  $score  Database score object
      */
     private function calculateDetailFinalScore(object $score): ?float
     {
@@ -1471,7 +1407,7 @@ class AssessmentReportService
         $finalScore = $score->percentage_score ?? 0;
 
         // Apply late penalty if applicable
-        if ($score->is_late && $score->late_penalty_applied > 0 && !$score->late_excuse_approved) {
+        if ($score->is_late && $score->late_penalty_applied > 0 && ! $score->late_excuse_approved) {
             $finalScore -= $score->late_penalty_applied;
         }
 
@@ -1487,8 +1423,7 @@ class AssessmentReportService
     /**
      * Check if a score has any adjustments applied.
      *
-     * @param object $score Database score object
-     * @return bool
+     * @param  object  $score  Database score object
      */
     private function scoreHasAdjustments(object $score): bool
     {
@@ -1501,11 +1436,6 @@ class AssessmentReportService
 
     /**
      * Calculate comprehensive matrix summary statistics.
-     *
-     * @param array $gradeMatrix
-     * @param array $assessmentComponents
-     * @param array $classStatistics
-     * @return array
      */
     private function calculateMatrixSummary(array $gradeMatrix, array $assessmentComponents, array $classStatistics): array
     {
@@ -1515,7 +1445,7 @@ class AssessmentReportService
 
         // Calculate class average
         $classAverage = 0;
-        if (!empty($classStatistics['total_weighted_scores'])) {
+        if (! empty($classStatistics['total_weighted_scores'])) {
             $classAverage = round(array_sum($classStatistics['total_weighted_scores']) / count($classStatistics['total_weighted_scores']), 2);
         }
 
@@ -1525,20 +1455,20 @@ class AssessmentReportService
         // Calculate component averages
         $componentAverages = [];
         foreach ($classStatistics['component_averages'] as $componentId => $averages) {
-            if (!empty($averages)) {
+            if (! empty($averages)) {
                 $componentAverages[$componentId] = round(array_sum($averages) / count($averages), 2);
             }
         }
 
         // Calculate performance metrics
         $performanceMetrics = [
-            'students_above_90' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 90)),
-            'students_above_80' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 80)),
-            'students_above_70' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 70)),
-            'students_below_60' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] < 60)),
-            'students_with_missing' => count(array_filter($gradeMatrix, fn($row) => $row['missing_assessments'] > 0)),
-            'students_with_late' => count(array_filter($gradeMatrix, fn($row) => $row['late_submissions'] > 0)),
-            'students_with_bonus' => count(array_filter($gradeMatrix, fn($row) => $row['bonus_points_total'] > 0)),
+            'students_above_90' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] >= 90)),
+            'students_above_80' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] >= 80)),
+            'students_above_70' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] >= 70)),
+            'students_below_60' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] < 60)),
+            'students_with_missing' => count(array_filter($gradeMatrix, fn ($row) => $row['missing_assessments'] > 0)),
+            'students_with_late' => count(array_filter($gradeMatrix, fn ($row) => $row['late_submissions'] > 0)),
+            'students_with_bonus' => count(array_filter($gradeMatrix, fn ($row) => $row['bonus_points_total'] > 0)),
         ];
 
         return [
@@ -1559,8 +1489,6 @@ class AssessmentReportService
 
     /**
      * Get empty completion statistics structure.
-     *
-     * @return array
      */
     private function getEmptyCompletionStatistics(): array
     {
@@ -1588,16 +1516,12 @@ class AssessmentReportService
 
     /**
      * Identify at-risk students based on performance metrics.
-     *
-     * @param CourseOffering $courseOffering
-     * @param array $criteria
-     * @return array
      */
     public function identifyAtRiskStudents(CourseOffering $courseOffering, array $criteria = []): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyAtRiskStudents();
         }
 
@@ -1639,7 +1563,7 @@ class AssessmentReportService
                     'severity' => 'high',
                     'description' => "Average score ({$studentPerformance['weighted_average']}%) below threshold ({$criteria['low_score_threshold']}%)",
                     'value' => $studentPerformance['weighted_average'],
-                    'threshold' => $criteria['low_score_threshold']
+                    'threshold' => $criteria['low_score_threshold'],
                 ];
                 $riskScore += 30;
             }
@@ -1651,7 +1575,7 @@ class AssessmentReportService
                     'severity' => 'high',
                     'description' => "{$studentPerformance['missing_submissions']} missing submissions (threshold: {$criteria['missing_submissions_threshold']})",
                     'value' => $studentPerformance['missing_submissions'],
-                    'threshold' => $criteria['missing_submissions_threshold']
+                    'threshold' => $criteria['missing_submissions_threshold'],
                 ];
                 $riskScore += 25;
             }
@@ -1663,7 +1587,7 @@ class AssessmentReportService
                     'severity' => 'medium',
                     'description' => "{$studentPerformance['late_submissions']} late submissions (threshold: {$criteria['late_submissions_threshold']})",
                     'value' => $studentPerformance['late_submissions'],
-                    'threshold' => $criteria['late_submissions_threshold']
+                    'threshold' => $criteria['late_submissions_threshold'],
                 ];
                 $riskScore += 15;
             }
@@ -1675,7 +1599,7 @@ class AssessmentReportService
                     'severity' => 'high',
                     'description' => "Failing in {$studentPerformance['failing_components']} components (threshold: {$criteria['failing_components_threshold']})",
                     'value' => $studentPerformance['failing_components'],
-                    'threshold' => $criteria['failing_components_threshold']
+                    'threshold' => $criteria['failing_components_threshold'],
                 ];
                 $riskScore += 35;
             }
@@ -1687,7 +1611,7 @@ class AssessmentReportService
                     'severity' => 'critical',
                     'description' => "{$studentPerformance['integrity_concerns']} academic integrity concern(s)",
                     'value' => $studentPerformance['integrity_concerns'],
-                    'threshold' => 0
+                    'threshold' => 0,
                 ];
                 $riskScore += 40;
             }
@@ -1699,7 +1623,7 @@ class AssessmentReportService
                     'severity' => 'medium',
                     'description' => "{$studentPerformance['appeal_requests']} grade appeal(s) requested",
                     'value' => $studentPerformance['appeal_requests'],
-                    'threshold' => 0
+                    'threshold' => 0,
                 ];
                 $riskScore += 10;
             }
@@ -1712,13 +1636,13 @@ class AssessmentReportService
                     'severity' => 'medium',
                     'description' => "Performance declining by {$performanceTrend['decline_rate']}% over recent assessments",
                     'value' => $performanceTrend['decline_rate'],
-                    'threshold' => 10
+                    'threshold' => 10,
                 ];
                 $riskScore += 20;
             }
 
             // If student has risk factors, add to at-risk list
-            if (!empty($riskFactors)) {
+            if (! empty($riskFactors)) {
                 $riskLevel = $this->determineRiskLevel($riskScore);
 
                 $atRiskStudents[] = [
@@ -1756,16 +1680,12 @@ class AssessmentReportService
 
     /**
      * Identify exceptional performing students.
-     *
-     * @param CourseOffering $courseOffering
-     * @param array $criteria
-     * @return array
      */
     public function identifyExceptionalStudents(CourseOffering $courseOffering, array $criteria = []): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyExceptionalStudents();
         }
 
@@ -1805,7 +1725,7 @@ class AssessmentReportService
                     'type' => 'high_average_score',
                     'description' => "Exceptional average score: {$studentPerformance['weighted_average']}%",
                     'value' => $studentPerformance['weighted_average'],
-                    'threshold' => $criteria['high_score_threshold']
+                    'threshold' => $criteria['high_score_threshold'],
                 ];
                 $excellenceScore += 30;
             }
@@ -1816,7 +1736,7 @@ class AssessmentReportService
                     'type' => 'consistent_performance',
                     'description' => "Consistent performance across all components (lowest: {$studentPerformance['lowest_component_score']}%)",
                     'value' => $studentPerformance['lowest_component_score'],
-                    'threshold' => $criteria['consistency_threshold']
+                    'threshold' => $criteria['consistency_threshold'],
                 ];
                 $excellenceScore += 25;
             }
@@ -1827,7 +1747,7 @@ class AssessmentReportService
                     'type' => 'punctual_submissions',
                     'description' => 'All submissions on time',
                     'value' => 0,
-                    'threshold' => 0
+                    'threshold' => 0,
                 ];
                 $excellenceScore += 15;
             }
@@ -1838,7 +1758,7 @@ class AssessmentReportService
                     'type' => 'complete_submissions',
                     'description' => 'All assessments completed',
                     'value' => 0,
-                    'threshold' => 0
+                    'threshold' => 0,
                 ];
                 $excellenceScore += 20;
             }
@@ -1849,7 +1769,7 @@ class AssessmentReportService
                     'type' => 'academic_integrity',
                     'description' => 'No academic integrity concerns',
                     'value' => 0,
-                    'threshold' => 0
+                    'threshold' => 0,
                 ];
                 $excellenceScore += 10;
             }
@@ -1861,7 +1781,7 @@ class AssessmentReportService
                     'type' => 'improving_performance',
                     'description' => "Performance improving by {$performanceTrend['improvement_rate']}% over recent assessments",
                     'value' => $performanceTrend['improvement_rate'],
-                    'threshold' => $criteria['improvement_threshold']
+                    'threshold' => $criteria['improvement_threshold'],
                 ];
                 $excellenceScore += 20;
             }
@@ -1901,15 +1821,12 @@ class AssessmentReportService
 
     /**
      * Monitor academic integrity issues across the course.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function monitorAcademicIntegrityIssues(CourseOffering $courseOffering): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyIntegrityMonitoring();
         }
 
@@ -1946,7 +1863,7 @@ class AssessmentReportService
             $componentId = $score->assessmentComponentDetail->assessmentComponent->id;
 
             // Track student-level issues
-            if (!isset($studentIntegrityIssues[$studentId])) {
+            if (! isset($studentIntegrityIssues[$studentId])) {
                 $studentIntegrityIssues[$studentId] = [
                     'student' => [
                         'id' => $score->student->id,
@@ -1964,7 +1881,7 @@ class AssessmentReportService
             }
 
             // Track component-level stats
-            if (!isset($componentIntegrityStats[$componentId])) {
+            if (! isset($componentIntegrityStats[$componentId])) {
                 $componentIntegrityStats[$componentId] = [
                     'component' => [
                         'id' => $score->assessmentComponentDetail->assessmentComponent->id,
@@ -2035,7 +1952,7 @@ class AssessmentReportService
         }
 
         foreach ($componentIntegrityStats as &$componentData) {
-            if (!empty($componentData['plagiarism_scores'])) {
+            if (! empty($componentData['plagiarism_scores'])) {
                 $componentData['average_plagiarism_score'] = round(
                     array_sum($componentData['plagiarism_scores']) / count($componentData['plagiarism_scores']),
                     2
@@ -2063,16 +1980,12 @@ class AssessmentReportService
 
     /**
      * Generate performance analytics data for charts and visualizations.
-     *
-     * @param CourseOffering $courseOffering
-     * @param array $options
-     * @return array
      */
     public function generatePerformanceAnalytics(CourseOffering $courseOffering, array $options = []): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyPerformanceAnalytics();
         }
 
@@ -2117,16 +2030,12 @@ class AssessmentReportService
 
     /**
      * Generate grade distribution histogram data for visualization.
-     *
-     * @param CourseOffering $courseOffering
-     * @param int $bins
-     * @return array
      */
     public function generateGradeDistributionData(CourseOffering $courseOffering, int $bins = 10): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyGradeDistribution();
         }
 
@@ -2165,6 +2074,7 @@ class AssessmentReportService
                 if ($i === $bins - 1) {
                     return $score >= $rangeMin && $score <= $rangeMax;
                 }
+
                 return $score >= $rangeMin && $score < $rangeMax;
             })->count();
 
@@ -2172,7 +2082,7 @@ class AssessmentReportService
                 'bin' => $i + 1,
                 'range_min' => round($rangeMin, 1),
                 'range_max' => round($rangeMax, 1),
-                'range_label' => round($rangeMin, 1) . '-' . round($rangeMax, 1) . '%',
+                'range_label' => round($rangeMin, 1).'-'.round($rangeMax, 1).'%',
                 'count' => $count,
                 'percentage' => $scores->count() > 0 ? round(($count / $scores->count()) * 100, 2) : 0,
                 'density' => $scores->count() > 0 ? round($count / ($scores->count() * $binSize), 4) : 0,
@@ -2235,15 +2145,12 @@ class AssessmentReportService
 
     /**
      * Generate component performance comparison data.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function generateComponentComparisonData(CourseOffering $courseOffering): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyComponentComparison();
         }
 
@@ -2294,15 +2201,21 @@ class AssessmentReportService
                 'B' => 0,
                 'C' => 0,
                 'D' => 0,
-                'F' => 0
+                'F' => 0,
             ];
 
             foreach ($percentageScores as $score) {
-                if ($score >= 90) $gradeDistribution['A']++;
-                elseif ($score >= 80) $gradeDistribution['B']++;
-                elseif ($score >= 70) $gradeDistribution['C']++;
-                elseif ($score >= 60) $gradeDistribution['D']++;
-                else $gradeDistribution['F']++;
+                if ($score >= 90) {
+                    $gradeDistribution['A']++;
+                } elseif ($score >= 80) {
+                    $gradeDistribution['B']++;
+                } elseif ($score >= 70) {
+                    $gradeDistribution['C']++;
+                } elseif ($score >= 60) {
+                    $gradeDistribution['D']++;
+                } else {
+                    $gradeDistribution['F']++;
+                }
             }
 
             // Calculate difficulty metrics
@@ -2342,7 +2255,7 @@ class AssessmentReportService
         }
 
         // Calculate overall comparison metrics
-        if (!empty($componentComparison)) {
+        if (! empty($componentComparison)) {
             $overallComparison = $this->calculateOverallComponentComparison($componentComparison);
         }
 
@@ -2359,16 +2272,12 @@ class AssessmentReportService
 
     /**
      * Generate performance trends data over time.
-     *
-     * @param CourseOffering $courseOffering
-     * @param int $periodDays
-     * @return array
      */
     public function generatePerformanceTrendsData(CourseOffering $courseOffering, int $periodDays = 30): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptyPerformanceTrends();
         }
 
@@ -2404,7 +2313,7 @@ class AssessmentReportService
             $componentId = $score->assessmentComponentDetail->assessmentComponent->id;
 
             // Daily performance
-            if (!isset($dailyPerformance[$date])) {
+            if (! isset($dailyPerformance[$date])) {
                 $dailyPerformance[$date] = [
                     'date' => $date,
                     'scores' => [],
@@ -2416,7 +2325,7 @@ class AssessmentReportService
             $dailyPerformance[$date]['count']++;
 
             // Weekly performance
-            if (!isset($weeklyPerformance[$week])) {
+            if (! isset($weeklyPerformance[$week])) {
                 $weeklyPerformance[$week] = [
                     'week' => $week,
                     'scores' => [],
@@ -2428,7 +2337,7 @@ class AssessmentReportService
             $weeklyPerformance[$week]['count']++;
 
             // Component trends
-            if (!isset($componentTrends[$componentId])) {
+            if (! isset($componentTrends[$componentId])) {
                 $componentTrends[$componentId] = [
                     'component' => [
                         'id' => $score->assessmentComponentDetail->assessmentComponent->id,
@@ -2437,7 +2346,7 @@ class AssessmentReportService
                     'daily_scores' => [],
                 ];
             }
-            if (!isset($componentTrends[$componentId]['daily_scores'][$date])) {
+            if (! isset($componentTrends[$componentId]['daily_scores'][$date])) {
                 $componentTrends[$componentId]['daily_scores'][$date] = [];
             }
             $componentTrends[$componentId]['daily_scores'][$date][] = $score->percentage_score;
@@ -2485,17 +2394,15 @@ class AssessmentReportService
             ],
         ];
     }
+
     /**
      * Generate submission patterns data for analysis.
-     *
-     * @param CourseOffering $courseOffering
-     * @return array
      */
     public function generateSubmissionPatternsData(CourseOffering $courseOffering): array
     {
         $syllabus = $courseOffering->syllabus;
 
-        if (!$syllabus) {
+        if (! $syllabus) {
             return $this->getEmptySubmissionPatterns();
         }
 
@@ -2575,7 +2482,9 @@ class AssessmentReportService
      */
     private function calculateMode(array $numbers): ?float
     {
-        if (empty($numbers)) return null;
+        if (empty($numbers)) {
+            return null;
+        }
 
         $frequency = array_count_values($numbers);
         $maxFreq = max($frequency);
@@ -2589,7 +2498,9 @@ class AssessmentReportService
      */
     private function calculateVariance(array $numbers): float
     {
-        if (empty($numbers)) return 0;
+        if (empty($numbers)) {
+            return 0;
+        }
 
         $mean = array_sum($numbers) / count($numbers);
         $squaredDifferences = array_map(function ($number) use ($mean) {
@@ -2604,12 +2515,16 @@ class AssessmentReportService
      */
     private function calculateSkewness(array $numbers): float
     {
-        if (count($numbers) < 3) return 0;
+        if (count($numbers) < 3) {
+            return 0;
+        }
 
         $mean = array_sum($numbers) / count($numbers);
         $stdDev = $this->calculateStandardDeviation($numbers);
 
-        if ($stdDev == 0) return 0;
+        if ($stdDev == 0) {
+            return 0;
+        }
 
         $sum = 0;
         foreach ($numbers as $number) {
@@ -2624,12 +2539,16 @@ class AssessmentReportService
      */
     private function calculateKurtosis(array $numbers): float
     {
-        if (count($numbers) < 4) return 0;
+        if (count($numbers) < 4) {
+            return 0;
+        }
 
         $mean = array_sum($numbers) / count($numbers);
         $stdDev = $this->calculateStandardDeviation($numbers);
 
-        if ($stdDev == 0) return 0;
+        if ($stdDev == 0) {
+            return 0;
+        }
 
         $sum = 0;
         foreach ($numbers as $number) {
@@ -2644,7 +2563,9 @@ class AssessmentReportService
      */
     private function calculatePercentiles(array $numbers): array
     {
-        if (empty($numbers)) return [];
+        if (empty($numbers)) {
+            return [];
+        }
 
         sort($numbers);
         $count = count($numbers);
@@ -2670,12 +2591,14 @@ class AssessmentReportService
      */
     private function calculateDiscriminationIndex(array $scores): float
     {
-        if (count($scores) < 10) return 0;
+        if (count($scores) < 10) {
+            return 0;
+        }
 
         sort($scores);
         $count = count($scores);
-        $topGroup = array_slice($scores, (int)($count * 0.73)); // Top 27%
-        $bottomGroup = array_slice($scores, 0, (int)($count * 0.27)); // Bottom 27%
+        $topGroup = array_slice($scores, (int) ($count * 0.73)); // Top 27%
+        $bottomGroup = array_slice($scores, 0, (int) ($count * 0.27)); // Bottom 27%
 
         $topAvg = array_sum($topGroup) / count($topGroup);
         $bottomAvg = array_sum($bottomGroup) / count($bottomGroup);
@@ -2688,12 +2611,16 @@ class AssessmentReportService
      */
     private function calculateReliabilityCoefficient(array $scores): float
     {
-        if (count($scores) < 5) return 0;
+        if (count($scores) < 5) {
+            return 0;
+        }
 
         $variance = $this->calculateVariance($scores);
         $mean = array_sum($scores) / count($scores);
 
-        if ($mean == 0) return 0;
+        if ($mean == 0) {
+            return 0;
+        }
 
         return round($variance / ($mean * (100 - $mean)), 3);
     }

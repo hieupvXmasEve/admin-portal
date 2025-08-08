@@ -15,7 +15,7 @@ class Program extends AuditableModel
     protected $fillable = [
         'name',
         'code',
-        'description'
+        'description',
     ];
 
     protected $casts = [

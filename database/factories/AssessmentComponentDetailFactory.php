@@ -36,7 +36,7 @@ class AssessmentComponentDetailFactory extends Factory
             'Research',
             'Development',
             'Demo',
-            'Reflection'
+            'Reflection',
         ];
 
         return [
@@ -51,7 +51,7 @@ class AssessmentComponentDetailFactory extends Factory
      */
     public function proposal(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'name' => 'Proposal Submission',
             'weight' => $this->faker->numberBetween(5, 15),
         ]);
@@ -62,7 +62,7 @@ class AssessmentComponentDetailFactory extends Factory
      */
     public function presentation(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'name' => 'Final Presentation',
             'weight' => $this->faker->numberBetween(10, 20),
         ]);
@@ -73,7 +73,7 @@ class AssessmentComponentDetailFactory extends Factory
      */
     public function report(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'name' => 'Written Report',
             'weight' => $this->faker->numberBetween(15, 25),
         ]);

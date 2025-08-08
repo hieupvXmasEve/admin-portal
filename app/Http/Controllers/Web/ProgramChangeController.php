@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
-use App\Models\ProgramChangeRequest;
 use App\Models\Program;
+use App\Models\ProgramChangeRequest;
 use App\Models\Specialization;
+use App\Models\Student;
 use App\Services\ProgramChangeService;
-use Illuminate\Http\Request;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -60,7 +60,7 @@ class ProgramChangeController extends Controller
             'toProgram',
             'fromSpecialization',
             'toSpecialization',
-            'approvedBy'
+            'approvedBy',
         ]);
 
         return Inertia::render('students/ProgramChanges/Show', [
@@ -118,7 +118,7 @@ class ProgramChangeController extends Controller
             return redirect()
                 ->back()
                 ->withInput()
-                ->with('error', 'Failed to create program change request: ' . $e->getMessage());
+                ->with('error', 'Failed to create program change request: '.$e->getMessage());
         }
     }
 
@@ -160,7 +160,7 @@ class ProgramChangeController extends Controller
 
             return redirect()
                 ->back()
-                ->with('error', 'Failed to approve request: ' . $e->getMessage());
+                ->with('error', 'Failed to approve request: '.$e->getMessage());
         }
     }
 
@@ -202,7 +202,7 @@ class ProgramChangeController extends Controller
 
             return redirect()
                 ->back()
-                ->with('error', 'Failed to reject request: ' . $e->getMessage());
+                ->with('error', 'Failed to reject request: '.$e->getMessage());
         }
     }
 

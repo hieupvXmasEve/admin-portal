@@ -8,7 +8,6 @@ use App\Http\Requests\User\UpdateUserRequest;
 use App\Http\Resources\User\UserResource;
 use App\Models\User;
 use App\Services\UserService;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class UserController extends Controller
@@ -23,6 +22,7 @@ class UserController extends Controller
     public function store(StoreUserRequest $request): UserResource
     {
         $user = $this->userService->createUser($request->validated());
+
         return new UserResource($user);
     }
 
@@ -34,12 +34,14 @@ class UserController extends Controller
     public function update(UpdateUserRequest $request, User $user): UserResource
     {
         $updatedUser = $this->userService->updateUser($user, $request->validated());
+
         return new UserResource($updatedUser);
     }
 
     public function destroy(User $user): \Illuminate\Http\Response
     {
         $this->userService->deleteUser($user);
+
         return response()->noContent();
     }
 }

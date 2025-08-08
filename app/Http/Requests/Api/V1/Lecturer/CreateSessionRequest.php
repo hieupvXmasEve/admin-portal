@@ -28,76 +28,76 @@ class CreateSessionRequest extends FormRequest
             'course_offering_id' => [
                 'required',
                 'integer',
-                'exists:course_offerings,id'
+                'exists:course_offerings,id',
             ],
             'session_title' => [
                 'required',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'session_description' => [
                 'nullable',
                 'string',
-                'max:1000'
+                'max:1000',
             ],
             'session_date' => [
                 'required',
                 'date',
-                'after_or_equal:today'
+                'after_or_equal:today',
             ],
             'start_time' => [
                 'required',
-                'date_format:H:i'
+                'date_format:H:i',
             ],
             'end_time' => [
                 'required',
                 'date_format:H:i',
-                'after:start_time'
+                'after:start_time',
             ],
             'session_type' => [
                 'nullable',
                 'string',
-                'in:lecture,tutorial,lab,seminar,workshop,exam,assessment'
+                'in:lecture,tutorial,lab,seminar,workshop,exam,assessment',
             ],
             'delivery_mode' => [
                 'nullable',
                 'string',
-                'in:in_person,online,hybrid,blended'
+                'in:in_person,online,hybrid,blended',
             ],
             'room_id' => [
                 'nullable',
                 'integer',
-                'exists:rooms,id'
+                'exists:rooms,id',
             ],
             'learning_objectives' => [
                 'nullable',
-                'array'
+                'array',
             ],
             'learning_objectives.*' => [
                 'string',
-                'max:500'
+                'max:500',
             ],
             'topics_covered' => [
                 'nullable',
-                'array'
+                'array',
             ],
             'topics_covered.*' => [
                 'string',
-                'max:255'
+                'max:255',
             ],
             'required_materials' => [
                 'nullable',
-                'array'
+                'array',
             ],
             'required_materials.*' => [
                 'string',
-                'max:255'
+                'max:255',
             ],
             'preparation_notes' => [
                 'nullable',
                 'string',
-                'max:2000'
-            ]
+                'max:2000',
+            ],
         ];
     }
 
@@ -129,7 +129,7 @@ class CreateSessionRequest extends FormRequest
             'topics_covered.*.max' => 'Each topic must not exceed 255 characters',
             'required_materials.array' => 'Required materials must be an array',
             'required_materials.*.max' => 'Each required material must not exceed 255 characters',
-            'preparation_notes.max' => 'Preparation notes must not exceed 2000 characters'
+            'preparation_notes.max' => 'Preparation notes must not exceed 2000 characters',
         ];
     }
 
@@ -155,13 +155,13 @@ class CreateSessionRequest extends FormRequest
         if ($this->has('start_time') && strlen($this->start_time) === 5) {
             $this->merge(['start_time' => $this->start_time]);
         }
-        
+
         if ($this->has('end_time') && strlen($this->end_time) === 5) {
             $this->merge(['end_time' => $this->end_time]);
         }
 
         // Set default session type if not provided
-        if (!$this->has('session_type')) {
+        if (! $this->has('session_type')) {
             $this->merge(['session_type' => 'lecture']);
         }
     }
@@ -177,11 +177,11 @@ class CreateSessionRequest extends FormRequest
                 $start = \Carbon\Carbon::createFromFormat('H:i', $this->start_time);
                 $end = \Carbon\Carbon::createFromFormat('H:i', $this->end_time);
                 $duration = $start->diffInMinutes($end);
-                
+
                 if ($duration < 15) {
                     $validator->errors()->add('end_time', 'Session must be at least 15 minutes long');
                 }
-                
+
                 if ($duration > 480) { // 8 hours
                     $validator->errors()->add('end_time', 'Session cannot be longer than 8 hours');
                 }

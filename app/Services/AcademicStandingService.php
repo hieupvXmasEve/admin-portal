@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Student;
 use App\Models\AcademicStanding;
 use App\Models\Semester;
+use App\Models\Student;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +16,7 @@ class AcademicStandingService
     /**
      * Calculate and update academic standing for a student
      */
-    public function calculateAndUpdateStanding(Student $student, Semester $semester, User $creator = null): AcademicStanding
+    public function calculateAndUpdateStanding(Student $student, Semester $semester, ?User $creator = null): AcademicStanding
     {
         return DB::transaction(function () use ($student, $semester, $creator) {
             $semesterGPA = $this->calculateSemesterGPA($student, $semester);
@@ -79,7 +79,7 @@ class AcademicStandingService
                 $this->calculateAndUpdateStanding($student, $semester, $creator);
                 $updated++;
             } catch (\Exception $e) {
-                $errors[] = "Student {$student->id}: " . $e->getMessage();
+                $errors[] = "Student {$student->id}: ".$e->getMessage();
             }
         }
 

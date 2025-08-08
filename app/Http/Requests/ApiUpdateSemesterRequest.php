@@ -21,7 +21,7 @@ class ApiUpdateSemesterRequest extends FormRequest
                 'required',
                 'string',
                 'max:20',
-                Rule::unique('semesters', 'code')->ignore($this->semester->id)
+                Rule::unique('semesters', 'code')->ignore($this->semester->id),
             ],
             'name' => 'required|string|max:255',
             'start_date' => 'required|date',

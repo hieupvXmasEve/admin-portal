@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Seeders\InitialSetup;
 
+use App\Models\EquivalentUnit;
 use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\Unit;
-use App\Models\UnitPrerequisiteGroup;
 use App\Models\UnitPrerequisiteCondition;
-use App\Models\EquivalentUnit;
+use App\Models\UnitPrerequisiteGroup;
 use Illuminate\Database\Seeder;
 
 class AcademicStructureSeeder extends Seeder
@@ -52,7 +52,8 @@ class AcademicStructureSeeder extends Seeder
 
         if ($studentsCount > 0 || $enrollmentsCount > 0) {
             $this->command->warn("⚠️  Found {$studentsCount} students and {$enrollmentsCount} enrollments. Skipping data cleanup to preserve foreign key relationships.");
-            $this->command->info("📝 Will update existing records instead of recreating them.");
+            $this->command->info('📝 Will update existing records instead of recreating them.');
+
             return;
         }
 
@@ -64,10 +65,10 @@ class AcademicStructureSeeder extends Seeder
             Unit::query()->delete();
             Specialization::query()->delete();
             Program::query()->delete();
-            $this->command->info("🧹 Cleaned existing data successfully.");
+            $this->command->info('🧹 Cleaned existing data successfully.');
         } catch (\Exception $e) {
-            $this->command->warn("⚠️  Could not clean existing data due to foreign key constraints. Will update existing records instead.");
-            $this->command->info("Error: " . $e->getMessage());
+            $this->command->warn('⚠️  Could not clean existing data due to foreign key constraints. Will update existing records instead.');
+            $this->command->info('Error: '.$e->getMessage());
         }
     }
 
@@ -260,7 +261,7 @@ class AcademicStructureSeeder extends Seeder
             );
         }
 
-        $this->command->info('📖 Created ' . count($units) . ' units');
+        $this->command->info('📖 Created '.count($units).' units');
     }
 
     private function createPrerequisiteRelationships(): void
@@ -319,7 +320,9 @@ class AcademicStructureSeeder extends Seeder
 
         foreach ($prerequisites as $unitCode => $requiredUnitCodes) {
             $unit = Unit::where('code', $unitCode)->first();
-            if (!$unit) continue;
+            if (! $unit) {
+                continue;
+            }
 
             // Create prerequisite group for this unit
             $group = UnitPrerequisiteGroup::create([

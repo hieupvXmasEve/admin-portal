@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
-use App\Models\CourseRegistration;
 use App\Models\AcademicHold;
+use App\Models\CourseRegistration;
 use App\Models\Semester;
-use Illuminate\Database\Seeder;
+use App\Models\Student;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class DropoutScenarioSeeder extends Seeder
 {
@@ -126,8 +126,8 @@ class DropoutScenarioSeeder extends Seeder
         // Update student status to inactive (withdrawn is not a valid enum value)
         $student->update([
             'status' => 'inactive',
-            'admission_notes' => ($student->admission_notes ?? '') .
-                " | Withdrawn: {$dropoutType['reason']} (Date: {$dropoutDate->format('Y-m-d')})"
+            'admission_notes' => ($student->admission_notes ?? '').
+                " | Withdrawn: {$dropoutType['reason']} (Date: {$dropoutDate->format('Y-m-d')})",
         ]);
 
         // Withdraw from current registrations
@@ -148,6 +148,7 @@ class DropoutScenarioSeeder extends Seeder
     {
         // Dropouts can happen throughout the academic year
         $baseDate = now()->subMonths(rand(1, 12));
+
         return $baseDate->addDays(rand(0, 30));
     }
 
@@ -181,8 +182,8 @@ class DropoutScenarioSeeder extends Seeder
             'hold_type' => 'administrative',
             'hold_category' => 'all', // Use 'all' for withdrawal processing holds
             'title' => 'Student Withdrawal Processing',
-            'description' => "Student withdrawn: {$dropoutType['reason']}. " .
-                ($dropoutType['voluntary'] ? 'Voluntary withdrawal.' : 'Involuntary withdrawal.') .
+            'description' => "Student withdrawn: {$dropoutType['reason']}. ".
+                ($dropoutType['voluntary'] ? 'Voluntary withdrawal.' : 'Involuntary withdrawal.').
                 ' Exit interview and documentation required.',
             'amount' => null,
             'priority' => 'medium',
@@ -208,9 +209,9 @@ class DropoutScenarioSeeder extends Seeder
                 'hold_type' => 'financial',
                 'hold_category' => 'all', // Use 'all' for refund processing holds
                 'title' => 'Tuition Refund Processing',
-                'description' => "Refund processing: {$refundPercentage}% refund eligible due to " .
+                'description' => "Refund processing: {$refundPercentage}% refund eligible due to ".
                     "withdrawal within refund period. Reason: {$dropoutType['reason']}",
-                'amount' => - ($refundPercentage * 10), // Negative amount indicates refund
+                'amount' => -($refundPercentage * 10), // Negative amount indicates refund
                 'priority' => 'low',
                 'status' => 'active',
                 'placed_date' => $dropoutDate,
@@ -230,7 +231,7 @@ class DropoutScenarioSeeder extends Seeder
             ->where('end_date', '>=', $dropoutDate)
             ->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return 0;
         }
 
@@ -259,7 +260,7 @@ class DropoutScenarioSeeder extends Seeder
 
     private function displayDropoutStatistics(array $stats, int $totalDropouts): void
     {
-        $this->command->info("✅ Dropout scenarios created!");
+        $this->command->info('✅ Dropout scenarios created!');
         $this->command->info("  📊 Total dropouts: {$totalDropouts} students");
         $this->command->info("  📉 Academic failure: {$stats['academic_failure']} students");
         $this->command->info("  💰 Financial hardship: {$stats['financial_hardship']} students");

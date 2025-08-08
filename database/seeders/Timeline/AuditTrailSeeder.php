@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
+use App\Models\AcademicHold;
 use App\Models\AcademicRecord;
 use App\Models\CourseRegistration;
-use App\Models\AcademicHold;
 use App\Models\GpaCalculation;
+use App\Models\Student;
 use App\Models\User;
-use Illuminate\Database\Seeder;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class AuditTrailSeeder extends Seeder
 {
@@ -28,7 +28,7 @@ class AuditTrailSeeder extends Seeder
             'academicRecords',
             'courseRegistrations',
             'academicHolds',
-            'gpaCalculations'
+            'gpaCalculations',
         ])->get();
 
         if ($students->isEmpty()) {
@@ -288,7 +288,7 @@ class AuditTrailSeeder extends Seeder
     private function extractDateFromNotes(string $notes, string $keyword): Carbon
     {
         // Simple date extraction - look for dates after keywords
-        $pattern = '/' . preg_quote($keyword) . '.*?(\d{4}-\d{2}-\d{2})/';
+        $pattern = '/'.preg_quote($keyword).'.*?(\d{4}-\d{2}-\d{2})/';
         if (preg_match($pattern, $notes, $matches)) {
             return Carbon::parse($matches[1]);
         }
@@ -324,9 +324,9 @@ class AuditTrailSeeder extends Seeder
             $currentNotes = $student->admission_notes ?? '';
 
             // Only add if not already present (to avoid duplicates)
-            if (!str_contains($currentNotes, $auditSummary)) {
+            if (! str_contains($currentNotes, $auditSummary)) {
                 $student->update([
-                    'admission_notes' => trim($currentNotes . ' | ' . $auditSummary)
+                    'admission_notes' => trim($currentNotes.' | '.$auditSummary),
                 ]);
             }
         }
@@ -334,7 +334,7 @@ class AuditTrailSeeder extends Seeder
 
     private function generateRandomIP(): string
     {
-        return rand(10, 192) . '.' . rand(0, 255) . '.' . rand(0, 255) . '.' . rand(1, 254);
+        return rand(10, 192).'.'.rand(0, 255).'.'.rand(0, 255).'.'.rand(1, 254);
     }
 
     private function createSystemAuditSummaries(array $stats): void
@@ -355,11 +355,11 @@ class AuditTrailSeeder extends Seeder
 
     private function displayAuditStatistics(array $stats): void
     {
-        $this->command->info("✅ Comprehensive audit trail created!");
+        $this->command->info('✅ Comprehensive audit trail created!');
         $this->command->info("  👥 Students audited: {$stats['students_audited']}");
         $this->command->info("  📚 Total audit entries: {$stats['total_audit_entries']}");
-        $this->command->info("  🔍 Data integrity: Verified");
-        $this->command->info("  ✅ Compliance status: Compliant");
-        $this->command->info("  📋 Audit trail complete and ready for review");
+        $this->command->info('  🔍 Data integrity: Verified');
+        $this->command->info('  ✅ Compliance status: Compliant');
+        $this->command->info('  📋 Audit trail complete and ready for review');
     }
 }

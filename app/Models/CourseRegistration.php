@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 
 class CourseRegistration extends AuditableModel
 {
@@ -102,17 +102,18 @@ class CourseRegistration extends AuditableModel
 
     public function isPassing(): bool
     {
-        if (!$this->final_grade) {
+        if (! $this->final_grade) {
             return false;
         }
 
         $passingGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D'];
+
         return in_array($this->final_grade, $passingGrades);
     }
 
     public function getGradePoints(): float
     {
-        if (!$this->final_grade) {
+        if (! $this->final_grade) {
             return 0.0;
         }
 
@@ -138,14 +139,14 @@ class CourseRegistration extends AuditableModel
     {
         return $this->isActive() &&
             $this->semester->isRegistrationOpen() &&
-            !$this->drop_date;
+            ! $this->drop_date;
     }
 
     public function canWithdraw(): bool
     {
         return $this->isActive() &&
             $this->semester->isActive() &&
-            !$this->withdrawal_date;
+            ! $this->withdrawal_date;
     }
 
     // Scopes
@@ -189,7 +190,7 @@ class CourseRegistration extends AuditableModel
     {
         $student = $this->student?->full_name ?? $this->student_code;
         $course = $this->courseOffering?->curriculumUnit?->unit?->code ?? $this->course_offering_id;
-        
+
         return "{$student} - {$course}";
     }
 

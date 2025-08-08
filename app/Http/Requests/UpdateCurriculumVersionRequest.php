@@ -31,7 +31,7 @@ class UpdateCurriculumVersionRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:20',
-                Rule::unique('curriculum_versions', 'version_code')->ignore($curriculumVersionId)
+                Rule::unique('curriculum_versions', 'version_code')->ignore($curriculumVersionId),
             ],
             'semester_id' => 'required|exists:semesters,id',
             'notes' => 'nullable|string|max:1000',

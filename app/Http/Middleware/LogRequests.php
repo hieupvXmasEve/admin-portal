@@ -30,7 +30,7 @@ class LogRequests
             'is_authenticated' => Auth::check(),
             'user_id' => Auth::id(),
             'session_id' => $request->session()->getId(),
-            'timestamp' => now()->toISOString()
+            'timestamp' => now()->toISOString(),
         ]);
 
         $response = $next($request);
@@ -38,7 +38,7 @@ class LogRequests
         Log::info('=== RESPONSE SENT ===', [
             'status_code' => $response->getStatusCode(),
             'redirect_to' => $response instanceof \Illuminate\Http\RedirectResponse ? $response->getTargetUrl() : null,
-            'timestamp' => now()->toISOString()
+            'timestamp' => now()->toISOString(),
         ]);
 
         return $response;

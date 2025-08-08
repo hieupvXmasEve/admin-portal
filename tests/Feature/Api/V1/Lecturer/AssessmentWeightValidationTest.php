@@ -32,20 +32,20 @@ class AssessmentWeightValidationTest extends TestCase
         $syllabus = Syllabus::factory()->create();
         $courseOffering = CourseOffering::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
 
         // Create components that total 100%
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 40,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 60,
-            'name' => 'Final Exam'
+            'name' => 'Final Exam',
         ]);
 
         $response = $this->getJson("/api/v1/lecturer/courses/{$courseOffering->id}/assessments/validate-weights");
@@ -66,10 +66,10 @@ class AssessmentWeightValidationTest extends TestCase
                             'current_weight',
                             'detail_weights_sum',
                             'is_valid',
-                            'errors'
-                        ]
-                    ]
-                ]
+                            'errors',
+                        ],
+                    ],
+                ],
             ]);
 
         expect($response->json('data.total_weight'))->toBe(100);
@@ -85,20 +85,20 @@ class AssessmentWeightValidationTest extends TestCase
         $syllabus = Syllabus::factory()->create();
         $courseOffering = CourseOffering::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
 
         // Create components that exceed 100%
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 70,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 50,
-            'name' => 'Final Exam'
+            'name' => 'Final Exam',
         ]);
 
         $response = $this->getJson("/api/v1/lecturer/courses/{$courseOffering->id}/assessments/validate-weights");
@@ -118,26 +118,26 @@ class AssessmentWeightValidationTest extends TestCase
         $syllabus = Syllabus::factory()->create();
         $courseOffering = CourseOffering::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
 
         $component = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 50,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         // Create details that exceed component weight
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component->id,
             'weight' => 40,
-            'name' => 'Part A'
+            'name' => 'Part A',
         ]);
 
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component->id,
             'weight' => 30,
-            'name' => 'Part B'
+            'name' => 'Part B',
         ]);
 
         $response = $this->getJson("/api/v1/lecturer/courses/{$courseOffering->id}/assessments/validate-weights");
@@ -159,7 +159,7 @@ class AssessmentWeightValidationTest extends TestCase
         $syllabus = Syllabus::factory()->create();
         $courseOffering = CourseOffering::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'lecture_id' => $anotherLecturer->id // Different lecturer
+            'lecture_id' => $anotherLecturer->id, // Different lecturer
         ]);
 
         $response = $this->getJson("/api/v1/lecturer/courses/{$courseOffering->id}/assessments/validate-weights");
@@ -168,7 +168,7 @@ class AssessmentWeightValidationTest extends TestCase
             ->assertJson([
                 'success' => false,
                 'message' => 'Unauthorized access to course offering',
-                'error_code' => 'UNAUTHORIZED'
+                'error_code' => 'UNAUTHORIZED',
             ]);
     }
 
@@ -177,7 +177,7 @@ class AssessmentWeightValidationTest extends TestCase
     {
         $courseOffering = CourseOffering::factory()->create([
             'syllabus_id' => null,
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
 
         $response = $this->getJson("/api/v1/lecturer/courses/{$courseOffering->id}/assessments/validate-weights");
@@ -197,7 +197,7 @@ class AssessmentWeightValidationTest extends TestCase
         $syllabus = Syllabus::factory()->create();
         $courseOffering = CourseOffering::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
 
         $response = $this->getJson("/api/v1/lecturer/courses/{$courseOffering->id}/assessments/validate-weights");
@@ -217,46 +217,46 @@ class AssessmentWeightValidationTest extends TestCase
         $syllabus = Syllabus::factory()->create();
         $courseOffering = CourseOffering::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
 
         // Create first component with valid details
         $assignment = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 40,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $assignment->id,
             'weight' => 25,
-            'name' => 'Code Quality'
+            'name' => 'Code Quality',
         ]);
 
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $assignment->id,
             'weight' => 15,
-            'name' => 'Documentation'
+            'name' => 'Documentation',
         ]);
 
         // Create second component with insufficient detail weights
         $midterm = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 30,
-            'name' => 'Midterm'
+            'name' => 'Midterm',
         ]);
 
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $midterm->id,
             'weight' => 20,
-            'name' => 'Multiple Choice'
+            'name' => 'Multiple Choice',
         ]);
 
         // Create third component with no details
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 30,
-            'name' => 'Final Exam'
+            'name' => 'Final Exam',
         ]);
 
         $response = $this->getJson("/api/v1/lecturer/courses/{$courseOffering->id}/assessments/validate-weights");
@@ -287,7 +287,7 @@ class AssessmentWeightValidationTest extends TestCase
     /** @test */
     public function it_returns_404_for_nonexistent_course_offering(): void
     {
-        $response = $this->getJson("/api/v1/lecturer/courses/999999/assessments/validate-weights");
+        $response = $this->getJson('/api/v1/lecturer/courses/999999/assessments/validate-weights');
 
         $response->assertNotFound();
     }
@@ -310,21 +310,21 @@ class AssessmentWeightValidationTest extends TestCase
         $syllabus = Syllabus::factory()->create();
         $courseOffering = CourseOffering::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
 
         // Create component with zero weight (invalid)
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 0,
-            'name' => 'Invalid Assignment'
+            'name' => 'Invalid Assignment',
         ]);
 
         // Create valid component
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 80,
-            'name' => 'Valid Assignment'
+            'name' => 'Valid Assignment',
         ]);
 
         $response = $this->getJson("/api/v1/lecturer/courses/{$courseOffering->id}/assessments/validate-weights");

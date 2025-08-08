@@ -1,11 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\StudentApplicationController;
-use App\Http\Controllers\Web\StudentApplicationController as WebStudentApplicationController;
 use App\Http\Controllers\Api\StudentController;
+use App\Http\Controllers\Web\StudentApplicationController as WebStudentApplicationController;
 use App\Http\Controllers\Web\StudentController as WebStudentController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AuthController;
+
 // Public authentication routes (Password-based login only - Google login moved to specific controllers)
 Route::name('api.')->group(function () {
     Route::post('v1/auth/login', [AuthController::class, 'login'])->name('auth.login');

@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Campus;
 
-use App\Models\Campus;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreCampusRequest extends FormRequest

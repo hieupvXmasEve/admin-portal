@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
-use App\Models\GraduationApplication;
 use App\Models\GpaCalculation;
-use Illuminate\Database\Seeder;
+use App\Models\GraduationApplication;
+use App\Models\Student;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class GraduationApplicationSeeder extends Seeder
 {
@@ -106,7 +106,7 @@ class GraduationApplicationSeeder extends Seeder
 
     private function determineGraduationHonors(?GpaCalculation $gpaCalculation): ?string
     {
-        if (!$gpaCalculation) {
+        if (! $gpaCalculation) {
             return null;
         }
 
@@ -233,11 +233,11 @@ class GraduationApplicationSeeder extends Seeder
     {
         // Generate realistic mailing address
         $addresses = [
-            "123 University Ave, Melbourne VIC 3000",
-            "456 Student St, Sydney NSW 2000",
-            "789 Graduate Rd, Brisbane QLD 4000",
-            "321 Alumni Blvd, Perth WA 6000",
-            "654 Campus Dr, Adelaide SA 5000",
+            '123 University Ave, Melbourne VIC 3000',
+            '456 Student St, Sydney NSW 2000',
+            '789 Graduate Rd, Brisbane QLD 4000',
+            '321 Alumni Blvd, Perth WA 6000',
+            '654 Campus Dr, Adelaide SA 5000',
         ];
 
         return $addresses[array_rand($addresses)];
@@ -260,11 +260,11 @@ class GraduationApplicationSeeder extends Seeder
 
         // Add random additional notes
         $additionalNotes = [
-            "Outstanding academic performance throughout program",
-            "Active participation in student organizations",
-            "Completed internship requirements",
-            "Research project completed successfully",
-            "Community service hours fulfilled",
+            'Outstanding academic performance throughout program',
+            'Active participation in student organizations',
+            'Completed internship requirements',
+            'Research project completed successfully',
+            'Community service hours fulfilled',
         ];
 
         if (rand(1, 100) <= 30) { // 30% chance of additional note
@@ -282,7 +282,7 @@ class GraduationApplicationSeeder extends Seeder
         $logMessage = "  📝 {$student->student_code}: {$status}";
 
         if ($honors) {
-            $logMessage .= " (with honors)";
+            $logMessage .= ' (with honors)';
         }
 
         $this->command->info($logMessage);
@@ -310,7 +310,7 @@ class GraduationApplicationSeeder extends Seeder
         $this->command->info("    Status: {$applicationStatus['status']}");
         $this->command->info("    Expected graduation: {$expectedGraduationDate->format('Y-m-d')}");
         if ($graduationHonors) {
-            $this->command->info("    Honors: " . str_replace('_', ' ', ucwords($graduationHonors)));
+            $this->command->info('    Honors: '.str_replace('_', ' ', ucwords($graduationHonors)));
         }
         if ($latestGPA) {
             $this->command->info("    GPA: {$latestGPA->gpa}");
@@ -338,7 +338,7 @@ class GraduationApplicationSeeder extends Seeder
         $currentNotes = $student->admission_notes ?? '';
         $graduationNote = "Graduation Application: {$applicationStatus['status']} (Expected: {$expectedGraduationDate->format('Y-m-d')})";
         $student->update([
-            'admission_notes' => trim($currentNotes . ' | ' . $graduationNote)
+            'admission_notes' => trim($currentNotes.' | '.$graduationNote),
         ]);
     }
 }

@@ -21,7 +21,7 @@ return new class extends Migration
                 'anti_requisite',
                 'assumed_knowledge',
                 'credit_requirement',
-                'textual'
+                'textual',
             ])->default('prerequisite');
             $table->foreignId('required_unit_id')->nullable()->constrained('units')->onDelete('cascade');
             $table->integer('required_credits')->nullable();

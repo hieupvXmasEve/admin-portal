@@ -70,9 +70,10 @@ class UpdatePermissionsSeeder extends Seeder
     {
         $superAdminRole = Role::where('code', 'super_admin')->first();
 
-        if (!$superAdminRole) {
+        if (! $superAdminRole) {
             $this->command->error('❌ Super Admin role not found. Skipping permission assignment.');
             Log::error('UpdatePermissionsSeeder: Super Admin role not found.');
+
             return;
         }
 

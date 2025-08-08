@@ -10,8 +10,7 @@ class CampusService
     /**
      * Create a new campus.
      *
-     * @param array $data Validated data.
-     * @return Campus
+     * @param  array  $data  Validated data.
      */
     public function createCampus(array $data): Campus
     {
@@ -25,22 +24,21 @@ class CampusService
     /**
      * Update an existing campus.
      *
-     * @param Campus $campus The campus to update.
-     * @param array $data Validated data.
-     * @return Campus
+     * @param  Campus  $campus  The campus to update.
+     * @param  array  $data  Validated data.
      */
     public function updateCampus(Campus $campus, array $data): Campus
     {
         Log::info("Updating campus {$campus->id}", $data);
         $campus->update($data);
+
         return $campus;
     }
 
     /**
      * Delete a campus.
      *
-     * @param Campus $campus The campus to delete.
-     * @return void
+     * @param  Campus  $campus  The campus to delete.
      */
     public function deleteCampus(Campus $campus): void
     {

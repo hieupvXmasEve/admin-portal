@@ -26,33 +26,33 @@ class ExportTeachingAssignmentsRequest extends FormRequest
             'format' => [
                 'required',
                 'string',
-                Rule::in(['excel', 'pdf'])
+                Rule::in(['excel', 'pdf']),
             ],
             'semester_id' => [
                 'sometimes',
                 'integer',
-                'exists:semesters,id'
+                'exists:semesters,id',
             ],
             'faculty' => [
                 'sometimes',
                 'string',
-                'max:100'
+                'max:100',
             ],
             'department' => [
                 'sometimes',
                 'string',
-                'max:100'
+                'max:100',
             ],
             'assignment_status' => [
                 'sometimes',
                 'string',
-                Rule::in(['assigned', 'unassigned', 'urgent', 'all'])
+                Rule::in(['assigned', 'unassigned', 'urgent', 'all']),
             ],
             'search' => [
                 'sometimes',
                 'string',
-                'max:255'
-            ]
+                'max:255',
+            ],
         ];
     }
 
@@ -91,7 +91,7 @@ class ExportTeachingAssignmentsRequest extends FormRequest
             'faculty',
             'department',
             'assignment_status',
-            'search'
+            'search',
         ]);
     }
 }
