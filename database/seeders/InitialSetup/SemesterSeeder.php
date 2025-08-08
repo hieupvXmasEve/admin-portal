@@ -33,8 +33,8 @@ class SemesterSeeder extends Seeder
 
         $semesters = [
             [
-                'name' => 'Semester 1 - 20252027',
-                'code' => 'INT01SE01',
+                'name' => 'Fall 2025 - 20252027',
+                'code' => 'FALL2025',
                 'start_date' => '2025-09-01',
                 'end_date' => '2025-12-14',
                 'enrollment_start_date' => null,
@@ -43,8 +43,8 @@ class SemesterSeeder extends Seeder
                 'is_archived' => false,
             ],
             [
-                'name' => 'Semester 2 - 20252027',
-                'code' => 'INT01SE02',
+                'name' => 'Spring 2026 - 20262028',
+                'code' => 'SPR2026',
                 'start_date' => '2025-12-29',
                 'end_date' => '2026-04-12',
                 'enrollment_start_date' => null,
@@ -53,8 +53,8 @@ class SemesterSeeder extends Seeder
                 'is_archived' => false,
             ],
             [
-                'name' => 'Semester 3 - 20252027',
-                'code' => 'INT01SE03',
+                'name' => 'Summer 2026 - 20262028',
+                'code' => 'SUM2026',
                 'start_date' => '2026-04-27',
                 'end_date' => '2026-08-02',
                 'enrollment_start_date' => null,

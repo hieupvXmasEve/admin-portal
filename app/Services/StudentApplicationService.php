@@ -81,10 +81,10 @@ class StudentApplicationService
                 // Remove unique validation for this conversion since we're creating new record
                 $rules = $validator->getRules();
                 if (isset($rules['email'])) {
-                    $rules['email'] = array_filter($rules['email'], fn ($rule) => ! str_contains($rule, 'unique'));
+                    $rules['email'] = array_filter($rules['email'], fn($rule) => ! str_contains($rule, 'unique'));
                 }
                 if (isset($rules['national_id'])) {
-                    $rules['national_id'] = array_filter($rules['national_id'], fn ($rule) => ! str_contains($rule, 'unique'));
+                    $rules['national_id'] = array_filter($rules['national_id'], fn($rule) => ! str_contains($rule, 'unique'));
                 }
 
                 $validator = Validator::make($studentData, $rules, Student::validationMessages());
@@ -114,7 +114,7 @@ class StudentApplicationService
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'error' => 'Conversion failed: '.$e->getMessage(),
+                'error' => 'Conversion failed: ' . $e->getMessage(),
             ];
         }
     }
@@ -134,7 +134,50 @@ class StudentApplicationService
         $errorCount = 0;
 
         foreach ($applicationIds as $applicationId) {
-            $result = $this->convertSingleApplication($applicationId, $conversionData);
+            // Clone base conversion data for this application
+            $dataForThisApplication = $conversionData;
+
+            // Resolve curriculum version and program from application's intake if not provided
+            if (! isset($dataForThisApplication['program_id']) || ! isset($dataForThisApplication['curriculum_version_id'])) {
+                $application = StudentApplication::find($applicationId);
+
+                if (! $application) {
+                    $failed[] = [
+                        'application_id' => $applicationId,
+                        'error' => 'Student application not found',
+                        'errors' => [],
+                    ];
+                    $errorCount++;
+                    continue;
+                }
+
+                if (! empty($application->intake)) {
+                    $curriculumVersion = CurriculumVersion::where('version_code', $application->intake)->first();
+
+                    if ($curriculumVersion) {
+                        $dataForThisApplication['curriculum_version_id'] = $curriculumVersion->id;
+                        $dataForThisApplication['program_id'] = $curriculumVersion->program_id;
+                    } else {
+                        $failed[] = [
+                            'application_id' => $applicationId,
+                            'error' => "Curriculum version not found for intake: {$application->intake}",
+                            'errors' => [],
+                        ];
+                        $errorCount++;
+                        continue;
+                    }
+                } else {
+                    $failed[] = [
+                        'application_id' => $applicationId,
+                        'error' => 'Intake is missing; cannot resolve curriculum version',
+                        'errors' => [],
+                    ];
+                    $errorCount++;
+                    continue;
+                }
+            }
+
+            $result = $this->convertSingleApplication($applicationId, $dataForThisApplication);
 
             if ($result['success']) {
                 $successful[] = $result;
@@ -283,7 +326,7 @@ class StudentApplicationService
             ]);
 
             if (! empty($scores)) {
-                $englishInfo .= ' ('.implode(', ', $scores).')';
+                $englishInfo .= ' (' . implode(', ', $scores) . ')';
             }
 
             $notes[] = $englishInfo;
@@ -309,7 +352,7 @@ class StudentApplicationService
             $notes[] = "Exception Units: {$application->exception_units}";
         }
 
-        return empty($notes) ? null : "Application Notes:\n".implode("\n", $notes);
+        return empty($notes) ? null : "Application Notes:\n" . implode("\n", $notes);
     }
 
     /**

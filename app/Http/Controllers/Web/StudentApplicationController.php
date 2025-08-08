@@ -14,6 +14,7 @@ use App\Services\StudentApplicationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 
@@ -31,7 +32,8 @@ class StudentApplicationController extends Controller
         $filters = [
             'search' => $request->get('search'),
             'status' => $request->get('status'),
-            'campus_code' => $request->get('campus'),
+            'converted' => $request->get('converted'),
+//            'campus_code' => $request->get('campus'),
             'per_page' => $request->get('per_page', 15),
             'sort' => $request->get('sort', 'created_at'),
             'direction' => $request->get('direction', 'desc'),
@@ -57,15 +59,23 @@ class StudentApplicationController extends Controller
             $query->where('status', $filters['status']);
         }
 
-        // Apply campus filter
-        if ($filters['campus_code']) {
-            $query->where('campus_code', $filters['campus_code']);
+        // Apply converted filter
+        if ($filters['converted'] !== null && $filters['converted'] !== '') {
+            if ($filters['converted'] === 'yes') {
+                $query->whereNotNull('student_id');
+            } elseif ($filters['converted'] === 'no') {
+                $query->whereNull('student_id');
+            }
         }
+
+//        // Apply campus filter
+//        if ($filters['campus_code']) {
+//            $query->where('campus_code', $filters['campus_code']);
+//        }
 
         // Apply sorting
         $query->orderBy($filters['sort'], $filters['direction']);
-
-        $applications = $query->paginate($filters['per_page'])
+        $applications = $query->where('campus_code', app('campus')->code)->paginate($filters['per_page'])
             ->withQueryString();
 
         // Get filter options
@@ -76,12 +86,17 @@ class StudentApplicationController extends Controller
             ['value' => 'approved', 'label' => 'Approved'],
             ['value' => 'rejected', 'label' => 'Rejected'],
         ];
+        $conversionOptions = [
+            ['value' => 'yes', 'label' => 'Converted to Student'],
+            ['value' => 'no', 'label' => 'Not Converted'],
+        ];
 
         return Inertia::render('student-applications/index', [
             'applications' => $applications,
             'filters' => $filters,
             'campuses' => $campuses,
             'statusOptions' => $statusOptions,
+            'conversionOptions' => $conversionOptions,
         ]);
     }
 
@@ -233,21 +248,13 @@ class StudentApplicationController extends Controller
         $request->validate([
             'application_ids' => 'required|array|min:1',
             'application_ids.*' => 'exists:student_applications,id',
-            'program_id' => 'required|exists:programs,id',
-            'curriculum_version_id' => 'required|exists:curriculum_versions,id',
-            'specialization_id' => 'nullable|exists:specializations,id',
             'admission_date' => 'required|date',
-            'expected_graduation_date' => 'nullable|date|after:admission_date',
         ]);
 
         $result = $this->studentApplicationService->convertBatchApplications(
             $request->application_ids,
             $request->only([
-                'program_id',
-                'curriculum_version_id',
-                'specialization_id',
                 'admission_date',
-                'expected_graduation_date',
             ])
         );
 

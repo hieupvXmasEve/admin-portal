@@ -36,12 +36,13 @@ class CreateActiveStudentsSeeder extends Seeder
         // Get required data
         // get campus Hanoi
         $campus = Campus::where('code', 'HN')->first();
-        $programs = Program::get();
+//        $programs = Program::get();
+        $program = Program::where('code', 'AI')->first();
         $curriculumVersions = CurriculumVersion::all();
 
-        if ($programs->isEmpty() || $curriculumVersions->isEmpty()) {
-            throw new \Exception(message: 'Required data not found. Please run InitialSetup seeders first.');
-        }
+//        if ($programs->isEmpty() || $curriculumVersions->isEmpty()) {
+//            throw new \Exception(message: 'Required data not found. Please run InitialSetup seeders first.');
+//        }
 
         $faker = Faker::create();
         $createdCount = 0;
@@ -49,7 +50,7 @@ class CreateActiveStudentsSeeder extends Seeder
         // Create 100 students
         for ($i = 1; $i <= 100; $i++) {
             // $campus = $campuses->random();
-            $program = $programs->random();
+//            $program = $programs->random();
             //            $specialization = $program->specializations->random();
 
             // Find curriculum version for this program/specialization

@@ -13,8 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
-import { AlertCircle, CheckCircle2, ChevronDown, Clock, Edit, Eye, FileCheck, RefreshCw, Trash2, Users, XCircle } from 'lucide-vue-next';
-import { computed, h, ref, watch } from 'vue';
+import { AlertCircle, CheckCircle2, ChevronDown, Clock, Eye, RefreshCw, Trash2, Users, XCircle } from 'lucide-vue-next';
+import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { createColumns } from '@/lib/table-utils';
 import { useApi } from '@/composables/useApiRequest';
@@ -62,6 +62,7 @@ interface Props {
     filters: {
         search: string;
         status: string;
+        converted: string;
         campus: string;
         per_page: number;
         sort: string;
@@ -69,10 +70,11 @@ interface Props {
     };
     campuses: Campus[];
     statusOptions: FilterOption[];
+    conversionOptions: FilterOption[];
 }
 
 const props = defineProps<Props>();
-
+console.log('%c props', 'color: red', props.filters);
 // API
 const api = useApi();
 
@@ -89,11 +91,7 @@ const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null);
 
 // Form state for conversions
 const conversionForm = ref({
-    program_id: '',
-    curriculum_version_id: '',
-    specialization_id: 'none',
     admission_date: format(new Date(), 'yyyy-MM-dd'),
-    expected_graduation_date: '',
 });
 
 const statusForm = ref({
@@ -102,13 +100,6 @@ const statusForm = ref({
 
 const bulkStatusForm = ref({
     status: '',
-});
-
-// Conversion options
-const conversionOptions = ref({
-    programs: [] as Array<{ id: number; name: string; code: string }>,
-    curriculumVersions: [] as Array<{ id: number; version_name: string; effective_date: string }>,
-    specializations: [] as Array<{ id: number; name: string }>,
 });
 
 const loadingOptions = ref(false);
@@ -223,13 +214,6 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
                                 },
                                 () => [h(Eye, { class: 'mr-2 h-4 w-4' }), 'View'],
                             ),
-                            h(
-                                DropdownMenuItem,
-                                {
-                                    onClick: () => router.visit(`/student-applications/${application.id}/edit`),
-                                },
-                                () => [h(Edit, { class: 'mr-2 h-4 w-4' }), 'Edit'],
-                            ),
                             h(DropdownMenuSeparator, {}),
                             h(
                                 DropdownMenuItem,
@@ -296,8 +280,8 @@ const onStatusFilter = (value: string) => {
     applyFilters({ status: value === 'all' ? '' : value });
 };
 
-const onCampusFilter = (value: string) => {
-    applyFilters({ campus: value === 'all' ? '' : value });
+const onConversionFilter = (value: string) => {
+    applyFilters({ converted: value === 'all' ? '' : value });
 };
 
 const onPageSizeChange = (size: number) => {
@@ -330,7 +314,6 @@ const openConversionDialog = async (application?: StudentApplication) => {
         selectedApplications.value = [application];
     }
     showBatchConversionDialog.value = true;
-    await loadConversionOptions();
 };
 
 const openBulkStatusDialog = () => {
@@ -338,77 +321,13 @@ const openBulkStatusDialog = () => {
     showBulkStatusUpdateDialog.value = true;
 };
 
-// Load conversion options
-const loadConversionOptions = async () => {
-    try {
-        loadingOptions.value = true;
-        const { data } = await api.get('/student-applications/api/conversion-options');
-        conversionOptions.value.programs = data.value?.data?.programs || [];
-    } catch (error) {
-        console.error('Failed to load conversion options:', error);
-        toast.error('Failed to load conversion options. Please try again.');
-    } finally {
-        loadingOptions.value = false;
-    }
-};
-
-const loadCurriculumVersions = async (programId: string) => {
-    if (!programId) {
-        conversionOptions.value.curriculumVersions = [];
-        return;
-    }
-
-    try {
-        const { data } = await api.get('/student-applications/api/conversion-options', { program_id: programId });
-        conversionOptions.value.curriculumVersions = data.value?.data?.curriculumVersions || [];
-    } catch (error) {
-        console.error('Failed to load curriculum versions:', error);
-        toast.error('Failed to load curriculum versions.');
-    }
-};
-
-const loadSpecializations = async (programId: string) => {
-    if (!programId) {
-        conversionOptions.value.specializations = [];
-        return;
-    }
-
-    try {
-        const { data } = await api.get('/student-applications/api/conversion-options', { program_id: programId });
-        conversionOptions.value.specializations = data.value?.data?.specializations || [];
-    } catch (error) {
-        console.error('Failed to load specializations:', error);
-        toast.error('Failed to load specializations.');
-    }
-};
-
-// Watch for program changes
-watch(
-    () => conversionForm.value.program_id,
-    async (newProgramId) => {
-        conversionForm.value.curriculum_version_id = '';
-        conversionForm.value.specialization_id = 'none';
-
-        if (newProgramId) {
-            await Promise.all([loadCurriculumVersions(newProgramId), loadSpecializations(newProgramId)]);
-        } else {
-            conversionOptions.value.curriculumVersions = [];
-            conversionOptions.value.specializations = [];
-        }
-    },
-);
-
 const closeDialogs = () => {
     showStatusUpdateDialog.value = false;
     showBatchConversionDialog.value = false;
     showBulkStatusUpdateDialog.value = false;
     currentApplication.value = null;
     conversionForm.value = {
-        program_id: '',
-        curriculum_version_id: '',
-        specialization_id: 'none',
         admission_date: format(new Date(), 'yyyy-MM-dd'),
-        expected_graduation_date: '',
     };
     statusForm.value.status = '';
     bulkStatusForm.value.status = '';
@@ -454,11 +373,7 @@ const batchConvert = () => {
         '/student-applications/batch-convert',
         {
             application_ids: selectedApplications.value.map((app) => app.id),
-            program_id: conversionForm.value.program_id,
-            curriculum_version_id: conversionForm.value.curriculum_version_id,
-            specialization_id: conversionForm.value.specialization_id === 'none' ? null : conversionForm.value.specialization_id,
             admission_date: conversionForm.value.admission_date,
-            expected_graduation_date: conversionForm.value.expected_graduation_date,
         },
         {
             preserveState: true,
@@ -562,89 +477,80 @@ const clearFilters = () => {
 <template>
     <Head title="Student Applications" />
 
-    <div class="space-y-6">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold tracking-tight">Student Applications</h1>
-                <p class="text-muted-foreground">Manage and process student applications for admission</p>
-            </div>
-            <div class="flex items-center space-x-2">
-                <Button v-if="hasSelectedApplications" @click="openBulkStatusDialog()" variant="outline" class="border-blue-300 text-blue-600 hover:bg-blue-50">
-                    <RefreshCw class="mr-2 h-4 w-4" />
-                    Update Status ({{ selectedApplications.length }})
-                </Button>
-
-                <Button v-if="hasSelectedApplications && canConvertSelected" @click="openConversionDialog()" class="bg-green-600 hover:bg-green-700">
-                    <Users class="mr-2 h-4 w-4" />
-                    Convert {{ selectedApplications.length }} to Students
-                </Button>
-
-                <Button @click="router.visit('/student-applications/create')">
-                    <FileCheck class="mr-2 h-4 w-4" />
-                    New Application
-                </Button>
-            </div>
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight">Student Applications</h1>
+            <p class="text-muted-foreground">Manage and process student applications for admission</p>
         </div>
+        <div class="flex items-center space-x-2">
+            <Button v-if="hasSelectedApplications" @click="openBulkStatusDialog()" variant="outline" class="border-blue-300 text-blue-600 hover:bg-blue-50">
+                <RefreshCw class="mr-2 h-4 w-4" />
+                Update Status ({{ selectedApplications.length }})
+            </Button>
 
-        <!-- Filters -->
-        <Card>
-            <CardHeader>
-                <CardTitle>Filters</CardTitle>
-                <CardDescription>Filter applications by status, campus, or search terms</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div class="flex flex-wrap items-center gap-4">
-                    <!-- Search -->
-                    <div class="min-w-[200px] flex-1">
-                        <DebouncedInput :model-value="filters.search || ''" @debounced="onSearch" placeholder="Search by name, email, phone, or ID..." class="w-full" />
-                    </div>
+            <Button v-if="hasSelectedApplications && canConvertSelected" @click="openConversionDialog()" class="bg-green-600 hover:bg-green-700">
+                <Users class="mr-2 h-4 w-4" />
+                Convert {{ selectedApplications.length }} to Students
+            </Button>
+        </div>
+    </div>
 
-                    <!-- Status Filter -->
-                    <div class="min-w-[150px]">
-                        <Select :model-value="filters.status || 'all'" @update:model-value="onStatusFilter">
-                            <SelectTrigger>
-                                <SelectValue placeholder="All Statuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
-                                <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">
-                                    {{ option.label }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <!-- Campus Filter -->
-                    <div class="min-w-[150px]">
-                        <Select :model-value="filters.campus || 'all'" @update:model-value="onCampusFilter">
-                            <SelectTrigger>
-                                <SelectValue placeholder="All Campuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Campuses</SelectItem>
-                                <SelectItem v-for="campus in campuses" :key="campus.code" :value="campus.code">
-                                    {{ campus.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <!-- Clear Filters -->
-                    <Button variant="outline" @click="clearFilters"> Clear Filters </Button>
+    <!-- Filters -->
+    <Card>
+        <CardHeader>
+            <CardTitle>Filters</CardTitle>
+            <CardDescription>Filter applications by status, campus, or search terms</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Search -->
+                <div class="min-w-[200px] flex-1">
+                    <DebouncedInput :model-value="filters.search || ''" @debounced="onSearch" placeholder="Search by name, email, phone, or ID..." class="w-full" />
                 </div>
-            </CardContent>
-        </Card>
 
-        <!-- Applications Table -->
-        <CardContent class="p-0">
-            <DataTable ref="dataTableRef" :data="applications.data" :columns="suggestedCoursesColumns" :enable-row-selection="true" @selection-change="onSelectionChange" empty-message="No applications found" />
+                <!-- Status Filter -->
+                <div class="min-w-[150px]">
+                    <Select :model-value="filters.status || 'all'" @update:model-value="onStatusFilter">
+                        <SelectTrigger>
+                            <SelectValue placeholder="All Statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
 
-            <div class="border-t px-6">
-                <DataPagination :pagination-data="applications" item-name="applications" @navigate="onNavigate" @page-size-change="onPageSizeChange" />
+                <!-- Conversion Filter -->
+                <div class="min-w-[180px]">
+                    <Select :model-value="filters.converted || 'all'" @update:model-value="onConversionFilter">
+                        <SelectTrigger>
+                            <SelectValue placeholder="All Applications" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Applications</SelectItem>
+                            <SelectItem v-for="option in conversionOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <!-- Clear Filters -->
+                <Button variant="outline" @click="clearFilters"> Clear Filters </Button>
             </div>
         </CardContent>
-    </div>
+    </Card>
+
+    <!-- Applications Table -->
+    <CardContent class="p-0">
+            <DataTable ref="dataTableRef" :data="applications.data" :columns="suggestedCoursesColumns" :enable-row-selection="true" @selection-change="onSelectionChange" empty-message="No applications found" />
+
+            <DataPagination :pagination-data="applications" item-name="applications" @navigate="onNavigate" @page-size-change="onPageSizeChange" />
+        </CardContent>
 
     <!-- Status Update Dialog -->
     <Dialog v-model:open="showStatusUpdateDialog">
@@ -692,63 +598,15 @@ const clearFilters = () => {
             </DialogHeader>
 
             <div class="space-y-4">
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-2">
-                        <Label for="program_id">Program *</Label>
-                        <Select v-model="conversionForm.program_id" :disabled="loadingOptions">
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select program" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem v-for="program in conversionOptions.programs" :key="program.id" :value="program.id.toString()"> {{ program.name }} ({{ program.code }}) </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div class="space-y-2">
-                        <Label for="curriculum_version_id">Curriculum Version *</Label>
-                        <Select v-model="conversionForm.curriculum_version_id" :disabled="!conversionForm.program_id || conversionOptions.curriculumVersions.length === 0">
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select version" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem v-for="version in conversionOptions.curriculumVersions" :key="version.id" :value="version.id.toString()"> {{ version.version_name }} ({{ format(new Date(version.effective_date), 'yyyy') }}) </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-2">
-                        <Label for="specialization_id">Specialization</Label>
-                        <Select v-model="conversionForm.specialization_id" :disabled="!conversionForm.program_id">
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select specialization (optional)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">No Specialization</SelectItem>
-                                <SelectItem v-for="specialization in conversionOptions.specializations" :key="specialization.id" :value="specialization.id.toString()">
-                                    {{ specialization.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div class="space-y-2">
-                        <Label for="admission_date">Admission Date *</Label>
-                        <Input v-model="conversionForm.admission_date" type="date" required />
-                    </div>
-                </div>
-
                 <div class="space-y-2">
-                    <Label for="expected_graduation_date">Expected Graduation Date</Label>
-                    <Input v-model="conversionForm.expected_graduation_date" type="date" />
+                    <Label for="admission_date">Admission Date *</Label>
+                    <Input v-model="conversionForm.admission_date" type="date" required />
                 </div>
             </div>
 
             <DialogFooter>
                 <Button variant="outline" @click="closeDialogs" :disabled="isLoading"> Cancel </Button>
-                <Button @click="batchConvert" :disabled="isLoading || !conversionForm.program_id || !conversionForm.curriculum_version_id || !conversionForm.admission_date" class="bg-green-600 hover:bg-green-700">
+                <Button @click="batchConvert" :disabled="isLoading || !conversionForm.admission_date" class="bg-green-600 hover:bg-green-700">
                     <RefreshCw v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
                     <Users class="mr-2 h-4 w-4" />
                     Convert to Students
