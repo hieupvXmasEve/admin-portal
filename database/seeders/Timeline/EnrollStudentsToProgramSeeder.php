@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
 use App\Models\Enrollment;
 use App\Models\Semester;
+use App\Models\Student;
 use Illuminate\Database\Seeder;
 
 class EnrollStudentsToProgramSeeder extends Seeder
@@ -30,7 +30,7 @@ class EnrollStudentsToProgramSeeder extends Seeder
         // Get the first semester (FALL2024) - should already exist from SemesterSeeder
         $firstSemester = Semester::where('is_active', true)->first();
 
-        if (!$firstSemester) {
+        if (! $firstSemester) {
             throw new \Exception('FALL2024 semester not found. Please run InitialSetup seeders first.');
         }
 
@@ -43,7 +43,7 @@ class EnrollStudentsToProgramSeeder extends Seeder
                 ->where('semester_id', $firstSemester->id)
                 ->first();
 
-            if (!$existingEnrollment) {
+            if (! $existingEnrollment) {
                 $semesterNumber = Semester::query()
                     ->whereDate('start_date', '>=', $student->admission_date)
                     ->whereDate('start_date', '<=', $firstSemester->start_date)
@@ -57,7 +57,7 @@ class EnrollStudentsToProgramSeeder extends Seeder
                     'curriculum_version_id' => $student->curriculum_version_id,
                     'semester_number' => $semesterNumber,
                     'status' => 'in_progress',
-                    'notes' => 'Initial enrollment into program for semester #' . $semesterNumber,
+                    'notes' => 'Initial enrollment into program for semester #'.$semesterNumber,
                 ]);
 
                 $enrollmentCount++;
@@ -79,6 +79,6 @@ class EnrollStudentsToProgramSeeder extends Seeder
         $this->command->info("✅ Successfully processed {$enrollmentCount} enrollments!");
         $this->command->info("  📅 Semester: {$firstSemester->name}");
         $this->command->info("  🎓 Newly activated students: {$newlyActivatedCount}");
-        $this->command->info("  📊 All eligible students now have enrollment records");
+        $this->command->info('  📊 All eligible students now have enrollment records');
     }
 }

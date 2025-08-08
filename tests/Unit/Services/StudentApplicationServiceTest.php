@@ -14,7 +14,6 @@ use App\Models\StudentApplication;
 use App\Services\StudentApplicationService;
 use App\Services\StudentCodeGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\App;
 use Tests\TestCase;
 
@@ -23,11 +22,17 @@ class StudentApplicationServiceTest extends TestCase
     use RefreshDatabase;
 
     protected StudentApplicationService $service;
+
     protected StudentCodeGenerationService $codeGenerationService;
+
     protected Campus $campus;
+
     protected Program $program;
+
     protected Semester $semester;
+
     protected Specialization $specialization;
+
     protected CurriculumVersion $curriculumVersion;
 
     protected function setUp(): void
@@ -36,35 +41,35 @@ class StudentApplicationServiceTest extends TestCase
 
         $this->service = app(StudentApplicationService::class);
         $this->codeGenerationService = app(StudentCodeGenerationService::class);
-        
+
         // Create test campus
         $this->campus = Campus::factory()->create([
             'code' => 'SAI',
-            'name' => 'Saigon Campus'
+            'name' => 'Saigon Campus',
         ]);
-        
+
         // Mock the campus context
         App::instance('campus', $this->campus);
-        
+
         // Create test program
         $this->program = Program::factory()->create([
             'code' => 'IT',
-            'name' => 'Information Technology'
+            'name' => 'Information Technology',
         ]);
-        
+
         // Create test semester
         $this->semester = Semester::factory()->create();
-        
+
         // Create test specialization
         $this->specialization = Specialization::factory()->create([
             'program_id' => $this->program->id,
-            'name' => 'Software Engineering'
+            'name' => 'Software Engineering',
         ]);
-        
+
         // Create test curriculum version
         $this->curriculumVersion = CurriculumVersion::factory()->create([
             'program_id' => $this->program->id,
-            'semester_id' => $this->semester->id
+            'semester_id' => $this->semester->id,
         ]);
     }
 
@@ -88,20 +93,20 @@ class StudentApplicationServiceTest extends TestCase
             'parent_phone' => '0987654321',
             'parent_email' => 'parent@example.com',
             'status' => 'pending',
-            'student_id' => null
+            'student_id' => null,
         ]);
 
         $result = $this->service->convertSingleApplication($application->id, [
             'program_id' => $this->program->id,
             'curriculum_version_id' => $this->curriculumVersion->id,
             'specialization_id' => $this->specialization->id,
-            'admission_date' => now()->toDateString()
+            'admission_date' => now()->toDateString(),
         ]);
 
         $this->assertTrue($result['success']);
         $this->assertInstanceOf(Student::class, $result['student']);
         $this->assertInstanceOf(StudentApplication::class, $result['application']);
-        
+
         // Verify student was created with correct data
         $student = $result['student'];
         $this->assertEquals('John Doe', $student->full_name);
@@ -130,7 +135,7 @@ class StudentApplicationServiceTest extends TestCase
     {
         $result = $this->service->convertSingleApplication(99999, [
             'program_id' => $this->program->id,
-            'curriculum_version_id' => $this->curriculumVersion->id
+            'curriculum_version_id' => $this->curriculumVersion->id,
         ]);
 
         $this->assertFalse($result['success']);
@@ -144,12 +149,12 @@ class StudentApplicationServiceTest extends TestCase
         $application = StudentApplication::factory()->create([
             'campus_code' => $this->campus->code,
             'student_id' => $existingStudent->id,
-            'status' => 'approved'
+            'status' => 'approved',
         ]);
 
         $result = $this->service->convertSingleApplication($application->id, [
             'program_id' => $this->program->id,
-            'curriculum_version_id' => $this->curriculumVersion->id
+            'curriculum_version_id' => $this->curriculumVersion->id,
         ]);
 
         $this->assertFalse($result['success']);
@@ -161,12 +166,12 @@ class StudentApplicationServiceTest extends TestCase
     {
         $application = StudentApplication::factory()->create([
             'campus_code' => 'INVALID',
-            'student_id' => null
+            'student_id' => null,
         ]);
 
         $result = $this->service->convertSingleApplication($application->id, [
             'program_id' => $this->program->id,
-            'curriculum_version_id' => $this->curriculumVersion->id
+            'curriculum_version_id' => $this->curriculumVersion->id,
         ]);
 
         $this->assertFalse($result['success']);
@@ -183,13 +188,13 @@ class StudentApplicationServiceTest extends TestCase
             'birth_month' => 12,
             'birth_year' => 1999,
             'campus_code' => $this->campus->code,
-            'student_id' => null
+            'student_id' => null,
         ]);
 
         $result = $this->service->convertSingleApplication($application->id, [
             'program_id' => $this->program->id,
             'curriculum_version_id' => $this->curriculumVersion->id,
-            'admission_date' => now()->toDateString()
+            'admission_date' => now()->toDateString(),
         ]);
 
         $this->assertTrue($result['success']);
@@ -203,7 +208,7 @@ class StudentApplicationServiceTest extends TestCase
         $applications = StudentApplication::factory()->count(3)->create([
             'campus_code' => $this->campus->code,
             'student_id' => null,
-            'status' => 'pending'
+            'status' => 'pending',
         ]);
 
         $applicationIds = $applications->pluck('id')->toArray();
@@ -211,7 +216,7 @@ class StudentApplicationServiceTest extends TestCase
             'program_id' => $this->program->id,
             'curriculum_version_id' => $this->curriculumVersion->id,
             'specialization_id' => $this->specialization->id,
-            'admission_date' => now()->toDateString()
+            'admission_date' => now()->toDateString(),
         ];
 
         $result = $this->service->convertBatchApplications($applicationIds, $conversionData);
@@ -240,7 +245,7 @@ class StudentApplicationServiceTest extends TestCase
         $validApplications = StudentApplication::factory()->count(2)->create([
             'campus_code' => $this->campus->code,
             'student_id' => null,
-            'status' => 'pending'
+            'status' => 'pending',
         ]);
 
         // Create invalid application (already converted)
@@ -248,7 +253,7 @@ class StudentApplicationServiceTest extends TestCase
         $invalidApplication = StudentApplication::factory()->create([
             'campus_code' => $this->campus->code,
             'student_id' => $existingStudent->id,
-            'status' => 'approved'
+            'status' => 'approved',
         ]);
 
         $applicationIds = $validApplications->pluck('id')
@@ -258,7 +263,7 @@ class StudentApplicationServiceTest extends TestCase
         $result = $this->service->convertBatchApplications($applicationIds, [
             'program_id' => $this->program->id,
             'curriculum_version_id' => $this->curriculumVersion->id,
-            'admission_date' => now()->toDateString()
+            'admission_date' => now()->toDateString(),
         ]);
 
         $this->assertEquals(2, $result['success_count']);
@@ -285,14 +290,14 @@ class StudentApplicationServiceTest extends TestCase
             'parent_phone' => '0987654321',
             'parent_email' => 'parent@test.com',
             'campus_code' => $this->campus->code,
-            'student_id' => null
+            'student_id' => null,
         ]);
 
         $mappedData = $this->service->mapApplicationToStudentData($application, [
             'campus_id' => $this->campus->id,
             'program_id' => $this->program->id,
             'curriculum_version_id' => $this->curriculumVersion->id,
-            'admission_date' => '2025-01-15'
+            'admission_date' => '2025-01-15',
         ]);
 
         $this->assertEquals('Test User', $mappedData['full_name']);
@@ -318,13 +323,13 @@ class StudentApplicationServiceTest extends TestCase
             'birth_day' => null,
             'birth_month' => null,
             'birth_year' => null,
-            'campus_code' => $this->campus->code
+            'campus_code' => $this->campus->code,
         ]);
 
         $mappedData = $this->service->mapApplicationToStudentData($application, [
             'campus_id' => $this->campus->id,
             'program_id' => $this->program->id,
-            'curriculum_version_id' => $this->curriculumVersion->id
+            'curriculum_version_id' => $this->curriculumVersion->id,
         ]);
 
         $this->assertNull($mappedData['date_of_birth']);
@@ -334,11 +339,11 @@ class StudentApplicationServiceTest extends TestCase
     public function it_validates_required_relationships_exist(): void
     {
         $invalidProgramId = 99999;
-        
+
         $result = $this->service->validateRequiredRelationships([
             'campus_id' => $this->campus->id,
             'program_id' => $invalidProgramId,
-            'curriculum_version_id' => $this->curriculumVersion->id
+            'curriculum_version_id' => $this->curriculumVersion->id,
         ]);
 
         $this->assertFalse($result['valid']);
@@ -350,18 +355,18 @@ class StudentApplicationServiceTest extends TestCase
     {
         $application = StudentApplication::factory()->create([
             'campus_code' => $this->campus->code,
-            'student_id' => null
+            'student_id' => null,
         ]);
 
         $result = $this->service->convertSingleApplication($application->id, [
             'program_id' => $this->program->id,
             'curriculum_version_id' => $this->curriculumVersion->id,
-            'admission_date' => now()->toDateString()
+            'admission_date' => now()->toDateString(),
         ]);
 
         $this->assertTrue($result['success']);
         $student = $result['student'];
         $this->assertStringStartsWith($this->campus->code, $student->student_code);
-        $this->assertMatchesRegularExpression('/^' . $this->campus->code . '\d{8}$/', $student->student_code);
+        $this->assertMatchesRegularExpression('/^'.$this->campus->code.'\d{8}$/', $student->student_code);
     }
 }

@@ -4,8 +4,8 @@ namespace App\Models;
 
 use App\Support\CampusLogContext;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 abstract class StudentAuditableModel extends Authenticatable
 {
@@ -27,7 +27,7 @@ abstract class StudentAuditableModel extends Authenticatable
         return [
             'student_code', 'full_name', 'email', 'phone', 'address',
             'campus_id', 'program_id', 'specialization_id', 'curriculum_version_id',
-            'status', 'academic_status', 'status_change_date', 'status_reason', 'status_changed_by'
+            'status', 'academic_status', 'status_change_date', 'status_reason', 'status_changed_by',
         ];
     }
 
@@ -43,7 +43,7 @@ abstract class StudentAuditableModel extends Authenticatable
             'admission_date', 'expected_graduation_date',
             'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
             'high_school_name', 'high_school_graduation_year', 'entrance_exam_score',
-            'status', 'academic_status', 'status_change_date', 'status_reason', 'status_changed_by'
+            'status', 'academic_status', 'status_change_date', 'status_reason', 'status_changed_by',
         ];
     }
 
@@ -79,10 +79,10 @@ abstract class StudentAuditableModel extends Authenticatable
     protected function getLogName(): string
     {
         $modelName = 'Student';
-        
+
         // Get campus ID from model field or session
         $campusId = $this->campus_id ?? CampusLogContext::getCurrentCampusId();
-        
+
         return CampusLogContext::getLogName($modelName, $campusId);
     }
 
@@ -107,15 +107,15 @@ abstract class StudentAuditableModel extends Authenticatable
      */
     protected function getIdentifierForLog(): string
     {
-        if (!empty($this->student_code)) {
+        if (! empty($this->student_code)) {
             return "{$this->student_code} ({$this->full_name})";
         }
 
-        if (!empty($this->full_name)) {
+        if (! empty($this->full_name)) {
             return $this->full_name;
         }
 
-        if (!empty($this->email)) {
+        if (! empty($this->email)) {
             return $this->email;
         }
 
@@ -146,7 +146,7 @@ abstract class StudentAuditableModel extends Authenticatable
         if ($this->isDirty() && $this->exists) {
             $changeContext['changed_fields'] = array_keys($this->getDirty());
             $changeContext['change_count'] = count($this->getDirty());
-            
+
             // Track important status changes
             if ($this->isDirty('status') || $this->isDirty('academic_status')) {
                 $changeContext['status_change'] = true;

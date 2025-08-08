@@ -26,13 +26,21 @@ class StudentAcademicSummaryControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Student $student;
+
     private Campus $campus;
+
     private Program $program;
+
     private Specialization $specialization;
+
     private CurriculumVersion $curriculumVersion;
+
     private Semester $semester;
+
     private Unit $unit;
+
     private CourseOffering $courseOffering;
 
     protected function setUp(): void
@@ -92,16 +100,15 @@ class StudentAcademicSummaryControllerTest extends TestCase
             ->get(route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $this->student));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) => 
-            $page->component('students/AcademicSummary')
-                ->has('student')
-                ->has('academicSummary')
-                ->has('academicSummary.overview')
-                ->has('academicSummary.registrations')
-                ->has('academicSummary.scores')
-                ->has('academicSummary.attendance')
-                ->has('academicSummary.gpa')
-                ->has('academicSummary.graduation')
+        $response->assertInertia(fn ($page) => $page->component('students/AcademicSummary')
+            ->has('student')
+            ->has('academicSummary')
+            ->has('academicSummary.overview')
+            ->has('academicSummary.registrations')
+            ->has('academicSummary.scores')
+            ->has('academicSummary.attendance')
+            ->has('academicSummary.gpa')
+            ->has('academicSummary.graduation')
         );
     }
 
@@ -111,11 +118,10 @@ class StudentAcademicSummaryControllerTest extends TestCase
             ->get(route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $this->student));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) => 
-            $page->has('student.campus')
-                ->has('student.program')
-                ->has('student.specialization')
-                ->has('student.curriculumVersion')
+        $response->assertInertia(fn ($page) => $page->has('student.campus')
+            ->has('student.program')
+            ->has('student.specialization')
+            ->has('student.curriculumVersion')
         );
     }
 
@@ -356,10 +362,9 @@ class StudentAcademicSummaryControllerTest extends TestCase
             ->get(route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $this->student));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) => 
-            $page->component('students/AcademicSummary')
-                ->where('academicSummary.registrations.summary.total_registrations', 1)
-                ->where('academicSummary.scores.summary.total_courses', 1)
+        $response->assertInertia(fn ($page) => $page->component('students/AcademicSummary')
+            ->where('academicSummary.registrations.summary.total_registrations', 1)
+            ->where('academicSummary.scores.summary.total_courses', 1)
         );
     }
 }

@@ -3,11 +3,9 @@
 namespace App\Providers;
 
 use App\Services\PermissionService;
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\ServiceProvider;
 
 class PermissionServiceProvider extends ServiceProvider
 {
@@ -17,7 +15,7 @@ class PermissionServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(PermissionService::class, function ($app) {
-            return new PermissionService();
+            return new PermissionService;
         });
     }
 
@@ -45,6 +43,7 @@ class PermissionServiceProvider extends ServiceProvider
                     // Sử dụng service để lấy quyền từ cache
                     $permissionService = app(PermissionService::class);
                     $permissions = $permissionService->getUserPermissions($user, $currentCampusId);
+
                     return in_array($permission, $permissions);
                 });
             }
@@ -68,6 +67,7 @@ class PermissionServiceProvider extends ServiceProvider
         // @hasPermission('permission_code')
         Blade::directive('hasPermission', function ($expression) {
             $expression = trim($expression, "'\"");
+
             return "<?php if(auth()->check() && auth()->user()->hasPermission('{$expression}')): ?>";
         });
 

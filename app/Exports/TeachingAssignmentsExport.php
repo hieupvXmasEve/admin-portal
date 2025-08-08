@@ -6,19 +6,20 @@ namespace App\Exports;
 
 use Illuminate\Database\Eloquent\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithTitle;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class TeachingAssignmentsExport implements FromCollection, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithTitle
+class TeachingAssignmentsExport implements FromCollection, WithColumnWidths, WithHeadings, WithMapping, WithStyles, WithTitle
 {
     protected Collection $assignments;
+
     protected array $filters;
 
     public function __construct(Collection $assignments, array $filters = [])
@@ -65,7 +66,7 @@ class TeachingAssignmentsExport implements FromCollection, WithHeadings, WithMap
             'Registration Start',
             'Registration End',
             'Special Requirements',
-            'Notes'
+            'Notes',
         ];
     }
 
@@ -99,7 +100,7 @@ class TeachingAssignmentsExport implements FromCollection, WithHeadings, WithMap
             $assignment->registration_start_date?->format('Y-m-d') ?? 'N/A',
             $assignment->registration_end_date?->format('Y-m-d') ?? 'N/A',
             $assignment->special_requirements ?? 'N/A',
-            $assignment->notes ?? 'N/A'
+            $assignment->notes ?? 'N/A',
         ];
     }
 
@@ -131,7 +132,7 @@ class TeachingAssignmentsExport implements FromCollection, WithHeadings, WithMap
                 ],
             ],
             // Style all data rows
-            'A2:Y' . ($this->assignments->count() + 1) => [
+            'A2:Y'.($this->assignments->count() + 1) => [
                 'borders' => [
                     'allBorders' => [
                         'borderStyle' => Border::BORDER_THIN,
@@ -186,15 +187,15 @@ class TeachingAssignmentsExport implements FromCollection, WithHeadings, WithMap
     public function title(): string
     {
         $title = 'Teaching Assignments';
-        
-        if (!empty($this->filters['semester_id'])) {
-            $title .= ' - Semester ' . $this->filters['semester_id'];
+
+        if (! empty($this->filters['semester_id'])) {
+            $title .= ' - Semester '.$this->filters['semester_id'];
         }
-        
-        if (!empty($this->filters['campus_id'])) {
-            $title .= ' - Campus ' . $this->filters['campus_id'];
+
+        if (! empty($this->filters['campus_id'])) {
+            $title .= ' - Campus '.$this->filters['campus_id'];
         }
-        
+
         return $title;
     }
 }

@@ -26,37 +26,37 @@ class StoreAssessmentDetailRequest extends FormRequest
             'assessment_component_id' => [
                 'required',
                 'integer',
-                'exists:assessment_components,id'
+                'exists:assessment_components,id',
             ],
             'name' => [
                 'required',
                 'string',
-                'max:100'
+                'max:100',
             ],
             'description' => [
                 'nullable',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'due_date' => [
                 'nullable',
                 'date',
-                'after:now'
+                'after:now',
             ],
             'max_points' => [
                 'nullable',
                 'numeric',
                 'min:0.01',
                 'max:999.99',
-                'decimal:0,2'
+                'decimal:0,2',
             ],
             'weight' => [
                 'required',
                 'numeric',
                 'min:0.01',
                 'max:100',
-                'decimal:0,2'
-            ]
+                'decimal:0,2',
+            ],
         ];
     }
 
@@ -78,7 +78,7 @@ class StoreAssessmentDetailRequest extends FormRequest
             'weight.required' => 'Weight is required.',
             'weight.min' => 'Weight must be at least 0.01%.',
             'weight.max' => 'Weight cannot exceed 100%.',
-            'weight.decimal' => 'Weight must have at most 2 decimal places.'
+            'weight.decimal' => 'Weight must have at most 2 decimal places.',
         ];
     }
 
@@ -100,14 +100,14 @@ class StoreAssessmentDetailRequest extends FormRequest
         $assessmentComponentId = $this->input('assessment_component_id');
         $newWeight = (float) $this->input('weight');
 
-        if (!$assessmentComponentId || !$newWeight) {
+        if (! $assessmentComponentId || ! $newWeight) {
             return;
         }
 
         // Get the parent assessment component
         $assessmentComponent = \App\Models\AssessmentComponent::find($assessmentComponentId);
 
-        if (!$assessmentComponent) {
+        if (! $assessmentComponent) {
             return;
         }
 

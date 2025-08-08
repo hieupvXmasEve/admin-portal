@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Web\ClassSessionController;
 use App\Http\Controllers\Web\AttendanceController;
+use App\Http\Controllers\Web\ClassSessionController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {

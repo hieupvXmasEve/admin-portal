@@ -157,11 +157,12 @@ class StudyPlanResource extends JsonResource
      */
     protected function getAcademicYear(?string $date): ?string
     {
-        if (!$date) {
+        if (! $date) {
             return null;
         }
 
         $year = \Carbon\Carbon::parse($date)->year;
+
         return (string) $year;
     }
 
@@ -171,7 +172,7 @@ class StudyPlanResource extends JsonResource
     protected function calculateGradeDistribution(array $units): array
     {
         $grades = collect($units)->pluck('grade')->countBy();
-        
+
         return $grades->map(function ($count, $grade) use ($units) {
             return [
                 'grade' => $grade,
@@ -201,11 +202,11 @@ class StudyPlanResource extends JsonResource
     {
         $averageCreditsPerSemester = 18;
         $semestersNeeded = $creditsRemaining > 0 ? ceil($creditsRemaining / $averageCreditsPerSemester) : 0;
-        
+
         return [
             'semesters_needed' => $semestersNeeded,
             'years_needed' => ceil($semestersNeeded / 2),
-            'estimated_date' => $semestersNeeded > 0 
+            'estimated_date' => $semestersNeeded > 0
                 ? now()->addMonths($semestersNeeded * 6)->format('Y-m-d')
                 : null,
         ];
@@ -229,7 +230,7 @@ class StudyPlanResource extends JsonResource
     protected function generateMilestones(array $timeline): array
     {
         $milestones = [];
-        
+
         if ($timeline['semesters_remaining'] > 0) {
             $milestones[] = [
                 'title' => 'Next Semester Registration',
@@ -237,7 +238,7 @@ class StudyPlanResource extends JsonResource
                 'target_date' => now()->addMonths(3)->format('Y-m-d'),
                 'type' => 'registration',
             ];
-            
+
             if ($timeline['semesters_remaining'] <= 2) {
                 $milestones[] = [
                     'title' => 'Graduation Application',

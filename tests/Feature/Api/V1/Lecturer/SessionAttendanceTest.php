@@ -22,7 +22,7 @@ beforeEach(function () {
         'instructor_id' => $this->lecturer->id,
     ]);
     $this->students = Student::factory()->count(3)->create();
-    
+
     // Enroll students in the course
     foreach ($this->students as $student) {
         CourseRegistration::factory()->create([
@@ -125,9 +125,9 @@ describe('GET lecturer/courses/sessions/{session}/attendance', function () {
             ->getJson("/api/v1/lecturer/courses/sessions/{$this->session->id}/attendance");
 
         $response->assertOk();
-        
+
         $attendanceData = collect($response->json('data.attendance_data'));
-        
+
         $presentStudent = $attendanceData->where('student_id', $this->students[0]->id)->first();
         $absentStudent = $attendanceData->where('student_id', $this->students[1]->id)->first();
         $notMarkedStudent = $attendanceData->where('student_id', $this->students[2]->id)->first();

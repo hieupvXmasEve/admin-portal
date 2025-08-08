@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateScheduleRequest extends FormRequest
 {
@@ -73,7 +72,7 @@ class UpdateScheduleRequest extends FormRequest
     public function getValidatedSessionData(): array
     {
         $validated = $this->validated();
-        
+
         return [
             'session_date' => $validated['session_date'],
             'start_time' => $validated['start_time'],

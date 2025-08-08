@@ -29,8 +29,8 @@ class UpdateLectureRequest extends FormRequest
 
         // Update unique validation rules for existing record
         if ($lecture) {
-            $rules['employee_id'] = ['required', 'string', 'max:20', 'unique:lectures,employee_id,' . $lecture->id];
-            $rules['email'] = ['required', 'email', 'unique:lectures,email,' . $lecture->id];
+            $rules['employee_id'] = ['required', 'string', 'max:20', 'unique:lectures,employee_id,'.$lecture->id];
+            $rules['email'] = ['required', 'email', 'unique:lectures,email,'.$lecture->id];
         }
 
         return $rules;

@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
-use App\Models\Unit;
 use App\Models\AcademicRecord;
 use App\Models\Semester;
+use App\Models\Student;
+use App\Models\Unit;
 use Illuminate\Database\Seeder;
-use Carbon\Carbon;
 
 class CourseExemptionSeeder extends Seeder
 {
@@ -31,7 +30,7 @@ class CourseExemptionSeeder extends Seeder
         // Get SPRING2025 semester for dating exemptions
         $semester = Semester::where('code', 'SPRING2025')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('SPRING2025 semester not found.');
         }
 
@@ -162,7 +161,7 @@ class CourseExemptionSeeder extends Seeder
             ->where('semester_id', $semester->id)
             ->first() ?? \App\Models\CourseOffering::where('semester_id', $semester->id)->first();
 
-        if (!$courseOffering) {
+        if (! $courseOffering) {
             throw new \Exception("No course offering found for exemption records in semester {$semester->code}");
         }
 
@@ -173,6 +172,7 @@ class CourseExemptionSeeder extends Seeder
 
         if ($existingRecord) {
             $this->command->info("  ⚠️ {$student->student_code}: Already has record for {$unit->code}, skipping exemption");
+
             return $existingRecord;
         }
 
@@ -279,6 +279,7 @@ class CourseExemptionSeeder extends Seeder
     {
         // Transfer credits typically receive Pass or Credit grades
         $grades = ['P', 'C', 'C', 'D']; // Weighted toward Credit
+
         return $grades[array_rand($grades)];
     }
 

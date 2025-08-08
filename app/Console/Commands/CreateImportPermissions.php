@@ -32,20 +32,20 @@ class CreateImportPermissions extends Command
 
         // Create import_user permission
         $importPermission = Permission::firstOrCreate([
-            'code' => 'import_user'
+            'code' => 'import_user',
         ], [
             'name' => 'Import Users',
             'description' => 'Can import users from Excel files',
-            'parent_id' => null
+            'parent_id' => null,
         ]);
 
         // Create export_user permission
         $exportPermission = Permission::firstOrCreate([
-            'code' => 'export_user'
+            'code' => 'export_user',
         ], [
             'name' => 'Export Users',
             'description' => 'Can export users to Excel files',
-            'parent_id' => null
+            'parent_id' => null,
         ]);
 
         $this->info('Permissions created:');
@@ -64,27 +64,27 @@ class CreateImportPermissions extends Command
                 ->where('permission_id', $exportPermission->id)
                 ->exists();
 
-            if (!$importExists) {
+            if (! $importExists) {
                 RolePermission::create([
                     'role_id' => $superAdminRole->id,
-                    'permission_id' => $importPermission->id
+                    'permission_id' => $importPermission->id,
                 ]);
-                $this->info("Assigned import_user permission to Super Admin role");
+                $this->info('Assigned import_user permission to Super Admin role');
             }
 
-            if (!$exportExists) {
+            if (! $exportExists) {
                 RolePermission::create([
                     'role_id' => $superAdminRole->id,
-                    'permission_id' => $exportPermission->id
+                    'permission_id' => $exportPermission->id,
                 ]);
-                $this->info("Assigned export_user permission to Super Admin role");
+                $this->info('Assigned export_user permission to Super Admin role');
             }
 
             if ($importExists && $exportExists) {
-                $this->info("Permissions already assigned to Super Admin role");
+                $this->info('Permissions already assigned to Super Admin role');
             }
         } else {
-            $this->warn("Super Admin role not found. Please assign permissions manually.");
+            $this->warn('Super Admin role not found. Please assign permissions manually.');
         }
 
         $this->info('Import permissions setup completed!');

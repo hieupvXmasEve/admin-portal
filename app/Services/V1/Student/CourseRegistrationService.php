@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
+use App\Exceptions\BusinessLogicException;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Semester;
-use App\Exceptions\BusinessLogicException;
+use App\Models\Student;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +28,7 @@ class CourseRegistrationService
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             throw new BusinessLogicException('No active semester for registration');
         }
 
@@ -41,12 +41,12 @@ class CourseRegistrationService
                 'classSessions.room',
                 'courseRegistrations' => function ($q) {
                     $q->where('registration_status', 'registered');
-                }
+                },
             ])
             ->get()
             ->unique('curriculum_unit_id') // giữ lại 1 section/môn
             ->values();
-        Log::info('Course offerings: ' . json_encode($courseOfferings));
+        Log::info('Course offerings: '.json_encode($courseOfferings));
         // B2: Lấy danh sách curriculum_unit_id mà sinh viên đã đăng ký (không lấy course_offering_id nữa)
         $registeredCurriculumUnitIds = $student->courseRegistrations()
             ->where('semester_id', $currentSemester->id)
@@ -57,7 +57,7 @@ class CourseRegistrationService
             ->filter() // loại null (phòng trường hợp course_offering bị xóa)
             ->unique()
             ->toArray();
-        Log::info('Registered curriculum unit IDs: ' . json_encode($registeredCurriculumUnitIds));
+        Log::info('Registered curriculum unit IDs: '.json_encode($registeredCurriculumUnitIds));
 
         // B3: Loại những môn đã đăng ký (dù khác section)
         return $courseOfferings->reject(function ($offering) use ($registeredCurriculumUnitIds) {
@@ -75,7 +75,7 @@ class CourseRegistrationService
         $courseOffering = CourseOffering::with([
             'curriculumUnit.unit',
             'classSessions',
-            'courseRegistrations'
+            'courseRegistrations',
         ])->findOrFail($courseOfferingId);
 
         // Validate registration
@@ -89,7 +89,7 @@ class CourseRegistrationService
                 'semester_id' => $courseOffering->semester_id,
                 'registration_status' => 'registered',
                 'registration_date' => now(),
-                'credit_hours' => (float)$courseOffering->curriculumUnit->unit->credit_points,
+                'credit_hours' => (float) $courseOffering->curriculumUnit->unit->credit_points,
                 'registration_method' => 'online',
             ]);
 
@@ -109,8 +109,8 @@ class CourseRegistrationService
             throw new BusinessLogicException('You can only drop your own registrations');
         }
 
-        if (!in_array($registration->registration_status, ['registered', 'pending'])) {
-            throw new BusinessLogicException('Cannot drop course with status: ' . $registration->registration_status);
+        if (! in_array($registration->registration_status, ['registered', 'pending'])) {
+            throw new BusinessLogicException('Cannot drop course with status: '.$registration->registration_status);
         }
 
         // Check drop deadline
@@ -145,7 +145,7 @@ class CourseRegistrationService
                 'courseOffering.curriculumUnit.unit',
                 'courseOffering.lecture',
                 'courseOffering.classSessions.room',
-                'semester'
+                'semester',
             ]);
 
         if ($semesterId) {
@@ -170,28 +170,28 @@ class CourseRegistrationService
     {
         // Check if registration is open
         $currentSemester = Semester::where('is_active', true)->first();
-        if (!$currentSemester || !$currentSemester->isRegistrationOpen()) {
+        if (! $currentSemester || ! $currentSemester->isRegistrationOpen()) {
             throw new BusinessLogicException('Registration is not currently open');
         }
 
         // Check if course is active
-        if (!$courseOffering->is_active) {
+        if (! $courseOffering->is_active) {
             throw new BusinessLogicException('This course is not available for registration');
         }
 
         // Check enrollment capacity
-        if (!$this->capacityService->hasAvailableCapacity($courseOffering)) {
+        if (! $this->capacityService->hasAvailableCapacity($courseOffering)) {
             throw new BusinessLogicException('This course is full');
         }
 
         // Check prerequisites
-        if (!$this->prerequisiteService->hasMetPrerequisites($student, $courseOffering)) {
+        if (! $this->prerequisiteService->hasMetPrerequisites($student, $courseOffering)) {
             throw new BusinessLogicException('Prerequisites not met for this course');
         }
 
         // Check for schedule conflicts
         $conflicts = $this->conflictDetectionService->detectConflicts($student, $courseOffering);
-        if (!$conflicts->isEmpty()) {
+        if (! $conflicts->isEmpty()) {
             throw new BusinessLogicException('Schedule conflict detected with existing registrations');
         }
 
@@ -246,7 +246,7 @@ class CourseRegistrationService
                 'code' => $offering->curriculumUnit->unit->code,
                 'name' => $offering->curriculumUnit->unit->name,
                 'description' => $offering->syllabus->description ?? $offering->curriculumUnit->unit->name,
-                'credit_hours' => (float)$offering->curriculumUnit->unit->credit_points,
+                'credit_hours' => (float) $offering->curriculumUnit->unit->credit_points,
             ],
             'lecturer' => [
                 'id' => $offering->lecture?->id,
@@ -256,7 +256,7 @@ class CourseRegistrationService
             'registration_eligibility' => [
                 'can_register' => $this->canRegisterForCourse($student, $offering),
                 'prerequisites_met' => $this->prerequisiteService->hasMetPrerequisites($student, $offering),
-                'has_conflicts' => !$this->conflictDetectionService->detectConflicts($student, $offering)->isEmpty(),
+                'has_conflicts' => ! $this->conflictDetectionService->detectConflicts($student, $offering)->isEmpty(),
                 'capacity_available' => $availableSpots > 0,
             ],
         ];
@@ -295,6 +295,7 @@ class CourseRegistrationService
     {
         try {
             $this->validateRegistration($student, $offering);
+
             return true;
         } catch (BusinessLogicException $e) {
             return false;

@@ -8,7 +8,6 @@ use App\Http\Requests\Unit\UpdateUnitRequest;
 use App\Http\Resources\Unit\UnitResource;
 use App\Models\Unit;
 use App\Services\UnitService;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class UnitController extends Controller
@@ -23,6 +22,7 @@ class UnitController extends Controller
     public function store(StoreUnitRequest $request): UnitResource
     {
         $unit = $this->unitService->createUnit($request->validated());
+
         return new UnitResource($unit);
     }
 
@@ -34,13 +34,14 @@ class UnitController extends Controller
     public function update(UpdateUnitRequest $request, Unit $unit): UnitResource
     {
         $updatedUnit = $this->unitService->updateUnit($unit, $request->validated());
+
         return new UnitResource($updatedUnit);
     }
 
     public function destroy(Unit $unit): \Illuminate\Http\Response
     {
         $this->unitService->deleteUnit($unit);
+
         return response()->noContent();
     }
-
 }

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Seeders\InitialSetup;
 
+use App\Models\CourseOffering;
+use App\Models\Lecture;
 use App\Models\Semester;
 use App\Models\Unit;
-use App\Models\Lecture;
-use App\Models\CourseOffering;
 use Illuminate\Database\Seeder;
 
 class SemesterAndOfferingSeeder extends Seeder
@@ -115,8 +115,8 @@ class SemesterAndOfferingSeeder extends Seeder
                     'notes' => "Created by seeder for {$semester->name}",
                 ]);
 
-                $this->command->info("  📖 {$unit->code} - {$lecturer->first_name} {$lecturer->last_name}" .
-                    ($courseOffering->section_code ? " (Section {$courseOffering->section_code})" : ""));
+                $this->command->info("  📖 {$unit->code} - {$lecturer->first_name} {$lecturer->last_name}".
+                    ($courseOffering->section_code ? " (Section {$courseOffering->section_code})" : ''));
             }
         }
     }
@@ -231,6 +231,6 @@ class SemesterAndOfferingSeeder extends Seeder
         $campusName = $lecturer->campus->name ?? 'Main Campus';
         $roomNumbers = ['101', '102', '201', '202', '301', '302', 'Lab A', 'Lab B', 'Auditorium'];
 
-        return "Room " . $roomNumbers[array_rand($roomNumbers)] . ", " . $campusName;
+        return 'Room '.$roomNumbers[array_rand($roomNumbers)].', '.$campusName;
     }
 }

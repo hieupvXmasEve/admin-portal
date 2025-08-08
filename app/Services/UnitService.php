@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Unit;
-use App\Services\PrerequisiteLogicService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -16,8 +15,7 @@ class UnitService
     /**
      * Create a new unit with its relationships.
      *
-     * @param array $data Validated data from the request.
-     * @return Unit
+     * @param  array  $data  Validated data from the request.
      */
     public function createUnit(array $data): Unit
     {
@@ -43,9 +41,8 @@ class UnitService
     /**
      * Update an existing unit and its relationships.
      *
-     * @param Unit $unit The unit to update.
-     * @param array $data Validated data from the request.
-     * @return Unit
+     * @param  Unit  $unit  The unit to update.
+     * @param  array  $data  Validated data from the request.
      */
     public function updateUnit(Unit $unit, array $data): Unit
     {
@@ -71,8 +68,7 @@ class UnitService
     /**
      * Delete a unit.
      *
-     * @param Unit $unit The unit to delete.
-     * @return void
+     * @param  Unit  $unit  The unit to delete.
      */
     public function deleteUnit(Unit $unit): void
     {
@@ -110,7 +106,7 @@ class UnitService
             $description
         );
 
-        if (!$result['success']) {
+        if (! $result['success']) {
             throw new \Exception($result['message']);
         }
     }

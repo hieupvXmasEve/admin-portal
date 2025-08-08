@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Student;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Api\V1\Student\SemesterResource;
-use App\Http\Resources\Api\V1\Student\SemesterDeadlinesResource;
 use App\Http\Resources\Api\V1\Student\AcademicCalendarResource;
 use App\Http\Resources\Api\V1\Student\CurrentSemesterResource;
+use App\Http\Resources\Api\V1\Student\SemesterDeadlinesResource;
+use App\Http\Resources\Api\V1\Student\SemesterResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Semester;
 use App\Services\V1\Student\CalendarService;
@@ -28,10 +28,10 @@ class CalendarController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $semesters = $this->calendarService->getSemesters($student);
-            
+
             return ApiResponse::success(
                 new SemesterResource($semesters),
                 'Semesters retrieved successfully'
@@ -48,11 +48,11 @@ class CalendarController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $semester = Semester::findOrFail($semesterId);
             $deadlines = $this->calendarService->getSemesterDeadlines($student, $semester);
-            
+
             return ApiResponse::success(
                 new SemesterDeadlinesResource($deadlines),
                 'Semester deadlines retrieved successfully'
@@ -69,10 +69,10 @@ class CalendarController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $calendar = $this->calendarService->getAcademicCalendar($student);
-            
+
             return ApiResponse::success(
                 new AcademicCalendarResource($calendar),
                 'Academic calendar retrieved successfully'
@@ -89,10 +89,10 @@ class CalendarController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $currentSemesterInfo = $this->calendarService->getCurrentSemesterInfo($student);
-            
+
             return ApiResponse::success(
                 new CurrentSemesterResource($currentSemesterInfo),
                 'Current semester information retrieved successfully'

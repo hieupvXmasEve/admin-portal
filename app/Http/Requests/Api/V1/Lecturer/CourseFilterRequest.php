@@ -28,29 +28,29 @@ class CourseFilterRequest extends FormRequest
             'semester_id' => [
                 'nullable',
                 'integer',
-                'exists:semesters,id'
+                'exists:semesters,id',
             ],
             'delivery_mode' => [
                 'nullable',
                 'string',
-                'in:in_person,online,hybrid,blended'
+                'in:in_person,online,hybrid,blended',
             ],
             'enrollment_status' => [
                 'nullable',
                 'string',
-                'in:open,closed,full'
+                'in:open,closed,full',
             ],
             'search' => [
                 'nullable',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'per_page' => [
                 'nullable',
                 'integer',
                 'min:5',
-                'max:50'
-            ]
+                'max:50',
+            ],
         ];
     }
 
@@ -67,7 +67,7 @@ class CourseFilterRequest extends FormRequest
             'search.max' => 'Search term must not exceed 255 characters',
             'per_page.integer' => 'Per page must be a valid number',
             'per_page.min' => 'Per page must be at least 5',
-            'per_page.max' => 'Per page must not exceed 50'
+            'per_page.max' => 'Per page must not exceed 50',
         ];
     }
 
@@ -92,7 +92,7 @@ class CourseFilterRequest extends FormRequest
         // Trim search term
         if ($this->has('search')) {
             $this->merge([
-                'search' => trim($this->search)
+                'search' => trim($this->search),
             ]);
         }
     }

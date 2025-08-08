@@ -25,13 +25,13 @@ class ConflictCheckRequest extends FormRequest
             'lecturer_id' => [
                 'required',
                 'integer',
-                'exists:lectures,id'
+                'exists:lectures,id',
             ],
             'course_offering_id' => [
                 'required',
                 'integer',
-                'exists:course_offerings,id'
-            ]
+                'exists:course_offerings,id',
+            ],
         ];
     }
 

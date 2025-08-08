@@ -11,9 +11,9 @@ class PermissionService
     /**
      * Lấy danh sách quyền của người dùng tại một campus cụ thể
      */
-    public function getUserPermissions(User $user, int $campusId = null)
+    public function getUserPermissions(User $user, ?int $campusId = null)
     {
-        $cacheKey = "user_permissions_{$user->id}_campus_" . ($campusId ?? 'all');
+        $cacheKey = "user_permissions_{$user->id}_campus_".($campusId ?? 'all');
 
         return Cache::remember($cacheKey, now()->addDay(), function () use ($user, $campusId) {
             $query = DB::table('permissions')

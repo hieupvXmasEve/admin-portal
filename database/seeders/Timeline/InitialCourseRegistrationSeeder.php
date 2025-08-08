@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Semester;
 use App\Models\CurriculumUnit;
-use Illuminate\Database\Seeder;
+use App\Models\Semester;
+use App\Models\Student;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class InitialCourseRegistrationSeeder extends Seeder
 {
@@ -30,7 +30,7 @@ class InitialCourseRegistrationSeeder extends Seeder
             throw new \Exception('No students found. Please run previous seeders first.');
         }
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('FALL2024 semester not found.');
         }
 
@@ -38,6 +38,7 @@ class InitialCourseRegistrationSeeder extends Seeder
         $existingRegistrations = CourseRegistration::where('semester_id', $semester->id)->count();
         if ($existingRegistrations > 0) {
             $this->command->info("✅ Course registrations already exist for FALL2024 ({$existingRegistrations} found). Skipping creation.");
+
             return;
         }
 
@@ -62,14 +63,16 @@ class InitialCourseRegistrationSeeder extends Seeder
 
         foreach ($eligibleUnits as $unitId) {
             // Check prerequisite requirements before registration
-            if (!$this->checkPrerequisiteRequirements($student, $unitId)) {
+            if (! $this->checkPrerequisiteRequirements($student, $unitId)) {
                 $this->command->warn("  Student {$student->student_code} does not meet prerequisites for unit {$unitId}");
+
                 continue;
             }
 
             // Check if student has active academic holds that restrict registration
-            if (!$this->checkAcademicHoldRestrictions($student, $unitId)) {
+            if (! $this->checkAcademicHoldRestrictions($student, $unitId)) {
                 $this->command->warn("  Student {$student->student_code} has academic holds restricting registration for unit {$unitId}");
+
                 continue;
             }
 
@@ -158,6 +161,7 @@ class InitialCourseRegistrationSeeder extends Seeder
 
         // Random date within enrollment period
         $daysDiff = (int) $startDate->diffInDays($endDate);
+
         return $startDate->copy()->addDays(rand(0, $daysDiff));
     }
 
@@ -228,7 +232,7 @@ class InitialCourseRegistrationSeeder extends Seeder
 
             case 'anti_requisite':
                 // Check if student has NOT taken this unit
-                return !$this->hasAttemptedUnit($student, $condition->required_unit_id);
+                return ! $this->hasAttemptedUnit($student, $condition->required_unit_id);
 
             case 'assumed_knowledge':
             case 'textual':
@@ -279,6 +283,7 @@ class InitialCourseRegistrationSeeder extends Seeder
         // Check if unit code indicates advanced level (e.g., 300+ level)
         if (preg_match('/(\d{3})/', $unit->unit_code, $matches)) {
             $level = (int) $matches[1];
+
             return $level >= 300; // 300+ level courses are advanced
         }
 

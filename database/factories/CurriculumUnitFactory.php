@@ -41,7 +41,7 @@ class CurriculumUnitFactory extends Factory
      */
     public function core(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'type' => 'core',
             'is_compulsory' => true,
             'note' => 'Core curriculum unit',
@@ -53,7 +53,7 @@ class CurriculumUnitFactory extends Factory
      */
     public function elective(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'type' => 'elective',
             'is_compulsory' => false,
             'note' => 'Elective curriculum unit',
@@ -65,7 +65,7 @@ class CurriculumUnitFactory extends Factory
      */
     public function major(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'type' => 'major',
             'is_compulsory' => true,
             'note' => 'Major curriculum unit',
@@ -77,7 +77,7 @@ class CurriculumUnitFactory extends Factory
      */
     public function forSemester(int $semester): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'semester_number' => $semester,
         ]);
     }
@@ -87,7 +87,7 @@ class CurriculumUnitFactory extends Factory
      */
     public function withNote(string $note): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'note' => $note,
         ]);
     }

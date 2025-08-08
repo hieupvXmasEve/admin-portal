@@ -18,7 +18,7 @@ class AssessmentWeightValidationServiceUnitTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new AssessmentWeightValidationService();
+        $this->service = new AssessmentWeightValidationService;
     }
 
     public function test_validates_course_weights_with_no_syllabus(): void
@@ -109,7 +109,7 @@ class AssessmentWeightValidationServiceUnitTest extends TestCase
         // Mock existing components query that returns collection with total weight 60
         $existingComponent = Mockery::mock(AssessmentComponent::class);
         $existingComponent->shouldReceive('getAttribute')->with('weight')->andReturn(60);
-        
+
         $existingComponents = collect([$existingComponent]);
         $existingComponents->shouldReceive('sum')->with('weight')->andReturn(60);
 
@@ -117,7 +117,7 @@ class AssessmentWeightValidationServiceUnitTest extends TestCase
         $queryBuilder = Mockery::mock();
         $queryBuilder->shouldReceive('when')->andReturnSelf();
         $queryBuilder->shouldReceive('get')->andReturn($existingComponents);
-        
+
         AssessmentComponent::shouldReceive('where')->with('syllabus_id', 1)->andReturn($queryBuilder);
 
         $result = $this->service->validateNewComponentWeight($courseOffering, $componentData);
@@ -141,7 +141,7 @@ class AssessmentWeightValidationServiceUnitTest extends TestCase
         // Mock existing components query that returns collection with total weight 80
         $existingComponent = Mockery::mock(AssessmentComponent::class);
         $existingComponent->shouldReceive('getAttribute')->with('weight')->andReturn(80);
-        
+
         $existingComponents = collect([$existingComponent]);
         $existingComponents->shouldReceive('sum')->with('weight')->andReturn(80);
 
@@ -149,7 +149,7 @@ class AssessmentWeightValidationServiceUnitTest extends TestCase
         $queryBuilder = Mockery::mock();
         $queryBuilder->shouldReceive('when')->andReturnSelf();
         $queryBuilder->shouldReceive('get')->andReturn($existingComponents);
-        
+
         AssessmentComponent::shouldReceive('where')->with('syllabus_id', 1)->andReturn($queryBuilder);
 
         $result = $this->service->validateNewComponentWeight($courseOffering, $componentData);
@@ -170,7 +170,7 @@ class AssessmentWeightValidationServiceUnitTest extends TestCase
         // Mock existing details query
         $existingDetail = Mockery::mock(AssessmentComponentDetail::class);
         $existingDetail->shouldReceive('getAttribute')->with('weight')->andReturn(25);
-        
+
         $existingDetails = collect([$existingDetail]);
         $existingDetails->shouldReceive('sum')->with('weight')->andReturn(25);
 
@@ -178,7 +178,7 @@ class AssessmentWeightValidationServiceUnitTest extends TestCase
         $detailsRelation = Mockery::mock();
         $detailsRelation->shouldReceive('when')->andReturnSelf();
         $detailsRelation->shouldReceive('get')->andReturn($existingDetails);
-        
+
         $component->shouldReceive('details')->andReturn($detailsRelation);
 
         $result = $this->service->validateNewDetailWeight($component, $detailData);
@@ -201,7 +201,7 @@ class AssessmentWeightValidationServiceUnitTest extends TestCase
         // Mock existing details query
         $existingDetail = Mockery::mock(AssessmentComponentDetail::class);
         $existingDetail->shouldReceive('getAttribute')->with('weight')->andReturn(25);
-        
+
         $existingDetails = collect([$existingDetail]);
         $existingDetails->shouldReceive('sum')->with('weight')->andReturn(25);
 
@@ -209,7 +209,7 @@ class AssessmentWeightValidationServiceUnitTest extends TestCase
         $detailsRelation = Mockery::mock();
         $detailsRelation->shouldReceive('when')->andReturnSelf();
         $detailsRelation->shouldReceive('get')->andReturn($existingDetails);
-        
+
         $component->shouldReceive('details')->andReturn($detailsRelation);
 
         $result = $this->service->validateNewDetailWeight($component, $detailData);

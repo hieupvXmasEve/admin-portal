@@ -31,7 +31,7 @@ class Fall2024OfferingSeeder extends Seeder
         }
 
         // Check existing data for this semester
-        if (!$this->shouldCreateOfferings($semester)) {
+        if (! $this->shouldCreateOfferings($semester)) {
             return;
         }
 
@@ -47,10 +47,12 @@ class Fall2024OfferingSeeder extends Seeder
         $existingOfferings = CourseOffering::where('semester_id', $semester->id)->count();
         if ($existingOfferings > 0) {
             $this->command->info("  ✅ Course offerings already exist for semester {$semester->id} ({$existingOfferings} found). Skipping creation.");
+
             return false;
         }
 
-        $this->command->info("  ✓ No existing course offerings found, proceeding with creation");
+        $this->command->info('  ✓ No existing course offerings found, proceeding with creation');
+
         return true;
     }
 
@@ -125,7 +127,7 @@ class Fall2024OfferingSeeder extends Seeder
                 $unitsWithOfferings->push($unit->id);
             }
 
-            $this->command->info("  📖 {$unit->code} - {$lecturer->first_name} {$lecturer->last_name}" .
+            $this->command->info("  📖 {$unit->code} - {$lecturer->first_name} {$lecturer->last_name}".
                 ($courseOffering->section_code ? " (Section {$courseOffering->section_code})" : ''));
         }
 
@@ -240,7 +242,7 @@ class Fall2024OfferingSeeder extends Seeder
         $campusName = $lecturer->campus->name ?? 'Main Campus';
         $roomNumbers = ['101', '102', '201', '202', '301', '302', 'Lab A', 'Lab B', 'Auditorium'];
 
-        return 'Room ' . $roomNumbers[array_rand($roomNumbers)] . ', ' . $campusName;
+        return 'Room '.$roomNumbers[array_rand($roomNumbers)].', '.$campusName;
     }
 
     private function createSyllabusForUnit(Unit $unit, Semester $semester): void
@@ -250,8 +252,9 @@ class Fall2024OfferingSeeder extends Seeder
             $query->where('semester_id', $semester->id);
         })->where('unit_id', $unit->id)->first();
 
-        if (!$curriculumUnit) {
+        if (! $curriculumUnit) {
             $this->command->warn("No curriculum unit found for {$unit->code} in {$semester->code}");
+
             return;
         }
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -129,31 +129,31 @@ return new class extends Migration
             'rooms' => [
                 'check_capacity_positive',
                 // 'check_exam_capacity_valid',
-                'check_available_times'
+                'check_available_times',
             ],
             'room_bookings' => [
                 'check_booking_times',
                 // 'check_expected_attendees', // Column doesn't exist
-                'check_recurrence_end_date'
+                'check_recurrence_end_date',
             ],
             'class_sessions' => [
                 'check_sessions_times',
                 'check_sessions_expected_attendees_positive',
                 'check_sessions_actual_attendees_valid',
                 'check_sessions_attendance_percentage',
-                'check_sessions_assessment_weight'
+                'check_sessions_assessment_weight',
             ],
             'attendances' => [
                 'check_attendances_minutes_late_positive',
                 'check_attendances_minutes_present_positive',
-                'check_attendances_participation_score'
+                'check_attendances_participation_score',
             ],
             'assessment_components' => [
                 'check_weight_percentage',
                 'check_late_penalty_percentage',
                 'check_file_size_positive',
                 'check_max_submissions_positive',
-                'check_group_size_valid'
+                'check_group_size_valid',
             ],
             'assessment_component_detail_scores' => [
                 'check_scores_percentage_score',
@@ -161,7 +161,7 @@ return new class extends Migration
                 'check_scores_submission_attempt_positive',
                 'check_scores_minutes_late_positive',
                 'check_scores_late_penalty_applied',
-                'check_scores_plagiarism_score'
+                'check_scores_plagiarism_score',
             ],
             'academic_records' => [
                 'check_records_final_percentage',
@@ -171,7 +171,7 @@ return new class extends Migration
                 'check_records_quality_points',
                 'check_records_attendance_percentage',
                 'check_records_attempt_number_positive',
-                'check_records_curve_adjustment'
+                'check_records_curve_adjustment',
             ],
             'gpa_calculations' => [
                 'check_gpa_valid',
@@ -180,8 +180,8 @@ return new class extends Migration
                 'check_course_counts',
                 'check_grade_counts',
                 'check_percentile',
-                'check_completion_percentage'
-            ]
+                'check_completion_percentage',
+            ],
         ];
 
         foreach ($constraints as $table => $tableConstraints) {

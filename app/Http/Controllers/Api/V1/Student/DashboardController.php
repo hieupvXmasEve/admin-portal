@@ -62,10 +62,10 @@ class DashboardController extends Controller
     public function creditProgress(Request $request): JsonResponse
     {
         $student = $request->user();
-        
+
         try {
             $creditProgress = $this->dashboardService->getCreditProgress($student);
-            
+
             return ApiResponse::success(
                 $creditProgress,
                 'Credit progress retrieved successfully'
@@ -81,10 +81,10 @@ class DashboardController extends Controller
     public function academicHolds(Request $request): JsonResponse
     {
         $student = $request->user();
-        
+
         try {
             $academicHolds = $this->dashboardService->getAcademicHolds($student);
-            
+
             return ApiResponse::success(
                 $academicHolds,
                 'Academic holds retrieved successfully'
@@ -100,10 +100,10 @@ class DashboardController extends Controller
     public function upcomingAssessments(Request $request): JsonResponse
     {
         $student = $request->user();
-        
+
         try {
             $upcomingAssessments = $this->dashboardService->getUpcomingAssessments($student);
-            
+
             return ApiResponse::success(
                 $upcomingAssessments,
                 'Upcoming assessments retrieved successfully'

@@ -26,7 +26,7 @@ class StudentResource extends JsonResource
             'academic_level' => $this->academic_level,
             'program' => $this->program,
             'year_level' => $this->year_level,
-            
+
             // Course Enrollments
             'course_enrollments' => $this->whenLoaded('courseRegistrations', function () {
                 return $this->courseRegistrations->map(function ($registration) {
@@ -40,7 +40,7 @@ class StudentResource extends JsonResource
                     ];
                 });
             }),
-            
+
             // Attendance Summary
             'attendance_summary' => $this->whenLoaded('attendances', function () {
                 $attendances = $this->attendances;
@@ -48,7 +48,7 @@ class StudentResource extends JsonResource
                 $presentSessions = $attendances->whereIn('status', ['present', 'late'])->count();
                 $absentSessions = $attendances->where('status', 'absent')->count();
                 $excusedSessions = $attendances->where('status', 'excused')->count();
-                
+
                 return [
                     'total_sessions' => $totalSessions,
                     'present_sessions' => $presentSessions,
@@ -58,7 +58,7 @@ class StudentResource extends JsonResource
                     'last_attendance' => $attendances->sortByDesc('created_at')->first()?->created_at?->format('Y-m-d'),
                 ];
             }),
-            
+
             // Status Indicators
             'status_indicators' => [
                 'attendance_status' => $this->getAttendanceStatus(),
@@ -67,7 +67,7 @@ class StudentResource extends JsonResource
                 'has_recent_activity' => $this->hasRecentActivity(),
                 'engagement_level' => $this->getEngagementLevel(),
             ],
-            
+
             // Quick Stats
             'quick_stats' => [
                 'courses_enrolled' => $this->whenLoaded('courseRegistrations', function () {
@@ -77,7 +77,7 @@ class StudentResource extends JsonResource
                 'days_since_last_attendance' => $this->getDaysSinceLastAttendance(),
                 'consecutive_absences' => $this->getConsecutiveAbsences(),
             ],
-            
+
             // Actions Available
             'available_actions' => [
                 'can_add_note' => true,
@@ -86,14 +86,14 @@ class StudentResource extends JsonResource
                 'can_mark_for_follow_up' => true,
                 'can_send_notification' => true,
             ],
-            
+
             // Alert Information
             'alert_info' => [
                 'has_alerts' => $this->hasAlerts(),
                 'alert_count' => $this->getAlertCount(),
                 'highest_priority_alert' => $this->getHighestPriorityAlert(),
             ],
-            
+
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
@@ -106,10 +106,17 @@ class StudentResource extends JsonResource
     protected function getAttendanceStatus(): string
     {
         $rate = $this->getAttendanceRate();
-        
-        if ($rate >= 90) return 'excellent';
-        if ($rate >= 75) return 'good';
-        if ($rate >= 60) return 'warning';
+
+        if ($rate >= 90) {
+            return 'excellent';
+        }
+        if ($rate >= 75) {
+            return 'good';
+        }
+        if ($rate >= 60) {
+            return 'warning';
+        }
+
         return 'at_risk';
     }
 
@@ -121,17 +128,17 @@ class StudentResource extends JsonResource
         $attendanceRate = $this->getAttendanceRate();
         $consecutiveAbsences = $this->getConsecutiveAbsences();
         $daysSinceLastAttendance = $this->getDaysSinceLastAttendance();
-        
+
         // High risk conditions
         if ($attendanceRate < 50 || $consecutiveAbsences >= 3 || $daysSinceLastAttendance > 14) {
             return 'high';
         }
-        
+
         // Medium risk conditions
         if ($attendanceRate < 75 || $consecutiveAbsences >= 2 || $daysSinceLastAttendance > 7) {
             return 'medium';
         }
-        
+
         return 'low';
     }
 
@@ -157,9 +164,14 @@ class StudentResource extends JsonResource
     protected function getEngagementLevel(): string
     {
         $attendanceRate = $this->getAttendanceRate();
-        
-        if ($attendanceRate >= 95) return 'high';
-        if ($attendanceRate >= 80) return 'medium';
+
+        if ($attendanceRate >= 95) {
+            return 'high';
+        }
+        if ($attendanceRate >= 80) {
+            return 'medium';
+        }
+
         return 'low';
     }
 
@@ -168,14 +180,14 @@ class StudentResource extends JsonResource
      */
     protected function getAttendanceRate(): float
     {
-        if (!$this->relationLoaded('attendances')) {
+        if (! $this->relationLoaded('attendances')) {
             return 0.0;
         }
-        
+
         $attendances = $this->attendances;
         $totalSessions = $attendances->count();
         $presentSessions = $attendances->whereIn('status', ['present', 'late'])->count();
-        
+
         return $totalSessions > 0 ? round(($presentSessions / $totalSessions) * 100, 1) : 0.0;
     }
 
@@ -184,19 +196,19 @@ class StudentResource extends JsonResource
      */
     protected function getDaysSinceLastAttendance(): ?int
     {
-        if (!$this->relationLoaded('attendances')) {
+        if (! $this->relationLoaded('attendances')) {
             return null;
         }
-        
+
         $lastAttendance = $this->attendances
             ->whereIn('status', ['present', 'late'])
             ->sortByDesc('created_at')
             ->first();
-        
-        if (!$lastAttendance) {
+
+        if (! $lastAttendance) {
             return null;
         }
-        
+
         return now()->diffInDays($lastAttendance->created_at);
     }
 
@@ -205,16 +217,16 @@ class StudentResource extends JsonResource
      */
     protected function getConsecutiveAbsences(): int
     {
-        if (!$this->relationLoaded('attendances')) {
+        if (! $this->relationLoaded('attendances')) {
             return 0;
         }
-        
+
         $recentAttendances = $this->attendances
             ->sortByDesc('created_at')
             ->take(10);
-        
+
         $consecutiveAbsences = 0;
-        
+
         foreach ($recentAttendances as $attendance) {
             if ($attendance->status === 'absent') {
                 $consecutiveAbsences++;
@@ -222,7 +234,7 @@ class StudentResource extends JsonResource
                 break;
             }
         }
-        
+
         return $consecutiveAbsences;
     }
 
@@ -244,11 +256,17 @@ class StudentResource extends JsonResource
         // This would typically count actual alerts
         // For now, return based on conditions
         $count = 0;
-        
-        if ($this->getAttendanceRate() < 75) $count++;
-        if ($this->getConsecutiveAbsences() >= 2) $count++;
-        if ($this->getDaysSinceLastAttendance() > 7) $count++;
-        
+
+        if ($this->getAttendanceRate() < 75) {
+            $count++;
+        }
+        if ($this->getConsecutiveAbsences() >= 2) {
+            $count++;
+        }
+        if ($this->getDaysSinceLastAttendance() > 7) {
+            $count++;
+        }
+
         return $count;
     }
 
@@ -257,11 +275,19 @@ class StudentResource extends JsonResource
      */
     protected function getHighestPriorityAlert(): ?string
     {
-        if ($this->getAttendanceRate() < 50) return 'high';
-        if ($this->getConsecutiveAbsences() >= 3) return 'high';
-        if ($this->getAttendanceRate() < 75) return 'medium';
-        if ($this->getConsecutiveAbsences() >= 2) return 'medium';
-        
+        if ($this->getAttendanceRate() < 50) {
+            return 'high';
+        }
+        if ($this->getConsecutiveAbsences() >= 3) {
+            return 'high';
+        }
+        if ($this->getAttendanceRate() < 75) {
+            return 'medium';
+        }
+        if ($this->getConsecutiveAbsences() >= 2) {
+            return 'medium';
+        }
+
         return null;
     }
 }

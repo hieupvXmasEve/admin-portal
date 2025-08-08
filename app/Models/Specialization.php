@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Builder;
 
 class Specialization extends Model
 {
@@ -129,12 +129,12 @@ class Specialization extends Model
     /**
      * Get validation rules for creating/updating specializations.
      */
-    public static function validationRules(int $id = null): array
+    public static function validationRules(?int $id = null): array
     {
         return [
             'program_id' => ['required', 'exists:programs,id'],
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', 'unique:specializations,code' . ($id ? ",$id" : '')],
+            'code' => ['required', 'string', 'max:50', 'unique:specializations,code'.($id ? ",$id" : '')],
             'description' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['boolean'],
         ];

@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Semester;
 use App\Models\Campus;
-use App\Models\CourseRegistration;
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
+use App\Models\Semester;
 use App\Models\Unit;
-use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +26,7 @@ class SemesterManagementService
             $this->validateSemesterDates($data);
 
             // Generate academic year if not provided
-            if (!isset($data['year'])) {
+            if (! isset($data['year'])) {
                 $data['year'] = $this->generateAcademicYear($data['start_date']);
             }
 
@@ -61,7 +60,7 @@ class SemesterManagementService
             ]);
 
             // Auto-generate code if not provided
-            if (!$semester->code) {
+            if (! $semester->code) {
                 $semester->update(['code' => $semester->generateCode()]);
             }
 
@@ -104,33 +103,34 @@ class SemesterManagementService
         }
 
         // Check if can change active status
-        if (!$semester->canChangeActiveStatus()) {
+        if (! $semester->canChangeActiveStatus()) {
             return [
                 'success' => false,
-                'message' => $semester->getActiveStatusChangeError()
+                'message' => $semester->getActiveStatusChangeError(),
             ];
         }
 
         // Check if semester can be activated
-        if (!$semester->canBeActivated()) {
+        if (! $semester->canBeActivated()) {
             return [
                 'success' => false,
-                'message' => $semester->getActivationError()
+                'message' => $semester->getActivationError(),
             ];
         }
 
         // Activate the semester
         if ($semester->activate()) {
             Log::info("Activated semester: {$semester->name}");
+
             return [
                 'success' => true,
-                'message' => 'Semester activated successfully!'
+                'message' => 'Semester activated successfully!',
             ];
         }
 
         return [
             'success' => false,
-            'message' => 'Failed to activate semester due to an unknown error.'
+            'message' => 'Failed to activate semester due to an unknown error.',
         ];
     }
 
@@ -140,24 +140,25 @@ class SemesterManagementService
     public function deactivateSemester(Semester $semester): array
     {
         // Check if can change active status
-        if (!$semester->canChangeActiveStatus()) {
+        if (! $semester->canChangeActiveStatus()) {
             return [
                 'success' => false,
-                'message' => $semester->getActiveStatusChangeError()
+                'message' => $semester->getActiveStatusChangeError(),
             ];
         }
 
         if ($semester->deactivate()) {
             Log::info("Deactivated semester: {$semester->name}");
+
             return [
                 'success' => true,
-                'message' => 'Semester deactivated successfully!'
+                'message' => 'Semester deactivated successfully!',
             ];
         }
 
         return [
             'success' => false,
-            'message' => 'Failed to deactivate semester.'
+            'message' => 'Failed to deactivate semester.',
         ];
     }
 
@@ -464,9 +465,9 @@ class SemesterManagementService
         // If semester starts in fall (Aug-Dec), academic year is current-next
         // If semester starts in spring/summer (Jan-Jul), academic year is previous-current
         if ($date->month >= 8) {
-            return "{$year}-" . ($year + 1);
+            return "{$year}-".($year + 1);
         } else {
-            return ($year - 1) . "-{$year}";
+            return ($year - 1)."-{$year}";
         }
     }
 

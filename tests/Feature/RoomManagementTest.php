@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Http\Resources\RoomResource;
 use App\Models\Campus;
 use App\Models\Room;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class RoomManagementTest extends TestCase
@@ -19,7 +17,9 @@ class RoomManagementTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Campus $campus;
+
     protected Room $room;
 
     protected function setUp(): void
@@ -99,19 +99,18 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.index'));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Index')
-                ->has('rooms')
-                ->has('rooms.data', 2)
-                ->has('statistics')
-                ->has('room_types')
-                ->has('room_statuses')
-                ->has('buildings')
-                ->has('floors')
-                ->has('permissions')
-                ->where('permissions.can_create', false)
-                ->where('permissions.can_edit', false)
-                ->where('permissions.can_delete', false)
+        $response->assertInertia(fn ($page) => $page->component('rooms/Index')
+            ->has('rooms')
+            ->has('rooms.data', 2)
+            ->has('statistics')
+            ->has('room_types')
+            ->has('room_statuses')
+            ->has('buildings')
+            ->has('floors')
+            ->has('permissions')
+            ->where('permissions.can_create', false)
+            ->where('permissions.can_edit', false)
+            ->where('permissions.can_delete', false)
         );
     }
 
@@ -124,11 +123,10 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.index'));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Index')
-                ->where('permissions.can_create', true)
-                ->where('permissions.can_edit', true)
-                ->where('permissions.can_delete', false)
+        $response->assertInertia(fn ($page) => $page->component('rooms/Index')
+            ->where('permissions.can_create', true)
+            ->where('permissions.can_edit', true)
+            ->where('permissions.can_delete', false)
         );
     }
 
@@ -146,10 +144,9 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.index', ['search' => 'Conference']));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Index')
-                ->has('rooms.data', 1)
-                ->where('rooms.data.0.name', 'Conference Room')
+        $response->assertInertia(fn ($page) => $page->component('rooms/Index')
+            ->has('rooms.data', 1)
+            ->where('rooms.data.0.name', 'Conference Room')
         );
     }
 
@@ -167,10 +164,9 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.index', ['type' => Room::TYPE_LABORATORY]));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Index')
-                ->has('rooms.data', 1)
-                ->where('rooms.data.0.type', Room::TYPE_LABORATORY)
+        $response->assertInertia(fn ($page) => $page->component('rooms/Index')
+            ->has('rooms.data', 1)
+            ->where('rooms.data.0.type', Room::TYPE_LABORATORY)
         );
     }
 
@@ -186,9 +182,8 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.index'));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Index')
-                ->has('rooms.data', 1) // Only room from current campus
+        $response->assertInertia(fn ($page) => $page->component('rooms/Index')
+            ->has('rooms.data', 1) // Only room from current campus
         );
     }
 
@@ -212,12 +207,11 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.create'));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Create')
-                ->has('room_types')
-                ->has('room_statuses')
-                ->has('buildings')
-                ->has('days_of_week')
+        $response->assertInertia(fn ($page) => $page->component('rooms/Create')
+            ->has('room_types')
+            ->has('room_statuses')
+            ->has('buildings')
+            ->has('days_of_week')
         );
     }
 
@@ -363,12 +357,11 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.show', $this->room));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Show')
-                ->has('room')
-                ->where('room.id', $this->room->id)
-                ->where('room.name', $this->room->name)
-                ->has('permissions')
+        $response->assertInertia(fn ($page) => $page->component('rooms/Show')
+            ->has('room')
+            ->where('room.id', $this->room->id)
+            ->where('room.name', $this->room->name)
+            ->has('permissions')
         );
     }
 
@@ -406,14 +399,13 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.edit', $this->room));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Edit')
-                ->has('room')
-                ->where('room.id', $this->room->id)
-                ->has('room_types')
-                ->has('room_statuses')
-                ->has('buildings')
-                ->has('days_of_week')
+        $response->assertInertia(fn ($page) => $page->component('rooms/Edit')
+            ->has('room')
+            ->where('room.id', $this->room->id)
+            ->has('room_types')
+            ->has('room_statuses')
+            ->has('buildings')
+            ->has('days_of_week')
         );
     }
 
@@ -639,7 +631,7 @@ class RoomManagementTest extends TestCase
 
         // Create a room that might have foreign key constraints preventing deletion
         // (In a real scenario, this could be a room with active bookings)
-        
+
         $response = $this->delete(route('rooms.destroy', $this->room));
 
         // The response should either succeed or handle the exception gracefully
@@ -665,14 +657,13 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.index'));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Index')
-                ->has('statistics')
-                ->has('statistics.total_rooms')
-                ->has('statistics.available_rooms')
-                ->has('statistics.bookable_rooms')
-                ->has('statistics.by_type')
-                ->has('statistics.by_status')
+        $response->assertInertia(fn ($page) => $page->component('rooms/Index')
+            ->has('statistics')
+            ->has('statistics.total_rooms')
+            ->has('statistics.available_rooms')
+            ->has('statistics.bookable_rooms')
+            ->has('statistics.by_type')
+            ->has('statistics.by_status')
         );
     }
 
@@ -685,12 +676,11 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.index'));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Index')
-                ->has('room_types')
-                ->has('room_statuses')
-                ->has('buildings')
-                ->has('floors')
+        $response->assertInertia(fn ($page) => $page->component('rooms/Index')
+            ->has('room_types')
+            ->has('room_statuses')
+            ->has('buildings')
+            ->has('floors')
         );
     }
 
@@ -705,9 +695,8 @@ class RoomManagementTest extends TestCase
         $response = $this->get(route('rooms.index', ['per_page' => 3]));
 
         $response->assertStatus(200);
-        $response->assertInertia(fn ($page) =>
-            $page->component('rooms/Index')
-                ->where('rooms.per_page', 3)
+        $response->assertInertia(fn ($page) => $page->component('rooms/Index')
+            ->where('rooms.per_page', 3)
         );
     }
 
@@ -715,7 +704,7 @@ class RoomManagementTest extends TestCase
     public function it_enforces_campus_context_middleware(): void
     {
         $this->giveUserPermissions(['view_room']);
-        
+
         // Create user without campus association
         $userWithoutCampus = User::factory()->create(['campus_id' => null]);
         $this->actingAs($userWithoutCampus);

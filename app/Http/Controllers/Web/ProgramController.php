@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Constants\ProgramRoutes;
 use App\Http\Controllers\Controller;
-use App\Models\Program;
 use App\Http\Requests\Program\StoreProgramRequest;
 use App\Http\Requests\Program\UpdateProgramRequest;
+use App\Models\Program;
 use App\Services\ProgramService;
-use App\Constants\ProgramRoutes;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -55,11 +55,12 @@ class ProgramController extends Controller
     {
         try {
             $this->programService->createProgram($request->validated());
+
             return redirect()
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program created successfully.');
         } catch (\Exception $e) {
-            Log::error('Program creation failed: ' . $e->getMessage());
+            Log::error('Program creation failed: '.$e->getMessage());
 
             return back()
                 ->withInput()
@@ -78,7 +79,7 @@ class ProgramController extends Controller
                 $query->with(['specialization', 'effectiveFromSemester'])
                     ->withCount('curriculumUnits')
                     ->orderBy('created_at', 'desc');
-            }
+            },
         ]);
 
         // Get program statistics
@@ -98,11 +99,12 @@ class ProgramController extends Controller
     {
         try {
             $this->programService->updateProgram($program, $request->validated());
+
             return redirect()
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program updated successfully.');
         } catch (\Exception $e) {
-            Log::error('Program update failed: ' . $e->getMessage());
+            Log::error('Program update failed: '.$e->getMessage());
 
             return back()
                 ->withInput()
@@ -114,11 +116,13 @@ class ProgramController extends Controller
     {
         try {
             $this->programService->deleteProgram($program);
+
             return redirect()
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program deleted successfully.');
         } catch (\Exception $e) {
-            Log::error('Program deletion failed: ' . $e->getMessage());
+            Log::error('Program deletion failed: '.$e->getMessage());
+
             return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
@@ -155,7 +159,7 @@ class ProgramController extends Controller
                     if ($program->specializations()->count() > 0 || $program->curriculumVersions()->count() > 0) {
                         $failed[] = [
                             'name' => $program->name,
-                            'reason' => 'Has existing specializations or curriculum versions'
+                            'reason' => 'Has existing specializations or curriculum versions',
                         ];
                     } else {
                         $program->delete();
@@ -167,13 +171,13 @@ class ProgramController extends Controller
                     'success' => true,
                     'deleted' => $deleted,
                     'failed' => $failed,
-                    'message' => count($deleted) . ' programs deleted successfully.'
+                    'message' => count($deleted).' programs deleted successfully.',
                 ]);
             });
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk delete failed: ' . $e->getMessage()
+                'message' => 'Bulk delete failed: '.$e->getMessage(),
             ], 500);
         }
     }

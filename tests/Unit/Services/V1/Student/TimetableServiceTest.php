@@ -4,32 +4,35 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\V1\Student;
 
-use App\Models\Student;
 use App\Models\Campus;
-use App\Models\Program;
-use App\Models\CurriculumVersion;
-use App\Models\Semester;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CurriculumUnit;
-use App\Models\Unit;
-use App\Models\Room;
+use App\Models\CurriculumVersion;
 use App\Models\Lecturer;
-use App\Services\V1\Student\TimetableService;
+use App\Models\Program;
+use App\Models\Room;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\Unit;
 use App\Repositories\V1\Student\ClassSessionRepository;
+use App\Services\V1\Student\TimetableService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Tests\TestCase;
 use Mockery;
+use Tests\TestCase;
 
 class TimetableServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     protected TimetableService $timetableService;
+
     protected ClassSessionRepository $classSessionRepository;
+
     protected Student $student;
+
     protected Semester $semester;
 
     protected function setUp(): void
@@ -55,7 +58,7 @@ class TimetableServiceTest extends TestCase
         $campus = Campus::factory()->create();
         $program = Program::factory()->create(['campus_id' => $campus->id]);
         $curriculumVersion = CurriculumVersion::factory()->create(['program_id' => $program->id]);
-        
+
         $this->student = Student::factory()->create([
             'campus_id' => $campus->id,
             'program_id' => $program->id,
@@ -72,7 +75,7 @@ class TimetableServiceTest extends TestCase
     public function test_get_student_timetable_returns_complete_structure(): void
     {
         $mockClassSessions = $this->createMockClassSessions();
-        
+
         $this->classSessionRepository->shouldReceive('getStudentClassSessions')
             ->with($this->student, $this->semester, [])
             ->andReturn($mockClassSessions);
@@ -98,7 +101,7 @@ class TimetableServiceTest extends TestCase
     public function test_get_weekly_timetable_returns_weekly_view(): void
     {
         $mockClassSessions = $this->createMockClassSessions();
-        
+
         $this->classSessionRepository->shouldReceive('getStudentClassSessions')
             ->with($this->student, $this->semester, [])
             ->andReturn($mockClassSessions);
@@ -117,7 +120,7 @@ class TimetableServiceTest extends TestCase
     public function test_weekly_schedule_has_all_days(): void
     {
         $mockClassSessions = $this->createMockClassSessions();
-        
+
         $this->classSessionRepository->shouldReceive('getStudentClassSessions')
             ->andReturn($mockClassSessions);
 
@@ -127,7 +130,7 @@ class TimetableServiceTest extends TestCase
         $weeklySchedule = $result['weekly_schedule'];
 
         $expectedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        
+
         foreach ($expectedDays as $day) {
             $this->assertArrayHasKey($day, $weeklySchedule);
             $this->assertArrayHasKey('day_name', $weeklySchedule[$day]);
@@ -139,7 +142,7 @@ class TimetableServiceTest extends TestCase
     public function test_get_class_session_detail_returns_complete_info(): void
     {
         $classSession = $this->createRealClassSession();
-        
+
         $this->classSessionRepository->shouldReceive('isStudentEnrolledInSession')
             ->with($this->student, $classSession)
             ->andReturn(true);
@@ -164,7 +167,7 @@ class TimetableServiceTest extends TestCase
     public function test_get_class_session_detail_throws_exception_for_unenrolled_student(): void
     {
         $classSession = $this->createRealClassSession();
-        
+
         $this->classSessionRepository->shouldReceive('isStudentEnrolledInSession')
             ->with($this->student, $classSession)
             ->andReturn(false);
@@ -178,7 +181,7 @@ class TimetableServiceTest extends TestCase
     public function test_get_filter_options_returns_available_filters(): void
     {
         $mockClassSessions = $this->createMockClassSessions();
-        
+
         $this->classSessionRepository->shouldReceive('getStudentClassSessions')
             ->with($this->student, $this->semester)
             ->andReturn($mockClassSessions);
@@ -196,7 +199,7 @@ class TimetableServiceTest extends TestCase
     public function test_timetable_data_is_cached(): void
     {
         $mockClassSessions = $this->createMockClassSessions();
-        
+
         // Should only be called once due to caching
         $this->classSessionRepository->shouldReceive('getStudentClassSessions')
             ->once()
@@ -232,7 +235,7 @@ class TimetableServiceTest extends TestCase
     public function test_schedule_summary_calculates_correctly(): void
     {
         $mockClassSessions = $this->createMockClassSessions();
-        
+
         $this->classSessionRepository->shouldReceive('getStudentClassSessions')
             ->andReturn($mockClassSessions);
 
@@ -253,18 +256,18 @@ class TimetableServiceTest extends TestCase
         // Create mock class sessions for testing
         $unit1 = Unit::factory()->create(['code' => 'CS101', 'name' => 'Introduction to Computer Science']);
         $unit2 = Unit::factory()->create(['code' => 'MATH101', 'name' => 'Calculus I']);
-        
+
         $curriculumUnit1 = CurriculumUnit::factory()->create(['unit_id' => $unit1->id]);
         $curriculumUnit2 = CurriculumUnit::factory()->create(['unit_id' => $unit2->id]);
-        
+
         $lecturer = Lecturer::factory()->create(['full_name' => 'Dr. Smith']);
         $room = Room::factory()->create(['code' => 'A101', 'building' => 'Building A']);
-        
+
         $courseOffering1 = CourseOffering::factory()->create([
             'curriculum_unit_id' => $curriculumUnit1->id,
             'lecturer_id' => $lecturer->id,
         ]);
-        
+
         $courseOffering2 = CourseOffering::factory()->create([
             'curriculum_unit_id' => $curriculumUnit2->id,
             'lecturer_id' => $lecturer->id,
@@ -297,7 +300,7 @@ class TimetableServiceTest extends TestCase
         $curriculumUnit = CurriculumUnit::factory()->create(['unit_id' => $unit->id]);
         $lecturer = Lecturer::factory()->create();
         $room = Room::factory()->create();
-        
+
         $courseOffering = CourseOffering::factory()->create([
             'curriculum_unit_id' => $curriculumUnit->id,
             'lecturer_id' => $lecturer->id,

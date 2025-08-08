@@ -19,21 +19,21 @@ class AdminMiddleware
         Log::info('Admin middleware called', [
             'url' => $request->fullUrl(),
             'method' => $request->method(),
-            'bearerToken' => $request->bearerToken()
+            'bearerToken' => $request->bearerToken(),
         ]);
         // Check if user is authenticated via Sanctum
-        if (!$request->user()) {
+        if (! $request->user()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated'
+                'message' => 'Unauthenticated',
             ], 401);
         }
 
         // Check if the authenticated user is a User (admin/staff)
-        if (!$request->user() instanceof \App\Models\User) {
+        if (! $request->user() instanceof \App\Models\User) {
             return response()->json([
                 'success' => false,
-                'message' => 'Access denied. Admin account required.'
+                'message' => 'Access denied. Admin account required.',
             ], 403);
         }
 

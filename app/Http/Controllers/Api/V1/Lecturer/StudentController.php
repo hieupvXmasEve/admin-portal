@@ -7,9 +7,8 @@ namespace App\Http\Controllers\Api\V1\Lecturer;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\StudentFilterRequest;
 use App\Http\Requests\Api\V1\Lecturer\StudentNoteRequest;
-use App\Http\Resources\Api\V1\Lecturer\StudentResource;
 use App\Http\Resources\Api\V1\Lecturer\StudentDetailResource;
-use App\Http\Resources\Api\V1\Lecturer\StudentNoteResource;
+use App\Http\Resources\Api\V1\Lecturer\StudentResource;
 use App\Http\Responses\ApiResponse;
 use App\Services\V1\Lecturer\LecturerStudentService;
 use Illuminate\Http\JsonResponse;
@@ -37,7 +36,7 @@ class StudentController extends Controller
             $students = $this->studentService->getStudents($lecturer, $filters, $perPage);
 
             return ApiResponse::paginated(
-                $students->through(fn($student) => new StudentResource($student)),
+                $students->through(fn ($student) => new StudentResource($student)),
                 'Students retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -56,7 +55,7 @@ class StudentController extends Controller
         try {
             $studentDetails = $this->studentService->getStudentDetails($lecturer, $studentId);
 
-            if (!$studentDetails) {
+            if (! $studentDetails) {
                 return ApiResponse::notFound('Student not found or access denied');
             }
 
@@ -112,6 +111,7 @@ class StudentController extends Controller
             if ($e->getMessage() === 'Student not found or access denied') {
                 return ApiResponse::notFound($e->getMessage());
             }
+
             return ApiResponse::serverError('Failed to add student note');
         }
     }
@@ -137,6 +137,7 @@ class StudentController extends Controller
             if ($e->getMessage() === 'Note not found or access denied') {
                 return ApiResponse::notFound($e->getMessage());
             }
+
             return ApiResponse::serverError('Failed to update student note');
         }
     }
@@ -160,6 +161,7 @@ class StudentController extends Controller
             if ($e->getMessage() === 'Note not found or access denied') {
                 return ApiResponse::notFound($e->getMessage());
             }
+
             return ApiResponse::serverError('Failed to delete student note');
         }
     }
@@ -320,7 +322,7 @@ class StudentController extends Controller
             'add_note' => $this->studentService->addStudentNote($lecturer, $studentId, $data),
             'send_notification' => $this->sendNotificationToStudent($lecturer, $studentId, $data),
             'mark_for_follow_up' => $this->markStudentForFollowUp($lecturer, $studentId, $data),
-            default => throw new \Exception('Unknown action: ' . $action),
+            default => throw new \Exception('Unknown action: '.$action),
         };
     }
 

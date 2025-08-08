@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
-use App\Models\Enrollment;
 use App\Models\AcademicHold;
+use App\Models\Enrollment;
+use App\Models\Student;
 use App\Services\StudentStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,11 +23,11 @@ class StudentStatusController extends Controller
     /**
      * Display student status tracking overview
      */
-    public function index(Request $request): Response | RedirectResponse
+    public function index(Request $request): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
         }
@@ -41,7 +41,7 @@ class StudentStatusController extends Controller
 
         // Get students by status if filtered
         $students = null;
-        if (!empty($validated['status'])) {
+        if (! empty($validated['status'])) {
             $students = $this->studentStatusService->getStudentsByStatus(
                 $validated['status'],
                 array_merge($validated, ['campus_id' => $campusId])
@@ -58,11 +58,11 @@ class StudentStatusController extends Controller
     /**
      * Display student enrollments overview
      */
-    public function enrollmentsIndex(Request $request): Response | RedirectResponse
+    public function enrollmentsIndex(Request $request): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
         }
@@ -78,11 +78,11 @@ class StudentStatusController extends Controller
                 $q->where('campus_id', $campusId);
             });
 
-        if (!empty($validated['semester_id'])) {
+        if (! empty($validated['semester_id'])) {
             $enrollmentsQuery->where('semester_id', $validated['semester_id']);
         }
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $search = $validated['search'];
             $enrollmentsQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
@@ -101,11 +101,11 @@ class StudentStatusController extends Controller
     /**
      * Display academic holds overview
      */
-    public function holdsIndex(Request $request): Response | RedirectResponse
+    public function holdsIndex(Request $request): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
         }
@@ -121,11 +121,11 @@ class StudentStatusController extends Controller
                 $q->where('campus_id', $campusId);
             });
 
-        if (!empty($validated['status'])) {
+        if (! empty($validated['status'])) {
             $holdsQuery->where('status', $validated['status']);
         }
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $search = $validated['search'];
             $holdsQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")

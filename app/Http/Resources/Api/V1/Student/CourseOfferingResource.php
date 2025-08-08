@@ -125,7 +125,7 @@ class CourseOfferingResource extends JsonResource
             $reasons[] = 'course full';
         }
 
-        return 'not eligible: ' . implode(', ', $reasons);
+        return 'not eligible: '.implode(', ', $reasons);
     }
 
     /**

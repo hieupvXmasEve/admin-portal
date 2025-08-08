@@ -67,14 +67,14 @@ class AcademicHistoryResource extends JsonResource
                 'academic_performance' => [
                     'total_courses' => $semester['total_courses'],
                     'completed_courses' => $semester['completed_courses'],
-                    'completion_rate' => $semester['total_courses'] > 0 
+                    'completion_rate' => $semester['total_courses'] > 0
                         ? round(($semester['completed_courses'] / $semester['total_courses']) * 100, 1)
                         : 0,
                 ],
                 'credit_summary' => [
                     'total_credits' => $semester['total_credits'],
                     'earned_credits' => $semester['earned_credits'],
-                    'credit_efficiency' => $semester['total_credits'] > 0 
+                    'credit_efficiency' => $semester['total_credits'] > 0
                         ? round(($semester['earned_credits'] / $semester['total_credits']) * 100, 1)
                         : 0,
                 ],
@@ -342,7 +342,7 @@ class AcademicHistoryResource extends JsonResource
     protected function getSemesterPerformanceLevel(array $semester): string
     {
         $gpa = $semester['semester_gpa'];
-        $completionRate = $semester['total_courses'] > 0 
+        $completionRate = $semester['total_courses'] > 0
             ? ($semester['completed_courses'] / $semester['total_courses']) * 100
             : 0;
 
@@ -388,7 +388,7 @@ class AcademicHistoryResource extends JsonResource
         }
 
         $mean = $gpas->avg();
-        $variance = $gpas->map(fn($gpa) => pow($gpa - $mean, 2))->avg();
+        $variance = $gpas->map(fn ($gpa) => pow($gpa - $mean, 2))->avg();
         $stdDev = sqrt($variance);
 
         return match (true) {
@@ -402,6 +402,7 @@ class AcademicHistoryResource extends JsonResource
     protected function calculateProgressPercentage(int $cumulativeCredits): float
     {
         $totalCreditsRequired = 144; // Typical bachelor's degree
+
         return $totalCreditsRequired > 0 ? round(($cumulativeCredits / $totalCreditsRequired) * 100, 1) : 0;
     }
 
@@ -418,14 +419,14 @@ class AcademicHistoryResource extends JsonResource
     protected function estimateCompletion(int $totalCredits, float $averageCreditsPerSemester): array
     {
         $creditsRemaining = max(0, 144 - $totalCredits); // Assuming 144 total credits needed
-        $semestersRemaining = $averageCreditsPerSemester > 0 
+        $semestersRemaining = $averageCreditsPerSemester > 0
             ? ceil($creditsRemaining / $averageCreditsPerSemester)
             : 0;
 
         return [
             'credits_remaining' => $creditsRemaining,
             'semesters_remaining' => $semestersRemaining,
-            'estimated_graduation_date' => $semestersRemaining > 0 
+            'estimated_graduation_date' => $semestersRemaining > 0
                 ? now()->addMonths($semestersRemaining * 6)->format('Y-m-d')
                 : null,
         ];

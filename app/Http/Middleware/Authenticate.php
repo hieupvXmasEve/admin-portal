@@ -17,7 +17,7 @@ class Authenticate extends Middleware
         Log::info('Authenticate middleware: User not authenticated', [
             'url' => $request->fullUrl(),
             'method' => $request->method(),
-            'is_api' => $request->expectsJson()
+            'is_api' => $request->expectsJson(),
         ]);
 
         return $request->expectsJson() ? null : route('login');
@@ -33,7 +33,7 @@ class Authenticate extends Middleware
             'method' => $request->method(),
             'guards' => $guards,
             'user_authenticated' => Auth::check(),
-            'user_id' => Auth::id()
+            'user_id' => Auth::id(),
         ]);
 
         return parent::handle($request, $next, ...$guards);

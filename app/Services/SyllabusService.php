@@ -33,7 +33,7 @@ class SyllabusService
             ]);
 
             // Create assessment components if provided
-            if (!empty($data['assessment_components'])) {
+            if (! empty($data['assessment_components'])) {
                 $this->createAssessmentComponents($syllabus, $data['assessment_components']);
             }
 
@@ -87,7 +87,7 @@ class SyllabusService
     public function toggleActive(Syllabus $syllabus): Syllabus
     {
         return DB::transaction(function () use ($syllabus) {
-            if (!$syllabus->is_active) {
+            if (! $syllabus->is_active) {
                 // Deactivate all other syllabus for this curriculum unit
                 Syllabus::where('curriculum_unit_id', $syllabus->curriculum_unit_id)
                     ->where('id', '!=', $syllabus->id)
@@ -157,7 +157,7 @@ class SyllabusService
             ]);
 
             // Create component details if provided
-            if (!empty($componentData['details'])) {
+            if (! empty($componentData['details'])) {
                 foreach ($componentData['details'] as $detailData) {
                     $component->details()->create([
                         'name' => $detailData['name'],
@@ -189,7 +189,7 @@ class SyllabusService
 
         // Delete components not in the request
         $toDelete = array_diff($existingComponentIds, $providedComponentIds);
-        if (!empty($toDelete)) {
+        if (! empty($toDelete)) {
             AssessmentComponent::whereIn('id', $toDelete)->delete();
         }
 
@@ -207,7 +207,7 @@ class SyllabusService
             // Store the original component data to prevent corruption
             $originalComponentData = $componentData;
 
-            if (!empty($componentData['id'])) {
+            if (! empty($componentData['id'])) {
                 // Update existing component
                 $component = AssessmentComponent::find($componentData['id']);
                 if ($component && $component->syllabus_id === $syllabus->id) {
@@ -221,6 +221,7 @@ class SyllabusService
                 } else {
                     // Component not found or doesn't belong to this syllabus, skip
                     Log::warning('Component not found or invalid', ['assessment_component_id' => $componentData['id']]);
+
                     continue;
                 }
             } else {
@@ -265,7 +266,7 @@ class SyllabusService
 
         // Delete details not in the request
         $toDeleteDetails = array_diff($existingDetailIds, $providedDetailIds);
-        if (!empty($toDeleteDetails)) {
+        if (! empty($toDeleteDetails)) {
             Log::info('Deleting details', ['ids' => $toDeleteDetails]);
             $component->details()->whereIn('id', $toDeleteDetails)->delete();
         }
@@ -274,7 +275,7 @@ class SyllabusService
         foreach ($details as $detailData) {
             Log::info('Processing detail', ['detail' => $detailData]);
 
-            if (!empty($detailData['id'])) {
+            if (! empty($detailData['id'])) {
                 // Update existing detail
                 $detail = $component->details()->find($detailData['id']);
                 if ($detail) {
@@ -314,7 +315,7 @@ class SyllabusService
             // Try incrementing minor version first
             for ($newMinor = $minor + 1; $newMinor <= 99; $newMinor++) {
                 $newVersion = "v{$major}.{$newMinor}";
-                if (!Syllabus::where('curriculum_unit_id', $curriculumUnitId)
+                if (! Syllabus::where('curriculum_unit_id', $curriculumUnitId)
                     ->where('version', $newVersion)->exists()) {
                     return $newVersion;
                 }
@@ -323,7 +324,7 @@ class SyllabusService
             // If minor versions exhausted, increment major
             for ($newMajor = $major + 1; $newMajor <= 99; $newMajor++) {
                 $newVersion = "v{$newMajor}.0";
-                if (!Syllabus::where('curriculum_unit_id', $curriculumUnitId)
+                if (! Syllabus::where('curriculum_unit_id', $curriculumUnitId)
                     ->where('version', $newVersion)->exists()) {
                     return $newVersion;
                 }

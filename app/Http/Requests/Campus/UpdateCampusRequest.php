@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Campus;
 
-use App\Models\Campus;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateCampusRequest extends FormRequest
@@ -26,7 +25,7 @@ class UpdateCampusRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:255', 'unique:campuses,code,' . $campus->id],
+            'code' => ['required', 'string', 'max:255', 'unique:campuses,code,'.$campus->id],
             'address' => ['required', 'string'],
         ];
     }

@@ -5,14 +5,11 @@ declare(strict_types=1);
 namespace App\Services\V1\Student;
 
 use App\Models\Student;
-use App\Models\AcademicRecord;
-use App\Models\CourseRegistration;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class ProfileService
 {
@@ -242,16 +239,16 @@ class ProfileService
     protected function calculateProfileCompletion(Student $student): array
     {
         $fields = [
-            'first_name' => !empty($student->first_name),
-            'last_name' => !empty($student->last_name),
-            'email' => !empty($student->email),
-            'phone' => !empty($student->phone),
-            'date_of_birth' => !empty($student->date_of_birth),
-            'address_street' => !empty($student->address_street),
-            'address_city' => !empty($student->address_city),
-            'emergency_contact_name' => !empty($student->emergency_contact_name),
-            'emergency_contact_phone' => !empty($student->emergency_contact_phone),
-            'avatar_path' => !empty($student->avatar_path),
+            'first_name' => ! empty($student->first_name),
+            'last_name' => ! empty($student->last_name),
+            'email' => ! empty($student->email),
+            'phone' => ! empty($student->phone),
+            'date_of_birth' => ! empty($student->date_of_birth),
+            'address_street' => ! empty($student->address_street),
+            'address_city' => ! empty($student->address_city),
+            'emergency_contact_name' => ! empty($student->emergency_contact_name),
+            'emergency_contact_phone' => ! empty($student->emergency_contact_phone),
+            'avatar_path' => ! empty($student->avatar_path),
         ];
 
         $completedFields = array_filter($fields);
@@ -263,7 +260,7 @@ class ProfileService
             'percentage' => $percentage,
             'completed_fields' => $completedCount,
             'total_fields' => $totalFields,
-            'missing_fields' => array_keys(array_filter($fields, fn($completed) => !$completed)),
+            'missing_fields' => array_keys(array_filter($fields, fn ($completed) => ! $completed)),
             'status' => $this->getCompletionStatus($percentage),
         ];
     }
@@ -326,7 +323,7 @@ class ProfileService
     {
         $currentSemester = $student->getCurrentSemester();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return [];
         }
 
@@ -516,7 +513,7 @@ class ProfileService
             $achievements[] = [
                 'type' => 'deans_list',
                 'title' => 'Dean\'s List',
-                'description' => 'Achieved GPA of ' . round($achievement->gpa, 2),
+                'description' => 'Achieved GPA of '.round($achievement->gpa, 2),
                 'semester' => $achievement->semester->name,
                 'date' => $achievement->created_at->toDateString(),
             ];
@@ -532,7 +529,7 @@ class ProfileService
     {
         $currentSemester = $student->getCurrentSemester();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return 0;
         }
 
@@ -554,7 +551,7 @@ class ProfileService
             ->latest()
             ->first();
 
-        if (!$latestGPA) {
+        if (! $latestGPA) {
             return 'Good Standing';
         }
 
@@ -600,7 +597,7 @@ class ProfileService
      */
     protected function getExpectedSemestersRemaining(Student $student): int
     {
-        if (!$student->expected_graduation_date) {
+        if (! $student->expected_graduation_date) {
             return 0;
         }
 

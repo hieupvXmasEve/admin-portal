@@ -18,18 +18,18 @@ class StudentApiRateLimiter
     public function handle(Request $request, Closure $next, string $limiter = 'student-api'): Response
     {
         $key = $this->resolveRequestSignature($request, $limiter);
-        
+
         // Define rate limits based on endpoint type
         $limits = $this->getRateLimits($limiter);
-        
+
         if (RateLimiter::tooManyAttempts($key, $limits['maxAttempts'])) {
             $retryAfter = RateLimiter::availableIn($key);
-            
+
             return ApiResponse::rateLimitError(
                 "Too many requests. Try again in {$retryAfter} seconds."
             )->header('Retry-After', $retryAfter)
-             ->header('X-RateLimit-Limit', $limits['maxAttempts'])
-             ->header('X-RateLimit-Remaining', 0);
+                ->header('X-RateLimit-Limit', $limits['maxAttempts'])
+                ->header('X-RateLimit-Remaining', 0);
         }
 
         RateLimiter::hit($key, $limits['decayMinutes'] * 60);
@@ -38,9 +38,9 @@ class StudentApiRateLimiter
 
         // Add rate limit headers to successful responses
         $remaining = RateLimiter::remaining($key, $limits['maxAttempts']);
-        
+
         return $response->header('X-RateLimit-Limit', $limits['maxAttempts'])
-                       ->header('X-RateLimit-Remaining', max(0, $remaining));
+            ->header('X-RateLimit-Remaining', max(0, $remaining));
     }
 
     /**
@@ -50,7 +50,7 @@ class StudentApiRateLimiter
     {
         $user = $request->user();
         $userId = $user ? $user->id : $request->ip();
-        
+
         return "student-api:{$limiter}:{$userId}";
     }
 

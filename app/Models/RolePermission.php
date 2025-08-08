@@ -11,7 +11,7 @@ class RolePermission extends AuditableModel
 
     protected $fillable = [
         'role_id',
-        'permission_id'
+        'permission_id',
     ];
 
     public function role()
@@ -47,7 +47,7 @@ class RolePermission extends AuditableModel
     {
         $roleName = $this->role?->name ?? "Role ID {$this->role_id}";
         $permissionName = $this->permission?->display_name ?? $this->permission?->name ?? "Permission ID {$this->permission_id}";
-        
+
         return "{$roleName} -> {$permissionName}";
     }
 

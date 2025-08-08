@@ -29,35 +29,35 @@ class ImportGradesRequest extends FormRequest
                 'required',
                 'file',
                 'mimes:xlsx,xls,csv',
-                'max:10240' // 10MB max file size
+                'max:10240', // 10MB max file size
             ],
             'update_mode' => [
                 'sometimes',
                 'string',
-                Rule::in(['update_existing', 'create_missing', 'update_and_create'])
+                Rule::in(['update_existing', 'create_missing', 'update_and_create']),
             ],
             'overwrite_existing' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'validate_only' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'skip_errors' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'default_status' => [
                 'sometimes',
                 'string',
-                Rule::in(['not_submitted', 'submitted', 'grading', 'graded', 'returned'])
+                Rule::in(['not_submitted', 'submitted', 'grading', 'graded', 'returned']),
             ],
             'default_score_status' => [
                 'sometimes',
                 'string',
-                Rule::in(['draft', 'provisional', 'final'])
-            ]
+                Rule::in(['draft', 'provisional', 'final']),
+            ],
         ];
     }
 
@@ -73,7 +73,7 @@ class ImportGradesRequest extends FormRequest
             'file.max' => 'The file size cannot exceed 10MB',
             'update_mode.in' => 'Invalid update mode. Must be one of: update_existing, create_missing, update_and_create',
             'default_status.in' => 'Invalid default status provided',
-            'default_score_status.in' => 'Invalid default score status provided'
+            'default_score_status.in' => 'Invalid default score status provided',
         ];
     }
 
@@ -83,14 +83,14 @@ class ImportGradesRequest extends FormRequest
     public function validatedWithDefaults(): array
     {
         $validated = $this->validated();
-        
+
         return array_merge([
             'update_mode' => 'update_and_create',
             'overwrite_existing' => false,
             'validate_only' => false,
             'skip_errors' => false,
             'default_status' => 'graded',
-            'default_score_status' => 'provisional'
+            'default_score_status' => 'provisional',
         ], $validated);
     }
 
@@ -109,15 +109,16 @@ class ImportGradesRequest extends FormRequest
      */
     protected function validateFileContent($validator): void
     {
-        if (!$this->hasFile('file') || !$this->file('file')->isValid()) {
+        if (! $this->hasFile('file') || ! $this->file('file')->isValid()) {
             return;
         }
 
         $file = $this->file('file');
-        
+
         // Basic file size validation
         if ($file->getSize() === 0) {
             $validator->errors()->add('file', 'The uploaded file is empty');
+
             return;
         }
 

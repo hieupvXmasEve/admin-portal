@@ -4,30 +4,28 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exceptions\AssignmentConflictException;
+use App\Exceptions\CourseOfferingNotFoundException;
+use App\Exceptions\InvalidAssignmentDataException;
+use App\Exceptions\LecturerNotAvailableException;
+use App\Exceptions\LecturerNotFoundException;
+use App\Exceptions\ScheduleConflictException;
+use App\Exports\TeachingAssignmentsExport;
 use App\Models\CourseOffering;
 use App\Models\Lecture;
-use App\Models\Semester;
-use App\Exports\TeachingAssignmentsExport;
-use App\Exceptions\{
-    LecturerNotAvailableException,
-    ScheduleConflictException,
-    AssignmentConflictException,
-    LecturerNotFoundException,
-    CourseOfferingNotFoundException,
-    InvalidAssignmentDataException,
-    ExportException
-};
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
+
 // use Barryvdh\DomPDF\Facade\Pdf; // TODO: Install barryvdh/laravel-dompdf package
 
 class TeachingAssignmentService
 {
     private array $currentFilters = [];
+
     /**
      * Get teaching assignments with filtering and pagination
      */
@@ -38,12 +36,12 @@ class TeachingAssignmentService
             ->withAssignmentDetails();
 
         // Apply filters
-        if (!empty($filters['semester_id'])) {
+        if (! empty($filters['semester_id'])) {
             $query->where('semester_id', $filters['semester_id']);
         }
         Log::info('$data', [
             'data' => $query->get()->toArray(),
-            'campus' => app('campus')->id
+            'campus' => app('campus')->id,
         ]);
 
         // Filter by current campus (include unassigned courses and assigned courses from current campus)
@@ -54,26 +52,26 @@ class TeachingAssignmentService
                 });
         });
         Log::info('$data', [
-            'data 2' => count($query->get()->toArray())
+            'data 2' => count($query->get()->toArray()),
         ]);
-        if (!empty($filters['assignment_status'])) {
+        if (! empty($filters['assignment_status'])) {
             $query->byAssignmentStatus($filters['assignment_status']);
         }
 
-        if (!empty($filters['faculty'])) {
+        if (! empty($filters['faculty'])) {
             $query->whereHas('lecture', function ($lectureQuery) use ($filters) {
                 $lectureQuery->where('faculty', $filters['faculty']);
             });
         }
 
-        if (!empty($filters['department'])) {
+        if (! empty($filters['department'])) {
             $query->whereHas('lecture', function ($lectureQuery) use ($filters) {
                 $lectureQuery->where('department', $filters['department']);
             });
         }
 
         // Search functionality
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($searchQuery) use ($search) {
                 // Search by unit code and name
@@ -94,13 +92,13 @@ class TeachingAssignmentService
 
         // Default ordering
         $query->orderBy('semester_id', 'desc')
-            ->orderByRaw("CASE
+            ->orderByRaw('CASE
                 WHEN lecture_id IS NULL AND EXISTS(
                     SELECT 1 FROM semesters s WHERE s.id = course_offerings.semester_id AND s.start_date <= NOW()
                 ) THEN 1
                 WHEN lecture_id IS NULL THEN 2
                 ELSE 3
-            END")
+            END')
             ->orderBy('id');
 
         return $query->paginate($filters['per_page'] ?? 15);
@@ -124,12 +122,12 @@ class TeachingAssignmentService
 
             // Find entities
             $courseOffering = CourseOffering::find($courseOfferingId);
-            if (!$courseOffering) {
+            if (! $courseOffering) {
                 throw new CourseOfferingNotFoundException($courseOfferingId);
             }
 
             $lecturer = Lecture::find($lecturerId);
-            if (!$lecturer) {
+            if (! $lecturer) {
                 throw new LecturerNotFoundException($lecturerId);
             }
 
@@ -139,7 +137,7 @@ class TeachingAssignmentService
             }
 
             // Validate lecturer availability
-            if (!$lecturer->isAvailableForAssignment()) {
+            if (! $lecturer->isAvailableForAssignment()) {
                 throw new LecturerNotAvailableException(
                     $lecturerId,
                     'Lecturer is not marked as available for assignment',
@@ -148,7 +146,7 @@ class TeachingAssignmentService
             }
 
             // Validate assignment compatibility
-            if (!$courseOffering->canBeAssignedTo($lecturer)) {
+            if (! $courseOffering->canBeAssignedTo($lecturer)) {
                 throw new LecturerNotAvailableException(
                     $lecturerId,
                     'Lecturer does not meet the requirements for this course offering'
@@ -157,7 +155,7 @@ class TeachingAssignmentService
 
             // Check for schedule conflicts
             $conflicts = $this->checkScheduleConflicts($lecturerId, $courseOfferingId);
-            if (!empty($conflicts)) {
+            if (! empty($conflicts)) {
                 throw new ScheduleConflictException($lecturerId, $courseOfferingId, $conflicts);
             }
 
@@ -202,12 +200,12 @@ class TeachingAssignmentService
 
             // Find course offering
             $courseOffering = CourseOffering::find($courseOfferingId);
-            if (!$courseOffering) {
+            if (! $courseOffering) {
                 throw new CourseOfferingNotFoundException($courseOfferingId);
             }
 
             // Check if course offering has an assignment
-            if (!$courseOffering->lecture_id) {
+            if (! $courseOffering->lecture_id) {
                 throw new AssignmentConflictException($courseOfferingId);
             }
 
@@ -249,7 +247,7 @@ class TeachingAssignmentService
             ->withCurrentLoad();
 
         // Apply filters
-        if (!empty($filters['faculty']) || !empty($filters['department'])) {
+        if (! empty($filters['faculty']) || ! empty($filters['department'])) {
             $query->byFacultyAndDepartment($filters['faculty'] ?? null, $filters['department'] ?? null);
         }
 
@@ -257,7 +255,7 @@ class TeachingAssignmentService
         $query->where('campus_id', app('campus')->id);
 
         // Search by name or employee ID
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($searchQuery) use ($search) {
                 $searchQuery->where('first_name', 'like', "%{$search}%")
@@ -274,6 +272,7 @@ class TeachingAssignmentService
             $lecturer->conflicts = $lecturer->hasScheduleConflictWith($courseOffering)
                 ? $lecturer->getConflictingCourses($courseOffering)
                 : collect();
+
             return $lecturer;
         });
     }
@@ -286,7 +285,7 @@ class TeachingAssignmentService
         $lecturer = Lecture::findOrFail($lecturerId);
         $courseOffering = CourseOffering::findOrFail($courseOfferingId);
 
-        if (!$lecturer->hasScheduleConflictWith($courseOffering)) {
+        if (! $lecturer->hasScheduleConflictWith($courseOffering)) {
             return [];
         }
 
@@ -320,6 +319,7 @@ class TeachingAssignmentService
             if ($startTime1->eq($startTime2) && $endTime1->eq($endTime2)) {
                 return 'same_time';
             }
+
             return 'time_overlap';
         }
 
@@ -357,7 +357,7 @@ class TeachingAssignmentService
             ->withAssignmentDetails();
 
         // Apply the same filters as getAssignments method
-        if (!empty($filters['semester_id'])) {
+        if (! empty($filters['semester_id'])) {
             $query->where('semester_id', $filters['semester_id']);
         }
 
@@ -369,23 +369,23 @@ class TeachingAssignmentService
                 });
         });
 
-        if (!empty($filters['assignment_status'])) {
+        if (! empty($filters['assignment_status'])) {
             $query->byAssignmentStatus($filters['assignment_status']);
         }
 
-        if (!empty($filters['faculty'])) {
+        if (! empty($filters['faculty'])) {
             $query->whereHas('lecture', function ($lectureQuery) use ($filters) {
                 $lectureQuery->where('faculty', $filters['faculty']);
             });
         }
 
-        if (!empty($filters['department'])) {
+        if (! empty($filters['department'])) {
             $query->whereHas('lecture', function ($lectureQuery) use ($filters) {
                 $lectureQuery->where('department', $filters['department']);
             });
         }
 
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($searchQuery) use ($search) {
                 $searchQuery->whereHas('curriculumUnit.unit', function ($unitQuery) use ($search) {
@@ -412,12 +412,12 @@ class TeachingAssignmentService
     private function exportToExcel(Collection $assignments): string
     {
         // Ensure exports directory exists
-        if (!Storage::exists('exports')) {
+        if (! Storage::exists('exports')) {
             Storage::makeDirectory('exports');
         }
 
-        $fileName = 'teaching-assignments-' . now()->format('Y-m-d-H-i-s') . '.xlsx';
-        $filePath = 'exports/' . $fileName;
+        $fileName = 'teaching-assignments-'.now()->format('Y-m-d-H-i-s').'.xlsx';
+        $filePath = 'exports/'.$fileName;
 
         Excel::store(new TeachingAssignmentsExport($assignments, $this->currentFilters ?? []), $filePath, 'local');
 
@@ -433,7 +433,6 @@ class TeachingAssignmentService
         // Run: composer require barryvdh/laravel-dompdf
 
         throw new \Exception('PDF export requires barryvdh/laravel-dompdf package. Please run: composer require barryvdh/laravel-dompdf');
-
         /*
         $fileName = 'teaching-assignments-' . now()->format('Y-m-d-H-i-s') . '.pdf';
         $filePath = 'exports/' . $fileName;

@@ -4,21 +4,20 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Carbon\Carbon;
 
 class Lecture extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\LectureFactory> */
-    use HasFactory, SoftDeletes, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $guard = 'lecturer';
 
@@ -129,7 +128,7 @@ class Lecture extends Authenticatable
             'highest_degree' => ['nullable', 'string', 'max:50'],
             'degree_field' => ['nullable', 'string', 'max:255'],
             'alma_mater' => ['nullable', 'string', 'max:255'],
-            'graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 10)],
+            'graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 10)],
             'hire_date' => ['required', 'date'],
             'contract_start_date' => ['nullable', 'date'],
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
@@ -206,15 +205,16 @@ class Lecture extends Authenticatable
     // Computed Properties / Accessors
     public function getFullNameAttribute(): string
     {
-        return trim($this->first_name . ' ' . $this->last_name);
+        return trim($this->first_name.' '.$this->last_name);
     }
 
     public function getDisplayNameAttribute(): string
     {
         $name = $this->full_name;
         if ($this->title) {
-            $name = $this->title . ' ' . $name;
+            $name = $this->title.' '.$name;
         }
+
         return $name;
     }
 
@@ -225,11 +225,12 @@ class Lecture extends Authenticatable
 
     public function getIsContractActiveAttribute(): bool
     {
-        if (!$this->contract_start_date || !$this->contract_end_date) {
+        if (! $this->contract_start_date || ! $this->contract_end_date) {
             return false;
         }
 
         $now = now();
+
         return $now >= $this->contract_start_date && $now <= $this->contract_end_date;
     }
 
@@ -433,11 +434,12 @@ class Lecture extends Authenticatable
     // Teaching Assignment Methods
     public function hasScheduleConflictWith(CourseOffering $courseOffering): bool
     {
-        if (!$courseOffering->schedule_days || !$courseOffering->schedule_time_start || !$courseOffering->schedule_time_end) {
+        if (! $courseOffering->schedule_days || ! $courseOffering->schedule_time_start || ! $courseOffering->schedule_time_end) {
             return false;
         }
 
         $conflictingCourses = $this->getConflictingCourses($courseOffering);
+
         return $conflictingCourses->isNotEmpty();
     }
 

@@ -41,7 +41,7 @@ class Role extends AuditableModel
         $counter = 1;
 
         while (static::where('code', $code)->exists()) {
-            $code = $originalCode . '_' . $counter;
+            $code = $originalCode.'_'.$counter;
             $counter++;
         }
 

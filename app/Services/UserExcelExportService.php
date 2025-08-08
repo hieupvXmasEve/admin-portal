@@ -4,25 +4,25 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\Campus;
-use App\Models\Role;
 use App\Models\CampusUserRole;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Maatwebsite\Excel\Facades\Excel;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithColumnWidths;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use Maatwebsite\Excel\Concerns\WithMultipleSheets;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Border;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class UserExcelExportService implements WithMultipleSheets
 {
@@ -38,13 +38,13 @@ class UserExcelExportService implements WithMultipleSheets
         $this->filters = $filters;
 
         // Create temporary file
-        $fileName = 'users_export_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+        $fileName = 'users_export_'.now()->format('Y-m-d_H-i-s').'.xlsx';
 
         // Use Laravel Excel to export to the local disk
-        Excel::store($this, 'temp/' . $fileName, 'local');
+        Excel::store($this, 'temp/'.$fileName, 'local');
 
         // Return the actual file path where it was stored
-        $filePath = Storage::disk('local')->path('temp/' . $fileName);
+        $filePath = Storage::disk('local')->path('temp/'.$fileName);
 
         return $filePath;
     }
@@ -57,8 +57,8 @@ class UserExcelExportService implements WithMultipleSheets
         return [
             new UsersSummarySheet($users, $campusUserRoles),
             new DetailedRolesSheet($campusUserRoles),
-            new CampusOverviewSheet(),
-            new RoleDistributionSheet(),
+            new CampusOverviewSheet,
+            new RoleDistributionSheet,
         ];
     }
 
@@ -66,6 +66,7 @@ class UserExcelExportService implements WithMultipleSheets
     {
         $query = User::query();
         $this->applyFilters($query, $filters);
+
         return $query->orderBy('name')->get();
     }
 
@@ -74,22 +75,22 @@ class UserExcelExportService implements WithMultipleSheets
         $query = CampusUserRole::with(['user', 'campus', 'role']);
 
         // Apply filters to the user relationship
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $query->whereHas('user', function ($q) use ($filters) {
-                $q->where('name', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('email', 'like', '%' . $filters['search'] . '%');
+                $q->where('name', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('email', 'like', '%'.$filters['search'].'%');
             });
         }
 
-        if (!empty($filters['name'])) {
+        if (! empty($filters['name'])) {
             $query->whereHas('user', function ($q) use ($filters) {
-                $q->where('name', 'like', '%' . $filters['name'] . '%');
+                $q->where('name', 'like', '%'.$filters['name'].'%');
             });
         }
 
-        if (!empty($filters['email'])) {
+        if (! empty($filters['email'])) {
             $query->whereHas('user', function ($q) use ($filters) {
-                $q->where('email', 'like', '%' . $filters['email'] . '%');
+                $q->where('email', 'like', '%'.$filters['email'].'%');
             });
         }
 
@@ -98,47 +99,48 @@ class UserExcelExportService implements WithMultipleSheets
 
     private function applyFilters(Builder $query, array $filters): void
     {
-        if (!empty($filters['campus_id'])) {
+        if (! empty($filters['campus_id'])) {
             $query->whereHas('campuses', function ($q) use ($filters) {
                 $q->whereIn('campus_id', (array) $filters['campus_id']);
             });
         }
 
-        if (!empty($filters['role_id'])) {
+        if (! empty($filters['role_id'])) {
             $query->whereHas('campusRoles', function ($q) use ($filters) {
                 $q->whereIn('role_id', (array) $filters['role_id']);
             });
         }
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->where('created_at', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->where('created_at', '<=', $filters['date_to']);
         }
 
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {
-                $q->where('name', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('email', 'like', '%' . $filters['search'] . '%');
+                $q->where('name', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('email', 'like', '%'.$filters['search'].'%');
             });
         }
 
         // Handle specific column filters
-        if (!empty($filters['name'])) {
-            $query->where('name', 'like', '%' . $filters['name'] . '%');
+        if (! empty($filters['name'])) {
+            $query->where('name', 'like', '%'.$filters['name'].'%');
         }
 
-        if (!empty($filters['email'])) {
-            $query->where('email', 'like', '%' . $filters['email'] . '%');
+        if (! empty($filters['email'])) {
+            $query->where('email', 'like', '%'.$filters['email'].'%');
         }
     }
 }
 
-class UsersSummarySheet implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class UsersSummarySheet implements FromCollection, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     private Collection $users;
+
     private Collection $campusUserRoles;
 
     public function __construct(Collection $users, Collection $campusUserRoles)
@@ -177,7 +179,7 @@ class UsersSummarySheet implements FromCollection, WithHeadings, WithStyles, Wit
             'Campus Count',
             'Total Roles',
             'Created At',
-            'Updated At'
+            'Updated At',
         ];
     }
 
@@ -188,15 +190,15 @@ class UsersSummarySheet implements FromCollection, WithHeadings, WithStyles, Wit
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4472C4']
+                    'startColor' => ['rgb' => '4472C4'],
                 ],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
             ],
         ];
     }
@@ -221,7 +223,7 @@ class UsersSummarySheet implements FromCollection, WithHeadings, WithStyles, Wit
     }
 }
 
-class DetailedRolesSheet implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class DetailedRolesSheet implements FromCollection, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     private Collection $campusUserRoles;
 
@@ -258,7 +260,7 @@ class DetailedRolesSheet implements FromCollection, WithHeadings, WithStyles, Wi
             'Campus Code',
             'Role ID',
             'Role Name',
-            'Assigned At'
+            'Assigned At',
         ];
     }
 
@@ -269,15 +271,15 @@ class DetailedRolesSheet implements FromCollection, WithHeadings, WithStyles, Wi
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4472C4']
+                    'startColor' => ['rgb' => '4472C4'],
                 ],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
             ],
         ];
     }
@@ -303,7 +305,7 @@ class DetailedRolesSheet implements FromCollection, WithHeadings, WithStyles, Wi
     }
 }
 
-class CampusOverviewSheet implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class CampusOverviewSheet implements FromCollection, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     public function collection()
     {
@@ -337,7 +339,7 @@ class CampusOverviewSheet implements FromCollection, WithHeadings, WithStyles, W
             'Campus Code',
             'Address',
             'Total Users',
-            'Active Roles'
+            'Active Roles',
         ];
     }
 
@@ -348,15 +350,15 @@ class CampusOverviewSheet implements FromCollection, WithHeadings, WithStyles, W
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4472C4']
+                    'startColor' => ['rgb' => '4472C4'],
                 ],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
             ],
         ];
     }
@@ -379,7 +381,7 @@ class CampusOverviewSheet implements FromCollection, WithHeadings, WithStyles, W
     }
 }
 
-class RoleDistributionSheet implements FromCollection, WithHeadings, WithStyles, WithColumnWidths, WithTitle
+class RoleDistributionSheet implements FromCollection, WithColumnWidths, WithHeadings, WithStyles, WithTitle
 {
     public function collection()
     {
@@ -424,7 +426,7 @@ class RoleDistributionSheet implements FromCollection, WithHeadings, WithStyles,
             'Role Name',
             'Total Users',
             'Campuses Used',
-            'Most Common Campus'
+            'Most Common Campus',
         ];
     }
 
@@ -435,15 +437,15 @@ class RoleDistributionSheet implements FromCollection, WithHeadings, WithStyles,
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4472C4']
+                    'startColor' => ['rgb' => '4472C4'],
                 ],
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN],
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
             ],
         ];
     }

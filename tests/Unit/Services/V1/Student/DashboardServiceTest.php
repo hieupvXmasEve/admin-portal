@@ -4,28 +4,31 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\V1\Student;
 
-use App\Models\Student;
-use App\Models\Campus;
-use App\Models\Program;
-use App\Models\CurriculumVersion;
-use App\Models\Semester;
-use App\Models\Enrollment;
 use App\Models\AcademicHold;
+use App\Models\Campus;
+use App\Models\CurriculumVersion;
+use App\Models\Enrollment;
+use App\Models\Program;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Services\V1\Student\CreditProgressService;
 use App\Services\V1\Student\DashboardService;
 use App\Services\V1\Student\GPACalculationService;
-use App\Services\V1\Student\CreditProgressService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use Tests\TestCase;
 use Mockery;
+use Tests\TestCase;
 
 class DashboardServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     protected DashboardService $dashboardService;
+
     protected GPACalculationService $gpaService;
+
     protected CreditProgressService $creditProgressService;
+
     protected Student $student;
 
     protected function setUp(): void
@@ -35,7 +38,7 @@ class DashboardServiceTest extends TestCase
         // Create mock services
         $this->gpaService = Mockery::mock(GPACalculationService::class);
         $this->creditProgressService = Mockery::mock(CreditProgressService::class);
-        
+
         $this->dashboardService = new DashboardService(
             $this->gpaService,
             $this->creditProgressService
@@ -45,7 +48,7 @@ class DashboardServiceTest extends TestCase
         $campus = Campus::factory()->create();
         $program = Program::factory()->create(['campus_id' => $campus->id]);
         $curriculumVersion = CurriculumVersion::factory()->create(['program_id' => $program->id]);
-        
+
         $this->student = Student::factory()->create([
             'campus_id' => $campus->id,
             'program_id' => $program->id,
@@ -211,7 +214,7 @@ class DashboardServiceTest extends TestCase
         $this->assertEquals(1, $result['blocking_registration']);
         $this->assertEquals(1, $result['blocking_graduation']);
         $this->assertCount(2, $result['holds']);
-        
+
         $firstHold = $result['holds'][0];
         $this->assertArrayHasKey('id', $firstHold);
         $this->assertArrayHasKey('type', $firstHold);

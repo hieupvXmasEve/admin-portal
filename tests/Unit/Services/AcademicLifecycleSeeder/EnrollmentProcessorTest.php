@@ -2,19 +2,18 @@
 
 namespace Tests\Unit\Services\AcademicLifecycleSeeder;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\CurriculumVersion;
+use App\Models\Enrollment;
+use App\Models\Semester;
+use App\Models\Student;
 use App\Services\AcademicLifecycleSeeder\Processors\EnrollmentProcessor;
 use App\Services\AcademicLifecycleSeeder\SeederConfiguration;
-use App\Models\Student;
-use App\Models\Semester;
-use App\Models\Enrollment;
-use App\Models\CurriculumVersion;
-use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 /**
  * Test the critical EnrollmentProcessor functionality
- * 
+ *
  * This tests the foundation of the enrollment-driven approach:
  * - Enrollment creation for active students
  * - Correct semester number calculation
@@ -25,13 +24,14 @@ class EnrollmentProcessorTest extends TestCase
     use RefreshDatabase;
 
     private EnrollmentProcessor $processor;
+
     private SeederConfiguration $configuration;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
-        $this->processor = new EnrollmentProcessor();
+
+        $this->processor = new EnrollmentProcessor;
         $this->configuration = new SeederConfiguration([
             'targetSemesters' => ['2024-S1'],
         ]);
@@ -42,7 +42,7 @@ class EnrollmentProcessorTest extends TestCase
     {
         // Arrange
         $curriculumVersion = CurriculumVersion::factory()->create();
-        
+
         $semester = Semester::factory()->create([
             'code' => '2024-S1',
             'start_date' => '2024-02-01',
@@ -60,7 +60,7 @@ class EnrollmentProcessorTest extends TestCase
 
         // Assert
         $this->assertCount(1, $enrollments);
-        
+
         $enrollment = $enrollments->first();
         $this->assertEquals($student->id, $enrollment->student_id);
         $this->assertEquals($semester->id, $enrollment->semester_id);
@@ -73,14 +73,14 @@ class EnrollmentProcessorTest extends TestCase
     {
         // Arrange
         $curriculumVersion = CurriculumVersion::factory()->create();
-        
+
         // Create multiple semesters
         $semester1 = Semester::factory()->create([
             'code' => '2024-S1',
             'start_date' => '2024-02-01',
             'end_date' => '2024-06-30',
         ]);
-        
+
         $semester2 = Semester::factory()->create([
             'code' => '2024-S2',
             'start_date' => '2024-07-01',
@@ -106,13 +106,13 @@ class EnrollmentProcessorTest extends TestCase
     {
         // Arrange
         $curriculumVersion = CurriculumVersion::factory()->create();
-        
+
         $semester1 = Semester::factory()->create([
             'code' => '2024-S1',
             'start_date' => '2024-02-01',
             'end_date' => '2024-06-30',
         ]);
-        
+
         $semester2 = Semester::factory()->create([
             'code' => '2024-S2',
             'start_date' => '2024-07-01',
@@ -139,7 +139,7 @@ class EnrollmentProcessorTest extends TestCase
     {
         // Arrange
         $curriculumVersion = CurriculumVersion::factory()->create();
-        
+
         $semester = Semester::factory()->create([
             'code' => '2024-S1',
             'start_date' => '2024-02-01',
@@ -180,7 +180,7 @@ class EnrollmentProcessorTest extends TestCase
     {
         // Arrange
         $curriculumVersion = CurriculumVersion::factory()->create();
-        
+
         $semester = Semester::factory()->create([
             'code' => '2024-S1',
             'start_date' => '2024-02-01',
@@ -207,7 +207,7 @@ class EnrollmentProcessorTest extends TestCase
 
         // Assert
         $this->assertCount(0, $enrollments, 'Should not create duplicate enrollments');
-        
+
         // Verify only one enrollment exists
         $totalEnrollments = Enrollment::where('student_id', $student->id)
             ->where('semester_id', $semester->id)
@@ -245,7 +245,7 @@ class EnrollmentProcessorTest extends TestCase
     {
         // Arrange
         $curriculumVersion = CurriculumVersion::factory()->create();
-        
+
         $semester = Semester::factory()->create([
             'code' => '2024-S1',
             'start_date' => '2024-02-01',

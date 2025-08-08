@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Repositories\V1\Student;
 
-use App\Models\Student;
-use App\Models\Semester;
 use App\Models\ClassSession;
-use Illuminate\Support\Collection;
+use App\Models\Semester;
+use App\Models\Student;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class ClassSessionRepository
 {
@@ -28,7 +28,7 @@ class ClassSessionRepository
             ->with([
                 'courseOffering.curriculumUnit.unit',
                 'courseOffering.lecturer',
-                'room'
+                'room',
             ]);
 
         // Apply filters
@@ -66,7 +66,7 @@ class ClassSessionRepository
             'time_range' => [
                 'start' => $startTime,
                 'end' => $endTime,
-            ]
+            ],
         ]);
     }
 
@@ -109,7 +109,7 @@ class ClassSessionRepository
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return null;
         }
 
@@ -167,7 +167,7 @@ class ClassSessionRepository
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return collect();
         }
 
@@ -187,7 +187,7 @@ class ClassSessionRepository
             ->with([
                 'courseOffering.curriculumUnit.unit',
                 'courseOffering.lecturer',
-                'room'
+                'room',
             ])
             ->get();
     }
@@ -199,7 +199,7 @@ class ClassSessionRepository
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return collect();
         }
 
@@ -216,7 +216,7 @@ class ClassSessionRepository
             ->with([
                 'courseOffering.curriculumUnit.unit',
                 'courseOffering.lecturer',
-                'room'
+                'room',
             ])
             ->orderBy('start_time')
             ->get();
@@ -227,45 +227,45 @@ class ClassSessionRepository
      */
     protected function applyFilters(Builder $query, array $filters): void
     {
-        if (!empty($filters['day_of_week'])) {
+        if (! empty($filters['day_of_week'])) {
             $query->where('day_of_week', $filters['day_of_week']);
         }
 
-        if (!empty($filters['session_type'])) {
+        if (! empty($filters['session_type'])) {
             $query->where('session_type', $filters['session_type']);
         }
 
-        if (!empty($filters['lecturer_id'])) {
+        if (! empty($filters['lecturer_id'])) {
             $query->whereHas('courseOffering', function (Builder $q) use ($filters) {
                 $q->where('lecturer_id', $filters['lecturer_id']);
             });
         }
 
-        if (!empty($filters['lecturer_name'])) {
+        if (! empty($filters['lecturer_name'])) {
             $query->whereHas('courseOffering.lecturer', function (Builder $q) use ($filters) {
-                $q->where('full_name', 'like', '%' . $filters['lecturer_name'] . '%');
+                $q->where('full_name', 'like', '%'.$filters['lecturer_name'].'%');
             });
         }
 
-        if (!empty($filters['building'])) {
+        if (! empty($filters['building'])) {
             $query->whereHas('room', function (Builder $q) use ($filters) {
                 $q->where('building', $filters['building']);
             });
         }
 
-        if (!empty($filters['room_code'])) {
+        if (! empty($filters['room_code'])) {
             $query->whereHas('room', function (Builder $q) use ($filters) {
                 $q->where('code', $filters['room_code']);
             });
         }
 
-        if (!empty($filters['course_code'])) {
+        if (! empty($filters['course_code'])) {
             $query->whereHas('courseOffering.curriculumUnit.unit', function (Builder $q) use ($filters) {
-                $q->where('code', 'like', '%' . $filters['course_code'] . '%');
+                $q->where('code', 'like', '%'.$filters['course_code'].'%');
             });
         }
 
-        if (!empty($filters['time_range'])) {
+        if (! empty($filters['time_range'])) {
             $startTime = $filters['time_range']['start'];
             $endTime = $filters['time_range']['end'];
 
@@ -279,11 +279,11 @@ class ClassSessionRepository
             });
         }
 
-        if (!empty($filters['start_time_after'])) {
+        if (! empty($filters['start_time_after'])) {
             $query->where('start_time', '>=', $filters['start_time_after']);
         }
 
-        if (!empty($filters['end_time_before'])) {
+        if (! empty($filters['end_time_before'])) {
             $query->where('end_time', '<=', $filters['end_time_before']);
         }
     }
@@ -300,6 +300,7 @@ class ClassSessionRepository
         $totalHours = $sessions->sum(function ($session) {
             $start = \Carbon\Carbon::createFromTimeString($session->start_time);
             $end = \Carbon\Carbon::createFromTimeString($session->end_time);
+
             return $start->diffInMinutes($end) / 60;
         });
 

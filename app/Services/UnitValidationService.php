@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Unit;
-use Illuminate\Support\Collection;
 
 class UnitValidationService
 {
@@ -55,7 +54,7 @@ class UnitValidationService
     {
         $restrictions = [];
 
-        if (!$this->canEditUnit($unit)) {
+        if (! $this->canEditUnit($unit)) {
             $restrictions[] = [
                 'field' => 'code',
                 'reason' => 'Cannot change code for units in active curricula',
@@ -93,13 +92,13 @@ class UnitValidationService
 
         // Circular dependency check
         $circularCheck = $this->checkCircularDependency($unitId, $requiredUnitId);
-        if (!$circularCheck['valid']) {
+        if (! $circularCheck['valid']) {
             return $circularCheck;
         }
 
         // Type-specific validations
         $typeValidation = $this->validatePrerequisiteType($unitId, $requiredUnitId, $type);
-        if (!$typeValidation['valid']) {
+        if (! $typeValidation['valid']) {
             return $typeValidation;
         }
 
@@ -115,7 +114,7 @@ class UnitValidationService
         $hasCycle = $this->dfsCircularCheck($requiredUnitId, $unitId, $visited, $recursionStack);
 
         return [
-            'valid' => !$hasCycle,
+            'valid' => ! $hasCycle,
             'errors' => $hasCycle ? ['This would create a circular dependency'] : [],
         ];
     }
@@ -136,7 +135,7 @@ class UnitValidationService
             }
 
             if (
-                !isset($visited[$prerequisite]) &&
+                ! isset($visited[$prerequisite]) &&
                 $this->dfsCircularCheck($prerequisite, $targetUnit, $visited, $recursionStack)
             ) {
                 return true;
@@ -148,6 +147,7 @@ class UnitValidationService
         }
 
         $recursionStack[$currentUnit] = false;
+
         return false;
     }
 

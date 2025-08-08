@@ -47,7 +47,7 @@ class Permission extends AuditableModel
         $grouped = [];
 
         foreach ($permissions as $permission) {
-            if (!isset($grouped[$permission->module])) {
+            if (! isset($grouped[$permission->module])) {
                 $grouped[$permission->module] = [];
             }
 
@@ -105,7 +105,7 @@ class Permission extends AuditableModel
         return [
             'permission_code' => $this->code,
             'module' => $this->module,
-            'has_parent' => !is_null($this->parent_id),
+            'has_parent' => ! is_null($this->parent_id),
             'children_count' => $this->children()->count(),
             'roles_count' => $this->roles()->count(),
         ];

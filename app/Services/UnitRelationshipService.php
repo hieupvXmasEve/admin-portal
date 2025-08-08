@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Unit;
 use App\Models\EquivalentUnit;
+use App\Models\Unit;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -46,7 +46,7 @@ class UnitRelationshipService
                         $visited
                     );
 
-                    if (!empty($childTree)) {
+                    if (! empty($childTree)) {
                         $tree['children'][] = array_merge($childTree, [
                             'relationship_type' => $condition->type,
                             'relationship_id' => $condition->id,
@@ -76,7 +76,7 @@ class UnitRelationshipService
             $groupedPrerequisites = [];
             foreach ($prerequisites as $prerequisite) {
                 $unitId = $prerequisite['unit_id'];
-                if (!isset($groupedPrerequisites[$unitId])) {
+                if (! isset($groupedPrerequisites[$unitId])) {
                     $groupedPrerequisites[$unitId] = [];
                 }
                 $groupedPrerequisites[$unitId][] = $prerequisite;
@@ -157,7 +157,7 @@ class UnitRelationshipService
         $allEquivalents = $directEquivalents->concat($reverseEquivalents);
 
         foreach ($allEquivalents as $equivalent) {
-            if (!in_array($equivalent->id, $processed)) {
+            if (! in_array($equivalent->id, $processed)) {
                 $equivalents->push($equivalent);
                 $processed[] = $equivalent->id;
 
@@ -221,26 +221,26 @@ class UnitRelationshipService
             // Get units this unit is equivalent to (outgoing relationships)
             $outgoingEquivalents = EquivalentUnit::where('unit_id', $currentUnit->id)
                 ->with([
-                    'equivalentUnit'
+                    'equivalentUnit',
                 ])
                 ->get();
 
             // Get units that are equivalent to this unit (incoming relationships)
             $incomingEquivalents = EquivalentUnit::where('equivalent_unit_id', $currentUnit->id)
                 ->with([
-                    'unit'
+                    'unit',
                 ])
                 ->get();
 
             // Process outgoing relationships
             foreach ($outgoingEquivalents as $equivalent) {
-                if (!in_array($equivalent->equivalent_unit_id, $processedIds)) {
+                if (! in_array($equivalent->equivalent_unit_id, $processedIds)) {
                     $equivalentUnits->push([
                         'id' => $equivalent->id,
                         'unit' => $equivalent->equivalentUnit,
                         'reason' => $equivalent->reason,
                         'valid_from_semester' => null, // Field not available in current schema
-                        'relationship_type' => 'equivalent_to' // This unit is equivalent to the found unit
+                        'relationship_type' => 'equivalent_to', // This unit is equivalent to the found unit
                     ]);
 
                     $processedIds[] = $equivalent->equivalent_unit_id;
@@ -250,13 +250,13 @@ class UnitRelationshipService
 
             // Process incoming relationships
             foreach ($incomingEquivalents as $equivalent) {
-                if (!in_array($equivalent->unit_id, $processedIds)) {
+                if (! in_array($equivalent->unit_id, $processedIds)) {
                     $equivalentUnits->push([
                         'id' => $equivalent->id,
                         'unit' => $equivalent->unit,
                         'reason' => $equivalent->reason,
                         'valid_from_semester' => null, // Field not available in current schema
-                        'relationship_type' => 'equivalent_from' // The found unit is equivalent to this unit
+                        'relationship_type' => 'equivalent_from', // The found unit is equivalent to this unit
                     ]);
 
                     $processedIds[] = $equivalent->unit_id;

@@ -39,7 +39,7 @@ class SpecializationFactory extends Factory
      */
     public function forProgram(Program $program): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'program_id' => $program->id,
         ]);
     }
@@ -49,7 +49,7 @@ class SpecializationFactory extends Factory
      */
     public function active(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'is_active' => true,
         ]);
     }
@@ -59,7 +59,7 @@ class SpecializationFactory extends Factory
      */
     public function inactive(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'is_active' => false,
         ]);
     }
@@ -69,7 +69,7 @@ class SpecializationFactory extends Factory
      */
     public function softwareDevelopment(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'name' => 'Software Development',
             'code' => 'IT-SD',
             'description' => 'Focuses on application development, programming languages, and software engineering principles.',
@@ -82,7 +82,7 @@ class SpecializationFactory extends Factory
      */
     public function cybersecurity(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'name' => 'Cybersecurity',
             'code' => 'IT-CS',
             'description' => 'Specialized track focusing on information security, network security, and digital forensics.',
@@ -95,7 +95,7 @@ class SpecializationFactory extends Factory
      */
     public function dataScience(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'name' => 'Data Science',
             'code' => 'IT-DS',
             'description' => 'Combines statistics, programming, and domain expertise to extract insights from data.',
@@ -108,7 +108,7 @@ class SpecializationFactory extends Factory
      */
     public function marketing(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'name' => 'Marketing',
             'code' => 'BUS-MKT',
             'description' => 'Focuses on digital marketing, consumer behavior, and brand management.',
@@ -121,7 +121,7 @@ class SpecializationFactory extends Factory
      */
     public function finance(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'name' => 'Finance',
             'code' => 'BUS-FIN',
             'description' => 'Covers financial analysis, investment strategies, and corporate finance.',

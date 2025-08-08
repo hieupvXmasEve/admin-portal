@@ -5,15 +5,14 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Traits\LazyPermissions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends UserAuditableModel
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, LazyPermissions;
+    use HasApiTokens, HasFactory, LazyPermissions, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -62,7 +61,7 @@ class User extends UserAuditableModel
     {
         return Str::of($this->name)
             ->split('/[\s,]+/')
-            ->map(fn($word) => Str::substr($word, 0, 1))
+            ->map(fn ($word) => Str::substr($word, 0, 1))
             ->slice(0, 2)
             ->join('');
     }
@@ -91,11 +90,14 @@ class User extends UserAuditableModel
     public function hasRole($roleCode, $campusId = null)
     {
         $campusId = $campusId ?? session('current_campus_id');
+
         return $this->campusRoles()->where('campus_id', $campusId)->where('code', $roleCode)->exists();
     }
+
     public function getAllPermissions($campusId = null)
     {
         $campusId = $campusId ?? session('current_campus_id');
+
         return $this->campusRoles()->where('campus_id', $campusId)->get();
     }
 
@@ -218,6 +220,7 @@ class User extends UserAuditableModel
     {
         return $this->update(['status' => self::STATUS_UNVERIFIED]);
     }
+
     public function hasSystemRole(string $roleCode): bool
     {
         return $this->campusRoles()->where('code', $roleCode)->exists();
@@ -227,12 +230,19 @@ class User extends UserAuditableModel
      * Available user status constants
      */
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_INACTIVE = 'inactive';
+
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_SUSPENDED = 'suspended';
+
     public const STATUS_BANNED = 'banned';
+
     public const STATUS_LOCKED = 'locked';
+
     public const STATUS_VERIFIED = 'verified';
+
     public const STATUS_UNVERIFIED = 'unverified';
 
     /**

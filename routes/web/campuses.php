@@ -1,9 +1,8 @@
 <?php
 
+use App\Constants\CampusRoutes;
 use App\Http\Controllers\Web\BuildingController;
 use App\Http\Controllers\Web\CampusController;
-use App\Helpers\RoutePermissionHelper;
-use App\Constants\CampusRoutes;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {

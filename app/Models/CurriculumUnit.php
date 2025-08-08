@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class CurriculumUnit extends Model
@@ -80,7 +80,7 @@ class CurriculumUnit extends Model
                 if ($condition->requiredUnit) {
                     $isCompleted = in_array($condition->requiredUnit->id, $completedUnits);
 
-                    if (!$isCompleted && !$this->allows_concurrent_enrollment) {
+                    if (! $isCompleted && ! $this->allows_concurrent_enrollment) {
                         $missingPrerequisites[] = [
                             'unit' => $condition->requiredUnit,
                             'type' => $condition->type,
@@ -113,6 +113,7 @@ class CurriculumUnit extends Model
         if ($this->year_level && $this->semester_number) {
             return "Year {$this->year_level}, Semester {$this->semester_number}";
         }
+
         return null;
     }
 
@@ -218,7 +219,7 @@ class CurriculumUnit extends Model
      */
     public function getAvailableElectiveUnits(): \Illuminate\Support\Collection
     {
-        if (!$this->isElective()) {
+        if (! $this->isElective()) {
             return collect();
         }
 
@@ -275,7 +276,7 @@ class CurriculumUnit extends Model
      */
     public function getAllAvailableElectives(): array
     {
-        if (!$this->isElective()) {
+        if (! $this->isElective()) {
             return [];
         }
 
@@ -291,7 +292,7 @@ class CurriculumUnit extends Model
      */
     public function canBeSubstitutedWith(Unit $unit): bool
     {
-        if (!$this->isElective()) {
+        if (! $this->isElective()) {
             return false;
         }
 

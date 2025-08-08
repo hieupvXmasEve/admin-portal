@@ -12,8 +12,8 @@ use App\Models\Student;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AuthController extends Controller
 {
@@ -23,11 +23,12 @@ class AuthController extends Controller
     public function login(LoginRequest $request): JsonResponse
     {
         // Rate limiting key
-        $key = 'login:' . $request->ip();
+        $key = 'login:'.$request->ip();
 
         // Check rate limiting
         if (RateLimiter::tooManyAttempts($key, 5)) {
             $seconds = RateLimiter::availableIn($key);
+
             return ApiResponse::rateLimitError(
                 "Too many login attempts. Try again in {$seconds} seconds."
             );
@@ -38,13 +39,14 @@ class AuthController extends Controller
         // Find student
         $student = Student::where('email', $request->email)->first();
 
-        if (!$student || !Hash::check($request->password, $student->password ?? '')) {
+        if (! $student || ! Hash::check($request->password, $student->password ?? '')) {
             RateLimiter::hit($key, 900); // 15 minutes
+
             return ApiResponse::authenticationError('Invalid credentials');
         }
 
         // Check if student account is active
-        if (!in_array($student->status, ['active', 'enrolled'])) {
+        if (! in_array($student->status, ['active', 'enrolled'])) {
             return ApiResponse::authorizationError(
                 'Account is not active. Please contact administration.'
             );
@@ -101,7 +103,7 @@ class AuthController extends Controller
 
         $student = $request->user();
 
-        if (!$student instanceof Student) {
+        if (! $student instanceof Student) {
             return ApiResponse::authenticationError('Invalid token');
         }
 
@@ -199,14 +201,14 @@ class AuthController extends Controller
 
             $googleUserData = $response->json();
 
-            if (!$googleUserData || !isset($googleUserData['email'])) {
+            if (! $googleUserData || ! isset($googleUserData['email'])) {
                 return ApiResponse::authenticationError('Unable to retrieve user information from Google');
             }
 
             // Check for student account
             $student = Student::where('email', $googleUserData['email'])->first();
 
-            if (!$student) {
+            if (! $student) {
                 // Handle student registration if allowed
                 if (config('app.allow_student_registration', false)) {
                     $student = Student::create([
@@ -225,7 +227,7 @@ class AuthController extends Controller
                             'full_name' => $student->full_name,
                             'email' => $student->email,
                             'status' => $student->status,
-                        ]
+                        ],
                     ], 'Student account created successfully. Please wait for admin approval.', 201);
                 }
 
@@ -233,7 +235,7 @@ class AuthController extends Controller
             }
 
             // Update OAuth provider data if not set
-            if (!$student->oauth_provider_id) {
+            if (! $student->oauth_provider_id) {
                 $student->update([
                     'oauth_provider' => 'google',
                     'oauth_provider_id' => $googleUserData['id'],
@@ -243,7 +245,7 @@ class AuthController extends Controller
             }
 
             // Check if student account is active
-            if (!in_array($student->status, ['active', 'enrolled'])) {
+            if (! in_array($student->status, ['active', 'enrolled'])) {
                 return ApiResponse::authorizationError('Student account is not active');
             }
 
@@ -283,7 +285,7 @@ class AuthController extends Controller
             ], 'Google login successful');
 
         } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to authenticate with Google: ' . $e->getMessage());
+            return ApiResponse::serverError('Failed to authenticate with Google: '.$e->getMessage());
         }
     }
 }

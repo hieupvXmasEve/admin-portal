@@ -27,7 +27,7 @@ class UpdateStudentRequest extends FormRequest
             'string',
             'email',
             'max:255',
-            Rule::unique('students')->ignore($studentId)
+            Rule::unique('students')->ignore($studentId),
         ];
 
         if (isset($rules['national_id'])) {
@@ -35,7 +35,7 @@ class UpdateStudentRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:20',
-                Rule::unique('students')->ignore($studentId)
+                Rule::unique('students')->ignore($studentId),
             ];
         }
 
@@ -52,26 +52,26 @@ class UpdateStudentRequest extends FormRequest
         // Clean and format data before validation
         if ($this->has('phone')) {
             $this->merge([
-                'phone' => preg_replace('/[^0-9+]/', '', $this->phone)
+                'phone' => preg_replace('/[^0-9+]/', '', $this->phone),
             ]);
         }
 
         if ($this->has('national_id')) {
             $this->merge([
-                'national_id' => preg_replace('/[^0-9]/', '', $this->national_id)
+                'national_id' => preg_replace('/[^0-9]/', '', $this->national_id),
             ]);
         }
 
         // Ensure proper date format
         if ($this->has('date_of_birth') && $this->date_of_birth) {
             $this->merge([
-                'date_of_birth' => date('Y-m-d', strtotime($this->date_of_birth))
+                'date_of_birth' => date('Y-m-d', strtotime($this->date_of_birth)),
             ]);
         }
 
         if ($this->has('admission_date') && $this->admission_date) {
             $this->merge([
-                'admission_date' => date('Y-m-d', strtotime($this->admission_date))
+                'admission_date' => date('Y-m-d', strtotime($this->admission_date)),
             ]);
         }
     }

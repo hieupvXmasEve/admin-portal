@@ -34,7 +34,7 @@ class StudentController extends Controller
     public function index(Request $request): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
-        Log::info('Current campus ID: ' . $campusId);
+        Log::info('Current campus ID: '.$campusId);
         if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
@@ -55,23 +55,23 @@ class StudentController extends Controller
         $students = Student::query()
             ->with(['campus', 'program', 'specialization'])
             ->where('campus_id', $campusId)
-             ->when($validated['search'] ?? null, function ($query, $search) {
-                 $query->where(function ($q) use ($search) {
-                     $q->where('student_code', 'like', "%{$search}%")
-                         ->orWhere('full_name', 'like', "%{$search}%")
-                         ->orWhere('email', 'like', "%{$search}%");
-                 });
-             })
-             ->when($validated['program_id'] ?? null, function ($query, $programId) {
-                 $query->where('program_id', $programId);
-             })
-             ->when($validated['status'] ?? null, function ($query, $status) {
-                 $query->where('status', $status);
-             })
-             ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
-                 $direction = $validated['direction'] ?? 'asc';
-                 $query->orderBy($sort, $direction);
-             })
+            ->when($validated['search'] ?? null, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('student_code', 'like', "%{$search}%")
+                        ->orWhere('full_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->when($validated['program_id'] ?? null, function ($query, $programId) {
+                $query->where('program_id', $programId);
+            })
+            ->when($validated['status'] ?? null, function ($query, $status) {
+                $query->where('status', $status);
+            })
+            ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
+                $direction = $validated['direction'] ?? 'asc';
+                $query->orderBy($sort, $direction);
+            })
             ->orderBy('created_at', 'desc')
             ->paginate($per_page, ['*'], 'page', $page)
             ->withQueryString();
@@ -675,12 +675,12 @@ class StudentController extends Controller
             $summary = $result['summary'] ?? [];
 
             $message = "Automated enrollment completed successfully!\n";
-            $message .= "• Students processed: " . count($students) . "\n";
+            $message .= '• Students processed: '.count($students)."\n";
             $message .= "• Enrollments created: {$result['enrollments']['created']}\n";
             $message .= "• Course offerings created: {$result['course_offerings']['created']}\n";
             $message .= "• Course registrations created: {$result['course_registrations']['created']}\n";
 
-            if (!empty($summary)) {
+            if (! empty($summary)) {
                 $message .= "• Success rate: {$summary['success_rate']}%\n";
                 if ($summary['total_errors'] > 0) {
                     $message .= "• Total errors: {$summary['total_errors']}";

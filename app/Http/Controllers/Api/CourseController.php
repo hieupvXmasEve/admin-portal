@@ -8,8 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Models\CourseOffering;
 use App\Models\Semester;
 use App\Services\RegistrationService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class CourseController extends Controller
@@ -35,22 +35,22 @@ class CourseController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         // Use current semester if not specified
         $semesterId = $request->semester_id;
-        if (!$semesterId) {
+        if (! $semesterId) {
             $currentSemester = Semester::where('is_active', true)
                 ->where('start_date', '<=', now())
                 ->where('end_date', '>=', now())
                 ->first();
 
-            if (!$currentSemester) {
+            if (! $currentSemester) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No active semester found'
+                    'message' => 'No active semester found',
                 ], 404);
             }
 
@@ -124,12 +124,12 @@ class CourseController extends Controller
                     'courses' => array_values($formattedCourses),
                     'total_count' => count($formattedCourses),
                     'semester_id' => $semesterId,
-                ]
+                ],
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 400);
         }
     }
@@ -201,8 +201,8 @@ class CourseController extends Controller
                     'is_registration_period_open' => $courseOffering->isRegistrationPeriodOpen(),
                     'is_full' => $courseOffering->isFull(),
                     'has_waitlist_space' => $courseOffering->hasWaitlistSpace(),
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 
@@ -219,8 +219,8 @@ class CourseController extends Controller
                 'course_code' => $courseOffering->course_code,
                 'course_title' => $courseOffering->course_title,
                 'prerequisites' => $prerequisites,
-                'has_prerequisites' => !empty($prerequisites),
-            ]
+                'has_prerequisites' => ! empty($prerequisites),
+            ],
         ]);
     }
 
@@ -252,7 +252,7 @@ class CourseController extends Controller
             'data' => [
                 'semesters' => $semesters,
                 'total_count' => $semesters->count(),
-            ]
+            ],
         ]);
     }
 
@@ -273,7 +273,7 @@ class CourseController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -342,8 +342,8 @@ class CourseController extends Controller
                     'delivery_mode' => $request->delivery_mode,
                     'search' => $request->search,
                     'available_only' => $request->boolean('available_only'),
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 }

@@ -19,15 +19,18 @@ class ScoreAdjustmentsTest extends TestCase
     use RefreshDatabase;
 
     private AssessmentManagementService $service;
+
     private CourseOffering $courseOffering;
+
     private Student $student;
+
     private AssessmentComponentDetailScore $score;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->service = new AssessmentManagementService();
+        $this->service = new AssessmentManagementService;
 
         // Create test data
         $this->courseOffering = CourseOffering::factory()->create();
@@ -39,12 +42,12 @@ class ScoreAdjustmentsTest extends TestCase
 
         $component = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'weight' => 30.0
+            'weight' => 30.0,
         ]);
 
         $detail = AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component->id,
-            'weight' => 100.0
+            'weight' => 100.0,
         ]);
 
         $this->score = AssessmentComponentDetailScore::factory()->create([
@@ -52,7 +55,7 @@ class ScoreAdjustmentsTest extends TestCase
             'student_id' => $this->student->id,
             'course_offering_id' => $this->courseOffering->id,
             'percentage_score' => 85.0,
-            'score_status' => 'final'
+            'score_status' => 'final',
         ]);
     }
 
@@ -162,7 +165,7 @@ class ScoreAdjustmentsTest extends TestCase
             'bonus_points' => 5.0,
             'is_late' => true,
             'late_penalty_applied' => 10.0,
-            'late_excuse_approved' => false
+            'late_excuse_approved' => false,
         ]);
 
         $weightedScore = $this->score->calculateWeightedScore(30.0);
@@ -186,7 +189,7 @@ class ScoreAdjustmentsTest extends TestCase
             'bonus_points' => 5.0,
             'is_late' => true,
             'late_penalty_applied' => 10.0,
-            'late_excuse_approved' => false
+            'late_excuse_approved' => false,
         ]);
 
         $finalScore = $this->score->calculateFinalScore();
@@ -237,7 +240,7 @@ class ScoreAdjustmentsTest extends TestCase
             'student_id' => Student::factory()->create()->id,
             'course_offering_id' => $this->courseOffering->id,
             'bonus_points' => 3.0,
-            'score_status' => 'final'
+            'score_status' => 'final',
         ]);
 
         $score3 = AssessmentComponentDetailScore::factory()->create([
@@ -245,7 +248,7 @@ class ScoreAdjustmentsTest extends TestCase
             'student_id' => Student::factory()->create()->id,
             'course_offering_id' => $this->courseOffering->id,
             'score_excluded' => true,
-            'score_status' => 'final'
+            'score_status' => 'final',
         ]);
 
         $stats = $this->service->getScoreAdjustmentStatistics($this->courseOffering);

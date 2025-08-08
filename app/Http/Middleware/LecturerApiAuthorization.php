@@ -18,19 +18,19 @@ class LecturerApiAuthorization
     public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
         // Check if user is authenticated via Sanctum
-        if (!$request->user()) {
+        if (! $request->user()) {
             return ApiResponse::authenticationError('Authentication required');
         }
 
         // Check if the authenticated user is a Lecturer
-        if (!$request->user() instanceof Lecture) {
+        if (! $request->user() instanceof Lecture) {
             return ApiResponse::authorizationError('Lecturer account required');
         }
 
         $lecturer = $request->user();
 
         // Check if lecturer account is active
-        if (!$this->isLecturerActive($lecturer)) {
+        if (! $this->isLecturerActive($lecturer)) {
             return ApiResponse::authorizationError(
                 'Lecturer account is not active. Please contact administration.'
             );
@@ -44,7 +44,7 @@ class LecturerApiAuthorization
         }
 
         // Check specific permissions if provided
-        if (!empty($permissions) && !$this->hasPermissions($lecturer, $permissions)) {
+        if (! empty($permissions) && ! $this->hasPermissions($lecturer, $permissions)) {
             return ApiResponse::authorizationError(
                 'Insufficient permissions for this action'
             );
@@ -85,12 +85,12 @@ class LecturerApiAuthorization
         }
 
         // Check if lecturer is available for assignment
-        if (!$lecturer->is_available_for_assignment) {
+        if (! $lecturer->is_available_for_assignment) {
             // Allow access to profile and basic endpoints even if not available for new assignments
             $allowedRoutes = [
                 'api/v1/lecturer/auth/*',
                 'api/v1/lecturer/profile',
-                'api/v1/lecturer/profile/*'
+                'api/v1/lecturer/profile/*',
             ];
 
             foreach ($allowedRoutes as $pattern) {
@@ -111,7 +111,7 @@ class LecturerApiAuthorization
     protected function hasPermissions(Lecture $lecturer, array $permissions): bool
     {
         foreach ($permissions as $permission) {
-            if (!$this->hasPermission($lecturer, $permission)) {
+            if (! $this->hasPermission($lecturer, $permission)) {
                 return false;
             }
         }
@@ -165,7 +165,7 @@ class LecturerApiAuthorization
                 'senior_lecturer',
                 'associate_professor',
                 'professor',
-                'emeritus_professor'
+                'emeritus_professor',
             ]);
         }
 
@@ -174,7 +174,7 @@ class LecturerApiAuthorization
             return in_array($lecturer->academic_rank, [
                 'associate_professor',
                 'professor',
-                'emeritus_professor'
+                'emeritus_professor',
             ]);
         }
 

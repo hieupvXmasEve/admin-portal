@@ -32,7 +32,7 @@ class UpdateSpecializationRequest extends FormRequest
         // Convert is_active checkbox value to boolean
         if ($this->has('is_active')) {
             $this->merge([
-                'is_active' => (bool) $this->input('is_active')
+                'is_active' => (bool) $this->input('is_active'),
             ]);
         }
     }

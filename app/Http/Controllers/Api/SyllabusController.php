@@ -171,7 +171,7 @@ class SyllabusController extends Controller
             ])
             ->first();
 
-        if (!$activeSyllabus) {
+        if (! $activeSyllabus) {
             return response()->json([
                 'success' => false,
                 'message' => 'No active syllabus found for this unit',

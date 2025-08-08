@@ -20,10 +20,15 @@ class AssessmentGradingTest extends TestCase
     use RefreshDatabase;
 
     private Lecture $lecturer;
+
     private CourseOffering $courseOffering;
+
     private Student $student;
+
     private AssessmentComponent $assessmentComponent;
+
     private AssessmentComponentDetail $assessmentDetail;
+
     private AssessmentComponentDetailScore $score;
 
     protected function setUp(): void
@@ -33,7 +38,7 @@ class AssessmentGradingTest extends TestCase
         // Create test data
         $this->lecturer = Lecture::factory()->create();
         $this->courseOffering = CourseOffering::factory()->create([
-            'lecture_id' => $this->lecturer->id
+            'lecture_id' => $this->lecturer->id,
         ]);
 
         $syllabus = Syllabus::factory()->create();
@@ -44,18 +49,18 @@ class AssessmentGradingTest extends TestCase
         // Enroll student in course
         CourseRegistration::factory()->create([
             'course_offering_id' => $this->courseOffering->id,
-            'student_id' => $this->student->id
+            'student_id' => $this->student->id,
         ]);
 
         $this->assessmentComponent = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'weight' => 30.0
+            'weight' => 30.0,
         ]);
 
         $this->assessmentDetail = AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $this->assessmentComponent->id,
             'weight' => 100.0,
-            'max_points' => 100
+            'max_points' => 100,
         ]);
 
         $this->score = AssessmentComponentDetailScore::factory()->create([
@@ -64,7 +69,7 @@ class AssessmentGradingTest extends TestCase
             'student_id' => $this->student->id,
             'points_earned' => null,
             'percentage_score' => null,
-            'score_status' => 'draft'
+            'score_status' => 'draft',
         ]);
     }
 
@@ -83,7 +88,7 @@ class AssessmentGradingTest extends TestCase
                         'name',
                         'first_name',
                         'last_name',
-                        'email'
+                        'email',
                     ],
                     'assessments' => [
                         '*' => [
@@ -96,18 +101,18 @@ class AssessmentGradingTest extends TestCase
                                     'id',
                                     'name',
                                     'weight',
-                                    'score'
-                                ]
-                            ]
-                        ]
+                                    'score',
+                                ],
+                            ],
+                        ],
                     ],
                     'summary' => [
                         'total_assessments',
                         'completed_assessments',
                         'pending_assessments',
-                        'overall_percentage'
-                    ]
-                ]
+                        'overall_percentage',
+                    ],
+                ],
             ]);
     }
 
@@ -124,7 +129,7 @@ class AssessmentGradingTest extends TestCase
                         'id',
                         'name',
                         'type',
-                        'weight'
+                        'weight',
                     ],
                     'details' => [
                         '*' => [
@@ -136,16 +141,16 @@ class AssessmentGradingTest extends TestCase
                                     'student' => [
                                         'id',
                                         'name',
-                                        'student_id'
+                                        'student_id',
                                     ],
-                                    'score'
-                                ]
+                                    'score',
+                                ],
                             ],
-                            'statistics'
-                        ]
+                            'statistics',
+                        ],
                     ],
-                    'statistics'
-                ]
+                    'statistics',
+                ],
             ]);
     }
 
@@ -156,7 +161,7 @@ class AssessmentGradingTest extends TestCase
             'percentage_score' => 85.0,
             'letter_grade' => 'B+',
             'score_status' => 'final',
-            'instructor_feedback' => 'Good work!'
+            'instructor_feedback' => 'Good work!',
         ];
 
         $response = $this->actingAs($this->lecturer)
@@ -176,7 +181,7 @@ class AssessmentGradingTest extends TestCase
             'letter_grade' => 'B+',
             'score_status' => 'final',
             'instructor_feedback' => 'Good work!',
-            'graded_by_lecture_id' => $this->lecturer->id
+            'graded_by_lecture_id' => $this->lecturer->id,
         ]);
     }
 
@@ -189,7 +194,7 @@ class AssessmentGradingTest extends TestCase
             'student_id' => Student::factory()->create()->id,
             'points_earned' => null,
             'percentage_score' => null,
-            'score_status' => 'draft'
+            'score_status' => 'draft',
         ]);
 
         $bulkData = [
@@ -198,15 +203,15 @@ class AssessmentGradingTest extends TestCase
                     'id' => $this->score->id,
                     'points_earned' => 90,
                     'percentage_score' => 90.0,
-                    'score_status' => 'final'
+                    'score_status' => 'final',
                 ],
                 [
                     'id' => $secondScore->id,
                     'points_earned' => 75,
                     'percentage_score' => 75.0,
-                    'score_status' => 'final'
-                ]
-            ]
+                    'score_status' => 'final',
+                ],
+            ],
         ];
 
         $response = $this->actingAs($this->lecturer)
@@ -219,14 +224,14 @@ class AssessmentGradingTest extends TestCase
             'id' => $this->score->id,
             'points_earned' => 90,
             'percentage_score' => 90.0,
-            'score_status' => 'final'
+            'score_status' => 'final',
         ]);
 
         $this->assertDatabaseHas('assessment_component_detail_scores', [
             'id' => $secondScore->id,
             'points_earned' => 75,
             'percentage_score' => 75.0,
-            'score_status' => 'final'
+            'score_status' => 'final',
         ]);
     }
 
@@ -234,7 +239,7 @@ class AssessmentGradingTest extends TestCase
     {
         $invalidData = [
             'points_earned' => 150, // Exceeds max_points (100)
-            'percentage_score' => 150.0 // Exceeds 100%
+            'percentage_score' => 150.0, // Exceeds 100%
         ];
 
         $response = $this->actingAs($this->lecturer)

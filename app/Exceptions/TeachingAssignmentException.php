@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 class TeachingAssignmentException extends Exception
 {
     protected string $errorCode;
+
     protected array $context;
 
     public function __construct(
@@ -86,9 +87,9 @@ class ScheduleConflictException extends TeachingAssignmentException
     {
         $conflictCount = count($conflicts);
         $message = "Schedule conflict detected for lecturer {$lecturerId} with course offering {$courseOfferingId}";
-        
+
         if ($conflictCount > 0) {
-            $message .= " ({$conflictCount} conflict" . ($conflictCount > 1 ? 's' : '') . ')';
+            $message .= " ({$conflictCount} conflict".($conflictCount > 1 ? 's' : '').')';
         }
 
         parent::__construct(
@@ -97,7 +98,7 @@ class ScheduleConflictException extends TeachingAssignmentException
             [
                 'lecturer_id' => $lecturerId,
                 'course_offering_id' => $courseOfferingId,
-                'conflicts' => $conflicts
+                'conflicts' => $conflicts,
             ]
         );
     }
@@ -108,7 +109,7 @@ class AssignmentConflictException extends TeachingAssignmentException
     public function __construct(int $courseOfferingId, ?int $currentLecturerId = null)
     {
         $message = "Assignment conflict for course offering {$courseOfferingId}";
-        
+
         if ($currentLecturerId) {
             $message .= " (currently assigned to lecturer {$currentLecturerId})";
         }
@@ -118,7 +119,7 @@ class AssignmentConflictException extends TeachingAssignmentException
             'ASSIGNMENT_CONFLICT',
             [
                 'course_offering_id' => $courseOfferingId,
-                'current_lecturer_id' => $currentLecturerId
+                'current_lecturer_id' => $currentLecturerId,
             ]
         );
     }

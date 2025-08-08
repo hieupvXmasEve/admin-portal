@@ -18,7 +18,7 @@ class SelectCampus extends Controller
         $campuses = $user->campuses->unique('id');
 
         return Inertia::render('SelectCampus', [
-            'campuses' => $campuses
+            'campuses' => $campuses,
         ]);
     }
 
@@ -46,7 +46,7 @@ class SelectCampus extends Controller
         } catch (\Exception $e) {
             Log::error('Error in setCurrentCampus:', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTrace()
+                'trace' => $e->getTrace(),
             ]);
 
             return back()->withErrors(['error' => 'Failed to set campus']);

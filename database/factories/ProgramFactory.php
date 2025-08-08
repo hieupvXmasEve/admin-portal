@@ -41,19 +41,17 @@ class ProgramFactory extends Factory
 
         return [
             'name' => $name,
-            'code' => strtoupper(substr(str_replace(' ', '', $name), 0, 6)) . $this->faker->unique()->numberBetween(100, 999),
+            'code' => strtoupper(substr(str_replace(' ', '', $name), 0, 6)).$this->faker->unique()->numberBetween(100, 999),
             'description' => $this->faker->sentence(),
         ];
     }
-
-
 
     /**
      * Create a computer science program.
      */
     public function computerScience(): static
     {
-        return $this->state(fn() => [
+        return $this->state(fn () => [
             'name' => 'Computer Science',
         ]);
     }
@@ -63,7 +61,7 @@ class ProgramFactory extends Factory
      */
     public function businessAdministration(): static
     {
-        return $this->state(fn() => [
+        return $this->state(fn () => [
             'name' => 'Business Administration',
         ]);
     }

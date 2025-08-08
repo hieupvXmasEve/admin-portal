@@ -12,9 +12,9 @@ use App\Models\Lecture;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
 {
@@ -24,7 +24,7 @@ class AuthController extends Controller
     public function login(LoginRequest $request): JsonResponse
     {
         // Rate limiting key
-        $key = 'lecturer-login:' . $request->ip();
+        $key = 'lecturer-login:'.$request->ip();
 
         // Check rate limiting
         // if (RateLimiter::tooManyAttempts($key, 5)) {
@@ -41,26 +41,26 @@ class AuthController extends Controller
         Log::debug('Raw password', ['value' => bin2hex($request->password)]);
         $hash = '$2y$12$K.2v568pEq8RvrFptjCAC.i0mz1Zcce2fGc1MGDfaQS5m3.6Omyty';
         Log::debug('check pass', [
-            'result' => Hash::check($request->password, $hash)
+            'result' => Hash::check($request->password, $hash),
         ]);
         Log::debug('Password match:', [
-            'result' => Hash::check($request->password, '$2y$12$zziCBIe4C97oqs4IT1Mp7u6xudoNnsjIbPiakbq7U/Ik4rUdYxdhm')
+            'result' => Hash::check($request->password, '$2y$12$zziCBIe4C97oqs4IT1Mp7u6xudoNnsjIbPiakbq7U/Ik4rUdYxdhm'),
         ]);
 
-        if (!$lecturer || !Hash::check($request->password, $lecturer->password ?? '')) {
+        if (! $lecturer || ! Hash::check($request->password, $lecturer->password ?? '')) {
             // RateLimiter::hit($key, 900); // 15 minutes
             return ApiResponse::authenticationError('Invalid credentials');
         }
 
         // Check if lecturer account is active
-        if (!$lecturer->is_active) {
+        if (! $lecturer->is_active) {
             return ApiResponse::authorizationError(
                 'Account is inactive. Please contact administration.'
             );
         }
 
         // Check employment status
-        if (!in_array($lecturer->employment_status, ['active', 'employed', 'contract_active'])) {
+        if (! in_array($lecturer->employment_status, ['active', 'employed', 'contract_active'])) {
             return ApiResponse::authorizationError(
                 'Account access restricted. Please contact HR.'
             );
@@ -79,7 +79,7 @@ class AuthController extends Controller
             'lecturer' => new LecturerResource($lecturer),
             'token' => $token,
             'token_type' => 'Bearer',
-            'expires_in' => config('sanctum.expiration', 525600) // minutes
+            'expires_in' => config('sanctum.expiration', 525600), // minutes
         ], 'Login successful');
     }
 
@@ -91,7 +91,7 @@ class AuthController extends Controller
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
 
-        if (!$lecturer) {
+        if (! $lecturer) {
             return ApiResponse::authenticationError('Invalid token');
         }
 
@@ -105,7 +105,7 @@ class AuthController extends Controller
             'lecturer' => new LecturerResource($lecturer),
             'token' => $token,
             'token_type' => 'Bearer',
-            'expires_in' => config('sanctum.expiration', 525600)
+            'expires_in' => config('sanctum.expiration', 525600),
         ], 'Token refreshed successfully');
     }
 
@@ -133,7 +133,7 @@ class AuthController extends Controller
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
 
-        if (!$lecturer) {
+        if (! $lecturer) {
             return ApiResponse::authenticationError('Invalid token');
         }
 
@@ -171,19 +171,19 @@ class AuthController extends Controller
 
             $googleUserData = $response->json();
 
-            if (!$googleUserData || !isset($googleUserData['email'])) {
+            if (! $googleUserData || ! isset($googleUserData['email'])) {
                 return ApiResponse::authenticationError('Unable to retrieve user information from Google');
             }
 
             // Check for lecturer account
             $lecturer = Lecture::where('email', $googleUserData['email'])->first();
 
-            if (!$lecturer) {
+            if (! $lecturer) {
                 return ApiResponse::notFoundError('No lecturer account found with this email. Please contact your administrator.');
             }
 
             // Update OAuth provider data if not set
-            if (!$lecturer->oauth_provider_id) {
+            if (! $lecturer->oauth_provider_id) {
                 $lecturer->update([
                     'oauth_provider' => 'google',
                     'oauth_provider_id' => $googleUserData['id'],
@@ -193,12 +193,12 @@ class AuthController extends Controller
             }
 
             // Check if lecturer account is active
-            if (!$lecturer->is_active) {
+            if (! $lecturer->is_active) {
                 return ApiResponse::authorizationError('Account is inactive. Please contact administration.');
             }
 
             // Check employment status
-            if (!in_array($lecturer->employment_status, ['active', 'employed', 'contract_active'])) {
+            if (! in_array($lecturer->employment_status, ['active', 'employed', 'contract_active'])) {
                 return ApiResponse::authorizationError('Account access restricted. Please contact HR.');
             }
 
@@ -213,11 +213,11 @@ class AuthController extends Controller
                 'lecturer' => new LecturerResource($lecturer),
                 'token' => $token,
                 'token_type' => 'Bearer',
-                'expires_in' => config('sanctum.expiration', 525600) // minutes
+                'expires_in' => config('sanctum.expiration', 525600), // minutes
             ], 'Google login successful');
 
         } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to authenticate with Google: ' . $e->getMessage());
+            return ApiResponse::serverError('Failed to authenticate with Google: '.$e->getMessage());
         }
     }
 }

@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
 use App\Models\Campus;
+use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Specialization;
-use App\Models\CurriculumVersion;
+use App\Models\Student;
 use App\Models\User;
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Faker\Factory as Faker;
 use Carbon\Carbon;
+use Faker\Factory as Faker;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class CreateActiveStudentsSeeder extends Seeder
 {
@@ -30,6 +29,7 @@ class CreateActiveStudentsSeeder extends Seeder
         $existingStudentsCount = Student::count();
         if ($existingStudentsCount >= 100) {
             $this->command->info("✅ Students already exist ({$existingStudentsCount} found). Skipping creation.");
+
             return;
         }
 
@@ -50,20 +50,21 @@ class CreateActiveStudentsSeeder extends Seeder
         for ($i = 1; $i <= 100; $i++) {
             // $campus = $campuses->random();
             $program = $programs->random();
-//            $specialization = $program->specializations->random();
+            //            $specialization = $program->specializations->random();
 
             // Find curriculum version for this program/specialization
             $curriculumVersion = $curriculumVersions->where('program_id', $program->id)
 //                ->where('specialization_id', $specialization->id)
                 ->first();
 
-            if (!$curriculumVersion) {
+            if (! $curriculumVersion) {
                 // Fallback to any curriculum version for this program
                 $curriculumVersion = $curriculumVersions->where('program_id', $program->id)->first();
             }
 
-            if (!$curriculumVersion) {
+            if (! $curriculumVersion) {
                 $this->command->warn("No curriculum version found for program {$program->name}, skipping student {$i}");
+
                 continue;
             }
 
@@ -72,7 +73,7 @@ class CreateActiveStudentsSeeder extends Seeder
             $firstName = $faker->firstName($gender);
             // generate unique last name with fallback
             $lastName = $faker->lastName;
-            $fullName = $firstName . ' ' . $lastName;
+            $fullName = $firstName.' '.$lastName;
 
             // Generate unique student ID based on campus and year
             $year = 2024;
@@ -84,11 +85,11 @@ class CreateActiveStudentsSeeder extends Seeder
             }
 
             // Generate unique email
-            $baseEmail = strtolower($firstName . '.' . $lastName . '@student.swinburne.edu.au');
+            $baseEmail = strtolower($firstName.'.'.$lastName.'@student.swinburne.edu.au');
             $email = $baseEmail;
             $counter = 1;
             while (User::where('email', $email)->exists() || Student::where('email', $email)->exists()) {
-                $email = strtolower($firstName . '.' . $lastName . $counter . '@student.swinburne.edu.au');
+                $email = strtolower($firstName.'.'.$lastName.$counter.'@student.swinburne.edu.au');
                 $counter++;
             }
 
@@ -117,7 +118,7 @@ class CreateActiveStudentsSeeder extends Seeder
                 'emergency_contact_name' => $faker->name,
                 'emergency_contact_phone' => $faker->phoneNumber,
                 'emergency_contact_relationship' => $faker->randomElement(['Parent', 'Guardian', 'Spouse', 'Sibling']),
-                'high_school_name' => $faker->company . ' High School',
+                'high_school_name' => $faker->company.' High School',
                 'high_school_graduation_year' => $faker->numberBetween(2020, 2024),
                 'entrance_exam_score' => $faker->randomFloat(2, 60, 100),
                 'admission_notes' => 'Admitted based on academic merit and entrance exam score.',
@@ -135,7 +136,7 @@ class CreateActiveStudentsSeeder extends Seeder
         }
 
         $this->command->info("✅ Successfully created {$createdCount} active students with user accounts!");
-        $this->command->info("📧 All students have user accounts with default password: password123");
+        $this->command->info('📧 All students have user accounts with default password: password123');
     }
 
     /**
@@ -173,7 +174,7 @@ class CreateActiveStudentsSeeder extends Seeder
      */
     private function generateStudentId(string $campusCode, int $year, int $sequence): string
     {
-        return $campusCode . $year . str_pad((string)$sequence, 3, '0', STR_PAD_LEFT);
+        return $campusCode.$year.str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -185,6 +186,7 @@ class CreateActiveStudentsSeeder extends Seeder
         while (Student::where('national_id', $nationalId)->exists()) {
             $nationalId = $faker->numerify('##########');
         }
+
         return $nationalId;
     }
 }

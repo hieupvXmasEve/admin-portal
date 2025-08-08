@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Models\Lecture;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
+use App\Models\Lecture;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

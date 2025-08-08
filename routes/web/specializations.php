@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Web\SpecializationController;
 use App\Constants\SpecializationRoutes;
+use App\Http\Controllers\Web\SpecializationController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {

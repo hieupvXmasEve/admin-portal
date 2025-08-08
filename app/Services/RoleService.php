@@ -10,8 +10,7 @@ class RoleService
     /**
      * Create a new role.
      *
-     * @param array $data Validated data.
-     * @return Role
+     * @param  array  $data  Validated data.
      */
     public function createRole(array $data): Role
     {
@@ -21,7 +20,7 @@ class RoleService
         Log::info('Creating a new role', $data);
         $role = Role::create($data);
 
-        if (!empty($permissions)) {
+        if (! empty($permissions)) {
             $role->permissions()->sync($permissions);
         }
 
@@ -31,9 +30,8 @@ class RoleService
     /**
      * Update an existing role.
      *
-     * @param Role $role The role to update.
-     * @param array $data Validated data.
-     * @return Role
+     * @param  Role  $role  The role to update.
+     * @param  array  $data  Validated data.
      */
     public function updateRole(Role $role, array $data): Role
     {
@@ -51,8 +49,7 @@ class RoleService
     /**
      * Delete a role.
      *
-     * @param Role $role The role to delete.
-     * @return void
+     * @param  Role  $role  The role to delete.
      */
     public function deleteRole(Role $role): void
     {

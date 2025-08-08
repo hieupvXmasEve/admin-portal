@@ -23,7 +23,7 @@ return new class extends Migration
                 'excused',
                 'partial', // For sessions where student left early or arrived very late
                 'medical_leave',
-                'official_leave'
+                'official_leave',
             ])->default('absent');
 
             // Timing details
@@ -40,7 +40,7 @@ return new class extends Migration
                 'biometric',
                 'mobile_app',
                 'online_participation',
-                'auto_system'
+                'auto_system',
             ])->default('manual');
 
             // Additional details
@@ -54,7 +54,7 @@ return new class extends Migration
                 'good',
                 'average',
                 'poor',
-                'none'
+                'none',
             ])->nullable();
 
             $table->decimal('participation_score', 3, 1)->nullable(); // Out of 10

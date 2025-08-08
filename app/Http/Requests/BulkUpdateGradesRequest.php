@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Models\AssessmentComponentDetailScore;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use App\Models\AssessmentComponentDetailScore;
 
 class BulkUpdateGradesRequest extends FormRequest
 {
@@ -28,86 +28,86 @@ class BulkUpdateGradesRequest extends FormRequest
                 'required',
                 'array',
                 'min:1',
-                'max:100' // Reasonable limit for bulk operations
+                'max:100', // Reasonable limit for bulk operations
             ],
             'scores.*.id' => [
                 'required',
                 'integer',
-                'exists:assessment_component_detail_scores,id'
+                'exists:assessment_component_detail_scores,id',
             ],
             'scores.*.points_earned' => [
                 'sometimes',
                 'numeric',
-                'min:0'
+                'min:0',
             ],
             'scores.*.percentage_score' => [
                 'sometimes',
                 'numeric',
                 'min:0',
-                'max:100'
+                'max:100',
             ],
             'scores.*.letter_grade' => [
                 'sometimes',
                 'string',
                 'max:5',
-                Rule::in(['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F', 'I', 'W', 'P', 'NP'])
+                Rule::in(['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F', 'I', 'W', 'P', 'NP']),
             ],
             'scores.*.status' => [
                 'sometimes',
-                Rule::in(['not_submitted', 'submitted', 'grading', 'graded', 'returned'])
+                Rule::in(['not_submitted', 'submitted', 'grading', 'graded', 'returned']),
             ],
             'scores.*.score_status' => [
                 'sometimes',
-                Rule::in(['draft', 'provisional', 'final'])
+                Rule::in(['draft', 'provisional', 'final']),
             ],
             'scores.*.instructor_feedback' => [
                 'sometimes',
                 'string',
-                'max:1000'
+                'max:1000',
             ],
             'scores.*.private_notes' => [
                 'sometimes',
                 'string',
-                'max:1000'
+                'max:1000',
             ],
             'scores.*.bonus_points' => [
                 'sometimes',
                 'numeric',
                 'min:0',
-                'max:100'
+                'max:100',
             ],
             'scores.*.bonus_reason' => [
                 'sometimes',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'scores.*.score_excluded' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'scores.*.exclusion_reason' => [
                 'sometimes',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'scores.*.late_excuse_approved' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'scores.*.plagiarism_suspected' => [
                 'sometimes',
-                'boolean'
+                'boolean',
             ],
             'scores.*.plagiarism_score' => [
                 'sometimes',
                 'numeric',
                 'min:0',
-                'max:100'
+                'max:100',
             ],
             'scores.*.integrity_status' => [
                 'sometimes',
-                Rule::in(['clean', 'flagged', 'under_review', 'violation_confirmed', 'cleared'])
-            ]
+                Rule::in(['clean', 'flagged', 'under_review', 'violation_confirmed', 'cleared']),
+            ],
         ];
     }
 
@@ -129,7 +129,7 @@ class BulkUpdateGradesRequest extends FormRequest
             'scores.*.letter_grade.in' => 'Invalid letter grade provided',
             'scores.*.status.in' => 'Invalid submission status',
             'scores.*.score_status.in' => 'Invalid score status',
-            'scores.*.instructor_feedback.max' => 'Instructor feedback cannot exceed 1000 characters'
+            'scores.*.instructor_feedback.max' => 'Instructor feedback cannot exceed 1000 characters',
         ];
     }
 
@@ -152,7 +152,7 @@ class BulkUpdateGradesRequest extends FormRequest
                 $invalidScores = $scoreIds->diff($validScores);
 
                 if ($invalidScores->isNotEmpty()) {
-                    $validator->errors()->add('scores', 'Some scores do not belong to this course offering: ' . $invalidScores->implode(', '));
+                    $validator->errors()->add('scores', 'Some scores do not belong to this course offering: '.$invalidScores->implode(', '));
                 }
 
                 // Validate individual score constraints
@@ -184,7 +184,7 @@ class BulkUpdateGradesRequest extends FormRequest
 
                             // Validate required fields for final scores
                             if (isset($scoreData['score_status']) && $scoreData['score_status'] === 'final') {
-                                if (!isset($scoreData['points_earned']) && !isset($scoreData['percentage_score'])) {
+                                if (! isset($scoreData['points_earned']) && ! isset($scoreData['percentage_score'])) {
                                     $validator->errors()->add(
                                         "scores.{$index}.score_status",
                                         'Final scores must have either points earned or percentage score'

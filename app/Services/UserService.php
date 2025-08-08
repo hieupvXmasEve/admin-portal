@@ -12,13 +12,12 @@ class UserService
     /**
      * Create a new user.
      *
-     * @param array $data Validated data.
-     * @return User
+     * @param  array  $data  Validated data.
      */
     public function createUser(array $data): User
     {
         $userData = collect($data)->except('selectedRoles')->toArray();
-        if (!empty($userData['password'])) {
+        if (! empty($userData['password'])) {
             $userData['password'] = Hash::make($userData['password']);
         }
 
@@ -35,15 +34,14 @@ class UserService
     /**
      * Update an existing user.
      *
-     * @param User $user The user to update.
-     * @param array $data Validated data.
-     * @return User
+     * @param  User  $user  The user to update.
+     * @param  array  $data  Validated data.
      */
     public function updateUser(User $user, array $data): User
     {
         $userData = collect($data)->except('selectedRoles')->toArray();
         Log::info('Updating user', ['userData' => $userData]);
-        if (!empty($userData['password'])) {
+        if (! empty($userData['password'])) {
             $userData['password'] = Hash::make($userData['password']);
         } else {
             unset($userData['password']);
@@ -61,15 +59,11 @@ class UserService
 
     /**
      * Sync roles for a user on the current campus.
-     *
-     * @param User $user
-     * @param array $roleIds
-     * @return void
      */
     public function syncCampusRoles(User $user, array $roleIds): void
     {
         $currentCampusId = session('current_campus_id');
-        if (!$currentCampusId) {
+        if (! $currentCampusId) {
             return;
         }
 
@@ -81,7 +75,7 @@ class UserService
 
         // Validate that all role IDs exist in the roles table
         $validRoleIds = [];
-        if (!empty($roleIds)) {
+        if (! empty($roleIds)) {
             $validRoleIds = Role::whereIn('id', $roleIds)->pluck('id')->toArray();
 
             if (empty($validRoleIds)) {
@@ -96,7 +90,7 @@ class UserService
         $rolesToAdd = array_diff($validRoleIds, $existingRoleIds);
 
         // Remove roles that are no longer selected
-        if (!empty($rolesToRemove)) {
+        if (! empty($rolesToRemove)) {
             \App\Models\CampusUserRole::where('user_id', $user->id)
                 ->where('campus_id', $currentCampusId)
                 ->whereIn('role_id', $rolesToRemove)
@@ -104,7 +98,7 @@ class UserService
         }
 
         // Add new roles
-        if (!empty($rolesToAdd)) {
+        if (! empty($rolesToAdd)) {
             $rolesToSync = [];
             foreach ($rolesToAdd as $roleId) {
                 $rolesToSync[] = [
@@ -123,8 +117,7 @@ class UserService
     /**
      * Delete a user.
      *
-     * @param User $user The user to delete.
-     * @return void
+     * @param  User  $user  The user to delete.
      */
     public function deleteUser(User $user): void
     {

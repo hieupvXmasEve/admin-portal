@@ -94,11 +94,11 @@ class ExportAssessmentRequest extends FormRequest
         ]);
 
         // Set default values for other fields
-        if (!$this->has('score_status')) {
+        if (! $this->has('score_status')) {
             $this->merge(['score_status' => 'final']);
         }
 
-        if (!$this->has('page_orientation')) {
+        if (! $this->has('page_orientation')) {
             $this->merge(['page_orientation' => 'landscape']);
         }
     }

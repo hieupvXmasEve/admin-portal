@@ -63,7 +63,7 @@ class ClassSessionService
             $lectureId = $courseOffering->lecture_id;
 
             Log::info("Lecture ID: {$lectureId}");
-            Log::info("Schedule: {$startDate}, Days: " . implode(',', $scheduleDays) . ", Time: {$startTime}-{$endTime}");
+            Log::info("Schedule: {$startDate}, Days: ".implode(',', $scheduleDays).", Time: {$startTime}-{$endTime}");
 
             $sessions = collect();
 
@@ -100,8 +100,8 @@ class ClassSessionService
 
             return $sessions;
         } catch (\Exception $e) {
-            Log::error("Error generating class sessions for course offering {$courseOffering->id}: " . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error("Error generating class sessions for course offering {$courseOffering->id}: ".$e->getMessage());
+            Log::error('Stack trace: '.$e->getTraceAsString());
             throw $e;
         }
     }
@@ -155,7 +155,7 @@ class ClassSessionService
             if (in_array($currentDate->dayOfWeek, $dayNumbers)) {
                 $sessionData = [
                     'course_offering_id' => $courseOffering->id,
-                    'session_title' => 'Session ' . ($sessionCount + 1),
+                    'session_title' => 'Session '.($sessionCount + 1),
                     'session_description' => 'Regular class session',
                     'session_date' => $currentDate->toDateString(),
                     'start_time' => $currentDate->copy()->setTimeFromTimeString($startTime),
@@ -224,8 +224,8 @@ class ClassSessionService
 
             $sessionData = [
                 'course_offering_id' => $courseOffering->id,
-                'session_title' => $component->name . ' Assessment',
-                'session_description' => 'Assessment session for ' . $component->name,
+                'session_title' => $component->name.' Assessment',
+                'session_description' => 'Assessment session for '.$component->name,
                 'session_date' => $assessmentDate->toDateString(),
                 'start_time' => $assessmentDate->copy()->setTimeFromTimeString($startTime),
                 'end_time' => $assessmentDate->copy()->setTimeFromTimeString($endTime),

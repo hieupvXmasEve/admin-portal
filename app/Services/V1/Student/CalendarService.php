@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
-use App\Models\Semester;
 use App\Models\AcademicCalendarEvent;
 use App\Models\AssessmentComponentDetailScore;
+use App\Models\Semester;
+use App\Models\Student;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Carbon\Carbon;
 
 class CalendarService
 {
@@ -95,7 +95,7 @@ class CalendarService
         return Cache::remember($cacheKey, 1800, function () use ($student) {
             $currentSemester = $this->getCurrentSemesterForStudent($student);
 
-            if (!$currentSemester) {
+            if (! $currentSemester) {
                 return [
                     'current_semester' => null,
                     'message' => 'No active semester found',
@@ -151,7 +151,7 @@ class CalendarService
     {
         return $semesters->where('start_date', '>', now())
             ->take(3)
-            ->map(fn($semester) => $this->formatSemester($semester))
+            ->map(fn ($semester) => $this->formatSemester($semester))
             ->values()
             ->toArray();
     }
@@ -163,7 +163,7 @@ class CalendarService
     {
         return $semesters->where('end_date', '<', now())
             ->take(5)
-            ->map(fn($semester) => $this->formatSemester($semester))
+            ->map(fn ($semester) => $this->formatSemester($semester))
             ->values()
             ->toArray();
     }
@@ -173,7 +173,7 @@ class CalendarService
      */
     protected function formatSemesters(Collection $semesters): array
     {
-        return $semesters->map(fn($semester) => $this->formatSemester($semester))->toArray();
+        return $semesters->map(fn ($semester) => $this->formatSemester($semester))->toArray();
     }
 
     /**
@@ -348,7 +348,7 @@ class CalendarService
         }
 
         // Sort by date and take next 10
-        usort($deadlines, fn($a, $b) => strcmp($a['date'], $b['date']));
+        usort($deadlines, fn ($a, $b) => strcmp($a['date'], $b['date']));
 
         return array_slice($deadlines, 0, 10);
     }
@@ -559,6 +559,7 @@ class CalendarService
     protected function isRegistrationOpen(Semester $semester): bool
     {
         $now = now();
+
         return $semester->registration_start_date &&
             $semester->registration_end_date &&
             $now >= $semester->registration_start_date &&

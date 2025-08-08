@@ -1,11 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\ElectiveController;
+use App\Http\Controllers\Web\CurriculumVersionController;
+use App\Http\Controllers\Web\SelectCampus;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\Web\SelectCampus;
-use App\Http\Controllers\Web\CurriculumVersionController;
-use App\Http\Controllers\Api\ElectiveController;
-
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -14,7 +13,6 @@ Route::get('/', function () {
 Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
-
 
 Route::middleware(['auth'])->group(callback: function () {
     Route::get('select-campus', [SelectCampus::class, 'index'])->name('select-campus.index');
@@ -61,31 +59,31 @@ Route::get('/health', function () {
     return response()->json([
         'status' => 'ok',
         'timestamp' => now()->toISOString(),
-        'version' => '1.0.0'
+        'version' => '1.0.0',
     ]);
 });
-require __DIR__ . '/web/settings.php';
-require __DIR__ . '/web/auth.php';
-require __DIR__ . '/web/user.php';
-require __DIR__ . '/web/role.php';
-require __DIR__ . '/web/semester.php';
-require __DIR__ . '/web/units.php';
-require __DIR__ . '/web/syllabus.php';
-require __DIR__ . '/web/programs.php';
-require __DIR__ . '/web/specializations.php';
-require __DIR__ . '/web/curriculum.php';
-require __DIR__ . '/web/course-offerings.php';
-require __DIR__ . '/web/course-registrations.php';
-require __DIR__ . '/web/campuses.php';
-require __DIR__ . '/web/rooms.php';
-require __DIR__ . '/web/lectures.php';
-require __DIR__ . '/web/teaching-assignments.php';
-require __DIR__ . '/web/student-management.php';
-require __DIR__ . '/web/class-sessions.php';
-require __DIR__ . '/web/attendance.php';
-require __DIR__ . '/web/class-schedule.php';
-require __DIR__ . '/web/student-application.php';
-require __DIR__ . '/web/systems.php';
+require __DIR__.'/web/settings.php';
+require __DIR__.'/web/auth.php';
+require __DIR__.'/web/user.php';
+require __DIR__.'/web/role.php';
+require __DIR__.'/web/semester.php';
+require __DIR__.'/web/units.php';
+require __DIR__.'/web/syllabus.php';
+require __DIR__.'/web/programs.php';
+require __DIR__.'/web/specializations.php';
+require __DIR__.'/web/curriculum.php';
+require __DIR__.'/web/course-offerings.php';
+require __DIR__.'/web/course-registrations.php';
+require __DIR__.'/web/campuses.php';
+require __DIR__.'/web/rooms.php';
+require __DIR__.'/web/lectures.php';
+require __DIR__.'/web/teaching-assignments.php';
+require __DIR__.'/web/student-management.php';
+require __DIR__.'/web/class-sessions.php';
+require __DIR__.'/web/attendance.php';
+require __DIR__.'/web/class-schedule.php';
+require __DIR__.'/web/student-application.php';
+require __DIR__.'/web/systems.php';
 
 // Admin Schedule API routes (using web auth for SPA)
 Route::middleware(['auth', 'verified'])->name('api.admin.')->group(function () {

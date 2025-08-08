@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\Student\AuthController;
-use App\Http\Controllers\Api\V1\Student\DashboardController;
-use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
-use App\Http\Controllers\Api\V1\Student\TimetableController;
-use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\AttendanceController;
-use App\Http\Controllers\Api\V1\Student\ProfileController;
-use App\Http\Controllers\Api\V1\Student\CurriculumController;
-use App\Http\Controllers\Api\V1\Student\NotificationController;
+use App\Http\Controllers\Api\V1\Student\AuthController;
 use App\Http\Controllers\Api\V1\Student\CalendarController;
+use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
+use App\Http\Controllers\Api\V1\Student\CurriculumController;
+use App\Http\Controllers\Api\V1\Student\DashboardController;
+use App\Http\Controllers\Api\V1\Student\GradeController;
+use App\Http\Controllers\Api\V1\Student\NotificationController;
+use App\Http\Controllers\Api\V1\Student\ProfileController;
+use App\Http\Controllers\Api\V1\Student\TimetableController;
 use Illuminate\Support\Facades\Route;
 
 // Public authentication routes
@@ -34,7 +34,7 @@ Route::middleware([
     'auth:sanctum',
     'student.api.auth',
     'student.api.rate:student-api',
-    'api.logging'
+    'api.logging',
 ])->group(function () {
 
     // Authentication management

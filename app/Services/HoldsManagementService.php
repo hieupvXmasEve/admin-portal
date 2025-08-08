@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Student;
 use App\Models\AcademicHold;
-use App\Models\User;
-use Illuminate\Support\Facades\DB;
+use App\Models\Student;
 use Exception;
+use Illuminate\Support\Facades\DB;
 
 class HoldsManagementService
 {
@@ -47,10 +46,10 @@ class HoldsManagementService
     /**
      * Resolve a hold
      */
-    public function resolveHold(AcademicHold $hold, int $resolvedByUserId, string $notes = null): bool
+    public function resolveHold(AcademicHold $hold, int $resolvedByUserId, ?string $notes = null): bool
     {
         return DB::transaction(function () use ($hold, $resolvedByUserId, $notes) {
-            if (!$hold->isActive()) {
+            if (! $hold->isActive()) {
                 throw new Exception('Hold is not active and cannot be resolved');
             }
 
@@ -67,10 +66,10 @@ class HoldsManagementService
     /**
      * Waive a hold
      */
-    public function waiveHold(AcademicHold $hold, int $resolvedByUserId, string $notes = null): bool
+    public function waiveHold(AcademicHold $hold, int $resolvedByUserId, ?string $notes = null): bool
     {
         return DB::transaction(function () use ($hold, $resolvedByUserId, $notes) {
-            if (!$hold->isActive()) {
+            if (! $hold->isActive()) {
                 throw new Exception('Hold is not active and cannot be waived');
             }
 
@@ -87,7 +86,7 @@ class HoldsManagementService
     /**
      * Get all holds for a student
      */
-    public function getStudentHolds(Student $student, string $status = null): array
+    public function getStudentHolds(Student $student, ?string $status = null): array
     {
         $query = AcademicHold::with(['placedByUser', 'resolvedByUser'])
             ->where('student_code', $student->id);
@@ -117,7 +116,7 @@ class HoldsManagementService
     /**
      * Check if student has any active holds
      */
-    public function hasActiveHolds(Student $student, string $category = null): bool
+    public function hasActiveHolds(Student $student, ?string $category = null): bool
     {
         $query = AcademicHold::where('student_code', $student->id)->active();
 
@@ -202,7 +201,7 @@ class HoldsManagementService
     /**
      * Get holds summary for dashboard
      */
-    public function getHoldsSummary(int $campusId = null): array
+    public function getHoldsSummary(?int $campusId = null): array
     {
         $query = AcademicHold::query();
 
@@ -228,7 +227,7 @@ class HoldsManagementService
     /**
      * Get students with active holds
      */
-    public function getStudentsWithHolds(int $campusId = null, string $holdType = null): array
+    public function getStudentsWithHolds(?int $campusId = null, ?string $holdType = null): array
     {
         $query = Student::with(['academicHolds' => function ($q) use ($holdType) {
             $q->active();
@@ -259,7 +258,7 @@ class HoldsManagementService
     /**
      * Bulk resolve holds
      */
-    public function bulkResolveHolds(array $holdIds, int $resolvedByUserId, string $notes = null): int
+    public function bulkResolveHolds(array $holdIds, int $resolvedByUserId, ?string $notes = null): int
     {
         $resolvedCount = 0;
 
@@ -281,7 +280,7 @@ class HoldsManagementService
     /**
      * Log hold actions for audit trail
      */
-    private function logHoldAction(AcademicHold $hold, string $action, int $userId = null): void
+    private function logHoldAction(AcademicHold $hold, string $action, ?int $userId = null): void
     {
         // TODO: Implement logging to audit table or log file
         // This would record all hold-related actions for compliance and tracking

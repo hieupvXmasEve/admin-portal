@@ -28,12 +28,12 @@ class StoreAssessmentRequest extends FormRequest
             'syllabus_id' => [
                 'required',
                 'integer',
-                'exists:syllabus,id'
+                'exists:syllabus,id',
             ],
             'name' => [
                 'required',
                 'string',
-                'max:100'
+                'max:100',
             ],
             'code' => [
                 'nullable',
@@ -41,127 +41,127 @@ class StoreAssessmentRequest extends FormRequest
                 'max:20',
                 Rule::unique('assessment_components')->where(function ($query) {
                     return $query->where('syllabus_id', $this->input('syllabus_id'));
-                })
+                }),
             ],
             'description' => [
                 'nullable',
-                'string'
+                'string',
             ],
             'weight' => [
                 'required',
                 'numeric',
                 'min:0.01',
                 'max:100',
-                'decimal:0,2'
+                'decimal:0,2',
             ],
             'type' => [
                 'required',
                 'string',
-                Rule::in(array_keys(AssessmentComponent::TYPES))
+                Rule::in(array_keys(AssessmentComponent::TYPES)),
             ],
             'is_required_to_sit_final_exam' => [
-                'boolean'
+                'boolean',
             ],
             'due_date' => [
                 'nullable',
                 'date',
-                'after:now'
+                'after:now',
             ],
             'available_from' => [
                 'nullable',
                 'date',
-                'before_or_equal:due_date'
+                'before_or_equal:due_date',
             ],
             'late_submission_deadline' => [
                 'nullable',
                 'date',
-                'after:due_date'
+                'after:due_date',
             ],
             'late_penalty_percentage' => [
                 'numeric',
                 'min:0',
                 'max:100',
-                'decimal:0,2'
+                'decimal:0,2',
             ],
             'late_penalty_type' => [
                 'string',
-                Rule::in(['per_day', 'per_hour', 'fixed', 'none'])
+                Rule::in(['per_day', 'per_hour', 'fixed', 'none']),
             ],
             'submission_type' => [
                 'string',
-                Rule::in(['online', 'in_person', 'both', 'no_submission'])
+                Rule::in(['online', 'in_person', 'both', 'no_submission']),
             ],
             'allowed_file_types' => [
                 'nullable',
-                'array'
+                'array',
             ],
             'allowed_file_types.*' => [
                 'string',
-                'max:10'
+                'max:10',
             ],
             'max_file_size_mb' => [
                 'nullable',
                 'integer',
                 'min:1',
-                'max:1024'
+                'max:1024',
             ],
             'max_submissions' => [
                 'integer',
                 'min:1',
-                'max:10'
+                'max:10',
             ],
             'allow_resubmission' => [
-                'boolean'
+                'boolean',
             ],
             'is_group_work' => [
-                'boolean'
+                'boolean',
             ],
             'min_group_size' => [
                 'nullable',
                 'integer',
                 'min:1',
-                'required_if:is_group_work,true'
+                'required_if:is_group_work,true',
             ],
             'max_group_size' => [
                 'nullable',
                 'integer',
                 'min:1',
                 'gte:min_group_size',
-                'required_if:is_group_work,true'
+                'required_if:is_group_work,true',
             ],
             'students_form_groups' => [
-                'boolean'
+                'boolean',
             ],
             'assessment_criteria' => [
                 'nullable',
-                'array'
+                'array',
             ],
             'grading_instructions' => [
                 'nullable',
-                'string'
+                'string',
             ],
             'is_published' => [
-                'boolean'
+                'boolean',
             ],
             'scores_published' => [
-                'boolean'
+                'boolean',
             ],
             'is_extra_credit' => [
-                'boolean'
+                'boolean',
             ],
             'status' => [
                 'string',
-                Rule::in(['draft', 'published', 'in_progress', 'grading', 'completed', 'cancelled'])
+                Rule::in(['draft', 'published', 'in_progress', 'grading', 'completed', 'cancelled']),
             ],
             'sort_order' => [
                 'integer',
-                'min:0'
+                'min:0',
             ],
             'category' => [
                 'nullable',
                 'string',
-                'max:50'
-            ]
+                'max:50',
+            ],
         ];
     }
 
@@ -193,7 +193,7 @@ class StoreAssessmentRequest extends FormRequest
             'max_submissions.max' => 'Maximum submissions cannot exceed 10.',
             'min_group_size.required_if' => 'Minimum group size is required for group work.',
             'max_group_size.required_if' => 'Maximum group size is required for group work.',
-            'max_group_size.gte' => 'Maximum group size must be greater than or equal to minimum group size.'
+            'max_group_size.gte' => 'Maximum group size must be greater than or equal to minimum group size.',
         ];
     }
 
@@ -215,7 +215,7 @@ class StoreAssessmentRequest extends FormRequest
             'scores_published' => $this->boolean('scores_published', false),
             'is_extra_credit' => $this->boolean('is_extra_credit', false),
             'status' => $this->input('status', 'draft'),
-            'sort_order' => $this->input('sort_order', 0)
+            'sort_order' => $this->input('sort_order', 0),
         ]);
     }
 
@@ -237,7 +237,7 @@ class StoreAssessmentRequest extends FormRequest
         $syllabusId = $this->input('syllabus_id');
         $newWeight = (float) $this->input('weight');
 
-        if (!$syllabusId || !$newWeight) {
+        if (! $syllabusId || ! $newWeight) {
             return;
         }
 

@@ -28,76 +28,76 @@ class UpdateSessionRequest extends FormRequest
             'session_title' => [
                 'sometimes',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'session_description' => [
                 'sometimes',
                 'nullable',
                 'string',
-                'max:1000'
+                'max:1000',
             ],
             'session_date' => [
                 'sometimes',
                 'date',
-                'after_or_equal:today'
+                'after_or_equal:today',
             ],
             'start_time' => [
                 'sometimes',
-                'date_format:H:i'
+                'date_format:H:i',
             ],
             'end_time' => [
                 'sometimes',
-                'date_format:H:i'
+                'date_format:H:i',
             ],
             'session_type' => [
                 'sometimes',
                 'string',
-                'in:lecture,tutorial,lab,seminar,workshop,exam,assessment'
+                'in:lecture,tutorial,lab,seminar,workshop,exam,assessment',
             ],
             'delivery_mode' => [
                 'sometimes',
                 'string',
-                'in:in_person,online,hybrid,blended'
+                'in:in_person,online,hybrid,blended',
             ],
             'room_id' => [
                 'sometimes',
                 'nullable',
                 'integer',
-                'exists:rooms,id'
+                'exists:rooms,id',
             ],
             'learning_objectives' => [
                 'sometimes',
                 'nullable',
-                'array'
+                'array',
             ],
             'learning_objectives.*' => [
                 'string',
-                'max:500'
+                'max:500',
             ],
             'topics_covered' => [
                 'sometimes',
                 'nullable',
-                'array'
+                'array',
             ],
             'topics_covered.*' => [
                 'string',
-                'max:255'
+                'max:255',
             ],
             'required_materials' => [
                 'sometimes',
                 'nullable',
-                'array'
+                'array',
             ],
             'required_materials.*' => [
                 'string',
-                'max:255'
+                'max:255',
             ],
             'preparation_notes' => [
                 'sometimes',
                 'nullable',
                 'string',
-                'max:2000'
-            ]
+                'max:2000',
+            ],
         ];
     }
 
@@ -122,7 +122,7 @@ class UpdateSessionRequest extends FormRequest
             'topics_covered.*.max' => 'Each topic must not exceed 255 characters',
             'required_materials.array' => 'Required materials must be an array',
             'required_materials.*.max' => 'Each required material must not exceed 255 characters',
-            'preparation_notes.max' => 'Preparation notes must not exceed 2000 characters'
+            'preparation_notes.max' => 'Preparation notes must not exceed 2000 characters',
         ];
     }
 
@@ -150,18 +150,19 @@ class UpdateSessionRequest extends FormRequest
                 try {
                     $start = \Carbon\Carbon::createFromFormat('H:i', $this->start_time);
                     $end = \Carbon\Carbon::createFromFormat('H:i', $this->end_time);
-                    
+
                     if ($end->lte($start)) {
                         $validator->errors()->add('end_time', 'End time must be after start time');
+
                         return;
                     }
-                    
+
                     $duration = $start->diffInMinutes($end);
-                    
+
                     if ($duration < 15) {
                         $validator->errors()->add('end_time', 'Session must be at least 15 minutes long');
                     }
-                    
+
                     if ($duration > 480) { // 8 hours
                         $validator->errors()->add('end_time', 'Session cannot be longer than 8 hours');
                     }

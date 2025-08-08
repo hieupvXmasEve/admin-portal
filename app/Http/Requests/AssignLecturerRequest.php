@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class AssignLecturerRequest extends FormRequest
 {
@@ -26,17 +25,17 @@ class AssignLecturerRequest extends FormRequest
             'course_offering_id' => [
                 'required',
                 'integer',
-                'exists:course_offerings,id'
+                'exists:course_offerings,id',
             ],
             'lecturer_id' => [
                 'required',
                 'integer',
-                'exists:lectures,id'
+                'exists:lectures,id',
             ],
             'force_assignment' => [
                 'sometimes',
-                'boolean'
-            ]
+                'boolean',
+            ],
         ];
     }
 
@@ -79,12 +78,12 @@ class AssignLecturerRequest extends FormRequest
 
                 if ($lecturer && $courseOffering) {
                     // Check if lecturer is available for assignment
-                    if (!$lecturer->isAvailableForAssignment()) {
+                    if (! $lecturer->isAvailableForAssignment()) {
                         $validator->errors()->add('lecturer_id', 'The selected lecturer is not available for assignment.');
                     }
 
                     // Check for schedule conflicts unless force assignment is enabled
-                    if (!$this->boolean('force_assignment') && $lecturer->hasScheduleConflictWith($courseOffering)) {
+                    if (! $this->boolean('force_assignment') && $lecturer->hasScheduleConflictWith($courseOffering)) {
                         $validator->errors()->add('lecturer_id', 'The selected lecturer has schedule conflicts with this course offering.');
                     }
                 }

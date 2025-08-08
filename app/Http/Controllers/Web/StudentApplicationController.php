@@ -45,10 +45,10 @@ class StudentApplicationController extends Controller
         // Apply search filter
         if ($filters['search']) {
             $query->where(function ($q) use ($filters) {
-                $q->where('full_name', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('email', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('national_id', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
+                $q->where('full_name', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('email', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('national_id', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('phone', 'like', '%'.$filters['search'].'%');
             });
         }
 
@@ -300,14 +300,14 @@ class StudentApplicationController extends Controller
         $validator = Validator::make($request->all(), [
             'application_ids' => 'required|array|min:1',
             'application_ids.*' => 'required|integer|exists:student_applications,id',
-            'status' => 'required|in:pending,reviewed,approved,rejected'
+            'status' => 'required|in:pending,reviewed,approved,rejected',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -325,13 +325,13 @@ class StudentApplicationController extends Controller
                 'message' => "Successfully updated status for {$updated} application(s)",
                 'data' => [
                     'updated_count' => $updated,
-                    'new_status' => $newStatus
-                ]
+                    'new_status' => $newStatus,
+                ],
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update application statuses: ' . $e->getMessage()
+                'message' => 'Failed to update application statuses: '.$e->getMessage(),
             ], 500);
         }
     }

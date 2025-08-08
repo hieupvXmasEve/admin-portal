@@ -25,13 +25,13 @@ class AttendanceSessionResource extends JsonResource
             'session_type' => $this->session_type,
             'delivery_mode' => $this->delivery_mode,
             'status' => $this->status,
-            
+
             // Attendance Information
             'attendance_marked' => $this->attendance_marked,
             'attendance_percentage' => $this->attendance_percentage,
             'expected_attendees' => $this->expected_attendees,
             'actual_attendees' => $this->actual_attendees,
-            
+
             // Course Information
             'course' => $this->whenLoaded('courseOffering', function () {
                 return [
@@ -47,7 +47,7 @@ class AttendanceSessionResource extends JsonResource
                     ]),
                 ];
             }),
-            
+
             // Attendance Statistics
             'attendance_stats' => $this->whenLoaded('attendances', function () {
                 $attendances = $this->attendances;
@@ -55,7 +55,7 @@ class AttendanceSessionResource extends JsonResource
                 $present = $attendances->whereIn('status', ['present', 'late'])->count();
                 $absent = $attendances->where('status', 'absent')->count();
                 $excused = $attendances->where('status', 'excused')->count();
-                
+
                 return [
                     'total_marked' => $total,
                     'present' => $present,
@@ -64,7 +64,7 @@ class AttendanceSessionResource extends JsonResource
                     'attendance_rate' => $total > 0 ? round(($present / $total) * 100, 1) : 0,
                 ];
             }),
-            
+
             // Status Indicators
             'status_indicators' => [
                 'needs_attention' => $this->needsAttention(),
@@ -73,7 +73,7 @@ class AttendanceSessionResource extends JsonResource
                 'is_upcoming' => $this->isUpcoming(),
                 'priority' => $this->getPriority(),
             ],
-            
+
             // Quick Actions
             'actions' => [
                 'can_mark_attendance' => $this->canMarkAttendance(),
@@ -81,7 +81,7 @@ class AttendanceSessionResource extends JsonResource
                 'can_view_details' => true,
                 'can_export_attendance' => $this->attendance_marked,
             ],
-            
+
             // Time Information
             'time_info' => [
                 'is_today' => $this->session_date->isToday(),
@@ -91,7 +91,7 @@ class AttendanceSessionResource extends JsonResource
                 'formatted_date' => $this->session_date->format('M d, Y'),
                 'relative_date' => $this->session_date->diffForHumans(),
             ],
-            
+
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
@@ -106,15 +106,15 @@ class AttendanceSessionResource extends JsonResource
         // Session needs attention if:
         // 1. Attendance not marked and session is completed or overdue
         // 2. Low attendance rate (if marked)
-        
-        if (!$this->attendance_marked && $this->isOverdue()) {
+
+        if (! $this->attendance_marked && $this->isOverdue()) {
             return true;
         }
-        
+
         if ($this->attendance_marked && $this->attendance_percentage < 60) {
             return true;
         }
-        
+
         return false;
     }
 
@@ -123,7 +123,7 @@ class AttendanceSessionResource extends JsonResource
      */
     protected function isOverdue(): bool
     {
-        return !$this->attendance_marked && 
+        return ! $this->attendance_marked &&
                $this->session_date->lt(now()->subHours(2)) &&
                in_array($this->status, ['completed', 'in_progress']);
     }
@@ -150,7 +150,7 @@ class AttendanceSessionResource extends JsonResource
      */
     protected function canEditSession(): bool
     {
-        return $this->session_date->isFuture() || 
+        return $this->session_date->isFuture() ||
                ($this->session_date->isToday() && $this->start_time->gt(now()));
     }
 
@@ -162,15 +162,15 @@ class AttendanceSessionResource extends JsonResource
         if ($this->needsAttention()) {
             return 'high';
         }
-        
+
         if ($this->isUpcoming() && $this->session_date->isToday()) {
             return 'medium';
         }
-        
+
         if ($this->isUpcoming() && $this->session_date->isTomorrow()) {
             return 'medium';
         }
-        
+
         return 'low';
     }
 }

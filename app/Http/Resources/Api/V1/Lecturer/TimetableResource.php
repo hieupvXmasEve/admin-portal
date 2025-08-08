@@ -21,9 +21,9 @@ class TimetableResource extends JsonResource
                 'view' => $this->resource['period']['view'],
                 'formatted_period' => $this->getFormattedPeriod(),
             ],
-            
+
             'sessions' => $this->formatSessionsForView(),
-            
+
             'summary' => [
                 'total_sessions' => $this->resource['summary']['total_sessions'],
                 'completed_sessions' => $this->resource['summary']['completed_sessions'],
@@ -34,7 +34,7 @@ class TimetableResource extends JsonResource
                 'average_sessions_per_day' => $this->getAverageSessionsPerDay(),
                 'busiest_day' => $this->getBusiestDay(),
             ],
-            
+
             'conflicts' => collect($this->resource['conflicts'])->map(function ($conflict) {
                 return [
                     'type' => $conflict['type'],
@@ -44,11 +44,11 @@ class TimetableResource extends JsonResource
                     'severity' => $this->getConflictSeverity($conflict),
                 ];
             }),
-            
+
             'availability' => $this->resource['availability'],
-            
+
             'insights' => $this->generateInsights(),
-            
+
             'navigation' => $this->getNavigationInfo(),
         ];
     }
@@ -60,7 +60,7 @@ class TimetableResource extends JsonResource
     {
         $view = $this->resource['period']['view'];
         $sessions = $this->resource['sessions'];
-        
+
         return match ($view) {
             'day' => $this->formatForDayView($sessions),
             'week' => $this->formatForWeekView($sessions),
@@ -75,7 +75,7 @@ class TimetableResource extends JsonResource
     protected function formatForDayView(array $sessions): array
     {
         $formatted = [];
-        
+
         foreach ($sessions as $date => $dateSessions) {
             $formatted[$date] = [
                 'date' => $date,
@@ -85,7 +85,7 @@ class TimetableResource extends JsonResource
                 'total_hours' => $this->calculateDayHours($dateSessions),
             ];
         }
-        
+
         return $formatted;
     }
 
@@ -96,15 +96,15 @@ class TimetableResource extends JsonResource
     {
         $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $formatted = [];
-        
+
         foreach ($weekDays as $day) {
             $dayDate = \Carbon\Carbon::parse($this->resource['period']['start_date'])
                 ->startOfWeek()
                 ->addDays(array_search($day, $weekDays))
                 ->format('Y-m-d');
-            
+
             $daySessions = $sessions[$dayDate] ?? [];
-            
+
             $formatted[$day] = [
                 'day' => $day,
                 'date' => $dayDate,
@@ -115,7 +115,7 @@ class TimetableResource extends JsonResource
                 'is_weekend' => in_array($day, ['Saturday', 'Sunday']),
             ];
         }
-        
+
         return $formatted;
     }
 
@@ -125,22 +125,22 @@ class TimetableResource extends JsonResource
     protected function formatForMonthView(array $sessions): array
     {
         $formatted = [];
-        
+
         foreach ($sessions as $date => $dateSessions) {
             $carbonDate = \Carbon\Carbon::parse($date);
-            
+
             $formatted[$date] = [
                 'date' => $date,
                 'day_of_month' => $carbonDate->day,
                 'day_name' => $carbonDate->format('D'),
                 'session_count' => count($dateSessions),
-                'has_sessions' => !empty($dateSessions),
+                'has_sessions' => ! empty($dateSessions),
                 'is_today' => $date === now()->format('Y-m-d'),
                 'is_weekend' => $carbonDate->isWeekend(),
                 'sessions_summary' => $this->getSessionsSummary($dateSessions),
             ];
         }
-        
+
         return $formatted;
     }
 
@@ -152,12 +152,12 @@ class TimetableResource extends JsonResource
         $start = \Carbon\Carbon::parse($this->resource['period']['start_date']);
         $end = \Carbon\Carbon::parse($this->resource['period']['end_date']);
         $view = $this->resource['period']['view'];
-        
+
         return match ($view) {
             'day' => $start->format('l, F j, Y'),
-            'week' => $start->format('M j') . ' - ' . $end->format('M j, Y'),
+            'week' => $start->format('M j').' - '.$end->format('M j, Y'),
             'month' => $start->format('F Y'),
-            default => $start->format('M j') . ' - ' . $end->format('M j, Y'),
+            default => $start->format('M j').' - '.$end->format('M j, Y'),
         };
     }
 
@@ -168,7 +168,7 @@ class TimetableResource extends JsonResource
     {
         $totalSessions = $this->resource['summary']['total_sessions'];
         $periodDays = $this->resource['summary']['period_days'];
-        
+
         return $periodDays > 0 ? round($totalSessions / $periodDays, 1) : 0;
     }
 
@@ -180,7 +180,7 @@ class TimetableResource extends JsonResource
         $sessions = $this->resource['sessions'];
         $maxSessions = 0;
         $busiestDay = null;
-        
+
         foreach ($sessions as $date => $dateSessions) {
             $sessionCount = count($dateSessions);
             if ($sessionCount > $maxSessions) {
@@ -192,7 +192,7 @@ class TimetableResource extends JsonResource
                 ];
             }
         }
-        
+
         return $busiestDay;
     }
 
@@ -215,13 +215,13 @@ class TimetableResource extends JsonResource
     protected function calculateDayHours(array $sessions): float
     {
         $totalMinutes = 0;
-        
+
         foreach ($sessions as $session) {
             $start = \Carbon\Carbon::createFromFormat('H:i', $session['start_time']);
             $end = \Carbon\Carbon::createFromFormat('H:i', $session['end_time']);
             $totalMinutes += $start->diffInMinutes($end);
         }
-        
+
         return round($totalMinutes / 60, 1);
     }
 
@@ -233,24 +233,24 @@ class TimetableResource extends JsonResource
         if (empty($sessions)) {
             return [];
         }
-        
+
         $summary = [];
         $sessionTypes = [];
-        
+
         foreach ($sessions as $session) {
             $sessionTypes[] = $session['session_type'];
         }
-        
+
         $typeCounts = array_count_values($sessionTypes);
-        
+
         foreach ($typeCounts as $type => $count) {
             $summary[] = [
                 'type' => $type,
                 'count' => $count,
-                'label' => ucfirst($type) . ($count > 1 ? 's' : ''),
+                'label' => ucfirst($type).($count > 1 ? 's' : ''),
             ];
         }
-        
+
         return $summary;
     }
 
@@ -262,34 +262,34 @@ class TimetableResource extends JsonResource
         $insights = [];
         $summary = $this->resource['summary'];
         $conflicts = $this->resource['conflicts'];
-        
+
         // Teaching load insights
         if ($summary['total_teaching_hours'] > 40) {
             $insights[] = [
                 'type' => 'warning',
                 'category' => 'workload',
                 'message' => 'Heavy teaching load detected. Consider workload balance.',
-                'value' => $summary['total_teaching_hours'] . ' hours',
+                'value' => $summary['total_teaching_hours'].' hours',
             ];
         } elseif ($summary['total_teaching_hours'] < 10) {
             $insights[] = [
                 'type' => 'info',
                 'category' => 'workload',
                 'message' => 'Light teaching schedule this period.',
-                'value' => $summary['total_teaching_hours'] . ' hours',
+                'value' => $summary['total_teaching_hours'].' hours',
             ];
         }
-        
+
         // Conflict insights
-        if (!empty($conflicts)) {
+        if (! empty($conflicts)) {
             $insights[] = [
                 'type' => 'error',
                 'category' => 'scheduling',
                 'message' => 'Schedule conflicts detected. Review and resolve.',
-                'value' => count($conflicts) . ' conflict(s)',
+                'value' => count($conflicts).' conflict(s)',
             ];
         }
-        
+
         // Session distribution insights
         $avgSessionsPerDay = $this->getAverageSessionsPerDay();
         if ($avgSessionsPerDay > 5) {
@@ -297,10 +297,10 @@ class TimetableResource extends JsonResource
                 'type' => 'warning',
                 'category' => 'distribution',
                 'message' => 'High session density. Consider spreading sessions.',
-                'value' => $avgSessionsPerDay . ' sessions/day',
+                'value' => $avgSessionsPerDay.' sessions/day',
             ];
         }
-        
+
         return $insights;
     }
 
@@ -312,7 +312,7 @@ class TimetableResource extends JsonResource
         $start = \Carbon\Carbon::parse($this->resource['period']['start_date']);
         $end = \Carbon\Carbon::parse($this->resource['period']['end_date']);
         $view = $this->resource['period']['view'];
-        
+
         $previous = match ($view) {
             'day' => [
                 'start_date' => $start->copy()->subDay()->format('Y-m-d'),
@@ -331,7 +331,7 @@ class TimetableResource extends JsonResource
                 'end_date' => $end->copy()->subWeek()->format('Y-m-d'),
             ],
         };
-        
+
         $next = match ($view) {
             'day' => [
                 'start_date' => $start->copy()->addDay()->format('Y-m-d'),
@@ -350,7 +350,7 @@ class TimetableResource extends JsonResource
                 'end_date' => $end->copy()->addWeek()->format('Y-m-d'),
             ],
         };
-        
+
         return [
             'previous' => $previous,
             'next' => $next,

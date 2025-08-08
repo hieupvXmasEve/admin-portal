@@ -29,8 +29,8 @@ class UserImportController extends Controller
             'availableFormats' => [
                 'simple' => 'Simple Format (Single Sheet)',
                 'detailed' => 'Detailed Format (Multiple Sheets)',
-                'relationship' => 'Relationship Format (One row per relationship)'
-            ]
+                'relationship' => 'Relationship Format (One row per relationship)',
+            ],
         ]);
     }
 
@@ -41,21 +41,21 @@ class UserImportController extends Controller
             'file_size' => $request->hasFile('file') ? $request->file('file')->getSize() : 'N/A',
             'file_name' => $request->hasFile('file') ? $request->file('file')->getClientOriginalName() : 'N/A',
             'content_length' => $request->header('Content-Length'),
-            'user_id' => Auth::id()
+            'user_id' => Auth::id(),
         ]);
 
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls|max:2048', // 2MB max to match PHP limits
-            'duplicate_handling' => 'nullable|in:skip,update,error'
+            'duplicate_handling' => 'nullable|in:skip,update,error',
         ]);
 
         try {
             $file = $request->file('file');
-            $filename = time() . '_' . $file->getClientOriginalName();
+            $filename = time().'_'.$file->getClientOriginalName();
 
             // Ensure the directory exists
             $uploadDir = storage_path('app/temp/imports');
-            if (!is_dir($uploadDir)) {
+            if (! is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
 
@@ -64,31 +64,31 @@ class UserImportController extends Controller
                 'filename' => $filename,
                 'upload_dir' => $uploadDir,
                 'dir_exists' => is_dir($uploadDir),
-                'dir_writable' => is_writable($uploadDir)
+                'dir_writable' => is_writable($uploadDir),
             ]);
 
             // Store file temporarily using direct path
-            $fullPath = storage_path('app/temp/imports/' . $filename);
+            $fullPath = storage_path('app/temp/imports/'.$filename);
 
             try {
                 $file->move(storage_path('app/temp/imports'), $filename);
-                $path = 'temp/imports/' . $filename;
+                $path = 'temp/imports/'.$filename;
 
                 Log::info('File move completed', [
                     'full_path' => $fullPath,
-                    'file_exists' => file_exists($fullPath)
+                    'file_exists' => file_exists($fullPath),
                 ]);
             } catch (\Exception $moveException) {
                 Log::error('File move failed', [
                     'error' => $moveException->getMessage(),
                     'upload_dir' => storage_path('app/temp/imports'),
-                    'filename' => $filename
+                    'filename' => $filename,
                 ]);
-                throw new \Exception('Failed to move uploaded file: ' . $moveException->getMessage());
+                throw new \Exception('Failed to move uploaded file: '.$moveException->getMessage());
             }
 
             // Verify file was stored
-            if (!file_exists($fullPath)) {
+            if (! file_exists($fullPath)) {
                 throw new \Exception('Failed to store uploaded file - file not found after move');
             }
 
@@ -96,7 +96,7 @@ class UserImportController extends Controller
                 'original_name' => $file->getClientOriginalName(),
                 'stored_path' => $path,
                 'full_path' => $fullPath,
-                'file_size' => filesize($fullPath)
+                'file_size' => filesize($fullPath),
             ]);
 
             // Get preview data
@@ -106,18 +106,18 @@ class UserImportController extends Controller
                 'success' => true,
                 'file_path' => $path,
                 'filename' => $file->getClientOriginalName(),
-                'preview' => $preview
+                'preview' => $preview,
             ]);
         } catch (\Exception $e) {
-            Log::error('File upload failed: ' . $e->getMessage(), [
+            Log::error('File upload failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
                 'file' => $request->file('file')?->getClientOriginalName(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], Response::HTTP_BAD_REQUEST);
         }
     }
@@ -126,28 +126,28 @@ class UserImportController extends Controller
     {
         $request->validate([
             'file_path' => 'required|string',
-            'preview_rows' => 'nullable|integer|min:1|max:50'
+            'preview_rows' => 'nullable|integer|min:1|max:50',
         ]);
 
         try {
-            $fullPath = storage_path('app/' . $request->file_path);
+            $fullPath = storage_path('app/'.$request->file_path);
             $previewRows = $request->preview_rows ?? 10;
 
             $preview = $this->importService->previewImportData($fullPath, $previewRows);
 
             return response()->json([
                 'success' => true,
-                'preview' => $preview
+                'preview' => $preview,
             ]);
         } catch (\Exception $e) {
-            Log::error('Preview failed: ' . $e->getMessage(), [
+            Log::error('Preview failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
-                'file_path' => $request->file_path
+                'file_path' => $request->file_path,
             ]);
 
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], Response::HTTP_BAD_REQUEST);
         }
     }
@@ -157,35 +157,35 @@ class UserImportController extends Controller
         $request->validate([
             'file_path' => 'required|string',
             'duplicate_handling' => 'nullable|in:skip,update,error',
-            'create_missing_campuses' => 'nullable|boolean'
+            'create_missing_campuses' => 'nullable|boolean',
         ]);
 
         $startTime = microtime(true);
 
         try {
-            $fullPath = storage_path('app/' . $request->file_path);
+            $fullPath = storage_path('app/'.$request->file_path);
 
             Log::info('Processing import', [
                 'file_path' => $request->file_path,
                 'full_path' => $fullPath,
-                'file_exists' => file_exists($fullPath)
+                'file_exists' => file_exists($fullPath),
             ]);
 
             // Check if file exists
-            if (!file_exists($fullPath)) {
-                throw new \Exception('Import file not found at: ' . $fullPath);
+            if (! file_exists($fullPath)) {
+                throw new \Exception('Import file not found at: '.$fullPath);
             }
 
             $options = [
                 'duplicate_handling' => $request->duplicate_handling ?? 'update',
-                'create_missing_campuses' => $request->create_missing_campuses ?? false
+                'create_missing_campuses' => $request->create_missing_campuses ?? false,
             ];
 
             $result = $this->importService->importUsersFromExcel($fullPath, $options);
 
             // Calculate processing time
             $processingTime = round(microtime(true) - $startTime, 2);
-            $result['summary']['processing_time'] = $processingTime . ' seconds';
+            $result['summary']['processing_time'] = $processingTime.' seconds';
 
             // Clean up temporary file
             if (file_exists($fullPath)) {
@@ -196,31 +196,31 @@ class UserImportController extends Controller
             // Log successful import
             Log::info('Import completed successfully', [
                 'user_id' => Auth::id(),
-                'summary' => $result['summary']
+                'summary' => $result['summary'],
             ]);
 
             return response()->json([
                 'success' => true,
-                'result' => $result
+                'result' => $result,
             ]);
         } catch (\Exception $e) {
             // Clean up temporary file on error
-            $fullPath = storage_path('app/' . $request->file_path);
+            $fullPath = storage_path('app/'.$request->file_path);
             if (file_exists($fullPath)) {
                 unlink($fullPath);
                 Log::info('Temporary file cleaned up after error', ['path' => $fullPath]);
             }
 
-            Log::error('Import failed: ' . $e->getMessage(), [
+            Log::error('Import failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
                 'file_path' => $request->file_path,
                 'options' => $request->only(['duplicate_handling', 'create_missing_campuses']),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -230,16 +230,16 @@ class UserImportController extends Controller
         $templates = [
             'simple' => 'users_simple_template.xlsx',
             'detailed' => 'users_detailed_template.xlsx',
-            'relationship' => 'users_relationship_template.xlsx'
+            'relationship' => 'users_relationship_template.xlsx',
         ];
 
-        if (!isset($templates[$format])) {
+        if (! isset($templates[$format])) {
             abort(404, 'Template not found');
         }
 
-        $templatePath = resource_path('templates/import/' . $templates[$format]);
+        $templatePath = resource_path('templates/import/'.$templates[$format]);
 
-        if (!file_exists($templatePath)) {
+        if (! file_exists($templatePath)) {
             // Generate template on the fly if it doesn't exist
             $templatePath = $this->generateTemplate($format);
         }
@@ -255,7 +255,7 @@ class UserImportController extends Controller
         // For now, return empty array as we haven't implemented the ImportLog model yet
         return response()->json([
             'success' => true,
-            'history' => []
+            'history' => [],
         ]);
     }
 
@@ -277,14 +277,14 @@ class UserImportController extends Controller
         // In a real implementation, you'd use PhpSpreadsheet to create proper templates
 
         $templateDir = storage_path('app/temp/templates');
-        if (!is_dir($templateDir)) {
+        if (! is_dir($templateDir)) {
             mkdir($templateDir, 0755, true);
         }
 
-        $templatePath = $templateDir . "/users_{$format}_template.xlsx";
+        $templatePath = $templateDir."/users_{$format}_template.xlsx";
 
         // Create a simple Excel file with headers based on format
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet;
 
         switch ($format) {
             case 'simple':
@@ -320,7 +320,7 @@ class UserImportController extends Controller
             'HN,HCM',
             'super_admin,giam_doc_dao_tao',
             '+1234567890',
-            '123 Main St'
+            '123 Main St',
         ];
         $worksheet->fromArray($sampleData, null, 'A2');
 
@@ -385,11 +385,11 @@ class UserImportController extends Controller
         // Add sample data
         $sampleData = [
             ['John Doe', 'john@example.com', 'HN', 'Swinburne Hà Nội', 'super_admin', 'password123', '+1234567890'],
-            ['John Doe', 'john@example.com', 'HCM', 'Swinburne Hồ Chí Minh', 'giam_doc_dao_tao', 'password123', '+1234567890']
+            ['John Doe', 'john@example.com', 'HCM', 'Swinburne Hồ Chí Minh', 'giam_doc_dao_tao', 'password123', '+1234567890'],
         ];
 
         foreach ($sampleData as $index => $row) {
-            $worksheet->fromArray($row, null, 'A' . ($index + 2));
+            $worksheet->fromArray($row, null, 'A'.($index + 2));
         }
 
         // Style headers

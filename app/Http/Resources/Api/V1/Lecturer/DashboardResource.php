@@ -64,8 +64,8 @@ class DashboardResource extends JsonResource
     {
         $today = now()->format('Y-m-d');
         $todaySessions = collect($this->resource['upcoming_sessions'])
-            ->filter(fn($session) => $session['date'] === $today);
-            
+            ->filter(fn ($session) => $session['date'] === $today);
+
         return $todaySessions->count();
     }
 }

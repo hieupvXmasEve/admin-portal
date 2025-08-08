@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Lecturer;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Lecturer\TimetableFilterRequest;
 use App\Http\Requests\Api\V1\Lecturer\CreateSessionRequest;
+use App\Http\Requests\Api\V1\Lecturer\TimetableFilterRequest;
 use App\Http\Requests\Api\V1\Lecturer\UpdateSessionRequest;
-use App\Http\Resources\Api\V1\Lecturer\TimetableResource;
 use App\Http\Resources\Api\V1\Lecturer\SessionResource;
+use App\Http\Resources\Api\V1\Lecturer\TimetableResource;
 use App\Http\Responses\ApiResponse;
 use App\Services\V1\Lecturer\LecturerTimetableService;
 use Illuminate\Http\JsonResponse;
@@ -28,12 +28,12 @@ class TimetableController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $filters = $request->validated();
-            
+
             $timetable = $this->timetableService->getTimetable($lecturer, $filters);
-            
+
             return ApiResponse::success(
                 new TimetableResource($timetable),
                 'Timetable retrieved successfully'
@@ -50,16 +50,16 @@ class TimetableController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $days = (int) $request->query('days', 7);
             $limit = (int) $request->query('limit', 20);
-            
+
             $days = min(max($days, 1), 30); // Between 1 and 30 days
             $limit = min(max($limit, 1), 50); // Between 1 and 50 sessions
-            
+
             $sessions = $this->timetableService->getUpcomingSessions($lecturer, $days, $limit);
-            
+
             return ApiResponse::success(
                 SessionResource::collection($sessions),
                 'Upcoming sessions retrieved successfully'
@@ -76,12 +76,12 @@ class TimetableController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $sessionData = $request->validated();
-            
+
             $result = $this->timetableService->createSession($lecturer, $sessionData);
-            
+
             return ApiResponse::success(
                 $result,
                 'Session created successfully'
@@ -96,6 +96,7 @@ class TimetableController extends Controller
                     'Scheduling conflict detected'
                 );
             }
+
             return ApiResponse::serverError('Failed to create session');
         }
     }
@@ -107,12 +108,12 @@ class TimetableController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $updateData = $request->validated();
-            
+
             $result = $this->timetableService->updateSession($lecturer, $sessionId, $updateData);
-            
+
             return ApiResponse::success(
                 $result,
                 'Session updated successfully'
@@ -133,6 +134,7 @@ class TimetableController extends Controller
                     'Session cannot be updated'
                 );
             }
+
             return ApiResponse::serverError('Failed to update session');
         }
     }
@@ -144,16 +146,16 @@ class TimetableController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $validated = $request->validate([
-                'reason' => 'nullable|string|max:500'
+                'reason' => 'nullable|string|max:500',
             ]);
-            
+
             $reason = $validated['reason'] ?? null;
-            
+
             $result = $this->timetableService->cancelSession($lecturer, $sessionId, $reason);
-            
+
             return ApiResponse::success(
                 $result,
                 'Session cancelled successfully'
@@ -168,6 +170,7 @@ class TimetableController extends Controller
                     'Session cannot be cancelled'
                 );
             }
+
             return ApiResponse::serverError('Failed to cancel session');
         }
     }
@@ -182,16 +185,16 @@ class TimetableController extends Controller
                 'date' => 'required|date|after_or_equal:today',
                 'start_time' => 'required|date_format:H:i',
                 'end_time' => 'required|date_format:H:i|after:start_time',
-                'exclude_session_id' => 'nullable|integer'
+                'exclude_session_id' => 'nullable|integer',
             ]);
-            
+
             $rooms = $this->timetableService->getAvailableRooms(
                 $validated['date'],
-                $validated['start_time'] . ':00',
-                $validated['end_time'] . ':00',
+                $validated['start_time'].':00',
+                $validated['end_time'].':00',
                 $validated['exclude_session_id'] ?? null
             );
-            
+
             return ApiResponse::success(
                 $rooms,
                 'Available rooms retrieved successfully'
@@ -213,14 +216,14 @@ class TimetableController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $session = $lecturer->classSessions()
                 ->with(['courseOffering.curriculumUnit', 'room'])
                 ->where('id', $sessionId)
                 ->first();
 
-            if (!$session) {
+            if (! $session) {
                 return ApiResponse::notFound('Session not found or access denied');
             }
 
@@ -240,10 +243,10 @@ class TimetableController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $filters = $request->only(['start_date', 'end_date']);
-            
+
             // Default to current week if no dates provided
             if (empty($filters['start_date'])) {
                 $filters['start_date'] = now()->startOfWeek()->format('Y-m-d');
@@ -251,18 +254,18 @@ class TimetableController extends Controller
             if (empty($filters['end_date'])) {
                 $filters['end_date'] = now()->endOfWeek()->format('Y-m-d');
             }
-            
+
             $timetable = $this->timetableService->getTimetable($lecturer, $filters);
-            
+
             $summary = [
                 'period' => $timetable['period'],
                 'summary' => $timetable['summary'],
                 'conflicts_count' => count($timetable['conflicts']),
-                'has_conflicts' => !empty($timetable['conflicts']),
+                'has_conflicts' => ! empty($timetable['conflicts']),
                 'next_session' => $this->getNextSession($timetable['sessions']),
                 'today_sessions' => $this->getTodaySessions($timetable['sessions']),
             ];
-            
+
             return ApiResponse::success(
                 $summary,
                 'Timetable summary retrieved successfully'
@@ -279,7 +282,7 @@ class TimetableController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $validated = $request->validate([
                 'sessions' => 'required|array|min:1|max:20',
@@ -298,7 +301,7 @@ class TimetableController extends Controller
                         $sessionUpdate['session_id'],
                         $sessionUpdate['updates']
                     );
-                    
+
                     $results[] = [
                         'session_id' => $sessionUpdate['session_id'],
                         'status' => 'success',
@@ -314,7 +317,7 @@ class TimetableController extends Controller
                     $errorCount++;
                 }
             }
-            
+
             return ApiResponse::success([
                 'total_processed' => count($validated['sessions']),
                 'successful_updates' => $successCount,
@@ -337,11 +340,11 @@ class TimetableController extends Controller
 
         foreach ($sessions as $dateSessions) {
             foreach ($dateSessions as $session) {
-                $sessionDateTime = \Carbon\Carbon::parse($session['date'] . ' ' . $session['start_time']);
-                
+                $sessionDateTime = \Carbon\Carbon::parse($session['date'].' '.$session['start_time']);
+
                 if ($sessionDateTime->gt($now)) {
                     $diff = $sessionDateTime->diffInMinutes($now);
-                    
+
                     if ($minDiff === null || $diff < $minDiff) {
                         $minDiff = $diff;
                         $nextSession = $session;
@@ -359,7 +362,7 @@ class TimetableController extends Controller
     protected function getTodaySessions(array $sessions): array
     {
         $today = now()->format('Y-m-d');
-        
+
         return $sessions[$today] ?? [];
     }
 }

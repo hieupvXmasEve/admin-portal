@@ -2,21 +2,16 @@
 
 declare(strict_types=1);
 
-use App\Models\AssessmentComponent;
-use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
-use App\Models\CourseOffering;
-use App\Models\Student;
-use App\Models\Syllabus;
 use App\Services\AssessmentManagementService;
 use Carbon\Carbon;
 
 beforeEach(function () {
-    $this->service = new AssessmentManagementService();
+    $this->service = new AssessmentManagementService;
 });
 
 test('calculateLatePenalty returns zero for on-time submission', function () {
-    $score = new AssessmentComponentDetailScore();
+    $score = new AssessmentComponentDetailScore;
     $submissionTime = Carbon::parse('2024-01-15 10:00:00');
     $deadline = Carbon::parse('2024-01-15 12:00:00');
 
@@ -26,7 +21,7 @@ test('calculateLatePenalty returns zero for on-time submission', function () {
 });
 
 test('calculateLatePenalty calculates per-day penalty correctly', function () {
-    $score = new AssessmentComponentDetailScore();
+    $score = new AssessmentComponentDetailScore;
     $submissionTime = Carbon::parse('2024-01-16 10:00:00'); // 1 day late
     $deadline = Carbon::parse('2024-01-15 12:00:00');
 
@@ -34,7 +29,7 @@ test('calculateLatePenalty calculates per-day penalty correctly', function () {
         'type' => 'per_day',
         'percentage' => 10.0,
         'max_penalty' => 100.0,
-        'grace_period_minutes' => 0
+        'grace_period_minutes' => 0,
     ];
 
     $penalty = $score->calculateLatePenalty($submissionTime, $deadline, $penaltyRules);
@@ -43,7 +38,7 @@ test('calculateLatePenalty calculates per-day penalty correctly', function () {
 });
 
 test('calculateLatePenalty calculates per-hour penalty correctly', function () {
-    $score = new AssessmentComponentDetailScore();
+    $score = new AssessmentComponentDetailScore;
     $submissionTime = Carbon::parse('2024-01-15 14:00:00'); // 2 hours late
     $deadline = Carbon::parse('2024-01-15 12:00:00');
 
@@ -51,7 +46,7 @@ test('calculateLatePenalty calculates per-hour penalty correctly', function () {
         'type' => 'per_hour',
         'percentage' => 5.0,
         'max_penalty' => 100.0,
-        'grace_period_minutes' => 0
+        'grace_period_minutes' => 0,
     ];
 
     $penalty = $score->calculateLatePenalty($submissionTime, $deadline, $penaltyRules);
@@ -60,7 +55,7 @@ test('calculateLatePenalty calculates per-hour penalty correctly', function () {
 });
 
 test('calculateLatePenalty respects grace period', function () {
-    $score = new AssessmentComponentDetailScore();
+    $score = new AssessmentComponentDetailScore;
     $submissionTime = Carbon::parse('2024-01-15 12:05:00'); // 5 minutes late
     $deadline = Carbon::parse('2024-01-15 12:00:00');
 
@@ -68,7 +63,7 @@ test('calculateLatePenalty respects grace period', function () {
         'type' => 'per_hour',
         'percentage' => 5.0,
         'max_penalty' => 100.0,
-        'grace_period_minutes' => 10 // 10 minute grace period
+        'grace_period_minutes' => 10, // 10 minute grace period
     ];
 
     $penalty = $score->calculateLatePenalty($submissionTime, $deadline, $penaltyRules);
@@ -77,7 +72,7 @@ test('calculateLatePenalty respects grace period', function () {
 });
 
 test('calculateLatePenalty respects maximum penalty', function () {
-    $score = new AssessmentComponentDetailScore();
+    $score = new AssessmentComponentDetailScore;
     $submissionTime = Carbon::parse('2024-01-20 12:00:00'); // 5 days late
     $deadline = Carbon::parse('2024-01-15 12:00:00');
 
@@ -85,7 +80,7 @@ test('calculateLatePenalty respects maximum penalty', function () {
         'type' => 'per_day',
         'percentage' => 30.0,
         'max_penalty' => 50.0, // Max 50%
-        'grace_period_minutes' => 0
+        'grace_period_minutes' => 0,
     ];
 
     $penalty = $score->calculateLatePenalty($submissionTime, $deadline, $penaltyRules);
@@ -97,7 +92,7 @@ test('applyLatePenalty updates score correctly', function () {
     $score = AssessmentComponentDetailScore::factory()->create([
         'is_late' => false,
         'late_penalty_applied' => 0.0,
-        'score_history' => []
+        'score_history' => [],
     ]);
 
     $score->applyLatePenalty(15.0, 'Test penalty');
@@ -115,7 +110,7 @@ test('processLateExcuse approves excuse and removes penalty', function () {
         'late_penalty_applied' => 10.0,
         'late_excuse' => 'Medical emergency',
         'late_excuse_approved' => false,
-        'score_history' => []
+        'score_history' => [],
     ]);
 
     $score->processLateExcuse(true, 'Approved due to medical documentation');
@@ -133,7 +128,7 @@ test('processLateExcuse denies excuse and keeps penalty', function () {
         'late_penalty_applied' => 10.0,
         'late_excuse' => 'Overslept',
         'late_excuse_approved' => false,
-        'score_history' => []
+        'score_history' => [],
     ]);
 
     $score->processLateExcuse(false, 'Insufficient justification');
@@ -150,7 +145,7 @@ test('canRequestLateExcuse returns correct status', function () {
     $score1 = AssessmentComponentDetailScore::factory()->create([
         'is_late' => true,
         'late_excuse' => null,
-        'late_excuse_approved' => false
+        'late_excuse_approved' => false,
     ]);
 
     expect($score1->canRequestLateExcuse())->toBe(true);
@@ -159,7 +154,7 @@ test('canRequestLateExcuse returns correct status', function () {
     $score2 = AssessmentComponentDetailScore::factory()->create([
         'is_late' => false,
         'late_excuse' => null,
-        'late_excuse_approved' => false
+        'late_excuse_approved' => false,
     ]);
 
     expect($score2->canRequestLateExcuse())->toBe(false);
@@ -168,7 +163,7 @@ test('canRequestLateExcuse returns correct status', function () {
     $score3 = AssessmentComponentDetailScore::factory()->create([
         'is_late' => true,
         'late_excuse' => 'Already requested',
-        'late_excuse_approved' => false
+        'late_excuse_approved' => false,
     ]);
 
     expect($score3->canRequestLateExcuse())->toBe(false);
@@ -180,7 +175,7 @@ test('getLateSubmissionStatus returns complete status', function () {
         'minutes_late' => 120,
         'late_penalty_applied' => 15.0,
         'late_excuse' => 'Traffic jam',
-        'late_excuse_approved' => false
+        'late_excuse_approved' => false,
     ]);
 
     $status = $score->getLateSubmissionStatus();
@@ -193,6 +188,6 @@ test('getLateSubmissionStatus returns complete status', function () {
         'excuse_approved' => false,
         'excuse_text' => 'Traffic jam',
         'can_request_excuse' => false,
-        'excuse_pending' => true
+        'excuse_pending' => true,
     ]);
 });

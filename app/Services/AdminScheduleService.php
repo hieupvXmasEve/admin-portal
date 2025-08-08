@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\ClassSession;
-use App\Models\CourseOffering;
 use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
@@ -47,8 +46,8 @@ class AdminScheduleService
             // Validate conflicts before updating
             $conflicts = $this->validateScheduleConflicts($session, $data);
 
-            if (!empty($conflicts)) {
-                throw new \InvalidArgumentException('Schedule conflicts detected: ' . implode(', ', $conflicts));
+            if (! empty($conflicts)) {
+                throw new \InvalidArgumentException('Schedule conflicts detected: '.implode(', ', $conflicts));
             }
 
             // Convert time strings to proper format if needed
@@ -152,26 +151,26 @@ class AdminScheduleService
      */
     private function applyFilters(Builder $query, array $filters): void
     {
-        if (!empty($filters['semester_id'])) {
+        if (! empty($filters['semester_id'])) {
             $query->whereHas('courseOffering', function ($q) use ($filters) {
                 $q->where('semester_id', $filters['semester_id']);
             });
         }
 
-        if (!empty($filters['lecturer_id'])) {
+        if (! empty($filters['lecturer_id'])) {
             $query->where('lecture_id', $filters['lecturer_id']);
         }
 
-        if (!empty($filters['room_id'])) {
+        if (! empty($filters['room_id'])) {
             $query->where('room_id', $filters['room_id']);
         }
 
-        if (!empty($filters['date_range'])) {
+        if (! empty($filters['date_range'])) {
             $dateRange = $filters['date_range'];
-            if (!empty($dateRange['start'])) {
+            if (! empty($dateRange['start'])) {
                 $query->whereDate('session_date', '>=', $dateRange['start']);
             }
-            if (!empty($dateRange['end'])) {
+            if (! empty($dateRange['end'])) {
                 $query->whereDate('session_date', '<=', $dateRange['end']);
             }
         }
@@ -186,8 +185,9 @@ class AdminScheduleService
     private function formatSessionsForGrid(Collection $sessions): Collection
     {
         Log::info('Formatting sessions for grid display', [
-            '$sessions'=> $sessions
+            '$sessions' => $sessions,
         ]);
+
         return $sessions->map(function (ClassSession $session) {
             return (object) [
                 'id' => $session->id,
@@ -231,18 +231,18 @@ class AdminScheduleService
             : $session->end_time->format('H:i');
 
         $query->where(function ($q) use ($startTime, $endTime) {
-            $q->where(function ($subQ) use ($startTime, $endTime) {
+            $q->where(function ($subQ) use ($startTime) {
                 // New session starts during existing session
                 $subQ->whereTime('start_time', '<=', $startTime)
-                     ->whereTime('end_time', '>', $startTime);
-            })->orWhere(function ($subQ) use ($startTime, $endTime) {
+                    ->whereTime('end_time', '>', $startTime);
+            })->orWhere(function ($subQ) use ($endTime) {
                 // New session ends during existing session
                 $subQ->whereTime('start_time', '<', $endTime)
-                     ->whereTime('end_time', '>=', $endTime);
+                    ->whereTime('end_time', '>=', $endTime);
             })->orWhere(function ($subQ) use ($startTime, $endTime) {
                 // Existing session is completely within new session
                 $subQ->whereTime('start_time', '>=', $startTime)
-                     ->whereTime('end_time', '<=', $endTime);
+                    ->whereTime('end_time', '<=', $endTime);
             });
         });
 
@@ -273,15 +273,15 @@ class AdminScheduleService
             : $session->end_time->format('H:i');
 
         $query->where(function ($q) use ($startTime, $endTime) {
-            $q->where(function ($subQ) use ($startTime, $endTime) {
+            $q->where(function ($subQ) use ($startTime) {
                 $subQ->whereTime('start_time', '<=', $startTime)
-                     ->whereTime('end_time', '>', $startTime);
-            })->orWhere(function ($subQ) use ($startTime, $endTime) {
+                    ->whereTime('end_time', '>', $startTime);
+            })->orWhere(function ($subQ) use ($endTime) {
                 $subQ->whereTime('start_time', '<', $endTime)
-                     ->whereTime('end_time', '>=', $endTime);
+                    ->whereTime('end_time', '>=', $endTime);
             })->orWhere(function ($subQ) use ($startTime, $endTime) {
                 $subQ->whereTime('start_time', '>=', $startTime)
-                     ->whereTime('end_time', '<=', $endTime);
+                    ->whereTime('end_time', '<=', $endTime);
             });
         });
 

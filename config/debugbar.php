@@ -32,13 +32,13 @@ return [
      |
      */
     'storage' => [
-        'enabled'    => false,
-        'driver'     => 'file', // redis, file, pdo, socket, custom
-        'path'       => storage_path('debugbar'), // For file driver
+        'enabled' => false,
+        'driver' => 'file', // redis, file, pdo, socket, custom
+        'path' => storage_path('debugbar'), // For file driver
         'connection' => null,   // Leave null for default connection (Redis/PDO)
-        'provider'   => '', // Instance of StorageInterface for custom driver
-        'hostname'   => '127.0.0.1', // Hostname to use with the "socket" driver
-        'port'       => 2304, // Port to use with the "socket" driver
+        'provider' => '', // Instance of StorageInterface for custom driver
+        'hostname' => '127.0.0.1', // Hostname to use with the "socket" driver
+        'port' => 2304, // Port to use with the "socket" driver
     ],
 
     /*
@@ -139,29 +139,29 @@ return [
      */
 
     'collectors' => [
-        'phpinfo'         => false,
-        'messages'        => false,
-        'time'            => false,
-        'memory'          => false,
-        'exceptions'      => false,
-        'log'             => false,
-        'db'              => false,
-        'views'           => false,
-        'route'           => false,
-        'auth'            => false,
-        'gate'            => false,
-        'session'         => false,
+        'phpinfo' => false,
+        'messages' => false,
+        'time' => false,
+        'memory' => false,
+        'exceptions' => false,
+        'log' => false,
+        'db' => false,
+        'views' => false,
+        'route' => false,
+        'auth' => false,
+        'gate' => false,
+        'session' => false,
         'symfony_request' => false,
-        'mail'            => false,
-        'laravel'         => false,
-        'events'          => false,
+        'mail' => false,
+        'laravel' => false,
+        'events' => false,
         'default_request' => false,
-        'logs'            => false,
-        'files'           => false,
-        'config'          => false,
-        'cache'           => false,
-        'models'          => false,
-        'livewire'        => false,
+        'logs' => false,
+        'files' => false,
+        'config' => false,
+        'cache' => false,
+        'models' => false,
+        'livewire' => false,
     ],
 
     /*
@@ -178,25 +178,25 @@ return [
             'show_name' => false,   // Also show the users name/email in the debugbar
         ],
         'db' => [
-            'with_params'       => false,   // Render SQL with the parameters substituted
-            'backtrace'         => false,   // Use a backtrace to find the origin of the query in your files.
+            'with_params' => false,   // Render SQL with the parameters substituted
+            'backtrace' => false,   // Use a backtrace to find the origin of the query in your files.
             'backtrace_exclude_paths' => [],   // Paths to exclude from backtrace. (in addition to defaults)
-            'timeline'          => false,  // Add the queries to the timeline
+            'timeline' => false,  // Add the queries to the timeline
             'duration_background' => true,   // Show shaded background on each query relative to how long it took.
             'explain' => [                 // Show EXPLAIN output on queries
                 'enabled' => false,
                 'types' => ['SELECT'],     // Deprecated setting, is always only SELECT
             ],
-            'hints'             => false,    // Show hints for common mistakes
-            'show_copy'         => false,    // Show copy button next to the query
-            'slow_threshold'    => false,   // Only track queries that last longer than this time in ms
+            'hints' => false,    // Show hints for common mistakes
+            'show_copy' => false,    // Show copy button next to the query
+            'slow_threshold' => false,   // Only track queries that last longer than this time in ms
         ],
         'mail' => [
             'full_log' => false,
         ],
         'views' => [
             'timeline' => false,  // Add the views to the timeline
-            'data' => false,    //Note: Can slow down the application, because the data can be quite large..
+            'data' => false,    // Note: Can slow down the application, because the data can be quite large..
         ],
         'route' => [
             'label' => false,  // show complete route on bar

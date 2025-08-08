@@ -26,14 +26,14 @@ class AttendanceController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $filters = $request->validated();
             $semesterId = $filters['semester_id'] ?? null;
             unset($filters['semester_id']);
-            
+
             $attendance = $this->attendanceService->getAttendanceSummary($student, $semesterId, $filters);
-            
+
             return ApiResponse::success(
                 new AttendanceResource($attendance),
                 'Attendance summary retrieved successfully'
@@ -50,10 +50,10 @@ class AttendanceController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $courseAttendance = $this->attendanceService->getCourseAttendance($student, $courseOfferingId);
-            
+
             return ApiResponse::success(
                 new CourseAttendanceResource($courseAttendance),
                 'Course attendance retrieved successfully'
@@ -70,11 +70,11 @@ class AttendanceController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        
+
         try {
             $semesterId = $request->query('semester_id');
             $statistics = $this->attendanceService->getAttendanceStatistics($student, $semesterId);
-            
+
             return ApiResponse::success(
                 $statistics,
                 'Attendance statistics retrieved successfully'

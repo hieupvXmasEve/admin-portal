@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Models\CourseRegistration;
-use App\Models\Student;
 use App\Models\CourseOffering;
+use App\Models\CourseRegistration;
 use App\Models\Semester;
+use App\Models\Student;
 use Illuminate\Database\Seeder;
 
 class CourseRegistrationSeeder extends Seeder
@@ -28,7 +28,7 @@ class CourseRegistrationSeeder extends Seeder
 
         foreach ($students as $student) {
             // Skip students without curriculum units
-            if (!$student->curriculumUnits || $student->curriculumUnits->isEmpty()) {
+            if (! $student->curriculumUnits || $student->curriculumUnits->isEmpty()) {
                 continue;
             }
 

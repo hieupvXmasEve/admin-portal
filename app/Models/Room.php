@@ -43,21 +43,34 @@ class Room extends Model
 
     // Room types enum values
     public const TYPE_CLASSROOM = 'classroom';
+
     public const TYPE_LABORATORY = 'laboratory';
+
     public const TYPE_COMPUTER_LAB = 'computer_lab';
+
     public const TYPE_AUDITORIUM = 'auditorium';
+
     public const TYPE_MEETING_ROOM = 'meeting_room';
+
     public const TYPE_LIBRARY = 'library';
+
     public const TYPE_STUDY_ROOM = 'study_room';
+
     public const TYPE_WORKSHOP = 'workshop';
+
     public const TYPE_OFFICE = 'office';
+
     public const TYPE_OTHER = 'other';
 
     // Room status enum values
     public const STATUS_AVAILABLE = 'available';
+
     public const STATUS_OCCUPIED = 'occupied';
+
     public const STATUS_MAINTENANCE = 'maintenance';
+
     public const STATUS_OUT_OF_SERVICE = 'out_of_service';
+
     public const STATUS_RESERVED = 'reserved';
 
     /**

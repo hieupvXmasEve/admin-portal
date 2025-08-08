@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\Campus;
-use App\Models\Role;
 use App\Models\CampusUserRole;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -21,11 +19,17 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class UserExcelImportService
 {
     private array $importResults = [];
+
     private array $errors = [];
+
     private array $warnings = [];
+
     private int $processedRows = 0;
+
     private int $successfulRows = 0;
+
     private int $failedRows = 0;
+
     private int $skippedRows = 0;
 
     public function importUsersFromExcel(string $filePath, array $options = []): array
@@ -57,9 +61,9 @@ class UserExcelImportService
 
             return $this->generateImportReport();
         } catch (\Exception $e) {
-            Log::error('Import failed: ' . $e->getMessage(), [
+            Log::error('Import failed: '.$e->getMessage(), [
                 'file' => $filePath,
-                'options' => $options
+                'options' => $options,
             ]);
 
             throw $e;
@@ -68,7 +72,7 @@ class UserExcelImportService
 
     public function validateImportFile(string $filePath): bool
     {
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             throw new \Exception('Import file not found');
         }
 
@@ -83,8 +87,8 @@ class UserExcelImportService
         $allowedExtensions = config('import.allowed_extensions', ['xlsx', 'xls']);
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
 
-        if (!in_array($extension, $allowedExtensions)) {
-            throw new \Exception('Invalid file format. Allowed formats: ' . implode(', ', $allowedExtensions));
+        if (! in_array($extension, $allowedExtensions)) {
+            throw new \Exception('Invalid file format. Allowed formats: '.implode(', ', $allowedExtensions));
         }
 
         return true;
@@ -100,7 +104,7 @@ class UserExcelImportService
         $preview = [
             'format' => $format,
             'sheets' => [],
-            'estimated_users' => 0
+            'estimated_users' => 0,
         ];
 
         foreach ($spreadsheet->getAllSheets() as $index => $worksheet) {
@@ -109,7 +113,7 @@ class UserExcelImportService
                 'name' => $worksheet->getTitle(),
                 'headers' => $sheetData['headers'],
                 'data' => $sheetData['data'],
-                'total_rows' => $sheetData['total_rows']
+                'total_rows' => $sheetData['total_rows'],
             ];
         }
 
@@ -147,7 +151,7 @@ class UserExcelImportService
                     $this->errors[] = [
                         'row' => $actualRowNumber,
                         'error' => $e->getMessage(),
-                        'data' => $row
+                        'data' => $row,
                     ];
                 }
             }
@@ -166,7 +170,7 @@ class UserExcelImportService
             $sheets[$worksheet->getTitle()] = $this->worksheetToArray($worksheet);
         }
 
-        if (!isset($sheets['Users']) || !isset($sheets['User Campus Roles'])) {
+        if (! isset($sheets['Users']) || ! isset($sheets['User Campus Roles'])) {
             throw new \Exception('Required sheets not found. Expected: Users, User Campus Roles');
         }
 
@@ -212,7 +216,7 @@ class UserExcelImportService
 
                     // Create user if not already processed
                     $userKey = strtolower($relationshipData['email']);
-                    if (!isset($processedUsers[$userKey])) {
+                    if (! isset($processedUsers[$userKey])) {
                         $user = $this->createOrUpdateUser($relationshipData, $actualRowNumber, $options);
                         $processedUsers[$userKey] = $user;
                     } else {
@@ -233,7 +237,7 @@ class UserExcelImportService
                     $this->errors[] = [
                         'row' => $actualRowNumber,
                         'error' => $e->getMessage(),
-                        'data' => $row
+                        'data' => $row,
                     ];
                 }
             }
@@ -253,11 +257,11 @@ class UserExcelImportService
             'email' => 'required|email|max:255',
             'password' => 'nullable|string|min:8',
             'phone' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:500'
+            'address' => 'nullable|string|max:500',
         ]);
 
         if ($validator->fails()) {
-            throw new \Exception('Validation failed: ' . implode(', ', $validator->errors()->all()));
+            throw new \Exception('Validation failed: '.implode(', ', $validator->errors()->all()));
         }
 
         // Check if user exists
@@ -270,13 +274,13 @@ class UserExcelImportService
                 case 'skip':
                     $this->warnings[] = [
                         'row' => $rowNumber,
-                        'message' => 'User already exists, skipped'
+                        'message' => 'User already exists, skipped',
                     ];
+
                     return $existingUser;
 
                 case 'error':
                     throw new \Exception('User with email already exists');
-
                 case 'update':
                 default:
                     $existingUser->update([
@@ -287,7 +291,7 @@ class UserExcelImportService
 
                     $this->warnings[] = [
                         'row' => $rowNumber,
-                        'message' => 'User already exists, updated information'
+                        'message' => 'User already exists, updated information',
                     ];
 
                     return $existingUser;
@@ -311,13 +315,13 @@ class UserExcelImportService
     {
         // Find campus
         $campus = Campus::where('code', $campusCode)->first();
-        if (!$campus) {
+        if (! $campus) {
             throw new \Exception("Campus with code '{$campusCode}' not found");
         }
 
         // Find role
         $role = Role::where('code', $roleCode)->first();
-        if (!$role) {
+        if (! $role) {
             throw new \Exception("Role with code '{$roleCode}' not found");
         }
 
@@ -325,14 +329,15 @@ class UserExcelImportService
         $existingRelation = CampusUserRole::where([
             'user_id' => $user->id,
             'campus_id' => $campus->id,
-            'role_id' => $role->id
+            'role_id' => $role->id,
         ])->first();
 
         if ($existingRelation) {
             $this->warnings[] = [
                 'row' => $rowNumber,
-                'message' => "User already assigned to {$campus->name} with role {$role->name}"
+                'message' => "User already assigned to {$campus->name} with role {$role->name}",
             ];
+
             return;
         }
 
@@ -340,7 +345,7 @@ class UserExcelImportService
         CampusUserRole::create([
             'user_id' => $user->id,
             'campus_id' => $campus->id,
-            'role_id' => $role->id
+            'role_id' => $role->id,
         ]);
     }
 
@@ -384,7 +389,7 @@ class UserExcelImportService
         $headers = [];
 
         for ($col = 'A'; $col <= $highestColumn; $col++) {
-            $headers[] = $worksheet->getCell($col . '1')->getValue();
+            $headers[] = $worksheet->getCell($col.'1')->getValue();
         }
 
         return array_filter($headers); // Remove empty headers
@@ -393,12 +398,12 @@ class UserExcelImportService
     private function getSheetPreview(Worksheet $worksheet, int $previewRows): array
     {
         $data = $this->worksheetToArray($worksheet);
-        $headers = !empty($data) ? array_shift($data) : [];
+        $headers = ! empty($data) ? array_shift($data) : [];
 
         return [
             'headers' => $headers,
             'data' => array_slice($data, 0, $previewRows),
-            'total_rows' => count($data)
+            'total_rows' => count($data),
         ];
     }
 
@@ -414,16 +419,18 @@ class UserExcelImportService
                         return $sheet['total_rows'];
                     }
                 }
+
                 return 0;
 
             case 'relationship':
                 // Count unique emails
                 $emails = [];
                 foreach ($preview['sheets'][0]['data'] as $row) {
-                    if (!empty($row[1])) { // Assuming email is in second column
+                    if (! empty($row[1])) { // Assuming email is in second column
                         $emails[strtolower($row[1])] = true;
                     }
                 }
+
                 return count($emails);
 
             default:
@@ -442,8 +449,8 @@ class UserExcelImportService
 
         $missing = array_diff($required, $cleanHeaders);
 
-        if (!empty($missing)) {
-            throw new \Exception('Missing required headers: ' . implode(', ', $missing));
+        if (! empty($missing)) {
+            throw new \Exception('Missing required headers: '.implode(', ', $missing));
         }
     }
 
@@ -458,8 +465,8 @@ class UserExcelImportService
 
         $missing = array_diff($required, $cleanHeaders);
 
-        if (!empty($missing)) {
-            throw new \Exception('Missing required headers: ' . implode(', ', $missing));
+        if (! empty($missing)) {
+            throw new \Exception('Missing required headers: '.implode(', ', $missing));
         }
     }
 
@@ -472,6 +479,7 @@ class UserExcelImportService
             $key = strtolower(str_replace(' ', '_', $cleanHeader));
             $mapped[$key] = $row[$index] ?? null;
         }
+
         return $mapped;
     }
 
@@ -492,7 +500,7 @@ class UserExcelImportService
             'phone' => $mapped['phone'] ?? null,
             'address' => $mapped['address'] ?? null,
             'campus_code' => $mapped['campus_code'],
-            'role_code' => $mapped['role_code']
+            'role_code' => $mapped['role_code'],
         ];
     }
 
@@ -502,7 +510,7 @@ class UserExcelImportService
         $user = $this->createOrUpdateUser($userData, $rowNumber, $options);
 
         // Process campus codes and roles if present
-        if (!empty($userData['campus_codes']) && !empty($userData['role_codes'])) {
+        if (! empty($userData['campus_codes']) && ! empty($userData['role_codes'])) {
             $campusCodes = array_map('trim', explode(',', $userData['campus_codes']));
             $roleCodes = array_map('trim', explode(',', $userData['role_codes']));
 
@@ -517,7 +525,9 @@ class UserExcelImportService
 
     private function processUsersSheet(array $data, array $options): void
     {
-        if (empty($data)) return;
+        if (empty($data)) {
+            return;
+        }
 
         $headers = array_shift($data);
 
@@ -534,7 +544,7 @@ class UserExcelImportService
                 $this->errors[] = [
                     'row' => $actualRowNumber,
                     'error' => $e->getMessage(),
-                    'data' => $row
+                    'data' => $row,
                 ];
             }
         }
@@ -542,7 +552,9 @@ class UserExcelImportService
 
     private function processRelationshipsSheet(array $data, array $options): void
     {
-        if (empty($data)) return;
+        if (empty($data)) {
+            return;
+        }
 
         $headers = array_shift($data);
 
@@ -553,8 +565,8 @@ class UserExcelImportService
                 $relationshipData = $this->mapSimpleFormatRow($headers, $row);
 
                 $user = User::where('email', $relationshipData['user_email'])->first();
-                if (!$user) {
-                    throw new \Exception('User not found with email: ' . $relationshipData['user_email']);
+                if (! $user) {
+                    throw new \Exception('User not found with email: '.$relationshipData['user_email']);
                 }
 
                 $this->assignUserToCampusWithRole(
@@ -567,7 +579,7 @@ class UserExcelImportService
                 $this->errors[] = [
                     'row' => $actualRowNumber,
                     'error' => $e->getMessage(),
-                    'data' => $row
+                    'data' => $row,
                 ];
             }
         }
@@ -581,10 +593,10 @@ class UserExcelImportService
                 'successful' => $this->successfulRows,
                 'failed' => $this->failedRows,
                 'skipped' => $this->skippedRows,
-                'processing_time' => '0 seconds' // Will be calculated by controller
+                'processing_time' => '0 seconds', // Will be calculated by controller
             ],
             'errors' => $this->errors,
-            'warnings' => $this->warnings
+            'warnings' => $this->warnings,
         ];
     }
 
@@ -602,7 +614,7 @@ class UserExcelImportService
     private function convertToBytes(string $size): int
     {
         $unit = strtoupper(substr($size, -2));
-        $value = (int)substr($size, 0, -2);
+        $value = (int) substr($size, 0, -2);
 
         switch ($unit) {
             case 'KB':
@@ -612,7 +624,7 @@ class UserExcelImportService
             case 'GB':
                 return $value * 1024 * 1024 * 1024;
             default:
-                return (int)$size;
+                return (int) $size;
         }
     }
 }

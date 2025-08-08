@@ -30,8 +30,8 @@ class UnitImportController extends Controller
                 'simple' => 'Simple Format (Units only)',
                 'detailed' => 'Detailed Format (Units with Prerequisites)',
                 'complete' => 'Complete Format (Units with all relationships)',
-                'combined' => 'Combined Format (Units and Syllabus)'
-            ]
+                'combined' => 'Combined Format (Units and Syllabus)',
+            ],
         ]);
     }
 
@@ -42,21 +42,21 @@ class UnitImportController extends Controller
             'file_size' => $request->hasFile('file') ? $request->file('file')->getSize() : 'N/A',
             'file_name' => $request->hasFile('file') ? $request->file('file')->getClientOriginalName() : 'N/A',
             'content_length' => $request->header('Content-Length'),
-            'user_id' => Auth::id()
+            'user_id' => Auth::id(),
         ]);
 
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls|max:2048', // 2MB max to match PHP limits
-            'duplicate_handling' => 'nullable|in:skip,update,error'
+            'duplicate_handling' => 'nullable|in:skip,update,error',
         ]);
 
         try {
             $file = $request->file('file');
-            $filename = time() . '_' . $file->getClientOriginalName();
+            $filename = time().'_'.$file->getClientOriginalName();
 
             // Ensure the directory exists
             $uploadDir = storage_path('app/temp/imports');
-            if (!is_dir($uploadDir)) {
+            if (! is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
             }
 
@@ -65,31 +65,31 @@ class UnitImportController extends Controller
                 'filename' => $filename,
                 'upload_dir' => $uploadDir,
                 'dir_exists' => is_dir($uploadDir),
-                'dir_writable' => is_writable($uploadDir)
+                'dir_writable' => is_writable($uploadDir),
             ]);
 
             // Store file temporarily using direct path
-            $fullPath = storage_path('app/temp/imports/' . $filename);
+            $fullPath = storage_path('app/temp/imports/'.$filename);
 
             try {
                 $file->move(storage_path('app/temp/imports'), $filename);
-                $path = 'temp/imports/' . $filename;
+                $path = 'temp/imports/'.$filename;
 
                 Log::info('Unit file move completed', [
                     'full_path' => $fullPath,
-                    'file_exists' => file_exists($fullPath)
+                    'file_exists' => file_exists($fullPath),
                 ]);
             } catch (\Exception $moveException) {
                 Log::error('Unit file move failed', [
                     'error' => $moveException->getMessage(),
                     'upload_dir' => storage_path('app/temp/imports'),
-                    'filename' => $filename
+                    'filename' => $filename,
                 ]);
-                throw new \Exception('Failed to move uploaded file: ' . $moveException->getMessage());
+                throw new \Exception('Failed to move uploaded file: '.$moveException->getMessage());
             }
 
             // Verify file was stored
-            if (!file_exists($fullPath)) {
+            if (! file_exists($fullPath)) {
                 throw new \Exception('Failed to store uploaded file - file not found after move');
             }
 
@@ -97,7 +97,7 @@ class UnitImportController extends Controller
                 'original_name' => $file->getClientOriginalName(),
                 'stored_path' => $path,
                 'full_path' => $fullPath,
-                'file_size' => filesize($fullPath)
+                'file_size' => filesize($fullPath),
             ]);
 
             // Get preview data
@@ -107,18 +107,18 @@ class UnitImportController extends Controller
                 'success' => true,
                 'file_path' => $path,
                 'filename' => $file->getClientOriginalName(),
-                'preview' => $preview
+                'preview' => $preview,
             ]);
         } catch (\Exception $e) {
-            Log::error('Unit file upload failed: ' . $e->getMessage(), [
+            Log::error('Unit file upload failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
                 'file' => $request->file('file')?->getClientOriginalName(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], Response::HTTP_BAD_REQUEST);
         }
     }
@@ -127,28 +127,28 @@ class UnitImportController extends Controller
     {
         $request->validate([
             'file_path' => 'required|string',
-            'preview_rows' => 'nullable|integer|min:1|max:50'
+            'preview_rows' => 'nullable|integer|min:1|max:50',
         ]);
 
         try {
-            $fullPath = storage_path('app/' . $request->file_path);
+            $fullPath = storage_path('app/'.$request->file_path);
             $previewRows = $request->preview_rows ?? 10;
 
             $preview = $this->importService->previewImportData($fullPath, $previewRows);
 
             return response()->json([
                 'success' => true,
-                'preview' => $preview
+                'preview' => $preview,
             ]);
         } catch (\Exception $e) {
-            Log::error('Unit preview failed: ' . $e->getMessage(), [
+            Log::error('Unit preview failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
-                'file_path' => $request->file_path
+                'file_path' => $request->file_path,
             ]);
 
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], Response::HTTP_BAD_REQUEST);
         }
     }
@@ -159,34 +159,34 @@ class UnitImportController extends Controller
             'file_path' => 'required|string',
             'duplicate_handling' => 'nullable|in:skip,update,error',
             'create_prerequisites' => 'nullable|boolean',
-            'create_equivalents' => 'nullable|boolean'
+            'create_equivalents' => 'nullable|boolean',
         ]);
 
         $startTime = microtime(true);
 
         try {
-            $fullPath = storage_path('app/' . $request->file_path);
+            $fullPath = storage_path('app/'.$request->file_path);
 
             Log::info('Processing unit import', [
                 'file_path' => $request->file_path,
                 'full_path' => $fullPath,
-                'file_exists' => file_exists($fullPath)
+                'file_exists' => file_exists($fullPath),
             ]);
 
             // Check if file exists
-            if (!file_exists($fullPath)) {
-                throw new \Exception('Import file not found at: ' . $fullPath);
+            if (! file_exists($fullPath)) {
+                throw new \Exception('Import file not found at: '.$fullPath);
             }
 
             $options = [
                 'duplicate_handling' => $request->duplicate_handling ?? 'update',
                 'create_prerequisites' => $request->create_prerequisites ?? false,
-                'create_equivalents' => $request->create_equivalents ?? false
+                'create_equivalents' => $request->create_equivalents ?? false,
             ];
 
             // Detect if this is a combined format by checking for syllabus-related sheets
             $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
-            $sheetNames = array_map(fn($sheet) => $sheet->getTitle(), $spreadsheet->getAllSheets());
+            $sheetNames = array_map(fn ($sheet) => $sheet->getTitle(), $spreadsheet->getAllSheets());
             $isCombinedFormat = in_array('Syllabus', $sheetNames) ||
                 in_array('Assessment Components', $sheetNames) ||
                 in_array('Assessment Details', $sheetNames);
@@ -199,7 +199,7 @@ class UnitImportController extends Controller
 
             // Calculate processing time
             $processingTime = round(microtime(true) - $startTime, 2);
-            $result['summary']['processing_time'] = $processingTime . ' seconds';
+            $result['summary']['processing_time'] = $processingTime.' seconds';
 
             // Clean up temporary file
             if (file_exists($fullPath)) {
@@ -210,31 +210,31 @@ class UnitImportController extends Controller
             // Log successful import
             Log::info('Unit import completed successfully', [
                 'user_id' => Auth::id(),
-                'summary' => $result['summary']
+                'summary' => $result['summary'],
             ]);
 
             return response()->json([
                 'success' => true,
-                'result' => $result
+                'result' => $result,
             ]);
         } catch (\Exception $e) {
             // Clean up temporary file on error
-            $fullPath = storage_path('app/' . $request->file_path);
+            $fullPath = storage_path('app/'.$request->file_path);
             if (file_exists($fullPath)) {
                 unlink($fullPath);
                 Log::info('Temporary unit file cleaned up after error', ['path' => $fullPath]);
             }
 
-            Log::error('Unit import failed: ' . $e->getMessage(), [
+            Log::error('Unit import failed: '.$e->getMessage(), [
                 'user_id' => Auth::id(),
                 'file_path' => $request->file_path,
                 'options' => $request->only(['duplicate_handling', 'create_prerequisites', 'create_equivalents']),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -245,16 +245,16 @@ class UnitImportController extends Controller
             'simple' => 'units_simple_template.xlsx',
             'detailed' => 'units_detailed_template.xlsx',
             'complete' => 'units_complete_template.xlsx',
-            'combined' => 'units_syllabus_combined_template.xlsx'
+            'combined' => 'units_syllabus_combined_template.xlsx',
         ];
 
-        if (!isset($templates[$format])) {
+        if (! isset($templates[$format])) {
             abort(404, 'Template not found');
         }
 
-        $templatePath = resource_path('templates/import/' . $templates[$format]);
+        $templatePath = resource_path('templates/import/'.$templates[$format]);
 
-        if (!file_exists($templatePath)) {
+        if (! file_exists($templatePath)) {
             // Generate template on the fly if it doesn't exist
             $templatePath = $this->generateTemplate($format);
         }
@@ -270,7 +270,7 @@ class UnitImportController extends Controller
         // For now, return empty array as we haven't implemented the ImportLog model yet
         return response()->json([
             'success' => true,
-            'history' => []
+            'history' => [],
         ]);
     }
 
@@ -290,14 +290,14 @@ class UnitImportController extends Controller
         // In a real implementation, you'd use PhpSpreadsheet to create proper templates
 
         $templateDir = storage_path('app/temp/templates');
-        if (!is_dir($templateDir)) {
+        if (! is_dir($templateDir)) {
             mkdir($templateDir, 0755, true);
         }
 
-        $templatePath = $templateDir . "/units_{$format}_template.xlsx";
+        $templatePath = $templateDir."/units_{$format}_template.xlsx";
 
         // Create a simple Excel file with headers based on format
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet;
 
         switch ($format) {
             case 'simple':
@@ -402,7 +402,7 @@ class UnitImportController extends Controller
             'Condition Type*',
             'Required Unit Code',
             'Required Credits',
-            'Free Text'
+            'Free Text',
         ];
         $prereqSheet->fromArray($prereqHeaders, null, 'A1');
 
@@ -472,7 +472,7 @@ class UnitImportController extends Controller
             'Condition Type*',
             'Required Unit Code',
             'Required Credits',
-            'Free Text'
+            'Free Text',
         ];
         $prereqSheet->fromArray($prereqHeaders, null, 'A1');
 
@@ -546,7 +546,7 @@ class UnitImportController extends Controller
             'Condition Type*',
             'Required Unit Code',
             'Required Credits',
-            'Free Text'
+            'Free Text',
         ];
         $prereqSheet->fromArray($prereqHeaders, null, 'A1');
 
@@ -590,7 +590,7 @@ class UnitImportController extends Controller
             'Total Hours',
             'Hours Per Session',
             'Effective From Semester',
-            'Is Active*'
+            'Is Active*',
         ];
         $syllabusSheet->fromArray($syllabusHeaders, null, 'A1');
 
@@ -602,7 +602,7 @@ class UnitImportController extends Controller
             '120',
             '3',
             '2024-S1',
-            'TRUE'
+            'TRUE',
         ], null, 'A2');
         $syllabusSheet->fromArray([
             'CS201',
@@ -611,7 +611,7 @@ class UnitImportController extends Controller
             '150',
             '4',
             '2024-S1',
-            'TRUE'
+            'TRUE',
         ], null, 'A3');
 
         // Add dropdown validation for Is Active column (column G)
@@ -627,7 +627,7 @@ class UnitImportController extends Controller
             'Component Name*',
             'Weight*',
             'Type*',
-            'Required for Final Exam*'
+            'Required for Final Exam*',
         ];
         $assessmentSheet->fromArray($assessmentHeaders, null, 'A1');
 
@@ -652,7 +652,7 @@ class UnitImportController extends Controller
             'Syllabus Version',
             'Component Name*',
             'Detail Name*',
-            'Weight'
+            'Weight',
         ];
         $detailsSheet->fromArray($detailsHeaders, null, 'A1');
 
@@ -706,11 +706,11 @@ class UnitImportController extends Controller
             'anti_requisite',
             'assumed_knowledge',
             'credit_requirement',
-            'textual'
+            'textual',
         ];
 
         try {
-            $validation = $worksheet->getDataValidation($column . $startRow . ':' . $column . $endRow);
+            $validation = $worksheet->getDataValidation($column.$startRow.':'.$column.$endRow);
             $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
                 ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
                 ->setAllowBlank(true)
@@ -721,9 +721,9 @@ class UnitImportController extends Controller
                 ->setError('Please select a valid condition type from the dropdown.')
                 ->setPromptTitle('Condition Type')
                 ->setPrompt('Select the type of prerequisite condition.')
-                ->setFormula1('"' . implode(',', $typeOptions) . '"');
+                ->setFormula1('"'.implode(',', $typeOptions).'"');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed to add type validation: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning('Failed to add type validation: '.$e->getMessage());
         }
     }
 
@@ -735,7 +735,7 @@ class UnitImportController extends Controller
         $logicOptions = ['AND', 'OR'];
 
         try {
-            $validation = $worksheet->getDataValidation($column . $startRow . ':' . $column . $endRow);
+            $validation = $worksheet->getDataValidation($column.$startRow.':'.$column.$endRow);
             $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
                 ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
                 ->setAllowBlank(true)
@@ -746,9 +746,9 @@ class UnitImportController extends Controller
                 ->setError('Please select either AND or OR.')
                 ->setPromptTitle('Group Logic')
                 ->setPrompt('Select the logic operator for this prerequisite group.')
-                ->setFormula1('"' . implode(',', $logicOptions) . '"');
+                ->setFormula1('"'.implode(',', $logicOptions).'"');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning('Failed to add group logic validation: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning('Failed to add group logic validation: '.$e->getMessage());
         }
     }
 
@@ -1090,15 +1090,15 @@ class UnitImportController extends Controller
         $units = array_slice($units, 0, 100);
 
         // Ensure the formula string doesn't exceed Excel's limits
-        $formula = '"' . implode(',', $units) . '"';
+        $formula = '"'.implode(',', $units).'"';
         if (strlen($formula) > 255) {
             // Fallback to fewer items if formula is too long
             $units = array_slice($units, 0, 20);
-            $formula = '"' . implode(',', $units) . '"';
+            $formula = '"'.implode(',', $units).'"';
         }
 
         try {
-            $validation = $worksheet->getDataValidation($column . $startRow . ':' . $column . $endRow);
+            $validation = $worksheet->getDataValidation($column.$startRow.':'.$column.$endRow);
             $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)
                 ->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION)
                 ->setAllowBlank(true)
@@ -1112,7 +1112,7 @@ class UnitImportController extends Controller
                 ->setFormula1($formula);
         } catch (\Exception $e) {
             // If validation fails, skip it to prevent corruption
-            \Illuminate\Support\Facades\Log::warning('Failed to add unit code validation: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning('Failed to add unit code validation: '.$e->getMessage());
         }
     }
 }

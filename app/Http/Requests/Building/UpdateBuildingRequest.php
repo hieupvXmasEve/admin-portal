@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Building;
 
-use App\Models\Building;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateBuildingRequest extends FormRequest
@@ -26,7 +25,7 @@ class UpdateBuildingRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:100'],
-            'code' => ['required', 'string', 'max:20', 'unique:buildings,code,' . $building->id],
+            'code' => ['required', 'string', 'max:20', 'unique:buildings,code,'.$building->id],
             'description' => ['nullable', 'string'],
             'address' => ['nullable', 'string'],
         ];

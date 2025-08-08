@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
-use App\Models\Semester;
 use App\Models\GpaCalculation;
-use App\Models\AcademicRecord;
+use App\Models\Semester;
+use App\Models\Student;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -139,7 +138,7 @@ class GPACalculationService
         return [
             'distribution' => $distribution,
             'percentages' => $totalCourses > 0 ? array_map(
-                fn($count) => round(($count / $totalCourses) * 100, 1),
+                fn ($count) => round(($count / $totalCourses) * 100, 1),
                 $distribution
             ) : array_fill_keys($standardGrades, 0),
             'total_courses' => $totalCourses,
@@ -155,7 +154,7 @@ class GPACalculationService
             ->orderBy('created_at', 'desc')
             ->first();
 
-        if (!$latestGPA) {
+        if (! $latestGPA) {
             return [
                 'standing' => 'unknown',
                 'gpa' => 0.0,
@@ -200,7 +199,7 @@ class GPACalculationService
 
         // Calculate consistency (standard deviation)
         $mean = $gpas->avg();
-        $variance = $gpas->map(fn($gpa) => pow($gpa - $mean, 2))->avg();
+        $variance = $gpas->map(fn ($gpa) => pow($gpa - $mean, 2))->avg();
         $stdDev = sqrt($variance);
 
         $consistency = $stdDev < 0.2 ? 'consistent' : ($stdDev < 0.5 ? 'moderate' : 'variable');

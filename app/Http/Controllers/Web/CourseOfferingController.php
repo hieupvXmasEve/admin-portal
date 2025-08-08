@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Constants\CourseOfferingRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCourseOfferingRequest;
 use App\Http\Requests\UpdateCourseOfferingRequest;
-use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Unit;
-use App\Constants\CourseOfferingRoutes;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +42,7 @@ class CourseOfferingController extends Controller
             ->where('campus_id', app('campus')->id)
             ->orderBy('semester_id', 'desc')
             ->orderBy('section_code');
-        Log::info('CourseOffering: ' . json_encode(CourseOffering::select(['id', 'lecture_id', 'semester_id', 'curriculum_unit_id', 'section_code'])->get()));
+        Log::info('CourseOffering: '.json_encode(CourseOffering::select(['id', 'lecture_id', 'semester_id', 'curriculum_unit_id', 'section_code'])->get()));
         // Apply filters
         if ($request->filled('search')) {
             $search = $request->search;
@@ -102,7 +101,7 @@ class CourseOfferingController extends Controller
         $activeSemester = Semester::getActiveSemester();
 
         // If no active semester, return with error state
-        if (!$activeSemester) {
+        if (! $activeSemester) {
             return Inertia::render('course-offerings/Create', [
                 'activeSemester' => null,
                 'units' => [],
@@ -321,9 +320,10 @@ class CourseOfferingController extends Controller
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering updated successfully.');
         } catch (\Throwable $th) {
-            Log::error('Failed to update course offering: ' . $th->getMessage());
+            Log::error('Failed to update course offering: '.$th->getMessage());
+
             return Redirect::back()
-                ->with('error', 'Failed to update course offering: ' . $th->getMessage());
+                ->with('error', 'Failed to update course offering: '.$th->getMessage());
         }
     }
 
@@ -475,7 +475,7 @@ class CourseOfferingController extends Controller
             'sections.*.section_code' => 'required|string|max:10',
             'sections.*.max_capacity' => 'required|integer|min:1',
             'sections.*.lecture_id' => ['nullable', function ($attribute, $value, $fail) {
-                if ($value && $value !== 'none' && !Lecture::find($value)) {
+                if ($value && $value !== 'none' && ! Lecture::find($value)) {
                     $fail('The selected lecture does not exist.');
                 }
             }],
@@ -496,7 +496,7 @@ class CourseOfferingController extends Controller
         }
 
         $sections = $request->sections;
-        $totalStudentsAssigned = collect($sections)->sum(fn($section) => count($section['student_codes']));
+        $totalStudentsAssigned = collect($sections)->sum(fn ($section) => count($section['student_codes']));
 
         if ($totalStudentsAssigned !== $courseOffering->current_enrollment) {
             return Redirect::back()
@@ -513,7 +513,7 @@ class CourseOfferingController extends Controller
                 // Handle lecture assignment - null if 'none' is selected
                 $lectureId = null;
                 if (isset($sectionData['lecture_id']) && $sectionData['lecture_id'] !== 'none') {
-                    $lectureId = (int)$sectionData['lecture_id'];
+                    $lectureId = (int) $sectionData['lecture_id'];
                 }
 
                 // Create new course offering for this section
@@ -571,12 +571,12 @@ class CourseOfferingController extends Controller
             DB::commit();
 
             return Redirect::route(CourseOfferingRoutes::INDEX)
-                ->with('success', 'Course offering successfully split into ' . count($sections) . ' sections. The original course offering has been deleted.');
+                ->with('success', 'Course offering successfully split into '.count($sections).' sections. The original course offering has been deleted.');
         } catch (\Exception $e) {
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to split course offering: ' . $e->getMessage());
+                ->with('error', 'Failed to split course offering: '.$e->getMessage());
         }
     }
 
@@ -644,7 +644,7 @@ class CourseOfferingController extends Controller
             $assignmentsCount = 0;
             foreach ($request->assignments as $assignment) {
                 $courseOffering = CourseOffering::find($assignment['course_offering_id']);
-                if ($courseOffering && !$courseOffering->lecture_id) {
+                if ($courseOffering && ! $courseOffering->lecture_id) {
                     $courseOffering->update(['lecture_id' => $assignment['lecture_id']]);
                     $assignmentsCount++;
                 }
@@ -658,7 +658,7 @@ class CourseOfferingController extends Controller
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to assign lectures: ' . $e->getMessage());
+                ->with('error', 'Failed to assign lectures: '.$e->getMessage());
         }
     }
 
@@ -688,12 +688,12 @@ class CourseOfferingController extends Controller
             // Update course offering enrollment counts if needed
             if (
                 in_array($request->from_status, ['registered', 'confirmed']) &&
-                !in_array($request->to_status, ['registered', 'confirmed'])
+                ! in_array($request->to_status, ['registered', 'confirmed'])
             ) {
                 // Students are being removed from active status
                 $courseOffering->decrement('current_enrollment', $updatedCount);
             } elseif (
-                !in_array($request->from_status, ['registered', 'confirmed']) &&
+                ! in_array($request->from_status, ['registered', 'confirmed']) &&
                 in_array($request->to_status, ['registered', 'confirmed'])
             ) {
                 // Students are being added to active status
@@ -716,7 +716,7 @@ class CourseOfferingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update registration status: ' . $e->getMessage(),
+                'message' => 'Failed to update registration status: '.$e->getMessage(),
             ], 500);
         }
     }

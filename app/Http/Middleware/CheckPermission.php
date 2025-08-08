@@ -13,9 +13,9 @@ class CheckPermission
     /**
      * Handle an incoming request.
      */
-    public function handle(Request $request, Closure $next, string $module = null): Response
+    public function handle(Request $request, Closure $next, ?string $module = null): Response
     {
-        if (!Auth::check()) {
+        if (! Auth::check()) {
             return redirect()->route('login');
         }
 
@@ -23,7 +23,7 @@ class CheckPermission
         if ($module) {
             $permission = $this->getPermissionForAction($module, $request->route()->getActionMethod());
 
-            if ($permission && !Gate::allows($permission)) {
+            if ($permission && ! Gate::allows($permission)) {
                 abort(403, 'Unauthorized action.');
             }
 
@@ -37,7 +37,7 @@ class CheckPermission
         if ($detectedModule) {
             $permission = $this->getPermissionForAction($detectedModule, $request->route()->getActionMethod());
 
-            if ($permission && !Gate::allows($permission)) {
+            if ($permission && ! Gate::allows($permission)) {
                 abort(403, 'Unauthorized action.');
             }
         }
@@ -80,7 +80,7 @@ class CheckPermission
         ];
 
         $permissionType = $actionMap[$action] ?? 'view';
-        $permissionKey = "{$permissionType}_" . rtrim($module, 's');
+        $permissionKey = "{$permissionType}_".rtrim($module, 's');
 
         return $permissions[$permissionKey] ?? null;
     }

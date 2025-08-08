@@ -25,13 +25,13 @@ class DashboardController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $filters = $request->validated();
             $semesterId = $filters['semester_id'] ?? null;
-            
+
             $dashboardData = $this->dashboardService->getDashboardData($lecturer, $semesterId);
-            
+
             return ApiResponse::success(
                 new DashboardResource($dashboardData),
                 'Dashboard data retrieved successfully'
@@ -48,13 +48,13 @@ class DashboardController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $semesterId = $request->query('semester_id');
             $semester = $semesterId ? \App\Models\Semester::find($semesterId) : \App\Models\Semester::getActiveSemester();
 
             $teachingSummary = $this->dashboardService->getTeachingSummary($lecturer, $semester);
-            
+
             return ApiResponse::success(
                 $teachingSummary,
                 'Teaching summary retrieved successfully'
@@ -71,13 +71,13 @@ class DashboardController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $semesterId = $request->query('semester_id');
             $semester = $semesterId ? \App\Models\Semester::find($semesterId) : \App\Models\Semester::getActiveSemester();
 
             $attendanceOverview = $this->dashboardService->getAttendanceOverview($lecturer, $semester);
-            
+
             return ApiResponse::success(
                 $attendanceOverview,
                 'Attendance overview retrieved successfully'
@@ -94,13 +94,13 @@ class DashboardController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $semesterId = $request->query('semester_id');
             $semester = $semesterId ? \App\Models\Semester::find($semesterId) : \App\Models\Semester::getActiveSemester();
 
             $studentAlerts = $this->dashboardService->getStudentAlerts($lecturer, $semester);
-            
+
             return ApiResponse::success(
                 $studentAlerts,
                 'Student alerts retrieved successfully'
@@ -117,13 +117,13 @@ class DashboardController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $limit = (int) $request->query('limit', 5);
             $limit = min(max($limit, 1), 20); // Ensure limit is between 1 and 20
-            
+
             $upcomingSessions = $this->dashboardService->getUpcomingSessions($lecturer, $limit);
-            
+
             return ApiResponse::success(
                 $upcomingSessions,
                 'Upcoming sessions retrieved successfully'
@@ -140,13 +140,13 @@ class DashboardController extends Controller
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
-        
+
         try {
             $limit = (int) $request->query('limit', 10);
             $limit = min(max($limit, 1), 50); // Ensure limit is between 1 and 50
-            
+
             $recentActivities = $this->dashboardService->getRecentActivities($lecturer, $limit);
-            
+
             return ApiResponse::success(
                 $recentActivities,
                 'Recent activities retrieved successfully'

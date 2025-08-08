@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
 use App\Models\AcademicHold;
-use App\Models\GpaCalculation;
 use App\Models\AcademicRecord;
+use App\Models\GpaCalculation;
 use App\Models\Semester;
+use App\Models\Student;
 use Illuminate\Database\Seeder;
-use Carbon\Carbon;
 
 class AcademicHoldSeeder extends Seeder
 {
@@ -25,7 +24,7 @@ class AcademicHoldSeeder extends Seeder
         // Get FALL2024 semester
         $semester = Semester::where('code', 'LIKE', '%Fall%2024%')->first();
 
-        if (!$semester) {
+        if (! $semester) {
             throw new \Exception('FALL2024 semester not found.');
         }
 
@@ -53,6 +52,7 @@ class AcademicHoldSeeder extends Seeder
 
         if ($existingHolds > 0) {
             $this->command->info("✅ Academic holds already exist for FALL2024 ({$existingHolds} found). Skipping creation.");
+
             return;
         }
 
@@ -180,7 +180,9 @@ class AcademicHoldSeeder extends Seeder
         $failedCourses = 0;
 
         foreach ($records as $record) {
-            if ($record->excluded_from_gpa) continue;
+            if ($record->excluded_from_gpa) {
+                continue;
+            }
 
             $gradePoints = $this->getGradePoints($record->final_grade);
             $creditHours = floatval($record->courseOffering->unit->credit_points ?? 12.5);

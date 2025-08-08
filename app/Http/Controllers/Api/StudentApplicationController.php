@@ -9,7 +9,6 @@ use App\Models\StudentApplication;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 
 class StudentApplicationController extends Controller
 {
@@ -47,7 +46,7 @@ class StudentApplicationController extends Controller
         return response()->json([
             'success' => true,
             'data' => $applications,
-            'filters' => $request->only(['status', 'campus_code', 'search', 'per_page'])
+            'filters' => $request->only(['status', 'campus_code', 'search', 'per_page']),
         ]);
     }
 
@@ -58,7 +57,7 @@ class StudentApplicationController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => $studentApplication
+            'data' => $studentApplication,
         ]);
     }
 
@@ -78,7 +77,7 @@ class StudentApplicationController extends Controller
                 try {
                     $existingStudent = StudentApplication::where('email', $studentData['email'])
                         ->orWhere(function ($query) use ($studentData) {
-                            if (!empty($studentData['national_id'])) {
+                            if (! empty($studentData['national_id'])) {
                                 $query->where('national_id', $studentData['national_id']);
                             }
                         })
@@ -95,7 +94,7 @@ class StudentApplicationController extends Controller
                     $errors[] = [
                         'index' => $index,
                         'email' => $studentData['email'] ?? 'N/A',
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ];
                 }
             }
@@ -109,8 +108,8 @@ class StudentApplicationController extends Controller
                 'updated' => $updated,
                 'errors' => $errors,
                 'total_processed' => count($students),
-                'total_failed' => count($errors)
-            ]
+                'total_failed' => count($errors),
+            ],
         ]);
     }
 
@@ -121,18 +120,18 @@ class StudentApplicationController extends Controller
     {
         try {
             $studentApplication->update([
-                'status' => $request->validated('status')
+                'status' => $request->validated('status'),
             ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Application status updated successfully',
-                'data' => $studentApplication->fresh()
+                'data' => $studentApplication->fresh(),
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update application status: ' . $e->getMessage()
+                'message' => 'Failed to update application status: '.$e->getMessage(),
             ], 500);
         }
     }

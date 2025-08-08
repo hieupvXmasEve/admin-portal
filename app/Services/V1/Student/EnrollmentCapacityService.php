@@ -18,6 +18,7 @@ class EnrollmentCapacityService
     public function hasAvailableCapacity(CourseOffering $courseOffering): bool
     {
         $currentEnrollment = $this->getCurrentEnrollmentCount($courseOffering);
+
         return $currentEnrollment < $courseOffering->max_enrollment;
     }
 
@@ -41,6 +42,7 @@ class EnrollmentCapacityService
     public function getAvailableSpots(CourseOffering $courseOffering): int
     {
         $currentEnrollment = $this->getCurrentEnrollmentCount($courseOffering);
+
         return max(0, $courseOffering->max_enrollment - $currentEnrollment);
     }
 
@@ -91,7 +93,7 @@ class EnrollmentCapacityService
      */
     public function canAddToWaitlist(CourseOffering $courseOffering, Student $student): bool
     {
-        if (!$courseOffering->allow_waitlist) {
+        if (! $courseOffering->allow_waitlist) {
             return false;
         }
 
@@ -126,7 +128,7 @@ class EnrollmentCapacityService
      */
     public function addToWaitlist(CourseOffering $courseOffering, Student $student): CourseRegistration
     {
-        if (!$this->canAddToWaitlist($courseOffering, $student)) {
+        if (! $this->canAddToWaitlist($courseOffering, $student)) {
             throw new \Exception('Cannot add student to waitlist');
         }
 
@@ -152,7 +154,7 @@ class EnrollmentCapacityService
      */
     public function processWaitlist(CourseOffering $courseOffering): ?CourseRegistration
     {
-        if (!$this->hasAvailableCapacity($courseOffering)) {
+        if (! $this->hasAvailableCapacity($courseOffering)) {
             return null;
         }
 
@@ -162,7 +164,7 @@ class EnrollmentCapacityService
             ->orderBy('waitlist_position')
             ->first();
 
-        if (!$nextWaitlistRegistration) {
+        if (! $nextWaitlistRegistration) {
             return null;
         }
 
@@ -197,7 +199,7 @@ class EnrollmentCapacityService
             ->where('registration_status', 'waitlisted')
             ->first();
 
-        if (!$waitlistRegistration) {
+        if (! $waitlistRegistration) {
             return null;
         }
 

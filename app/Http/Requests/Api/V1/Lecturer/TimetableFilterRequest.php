@@ -28,32 +28,32 @@ class TimetableFilterRequest extends FormRequest
             'start_date' => [
                 'nullable',
                 'date',
-                'before_or_equal:end_date'
+                'before_or_equal:end_date',
             ],
             'end_date' => [
                 'nullable',
                 'date',
-                'after_or_equal:start_date'
+                'after_or_equal:start_date',
             ],
             'view' => [
                 'nullable',
                 'string',
-                'in:day,week,month'
+                'in:day,week,month',
             ],
             'course_offering_id' => [
                 'nullable',
                 'integer',
-                'exists:course_offerings,id'
+                'exists:course_offerings,id',
             ],
             'status' => [
                 'nullable',
                 'string',
-                'in:scheduled,completed,cancelled,in_progress'
+                'in:scheduled,completed,cancelled,in_progress',
             ],
             'include_cancelled' => [
                 'nullable',
-                'boolean'
-            ]
+                'boolean',
+            ],
         ];
     }
 
@@ -70,7 +70,7 @@ class TimetableFilterRequest extends FormRequest
             'view.in' => 'View must be one of: day, week, month',
             'course_offering_id.exists' => 'The selected course offering does not exist',
             'status.in' => 'Status must be one of: scheduled, completed, cancelled, in_progress',
-            'include_cancelled.boolean' => 'Include cancelled must be true or false'
+            'include_cancelled.boolean' => 'Include cancelled must be true or false',
         ];
     }
 
@@ -93,12 +93,12 @@ class TimetableFilterRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         // Set default view if not provided
-        if (!$this->has('view')) {
+        if (! $this->has('view')) {
             $this->merge(['view' => 'week']);
         }
 
         // Set default date range if not provided (current week)
-        if (!$this->has('start_date') && !$this->has('end_date')) {
+        if (! $this->has('start_date') && ! $this->has('end_date')) {
             $this->merge([
                 'start_date' => now()->startOfWeek()->format('Y-m-d'),
                 'end_date' => now()->endOfWeek()->format('Y-m-d'),
@@ -108,7 +108,7 @@ class TimetableFilterRequest extends FormRequest
         // Convert string 'true'/'false' to boolean for include_cancelled
         if ($this->has('include_cancelled')) {
             $this->merge([
-                'include_cancelled' => filter_var($this->include_cancelled, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+                'include_cancelled' => filter_var($this->include_cancelled, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE),
             ]);
         }
     }

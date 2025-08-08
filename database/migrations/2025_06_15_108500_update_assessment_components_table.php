@@ -27,7 +27,7 @@ return new class extends Migration
                 'online',
                 'in_person',
                 'both',
-                'no_submission'
+                'no_submission',
             ])->default('online');
 
             $table->json('allowed_file_types')->nullable(); // ["pdf", "docx", "pptx"]
@@ -56,7 +56,7 @@ return new class extends Migration
                 'in_progress',
                 'grading',
                 'completed',
-                'cancelled'
+                'cancelled',
             ])->default('draft');
 
             // Ordering and organization
@@ -111,7 +111,7 @@ return new class extends Migration
                 'is_extra_credit',
                 'status',
                 'sort_order',
-                'category'
+                'category',
             ]);
         });
     }

@@ -6,13 +6,12 @@ namespace App\Services;
 
 use App\Models\Unit;
 use Illuminate\Database\Eloquent\Builder;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\Border;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class UnitExcelExportService
 {
@@ -20,7 +19,7 @@ class UnitExcelExportService
     {
         $units = $this->getUnitsWithRelationships($filters);
 
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
 
         // Remove default worksheet
         $spreadsheet->removeSheetByIndex(0);
@@ -36,11 +35,11 @@ class UnitExcelExportService
         $spreadsheet->setActiveSheetIndex(0);
 
         // Save to temporary file
-        $fileName = 'units_export_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
-        $filePath = storage_path('app/temp/' . $fileName);
+        $fileName = 'units_export_'.now()->format('Y-m-d_H-i-s').'.xlsx';
+        $filePath = storage_path('app/temp/'.$fileName);
 
         // Ensure temp directory exists
-        if (!file_exists(storage_path('app/temp'))) {
+        if (! file_exists(storage_path('app/temp'))) {
             mkdir(storage_path('app/temp'), 0755, true);
         }
 
@@ -57,7 +56,7 @@ class UnitExcelExportService
             'equivalentUnits.equivalentUnit',
             'curriculumUnits.curriculumVersion.program',
             'curriculumUnits.curriculumVersion.specialization',
-            'syllabus'
+            'syllabus',
         ]);
 
         $this->applyFilters($query, $filters);
@@ -82,7 +81,7 @@ class UnitExcelExportService
             'Curricula Count',
             'Syllabus Count',
             'Created At',
-            'Updated At'
+            'Updated At',
         ];
 
         $worksheet->fromArray($headers, null, 'A1');
@@ -92,15 +91,15 @@ class UnitExcelExportService
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '4472C4']
+                'startColor' => ['rgb' => '4472C4'],
             ],
             'borders' => [
-                'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical' => Alignment::VERTICAL_CENTER
-            ]
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
         ];
 
         $worksheet->getStyle('A1:K1')->applyFromArray($headerStyle);
@@ -129,7 +128,7 @@ class UnitExcelExportService
                 $curriculaCount,
                 $syllabusCount,
                 $unit->created_at->format('Y-m-d H:i:s'),
-                $unit->updated_at->format('Y-m-d H:i:s')
+                $unit->updated_at->format('Y-m-d H:i:s'),
             ], null, "A{$row}");
 
             $row++;
@@ -144,7 +143,7 @@ class UnitExcelExportService
         $worksheet->freezePane('A2');
 
         // Add auto-filter
-        $worksheet->setAutoFilter('A1:K' . ($row - 1));
+        $worksheet->setAutoFilter('A1:K'.($row - 1));
     }
 
     /**
@@ -172,15 +171,15 @@ class UnitExcelExportService
                         break;
                     case 'prerequisite':
                         $prefix = '(P)';
-                        $conditionExpressions[] = $prefix . $condition->requiredUnit?->code;
+                        $conditionExpressions[] = $prefix.$condition->requiredUnit?->code;
                         break;
                     case 'co_requisite':
                         $prefix = '(C)';
-                        $conditionExpressions[] = $prefix . $condition->requiredUnit?->code;
+                        $conditionExpressions[] = $prefix.$condition->requiredUnit?->code;
                         break;
                     case 'anti_requisite':
                         $prefix = '(E)';
-                        $conditionExpressions[] = $prefix . $condition->requiredUnit?->code;
+                        $conditionExpressions[] = $prefix.$condition->requiredUnit?->code;
                         break;
                     case 'textual':
                         $conditionExpressions[] = "({$condition->free_text})";
@@ -193,9 +192,9 @@ class UnitExcelExportService
                 }
             }
 
-            if (!empty($conditionExpressions)) {
+            if (! empty($conditionExpressions)) {
                 if (count($conditionExpressions) > 1) {
-                    $groupExpression = '(' . implode(' ' . $group->logic_operator . ' ', $conditionExpressions) . ')';
+                    $groupExpression = '('.implode(' '.$group->logic_operator.' ', $conditionExpressions).')';
                 } else {
                     $groupExpression = $conditionExpressions[0];
                 }
@@ -232,7 +231,7 @@ class UnitExcelExportService
             'Required Unit Code',
             'Required Unit Name',
             'Required Credits',
-            'Free Text'
+            'Free Text',
         ];
 
         $worksheet->fromArray($headers, null, 'A1');
@@ -242,15 +241,15 @@ class UnitExcelExportService
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '4472C4']
+                'startColor' => ['rgb' => '4472C4'],
             ],
             'borders' => [
-                'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical' => Alignment::VERTICAL_CENTER
-            ]
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
         ];
 
         $worksheet->getStyle('A1:K1')->applyFromArray($headerStyle);
@@ -271,7 +270,7 @@ class UnitExcelExportService
                         $condition->requiredUnit?->code ?? '',
                         $condition->requiredUnit?->name ?? '',
                         $condition->required_credits,
-                        $condition->free_text
+                        $condition->free_text,
                     ], null, "A{$row}");
 
                     $row++;
@@ -288,7 +287,7 @@ class UnitExcelExportService
         $worksheet->freezePane('A2');
 
         // Add auto-filter
-        $worksheet->setAutoFilter('A1:K' . ($row - 1));
+        $worksheet->setAutoFilter('A1:K'.($row - 1));
     }
 
     private function createEquivalentsSheet(Spreadsheet $spreadsheet, Collection $units): void
@@ -306,7 +305,7 @@ class UnitExcelExportService
             'Equivalent Unit Name',
             'Reason',
             'Valid From Semester',
-            'Created At'
+            'Created At',
         ];
 
         $worksheet->fromArray($headers, null, 'A1');
@@ -316,15 +315,15 @@ class UnitExcelExportService
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '4472C4']
+                'startColor' => ['rgb' => '4472C4'],
             ],
             'borders' => [
-                'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical' => Alignment::VERTICAL_CENTER
-            ]
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
         ];
 
         $worksheet->getStyle('A1:I1')->applyFromArray($headerStyle);
@@ -342,7 +341,7 @@ class UnitExcelExportService
                     $equivalent->equivalentUnit->name,
                     $equivalent->reason,
                     'N/A', // validFromSemester field not available in current schema
-                    $equivalent->created_at->format('Y-m-d H:i:s')
+                    $equivalent->created_at->format('Y-m-d H:i:s'),
                 ], null, "A{$row}");
 
                 $row++;
@@ -358,7 +357,7 @@ class UnitExcelExportService
         $worksheet->freezePane('A2');
 
         // Add auto-filter
-        $worksheet->setAutoFilter('A1:I' . ($row - 1));
+        $worksheet->setAutoFilter('A1:I'.($row - 1));
     }
 
     private function createCurriculumMappingSheet(Spreadsheet $spreadsheet, Collection $units): void
@@ -377,7 +376,7 @@ class UnitExcelExportService
             'Group Type',
             'Is Required',
             'Year Level',
-            'Semester Number'
+            'Semester Number',
         ];
 
         $worksheet->fromArray($headers, null, 'A1');
@@ -387,15 +386,15 @@ class UnitExcelExportService
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '4472C4']
+                'startColor' => ['rgb' => '4472C4'],
             ],
             'borders' => [
-                'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical' => Alignment::VERTICAL_CENTER
-            ]
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
         ];
 
         $worksheet->getStyle('A1:J1')->applyFromArray($headerStyle);
@@ -414,7 +413,7 @@ class UnitExcelExportService
                     $curriculumUnit->type,
                     $curriculumUnit->is_required ? 'Yes' : 'No',
                     $curriculumUnit->year_level,
-                    $curriculumUnit->semester_number
+                    $curriculumUnit->semester_number,
                 ], null, "A{$row}");
 
                 $row++;
@@ -430,7 +429,7 @@ class UnitExcelExportService
         $worksheet->freezePane('A2');
 
         // Add auto-filter
-        $worksheet->setAutoFilter('A1:J' . ($row - 1));
+        $worksheet->setAutoFilter('A1:J'.($row - 1));
     }
 
     private function createStatisticsSheet(Spreadsheet $spreadsheet): void
@@ -442,7 +441,7 @@ class UnitExcelExportService
         $headers = [
             'Metric',
             'Value',
-            'Description'
+            'Description',
         ];
 
         $worksheet->fromArray($headers, null, 'A1');
@@ -452,15 +451,15 @@ class UnitExcelExportService
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '4472C4']
+                'startColor' => ['rgb' => '4472C4'],
             ],
             'borders' => [
-                'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN],
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical' => Alignment::VERTICAL_CENTER
-            ]
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
         ];
 
         $worksheet->getStyle('A1:C1')->applyFromArray($headerStyle);
@@ -477,7 +476,7 @@ class UnitExcelExportService
             ['Units with Prerequisites', $unitsWithPrerequisites, 'Units that have prerequisite requirements'],
             ['Units with Equivalents', $unitsWithEquivalents, 'Units that have equivalent unit relationships'],
             ['Units in Curricula', $unitsInCurricula, 'Units that are part of curriculum structures'],
-            ['Average Credit Points', $avgCreditPoints ? round((float)$avgCreditPoints, 2) : 0, 'Average credit points across all units'],
+            ['Average Credit Points', $avgCreditPoints ? round((float) $avgCreditPoints, 2) : 0, 'Average credit points across all units'],
         ];
 
         $row = 2;
@@ -497,10 +496,10 @@ class UnitExcelExportService
 
     private function applyFilters(Builder $query, array $filters): void
     {
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {
-                $q->where('code', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('name', 'like', '%' . $filters['search'] . '%');
+                $q->where('code', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('name', 'like', '%'.$filters['search'].'%');
             });
         }
 

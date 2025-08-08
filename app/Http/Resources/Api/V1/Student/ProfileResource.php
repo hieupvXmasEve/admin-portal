@@ -49,7 +49,7 @@ class ProfileResource extends JsonResource
             ],
             'avatar' => [
                 'url' => $personalInfo['avatar_url'],
-                'has_avatar' => !empty($personalInfo['avatar_url']),
+                'has_avatar' => ! empty($personalInfo['avatar_url']),
             ],
         ];
     }
@@ -66,20 +66,20 @@ class ProfileResource extends JsonResource
                 'code' => $academicInfo['program']['code'],
                 'degree_type' => $academicInfo['program']['degree_type'],
                 'duration_years' => $academicInfo['program']['duration_years'],
-                'display_name' => $academicInfo['program']['code'] . ' - ' . $academicInfo['program']['name'],
+                'display_name' => $academicInfo['program']['code'].' - '.$academicInfo['program']['name'],
             ],
             'curriculum_version' => [
                 'id' => $academicInfo['curriculum_version']['id'],
                 'version' => $academicInfo['curriculum_version']['version'],
                 'effective_date' => $academicInfo['curriculum_version']['effective_date'],
-                'display' => 'Version ' . $academicInfo['curriculum_version']['version'],
+                'display' => 'Version '.$academicInfo['curriculum_version']['version'],
             ],
             'campus' => [
                 'id' => $academicInfo['campus']['id'],
                 'name' => $academicInfo['campus']['name'],
                 'code' => $academicInfo['campus']['code'],
                 'location' => $academicInfo['campus']['location'],
-                'display_name' => $academicInfo['campus']['name'] . ' (' . $academicInfo['campus']['code'] . ')',
+                'display_name' => $academicInfo['campus']['name'].' ('.$academicInfo['campus']['code'].')',
             ],
             'enrollment' => [
                 'enrollment_date' => $academicInfo['enrollment_date'],
@@ -102,14 +102,14 @@ class ProfileResource extends JsonResource
             'primary_contact' => [
                 'email' => $contactInfo['email'],
                 'phone' => $contactInfo['phone'],
-                'has_phone' => !empty($contactInfo['phone']),
+                'has_phone' => ! empty($contactInfo['phone']),
             ],
             'emergency_contact' => [
                 'name' => $contactInfo['emergency_contact_name'],
                 'phone' => $contactInfo['emergency_contact_phone'],
                 'relationship' => $contactInfo['emergency_contact_relationship'],
-                'is_complete' => !empty($contactInfo['emergency_contact_name']) &&
-                    !empty($contactInfo['emergency_contact_phone']),
+                'is_complete' => ! empty($contactInfo['emergency_contact_name']) &&
+                    ! empty($contactInfo['emergency_contact_phone']),
             ],
             'address' => [
                 'street' => $contactInfo['address']['street'],
@@ -269,9 +269,9 @@ class ProfileResource extends JsonResource
      */
     protected function isAddressComplete(array $address): bool
     {
-        return !empty($address['street']) &&
-            !empty($address['city']) &&
-            !empty($address['country']);
+        return ! empty($address['street']) &&
+            ! empty($address['city']) &&
+            ! empty($address['country']);
     }
 
     /**

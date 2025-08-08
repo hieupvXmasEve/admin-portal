@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Constants\UnitRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Unit\StoreUnitRequest;
 use App\Http\Requests\Unit\UpdateUnitRequest;
@@ -12,7 +13,6 @@ use App\Services\PrerequisiteLogicService;
 use App\Services\UnitRelationshipService;
 use App\Services\UnitService;
 use App\Services\UnitValidationService;
-use App\Constants\UnitRoutes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -21,13 +21,11 @@ use Inertia\Response;
 class UnitController extends Controller
 {
     public function __construct(
-        private UnitValidationService    $validationService,
-        private UnitRelationshipService  $relationshipService,
+        private UnitValidationService $validationService,
+        private UnitRelationshipService $relationshipService,
         private PrerequisiteLogicService $prerequisiteLogicService,
-        private UnitService              $unitService
-    )
-    {
-    }
+        private UnitService $unitService
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -86,10 +84,11 @@ class UnitController extends Controller
     {
         try {
             $this->unitService->createUnit($request->validated());
+
             return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit created successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to create unit: ' . $e->getMessage()])
+                ->withErrors(['error' => 'Failed to create unit: '.$e->getMessage()])
                 ->withInput();
         }
     }
@@ -102,7 +101,7 @@ class UnitController extends Controller
             'curriculumUnits.semester',
             'prerequisiteGroups.conditions.requiredUnit',
             'syllabus.curriculumUnit.semester',
-            'syllabus.assessmentComponents.details'
+            'syllabus.assessmentComponents.details',
         ]);
 
         // Transform the data to match frontend expectations
@@ -197,7 +196,7 @@ class UnitController extends Controller
                         'id' => $conditionData['required_unit']['id'],
                         'code' => $conditionData['required_unit']['code'],
                         'name' => $conditionData['required_unit']['name'],
-                        'credit_points' => (float)$conditionData['required_unit']['credit_points'],
+                        'credit_points' => (float) $conditionData['required_unit']['credit_points'],
                     ] : null,
                     'required_credits' => $conditionData['required_credits'],
                     'free_text' => $conditionData['free_text'],
@@ -210,10 +209,11 @@ class UnitController extends Controller
     {
         try {
             $this->unitService->updateUnit($unit, $request->validated());
+
             return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to update unit: ' . $e->getMessage()])
+                ->withErrors(['error' => 'Failed to update unit: '.$e->getMessage()])
                 ->withInput();
         }
     }
@@ -222,17 +222,18 @@ class UnitController extends Controller
     {
         $canDelete = $this->validationService->canDeleteUnit($unit);
 
-        if (!$canDelete['allowed']) {
+        if (! $canDelete['allowed']) {
             return redirect()->route(UnitRoutes::INDEX)
                 ->with('error', $canDelete['reason']);
         }
 
         try {
             $this->unitService->deleteUnit($unit);
+
             return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit deleted successfully.');
         } catch (\Exception $e) {
             return redirect()->route(UnitRoutes::INDEX)
-                ->with('error', 'Failed to delete unit: ' . $e->getMessage());
+                ->with('error', 'Failed to delete unit: '.$e->getMessage());
         }
     }
 
@@ -247,10 +248,10 @@ class UnitController extends Controller
 
         // Convert comma-separated string to array
         $excludeIds = [];
-        if (!empty($validated['exclude'])) {
+        if (! empty($validated['exclude'])) {
             $excludeIds = array_filter(
                 array_map('intval', explode(',', $validated['exclude'])),
-                fn($id) => $id > 0
+                fn ($id) => $id > 0
             );
         }
 
@@ -268,7 +269,7 @@ class UnitController extends Controller
         return response()->json([
             'success' => true,
             'data' => $units,
-            'message' => 'Units retrieved successfully'
+            'message' => 'Units retrieved successfully',
         ]);
     }
 
@@ -294,7 +295,7 @@ class UnitController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'valid' => false,
-                'message' => 'Error validating expression: ' . $e->getMessage(),
+                'message' => 'Error validating expression: '.$e->getMessage(),
             ], 400);
         }
     }
@@ -315,9 +316,9 @@ class UnitController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'valid' => !$exists,
+                'valid' => ! $exists,
                 'message' => $exists ? 'Unit code already exists' : 'Unit code is available',
-            ]
+            ],
         ]);
     }
 
@@ -344,7 +345,7 @@ class UnitController extends Controller
                 } else {
                     $failed[] = [
                         'code' => $unit->code,
-                        'reason' => $canDelete['reason']
+                        'reason' => $canDelete['reason'],
                     ];
                 }
             }
@@ -355,14 +356,14 @@ class UnitController extends Controller
                 'success' => true,
                 'deleted' => $deleted,
                 'failed' => $failed,
-                'message' => count($deleted) . ' units deleted successfully.'
+                'message' => count($deleted).' units deleted successfully.',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk delete failed: ' . $e->getMessage()
+                'message' => 'Bulk delete failed: '.$e->getMessage(),
             ], 500);
         }
     }

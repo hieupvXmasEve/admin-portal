@@ -28,13 +28,13 @@ class UserAccountSeeder extends Seeder
         $this->createSuperAdminUser();
 
         // Create campus admin users
-//        $this->createCampusAdminUsers();
+        //        $this->createCampusAdminUsers();
 
         // Create staff users
-//        $this->createStaffUsers();
+        //        $this->createStaffUsers();
 
         // Create additional test users in local environment
-//        $this->createTestUsers();
+        //        $this->createTestUsers();
 
         $this->command->info('✅ User accounts created successfully!');
     }
@@ -79,7 +79,7 @@ class UserAccountSeeder extends Seeder
             'lienpt13@fpt.edu.vn' => 'lienpt',
         ];
 
-        return $emailToName[$email] ?? "Super Admin " . ($index + 1);
+        return $emailToName[$email] ?? 'Super Admin '.($index + 1);
     }
 
     private function createCampusAdminUsers(): void

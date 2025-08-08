@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Web\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
-use Illuminate\Http\Request;
-use App\Models\User;
-use Illuminate\Support\Facades\Auth;
 
 class SocialController extends Controller
 {
@@ -24,11 +24,12 @@ class SocialController extends Controller
             if ($user) {
                 Auth::login($user);
                 $request->session()->put('email', $user->email);
+
                 return redirect()->route('select-campus.index');
             } else {
                 return redirect()->route('login', [
                     'error' => 'Email is not registered',
-                    'email' => $user_social->email
+                    'email' => $user_social->email,
                 ]);
             }
         } catch (InvalidStateException $e) {
@@ -36,7 +37,7 @@ class SocialController extends Controller
             return redirect()->route('login')->with('error', 'Authentication failed. Please try again.');
         } catch (\Exception $e) {
             // Handle other exceptions
-            return redirect()->route('login')->with('error', 'Authentication error: ' . $e->getMessage());
+            return redirect()->route('login')->with('error', 'Authentication error: '.$e->getMessage());
         }
     }
 }

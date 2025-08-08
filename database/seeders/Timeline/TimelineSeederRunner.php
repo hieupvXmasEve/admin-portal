@@ -78,10 +78,10 @@ class TimelineSeederRunner extends Seeder
             ]);
 
             $this->command->info("\n✅ Timeline Seeder Runner completed successfully!");
-            $this->command->info("📊 Academic workflow simulation complete");
+            $this->command->info('📊 Academic workflow simulation complete');
         } catch (\Exception $e) {
             $this->command->error("\n❌ Timeline Seeder Runner failed!");
-            $this->command->error("Error: " . $e->getMessage());
+            $this->command->error('Error: '.$e->getMessage());
             throw $e;
         }
     }

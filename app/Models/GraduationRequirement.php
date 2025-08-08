@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 
 class GraduationRequirement extends Model
 {
@@ -98,8 +98,8 @@ class GraduationRequirement extends Model
     public function isCurrentlyActive(): bool
     {
         $now = now()->toDateString();
-        
-        return $this->is_active && 
+
+        return $this->is_active &&
                $this->effective_from <= $now &&
                ($this->effective_to === null || $this->effective_to >= $now);
     }
@@ -154,11 +154,11 @@ class GraduationRequirement extends Model
     {
         $now = now()->toDateString();
         $query->where('is_active', true)
-              ->where('effective_from', '<=', $now)
-              ->where(function ($q) use ($now) {
-                  $q->whereNull('effective_to')
+            ->where('effective_from', '<=', $now)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('effective_to')
                     ->orWhere('effective_to', '>=', $now);
-              });
+            });
     }
 
     public function scopeForProgram(Builder $query, int $programId): void
@@ -166,7 +166,7 @@ class GraduationRequirement extends Model
         $query->where('program_id', $programId);
     }
 
-    public function scopeForSpecialization(Builder $query, int $specializationId = null): void
+    public function scopeForSpecialization(Builder $query, ?int $specializationId = null): void
     {
         if ($specializationId) {
             $query->where('specialization_id', $specializationId);
@@ -178,9 +178,9 @@ class GraduationRequirement extends Model
     public function scopeEffectiveForDate(Builder $query, string $date): void
     {
         $query->where('effective_from', '<=', $date)
-              ->where(function ($q) use ($date) {
-                  $q->whereNull('effective_to')
+            ->where(function ($q) use ($date) {
+                $q->whereNull('effective_to')
                     ->orWhere('effective_to', '>=', $date);
-              });
+            });
     }
 }

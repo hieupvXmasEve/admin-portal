@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
-use App\Models\CourseRegistration;
-use App\Models\CourseOffering;
-use App\Models\Semester;
-use App\Models\Unit;
 use App\Models\CurriculumUnit;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\Unit;
 use Illuminate\Database\Seeder;
 
 class MixedSemesterProgressionSeeder extends Seeder
@@ -172,6 +170,7 @@ class MixedSemesterProgressionSeeder extends Seeder
 
         // Extract unit models and return as Unit collection
         $unitIds = $curriculumUnits->pluck('unit_id')->toArray();
+
         return Unit::whereIn('id', $unitIds)->get();
     }
 
@@ -185,7 +184,7 @@ class MixedSemesterProgressionSeeder extends Seeder
 
         $currentNotes = $student->admission_notes ?? '';
         $student->update([
-            'admission_notes' => trim($currentNotes . ' | ' . $planNote)
+            'admission_notes' => trim($currentNotes.' | '.$planNote),
         ]);
     }
 
@@ -195,7 +194,7 @@ class MixedSemesterProgressionSeeder extends Seeder
 
         $currentNotes = $student->admission_notes ?? '';
         $student->update([
-            'admission_notes' => trim($currentNotes . ' | ' . $progressionNote)
+            'admission_notes' => trim($currentNotes.' | '.$progressionNote),
         ]);
 
         $this->command->info("  📋 {$student->student_code}: {$progressionType['description']}");
@@ -219,8 +218,8 @@ class MixedSemesterProgressionSeeder extends Seeder
                     'name' => $data['name'],
                     'start_date' => $data['start'],
                     'end_date' => $data['end'],
-                    'enrollment_start_date' => date('Y-m-d', strtotime($data['start'] . ' -30 days')),
-                    'enrollment_end_date' => date('Y-m-d', strtotime($data['start'] . ' +14 days')),
+                    'enrollment_start_date' => date('Y-m-d', strtotime($data['start'].' -30 days')),
+                    'enrollment_end_date' => date('Y-m-d', strtotime($data['start'].' +14 days')),
                     'is_active' => true,
                     'is_current' => false,
                 ]

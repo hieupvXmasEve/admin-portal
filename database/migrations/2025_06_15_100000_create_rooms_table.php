@@ -29,7 +29,7 @@ return new class extends Migration
                 'study_room',
                 'workshop',
                 'office',
-                'other'
+                'other',
             ])->default('classroom');
 
             $table->integer('capacity')->default(1); // Maximum occupancy
@@ -45,7 +45,7 @@ return new class extends Migration
                 'occupied',
                 'maintenance',
                 'out_of_service',
-                'reserved'
+                'reserved',
             ])->default('available');
 
             $table->boolean('is_bookable')->default(true); // Can this room be booked?

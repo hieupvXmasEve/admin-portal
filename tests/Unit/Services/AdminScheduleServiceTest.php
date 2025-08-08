@@ -24,7 +24,7 @@ class AdminScheduleServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new AdminScheduleService();
+        $this->service = new AdminScheduleService;
     }
 
     public function test_can_retrieve_schedule_data_with_filters(): void
@@ -37,7 +37,7 @@ class AdminScheduleServiceTest extends TestCase
             'semester_id' => $semester->id,
             'lecture_id' => $lecture->id,
         ]);
-        
+
         ClassSession::factory()->count(3)->create([
             'course_offering_id' => $courseOffering->id,
             'lecture_id' => $lecture->id,
@@ -65,7 +65,7 @@ class AdminScheduleServiceTest extends TestCase
         // Arrange
         $startDate = Carbon::today();
         $endDate = Carbon::today()->addWeek();
-        
+
         ClassSession::factory()->create([
             'session_date' => $startDate->copy()->addDays(2),
         ]);
@@ -95,9 +95,9 @@ class AdminScheduleServiceTest extends TestCase
             'start_time' => Carbon::createFromTime(9, 0),
             'end_time' => Carbon::createFromTime(11, 0),
         ]);
-        
+
         $room = Room::factory()->create();
-        
+
         $updateData = [
             'session_date' => Carbon::today()->addDays(2)->toDateString(),
             'start_time' => '10:00',
@@ -125,11 +125,11 @@ class AdminScheduleServiceTest extends TestCase
             'start_time' => Carbon::createFromTime(9, 0),
             'end_time' => Carbon::createFromTime(11, 0),
         ]);
-        
+
         $newSession = ClassSession::factory()->create([
             'room_id' => Room::factory()->create()->id,
         ]);
-        
+
         $conflictingData = [
             'session_date' => Carbon::today()->addDays(1)->toDateString(),
             'start_time' => '09:30',
@@ -156,11 +156,11 @@ class AdminScheduleServiceTest extends TestCase
             'start_time' => Carbon::createFromTime(9, 0),
             'end_time' => Carbon::createFromTime(11, 0),
         ]);
-        
+
         $newSession = ClassSession::factory()->create([
             'lecture_id' => $lecture->id,
         ]);
-        
+
         $conflictingData = [
             'session_date' => Carbon::today()->addDays(1)->toDateString(),
             'start_time' => '10:00',
@@ -180,7 +180,7 @@ class AdminScheduleServiceTest extends TestCase
     {
         // Arrange
         $session = ClassSession::factory()->create();
-        
+
         $invalidData = [
             'session_date' => Carbon::today()->addDays(1)->toDateString(),
             'start_time' => '11:00',
@@ -204,9 +204,9 @@ class AdminScheduleServiceTest extends TestCase
             'start_time' => Carbon::createFromTime(9, 0),
             'end_time' => Carbon::createFromTime(11, 0),
         ]);
-        
+
         $room = Room::factory()->create();
-        
+
         $validData = [
             'session_date' => Carbon::today()->addDays(2)->toDateString(),
             'start_time' => '10:00',
@@ -227,7 +227,7 @@ class AdminScheduleServiceTest extends TestCase
         $courseOffering = CourseOffering::factory()->create();
         $lecture = Lecture::factory()->create(['name' => 'Dr. Smith']);
         $room = Room::factory()->create(['name' => 'Room A101']);
-        
+
         $session = ClassSession::factory()->create([
             'course_offering_id' => $courseOffering->id,
             'lecture_id' => $lecture->id,

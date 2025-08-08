@@ -139,7 +139,7 @@ class ClassSessionController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Apply search filter
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $attendanceQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -149,7 +149,7 @@ class ClassSessionController extends Controller
         }
 
         // Apply status filter
-        if (!empty($filters['status']) && $filters['status'] !== 'all') {
+        if (! empty($filters['status']) && $filters['status'] !== 'all') {
             $attendanceQuery->where('status', $filters['status']);
         }
 
@@ -277,7 +277,7 @@ class ClassSessionController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Apply search filter
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $attendanceQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -287,7 +287,7 @@ class ClassSessionController extends Controller
         }
 
         // Apply status filter
-        if (!empty($filters['status']) && $filters['status'] !== 'all') {
+        if (! empty($filters['status']) && $filters['status'] !== 'all') {
             $attendanceQuery->where('status', $filters['status']);
         }
 
@@ -323,7 +323,7 @@ class ClassSessionController extends Controller
 
         return response($csvContent, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -338,7 +338,7 @@ class ClassSessionController extends Controller
 
         // Escape quotes by doubling them and wrap in quotes if contains comma, quote, or newline
         if (str_contains($field, ',') || str_contains($field, '"') || str_contains($field, "\n")) {
-            return '"' . str_replace('"', '""', $field) . '"';
+            return '"'.str_replace('"', '""', $field).'"';
         }
 
         return $field;

@@ -28,23 +28,23 @@ class StudentFilterRequest extends FormRequest
             'search' => [
                 'nullable',
                 'string',
-                'max:255'
+                'max:255',
             ],
             'attendance_status' => [
                 'nullable',
                 'string',
-                'in:excellent,good,warning,at_risk'
+                'in:excellent,good,warning,at_risk',
             ],
             'sort_by' => [
                 'nullable',
                 'string',
-                'in:name,student_number,attendance_percentage,last_attendance'
+                'in:name,student_number,attendance_percentage,last_attendance',
             ],
             'sort_direction' => [
                 'nullable',
                 'string',
-                'in:asc,desc'
-            ]
+                'in:asc,desc',
+            ],
         ];
     }
 
@@ -57,7 +57,7 @@ class StudentFilterRequest extends FormRequest
             'search.max' => 'Search term must not exceed 255 characters',
             'attendance_status.in' => 'Attendance status must be one of: excellent, good, warning, at_risk',
             'sort_by.in' => 'Sort by must be one of: name, student_number, attendance_percentage, last_attendance',
-            'sort_direction.in' => 'Sort direction must be either asc or desc'
+            'sort_direction.in' => 'Sort direction must be either asc or desc',
         ];
     }
 
@@ -82,14 +82,14 @@ class StudentFilterRequest extends FormRequest
         // Trim search term
         if ($this->has('search')) {
             $this->merge([
-                'search' => trim($this->search)
+                'search' => trim($this->search),
             ]);
         }
 
         // Set default sort direction
-        if ($this->has('sort_by') && !$this->has('sort_direction')) {
+        if ($this->has('sort_by') && ! $this->has('sort_direction')) {
             $this->merge([
-                'sort_direction' => 'asc'
+                'sort_direction' => 'asc',
             ]);
         }
     }

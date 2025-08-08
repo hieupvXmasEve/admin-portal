@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders\InitialSetup;
 
-use App\Models\Campus;
 use App\Models\Building;
+use App\Models\Campus;
 use App\Models\Room;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -55,18 +55,18 @@ class InstitutionSetupSeeder extends Seeder
                 'code' => 'HCM',
                 'address' => 'Số 123 Đường Nguyễn Văn Cừ, Phường An Hoà, Quận Ninh Kiều, Thành phố Hồ Chí Minh',
             ],
-//            [
-//                'id' => 3,
-//                'name' => 'Swinburne Đà Nẵng',
-//                'code' => 'DN',
-//                'address' => 'Số 456 Đường Ngô Quyền, Phường An Hải Bắc, Quận Sơn Trà, Thành phố Đà Nẵng',
-//            ],
-//            [
-//                'id' => 4,
-//                'name' => 'Swinburne Cần Thơ',
-//                'code' => 'CT',
-//                'address' => 'Số 789 Đường 3 Tháng 2, Phường Xuân Khánh, Quận Ninh Kiều, Thành phố Cần Thơ',
-//            ],
+            //            [
+            //                'id' => 3,
+            //                'name' => 'Swinburne Đà Nẵng',
+            //                'code' => 'DN',
+            //                'address' => 'Số 456 Đường Ngô Quyền, Phường An Hải Bắc, Quận Sơn Trà, Thành phố Đà Nẵng',
+            //            ],
+            //            [
+            //                'id' => 4,
+            //                'name' => 'Swinburne Cần Thơ',
+            //                'code' => 'CT',
+            //                'address' => 'Số 789 Đường 3 Tháng 2, Phường Xuân Khánh, Quận Ninh Kiều, Thành phố Cần Thơ',
+            //            ],
         ];
 
         foreach ($campuses as $campusData) {
@@ -91,7 +91,7 @@ class InstitutionSetupSeeder extends Seeder
 
                 $building = Building::create([
                     'campus_id' => $campus->id,
-                    'code' => $campus->code . sprintf('%02d', $buildingCount),
+                    'code' => $campus->code.sprintf('%02d', $buildingCount),
                     'name' => $buildingName,
                     'description' => $this->getBuildingDescription($type, $buildingName),
                     'address' => $this->getBuildingAddress($campus, $buildingName),
@@ -137,12 +137,12 @@ class InstitutionSetupSeeder extends Seeder
             for ($i = 1; $i <= $config['count']; $i++) {
                 $roomNumber++;
                 $capacity = rand($config['capacity_range'][0], $config['capacity_range'][1]);
-                $floor = (string)floor($roomNumber / 100);
+                $floor = (string) floor($roomNumber / 100);
 
                 Room::create([
                     'campus_id' => $building->campus_id,
-                    'code' => $building->code . '-' . $roomNumber,
-                    'name' => $config['name_prefix'] . ' ' . $roomNumber,
+                    'code' => $building->code.'-'.$roomNumber,
+                    'name' => $config['name_prefix'].' '.$roomNumber,
                     'building' => $building->name,
                     'floor' => $floor,
                     'type' => $config['type'],
@@ -173,6 +173,6 @@ class InstitutionSetupSeeder extends Seeder
 
     private function getBuildingAddress(Campus $campus, string $buildingName): string
     {
-        return $buildingName . ', ' . $campus->address;
+        return $buildingName.', '.$campus->address;
     }
 }

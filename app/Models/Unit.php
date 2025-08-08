@@ -107,7 +107,7 @@ class Unit extends Model
             })
             ->exists();
 
-        return !$isFromSameSpecialization;
+        return ! $isFromSameSpecialization;
     }
 
     /**

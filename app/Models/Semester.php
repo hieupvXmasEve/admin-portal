@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Builder;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class Semester extends AuditableModel
@@ -63,27 +63,29 @@ class Semester extends AuditableModel
 
     public function canEdit(): bool
     {
-        return !$this->isArchived();
+        return ! $this->isArchived();
     }
 
     public function canDelete(): bool
     {
-        return !$this->isArchived() && !$this->is_active;
+        return ! $this->isArchived() && ! $this->is_active;
     }
 
     public function isRegistrationOpen(): bool
     {
-        if (!$this->enrollment_start_date || !$this->enrollment_end_date) {
+        if (! $this->enrollment_start_date || ! $this->enrollment_end_date) {
             return false;
         }
 
         $now = Carbon::now();
+
         return $now->between($this->enrollment_start_date, $this->enrollment_end_date);
     }
 
     public function isActive(): bool
     {
         $now = Carbon::now();
+
         return $now->between($this->start_date, $this->end_date);
     }
 
@@ -167,7 +169,7 @@ class Semester extends AuditableModel
 
         // Check if this is the next semester to be activated
         $nextSemester = static::getNextActiveSemester();
-        if (!$nextSemester || $nextSemester->id !== $this->id) {
+        if (! $nextSemester || $nextSemester->id !== $this->id) {
             return false;
         }
 
@@ -198,7 +200,7 @@ class Semester extends AuditableModel
      */
     public function activate(): bool
     {
-        if (!$this->canBeActivated()) {
+        if (! $this->canBeActivated()) {
             return false;
         }
 
@@ -226,11 +228,12 @@ class Semester extends AuditableModel
      */
     public function shouldBeDeactivated(): bool
     {
-        if (!$this->is_active || !$this->end_date) {
+        if (! $this->is_active || ! $this->end_date) {
             return false;
         }
 
         $now = Carbon::now();
+
         return $now->gt($this->end_date);
     }
 
@@ -241,7 +244,7 @@ class Semester extends AuditableModel
     {
         $now = Carbon::now();
 
-        return (int)static::where('is_active', true)
+        return (int) static::where('is_active', true)
             ->where('end_date', '<', $now)
             ->update(['is_active' => false]);
     }
@@ -262,7 +265,7 @@ class Semester extends AuditableModel
         }
 
         $nextSemester = static::getNextActiveSemester();
-        if (!$nextSemester) {
+        if (! $nextSemester) {
             return 'No upcoming semesters available for activation.';
         }
 
@@ -278,7 +281,7 @@ class Semester extends AuditableModel
      */
     public function getActiveStatusChangeError(): ?string
     {
-        if (!$this->canChangeActiveStatus()) {
+        if (! $this->canChangeActiveStatus()) {
             return 'Cannot change active status during the semester period.';
         }
 
@@ -301,7 +304,7 @@ class Semester extends AuditableModel
         return [
             'code', 'name', 'start_date', 'end_date',
             'enrollment_start_date', 'enrollment_end_date',
-            'is_active', 'is_archived'
+            'is_active', 'is_archived',
         ];
     }
 

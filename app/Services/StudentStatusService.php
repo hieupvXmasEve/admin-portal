@@ -6,9 +6,9 @@ namespace App\Services;
 
 use App\Models\Student;
 use App\Models\User;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class StudentStatusService
 {
@@ -49,11 +49,11 @@ class StudentStatusService
         $query = Student::where('academic_status', $status)
             ->with(['campus', 'program', 'specialization', 'statusChangedBy']);
 
-        if (!empty($filters['campus_id'])) {
+        if (! empty($filters['campus_id'])) {
             $query->where('campus_id', $filters['campus_id']);
         }
 
-        if (!empty($filters['program_id'])) {
+        if (! empty($filters['program_id'])) {
             $query->where('program_id', $filters['program_id']);
         }
 
@@ -67,7 +67,7 @@ class StudentStatusService
     {
         $query = Student::query();
 
-        if (!empty($filters['campus_id'])) {
+        if (! empty($filters['campus_id'])) {
             $query->where('campus_id', $filters['campus_id']);
         }
 
@@ -95,7 +95,7 @@ class StudentStatusService
     {
         $validStatuses = ['active', 'inactive', 'graduated', 'suspended', 'withdrawn'];
 
-        if (!in_array($newStatus, $validStatuses)) {
+        if (! in_array($newStatus, $validStatuses)) {
             throw new Exception('Invalid academic status');
         }
 

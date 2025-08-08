@@ -6,11 +6,9 @@ namespace App\Services\V1\Lecturer;
 
 use App\Models\Lecture;
 use App\Models\Student;
-use App\Models\CourseOffering;
 use App\Models\StudentNote;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 
 class LecturerStudentService
 {
@@ -37,7 +35,7 @@ class LecturerStudentService
                 $q->whereHas('classSession', function ($sessionQuery) use ($lecturer) {
                     $sessionQuery->where('lecture_id', $lecturer->id);
                 });
-            }
+            },
         ]);
 
         // Apply filters
@@ -67,10 +65,10 @@ class LecturerStudentService
                 $q->whereHas('classSession', function ($sessionQuery) use ($lecturer) {
                     $sessionQuery->where('lecture_id', $lecturer->id);
                 })->with('classSession.courseOffering.curriculumUnit');
-            }
+            },
         ])->where('id', $studentId)->first();
 
-        if (!$student) {
+        if (! $student) {
             return null;
         }
 
@@ -90,7 +88,7 @@ class LecturerStudentService
      */
     public function getStudentAlerts(Lecture $lecturer, array $filters = []): array
     {
-        $cacheKey = "lecturer-student-alerts:{$lecturer->id}:" . md5(serialize($filters));
+        $cacheKey = "lecturer-student-alerts:{$lecturer->id}:".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($lecturer, $filters) {
             $alerts = [];
@@ -159,7 +157,7 @@ class LecturerStudentService
             });
         })->where('id', $studentId)->exists();
 
-        if (!$hasAccess) {
+        if (! $hasAccess) {
             throw new \Exception('Student not found or access denied');
         }
 
@@ -193,7 +191,7 @@ class LecturerStudentService
             ->where('lecture_id', $lecturer->id)
             ->first();
 
-        if (!$note) {
+        if (! $note) {
             throw new \Exception('Note not found or access denied');
         }
 
@@ -214,7 +212,7 @@ class LecturerStudentService
             ->where('lecture_id', $lecturer->id)
             ->first();
 
-        if (!$note) {
+        if (! $note) {
             throw new \Exception('Note not found or access denied');
         }
 
@@ -250,13 +248,13 @@ class LecturerStudentService
      */
     protected function applyStudentFilters($query, array $filters, Lecture $lecturer): void
     {
-        if (!empty($filters['course_offering_id'])) {
+        if (! empty($filters['course_offering_id'])) {
             $query->whereHas('courseRegistrations', function ($q) use ($filters) {
                 $q->where('course_offering_id', $filters['course_offering_id']);
             });
         }
 
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('student_number', 'like', "%{$search}%")
@@ -266,12 +264,12 @@ class LecturerStudentService
             });
         }
 
-        if (!empty($filters['attendance_status'])) {
+        if (! empty($filters['attendance_status'])) {
             // This would require complex subquery logic
             // Implementation depends on specific requirements
         }
 
-        if (!empty($filters['alert_type'])) {
+        if (! empty($filters['alert_type'])) {
             // Filter students with specific alert types
             // Implementation depends on alert system design
         }
@@ -459,9 +457,16 @@ class LecturerStudentService
 
     protected function getAttendanceStatus(float $percentage): string
     {
-        if ($percentage >= 90) return 'excellent';
-        if ($percentage >= 75) return 'good';
-        if ($percentage >= 60) return 'warning';
+        if ($percentage >= 90) {
+            return 'excellent';
+        }
+        if ($percentage >= 75) {
+            return 'good';
+        }
+        if ($percentage >= 60) {
+            return 'warning';
+        }
+
         return 'at_risk';
     }
 

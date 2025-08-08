@@ -37,7 +37,7 @@ class CourseRegistrationRequest extends FormRequest
                 'exists:course_offerings,id',
                 function ($attribute, $value, $fail) {
                     $courseOffering = CourseOffering::where('id', (int) $value)->first();
-                    if ($courseOffering && !$courseOffering->is_active) {
+                    if ($courseOffering && ! $courseOffering->is_active) {
                         $fail('The selected course offering is not active.');
                     }
                 },

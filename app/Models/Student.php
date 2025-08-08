@@ -14,7 +14,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Student extends StudentAuditableModel
 {
-    use HasFactory, Notifiable, SoftDeletes, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $guard = 'student';
 
@@ -89,7 +89,7 @@ class Student extends StudentAuditableModel
             'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
             'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
             'high_school_name' => ['nullable', 'string', 'max:255'],
-            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
+            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
             'status' => ['nullable', 'in:active,inactive,suspended,graduated'],
@@ -151,6 +151,7 @@ class Student extends StudentAuditableModel
     {
         return $this->hasMany(CourseRegistration::class);
     }
+
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class, 'student_id');
@@ -194,12 +195,12 @@ class Student extends StudentAuditableModel
     public function canRegisterForCourses(): bool
     {
         return $this->status === 'active' &&
-            !$this->hasActiveHolds();
+            ! $this->hasActiveHolds();
     }
 
     public function generateStudentId(string $campusCode, int $year): string
     {
-        $lastStudent = static::where('student_code', 'like', $campusCode . $year . '%')
+        $lastStudent = static::where('student_code', 'like', $campusCode.$year.'%')
             ->orderBy('student_code', 'desc')
             ->first();
 
@@ -210,7 +211,7 @@ class Student extends StudentAuditableModel
             $newNumber = 1;
         }
 
-        return $campusCode . $year . str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
+        return $campusCode.$year.str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
     }
 
     // New Student Management methods
@@ -234,7 +235,7 @@ class Student extends StudentAuditableModel
 
     public function canRetakeCourse(): bool
     {
-        return $this->isAcademicStatusActive() && !$this->hasActiveHolds();
+        return $this->isAcademicStatusActive() && ! $this->hasActiveHolds();
     }
 
     public function getRetakeCoursesCount(): int

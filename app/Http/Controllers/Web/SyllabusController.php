@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Constants\SyllabusRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Syllabus\StoreSyllabusRequest;
 use App\Http\Requests\Syllabus\UpdateSyllabusRequest;
@@ -15,7 +16,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Constants\SyllabusRoutes;
 
 class SyllabusController extends Controller
 {
@@ -36,7 +36,7 @@ class SyllabusController extends Controller
                 'curriculumUnit.semester',
                 'curriculumUnit.curriculumVersion.program',
                 'curriculumUnit.curriculumVersion.specialization',
-                'assessmentComponents.details'
+                'assessmentComponents.details',
             ])
             ->orderBy('is_active', 'desc')
             ->orderBy('created_at', 'desc')
@@ -92,7 +92,7 @@ class SyllabusController extends Controller
                 ->with('success', 'Syllabus created successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to create syllabus: ' . $e->getMessage()])
+                ->withErrors(['error' => 'Failed to create syllabus: '.$e->getMessage()])
                 ->withInput();
         }
     }
@@ -126,14 +126,14 @@ class SyllabusController extends Controller
             'assessmentComponents.details',
             'curriculumUnit.semester',
             'curriculumUnit.curriculumVersion.program',
-            'curriculumUnit.curriculumVersion.specialization'
+            'curriculumUnit.curriculumVersion.specialization',
         ]);
 
         $curriculumUnits = $unit->curriculumUnits()
             ->with([
                 'semester',
                 'curriculumVersion.program',
-                'curriculumVersion.specialization'
+                'curriculumVersion.specialization',
             ])
             ->get();
 
@@ -165,7 +165,7 @@ class SyllabusController extends Controller
             Log::error('Syllabus update failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
 
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to update syllabus: ' . $e->getMessage()])
+                ->withErrors(['error' => 'Failed to update syllabus: '.$e->getMessage()])
                 ->withInput();
         }
     }
@@ -182,7 +182,7 @@ class SyllabusController extends Controller
                 ->with('success', 'Syllabus deleted successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to delete syllabus: ' . $e->getMessage()]);
+                ->withErrors(['error' => 'Failed to delete syllabus: '.$e->getMessage()]);
         }
     }
 
@@ -201,7 +201,7 @@ class SyllabusController extends Controller
             return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to toggle syllabus status: ' . $e->getMessage()]);
+                ->withErrors(['error' => 'Failed to toggle syllabus status: '.$e->getMessage()]);
         }
     }
 
@@ -217,7 +217,7 @@ class SyllabusController extends Controller
                 ->with('success', "Syllabus cloned successfully as version {$clonedSyllabus->version}.");
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to clone syllabus: ' . $e->getMessage()]);
+                ->withErrors(['error' => 'Failed to clone syllabus: '.$e->getMessage()]);
         }
     }
 }

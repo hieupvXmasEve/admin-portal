@@ -64,7 +64,7 @@ class StudentResource extends JsonResource
             }),
 
             // Computed fields
-            'display_name' => $this->full_name . ' (' . $this->student_code . ')',
+            'display_name' => $this->full_name.' ('.$this->student_code.')',
             'status_label' => ucfirst(str_replace('_', ' ', $this->status)),
 
             // Timestamps

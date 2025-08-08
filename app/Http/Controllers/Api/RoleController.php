@@ -22,6 +22,7 @@ class RoleController extends Controller
     public function store(StoreRoleRequest $request): RoleResource
     {
         $role = $this->roleService->createRole($request->validated());
+
         return new RoleResource($role);
     }
 
@@ -33,12 +34,14 @@ class RoleController extends Controller
     public function update(UpdateRoleRequest $request, Role $role): RoleResource
     {
         $updatedRole = $this->roleService->updateRole($role, $request->validated());
+
         return new RoleResource($updatedRole);
     }
 
     public function destroy(Role $role): \Illuminate\Http\Response
     {
         $this->roleService->deleteRole($role);
+
         return response()->noContent();
     }
 }

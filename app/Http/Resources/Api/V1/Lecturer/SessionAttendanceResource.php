@@ -43,7 +43,7 @@ class SessionAttendanceResource extends JsonResource
                         'recorded_by' => $student['attendance']['recorded_by'],
                         'recorded_at' => $student['attendance']['recorded_at'],
                         'can_edit' => true,
-                        'can_verify' => !$student['attendance']['is_verified'],
+                        'can_verify' => ! $student['attendance']['is_verified'],
                     ],
                 ];
             }),
@@ -148,7 +148,7 @@ class SessionAttendanceResource extends JsonResource
                 'type' => 'action',
                 'priority' => 'high',
                 'message' => "Mark attendance for {$counts['not_marked']} remaining students",
-                'action' => 'mark_remaining_attendance'
+                'action' => 'mark_remaining_attendance',
             ];
         }
 
@@ -157,14 +157,14 @@ class SessionAttendanceResource extends JsonResource
                 'type' => 'alert',
                 'priority' => 'high',
                 'message' => 'Very low attendance rate detected. Consider follow-up actions.',
-                'action' => 'investigate_low_attendance'
+                'action' => 'investigate_low_attendance',
             ];
         } elseif ($summary['attendance_rate'] < 75) {
             $recommendations[] = [
                 'type' => 'warning',
                 'priority' => 'medium',
                 'message' => 'Below average attendance rate. Monitor closely.',
-                'action' => 'monitor_attendance'
+                'action' => 'monitor_attendance',
             ];
         }
 
@@ -173,7 +173,7 @@ class SessionAttendanceResource extends JsonResource
                 'type' => 'action',
                 'priority' => 'medium',
                 'message' => "Consider sending follow-up to {$counts['absent']} absent students",
-                'action' => 'contact_absent_students'
+                'action' => 'contact_absent_students',
             ];
         }
 
@@ -182,7 +182,7 @@ class SessionAttendanceResource extends JsonResource
                 'type' => 'positive',
                 'priority' => 'low',
                 'message' => 'Excellent attendance rate! Keep up the good work.',
-                'action' => 'maintain_engagement'
+                'action' => 'maintain_engagement',
             ];
         }
 

@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Semester;
+use App\Models\Student;
 use App\Services\RegistrationService;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Validator;
 use Exception;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class RegistrationController extends Controller
 {
@@ -37,14 +37,14 @@ class RegistrationController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         $query = CourseRegistration::with([
             'courseOffering.curriculumUnit.unit',
             'courseOffering.lecture',
-            'semester'
+            'semester',
         ])->where('student_code', $student->id);
 
         if ($request->semester_id) {
@@ -92,8 +92,8 @@ class RegistrationController extends Controller
                         'can_drop' => $registration->canDrop(),
                         'can_withdraw' => $registration->canWithdraw(),
                     ];
-                })
-            ]
+                }),
+            ],
         ]);
     }
 
@@ -110,10 +110,10 @@ class RegistrationController extends Controller
             ->where('end_date', '>=', now())
             ->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return response()->json([
                 'success' => false,
-                'message' => 'No active semester found'
+                'message' => 'No active semester found',
             ], 404);
         }
 
@@ -139,8 +139,8 @@ class RegistrationController extends Controller
                     'active_registrations' => count(array_filter($registrations, function ($reg) {
                         return in_array($reg['registration_status'], ['registered', 'confirmed']);
                     })),
-                ]
-            ]
+                ],
+            ],
         ]);
     }
 
@@ -159,7 +159,7 @@ class RegistrationController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -181,13 +181,13 @@ class RegistrationController extends Controller
                         'credit_hours' => $registration->credit_hours,
                         'registration_date' => $registration->registration_date->format('Y-m-d H:i:s'),
 
-                    ]
-                ]
+                    ],
+                ],
             ], 201);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 400);
         }
     }
@@ -203,7 +203,7 @@ class RegistrationController extends Controller
         if ($registration->student_code !== $student->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized'
+                'message' => 'Unauthorized',
             ], 403);
         }
 
@@ -212,12 +212,12 @@ class RegistrationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Course dropped successfully'
+                'message' => 'Course dropped successfully',
             ]);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 400);
         }
     }
@@ -233,7 +233,7 @@ class RegistrationController extends Controller
         if ($registration->student_code !== $student->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized'
+                'message' => 'Unauthorized',
             ], 403);
         }
 
@@ -242,12 +242,12 @@ class RegistrationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Withdrawn from course successfully'
+                'message' => 'Withdrawn from course successfully',
             ]);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 400);
         }
     }
@@ -268,10 +268,10 @@ class RegistrationController extends Controller
 
             $courseInfo = collect($availableCourses)->firstWhere('offering.id', $courseOffering->id);
 
-            if (!$courseInfo) {
+            if (! $courseInfo) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Course not found or not available'
+                    'message' => 'Course not found or not available',
                 ], 404);
             }
 
@@ -289,13 +289,13 @@ class RegistrationController extends Controller
                         'credit_hours' => $courseOffering->credit_hours,
                         'max_enrollment' => $courseOffering->max_enrollment,
                         'current_enrollment' => $courseOffering->current_enrollment,
-                    ]
-                ]
+                    ],
+                ],
             ]);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 400);
         }
     }
@@ -333,17 +333,17 @@ class RegistrationController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'has_conflicts' => !empty($conflicts),
+                'has_conflicts' => ! empty($conflicts),
                 'conflicts' => $conflicts,
                 'course_schedule' => $courseOffering->schedule,
-            ]
+            ],
         ]);
     }
 
     /**
      * Simple time conflict check (placeholder implementation)
      */
-    private function hasTimeConflict(array $schedule1 = null, array $schedule2 = null): bool
+    private function hasTimeConflict(?array $schedule1 = null, ?array $schedule2 = null): bool
     {
         // TODO: Implement actual schedule conflict logic
         // This would compare days of week, start/end times, etc.

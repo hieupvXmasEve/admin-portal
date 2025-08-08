@@ -21,7 +21,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new AssessmentWeightValidationService();
+        $this->service = new AssessmentWeightValidationService;
     }
 
     /** @test */
@@ -37,7 +37,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
             'exceeds_limit',
             'missing_weight',
             'component_validations',
-            'errors'
+            'errors',
         ]);
 
         expect($result['total_weight'])->toBe(0);
@@ -74,13 +74,13 @@ class AssessmentWeightValidationServiceTest extends TestCase
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 40,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 60,
-            'name' => 'Final Exam'
+            'name' => 'Final Exam',
         ]);
 
         $result = $this->service->validateCourseWeights($courseOffering);
@@ -103,13 +103,13 @@ class AssessmentWeightValidationServiceTest extends TestCase
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 60,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 50,
-            'name' => 'Final Exam'
+            'name' => 'Final Exam',
         ]);
 
         $result = $this->service->validateCourseWeights($courseOffering);
@@ -131,13 +131,13 @@ class AssessmentWeightValidationServiceTest extends TestCase
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 30,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 40,
-            'name' => 'Final Exam'
+            'name' => 'Final Exam',
         ]);
 
         $result = $this->service->validateCourseWeights($courseOffering);
@@ -156,20 +156,20 @@ class AssessmentWeightValidationServiceTest extends TestCase
         $component = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 50,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         // Create details that total exactly the component weight
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component->id,
             'weight' => 30,
-            'name' => 'Part A'
+            'name' => 'Part A',
         ]);
 
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component->id,
             'weight' => 20,
-            'name' => 'Part B'
+            'name' => 'Part B',
         ]);
 
         $result = $this->service->validateComponentWeights($component->fresh());
@@ -189,20 +189,20 @@ class AssessmentWeightValidationServiceTest extends TestCase
         $component = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 50,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         // Create details that exceed the component weight
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component->id,
             'weight' => 40,
-            'name' => 'Part A'
+            'name' => 'Part A',
         ]);
 
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component->id,
             'weight' => 30,
-            'name' => 'Part B'
+            'name' => 'Part B',
         ]);
 
         $result = $this->service->validateComponentWeights($component->fresh());
@@ -219,20 +219,20 @@ class AssessmentWeightValidationServiceTest extends TestCase
         $component = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 50,
-            'name' => 'Assignment'
+            'name' => 'Assignment',
         ]);
 
         // Create details that are less than the component weight
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component->id,
             'weight' => 20,
-            'name' => 'Part A'
+            'name' => 'Part A',
         ]);
 
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component->id,
             'weight' => 15,
-            'name' => 'Part B'
+            'name' => 'Part B',
         ]);
 
         $result = $this->service->validateComponentWeights($component->fresh());
@@ -249,7 +249,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
         $component = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 0,
-            'name' => 'Invalid Assignment'
+            'name' => 'Invalid Assignment',
         ]);
 
         $result = $this->service->validateComponentWeights($component);
@@ -265,7 +265,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
         $component = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 120,
-            'name' => 'Invalid Assignment'
+            'name' => 'Invalid Assignment',
         ]);
 
         $result = $this->service->validateComponentWeights($component);
@@ -283,7 +283,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
         // Create existing component that uses 60%
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'weight' => 60
+            'weight' => 60,
         ]);
 
         $componentData = ['weight' => 30];
@@ -306,7 +306,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
         // Create existing component that uses 80%
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'weight' => 80
+            'weight' => 80,
         ]);
 
         $componentData = ['weight' => 30];
@@ -329,25 +329,25 @@ class AssessmentWeightValidationServiceTest extends TestCase
             'syllabus_id' => $syllabus->id,
             'weight' => 40,
             'name' => 'Assignment',
-            'type' => 'assignment'
+            'type' => 'assignment',
         ]);
 
         $component2 = AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
             'weight' => 60,
             'name' => 'Final Exam',
-            'type' => 'exam'
+            'type' => 'exam',
         ]);
 
         // Add some details to component1
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component1->id,
-            'weight' => 25
+            'weight' => 25,
         ]);
 
         AssessmentComponentDetail::factory()->create([
             'assessment_component_id' => $component1->id,
-            'weight' => 15
+            'weight' => 15,
         ]);
 
         $result = $this->service->getWeightDistributionSummary($courseOffering);
@@ -374,7 +374,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
 
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'weight' => 70
+            'weight' => 70,
         ]);
 
         $validation = $this->service->validateCourseWeights($courseOffering);
@@ -384,7 +384,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
         expect($recommendations)->toContainEqual([
             'type' => 'missing_weight',
             'message' => 'Add 30% more assessment weight to reach 100%',
-            'severity' => 'warning'
+            'severity' => 'warning',
         ]);
     }
 
@@ -396,7 +396,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
 
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'weight' => 120
+            'weight' => 120,
         ]);
 
         $validation = $this->service->validateCourseWeights($courseOffering);
@@ -406,7 +406,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
         expect($recommendations)->toContainEqual([
             'type' => 'exceeds_limit',
             'message' => 'Reduce assessment weights by 20% to not exceed 100%',
-            'severity' => 'error'
+            'severity' => 'error',
         ]);
     }
 
@@ -418,12 +418,12 @@ class AssessmentWeightValidationServiceTest extends TestCase
             'syllabus_id' => $syllabus->id,
             'course_code' => 'CS101',
             'course_title' => 'Introduction to Programming',
-            'section_code' => 'A'
+            'section_code' => 'A',
         ]);
 
         AssessmentComponent::factory()->create([
             'syllabus_id' => $syllabus->id,
-            'weight' => 100
+            'weight' => 100,
         ]);
 
         $report = $this->service->generateWeightValidationReport($courseOffering);
@@ -433,7 +433,7 @@ class AssessmentWeightValidationServiceTest extends TestCase
             'validation_timestamp',
             'validation_results',
             'weight_distribution',
-            'recommendations'
+            'recommendations',
         ]);
 
         expect($report['course_offering']['course_code'])->toBe('CS101');

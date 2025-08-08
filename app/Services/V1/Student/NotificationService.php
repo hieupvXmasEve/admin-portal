@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
 use App\Models\Notification;
 use App\Models\NotificationPreference;
-use Illuminate\Support\Collection;
+use App\Models\Student;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class NotificationService
 {
@@ -19,7 +17,7 @@ class NotificationService
      */
     public function getNotifications(Student $student, array $filters = []): array
     {
-        $cacheKey = "notifications:student:{$student->id}:" . md5(serialize($filters));
+        $cacheKey = "notifications:student:{$student->id}:".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($student, $filters) {
             $query = $student->notifications()->with(['notificationType']);
@@ -177,7 +175,7 @@ class NotificationService
 
         // Merge with existing preferences
         foreach ($preferences as $preference) {
-            $key = $preference->notification_type . '.' . $preference->channel;
+            $key = $preference->notification_type.'.'.$preference->channel;
             if (isset($defaultPreferences[$preference->notification_type][$preference->channel])) {
                 $defaultPreferences[$preference->notification_type][$preference->channel]['enabled'] = $preference->is_enabled;
             }
@@ -212,6 +210,7 @@ class NotificationService
             }
 
             $this->clearNotificationCache($student);
+
             return true;
         });
     }
@@ -337,15 +336,15 @@ class NotificationService
      */
     protected function applyNotificationFilters($query, array $filters): void
     {
-        if (!empty($filters['category'])) {
+        if (! empty($filters['category'])) {
             $query->where('category', $filters['category']);
         }
 
-        if (!empty($filters['type'])) {
+        if (! empty($filters['type'])) {
             $query->where('type', $filters['type']);
         }
 
-        if (!empty($filters['priority'])) {
+        if (! empty($filters['priority'])) {
             $query->where('priority', $filters['priority']);
         }
 
@@ -353,11 +352,11 @@ class NotificationService
             $query->where('is_read', $filters['is_read']);
         }
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->whereDate('created_at', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->whereDate('created_at', '<=', $filters['date_to']);
         }
     }
@@ -561,7 +560,7 @@ class NotificationService
 
         // Clear all cached notification data for this student
         $keys = Cache::getRedis()->keys($pattern);
-        if (!empty($keys)) {
+        if (! empty($keys)) {
             Cache::getRedis()->del($keys);
         }
     }

@@ -133,7 +133,7 @@ class NotificationResource extends JsonResource
             ];
         }
 
-        if (!$notification['is_read']) {
+        if (! $notification['is_read']) {
             $badges[] = [
                 'type' => 'unread',
                 'text' => 'New',

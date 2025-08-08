@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\Web\RoleController;
 use App\Constants\RoleRoutes;
+use App\Http\Controllers\Web\RoleController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'web'])->group(function () {

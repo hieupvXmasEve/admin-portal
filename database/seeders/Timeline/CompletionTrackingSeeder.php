@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
-use App\Models\CurriculumUnit;
-use App\Models\AcademicRecord;
 use App\Models\GpaCalculation;
+use App\Models\Student;
 use Illuminate\Database\Seeder;
 
 class CompletionTrackingSeeder extends Seeder
@@ -25,7 +23,7 @@ class CompletionTrackingSeeder extends Seeder
             'academicRecords' => function ($query) {
                 $query->where('grade_status', 'final');
             },
-            'curriculumVersion.curriculumUnits.unit'
+            'curriculumVersion.curriculumUnits.unit',
         ])->get();
 
         if ($students->isEmpty()) {
@@ -204,7 +202,7 @@ class CompletionTrackingSeeder extends Seeder
         // Update student record
         $currentNotes = $student->admission_notes ?? '';
         $student->update([
-            'admission_notes' => trim($currentNotes . ' | ' . $completionNotes)
+            'admission_notes' => trim($currentNotes.' | '.$completionNotes),
         ]);
 
         // Log significant milestones
@@ -222,14 +220,14 @@ class CompletionTrackingSeeder extends Seeder
         $notes = [];
 
         $notes[] = "Completion: {$data['unit_completion_percentage']}% units, {$data['credit_completion_percentage']}% credits";
-        $notes[] = "Status: " . str_replace('_', ' ', ucwords($data['status']));
+        $notes[] = 'Status: '.str_replace('_', ' ', ucwords($data['status']));
         $notes[] = "GPA: {$data['current_gpa']}";
         $notes[] = "Est. graduation: {$data['estimated_graduation_semester']}";
 
         // Add category-specific notes
         foreach ($data['completion_by_category'] as $category => $info) {
             if ($info['required'] > 0) {
-                $notes[] = ucfirst($category) . ": {$info['completed']}/{$info['required']} ({$info['percentage']}%)";
+                $notes[] = ucfirst($category).": {$info['completed']}/{$info['required']} ({$info['percentage']}%)";
             }
         }
 
@@ -238,7 +236,7 @@ class CompletionTrackingSeeder extends Seeder
 
     private function displayCompletionStatistics(array $stats): void
     {
-        $this->command->info("✅ Degree completion tracking complete!");
+        $this->command->info('✅ Degree completion tracking complete!');
         $this->command->info("  📊 Total students analyzed: {$stats['total_students']}");
         $this->command->info("  ✅ On track: {$stats['on_track']} students");
         $this->command->info("  🚀 Ahead of schedule: {$stats['ahead_of_schedule']} students");

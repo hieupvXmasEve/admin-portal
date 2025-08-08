@@ -81,7 +81,7 @@ class RoomService
             }
 
             $room->update($data);
-            
+
             return $room->fresh('campus');
         });
     }
@@ -170,8 +170,8 @@ class RoomService
      */
     private function applyFilters(Builder $query, array $filters): void
     {
-        if (!empty($filters['search'])) {
-            $search = '%' . $filters['search'] . '%';
+        if (! empty($filters['search'])) {
+            $search = '%'.$filters['search'].'%';
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', $search)
                     ->orWhere('code', 'like', $search)
@@ -180,19 +180,19 @@ class RoomService
             });
         }
 
-        if (!empty($filters['type'])) {
+        if (! empty($filters['type'])) {
             $query->ofType($filters['type']);
         }
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->withStatus($filters['status']);
         }
 
-        if (!empty($filters['building'])) {
+        if (! empty($filters['building'])) {
             $query->where('building', $filters['building']);
         }
 
-        if (!empty($filters['floor'])) {
+        if (! empty($filters['floor'])) {
             $query->where('floor', $filters['floor']);
         }
 
@@ -204,16 +204,16 @@ class RoomService
             $query->where('requires_approval', (bool) $filters['requires_approval']);
         }
 
-        if (!empty($filters['min_capacity'])) {
+        if (! empty($filters['min_capacity'])) {
             $query->withMinimumCapacity((int) $filters['min_capacity']);
         }
 
-        if (!empty($filters['max_capacity'])) {
+        if (! empty($filters['max_capacity'])) {
             $query->where('capacity', '<=', (int) $filters['max_capacity']);
         }
 
         // Sorting
-        if (!empty($filters['sort'])) {
+        if (! empty($filters['sort'])) {
             $direction = $filters['direction'] ?? 'asc';
             $query->orderBy($filters['sort'], $direction);
         }

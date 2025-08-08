@@ -28,12 +28,12 @@ class ActivityLogController extends Controller
             ->latest();
 
         // Apply campus filtering based on user permissions
-        if (!$isSystemAdmin) {
+        if (! $isSystemAdmin) {
             // Non-system admins see only their accessible campuses
-            if (!empty($accessibleCampusIds)) {
+            if (! empty($accessibleCampusIds)) {
                 $campusLogNames = [];
                 foreach ($accessibleCampusIds as $campusId) {
-                    $campusLogNames[] = '%_campus_' . $campusId;
+                    $campusLogNames[] = '%_campus_'.$campusId;
                 }
 
                 $query->where(function ($q) use ($campusLogNames) {
@@ -44,31 +44,31 @@ class ActivityLogController extends Controller
             }
         } else {
             // System admins can optionally filter by specific campus
-            if (!empty($filters['campus_id']) && $filters['campus_id'] !== 'all') {
-                $query->where('log_name', 'like', '%_campus_' . $filters['campus_id']);
+            if (! empty($filters['campus_id']) && $filters['campus_id'] !== 'all') {
+                $query->where('log_name', 'like', '%_campus_'.$filters['campus_id']);
             }
         }
 
         // Apply search filter
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {
-                $q->where('description', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('log_name', 'like', '%' . $filters['search'] . '%')
-                  ->orWhereJsonContains('properties->campus_name', $filters['search'])
-                  ->orWhereJsonContains('properties->user_name', $filters['search'])
-                  ->orWhereHas('causer', function ($q) use ($filters) {
-                      $q->where('name', 'like', '%' . $filters['search'] . '%');
-                  });
+                $q->where('description', 'like', '%'.$filters['search'].'%')
+                    ->orWhere('log_name', 'like', '%'.$filters['search'].'%')
+                    ->orWhereJsonContains('properties->campus_name', $filters['search'])
+                    ->orWhereJsonContains('properties->user_name', $filters['search'])
+                    ->orWhereHas('causer', function ($q) use ($filters) {
+                        $q->where('name', 'like', '%'.$filters['search'].'%');
+                    });
             });
         }
 
         // Apply subject type filter
-        if (!empty($filters['subject_type'])) {
+        if (! empty($filters['subject_type'])) {
             $query->where('subject_type', $filters['subject_type']);
         }
 
         // Apply event filter
-        if (!empty($filters['event'])) {
+        if (! empty($filters['event'])) {
             $query->where('event', $filters['event']);
         }
 
@@ -76,10 +76,10 @@ class ActivityLogController extends Controller
 
         // Get available filter options based on current campus context
         $queryForOptions = Activity::query();
-        if (!$isSystemAdmin && !empty($accessibleCampusIds)) {
+        if (! $isSystemAdmin && ! empty($accessibleCampusIds)) {
             $campusLogNames = [];
             foreach ($accessibleCampusIds as $campusId) {
-                $campusLogNames[] = '%_campus_' . $campusId;
+                $campusLogNames[] = '%_campus_'.$campusId;
             }
 
             $queryForOptions->where(function ($q) use ($campusLogNames) {

@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('permissions', function (Blueprint $table) {
-            if (!Schema::hasColumn('permissions', 'display_name')) {
+            if (! Schema::hasColumn('permissions', 'display_name')) {
                 $table->string('display_name')->after('name')->nullable();
             }
-            if (!Schema::hasColumn('permissions', 'module')) {
+            if (! Schema::hasColumn('permissions', 'module')) {
                 $table->string('module')->after('description')->nullable();
             }
         });

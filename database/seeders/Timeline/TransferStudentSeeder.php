@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Timeline;
 
-use App\Models\Student;
-use App\Models\Campus;
-use App\Models\Program;
-use App\Models\CurriculumVersion;
 use App\Models\AcademicRecord;
-use App\Models\Unit;
+use App\Models\Campus;
+use App\Models\CurriculumVersion;
+use App\Models\Program;
 use App\Models\Semester;
-use Illuminate\Database\Seeder;
+use App\Models\Student;
+use App\Models\Unit;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class TransferStudentSeeder extends Seeder
 {
@@ -53,7 +53,7 @@ class TransferStudentSeeder extends Seeder
         $curriculumVersion = CurriculumVersion::where('program_id', $program->id)
             ->first();
 
-        if (!$curriculumVersion) {
+        if (! $curriculumVersion) {
             return; // Skip if no curriculum version
         }
 
@@ -71,8 +71,8 @@ class TransferStudentSeeder extends Seeder
         $transferDate = $this->getTransferDate();
         $firstName = $this->getRandomFirstName();
         $lastName = $this->getRandomLastName();
-        $fullName = $firstName . ' ' . $lastName;
-        $email = strtolower($firstName . '.' . $lastName . rand(100, 999) . '@student.swinburne.edu.au');
+        $fullName = $firstName.' '.$lastName;
+        $email = strtolower($firstName.'.'.$lastName.rand(100, 999).'@student.swinburne.edu.au');
 
         return Student::create([
             'student_code' => $this->generateTransferStudentId($campus),
@@ -128,12 +128,12 @@ class TransferStudentSeeder extends Seeder
             ->first();
 
         // If no course offering exists for this specific unit/semester, find any course offering for this unit
-        if (!$courseOffering) {
+        if (! $courseOffering) {
             $courseOffering = \App\Models\CourseOffering::where('unit_id', $unit->id)->first();
         }
 
         // If still no course offering, skip this transfer credit
-        if (!$courseOffering) {
+        if (! $courseOffering) {
             return;
         }
 
@@ -239,6 +239,7 @@ class TransferStudentSeeder extends Seeder
     private function getTransferGrade(): string
     {
         $grades = ['C', 'C', 'D', 'D', 'HD'];
+
         return $grades[array_rand($grades)];
     }
 
@@ -314,7 +315,7 @@ class TransferStudentSeeder extends Seeder
             'Aaron',
             'Kayla',
             'Jose',
-            'Alexis'
+            'Alexis',
         ];
 
         return $names[array_rand($names)];
@@ -362,7 +363,7 @@ class TransferStudentSeeder extends Seeder
             'Torres',
             'Nguyen',
             'Hill',
-            'Flores'
+            'Flores',
         ];
 
         return $names[array_rand($names)];
@@ -371,6 +372,7 @@ class TransferStudentSeeder extends Seeder
     private function getRandomNationality(): string
     {
         $nationalities = ['Australian', 'Vietnamese', 'Chinese', 'Indian', 'Malaysian', 'Indonesian'];
+
         return $nationalities[array_rand($nationalities)];
     }
 

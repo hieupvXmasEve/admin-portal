@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Student;
-use App\Models\Semester;
-use App\Models\Enrollment;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\CurriculumUnit;
+use App\Models\Enrollment;
+use App\Models\Semester;
+use App\Models\Student;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class AutomatedEnrollmentService
 {
@@ -26,7 +26,7 @@ class AutomatedEnrollmentService
                 'enrollments' => ['created' => 0, 'errors' => [], 'skipped' => 0],
                 'course_offerings' => ['created' => 0, 'errors' => [], 'existing' => 0],
                 'course_registrations' => ['created' => 0, 'errors' => [], 'skipped' => 0],
-                'summary' => []
+                'summary' => [],
             ];
 
             // Step 1: Create semester enrollments
@@ -48,7 +48,7 @@ class AutomatedEnrollmentService
                 'total_students' => count($studentIds),
                 'semester_id' => $semesterId,
                 'campus_id' => $campusId,
-                'results' => $results['summary']
+                'results' => $results['summary'],
             ]);
 
             return $results;
@@ -67,9 +67,10 @@ class AutomatedEnrollmentService
                 $student = Student::with('curriculumVersion')->findOrFail($studentId);
 
                 // Skip if student doesn't have curriculum version
-                if (!$student->curriculum_version_id) {
+                if (! $student->curriculum_version_id) {
                     $result['errors'][] = "Student {$student->student_code} has no curriculum version assigned";
                     $result['skipped']++;
+
                     continue;
                 }
 
@@ -80,6 +81,7 @@ class AutomatedEnrollmentService
 
                 if ($existingEnrollment) {
                     $result['skipped']++;
+
                     continue;
                 }
 
@@ -94,6 +96,7 @@ class AutomatedEnrollmentService
                 if ($semesterNumber > 8) {
                     $result['errors'][] = "Student {$student->student_code} has exceeded maximum semester limit";
                     $result['skipped']++;
+
                     continue;
                 }
 
@@ -136,12 +139,13 @@ class AutomatedEnrollmentService
 
             if ($enrollments->isEmpty()) {
                 $result['errors'][] = 'No enrollments found for students';
+
                 return $result;
             }
 
             // Group enrollments by curriculum_version_id and semester_number
             $enrollmentGroups = $enrollments->groupBy(function ($enrollment) {
-                return $enrollment->curriculum_version_id . '_' . $enrollment->semester_number;
+                return $enrollment->curriculum_version_id.'_'.$enrollment->semester_number;
             });
 
             $curriculumUnitDemand = [];
@@ -161,7 +165,7 @@ class AutomatedEnrollmentService
                 foreach ($curriculumUnits as $curriculumUnit) {
                     $curriculumUnitId = $curriculumUnit->id;
 
-                    if (!isset($curriculumUnitDemand[$curriculumUnitId])) {
+                    if (! isset($curriculumUnitDemand[$curriculumUnitId])) {
                         $curriculumUnitDemand[$curriculumUnitId] = $studentCount;
                     } else {
                         $curriculumUnitDemand[$curriculumUnitId] += $studentCount;
@@ -179,6 +183,7 @@ class AutomatedEnrollmentService
 
                     if ($existingOffering) {
                         $result['existing']++;
+
                         continue;
                     }
 
@@ -239,6 +244,7 @@ class AutomatedEnrollmentService
                 // Skip inactive students
                 if ($student->status !== 'active') {
                     $result['skipped']++;
+
                     continue;
                 }
 
@@ -251,6 +257,7 @@ class AutomatedEnrollmentService
                 if ($curriculumUnits->isEmpty()) {
                     $result['errors'][] = "No curriculum units found for student {$student->student_code} in semester {$enrollment->semester_number}";
                     $result['skipped']++;
+
                     continue;
                 }
 
@@ -263,7 +270,7 @@ class AutomatedEnrollmentService
                             ->where('enrollment_status', 'open')
                             ->first();
 
-                        if (!$courseOffering) {
+                        if (! $courseOffering) {
                             continue;
                         }
 
@@ -292,7 +299,7 @@ class AutomatedEnrollmentService
                             'registration_date' => now(),
                             'registration_method' => 'admin_override',
                             'credit_hours' => $curriculumUnit->unit->credit_points ?? 3,
-                            'notes' => "Automated enrollment for new student",
+                            'notes' => 'Automated enrollment for new student',
                         ]);
 
                         // Update course offering enrollment count

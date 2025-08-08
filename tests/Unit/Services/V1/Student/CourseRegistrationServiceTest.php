@@ -4,34 +4,40 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\V1\Student;
 
-use App\Models\Student;
+use App\Exceptions\BusinessLogicException;
+use App\Models\Campus;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Campus;
-use App\Models\Program;
-use App\Models\CurriculumVersion;
 use App\Models\CurriculumUnit;
-use App\Models\Unit;
+use App\Models\CurriculumVersion;
+use App\Models\Program;
 use App\Models\Semester;
-use App\Services\V1\Student\CourseRegistrationService;
+use App\Models\Student;
+use App\Models\Unit;
 use App\Services\V1\Student\ConflictDetectionService;
+use App\Services\V1\Student\CourseRegistrationService;
 use App\Services\V1\Student\EnrollmentCapacityService;
 use App\Services\V1\Student\PrerequisiteValidationService;
-use App\Exceptions\BusinessLogicException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use Mockery;
+use Tests\TestCase;
 
 class CourseRegistrationServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     protected CourseRegistrationService $registrationService;
+
     protected ConflictDetectionService $conflictService;
+
     protected EnrollmentCapacityService $capacityService;
+
     protected PrerequisiteValidationService $prerequisiteService;
+
     protected Student $student;
+
     protected CourseOffering $courseOffering;
+
     protected Semester $semester;
 
     protected function setUp(): void
@@ -64,7 +70,7 @@ class CourseRegistrationServiceTest extends TestCase
         $campus = Campus::factory()->create();
         $program = Program::factory()->create(['campus_id' => $campus->id]);
         $curriculumVersion = CurriculumVersion::factory()->create(['program_id' => $program->id]);
-        
+
         $this->student = Student::factory()->create([
             'campus_id' => $campus->id,
             'program_id' => $program->id,
@@ -98,7 +104,7 @@ class CourseRegistrationServiceTest extends TestCase
 
         $this->assertInstanceOf(\Illuminate\Support\Collection::class, $availableCourses);
         $this->assertGreaterThan(0, $availableCourses->count());
-        
+
         $firstCourse = $availableCourses->first();
         $this->assertArrayHasKey('id', $firstCourse);
         $this->assertArrayHasKey('unit', $firstCourse);
@@ -149,7 +155,7 @@ class CourseRegistrationServiceTest extends TestCase
         $this->assertEquals($this->student->id, $registration->student_id);
         $this->assertEquals($this->courseOffering->id, $registration->course_offering_id);
         $this->assertEquals('registered', $registration->registration_status);
-        
+
         $this->assertDatabaseHas('course_registrations', [
             'student_id' => $this->student->id,
             'course_offering_id' => $this->courseOffering->id,
@@ -221,7 +227,7 @@ class CourseRegistrationServiceTest extends TestCase
         $result = $this->registrationService->dropCourse($this->student, $registration);
 
         $this->assertTrue($result);
-        
+
         $registration->refresh();
         $this->assertEquals('dropped', $registration->registration_status);
         $this->assertNotNull($registration->drop_date);
@@ -269,7 +275,7 @@ class CourseRegistrationServiceTest extends TestCase
 
         $this->assertInstanceOf(\Illuminate\Support\Collection::class, $registrations);
         $this->assertEquals(1, $registrations->count());
-        
+
         $registration = $registrations->first();
         $this->assertArrayHasKey('id', $registration);
         $this->assertArrayHasKey('status', $registration);

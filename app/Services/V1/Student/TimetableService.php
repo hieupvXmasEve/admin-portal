@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
-use App\Models\Student;
-use App\Models\Semester;
 use App\Models\ClassSession;
+use App\Models\Semester;
+use App\Models\Student;
 use App\Repositories\V1\Student\ClassSessionRepository;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Carbon\Carbon;
 
 class TimetableService
 {
@@ -24,16 +24,16 @@ class TimetableService
     public function getStudentTimetable(Student $student, ?int $semesterId = null, array $filters = []): array
     {
         $semester = $this->resolveSemester($semesterId);
-        
-        if (!$semester) {
+
+        if (! $semester) {
             return $this->getEmptyTimetable();
         }
 
-        $cacheKey = "timetable:student:{$student->id}:semester:{$semester->id}:" . md5(serialize($filters));
-        
+        $cacheKey = "timetable:student:{$student->id}:semester:{$semester->id}:".md5(serialize($filters));
+
         return Cache::remember($cacheKey, 300, function () use ($student, $semester, $filters) {
             $classSessions = $this->classSessionRepository->getStudentClassSessions($student, $semester, $filters);
-            
+
             return [
                 'semester' => [
                     'id' => $semester->id,
@@ -56,7 +56,7 @@ class TimetableService
     public function getWeeklyTimetable(Student $student, ?int $semesterId = null, array $filters = []): array
     {
         $timetable = $this->getStudentTimetable($student, $semesterId, $filters);
-        
+
         return [
             'semester' => $timetable['semester'],
             'weekly_schedule' => $timetable['weekly_schedule'],
@@ -71,8 +71,8 @@ class TimetableService
     {
         // Verify student is enrolled in this class
         $isEnrolled = $this->classSessionRepository->isStudentEnrolledInSession($student, $classSession);
-        
-        if (!$isEnrolled) {
+
+        if (! $isEnrolled) {
             throw new \Exception('Student is not enrolled in this class session');
         }
 
@@ -115,8 +115,8 @@ class TimetableService
     public function getFilterOptions(Student $student, ?int $semesterId = null): array
     {
         $semester = $this->resolveSemester($semesterId);
-        
-        if (!$semester) {
+
+        if (! $semester) {
             return [];
         }
 
@@ -203,7 +203,7 @@ class TimetableService
                 $sessionsInSlot = $classSessions->filter(function ($session) use ($day, $hour) {
                     $startHour = Carbon::createFromTimeString($session->start_time)->hour;
                     $endHour = Carbon::createFromTimeString($session->end_time)->hour;
-                    
+
                     return $session->day_of_week === $day && $hour >= $startHour && $hour < $endHour;
                 });
 
@@ -262,7 +262,7 @@ class TimetableService
     {
         $start = Carbon::createFromTimeString($startTime);
         $end = Carbon::createFromTimeString($endTime);
-        
+
         return $start->diffInMinutes($end);
     }
 
@@ -273,10 +273,11 @@ class TimetableService
     {
         $colors = [
             '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
-            '#06B6D4', '#F97316', '#84CC16', '#EC4899', '#6366F1'
+            '#06B6D4', '#F97316', '#84CC16', '#EC4899', '#6366F1',
         ];
-        
+
         $index = crc32($courseCode) % count($colors);
+
         return $colors[abs($index)];
     }
 
@@ -288,7 +289,7 @@ class TimetableService
         if ($semesterId) {
             return Semester::find($semesterId);
         }
-        
+
         return Semester::where('is_active', true)->first();
     }
 
@@ -358,13 +359,13 @@ class TimetableService
     protected function getAvailableTimeSlots(Collection $classSessions): array
     {
         $timeSlots = [];
-        
+
         foreach ($classSessions as $session) {
             $timeSlots[] = [
                 'start' => $session->start_time,
                 'end' => $session->end_time,
-                'display' => Carbon::createFromTimeString($session->start_time)->format('g:i A') . 
-                           ' - ' . 
+                'display' => Carbon::createFromTimeString($session->start_time)->format('g:i A').
+                           ' - '.
                            Carbon::createFromTimeString($session->end_time)->format('g:i A'),
             ];
         }

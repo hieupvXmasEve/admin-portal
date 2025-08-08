@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Student;
 
+use App\Exceptions\BusinessLogicException;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Student\CourseRegistrationRequest;
 use App\Http\Requests\Api\V1\Student\AvailableCoursesRequest;
+use App\Http\Requests\Api\V1\Student\CourseRegistrationRequest;
 use App\Http\Resources\Api\V1\Student\CourseOfferingResource;
 use App\Http\Resources\Api\V1\Student\CourseRegistrationResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Services\V1\Student\CourseRegistrationService;
 use App\Services\V1\Student\ConflictDetectionService;
-use App\Exceptions\BusinessLogicException;
+use App\Services\V1\Student\CourseRegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -36,7 +36,8 @@ class CourseRegistrationController extends Controller
         try {
             $filters = $request->validated();
             $availableCourses = $this->registrationService->getAvailableCourses($student, $filters);
-            Log::info('AvailableCourses: ' . $availableCourses);
+            Log::info('AvailableCourses: '.$availableCourses);
+
             return ApiResponse::success(
                 CourseOfferingResource::collection($availableCourses),
                 'Available courses retrieved successfully'
@@ -44,9 +45,10 @@ class CourseRegistrationController extends Controller
         } catch (BusinessLogicException $e) {
             return ApiResponse::businessLogicError($e->getMessage());
         } catch (\Exception $e) {
-            Log::error('AvailableCourses error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
+            Log::error('AvailableCourses error: '.$e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return ApiResponse::serverError('Failed to retrieve available courses');
         }
     }
@@ -72,8 +74,9 @@ class CourseRegistrationController extends Controller
                     'courseOffering.curriculumUnit.unit',
                     'courseOffering.lecturer',
                     'courseOffering.classSessions.room',
-                    'semester'
+                    'semester',
                 ]);
+
                 return $this->registrationService->formatRegistrationForStudent($registration);
             });
 
@@ -85,7 +88,7 @@ class CourseRegistrationController extends Controller
         } catch (BusinessLogicException $e) {
             return ApiResponse::businessLogicError($e->getMessage());
         } catch (\Exception $e) {
-            Log::error('Failed to retrieve registrations: ' . $e->getMessage());
+            Log::error('Failed to retrieve registrations: '.$e->getMessage());
 
             return ApiResponse::serverError('Failed to register for course');
         }
@@ -147,7 +150,7 @@ class CourseRegistrationController extends Controller
                 $courseOffering = CourseOffering::with([
                     'curriculumUnit.unit',
                     'classSessions',
-                    'courseRegistrations'
+                    'courseRegistrations',
                 ])->findOrFail($courseOfferingId);
 
                 // Use reflection to access the protected method
@@ -192,7 +195,7 @@ class CourseRegistrationController extends Controller
             $conflicts = $this->conflictDetectionService->detectConflicts($student, $courseOffering);
 
             return ApiResponse::success([
-                'has_conflicts' => !$conflicts->isEmpty(),
+                'has_conflicts' => ! $conflicts->isEmpty(),
                 'conflict_count' => $conflicts->count(),
                 'conflicts' => $conflicts->toArray(),
             ], 'Schedule conflicts checked successfully');

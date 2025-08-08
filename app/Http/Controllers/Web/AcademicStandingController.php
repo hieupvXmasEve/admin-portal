@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
 use App\Models\AcademicStanding;
 use App\Models\Semester;
+use App\Models\Student;
 use App\Services\AcademicStandingService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -26,7 +26,7 @@ class AcademicStandingController extends Controller
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
         }
@@ -44,15 +44,15 @@ class AcademicStandingController extends Controller
             })
             ->where('is_active', true);
 
-        if (!empty($validated['standing'])) {
+        if (! empty($validated['standing'])) {
             $standingsQuery->where('standing', $validated['standing']);
         }
 
-        if (!empty($validated['semester_id'])) {
+        if (! empty($validated['semester_id'])) {
             $standingsQuery->where('semester_id', $validated['semester_id']);
         }
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $search = $validated['search'];
             $standingsQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")

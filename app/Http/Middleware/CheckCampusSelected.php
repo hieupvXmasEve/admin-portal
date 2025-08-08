@@ -11,12 +11,12 @@ class CheckCampusSelected
     /**
      * Handle an incoming request.
      *
-     * @param \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response) $next
+     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         // Nếu chưa login thì để middleware auth xử lý
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return $next($request);
         }
         if (session()->has('current_campus_id') && $request->routeIs('select-campus.index')) {
@@ -31,13 +31,13 @@ class CheckCampusSelected
             'verification.verify',
             'verification.send',
             'password.confirm',
-            'logout'
+            'logout',
         ])) {
             return $next($request);
         }
 
         // Redirect nếu chưa chọn campus
-        if (!session()->has('current_campus_id')) {
+        if (! session()->has('current_campus_id')) {
             return redirect()->route('select-campus.index');
         }
 

@@ -4,8 +4,8 @@ namespace App\Models;
 
 use App\Support\CampusLogContext;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 abstract class UserAuditableModel extends Authenticatable
 {
@@ -61,7 +61,7 @@ abstract class UserAuditableModel extends Authenticatable
     {
         $modelName = class_basename($this);
         $campusId = CampusLogContext::getCurrentCampusId();
-        
+
         return CampusLogContext::getLogName($modelName, $campusId);
     }
 
@@ -91,7 +91,7 @@ abstract class UserAuditableModel extends Authenticatable
         $identifierFields = ['name', 'email', 'full_name'];
 
         foreach ($identifierFields as $field) {
-            if (isset($this->attributes[$field]) && !empty($this->attributes[$field])) {
+            if (isset($this->attributes[$field]) && ! empty($this->attributes[$field])) {
                 return $this->attributes[$field];
             }
         }

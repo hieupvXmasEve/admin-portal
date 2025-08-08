@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Exports\GradeTemplateExport;
 use App\Imports\GradeImport;
 use App\Models\AssessmentComponentDetail;
 use App\Models\CourseOffering;
@@ -37,13 +36,13 @@ class AssessmentGradeExcelService
                     'original_limit' => $originalMemoryLimit,
                     'new_limit' => $configuredMemoryLimit,
                     'current_usage' => memory_get_usage(true),
-                    'peak_usage' => memory_get_peak_usage(true)
+                    'peak_usage' => memory_get_peak_usage(true),
                 ]);
             }
 
             // Generate filename first
             $fileName = $this->generateExportFileName($assessmentComponentDetail, $courseOffering);
-            $filePath = 'temp/' . $fileName;
+            $filePath = 'temp/'.$fileName;
 
             // Use optimized export with memory management
             $export = new \App\Exports\OptimizedGradeTemplateExport(
@@ -72,10 +71,10 @@ class AssessmentGradeExcelService
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
                 'course_offering_id' => $courseOffering->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
-            throw new \Exception('Failed to generate grade template: ' . $e->getMessage());
+            throw new \Exception('Failed to generate grade template: '.$e->getMessage());
         }
     }
 
@@ -112,7 +111,7 @@ class AssessmentGradeExcelService
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
                 'course_offering_id' => $courseOffering->id,
                 'lecturer_id' => $lecturerId,
-                'results' => $results
+                'results' => $results,
             ]);
 
             return $results;
@@ -122,10 +121,10 @@ class AssessmentGradeExcelService
                 'course_offering_id' => $courseOffering->id,
                 'lecturer_id' => $lecturerId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
-            throw new \Exception('Failed to import grades: ' . $e->getMessage());
+            throw new \Exception('Failed to import grades: '.$e->getMessage());
         }
     }
 
@@ -160,7 +159,7 @@ class AssessmentGradeExcelService
             $results['assessment_info'] = [
                 'name' => $assessmentComponentDetail->name,
                 'max_points' => $assessmentComponentDetail->max_points,
-                'component_name' => $assessmentComponentDetail->assessmentComponent->name ?? 'Unknown'
+                'component_name' => $assessmentComponentDetail->assessmentComponent->name ?? 'Unknown',
             ];
 
             return $results;
@@ -168,10 +167,10 @@ class AssessmentGradeExcelService
             Log::error('Failed to preview import', [
                 'assessment_component_detail_id' => $assessmentComponentDetail->id,
                 'course_offering_id' => $courseOffering->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
-            throw new \Exception('Failed to preview import: ' . $e->getMessage());
+            throw new \Exception('Failed to preview import: '.$e->getMessage());
         }
     }
 
@@ -266,12 +265,12 @@ class AssessmentGradeExcelService
         $allowedExtensions = ['xlsx', 'xls', 'csv'];
         $extension = strtolower($file->getClientOriginalExtension());
 
-        if (!in_array($extension, $allowedExtensions)) {
+        if (! in_array($extension, $allowedExtensions)) {
             throw new \Exception('File must be an Excel file (.xlsx, .xls) or CSV file (.csv)');
         }
 
         // Check if file is readable
-        if (!$file->isValid()) {
+        if (! $file->isValid()) {
             throw new \Exception('The uploaded file is not valid or is corrupted');
         }
 
@@ -319,8 +318,8 @@ class AssessmentGradeExcelService
                 'max_points' => $assessmentComponentDetail->max_points,
                 'weight' => $assessmentComponentDetail->weight,
                 'due_date' => $assessmentComponentDetail->due_date,
-                'component_name' => $assessmentComponentDetail->assessmentComponent->name ?? 'Unknown'
-            ]
+                'component_name' => $assessmentComponentDetail->assessmentComponent->name ?? 'Unknown',
+            ],
         ];
     }
 
@@ -332,11 +331,11 @@ class AssessmentGradeExcelService
         $tempPath = storage_path('app/temp');
         $deletedCount = 0;
 
-        if (!is_dir($tempPath)) {
+        if (! is_dir($tempPath)) {
             return $deletedCount;
         }
 
-        $files = glob($tempPath . '/grade_template_*.xlsx');
+        $files = glob($tempPath.'/grade_template_*.xlsx');
         $cutoffTime = time() - (24 * 60 * 60); // 24 hours ago
 
         foreach ($files as $file) {
@@ -348,7 +347,7 @@ class AssessmentGradeExcelService
         }
 
         Log::info('Cleaned up temporary grade template files', [
-            'deleted_count' => $deletedCount
+            'deleted_count' => $deletedCount,
         ]);
 
         return $deletedCount;

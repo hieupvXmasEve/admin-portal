@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
-use App\Models\Semester;
-use App\Models\Unit;
 use App\Models\Program;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\Unit;
 use App\Services\AcademicRecordService;
-use Illuminate\Http\Request;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,7 +29,7 @@ class AcademicRecordController extends Controller
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
         }
@@ -44,7 +44,7 @@ class AcademicRecordController extends Controller
         $studentsQuery = Student::with(['program', 'specialization', 'academicRecords'])
             ->where('campus_id', $campusId);
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $search = $validated['search'];
             $studentsQuery->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
@@ -53,7 +53,7 @@ class AcademicRecordController extends Controller
             });
         }
 
-        if (!empty($validated['program_id'])) {
+        if (! empty($validated['program_id'])) {
             $studentsQuery->where('program_id', $validated['program_id']);
         }
 
@@ -183,7 +183,7 @@ class AcademicRecordController extends Controller
             return redirect()
                 ->back()
                 ->withInput()
-                ->with('error', 'Failed to update academic record: ' . $e->getMessage());
+                ->with('error', 'Failed to update academic record: '.$e->getMessage());
         }
     }
 

@@ -18,18 +18,18 @@ class LecturerApiRateLimiter
     public function handle(Request $request, Closure $next, string $limiter = 'lecturer-api'): Response
     {
         $key = $this->resolveRequestSignature($request, $limiter);
-        
+
         // Define rate limits based on endpoint type
         $limits = $this->getRateLimits($limiter);
-        
+
         if (RateLimiter::tooManyAttempts($key, $limits['maxAttempts'])) {
             $retryAfter = RateLimiter::availableIn($key);
-            
+
             return ApiResponse::rateLimitError(
                 "Too many requests. Try again in {$retryAfter} seconds."
             )->header('Retry-After', $retryAfter)
-             ->header('X-RateLimit-Limit', $limits['maxAttempts'])
-             ->header('X-RateLimit-Remaining', 0);
+                ->header('X-RateLimit-Limit', $limits['maxAttempts'])
+                ->header('X-RateLimit-Remaining', 0);
         }
 
         RateLimiter::hit($key, $limits['decayMinutes'] * 60);
@@ -38,16 +38,16 @@ class LecturerApiRateLimiter
 
         // Add rate limit headers to successful responses
         $remaining = RateLimiter::remaining($key, $limits['maxAttempts']);
-        
+
         // Handle different response types for rate limit headers
         if ($response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse) {
             $response->headers->set('X-RateLimit-Limit', (string) $limits['maxAttempts']);
             $response->headers->set('X-RateLimit-Remaining', (string) max(0, $remaining));
         } else {
             $response->header('X-RateLimit-Limit', $limits['maxAttempts'])
-                    ->header('X-RateLimit-Remaining', max(0, $remaining));
+                ->header('X-RateLimit-Remaining', max(0, $remaining));
         }
-        
+
         return $response;
     }
 
@@ -58,7 +58,7 @@ class LecturerApiRateLimiter
     {
         $user = $request->user();
         $userId = $user ? $user->id : $request->ip();
-        
+
         return "lecturer-api:{$limiter}:{$userId}";
     }
 

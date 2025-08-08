@@ -29,7 +29,7 @@ return [
     'templates' => [
         'simple' => 'templates/import/users_simple_template.xlsx',
         'detailed' => 'templates/import/users_detailed_template.xlsx',
-        'relationship' => 'templates/import/users_relationship_template.xlsx'
+        'relationship' => 'templates/import/users_relationship_template.xlsx',
     ],
 
     /*
@@ -44,17 +44,17 @@ return [
             'email' => 'required|email|max:255',
             'password' => 'nullable|string|min:8',
             'phone' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:500'
+            'address' => 'nullable|string|max:500',
         ],
 
         'campus' => [
             'code' => 'required|string|exists:campuses,code',
-            'name' => 'nullable|string|exists:campuses,name'
+            'name' => 'nullable|string|exists:campuses,name',
         ],
 
         'role' => [
-            'code' => 'required|string|exists:roles,code'
-        ]
+            'code' => 'required|string|exists:roles,code',
+        ],
     ],
 
     /*
@@ -66,6 +66,6 @@ return [
     'performance' => [
         'memory_limit' => '512M',
         'time_limit' => 300,
-        'batch_size' => 100
-    ]
+        'batch_size' => 100,
+    ],
 ];

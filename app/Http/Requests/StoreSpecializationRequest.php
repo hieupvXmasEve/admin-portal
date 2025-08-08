@@ -27,9 +27,9 @@ class StoreSpecializationRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         // Ensure is_active is set to true by default if not provided
-        if (!$this->has('is_active')) {
+        if (! $this->has('is_active')) {
             $this->merge([
-                'is_active' => true
+                'is_active' => true,
             ]);
         }
     }

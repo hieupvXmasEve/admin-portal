@@ -76,6 +76,7 @@ class ApiExceptionHandler
     protected function handleModelNotFoundException(ModelNotFoundException $exception): JsonResponse
     {
         $model = class_basename($exception->getModel());
+
         return ApiResponse::notFound(
             "The requested {$model} was not found"
         );
@@ -97,7 +98,7 @@ class ApiExceptionHandler
     protected function handleTooManyRequestsException(TooManyRequestsHttpException $exception): JsonResponse
     {
         $retryAfter = $exception->getHeaders()['Retry-After'] ?? null;
-        $message = $retryAfter 
+        $message = $retryAfter
             ? "Too many requests. Try again in {$retryAfter} seconds."
             : 'Too many requests. Please try again later.';
 
@@ -121,7 +122,7 @@ class ApiExceptionHandler
     protected function handleGenericException(Throwable $exception): JsonResponse
     {
         // Don't expose internal errors in production
-        $message = app()->environment('production') 
+        $message = app()->environment('production')
             ? 'An unexpected error occurred'
             : $exception->getMessage();
 
@@ -147,7 +148,7 @@ class ApiExceptionHandler
         // Log validation errors as warnings, others as errors
         if ($exception instanceof ValidationException) {
             Log::channel('api')->warning('API Validation Error', $context);
-        } elseif ($exception instanceof AuthenticationException || 
+        } elseif ($exception instanceof AuthenticationException ||
                   $exception instanceof AccessDeniedHttpException) {
             Log::channel('api')->warning('API Authorization Error', $context);
         } else {

@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Helpers\PermissionHelper;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
