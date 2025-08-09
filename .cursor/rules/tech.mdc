@@ -22,7 +22,6 @@ alwaysApply: false
 - **State Management**: Pinia
 
 ## Development Tools
-- **Containerization**: Docker + Docker Compose
 - **Code Quality**: ESLint, Prettier
 - **Type Checking**: TypeScript, Vue-TSC
 - **Version Control**: Git
@@ -32,12 +31,6 @@ alwaysApply: false
 
 ### Development Environment
 ```bash
-# Start development environment with Docker
-./dev.sh start
-
-# Stop development environment
-./dev.sh stop
-
 # Traditional development (without Docker)
 composer dev
 
@@ -59,18 +52,6 @@ npm run type-check
 # Linting and formatting
 npm run lint
 npm run format
-```
-
-### Production
-```bash
-# Local production testing
-./local-prod.sh start
-
-# Production deployment
-./prod.sh deploy
-
-# Build frontend assets
-npm run build
 ```
 
 ### Database

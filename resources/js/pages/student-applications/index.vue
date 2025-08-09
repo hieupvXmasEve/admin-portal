@@ -74,7 +74,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log('%c props', 'color: red', props.filters);
 // API
 const api = useApi();
 
@@ -298,7 +297,6 @@ const onNavigate = (url: string) => {
 
 // Selection handlers
 const onSelectionChange = (selected: StudentApplication[]) => {
-    console.log('%c selected', 'color: red', selected);
     selectedApplications.value = selected;
 };
 
@@ -331,13 +329,6 @@ const closeDialogs = () => {
     };
     statusForm.value.status = '';
     bulkStatusForm.value.status = '';
-
-    // Clear conversion options
-    conversionOptions.value = {
-        programs: [],
-        curriculumVersions: [],
-        specializations: [],
-    };
 };
 
 // Action handlers

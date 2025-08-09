@@ -13,7 +13,7 @@ class AcademicHold extends AuditableModel
     use HasFactory;
 
     protected $fillable = [
-        'student_code',
+        'student_id',
         'hold_type',
         'hold_category',
         'title',
@@ -40,7 +40,7 @@ class AcademicHold extends AuditableModel
     public static function validationRules(): array
     {
         return [
-            'student_code' => ['required', 'exists:students,id'],
+            'student_id' => ['required', 'exists:students,id'],
             'hold_type' => ['required', 'in:financial,academic,disciplinary,administrative,health,library'],
             'hold_category' => ['nullable', 'in:registration,graduation,transcript,all'],
             'title' => ['required', 'string', 'max:255'],
@@ -60,8 +60,8 @@ class AcademicHold extends AuditableModel
     public static function validationMessages(): array
     {
         return [
-            'student_code.required' => 'Student is required',
-            'student_code.exists' => 'Selected student does not exist',
+            'student_id.required' => 'Student is required',
+            'student_id.exists' => 'Selected student does not exist',
             'hold_type.required' => 'Hold type is required',
             'title.required' => 'Hold title is required',
             'placed_date.required' => 'Placed date is required',
@@ -73,7 +73,7 @@ class AcademicHold extends AuditableModel
     // Relationships
     public function student(): BelongsTo
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Student::class, 'student_id', 'id');
     }
 
     public function placedByUser(): BelongsTo
@@ -177,6 +177,6 @@ class AcademicHold extends AuditableModel
 
     public function scopeForStudent(Builder $query, int $studentId): void
     {
-        $query->where('student_code', $studentId);
+        $query->where('student_id', $studentId);
     }
 }

@@ -27,6 +27,15 @@ class CurriculumRoutes
 
     public const VERSION_EXPORT_FILTERED = 'curriculum_versions.export.filtered';
 
+    // Curriculum Version Summary Tab Routes
+    public const VERSION_SUMMARY_OVERVIEW = 'curriculum_versions.summary.overview';
+
+    public const VERSION_SUMMARY_UNITS = 'curriculum_versions.summary.units';
+
+    public const VERSION_SUMMARY_STUDENTS = 'curriculum_versions.summary.students';
+
+    public const VERSION_SUMMARY_DEPLOYMENTS = 'curriculum_versions.summary.deployments';
+
     // Curriculum Unit Routes
     public const UNIT_INDEX = 'curriculum_unit.index';
 

@@ -138,6 +138,7 @@ const singleOpenForm = useForm({
     special_requirements: '',
     notes: '',
 });
+const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null);
 
 // Generate enrollments
 const generateEnrollments = async () => {
@@ -201,6 +202,34 @@ const loadRegistrationStats = async () => {
     }
 };
 
+// Bulk register students for course offerings
+const bulkRegisterStudents = async () => {
+    loading.value.bulkRegister = true;
+
+    try {
+        const { data } = await api.post(`/api/semesters/${props.semester.id}/enrollment/bulk-register`, {
+            registration_method: 'admin_override',
+            force_registration: false,
+            page: 1,
+            per_page: 300,
+        });
+
+        if (data.value?.success) {
+            toast.success(data.value.message);
+            // Refresh registration stats to show updated numbers
+            loadRegistrationStats();
+        } else {
+            console.log('%c error', 'color: red', data.value);
+            toast.error(data.value?.message || 'Failed to bulk register students');
+        }
+    } catch (error) {
+        console.error('Bulk register students error:', error);
+        toast.error('Failed to bulk register students');
+    } finally {
+        loading.value.bulkRegister = false;
+    }
+};
+
 // Bulk open courses
 const openBulkOpenModal = () => {
     bulkOpenForm.unit_ids = Array.from(selectedCourses.value);
@@ -214,11 +243,15 @@ const submitBulkOpen = async () => {
             default_capacity: bulkOpenForm.default_capacity,
             delivery_mode: bulkOpenForm.delivery_mode,
         });
-        console.log(data.value?.errors);
+        console.log(data.value);
 
         if (data.value?.success && data.value?.errors?.length === 0) {
             showBulkOpenModal.value = false;
             toast.success('Course offerings created successfully');
+
+            // Clear table selection
+            dataTableRef.value?.clearSelection();
+
             loadSuggestedCourses();
             loadRegistrationStats();
         } else {
@@ -284,7 +317,7 @@ const baseSuggestedCoursesColumns: ColumnDef<SuggestedCourse>[] = [
         accessorKey: 'unit.code',
         header: 'Unit Code',
         // Link to course-offerings?search=COS10004
-        cell: ({ row }) => h(Link, { href: courseRoutes.offerings.index() + '?search=' + row.original.unit.code, class: 'text-red-500' }, row.original.unit.code),
+        cell: ({ row }) => h(Link, { href: courseRoutes.offerings.index() + '?search=' + row.original.unit.code, class: 'text-red-500' }, () => row.original.unit.code),
     },
     {
         accessorKey: 'unit.name',
@@ -305,7 +338,7 @@ const baseSuggestedCoursesColumns: ColumnDef<SuggestedCourse>[] = [
         id: 'actions',
         header: 'Actions',
         cell: ({ row }) =>
-            h('div', { class: 'flex gap-2' }, [
+            h('div', { class: 'flex gap-2' }, () => [
                 h(
                     Button,
                     {
@@ -446,14 +479,27 @@ onMounted(() => {
                     <CardDescription> Create enrollments for all active students based on their curriculum progress. </CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-muted-foreground text-sm">This will create enrollment records for students who don't already have one for this semester.</p>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-muted-foreground text-sm">This will create enrollment records for students who don't already have one for this semester.</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <Button @click="generateEnrollments" :disabled="loading.generate">
+                                    <Loader2 v-if="loading.generate" class="mr-2 h-4 w-4 animate-spin" />
+                                    Generate Enrollments
+                                </Button>
+                                <Button
+                                    @click="bulkRegisterStudents"
+                                    :disabled="loading.bulkRegister || enrollmentStats.total_enrolled === 0"
+                                    variant="outline"
+                                >
+                                    <Loader2 v-if="loading.bulkRegister" class="mr-2 h-4 w-4 animate-spin" />
+                                    <Users class="mr-2 h-4 w-4" />
+                                    Auto Register Students
+                                </Button>
+                            </div>
                         </div>
-                        <Button @click="generateEnrollments" :disabled="loading.generate">
-                            <Loader2 v-if="loading.generate" class="mr-2 h-4 w-4 animate-spin" />
-                            Generate Enrollments
-                        </Button>
                     </div>
 
                     <!-- Enrollment Stats -->
@@ -461,6 +507,18 @@ onMounted(() => {
                         <div v-for="(count, status) in enrollmentStats.by_status" :key="status" class="rounded bg-gray-50 p-3 text-center">
                             <div class="text-lg font-semibold">{{ count }}</div>
                             <div class="text-muted-foreground text-sm capitalize">{{ status.replace('_', ' ') }}</div>
+                        </div>
+
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                            <div class="flex items-start gap-3">
+                                <Users class="h-5 w-5 text-amber-600 mt-0.5" />
+                                <div class="flex-1">
+                                    <h4 class="text-sm font-medium text-amber-800">Automatic Course Registration</h4>
+                                    <p class="text-sm text-amber-700 mt-1">
+                                        After opening course offerings, use "Auto Register Students" to automatically register enrolled students for their required courses based on their curriculum.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
@@ -490,6 +548,7 @@ onMounted(() => {
                 </CardHeader>
                 <CardContent>
                     <DataTable
+                        ref="dataTableRef"
                         :data="suggestedCourses"
                         :columns="suggestedCoursesColumns"
                         :loading="loading.suggested"

@@ -224,16 +224,16 @@ const columns: ColumnDef<Semester>[] = [
                     },
                     () => ['Manage Enrollment'],
                 ),
-                h(
-                    Button,
-                    {
-                        size: 'sm',
-                        variant: 'outline',
-                        disabled: isArchived,
-                        onClick: () => openDeleteModal(semester),
-                    },
-                    () => [h(Trash2, { class: 'h-4 w-4' })],
-                ),
+                // h(
+                //     Button,
+                //     {
+                //         size: 'sm',
+                //         variant: 'outline',
+                //         disabled: isArchived,
+                //         onClick: () => openDeleteModal(semester),
+                //     },
+                //     () => [h(Trash2, { class: 'h-4 w-4' })],
+                // ),
             ]);
         },
     },

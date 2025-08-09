@@ -13,7 +13,7 @@ class AcademicRecord extends AuditableModel
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'student_code',
+        'student_id',
         'course_offering_id',
         'semester_id',
         'unit_id',
@@ -110,7 +110,7 @@ class AcademicRecord extends AuditableModel
     public function getExtraLogProperties(): array
     {
         return [
-            'student_code' => $this->student_code,
+            'student_id' => $this->student_id,
             'course_offering_id' => $this->course_offering_id,
             'semester_id' => $this->semester_id,
             'unit_id' => $this->unit_id,
@@ -158,7 +158,7 @@ class AcademicRecord extends AuditableModel
     // Relationships
     public function student(): BelongsTo
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Student::class, 'student_id', 'id');
     }
 
     public function courseOffering(): BelongsTo

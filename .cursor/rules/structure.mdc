@@ -48,18 +48,7 @@ alwaysApply: false
   - **factories/**: Model factories for testing and seeding
   - **migrations/**: Database migrations
   - **seeders/**: Database seeders
-
-### Documentation
-- **docs/**: Project documentation
-  - **api/**: API documentation
-  - **setup/**: Installation and deployment guides
-  - **technical/**: Technical specifications and architecture
-
-### Docker
-- **docker/**: Docker configuration files
-- **Dockerfile**: Main application Dockerfile
-- **docker-compose.*.yml**: Docker Compose configurations
-
+  -
 ## Naming Conventions
 
 ### Backend

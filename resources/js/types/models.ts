@@ -82,6 +82,7 @@ export interface CurriculumUnit {
     curriculum_version_id: number;
     unit_id: number;
     type: 'core' | 'major' | 'elective';
+    unit_scope: 'program' | 'common' | 'specialization_specific';
     year_level?: number;
     semester_number?: number;
     note?: string;
