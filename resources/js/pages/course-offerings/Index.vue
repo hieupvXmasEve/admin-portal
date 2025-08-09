@@ -32,7 +32,7 @@ interface Props {
     deliveryModeOptions: { value: string; label: string }[];
 }
 const props = defineProps<Props>();
-console.log(props.courseOfferings.data);
+console.log(props.courseOfferings);
 const filters = ref({
     search: props.filters.search || '',
     semester_id: props.filters.semester_id || 'all',

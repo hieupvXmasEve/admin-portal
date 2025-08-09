@@ -14,13 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables';
 import { createColumns } from '@/lib/table-utils';
-import type { CurriculumUnit, CurriculumVersion, Program, Semester, Specialization, Unit, UnitScope } from '@/types/models';
+import type { CurriculumUnit, CurriculumVersion, Program, Semester, Specialization, Unit } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
 import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
-import { ArrowLeft, Book, Edit, GraduationCap, Info, Plus, School, Target, Trash2, ChevronsUpDown } from 'lucide-vue-next';
+import { ArrowLeft, Book, ChevronsUpDown, Edit, GraduationCap, Info, Plus, School, Target, Trash2 } from 'lucide-vue-next';
 import { Form } from 'vee-validate';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
@@ -32,7 +32,6 @@ interface Props {
     specializations?: Specialization[];
     semesters?: Semester[];
     units?: Unit[];
-    unitScopes?: UnitScope[];
 }
 
 const props = defineProps<Props>();

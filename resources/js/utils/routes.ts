@@ -151,6 +151,13 @@ export const curriculumRoutes = {
         edit: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_EDIT, { curriculum_version: id }),
         show: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SHOW, { curriculum_version: id }),
         electives: (id: number) => route('curriculum_versions.electives', { curriculumVersion: id }),
+        // Tab-based summary routes
+        summary: {
+            overview: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SUMMARY_OVERVIEW, { curriculum_version: id }),
+            units: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SUMMARY_UNITS, { curriculum_version: id }),
+            students: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SUMMARY_STUDENTS, { curriculum_version: id }),
+            deployments: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SUMMARY_DEPLOYMENTS, { curriculum_version: id }),
+        },
     },
     units: {
         index: () => route(UNIT_ROUTE_NAMES.INDEX),

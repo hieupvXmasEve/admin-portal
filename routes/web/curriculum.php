@@ -9,27 +9,43 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth')->group(function () {
 
     // Curriculum Versions routes
-    Route::get('curriculum-versions', [CurriculumVersionController::class, 'index'])
-        ->middleware('can:view_curriculum_version')
-        ->name(CurriculumRoutes::VERSION_INDEX);
-    Route::get('curriculum-versions/create', [CurriculumVersionController::class, 'create'])
-        ->middleware('can:create_curriculum_version')
-        ->name(CurriculumRoutes::VERSION_CREATE);
-    Route::post('curriculum-versions', [CurriculumVersionController::class, 'store'])
-        ->middleware('can:create_curriculum_version')
-        ->name(CurriculumRoutes::VERSION_STORE);
-    Route::get('curriculum-versions/{curriculum_version}', [CurriculumVersionController::class, 'show'])
-        ->middleware('can:view_curriculum_version')
-        ->name(CurriculumRoutes::VERSION_SHOW);
-    Route::get('curriculum-versions/{curriculum_version}/edit', [CurriculumVersionController::class, 'edit'])
-        ->middleware('can:edit_curriculum_version')
-        ->name(CurriculumRoutes::VERSION_EDIT);
-    Route::put('curriculum-versions/{curriculum_version}', [CurriculumVersionController::class, 'update'])
-        ->middleware('can:edit_curriculum_version')
-        ->name(CurriculumRoutes::VERSION_UPDATE);
-    Route::delete('curriculum-versions/{curriculum_version}', [CurriculumVersionController::class, 'destroy'])
-        ->middleware('can:delete_curriculum_version')
-        ->name(CurriculumRoutes::VERSION_DESTROY);
+    Route::prefix('curriculum-versions')->group(function () {
+        Route::get('/', [CurriculumVersionController::class, 'index'])
+            ->middleware('can:view_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_INDEX);
+        Route::get('/create', [CurriculumVersionController::class, 'create'])
+            ->middleware('can:create_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_CREATE);
+        Route::post('', [CurriculumVersionController::class, 'store'])
+            ->middleware('can:create_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_STORE);
+        Route::get('/{curriculum_version}', [CurriculumVersionController::class, 'show'])
+            ->middleware('can:view_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_SHOW);
+
+        // Tab-based detail routes
+        Route::get('/{curriculum_version}/overview', [CurriculumVersionController::class, 'summaryOverview'])
+            ->middleware('can:view_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW);
+        Route::get('/{curriculum_version}/units', [CurriculumVersionController::class, 'summaryUnits'])
+            ->middleware('can:view_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_SUMMARY_UNITS);
+        Route::get('/{curriculum_version}/students', [CurriculumVersionController::class, 'summaryStudents'])
+            ->middleware('can:view_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_SUMMARY_STUDENTS);
+        Route::get('/{curriculum_version}/deployments', [CurriculumVersionController::class, 'summaryDeployments'])
+            ->middleware('can:view_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_SUMMARY_DEPLOYMENTS);
+        Route::get('/{curriculum_version}/edit', [CurriculumVersionController::class, 'edit'])
+            ->middleware('can:edit_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_EDIT);
+        Route::put('/{curriculum_version}', [CurriculumVersionController::class, 'update'])
+            ->middleware('can:edit_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_UPDATE);
+        Route::delete('/{curriculum_version}', [CurriculumVersionController::class, 'destroy'])
+            ->middleware('can:delete_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_DESTROY);
+    });
 
     // Global management routes for curriculum versions
     Route::get('curriculum-versions/export/excel/filtered', [CurriculumVersionController::class, 'exportFiltered'])

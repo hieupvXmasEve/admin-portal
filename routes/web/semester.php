@@ -15,9 +15,11 @@ Route::middleware('auth')->group(function () {
     Route::post('semesters', [SemesterController::class, 'store'])
         ->middleware('can:create_semester')
         ->name(SemesterRoutes::STORE);
+    // Detail
     Route::get('semesters/{semester}', [SemesterController::class, 'show'])
         ->middleware('can:view_semester')
         ->name(SemesterRoutes::SHOW);
+
     Route::get('semesters/{semester}/edit', [SemesterController::class, 'edit'])
         ->middleware('can:edit_semester')
         ->name(SemesterRoutes::EDIT);

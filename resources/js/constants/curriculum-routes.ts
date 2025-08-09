@@ -15,6 +15,12 @@ export const CURRICULUM_ROUTE_NAMES = {
     VERSION_DESTROY: 'curriculum_versions.destroy',
     VERSION_EXPORT_FILTERED: 'curriculum_versions.export.filtered',
 
+    // Version Summary Tab Routes
+    VERSION_SUMMARY_OVERVIEW: 'curriculum_versions.summary.overview',
+    VERSION_SUMMARY_UNITS: 'curriculum_versions.summary.units',
+    VERSION_SUMMARY_STUDENTS: 'curriculum_versions.summary.students',
+    VERSION_SUMMARY_DEPLOYMENTS: 'curriculum_versions.summary.deployments',
+
     // Unit
     UNIT_INDEX: 'curriculum_unit.index',
     UNIT_CREATE: 'curriculum_unit.create',

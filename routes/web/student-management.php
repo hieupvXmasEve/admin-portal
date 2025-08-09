@@ -72,29 +72,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name(StudentRoutes::UPDATE_STATUS);
 
     // Student Academic Summary routes
-    Route::get('students/{student}/academic-summary', [StudentAcademicSummaryController::class, 'show'])
-        ->middleware('can:view_student_summary')
-        ->name(StudentRoutes::ACADEMIC_SUMMARY_SHOW);
+    Route::prefix('students/{student}/academic-summary')->group(function () {
 
-    Route::get('students/{student}/academic-summary/filter-by-semester', [StudentAcademicSummaryController::class, 'filterBySemester'])
-        ->middleware('can:view_student_summary')
-        ->name(StudentRoutes::ACADEMIC_SUMMARY_FILTER_BY_SEMESTER);
+        Route::get('/', [StudentAcademicSummaryController::class, 'show'])
+            ->middleware('can:view_student_summary')
+            ->name(StudentRoutes::ACADEMIC_SUMMARY_SHOW);
 
-    Route::get('students/{student}/academic-summary/filter-by-course-offering', [StudentAcademicSummaryController::class, 'filterByCourseOffering'])
-        ->middleware('can:view_student_summary')
-        ->name(StudentRoutes::ACADEMIC_SUMMARY_FILTER_BY_COURSE_OFFERING);
+        Route::get('/filter-by-semester', [StudentAcademicSummaryController::class, 'filterBySemester'])
+            ->middleware('can:view_student_summary')
+            ->name(StudentRoutes::ACADEMIC_SUMMARY_FILTER_BY_SEMESTER);
 
-    Route::get('students/{student}/academic-summary/attendance-details', [StudentAcademicSummaryController::class, 'getAttendanceDetails'])
-        ->middleware('can:view_student_summary')
-        ->name(StudentRoutes::ACADEMIC_SUMMARY_ATTENDANCE_DETAILS);
+        Route::get('/filter-by-course-offering', [StudentAcademicSummaryController::class, 'filterByCourseOffering'])
+            ->middleware('can:view_student_summary')
+            ->name(StudentRoutes::ACADEMIC_SUMMARY_FILTER_BY_COURSE_OFFERING);
 
-    Route::get('students/{student}/academic-summary/score-details', [StudentAcademicSummaryController::class, 'getScoreDetails'])
-        ->middleware('can:view_student_summary')
-        ->name(StudentRoutes::ACADEMIC_SUMMARY_SCORE_DETAILS);
+        Route::get('/attendance-details', [StudentAcademicSummaryController::class, 'getAttendanceDetails'])
+            ->middleware('can:view_student_summary')
+            ->name(StudentRoutes::ACADEMIC_SUMMARY_ATTENDANCE_DETAILS);
 
-    Route::get('students/{student}/academic-summary/course-scores/{courseOfferingId}', [StudentAcademicSummaryController::class, 'getCourseScores'])
-        ->middleware('can:view_student_summary')
-        ->name(StudentRoutes::ACADEMIC_SUMMARY_COURSE_SCORES);
+        Route::get('/score-details', [StudentAcademicSummaryController::class, 'getScoreDetails'])
+            ->middleware('can:view_student_summary')
+            ->name(StudentRoutes::ACADEMIC_SUMMARY_SCORE_DETAILS);
+
+        Route::get('/course-scores/{courseOfferingId}', [StudentAcademicSummaryController::class, 'getCourseScores'])
+            ->middleware('can:view_student_summary')
+            ->name(StudentRoutes::ACADEMIC_SUMMARY_COURSE_SCORES);
+    });
 });
 
 // Academic Records Management - General Access (for menu)

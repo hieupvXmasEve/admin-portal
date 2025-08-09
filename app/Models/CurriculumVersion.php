@@ -21,6 +21,13 @@ class CurriculumVersion extends Model
         'version_code',
         'semester_id',
         'notes',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     /**
@@ -74,6 +81,14 @@ class CurriculumVersion extends Model
     /**
      * Get students enrolled with this curriculum version.
      */
+    public function students(): HasMany
+    {
+        return $this->hasMany(Student::class);
+    }
+
+    /**
+     * Get students enrolled with this curriculum version.
+     */
     public function enrollments(): HasMany
     {
         return $this->hasMany(Enrollment::class);
@@ -106,29 +121,24 @@ class CurriculumVersion extends Model
     /**
      * Get all available elective units for this curriculum version.
      * Students can choose from all units outside their specialization.
+     * 
+     * @return \Illuminate\Support\Collection
      */
     public function getAvailableElectiveUnits(): \Illuminate\Support\Collection
     {
-        // Lấy tất cả units từ:
-        // 1. Các chuyên ngành khác trong cùng program
-        // 2. Tất cả units từ các programs khác
-        // 3. Units chưa được assign vào curriculum nào
+        // Optimize with raw queries to avoid nested whereHas
+        $excludedUnitIds = CurriculumUnit::query()
+            ->whereHas('curriculumVersion', function ($query) {
+                $query->where('program_id', $this->program_id)
+                      ->where('specialization_id', $this->specialization_id);
+            })
+            ->pluck('unit_id')
+            ->toArray();
 
         return Unit::query()
-            ->where(function ($query) {
-                // Units từ các chuyên ngành khác trong cùng program
-                $query->whereHas('curriculumUnits.curriculumVersion', function ($q) {
-                    $q->where('program_id', $this->program_id)
-                        ->where('specialization_id', '!=', $this->specialization_id);
-                })
-                    // Hoặc units từ programs khác
-                    ->orWhereHas('curriculumUnits.curriculumVersion', function ($q) {
-                        $q->where('program_id', '!=', $this->program_id);
-                    })
-                    // Hoặc units chưa được assign
-                    ->orWhereDoesntHave('curriculumUnits');
-            })
-            ->distinct()
+            ->whereNotIn('id', $excludedUnitIds)
+            ->with(['unitType', 'prerequisites']) // Eager load commonly used relations
+            ->orderBy('code')
             ->get();
     }
 
@@ -161,12 +171,28 @@ class CurriculumVersion extends Model
     public function getElectiveSlots(): \Illuminate\Support\Collection
     {
         return $this->curriculumUnits()
-            ->whereHas('unitType', function ($query) {
-                $query->where('name', 'elective');
-            })
+            ->join('unit_types', 'curriculum_units.unit_type_id', '=', 'unit_types.id')
+            ->where('unit_types.name', 'elective')
             ->with(['unit', 'unitType'])
+            ->select('curriculum_units.*')
             ->orderBy('year_level')
             ->orderBy('semester_number')
             ->get();
+    }
+
+    /**
+     * Scope for active curriculum versions.
+     */
+    public function scopeActive(Builder $query): void
+    {
+        $query->where('is_active', true);
+    }
+
+    /**
+     * Scope for a specific program.
+     */
+    public function scopeForProgram(Builder $query, Program $program): void
+    {
+        $query->where('program_id', $program->id);
     }
 }
