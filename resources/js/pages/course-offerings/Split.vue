@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 
 import type { CourseOffering, Lecture, Student } from '@/types/models';
+import { toast } from 'vue-sonner';
 
 interface Props {
     courseOffering: CourseOffering;
@@ -212,13 +213,16 @@ const removeStudentFromSection = (sectionIndex: number, studentId: number) => {
 // Form submission
 const onSubmit = handleSubmit((formValues) => {
     router.post(`/course-offerings/${props.courseOffering.id}/split`, formValues, {
-        onSuccess: () => {
-            // Course offering has been successfully split and deleted
-            // User will be redirected to the course offerings index with success message
+        onSuccess: (page: any) => {
+            const message = page.props?.flash?.success || 'Course offering split successfully';
+            toast.success(message);
         },
-        onError: (errors) => {
+        onError: (errors: any) => {
+            const message = errors?.flash?.error || 'Failed to split course offering';
+            toast.error(message);
             console.error('Split failed:', errors);
         },
+        preserveScroll: true,
     });
 });
 

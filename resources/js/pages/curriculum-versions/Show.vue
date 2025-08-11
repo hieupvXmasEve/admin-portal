@@ -673,7 +673,7 @@ const getUnitScopeColor = (scope: string) => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All semesters</SelectItem>
-                                <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }}) </SelectItem>
+                                <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }}) </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -836,7 +836,7 @@ const getUnitScopeColor = (scope: string) => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none">None</SelectItem>
-                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }}) </SelectItem>
+                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }}) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -947,7 +947,7 @@ const getUnitScopeColor = (scope: string) => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none">None</SelectItem>
-                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }}) </SelectItem>
+                                        <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }}) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>

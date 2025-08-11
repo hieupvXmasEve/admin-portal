@@ -139,7 +139,6 @@ class RegistrationService
                 'eligible' => $eligibility['eligible'],
                 'reasons' => $eligibility['reasons'],
                 'available_spots' => $offering->getAvailableSpots(),
-                'total_cost' => $offering->getTotalTuition(),
             ];
         })->values()->toArray();
     }

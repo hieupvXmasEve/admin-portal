@@ -161,7 +161,6 @@ class CourseController extends Controller
                     'status' => $courseOffering->status,
                     'tuition_per_credit' => $courseOffering->tuition_per_credit,
                     'additional_fees' => $courseOffering->additional_fees,
-                    'total_cost' => $courseOffering->getTotalTuition(),
                     'prerequisites' => $courseOffering->prerequisites,
                     'notes' => $courseOffering->notes,
                     'registration_dates' => [
@@ -313,7 +312,7 @@ class CourseController extends Controller
                 'current_enrollment' => $course->current_enrollment,
                 'available_spots' => $course->getAvailableSpots(),
                 'status' => $course->status,
-                'total_cost' => $course->getTotalTuition(),
+//                'total_cost' => $course->getTotalTuition(),
                 'instructor' => $course->lecture ? [
                     'name' => $course->lecture->display_name,
                     'email' => $course->lecture->email,

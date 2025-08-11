@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -50,16 +49,7 @@ interface Props {
         } | null;
     };
     data: {
-        units: {
-            data: CurriculumUnit[];
-            current_page: number;
-            last_page: number;
-            per_page: number;
-            total: number;
-            from: number;
-            to: number;
-            links: any[];
-        };
+        units: CurriculumUnit[];
         stats: {
             totalUnits: number;
             totalCreditPoints: number;
@@ -79,7 +69,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log('props', props.curriculumVersion);
 const page = usePage();
 const api = useApi();
 
@@ -146,19 +135,6 @@ const isEditSubmitting = ref(false);
 const addUnitSearch = ref('');
 const editUnitSearch = ref('');
 
-// Computed data
-const paginationData = computed(() => ({
-    from: props.data.units.from,
-    to: props.data.units.to,
-    total: props.data.units.total,
-    current_page: props.data.units.current_page,
-    last_page: props.data.units.last_page,
-    per_page: props.data.units.per_page,
-    prev_page_url: props.data.units.current_page > 1 ? `?page=${props.data.units.current_page - 1}` : null,
-    next_page_url: props.data.units.current_page < props.data.units.last_page ? `?page=${props.data.units.current_page + 1}` : null,
-    links: props.data.units.links,
-}));
-
 const yearLevelStats = computed(() => {
     return Object.entries(props.data.stats.byYearLevel).map(([level, data]) => ({
         level: `Year ${level}`,
@@ -182,7 +158,7 @@ const unitScopeStats = computed(() => {
 });
 
 // Curriculum units data
-const curriculumUnits = computed(() => props.data.units.data || []);
+const curriculumUnits = computed(() => props.data.units || []);
 
 // Filter available units - only show units that haven't been added yet
 const availableUnits = computed(() => {
@@ -317,18 +293,6 @@ const applyFilters = () => {
     });
 };
 
-const handlePageChange = (url: string) => {
-    router.get(
-        url,
-        {},
-        {
-            replace: true,
-            preserveScroll: true,
-            preserveState: true,
-        },
-    );
-};
-
 // Event handlers
 const handleAddUnitClick = () => {
     addUnitSearch.value = '';
@@ -348,7 +312,6 @@ const onAddUnitSubmit = async (values: any) => {
         semester_number: formData.semester_number ? parseInt(formData.semester_number) : null,
         note: formData.note || null,
     };
-    console.log('%c submitData', 'color: red', submitData);
 
     const { data, error, statusCode } = await api.post('/api/curriculum-units', submitData);
 
@@ -585,7 +548,7 @@ const organizedUnits = computed(() => {
                         <CardTitle class="flex items-center gap-2">
                             <Book class="h-5 w-5" />
                             Curriculum Units
-                            <Badge variant="secondary" class="ml-2"> {{ paginationData.from }}-{{ paginationData.to }} of {{ paginationData.total }} </Badge>
+                            <Badge variant="secondary" class="ml-2"> {{ data.units.length }} </Badge>
                         </CardTitle>
 
                     </div>
@@ -623,14 +586,14 @@ const organizedUnits = computed(() => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All semesters</SelectItem>
-                                <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }}) </SelectItem>
+                                <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }}) </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                 </CardHeader>
 
                 <CardContent>
-                    <div v-if="data.units.data.length === 0" class="py-8 text-center">
+                    <div v-if="data.units.length === 0" class="py-8 text-center">
                         <Book class="mx-auto h-12 w-12 text-gray-400" />
                         <h3 class="mt-4 text-sm font-medium">No curriculum units found</h3>
                         <p class="text-muted-foreground mt-2 text-sm">
@@ -646,11 +609,7 @@ const organizedUnits = computed(() => {
                     </div>
 
                     <div v-else>
-                        <DataTable :data="data.units.data" :columns="columns" :loading="false" :enable-row-selection="false" class="border-0" />
-
-                        <div class="border-t p-4" v-if="paginationData.total > paginationData.per_page">
-                            <DataPagination :pagination-data="paginationData" @navigate="handlePageChange" />
-                        </div>
+                        <DataTable :data="data.units" :columns="columns" :loading="false" :enable-row-selection="false" class="border-0" />
                     </div>
                 </CardContent>
             </Card>
@@ -735,7 +694,7 @@ const organizedUnits = computed(() => {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">None</SelectItem>
-                                            <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }}) </SelectItem>
+                                            <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }}) </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </FormControl>
@@ -845,7 +804,7 @@ const organizedUnits = computed(() => {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">None</SelectItem>
-                                            <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 2) }}) </SelectItem>
+                                            <SelectItem v-for="semester in [1, 2, 3, 4, 5, 6]" :key="semester" :value="semester.toString()"> Semester {{ semester }} (Year {{ Math.ceil(semester / 3) }}) </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </FormControl>

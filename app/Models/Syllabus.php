@@ -106,4 +106,12 @@ class Syllabus extends Model
     {
         return $this->getTotalAssessmentWeightAttribute() === 100.0;
     }
+
+    /**
+     * Check if this syllabus has a complete total hours and per session hours.
+     */
+    public function hasCompleteTotalHoursAndPerSessionHours(): bool
+    {
+        return $this->total_hours !== null && $this->hours_per_session !== null && $this->total_hours > 0 && $this->hours_per_session > 0;
+    }
 }
