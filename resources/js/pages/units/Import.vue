@@ -236,7 +236,8 @@ const downloadTemplate = (format: string) => {
 };
 
 const goBackToUnits = () => {
-    router.visit('/units');
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    router.visit(`/units${search || ''}`);
 };
 </script>
 
@@ -250,7 +251,7 @@ const goBackToUnits = () => {
         </div>
         <Button variant="outline" @click="goBackToUnits">
             <X class="mr-2 h-4 w-4" />
-            Back to Units
+            Back
         </Button>
     </div>
 
@@ -260,11 +261,7 @@ const goBackToUnits = () => {
             <div
                 :class="[
                     'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
-                    currentStep === 'upload'
-                        ? 'bg-primary text-primary-foreground'
-                        : ['configure', 'preview', 'process', 'complete'].includes(currentStep)
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-200',
+                    currentStep === 'upload' ? 'bg-primary text-primary-foreground' : ['configure', 'preview', 'process', 'complete'].includes(currentStep) ? 'bg-green-500 text-white' : 'bg-gray-200',
                 ]"
             >
                 1
@@ -276,11 +273,7 @@ const goBackToUnits = () => {
             <div
                 :class="[
                     'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
-                    currentStep === 'configure'
-                        ? 'bg-primary text-primary-foreground'
-                        : ['preview', 'process', 'complete'].includes(currentStep)
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-200',
+                    currentStep === 'configure' ? 'bg-primary text-primary-foreground' : ['preview', 'process', 'complete'].includes(currentStep) ? 'bg-green-500 text-white' : 'bg-gray-200',
                 ]"
             >
                 2
@@ -292,11 +285,7 @@ const goBackToUnits = () => {
             <div
                 :class="[
                     'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
-                    currentStep === 'preview'
-                        ? 'bg-primary text-primary-foreground'
-                        : ['process', 'complete'].includes(currentStep)
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-200',
+                    currentStep === 'preview' ? 'bg-primary text-primary-foreground' : ['process', 'complete'].includes(currentStep) ? 'bg-green-500 text-white' : 'bg-gray-200',
                 ]"
             >
                 3
@@ -305,18 +294,7 @@ const goBackToUnits = () => {
         </div>
         <div class="h-px w-12 bg-gray-200"></div>
         <div class="flex items-center space-x-2">
-            <div
-                :class="[
-                    'flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium',
-                    currentStep === 'process'
-                        ? 'bg-primary text-primary-foreground'
-                        : currentStep === 'complete'
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-200',
-                ]"
-            >
-                4
-            </div>
+            <div :class="['flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium', currentStep === 'process' ? 'bg-primary text-primary-foreground' : currentStep === 'complete' ? 'bg-green-500 text-white' : 'bg-gray-200']">4</div>
             <span class="text-sm">Import</span>
         </div>
     </div>
@@ -462,11 +440,7 @@ const goBackToUnits = () => {
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th
-                                        v-for="header in sheet.headers"
-                                        :key="header"
-                                        class="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
-                                    >
+                                    <th v-for="header in sheet.headers" :key="header" class="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                                         {{ header }}
                                     </th>
                                 </tr>
@@ -552,11 +526,7 @@ const goBackToUnits = () => {
                 <div v-if="importResult.result?.warnings && importResult.result.warnings.length > 0" class="space-y-2">
                     <h4 class="font-medium text-yellow-600">Warnings</h4>
                     <div class="max-h-48 space-y-1 overflow-y-auto">
-                        <div
-                            v-for="warning in importResult.result.warnings"
-                            :key="warning.row"
-                            class="rounded border border-yellow-200 bg-yellow-50 p-2 text-sm"
-                        >
+                        <div v-for="warning in importResult.result.warnings" :key="warning.row" class="rounded border border-yellow-200 bg-yellow-50 p-2 text-sm">
                             <strong>Row {{ warning.row }}:</strong> {{ warning.message }}
                         </div>
                     </div>

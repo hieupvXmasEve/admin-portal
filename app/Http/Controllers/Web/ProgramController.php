@@ -46,7 +46,10 @@ class ProgramController extends Controller
         return Inertia::render('programs/Index', [
             'programs' => $programs,
             'filters' => [
-                'search' => $validated['search'] ?? null,
+                'search' => $validated['search'] ?? '',
+                'sort' => $validated['sort'] ?? '',
+                'direction' => $validated['direction'] ?? 'asc',
+                'per_page' => $validated['per_page'] ?? 15,
             ],
         ]);
     }
@@ -60,7 +63,7 @@ class ProgramController extends Controller
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program created successfully.');
         } catch (\Exception $e) {
-            Log::error('Program creation failed: '.$e->getMessage());
+            Log::error('Program creation failed: ' . $e->getMessage());
 
             return back()
                 ->withInput()
@@ -104,7 +107,7 @@ class ProgramController extends Controller
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program updated successfully.');
         } catch (\Exception $e) {
-            Log::error('Program update failed: '.$e->getMessage());
+            Log::error('Program update failed: ' . $e->getMessage());
 
             return back()
                 ->withInput()
@@ -121,7 +124,7 @@ class ProgramController extends Controller
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program deleted successfully.');
         } catch (\Exception $e) {
-            Log::error('Program deletion failed: '.$e->getMessage());
+            Log::error('Program deletion failed: ' . $e->getMessage());
 
             return back()->withErrors(['error' => $e->getMessage()]);
         }
@@ -171,13 +174,13 @@ class ProgramController extends Controller
                     'success' => true,
                     'deleted' => $deleted,
                     'failed' => $failed,
-                    'message' => count($deleted).' programs deleted successfully.',
+                    'message' => count($deleted) . ' programs deleted successfully.',
                 ]);
             });
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk delete failed: '.$e->getMessage(),
+                'message' => 'Bulk delete failed: ' . $e->getMessage(),
             ], 500);
         }
     }

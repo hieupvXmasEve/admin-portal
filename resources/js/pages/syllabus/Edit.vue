@@ -107,11 +107,7 @@ const formSchema = toTypedSchema(
                             z.object({
                                 id: z.number().optional(),
                                 name: z.string().min(1, { message: 'Detail name is required' }),
-                                weight: z
-                                    .number()
-                                    .min(0, { message: 'Weight must be non-negative' })
-                                    .max(100, { message: 'Weight cannot exceed 100%' })
-                                    .nullable(),
+                                weight: z.number().min(0, { message: 'Weight must be non-negative' }).max(100, { message: 'Weight cannot exceed 100%' }).nullable(),
                             }),
                         )
                         .default([])
@@ -387,9 +383,7 @@ const onSubmit = form.handleSubmit(async (formData) => {
                 <div>
                     <CardTitle class="flex items-center gap-2">
                         Assessment Components
-                        <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
-                            {{ getTotalWeight() }}%
-                        </Badge>
+                        <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'"> {{ getTotalWeight() }}% </Badge>
                     </CardTitle>
                     <CardDescription>Define the assessment structure and weightings for this syllabus.</CardDescription>
                 </div>
@@ -399,11 +393,7 @@ const onSubmit = form.handleSubmit(async (formData) => {
                 </Button>
             </CardHeader>
             <CardContent class="space-y-6">
-                <div
-                    v-for="(component, componentIndex) in form.values.assessment_components || []"
-                    :key="componentIndex"
-                    class="rounded-lg border p-4"
-                >
+                <div v-for="(component, componentIndex) in form.values.assessment_components || []" :key="componentIndex" class="rounded-lg border p-4">
                     <div class="mb-4 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <h4 class="font-medium">Component {{ componentIndex + 1 }}</h4>
@@ -411,13 +401,7 @@ const onSubmit = form.handleSubmit(async (formData) => {
                                 {{ assessmentTypes[component.type] || component.type }}
                             </Badge>
                         </div>
-                        <Button
-                            v-if="(form.values.assessment_components || []).length > 1"
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            @click="removeAssessmentComponent(componentIndex)"
-                        >
+                        <Button v-if="(form.values.assessment_components || []).length > 1" type="button" variant="ghost" size="sm" @click="removeAssessmentComponent(componentIndex)">
                             <Trash2 class="h-4 w-4" />
                         </Button>
                     </div>
@@ -433,11 +417,25 @@ const onSubmit = form.handleSubmit(async (formData) => {
                             </FormItem>
                         </FormField>
 
-                        <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.weight`">
+                        <FormField v-slot="{ value, setValue }" :name="`assessment_components.${componentIndex}.weight`">
                             <FormItem>
                                 <FormLabel>Weight (%)</FormLabel>
                                 <FormControl>
-                                    <NumberField v-bind="componentField" :default-value="0" :min="0" :max="100">
+                                    <NumberField
+                                        :model-value="value"
+                                        @update:model-value="
+                                            (v) => {
+                                                if (v) {
+                                                    setValue(v);
+                                                } else {
+                                                    setValue(0);
+                                                }
+                                            }
+                                        "
+                                        :default-value="0"
+                                        :min="0"
+                                        :max="100"
+                                    >
                                         <NumberFieldContent>
                                             <NumberFieldInput />
                                         </NumberFieldContent>
@@ -484,73 +482,79 @@ const onSubmit = form.handleSubmit(async (formData) => {
                     </FormField>
 
                     <!-- Component Details -->
-                    <div v-if="component.details && component.details.length > 0" class="mt-4 space-y-3">
-                        <div class="flex items-center gap-2">
-                            <Label class="text-sm font-medium">Subcomponents</Label>
-                            <Badge
-                                v-if="getSubcomponentTotalWeight(componentIndex) !== null"
-                                :class="
-                                    getSubcomponentTotalWeight(componentIndex) === 100
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-orange-100 text-orange-800'
-                                "
-                            >
-                                {{ getSubcomponentTotalWeight(componentIndex) }}%
-                            </Badge>
-                        </div>
-                        <div class="rounded border bg-gray-50 p-3">
-                            <div v-for="(detail, detailIndex) in component.details" :key="detailIndex" class="mb-3 flex items-end gap-3 last:mb-0">
-                                <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`">
-                                    <FormItem class="flex-1">
-                                        <FormLabel v-if="detailIndex === 0" class="text-xs">Detail Name</FormLabel>
-                                        <FormControl>
-                                            <Input v-bind="componentField" placeholder="e.g., Part A" class="text-sm" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-
-                                <FormField
-                                    v-slot="{ componentField }"
-                                    :name="`assessment_components.${componentIndex}.details.${detailIndex}.weight`"
-                                >
-                                    <FormItem class="w-24">
-                                        <FormLabel v-if="detailIndex === 0" class="text-xs">Weight (%)</FormLabel>
-                                        <FormControl>
-                                            <NumberField v-bind="componentField" :default-value="0" :min="0" :max="100">
-                                                <NumberFieldContent>
-                                                    <NumberFieldInput class="text-sm" />
-                                                </NumberFieldContent>
-                                            </NumberField>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    @click="removeComponentDetail(componentIndex, detailIndex)"
-                                    class="mb-1"
-                                >
-                                    <Trash2 class="h-3 w-3" />
-                                </Button>
+                    <FormField v-if="component.details && component.details.length > 0" v-slot="{}" :name="`assessment_components.${componentIndex}.details`">
+                        <div class="mt-4 space-y-3">
+                            <div class="flex items-center gap-2">
+                                <Label class="text-sm font-medium">Subcomponents</Label>
+                                <Badge v-if="getSubcomponentTotalWeight(componentIndex) !== null" :class="getSubcomponentTotalWeight(componentIndex) === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
+                                    {{ getSubcomponentTotalWeight(componentIndex) }}%
+                                </Badge>
                             </div>
+                            <div class="rounded border bg-gray-50 p-3">
+                                <div v-for="(detail, detailIndex) in component.details" :key="detailIndex" class="mb-3 flex items-end gap-3 last:mb-0">
+                                    <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`">
+                                        <FormItem class="flex-1">
+                                            <FormLabel v-if="detailIndex === 0" class="text-xs">Detail Name</FormLabel>
+                                            <FormControl>
+                                                <Input v-bind="componentField" placeholder="e.g., Part A" class="text-sm" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    </FormField>
+
+                                    <FormField v-slot="{ value, setValue }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.weight`">
+                                        <FormItem class="w-24">
+                                            <FormLabel v-if="detailIndex === 0" class="text-xs">Weight (%)</FormLabel>
+                                            <FormControl>
+                                                <NumberField
+                                                    :model-value="value"
+                                                    @update:model-value="
+                                                        (v) => {
+                                                            if (v) {
+                                                                setValue(v);
+                                                            } else {
+                                                                setValue(0);
+                                                            }
+                                                        }
+                                                    "
+                                                    :default-value="0"
+                                                    :min="0"
+                                                    :max="100"
+                                                >
+                                                    <NumberFieldContent>
+                                                        <NumberFieldInput class="text-sm" />
+                                                    </NumberFieldContent>
+                                                </NumberField>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    </FormField>
+
+                                    <Button type="button" variant="ghost" size="sm" @click="removeComponentDetail(componentIndex, detailIndex)" class="mb-1">
+                                        <Trash2 class="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                            <FormItem>
+                                <FormMessage />
+                            </FormItem>
                         </div>
-                    </div>
+                    </FormField>
                 </div>
 
                 <!-- Total Weight Summary -->
-                <div class="rounded-lg bg-gray-50 p-4">
-                    <div class="flex items-center justify-between">
-                        <span class="font-medium">Total Assessment Weight:</span>
-                        <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
-                            {{ getTotalWeight() }}% / 100%
-                        </Badge>
+                <FormField v-slot="{}" name="assessment_components">
+                    <div class="rounded-lg bg-gray-50 p-4">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium">Total Assessment Weight:</span>
+                            <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'"> {{ getTotalWeight() }}% / 100% </Badge>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-600">All assessment components must total exactly 100% for a valid syllabus.</p>
+                        <FormItem class="mt-2">
+                            <FormMessage />
+                        </FormItem>
                     </div>
-                    <p class="mt-1 text-sm text-gray-600">All assessment components must total exactly 100% for a valid syllabus.</p>
-                </div>
+                </FormField>
             </CardContent>
         </Card>
     </form>

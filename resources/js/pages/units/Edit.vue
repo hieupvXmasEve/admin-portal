@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import DebouncedInput from '@/components/DebouncedInput.vue';
 import PrerequisiteGroupsManager from '@/components/PrerequisiteGroupsManager.vue';
-import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useApi } from '@/composables/useApiRequest';
+import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { EquivalentUnit, PrerequisiteGroup, Unit } from '@/types/Unit';
-import { curriculumRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { AlertTriangle, ArrowLeft, Plus, Save, Search, X } from 'lucide-vue-next';
+import { ArrowLeft, Plus, Save, Search, X } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -22,14 +21,14 @@ interface UnitData {
     prerequisite_groups?: PrerequisiteGroup[];
 }
 
-interface EditRestriction {
-    field: string;
-    reason: string;
-}
+// interface EditRestriction {
+//     field: string;
+//     reason: string;
+// }
 
 const props = defineProps<{
     unit: UnitData;
-    editRestrictions: EditRestriction[];
+    // editRestrictions: EditRestriction[];
     prerequisiteDescriptions?: string | null;
 }>();
 
@@ -57,15 +56,20 @@ const showUnitSearch = ref(false);
 // API instance
 const api = useApi();
 
-// Check if field is restricted
-const isFieldRestricted = (fieldName: string) => {
-    return props.editRestrictions.some((restriction) => restriction.field === fieldName);
-};
+// Module navigation với return param
+const { navigateBack, getReturnUrl } = useModuleNavigation({
+    moduleIndexRoute: 'units.index',
+});
 
-const getFieldRestrictionReason = (fieldName: string) => {
-    const restriction = props.editRestrictions.find((r) => r.field === fieldName);
-    return restriction?.reason || '';
-};
+// Check if field is restricted
+// const isFieldRestricted = (fieldName: string) => {
+//     return props.editRestrictions.some((restriction) => restriction.field === fieldName);
+// };
+
+// const getFieldRestrictionReason = (fieldName: string) => {
+//     const restriction = props.editRestrictions.find((r) => r.field === fieldName);
+//     return restriction?.reason || '';
+// };
 
 const validateCode = async (code: string) => {
     if (!code || code.length < 2 || code === props.unit.code) {
@@ -137,14 +141,14 @@ const searchUnits = async (query: string) => {
 const handleCodeChange = (value: string | number) => {
     const stringValue = String(value);
     const formattedCode = stringValue.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (!isFieldRestricted('code')) {
-        form.code = formattedCode;
-        if (formattedCode && formattedCode.length >= 2 && formattedCode !== props.unit.code) {
-            validateCode(formattedCode);
-        } else {
-            codeValidation.value = null;
-        }
+    // if (!isFieldRestricted('code')) {
+    form.code = formattedCode;
+    if (formattedCode && formattedCode.length >= 2 && formattedCode !== props.unit.code) {
+        validateCode(formattedCode);
+    } else {
+        codeValidation.value = null;
     }
+    // }
 };
 
 // Debounced unit search handler
@@ -169,6 +173,12 @@ const handleSubmit = () => {
         }));
     }
 
+    // Add return parameter if exists
+    const returnUrl = getReturnUrl();
+    if (returnUrl) {
+        formData.return = returnUrl;
+    }
+
     router.put(`/units/${props.unit.id}`, formData, {
         preserveScroll: true,
         onSuccess: () => {
@@ -182,13 +192,11 @@ const handleSubmit = () => {
 
 // Validate credit points
 const validateCreditPoints = (value: string) => {
-    if (!isFieldRestricted('credit_points')) {
-        const num = parseFloat(value);
-        if (isNaN(num)) {
-            form.credit_points = 0;
-        } else {
-            form.credit_points = Math.max(0.25, Math.min(999.99, Math.round(num * 100) / 100));
-        }
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+        form.credit_points = 0;
+    } else {
+        form.credit_points = Math.max(0.25, Math.min(999.99, Math.round(num * 100) / 100));
     }
 };
 
@@ -204,13 +212,13 @@ const addEquivalentUnit = (unit: Unit, reason: string = '') => {
     }
 };
 
-const removeEquivalentUnit = (index: number) => {
-    equivalentUnits.value.splice(index, 1);
-};
+// const removeEquivalentUnit = (index: number) => {
+//     equivalentUnits.value.splice(index, 1);
+// };
 
-const updateEquivalentReason = (index: number, reason: string) => {
-    equivalentUnits.value[index].reason = reason;
-};
+// const updateEquivalentReason = (index: number, reason: string) => {
+//     equivalentUnits.value[index].reason = reason;
+// };
 
 // Search management
 const openUnitSearch = () => {
@@ -222,6 +230,12 @@ const openUnitSearch = () => {
 const selectUnit = (unit: Unit) => {
     addEquivalentUnit(unit);
 };
+
+// URL helpers
+// const indexWithCurrentQuery = (): string => {
+//     const search = typeof window !== 'undefined' ? window.location.search : '';
+//     return `${curriculumRoutes.units.index()}${search || ''}`;
+// };
 </script>
 
 <template>
@@ -229,14 +243,14 @@ const selectUnit = (unit: Unit) => {
     <!-- Header -->
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Edit Unit - {{ unit.code }}</h1>
-        <Button variant="outline" size="sm" @click="router.visit(curriculumRoutes.units.index())">
+        <Button variant="outline" size="sm" @click="navigateBack">
             <ArrowLeft class="mr-2 h-4 w-4" />
-            Back to Unit
+            Back
         </Button>
     </div>
 
     <!-- Edit Restrictions Warning -->
-    <div v-if="editRestrictions.length > 0" class="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+    <!-- <div v-if="editRestrictions.length > 0" class="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
         <div class="flex items-start">
             <AlertTriangle class="mt-0.5 mr-3 h-5 w-5 text-yellow-400" />
             <div>
@@ -253,7 +267,7 @@ const selectUnit = (unit: Unit) => {
                 </div>
             </div>
         </div>
-    </div>
+    </div> -->
 
     <!-- Form -->
     <div class="mx-auto w-full max-w-4xl">
@@ -277,9 +291,7 @@ const selectUnit = (unit: Unit) => {
                                 :class="{
                                     'border-red-500': form.errors.code || codeValidation?.valid === false,
                                     'border-green-500': codeValidation?.valid === true,
-                                    'bg-gray-50': isFieldRestricted('code'),
                                 }"
-                                :disabled="isFieldRestricted('code')"
                                 :debounce="500"
                                 maxlength="20"
                                 required
@@ -290,12 +302,12 @@ const selectUnit = (unit: Unit) => {
                         </div>
 
                         <!-- Field restriction message -->
-                        <p v-if="isFieldRestricted('code')" class="text-sm text-amber-600">
+                        <!-- <p v-if="isFieldRestricted('code')" class="text-sm text-amber-600">
                             {{ getFieldRestrictionReason('code') }}
-                        </p>
+                        </p> -->
 
                         <!-- Code validation feedback -->
-                        <div v-else-if="codeValidation" class="text-sm">
+                        <div v-if="codeValidation" class="text-sm">
                             <p
                                 :class="{
                                     'text-green-600': codeValidation.valid,
@@ -311,7 +323,7 @@ const selectUnit = (unit: Unit) => {
                             {{ form.errors.code }}
                         </p>
 
-                        <p v-if="!isFieldRestricted('code')" class="text-sm text-gray-500">Unit code must be 2-20 characters, uppercase letters and numbers only.</p>
+                        <!-- <p v-if="!isFieldRestricted('code')" class="text-sm text-gray-500">Unit code must be 2-20 characters, uppercase letters and numbers only.</p> -->
                     </div>
 
                     <!-- Unit Name -->
@@ -323,19 +335,17 @@ const selectUnit = (unit: Unit) => {
                             placeholder="e.g., Introduction to Computer Science"
                             :class="{
                                 'border-red-500': form.errors.name,
-                                'bg-gray-50': isFieldRestricted('name'),
                             }"
-                            :disabled="isFieldRestricted('name')"
                             maxlength="255"
                             required
                         />
-                        <p v-if="isFieldRestricted('name')" class="text-sm text-amber-600">
+                        <!-- <p v-if="isFieldRestricted('name')" class="text-sm text-amber-600">
                             {{ getFieldRestrictionReason('name') }}
-                        </p>
-                        <p v-else-if="form.errors.name" class="text-sm text-red-600">
+                        </p> -->
+                        <p v-if="form.errors.name" class="text-sm text-red-600">
                             {{ form.errors.name }}
                         </p>
-                        <p v-if="!isFieldRestricted('name')" class="text-sm text-gray-500">Enter the full name of the unit (3-255 characters).</p>
+                        <!-- <p v-if="!isFieldRestricted('name')" class="text-sm text-gray-500">Enter the full name of the unit (3-255 characters).</p> -->
                     </div>
 
                     <!-- Credit Points -->
@@ -352,17 +362,16 @@ const selectUnit = (unit: Unit) => {
                             placeholder="3.00"
                             :class="{
                                 'border-red-500': form.errors.credit_points,
-                                'bg-gray-50': isFieldRestricted('credit_points'),
                             }"
                             required
                         />
-                        <p v-if="isFieldRestricted('credit_points')" class="text-sm text-amber-600">
+                        <!-- <p v-if="isFieldRestricted('credit_points')" class="text-sm text-amber-600">
                             {{ getFieldRestrictionReason('credit_points') }}
-                        </p>
-                        <p v-else-if="form.errors.credit_points" class="text-sm text-red-600">
+                        </p> -->
+                        <p v-if="form.errors.credit_points" class="text-sm text-red-600">
                             {{ form.errors.credit_points }}
                         </p>
-                        <p v-if="!isFieldRestricted('credit_points')" class="text-sm text-gray-500">Credit points must be between 0.25 and 999.99 (e.g., 3.00, 6.00).</p>
+                        <!-- <p v-if="!isFieldRestricted('credit_points')" class="text-sm text-gray-500">Credit points must be between 0.25 and 999.99 (e.g., 3.00, 6.00).</p> -->
                     </div>
                 </CardContent>
             </Card>
@@ -371,7 +380,10 @@ const selectUnit = (unit: Unit) => {
             <Card>
                 <CardHeader>
                     <CardTitle>Prerequisites</CardTitle>
-                    <CardDescription> Define prerequisite requirements using five types: P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A (Anti-requisite), and AK (Assumed Knowledge). Group conditions with AND/OR logic operators for complex requirements. </CardDescription>
+                    <CardDescription>
+                        Define prerequisite requirements using five types: P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A (Anti-requisite), and AK (Assumed Knowledge). Group conditions with AND/OR logic operators for complex
+                        requirements.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <!-- Current Prerequisites -->
@@ -398,7 +410,7 @@ const selectUnit = (unit: Unit) => {
                     </Button>
 
                     <!-- Selected Equivalent Units -->
-                    <div v-if="equivalentUnits.length > 0" class="space-y-3">
+                    <!-- <div v-if="equivalentUnits.length > 0" class="space-y-3">
                         <div v-for="(equivalent, index) in equivalentUnits" :key="equivalent.unit.id" class="space-y-3 rounded-lg border bg-gray-50 p-3">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
@@ -420,15 +432,15 @@ const selectUnit = (unit: Unit) => {
                                 <Input :id="`reason-${index}`" v-model="equivalent.reason" @input="updateEquivalentReason(index, $event.target.value)" placeholder="e.g., Curriculum update, Content overlap" class="mt-1" />
                             </div>
                         </div>
-                    </div>
+                    </div> -->
 
-                    <p v-else class="text-sm text-gray-500 italic">No equivalent units specified. This unit does not replace any existing units.</p>
+                    <!-- <p v-else class="text-sm text-gray-500 italic">No equivalent units specified. This unit does not replace any existing units.</p> -->
                 </CardContent>
             </Card>
 
             <!-- Form Actions -->
             <div class="flex items-center justify-end space-x-4 pt-6">
-                <Button type="button" variant="outline" @click="router.visit(curriculumRoutes.units.index())" :disabled="form.processing"> Cancel </Button>
+                <Button type="button" variant="outline" @click="navigateBack" :disabled="form.processing"> Cancel </Button>
                 <Button type="submit" :disabled="form.processing || codeValidation?.valid === false">
                     <Save class="mr-2 h-4 w-4" />
                     {{ form.processing ? 'Saving...' : 'Save Changes' }}
