@@ -49,7 +49,7 @@ class CourseRegistrationController extends Controller
             $search = $request->search;
             $query->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_code', 'like', "%{$search}%")
+                    ->orWhere('student_id', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             })->orWhereHas('courseOffering', function ($q) use ($search) {
                 $q->whereHas('curriculumUnit.unit', function ($unitQuery) use ($search) {
@@ -82,7 +82,7 @@ class CourseRegistrationController extends Controller
             $search = $request->search;
             $statsQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_code', 'like', "%{$search}%")
+                    ->orWhere('student_id', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             })->orWhereHas('courseOffering', function ($q) use ($search) {
                 $q->whereHas('curriculumUnit.unit', function ($unitQuery) use ($search) {
@@ -187,14 +187,14 @@ class CourseRegistrationController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'student_code' => 'required|exists:students,id',
+            'student_id' => 'required|exists:students,id',
             'unit_ids' => 'required|array',
             'unit_ids.*' => 'exists:units,id',
             'notes' => 'nullable|string|max:1000',
         ]);
 
         try {
-            $student = Student::findOrFail($request->student_code);
+            $student = Student::findOrFail($request->student_id);
 
             // Get the active semester
             $activeSemester = Semester::where('is_active', true)->first();
@@ -230,7 +230,7 @@ class CourseRegistrationController extends Controller
 
                         // Create registration
                         CourseRegistration::create([
-                            'student_code' => $student->id,
+                            'student_id' => $student->id,
                             'course_offering_id' => $courseOffering->id,
                             'semester_id' => $activeSemester->id,
                             'registration_date' => now(),
@@ -447,12 +447,12 @@ class CourseRegistrationController extends Controller
     public function getAvailableCourses(Request $request)
     {
         $request->validate([
-            'student_code' => 'required|exists:students,id',
+            'student_id' => 'required|exists:students,id',
             'semester_id' => 'required|exists:semesters,id',
         ]);
 
         try {
-            $student = Student::findOrFail($request->student_code);
+            $student = Student::findOrFail($request->student_id);
             $availableCourses = $this->registrationService->getAvailableCoursesForStudent(
                 $student,
                 $request->semester_id
@@ -476,11 +476,11 @@ class CourseRegistrationController extends Controller
     public function getAvailableUnits(Request $request)
     {
         $request->validate([
-            'student_code' => 'required|exists:students,id',
+            'student_id' => 'required|exists:students,id',
         ]);
 
         try {
-            $student = Student::findOrFail($request->student_code);
+            $student = Student::findOrFail($request->student_id);
 
             // Get the active semester (only one should be active at a time)
             $activeSemester = Semester::where('is_active', true)->first();
@@ -528,7 +528,7 @@ class CourseRegistrationController extends Controller
 
             // Get already registered units with full data
             $registeredUnits = [];
-            $registrations = CourseRegistration::where('student_code', $student->id)
+            $registrations = CourseRegistration::where('student_id', $student->id)
                 ->where('semester_id', $activeSemester->id)
                 ->whereIn('registration_status', ['registered', 'confirmed'])
                 ->with('courseOffering.curriculumUnit.unit')
@@ -579,12 +579,12 @@ class CourseRegistrationController extends Controller
     public function checkEligibility(Request $request)
     {
         $request->validate([
-            'student_code' => 'required|exists:students,id',
+            'student_id' => 'required|exists:students,id',
             'course_offering_id' => 'required|exists:course_offerings,id',
         ]);
 
         try {
-            $student = Student::findOrFail($request->student_code);
+            $student = Student::findOrFail($request->student_id);
             $courseOffering = CourseOffering::findOrFail($request->course_offering_id);
 
             $eligibility = $this->checkStudentEligibility($student, $courseOffering);
@@ -607,12 +607,12 @@ class CourseRegistrationController extends Controller
     public function getStudentRegistrations(Request $request)
     {
         $request->validate([
-            'student_code' => 'required|exists:students,id',
+            'student_id' => 'required|exists:students,id',
             'semester_id' => 'nullable|exists:semesters,id',
         ]);
 
         $query = CourseRegistration::with(['courseOffering.curriculumUnit.unit'])
-            ->where('student_code', $request->student_code);
+            ->where('student_id', $request->student_id);
 
         if ($request->filled('semester_id')) {
             $query->where('semester_id', $request->semester_id);
@@ -637,7 +637,7 @@ class CourseRegistrationController extends Controller
         }
 
         // Check if already registered
-        $existingRegistration = CourseRegistration::where('student_code', $student->id)
+        $existingRegistration = CourseRegistration::where('student_id', $student->id)
             ->where('course_offering_id', $courseOffering->id)
             ->where('semester_id', $courseOffering->semester_id)
             ->whereIn('registration_status', ['registered', 'confirmed'])
@@ -651,7 +651,7 @@ class CourseRegistrationController extends Controller
         if ($courseOffering->current_enrollment >= $courseOffering->max_enrollment) {
             // Admin override - log this action but allow registration
             Log::info('Admin override registration', [
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'course_offering_id' => $courseOffering->id,
                 'current_enrollment' => $courseOffering->current_enrollment,
                 'max_enrollment' => $courseOffering->max_enrollment,
@@ -674,7 +674,7 @@ class CourseRegistrationController extends Controller
         }
 
         // Check if already registered
-        $existingRegistration = CourseRegistration::where('student_code', $student->id)
+        $existingRegistration = CourseRegistration::where('student_id', $student->id)
             ->where('course_offering_id', $courseOffering->id)
             ->where('semester_id', $courseOffering->semester_id)
             ->whereIn('registration_status', ['registered', 'confirmed'])

@@ -141,7 +141,7 @@ class ClassSessionService
         string $startTime,
         string $endTime,
         int $sessionDuration,
-        int $lectureId,
+        ?int $lectureId,
         int $roomId
     ): Collection {
         $sessions = collect();

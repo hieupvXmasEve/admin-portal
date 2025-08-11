@@ -128,6 +128,8 @@ export const lecturerRoutes = {
     store: () => route(LECTURE_ROUTE_NAMES.STORE),
     update: (id: number) => route(LECTURE_ROUTE_NAMES.UPDATE, { lecture: id }),
     destroy: (id: number) => route(LECTURE_ROUTE_NAMES.DESTROY, { lecture: id }),
+    import: () => route(LECTURE_ROUTE_NAMES.IMPORT_FORM),
+    exportFiltered: () => route(LECTURE_ROUTE_NAMES.EXPORT_EXCEL_FILTERED),
     // API routes
     apiSearch: () => route(LECTURE_ROUTE_NAMES.API_SEARCH),
     apiStatistics: () => route(LECTURE_ROUTE_NAMES.API_STATISTICS),

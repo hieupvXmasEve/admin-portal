@@ -26,7 +26,7 @@ class RegistrationService
             $this->validateRegistrationEligibility($student, $courseOffering);
 
             // Check for existing registration
-            $existingRegistration = CourseRegistration::where('student_code', $student->id)
+            $existingRegistration = CourseRegistration::where('student_id', $student->id)
                 ->where('course_offering_id', $courseOfferingId)
                 ->where('semester_id', $courseOffering->semester_id)
                 ->first();
@@ -37,7 +37,7 @@ class RegistrationService
 
             // Create registration
             $registration = CourseRegistration::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'course_offering_id' => $courseOfferingId,
                 'semester_id' => $courseOffering->semester_id,
                 'registration_status' => 'registered',
@@ -120,7 +120,7 @@ class RegistrationService
             ->get();
 
         // Filter out courses already registered for
-        $registeredCourseIds = CourseRegistration::where('student_code', $student->id)
+        $registeredCourseIds = CourseRegistration::where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->whereIn('registration_status', ['registered', 'confirmed'])
             ->pluck('course_offering_id')
@@ -150,7 +150,7 @@ class RegistrationService
     public function getStudentRegistrations(Student $student, int $semesterId): array
     {
         return CourseRegistration::with(['courseOffering.curriculumUnit.unit', 'courseOffering.lecture'])
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->orderBy('registration_date', 'desc')
             ->get()
@@ -237,7 +237,7 @@ class RegistrationService
 
         // Get student's current registrations for the semester
         $currentRegistrations = CourseRegistration::with('courseOffering')
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('semester_id', $courseOffering->semester_id)
             ->whereIn('registration_status', ['registered', 'confirmed'])
             ->get();
@@ -257,7 +257,7 @@ class RegistrationService
      */
     private function validateCreditLoad(Student $student, CourseOffering $courseOffering): void
     {
-        $currentCredits = CourseRegistration::where('student_code', $student->id)
+        $currentCredits = CourseRegistration::where('student_id', $student->id)
             ->where('semester_id', $courseOffering->semester_id)
             ->whereIn('registration_status', ['registered', 'confirmed'])
             ->sum('credit_hours');
@@ -276,7 +276,7 @@ class RegistrationService
     private function getCompletedCourses(Student $student): array
     {
         return CourseRegistration::with('courseOffering.curriculumUnit.unit')
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('registration_status', 'completed')
             ->passing()
             ->get()
@@ -311,7 +311,7 @@ class RegistrationService
      */
     public function calculateSemesterGPA(Student $student, int $semesterId): float
     {
-        $registrations = CourseRegistration::where('student_code', $student->id)
+        $registrations = CourseRegistration::where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->where('registration_status', 'completed')
             ->whereNotNull('final_grade')

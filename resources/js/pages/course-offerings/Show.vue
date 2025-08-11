@@ -363,7 +363,7 @@ const getSessionStatusVariant = (status: string) => {
     </div>
 
     <!-- Class Sessions Management -->
-    <Collapsible>
+    <Collapsible default-open>
         <Card>
             <CardHeader>
                 <div class="flex items-center justify-between">
@@ -450,7 +450,7 @@ const getSessionStatusVariant = (status: string) => {
     </Collapsible>
 
     <!-- Student Registration Status -->
-    <Collapsible>
+    <Collapsible default-open>
         <Card>
             <CardHeader>
                 <div class="flex items-center justify-between">
