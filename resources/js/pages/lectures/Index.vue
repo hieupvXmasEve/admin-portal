@@ -1,16 +1,7 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,10 +26,8 @@ interface Props {
         campus_id?: string;
         employment_status?: string;
         employment_type?: string;
-        department?: string;
         available_for_assignment?: boolean;
     };
-    departments: string[];
     employmentStatusOptions: Array<{ value: string; label: string }>;
     employmentTypeOptions: Array<{ value: string; label: string }>;
 }
@@ -56,7 +45,6 @@ const filtersForm = useForm({
     campus_id: props.filters.campus_id || 'all',
     employment_status: props.filters.employment_status || 'all',
     employment_type: props.filters.employment_type || 'all',
-    department: props.filters.department || 'all',
     available_for_assignment: props.filters.available_for_assignment,
 });
 
@@ -94,6 +82,29 @@ const goToCreatePage = () => {
     router.visit(lecturerRoutes.create());
 };
 
+const goToImportPage = () => {
+    router.visit(lecturerRoutes.import());
+};
+
+const exportToExcel = () => {
+    window.open('/lectures/export/excel', '_blank');
+};
+
+const exportFilteredToExcel = () => {
+    // Build query parameters from current filters
+    const params = new URLSearchParams();
+
+    if (filtersForm.search) params.append('search', filtersForm.search);
+    if (filtersForm.campus_id && filtersForm.campus_id !== 'all') params.append('campus_id', filtersForm.campus_id);
+    if (filtersForm.employment_status && filtersForm.employment_status !== 'all') params.append('employment_status', filtersForm.employment_status);
+    if (filtersForm.employment_type && filtersForm.employment_type !== 'all') params.append('employment_type', filtersForm.employment_type);
+    if (filtersForm.available_for_assignment !== undefined) params.append('available_for_assignment', filtersForm.available_for_assignment.toString());
+
+    const queryString = params.toString();
+    const url = `/lectures/export/excel/filtered${queryString ? '?' + queryString : ''}`;
+    window.open(url, '_blank');
+};
+
 const goToEditPage = (lecture: Lecture) => {
     router.visit(lecturerRoutes.edit(lecture.id));
 };
@@ -127,22 +138,13 @@ watch(
     },
 );
 
-watch(
-    [
-        () => filtersForm.campus_id,
-        () => filtersForm.employment_status,
-        () => filtersForm.employment_type,
-        () => filtersForm.department,
-        () => filtersForm.available_for_assignment,
-    ],
-    () => {
-        filtersForm.get(route('lectures.index'), {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['lectures'],
-        });
-    },
-);
+watch([() => filtersForm.campus_id, () => filtersForm.employment_status, () => filtersForm.employment_type, () => filtersForm.available_for_assignment], () => {
+    filtersForm.get(route('lectures.index'), {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['lectures'],
+    });
+});
 
 const getEmploymentStatusBadge = (status: string) => {
     const statusMap: Record<string, { variant: any; label: string }> = {
@@ -204,10 +206,7 @@ const columns: ColumnDef<Lecture>[] = [
         enableSorting: true,
         cell: ({ row }) => {
             const lecture = row.original;
-            return h('div', { class: 'min-w-0' }, [
-                h('div', { class: 'font-medium text-sm truncate' }, lecture.display_name),
-                h('div', { class: 'text-xs text-gray-500 dark:text-gray-400 truncate' }, lecture.email),
-            ]);
+            return h('div', { class: 'min-w-0' }, [h('div', { class: 'font-medium text-sm truncate' }, lecture.display_name), h('div', { class: 'text-xs text-gray-500 dark:text-gray-400 truncate' }, lecture.email)]);
         },
     },
     {
@@ -228,15 +227,7 @@ const columns: ColumnDef<Lecture>[] = [
             return h('div', { class: 'flex items-center gap-1 text-sm' }, campus ? [h(Building2, { class: 'h-3 w-3' }), campus.name] : 'No Campus');
         },
     },
-    {
-        header: 'Department',
-        accessorKey: 'department',
-        enableSorting: true,
-        cell: ({ row }) => {
-            const department = row.original.department;
-            return h('div', { class: 'text-sm' }, department || 'Not specified');
-        },
-    },
+
     {
         header: 'Status',
         accessorKey: 'employment_status',
@@ -280,10 +271,33 @@ const columns: ColumnDef<Lecture>[] = [
             <h2 class="text-xl leading-tight font-semibold text-gray-800 dark:text-gray-200">Lecturers</h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Manage all lecturer information and assignments.</p>
         </div>
-        <Button size="sm" @click="goToCreatePage">
-            <Plus class="mr-2 h-4 w-4" />
-            Add Lecturer
-        </Button>
+        <div class="flex items-center gap-2">
+            <!-- Import/Export Dropdown -->
+            <div class="relative">
+                <select
+                    class="bg-background border-input ring-offset-background focus:ring-ring appearance-none rounded-md border px-3 py-2 text-sm focus:ring-2 focus:ring-offset-2"
+                    @change="
+                        (e) => {
+                            const value = (e.target as HTMLSelectElement).value;
+                            if (value === 'import') goToImportPage();
+                            else if (value === 'export-all') exportToExcel();
+                            else if (value === 'export-filtered') exportFilteredToExcel();
+                            (e.target as HTMLSelectElement).value = '';
+                        }
+                    "
+                >
+                    <option value="">Import/Export</option>
+                    <option value="import">📤 Import Lecturers</option>
+                    <option value="export-all">📋 Export All</option>
+                    <option value="export-filtered">🔍 Export Filtered</option>
+                </select>
+            </div>
+
+            <Button size="sm" @click="goToCreatePage">
+                <Plus class="mr-2 h-4 w-4" />
+                Add Lecturer
+            </Button>
+        </div>
     </div>
 
     <!-- Filters -->
@@ -322,20 +336,6 @@ const columns: ColumnDef<Lecture>[] = [
                         <SelectItem value="all">All Types</SelectItem>
                         <SelectItem v-for="type in employmentTypeOptions" :key="type.value" :value="type.value">
                             {{ type.label }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div class="space-y-2">
-                <Label for="department">Department</Label>
-                <Select v-model="filtersForm.department">
-                    <SelectTrigger>
-                        <SelectValue placeholder="All Departments" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Departments</SelectItem>
-                        <SelectItem v-for="department in departments" :key="department" :value="department">
-                            {{ department }}
                         </SelectItem>
                     </SelectContent>
                 </Select>

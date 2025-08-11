@@ -53,7 +53,6 @@ const props = defineProps<{
     curriculumUnits: CurriculumUnit[];
     assessmentTypes: Record<string, string>;
 }>();
-console.log(props);
 
 // Validation Schema
 const formSchema = toTypedSchema(
@@ -62,7 +61,7 @@ const formSchema = toTypedSchema(
         description: z.string().min(1, { message: 'Description is required' }),
         total_hours: z.number().positive({ message: 'Total hours must be a positive number' }),
         hours_per_session: z.number().positive({ message: 'Hours per session must be a positive number' }),
-        curriculum_unit_id: z.number().int().positive({ message: 'Please select a curriculum unit' }),
+        curriculum_unit_id: z.string({ message: 'Please select a curriculum unit' }),
         is_active: z.boolean().default(false),
         assessment_components: z
             .array(
@@ -300,7 +299,7 @@ const onSubmit = form.handleSubmit((formData) => {
 
                     <FormField v-slot="{ componentField }" name="curriculum_unit_id">
                         <FormItem>
-                            <FormLabel for="curriculum_unit_id">Curriculum Unit Context</FormLabel>
+                            <FormLabel for="curriculum_unit_id">Semester for Unit Syllabus</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
@@ -312,7 +311,7 @@ const onSubmit = form.handleSubmit((formData) => {
                                             :key="curriculumUnit.id"
                                             :value="curriculumUnit.id.toString()"
                                         >
-                                            {{ curriculumUnit.semester.name }} - {{ curriculumUnit.curriculum_version.specialization.name }}
+                                            {{ curriculumUnit.semester.name }}
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -411,10 +410,10 @@ const onSubmit = form.handleSubmit((formData) => {
                     </FormItem>
                 </FormField>
 
-                <FormField v-slot="{ componentField }" name="is_active">
+                <FormField v-slot="{ value, handleChange }" name="is_active">
                     <FormItem class="flex flex-row items-start space-y-0 space-x-3">
                         <FormControl>
-                            <Checkbox v-bind="componentField" />
+                            <Checkbox :model-value="value" @update:model-value="handleChange" />
                         </FormControl>
                         <div class="space-y-1 leading-none">
                             <FormLabel>Set as active syllabus</FormLabel>
@@ -530,22 +529,6 @@ const onSubmit = form.handleSubmit((formData) => {
                                 </FormItem>
                             </FormField>
                         </div>
-
-                        <!-- <div class="mt-4">
-                                    <FormField
-                                        v-slot="{ componentField }"
-                                        :name="`assessment_components.${componentIndex}.is_required_to_sit_final_exam`"
-                                    >
-                                        <FormItem class="flex flex-row items-start space-y-0 space-x-3">
-                                            <FormControl>
-                                                <Checkbox v-bind="componentField" />
-                                            </FormControl>
-                                            <div class="space-y-1 leading-none">
-                                                <FormLabel :for="`component_required_${componentIndex}`">Required to sit final exam</FormLabel>
-                                            </div>
-                                        </FormItem>
-                                    </FormField>
-                                </div> -->
 
                         <!-- Component Details -->
                         <div class="mt-4">

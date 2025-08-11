@@ -193,6 +193,8 @@ return [
             'create_lecturer' => 'create_lecturer',
             'edit_lecturer' => 'edit_lecturer',
             'delete_lecturer' => 'delete_lecturer',
+            'import_lecturer' => 'import_lecturer',
+            'export_lecturer' => 'export_lecturer',
         ],
 
         // Teaching Assignment Management

@@ -136,7 +136,8 @@ class UnitController extends Controller
                 'syllabus_count' => $unit->syllabus()->count(),
                 'active_syllabus_count' => $unit->syllabus()->where('is_active', true)->count(),
             ],
-            'canEdit' => $this->validationService->canEditUnit($unit),
+//            'canEdit' => $this->validationService->canEditUnit($unit),
+            'canEdit' => true,
             'canDelete' => $this->validationService->canDeleteUnit($unit)['allowed'],
         ]);
     }

@@ -2,9 +2,49 @@
 
 use App\Constants\LectureRoutes;
 use App\Http\Controllers\Web\LectureController;
+use App\Http\Controllers\Web\Lectures\LectureExportController;
+use App\Http\Controllers\Web\Lectures\LectureImportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
+
+    // Import routes must come BEFORE resource routes to avoid conflicts
+
+    // Show import form
+    Route::get('lectures/import', [LectureImportController::class, 'showImportForm'])
+        ->middleware('can:import_lecturer')
+        ->name(LectureRoutes::IMPORT_FORM);
+
+    // File upload and preview
+    Route::post('lectures/import/upload', [LectureImportController::class, 'uploadFile'])
+        ->middleware('can:import_lecturer')
+        ->name(LectureRoutes::IMPORT_UPLOAD);
+
+    // Preview import data
+    Route::post('lectures/import/preview', [LectureImportController::class, 'previewImport'])
+        ->middleware('can:import_lecturer')
+        ->name(LectureRoutes::IMPORT_PREVIEW);
+
+    // Process import
+    Route::post('lectures/import/process', [LectureImportController::class, 'processImport'])
+        ->middleware('can:import_lecturer')
+        ->name(LectureRoutes::IMPORT_PROCESS);
+
+    // Template downloads
+    Route::get('lectures/templates/{format}', [LectureImportController::class, 'downloadTemplate'])
+        ->middleware('can:import_lecturer')
+        ->name(LectureRoutes::TEMPLATE_DOWNLOAD)
+        ->where('format', 'simple');
+
+    // Export data
+    Route::get('lectures/export/excel', [LectureExportController::class, 'exportExcel'])
+        ->middleware('can:export_lecturer')
+        ->name(LectureRoutes::EXPORT_EXCEL);
+
+    Route::get('lectures/export/excel/filtered', [LectureExportController::class, 'exportExcelWithCurrentFilters'])
+        ->middleware('can:export_lecturer')
+        ->name(LectureRoutes::EXPORT_EXCEL_FILTERED);
+
     // Lecturer resource routes
     Route::get('lectures', [LectureController::class, 'index'])
         ->middleware('can:view_lecturer')

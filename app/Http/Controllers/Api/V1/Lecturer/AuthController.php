@@ -76,7 +76,7 @@ class AuthController extends Controller
         $token = $lecturer->createToken('lecturer-api', ['lecturer:access'])->plainTextToken;
 
         return ApiResponse::success([
-            'lecturer' => new LecturerResource($lecturer),
+//            'lecturer' => new LecturerResource($lecturer),
             'token' => $token,
             'token_type' => 'Bearer',
             'expires_in' => config('sanctum.expiration', 525600), // minutes
@@ -179,7 +179,7 @@ class AuthController extends Controller
             $lecturer = Lecture::where('email', $googleUserData['email'])->first();
 
             if (! $lecturer) {
-                return ApiResponse::notFoundError('No lecturer account found with this email. Please contact your administrator.');
+                return ApiResponse::notFound('No lecturer account found with this email. Please contact your administrator.');
             }
 
             // Update OAuth provider data if not set

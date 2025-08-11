@@ -52,7 +52,7 @@ export interface UnitData {
     }>;
     curriculum_units: Array<{
         id: number;
-        type: 'core' | 'major' | 'elective';
+        type?: 'core' | 'major' | 'elective';
         is_compulsory: boolean;
         note?: string;
         curriculum_version: {

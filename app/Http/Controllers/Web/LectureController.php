@@ -73,13 +73,6 @@ class LectureController extends Controller
 
         // Get filter options
 
-        $departments = Lecture::select('department')
-            ->where('campus_id', $currentCampusId)
-            ->whereNotNull('department')
-            ->distinct()
-            ->orderBy('department')
-            ->pluck('department');
-
         return Inertia::render('lectures/Index', [
             'lectures' => $lectures,
             'filters' => $request->only([
@@ -87,10 +80,8 @@ class LectureController extends Controller
                 'campus_id',
                 'employment_status',
                 'employment_type',
-                'department',
                 'available_for_assignment',
             ]),
-            'departments' => $departments,
             'employmentStatusOptions' => [
                 ['value' => 'active', 'label' => 'Active'],
                 ['value' => 'on_leave', 'label' => 'On Leave'],

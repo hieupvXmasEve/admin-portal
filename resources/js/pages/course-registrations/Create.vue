@@ -27,7 +27,7 @@ interface AvailableUnitsResponse {
 
 // Form state
 const form = ref({
-    student_code: '',
+    student_id: '',
     unit_ids: [] as string[],
     notes: '',
 });
@@ -60,10 +60,10 @@ const handleStudentSelect = async (student: Student | null) => {
     form.value.unit_ids = [];
 
     if (student) {
-        form.value.student_code = student.id.toString();
+        form.value.student_id = student.id.toString();
         await loadAvailableUnits(student.id);
     } else {
-        form.value.student_code = '';
+        form.value.student_id = '';
     }
 };
 
@@ -73,7 +73,7 @@ const loadAvailableUnits = async (studentId: number) => {
 
     isLoadingUnits.value = true;
     try {
-        const response = await fetch(`/api/course-registrations/available-units?student_code=${studentId}`, {
+        const response = await fetch(`/api/course-registrations/available-units?student_id=${studentId}`, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
             },
@@ -115,7 +115,7 @@ const onSubmit = () => {
     errors.value = {};
 
     const formData = {
-        student_code: Number(form.value.student_code),
+        student_id: Number(form.value.student_id),
         unit_ids: form.value.unit_ids.map((id) => Number(id)),
         notes: form.value.notes,
     };
@@ -158,7 +158,7 @@ const onSubmit = () => {
                         <!-- Student Selection -->
                         <div class="space-y-2">
                             <label class="text-sm font-medium">Student *</label>
-                            <StudentCombobox v-model="form.student_code" :error-message="errors.student_code" placeholder="Search and select a student..." @select="handleStudentSelect" />
+                            <StudentCombobox v-model="form.student_id" :error-message="errors.student_id" placeholder="Search and select a student..." @select="handleStudentSelect" />
                         </div>
 
                         <!-- No Student Selected -->
@@ -295,7 +295,7 @@ const onSubmit = () => {
                 <CardContent class="space-y-3">
                     <div>
                         <p class="font-medium">{{ selectedStudent.full_name }}</p>
-                        <p class="text-muted-foreground text-sm">{{ selectedStudent.student_code }}</p>
+                        <p class="text-muted-foreground text-sm">{{ selectedStudent.student_id }}</p>
                         <p class="text-muted-foreground text-sm">{{ selectedStudent.email }}</p>
                     </div>
                     <div v-if="selectedStudent.program">

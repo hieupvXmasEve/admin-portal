@@ -144,7 +144,7 @@ class ClassSessionController extends Controller
             $attendanceQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('student_code', 'like', "%{$search}%");
+                    ->orWhere('student_id', 'like', "%{$search}%");
             });
         }
 
@@ -156,9 +156,9 @@ class ClassSessionController extends Controller
         $attendanceData = $attendanceQuery->paginate($perPage);
 
         // Get all enrolled students who don't have attendance records yet
-        $studentsWithAttendance = $session->attendances()->pluck('student_code')->toArray();
+        $studentsWithAttendance = $session->attendances()->pluck('student_id')->toArray();
         $studentsWithoutAttendance = $enrolledStudentsQuery
-            ->whereNotIn('student_code', $studentsWithAttendance)
+            ->whereNotIn('student_id', $studentsWithAttendance)
             ->get()
             ->pluck('student');
 
@@ -282,7 +282,7 @@ class ClassSessionController extends Controller
             $attendanceQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('student_code', 'like', "%{$search}%");
+                    ->orWhere('student_id', 'like', "%{$search}%");
             });
         }
 
@@ -301,7 +301,7 @@ class ClassSessionController extends Controller
             $csvContent .= sprintf(
                 "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
                 $this->escapeCsvField($student?->name ?? 'N/A'),
-                $this->escapeCsvField($student?->student_code ?? 'N/A'),
+                $this->escapeCsvField($student?->student_id ?? 'N/A'),
                 $this->escapeCsvField($student?->email ?? 'N/A'),
                 $this->escapeCsvField(ucfirst($attendance->status)),
                 $this->escapeCsvField($attendance->formatted_check_in_time ?? ''),

@@ -91,7 +91,7 @@ const props = defineProps<{
     canEdit: boolean;
     canDelete: boolean;
 }>();
-console.log(props.unit.syllabus);
+console.log(props.unit);
 
 // Delete confirmation
 const isDeleting = ref(false);
@@ -158,7 +158,8 @@ const getConditionTypeIcon = (type: string) => {
 };
 
 const getUnitTypeColor = (unitTypeCode: string) => {
-    switch (unitTypeCode.toLowerCase()) {
+    console.log('unitTypeCode', unitTypeCode)
+    switch (unitTypeCode?.toLowerCase()) {
         case 'core':
             return 'bg-red-100 text-red-800';
         case 'major':
@@ -508,8 +509,8 @@ const hasRelationships = () => {
                                 {{ curriculumUnit.semester.term }} {{ curriculumUnit.semester.year }}
                             </p>
                         </div>
-                        <Badge :class="getUnitTypeColor(curriculumUnit.type)" class="text-xs">
-                            {{ curriculumUnit.type.toUpperCase() }}
+                        <Badge v-if="curriculumUnit.type" :class="getUnitTypeColor(curriculumUnit.type)" class="text-xs">
+                            {{ curriculumUnit.type?.toUpperCase() }}
                         </Badge>
                     </div>
 

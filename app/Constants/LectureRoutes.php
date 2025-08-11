@@ -30,6 +30,22 @@ class LectureRoutes
 
     public const API_STATISTICS = 'api.lectures.statistics';
 
+    // Import Routes
+    public const IMPORT_FORM = 'lectures.import.form';
+
+    public const IMPORT_UPLOAD = 'lectures.import.upload';
+
+    public const IMPORT_PREVIEW = 'lectures.import.preview';
+
+    public const IMPORT_PROCESS = 'lectures.import.process';
+
+    public const TEMPLATE_DOWNLOAD = 'lectures.templates.download';
+
+    // Export Routes
+    public const EXPORT_EXCEL = 'lectures.export.excel';
+
+    public const EXPORT_EXCEL_FILTERED = 'lectures.export.excel.filtered';
+
     // Route Prefixes
     public const WEB_PREFIX = 'lectures.';
 
