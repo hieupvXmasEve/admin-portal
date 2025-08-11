@@ -30,7 +30,7 @@ class StudentStatusService
             ]);
 
             Log::info('Student status updated', [
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'old_status' => $oldStatus,
                 'new_status' => $newStatus,
                 'reason' => $reason,

@@ -9,7 +9,7 @@ import { computed, h } from 'vue';
 
 interface Student {
     id: number;
-    student_code: string;
+    student_id: string;
     full_name: string;
     program?: {
         name: string;
@@ -39,7 +39,7 @@ const data = computed(() => props.students?.data || []);
 const columns: ColumnDef<Student>[] = [
     {
         header: 'Student ID',
-        accessorKey: 'student_code',
+        accessorKey: 'student_id',
         enableSorting: false,
     },
     {

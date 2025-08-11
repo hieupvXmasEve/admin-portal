@@ -36,7 +36,7 @@ class StudentController extends Controller
             $students = $this->studentService->getStudents($lecturer, $filters, $perPage);
 
             return ApiResponse::paginated(
-                $students->through(fn ($student) => new StudentResource($student)),
+                $students->through(fn($student) => new StudentResource($student)),
                 'Students retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -263,8 +263,8 @@ class StudentController extends Controller
         try {
             $validated = $request->validate([
                 'action' => 'required|string|in:add_note,send_notification,mark_for_follow_up',
-                'student_codes' => 'required|array|min:1|max:50',
-                'student_codes.*' => 'integer',
+                'student_ids' => 'required|array|min:1|max:50',
+                'student_ids.*' => 'integer',
                 'data' => 'required|array',
             ]);
 
@@ -272,7 +272,7 @@ class StudentController extends Controller
             $successCount = 0;
             $errorCount = 0;
 
-            foreach ($validated['student_codes'] as $studentId) {
+            foreach ($validated['student_ids'] as $studentId) {
                 try {
                     $result = $this->processBulkAction(
                         $lecturer,
@@ -282,14 +282,14 @@ class StudentController extends Controller
                     );
 
                     $results[] = [
-                        'student_code' => $studentId,
+                        'student_id' => $studentId,
                         'status' => 'success',
                         'result' => $result,
                     ];
                     $successCount++;
                 } catch (\Exception $e) {
                     $results[] = [
-                        'student_code' => $studentId,
+                        'student_id' => $studentId,
                         'status' => 'error',
                         'error' => $e->getMessage(),
                     ];
@@ -299,7 +299,7 @@ class StudentController extends Controller
 
             return ApiResponse::success([
                 'action' => $validated['action'],
-                'total_processed' => count($validated['student_codes']),
+                'total_processed' => count($validated['student_ids']),
                 'successful_actions' => $successCount,
                 'failed_actions' => $errorCount,
                 'results' => $results,
@@ -322,7 +322,7 @@ class StudentController extends Controller
             'add_note' => $this->studentService->addStudentNote($lecturer, $studentId, $data),
             'send_notification' => $this->sendNotificationToStudent($lecturer, $studentId, $data),
             'mark_for_follow_up' => $this->markStudentForFollowUp($lecturer, $studentId, $data),
-            default => throw new \Exception('Unknown action: '.$action),
+            default => throw new \Exception('Unknown action: ' . $action),
         };
     }
 

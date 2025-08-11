@@ -71,7 +71,7 @@ class AcademicLeaveSeeder extends Seeder
         // Create academic hold for leave documentation
         $this->createLeaveHold($student, $leaveType, $leaveDate);
 
-        $this->command->info("  📋 {$student->student_code}: {$leaveType['reason']}");
+        $this->command->info("  📋 {$student->student_id}: {$leaveType['reason']}");
     }
 
     private function determineLeaveType(): array
@@ -142,7 +142,7 @@ class AcademicLeaveSeeder extends Seeder
 
     private function withdrawFromCourses(Student $student, Semester $semester, Carbon $leaveDate, array $leaveType): void
     {
-        $registrations = CourseRegistration::where('student_code', $student->id)
+        $registrations = CourseRegistration::where('student_id', $student->id)
             ->where('semester_id', $semester->id)
             ->where('registration_status', 'registered')
             ->get();
@@ -193,12 +193,12 @@ class AcademicLeaveSeeder extends Seeder
         $expectedReturnDate = $leaveDate->copy()->addMonths($leaveType['max_duration_months']);
 
         AcademicHold::create([
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'hold_type' => 'administrative',
             'hold_category' => 'registration',
             'title' => 'Academic Leave Documentation',
-            'description' => "Student on {$leaveType['reason']} leave. ".
-                ($leaveType['documentation_required'] ? 'Documentation required for return. ' : '').
+            'description' => "Student on {$leaveType['reason']} leave. " .
+                ($leaveType['documentation_required'] ? 'Documentation required for return. ' : '') .
                 "Expected return: {$expectedReturnDate->format('Y-m-d')}",
             'amount' => null,
             'priority' => 'medium',

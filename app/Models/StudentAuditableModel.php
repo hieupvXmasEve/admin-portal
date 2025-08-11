@@ -25,9 +25,20 @@ abstract class StudentAuditableModel extends Authenticatable
     protected function getStandardLogFields(): array
     {
         return [
-            'student_code', 'full_name', 'email', 'phone', 'address',
-            'campus_id', 'program_id', 'specialization_id', 'curriculum_version_id',
-            'status', 'academic_status', 'status_change_date', 'status_reason', 'status_changed_by',
+            'student_id',
+            'full_name',
+            'email',
+            'phone',
+            'address',
+            'campus_id',
+            'program_id',
+            'specialization_id',
+            'curriculum_version_id',
+            'status',
+            'academic_status',
+            'status_change_date',
+            'status_reason',
+            'status_changed_by',
         ];
     }
 
@@ -37,13 +48,32 @@ abstract class StudentAuditableModel extends Authenticatable
     protected function getComprehensiveLogFields(): array
     {
         return [
-            'student_code', 'full_name', 'email', 'phone', 'address',
-            'date_of_birth', 'gender', 'nationality', 'national_id',
-            'campus_id', 'program_id', 'specialization_id', 'curriculum_version_id',
-            'admission_date', 'expected_graduation_date',
-            'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
-            'high_school_name', 'high_school_graduation_year', 'entrance_exam_score',
-            'status', 'academic_status', 'status_change_date', 'status_reason', 'status_changed_by',
+            'student_id',
+            'full_name',
+            'email',
+            'phone',
+            'address',
+            'date_of_birth',
+            'gender',
+            'nationality',
+            'national_id',
+            'campus_id',
+            'program_id',
+            'specialization_id',
+            'curriculum_version_id',
+            'admission_date',
+            'expected_graduation_date',
+            'emergency_contact_name',
+            'emergency_contact_phone',
+            'emergency_contact_relationship',
+            'high_school_name',
+            'high_school_graduation_year',
+            'entrance_exam_score',
+            'status',
+            'academic_status',
+            'status_change_date',
+            'status_reason',
+            'status_changed_by',
         ];
     }
 
@@ -107,8 +137,8 @@ abstract class StudentAuditableModel extends Authenticatable
      */
     protected function getIdentifierForLog(): string
     {
-        if (! empty($this->student_code)) {
-            return "{$this->student_code} ({$this->full_name})";
+        if (! empty($this->student_id)) {
+            return "{$this->student_id} ({$this->full_name})";
         }
 
         if (! empty($this->full_name)) {
@@ -137,7 +167,7 @@ abstract class StudentAuditableModel extends Authenticatable
             'program_id' => $this->program_id ?? null,
             'specialization_id' => $this->specialization_id ?? null,
             'curriculum_version_id' => $this->curriculum_version_id ?? null,
-            'student_code' => $this->student_code ?? null,
+            'student_id' => $this->student_id ?? null,
             'academic_status' => $this->academic_status ?? null,
         ];
 

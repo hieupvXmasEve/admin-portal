@@ -361,7 +361,7 @@ class AssessmentManagementService
         );
 
         if (! $weightValidation['is_valid']) {
-            throw new \Exception('Weight validation failed: '.implode(', ', $weightValidation['errors']));
+            throw new \Exception('Weight validation failed: ' . implode(', ', $weightValidation['errors']));
         }
 
         return DB::transaction(function () use ($data) {
@@ -385,7 +385,7 @@ class AssessmentManagementService
             );
 
             if (! $weightValidation['is_valid']) {
-                throw new \Exception('Weight validation failed: '.implode(', ', $weightValidation['errors']));
+                throw new \Exception('Weight validation failed: ' . implode(', ', $weightValidation['errors']));
             }
         }
 
@@ -410,7 +410,7 @@ class AssessmentManagementService
         );
 
         if (! $weightValidation['is_valid']) {
-            throw new \Exception('Detail weight validation failed: '.implode(', ', $weightValidation['errors']));
+            throw new \Exception('Detail weight validation failed: ' . implode(', ', $weightValidation['errors']));
         }
 
         return DB::transaction(function () use ($data) {
@@ -434,7 +434,7 @@ class AssessmentManagementService
             );
 
             if (! $weightValidation['is_valid']) {
-                throw new \Exception('Detail weight validation failed: '.implode(', ', $weightValidation['errors']));
+                throw new \Exception('Detail weight validation failed: ' . implode(', ', $weightValidation['errors']));
             }
         }
 
@@ -452,7 +452,7 @@ class AssessmentManagementService
     {
         // Verify student is enrolled
         $isEnrolled = $courseOffering->courseRegistrations()
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->exists();
 
         if (! $isEnrolled) {
@@ -477,7 +477,7 @@ class AssessmentManagementService
         $assessmentComponents = $syllabus->assessmentComponents()
             ->with(['details.scores' => function ($query) use ($courseOffering, $student) {
                 $query->where('course_offering_id', $courseOffering->id)
-                    ->where('student_code', $student->id)
+                    ->where('student_id', $student->id)
                     ->with('assessmentComponentDetail');
             }])
             ->orderBy('sort_order')
@@ -618,7 +618,7 @@ class AssessmentManagementService
             $gradedCount = 0;
 
             foreach ($enrolledStudents as $student) {
-                $score = $detail->scores->where('student_code', $student->id)->first();
+                $score = $detail->scores->where('student_id', $student->id)->first();
 
                 $studentData = [
                     'student' => $this->formatStudentData($student),
@@ -704,7 +704,7 @@ class AssessmentManagementService
     {
         return [
             'id' => $student->id,
-            'student_code' => $student->student_code,
+            'student_id' => $student->student_id,
             'name' => $student->display_name,
             'first_name' => $student->first_name,
             'last_name' => $student->last_name,
@@ -942,12 +942,12 @@ class AssessmentManagementService
             case 'per_hour':
                 $hoursLate = ceil($minutesLate / 60);
 
-                return "Submission is {$timeDelay} late ({$hoursLate} hour".($hoursLate > 1 ? 's' : '')."), penalty: {$penaltyPercentage}%";
+                return "Submission is {$timeDelay} late ({$hoursLate} hour" . ($hoursLate > 1 ? 's' : '') . "), penalty: {$penaltyPercentage}%";
 
             case 'per_day':
                 $daysLate = ceil($minutesLate / (24 * 60));
 
-                return "Submission is {$timeDelay} late ({$daysLate} day".($daysLate > 1 ? 's' : '')."), penalty: {$penaltyPercentage}%";
+                return "Submission is {$timeDelay} late ({$daysLate} day" . ($daysLate > 1 ? 's' : '') . "), penalty: {$penaltyPercentage}%";
 
             case 'fixed':
                 return "Submission is {$timeDelay} late, fixed penalty: {$penaltyPercentage}%";
@@ -963,16 +963,16 @@ class AssessmentManagementService
     private function formatTimeDelay(int $minutes): string
     {
         if ($minutes < 60) {
-            return "{$minutes} minute".($minutes > 1 ? 's' : '');
+            return "{$minutes} minute" . ($minutes > 1 ? 's' : '');
         }
 
         if ($minutes < 1440) { // Less than 24 hours
             $hours = floor($minutes / 60);
             $remainingMinutes = $minutes % 60;
 
-            $result = "{$hours} hour".($hours > 1 ? 's' : '');
+            $result = "{$hours} hour" . ($hours > 1 ? 's' : '');
             if ($remainingMinutes > 0) {
-                $result .= " and {$remainingMinutes} minute".($remainingMinutes > 1 ? 's' : '');
+                $result .= " and {$remainingMinutes} minute" . ($remainingMinutes > 1 ? 's' : '');
             }
 
             return $result;
@@ -981,9 +981,9 @@ class AssessmentManagementService
         $days = floor($minutes / 1440);
         $remainingHours = floor(($minutes % 1440) / 60);
 
-        $result = "{$days} day".($days > 1 ? 's' : '');
+        $result = "{$days} day" . ($days > 1 ? 's' : '');
         if ($remainingHours > 0) {
-            $result .= " and {$remainingHours} hour".($remainingHours > 1 ? 's' : '');
+            $result .= " and {$remainingHours} hour" . ($remainingHours > 1 ? 's' : '');
         }
 
         return $result;
@@ -1026,7 +1026,7 @@ class AssessmentManagementService
         ];
 
         if ($integrityStatus && ! in_array($integrityStatus, $validIntegrityStatuses)) {
-            throw new \Exception('Invalid integrity status. Valid values: '.implode(', ', $validIntegrityStatuses));
+            throw new \Exception('Invalid integrity status. Valid values: ' . implode(', ', $validIntegrityStatuses));
         }
 
         // Set default integrity status based on plagiarism flag
@@ -1151,7 +1151,7 @@ class AssessmentManagementService
         ];
 
         if (! in_array($newStatus, $validStatuses)) {
-            throw new \Exception('Invalid integrity status. Valid values: '.implode(', ', $validStatuses));
+            throw new \Exception('Invalid integrity status. Valid values: ' . implode(', ', $validStatuses));
         }
 
         $previousStatus = $score->integrity_status;
@@ -1225,7 +1225,7 @@ class AssessmentManagementService
             'action' => 'appeal_requested',
             'appeal_reason' => $appealReason,
             'requested_at' => now()->toISOString(),
-            'requested_by' => $score->student_code,
+            'requested_by' => $score->student_id,
         ];
         $score->score_history = $history;
         $score->save();
@@ -1287,7 +1287,7 @@ class AssessmentManagementService
         // Update score history
         $history = $score->score_history ?? [];
         $history[] = [
-            'action' => 'appeal_'.$decision,
+            'action' => 'appeal_' . $decision,
             'decision' => $decision,
             'reviewer_notes' => $reviewerNotes,
             'instructor_feedback' => $instructorFeedback,
@@ -1610,7 +1610,7 @@ class AssessmentManagementService
                 $detailWeights = [];
 
                 foreach ($component->details as $detail) {
-                    $score = $detail->scores->where('student_code', $student->id)->first();
+                    $score = $detail->scores->where('student_id', $student->id)->first();
 
                     if ($score && ($includeExcluded || ! $score->score_excluded)) {
                         $finalScore = $score->calculateFinalScore();
@@ -1642,7 +1642,7 @@ class AssessmentManagementService
                     'weight_used' => $componentWeightUsed,
                     'detail_count' => count($detailScores),
                     'has_excluded_scores' => $component->details->flatMap->scores
-                        ->where('student_code', $student->id)
+                        ->where('student_id', $student->id)
                         ->where('score_excluded', true)
                         ->isNotEmpty(),
                 ];
@@ -1938,7 +1938,7 @@ class AssessmentManagementService
         $auditTrail = [];
 
         foreach ($component->details as $detail) {
-            $score = $detail->scores->where('student_code', $student->id)->first();
+            $score = $detail->scores->where('student_id', $student->id)->first();
 
             $detailData = [
                 'detail_id' => $detail->id,
@@ -2008,7 +2008,7 @@ class AssessmentManagementService
                     $auditTrail[] = [
                         'component' => $component->name,
                         'detail' => $detail->name,
-                        'student_code' => $student->id,
+                        'student_id' => $student->id,
                         'score_id' => $score->id,
                         'adjustments' => $adjustments,
                     ];

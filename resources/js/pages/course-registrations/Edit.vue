@@ -158,7 +158,7 @@ const getStatusVariant = (status: string) => {
                 <CardContent class="space-y-3">
                     <div>
                         <p class="font-medium">{{ registration.student.full_name }}</p>
-                        <p class="text-muted-foreground text-sm">{{ registration.student.student_code }}</p>
+                        <p class="text-muted-foreground text-sm">{{ registration.student.student_id }}</p>
                         <p class="text-muted-foreground text-sm">{{ registration.student.email }}</p>
                     </div>
                 </CardContent>

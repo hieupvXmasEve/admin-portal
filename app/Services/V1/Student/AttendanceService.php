@@ -25,7 +25,7 @@ class AttendanceService
             return $this->getEmptyAttendanceSummary();
         }
 
-        $cacheKey = "attendance:summary:student:{$student->id}:semester:{$semester->id}:".md5(serialize($filters));
+        $cacheKey = "attendance:summary:student:{$student->id}:semester:{$semester->id}:" . md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($student, $semester, $filters) {
             $attendanceRecords = $this->getAttendanceRecords($student, $semester, $filters);
@@ -63,7 +63,7 @@ class AttendanceService
             throw new \Exception('Student is not enrolled in this course');
         }
 
-        $attendanceRecords = Attendance::where('student_code', $student->id)
+        $attendanceRecords = Attendance::where('student_id', $student->id)
             ->where('course_offering_id', $courseOfferingId)
             ->with(['classSession'])
             ->orderBy('session_date', 'desc')
@@ -111,7 +111,7 @@ class AttendanceService
      */
     protected function getAttendanceRecords(Student $student, Semester $semester, array $filters = []): Collection
     {
-        $query = Attendance::where('student_code', $student->id)
+        $query = Attendance::where('student_id', $student->id)
             ->whereHas('courseOffering', function ($q) use ($semester) {
                 $q->where('semester_id', $semester->id);
             })
@@ -130,7 +130,7 @@ class AttendanceService
     {
         if (! empty($filters['course_code'])) {
             $query->whereHas('courseOffering.curriculumUnit.unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%'.$filters['course_code'].'%');
+                $q->where('code', 'like', '%' . $filters['course_code'] . '%');
             });
         }
 
@@ -231,7 +231,7 @@ class AttendanceService
      */
     protected function calculateAttendanceTrends(Student $student, Semester $semester): array
     {
-        $weeklyAttendance = Attendance::where('student_code', $student->id)
+        $weeklyAttendance = Attendance::where('student_id', $student->id)
             ->whereHas('courseOffering', function ($q) use ($semester) {
                 $q->where('semester_id', $semester->id);
             })
@@ -272,7 +272,7 @@ class AttendanceService
                 'course_name' => $record->courseOffering->curriculumUnit->unit->name,
                 'session_date' => $record->session_date->toDateString(),
                 'session_time' => $record->classSession ?
-                    $record->classSession->start_time.' - '.$record->classSession->end_time : null,
+                    $record->classSession->start_time . ' - ' . $record->classSession->end_time : null,
                 'status' => $record->status,
                 'status_display' => $this->getStatusDisplay($record->status),
                 'marked_at' => $record->marked_at?->toDateTimeString(),
@@ -310,7 +310,7 @@ class AttendanceService
         }
 
         // Check for consecutive absences
-        $recentAbsences = Attendance::where('student_code', $student->id)
+        $recentAbsences = Attendance::where('student_id', $student->id)
             ->whereHas('courseOffering', function ($q) use ($semester) {
                 $q->where('semester_id', $semester->id);
             })
@@ -551,7 +551,7 @@ class AttendanceService
         $start = Carbon::createFromTimeString($startTime);
         $end = Carbon::createFromTimeString($endTime);
 
-        return $start->format('g:i A').' - '.$end->format('g:i A');
+        return $start->format('g:i A') . ' - ' . $end->format('g:i A');
     }
 
     /**
@@ -653,7 +653,7 @@ class AttendanceService
     protected function calculateStandardDeviation(Collection $values): float
     {
         $mean = $values->avg();
-        $variance = $values->map(fn ($value) => pow($value - $mean, 2))->avg();
+        $variance = $values->map(fn($value) => pow($value - $mean, 2))->avg();
 
         return sqrt($variance);
     }
@@ -704,7 +704,7 @@ class AttendanceService
     protected function getPerfectAttendanceCourses(Collection $records): array
     {
         return $records->groupBy('course_offering_id')->filter(function ($courseRecords) {
-            return $courseRecords->every(fn ($record) => in_array($record->status, ['present', 'late']));
+            return $courseRecords->every(fn($record) => in_array($record->status, ['present', 'late']));
         })->map(function ($courseRecords) {
             $courseOffering = $courseRecords->first()->courseOffering;
 

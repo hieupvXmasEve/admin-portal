@@ -35,7 +35,7 @@ class StudentService
 
             // Create student with admitted status by default
             $student = Student::create([
-                'student_code' => $studentId,
+                'student_id' => $studentId,
                 'full_name' => $data['full_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'] ?? null,
@@ -114,7 +114,7 @@ class StudentService
 
             // Create student with active status by default
             $student = Student::create([
-                'student_code' => $studentId,
+                'student_id' => $studentId,
                 'full_name' => $data['full_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'] ?? null,
@@ -152,8 +152,8 @@ class StudentService
 
             // Log the creation and admission
             Log::info('Student created and admitted', [
-                'student_code' => $student->id,
-                'student_code' => $student->student_code,
+                'student_id' => $student->id,
+                'student_id' => $student->student_id,
                 'campus_id' => $campusId,
                 'admission_date' => $data['admission_date'],
             ]);
@@ -175,7 +175,7 @@ class StudentService
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_code', 'like', "%{$search}%")
+                    ->orWhere('student_id', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
         }
@@ -209,8 +209,8 @@ class StudentService
 
             // Log the admission
             Log::info('Student admitted', [
-                'student_code' => $student->id,
-                'student_code' => $student->student_code,
+                'student_id' => $student->id,
+                'student_id' => $student->student_id,
                 'admission_date' => $data['admission_date'],
             ]);
 
@@ -267,21 +267,21 @@ class StudentService
      */
     private function generateStudentId(string $campusCode, string $year): string
     {
-        $prefix = strtoupper($campusCode).$year;
+        $prefix = strtoupper($campusCode) . $year;
 
         // Find the last student ID with this prefix
-        $lastStudent = Student::where('student_code', 'like', $prefix.'%')
-            ->orderBy('student_code', 'desc')
+        $lastStudent = Student::where('student_id', 'like', $prefix . '%')
+            ->orderBy('student_id', 'desc')
             ->first();
 
         if ($lastStudent) {
-            $lastNumber = (int) substr($lastStudent->student_code, -4);
+            $lastNumber = (int) substr($lastStudent->student_id, -4);
             $newNumber = $lastNumber + 1;
         } else {
             $newNumber = 1;
         }
 
-        return $prefix.str_pad((string) $newNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad((string) $newNumber, 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -382,7 +382,7 @@ class StudentService
             }
         } catch (\Exception $e) {
             // Silently skip if graduation requirements table doesn't exist yet
-            \Illuminate\Support\Facades\Log::info('Graduation requirements not available: '.$e->getMessage());
+            \Illuminate\Support\Facades\Log::info('Graduation requirements not available: ' . $e->getMessage());
         }
     }
 
@@ -506,7 +506,7 @@ class StudentService
                         $created++;
                     }
                 } catch (Exception $e) {
-                    $errors[] = "Student ID {$studentId}: ".$e->getMessage();
+                    $errors[] = "Student ID {$studentId}: " . $e->getMessage();
                 }
             }
 
@@ -551,7 +551,7 @@ class StudentService
                         $created++;
                     }
                 } catch (Exception $e) {
-                    $errors[] = "Unit ID {$unitId}: ".$e->getMessage();
+                    $errors[] = "Unit ID {$unitId}: " . $e->getMessage();
                 }
             }
 
@@ -597,7 +597,7 @@ class StudentService
                             $created++;
                         }
                     } catch (Exception $e) {
-                        $errors[] = "Student ID {$studentId}, Course Offering ID {$courseOfferingId}: ".$e->getMessage();
+                        $errors[] = "Student ID {$studentId}, Course Offering ID {$courseOfferingId}: " . $e->getMessage();
                     }
                 }
             }
@@ -689,7 +689,7 @@ class StudentService
             return $units;
         } catch (Exception $e) {
             // Fallback: return some default units or empty array
-            Log::warning('Could not determine first-year units: '.$e->getMessage());
+            Log::warning('Could not determine first-year units: ' . $e->getMessage());
 
             return [];
         }

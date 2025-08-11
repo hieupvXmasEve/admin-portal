@@ -151,7 +151,7 @@ class CalendarService
     {
         return $semesters->where('start_date', '>', now())
             ->take(3)
-            ->map(fn ($semester) => $this->formatSemester($semester))
+            ->map(fn($semester) => $this->formatSemester($semester))
             ->values()
             ->toArray();
     }
@@ -163,7 +163,7 @@ class CalendarService
     {
         return $semesters->where('end_date', '<', now())
             ->take(5)
-            ->map(fn ($semester) => $this->formatSemester($semester))
+            ->map(fn($semester) => $this->formatSemester($semester))
             ->values()
             ->toArray();
     }
@@ -173,7 +173,7 @@ class CalendarService
      */
     protected function formatSemesters(Collection $semesters): array
     {
-        return $semesters->map(fn ($semester) => $this->formatSemester($semester))->toArray();
+        return $semesters->map(fn($semester) => $this->formatSemester($semester))->toArray();
     }
 
     /**
@@ -223,7 +223,7 @@ class CalendarService
      */
     protected function getAssessmentDeadlines(Student $student, Semester $semester): array
     {
-        $assessments = AssessmentComponentDetailScore::where('student_code', $student->id)
+        $assessments = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->whereHas('courseOffering', function ($query) use ($semester) {
                 $query->where('semester_id', $semester->id);
             })
@@ -348,7 +348,7 @@ class CalendarService
         }
 
         // Sort by date and take next 10
-        usort($deadlines, fn ($a, $b) => strcmp($a['date'], $b['date']));
+        usort($deadlines, fn($a, $b) => strcmp($a['date'], $b['date']));
 
         return array_slice($deadlines, 0, 10);
     }

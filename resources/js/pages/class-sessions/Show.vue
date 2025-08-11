@@ -111,11 +111,11 @@ const columns: ColumnDef<Attendance>[] = [
     },
     {
         header: 'Student ID',
-        accessorKey: 'student.student_code',
+        accessorKey: 'student.student_id',
         enableSorting: false,
         cell: ({ row }) => {
             const attendance = row.original;
-            return h('div', { class: 'font-mono text-sm' }, attendance.student?.student_code || 'N/A');
+            return h('div', { class: 'font-mono text-sm' }, attendance.student?.student_id || 'N/A');
         },
     },
     {

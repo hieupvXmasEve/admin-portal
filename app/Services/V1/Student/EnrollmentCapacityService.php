@@ -103,7 +103,7 @@ class EnrollmentCapacityService
 
         // Check if student is already waitlisted
         $existingWaitlist = CourseRegistration::where('course_offering_id', $courseOffering->id)
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('registration_status', 'waitlisted')
             ->exists();
 
@@ -138,7 +138,7 @@ class EnrollmentCapacityService
             ->max('waitlist_position') + 1;
 
         return CourseRegistration::create([
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'course_offering_id' => $courseOffering->id,
             'semester_id' => $courseOffering->semester_id,
             'registration_status' => 'waitlisted',
@@ -195,7 +195,7 @@ class EnrollmentCapacityService
     public function getWaitlistInfo(CourseOffering $courseOffering, Student $student): ?array
     {
         $waitlistRegistration = CourseRegistration::where('course_offering_id', $courseOffering->id)
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('registration_status', 'waitlisted')
             ->first();
 

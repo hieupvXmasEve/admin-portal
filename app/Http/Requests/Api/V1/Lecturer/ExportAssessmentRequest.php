@@ -25,8 +25,8 @@ class ExportAssessmentRequest extends FormRequest
             // Excel export specific filters
             'include_excluded' => 'boolean',
             'score_status' => 'in:draft,provisional,final',
-            'student_codes' => 'array',
-            'student_codes.*' => 'integer|exists:students,id',
+            'student_ids' => 'array',
+            'student_ids.*' => 'integer|exists:students,id',
             'component_ids' => 'array',
             'component_ids.*' => 'integer|exists:assessment_components,id',
             'include_statistics' => 'boolean',
@@ -51,7 +51,7 @@ class ExportAssessmentRequest extends FormRequest
     {
         return [
             'score_status.in' => 'Score status must be one of: draft, provisional, final',
-            'student_codes.*.exists' => 'One or more selected students do not exist',
+            'student_ids.*.exists' => 'One or more selected students do not exist',
             'component_ids.*.exists' => 'One or more selected assessment components do not exist',
             'page_orientation.in' => 'Page orientation must be either portrait or landscape',
             'format.in' => 'Export format must be either excel or pdf',
@@ -67,7 +67,7 @@ class ExportAssessmentRequest extends FormRequest
         return [
             'include_excluded' => 'include excluded scores',
             'score_status' => 'score status filter',
-            'student_codes' => 'selected students',
+            'student_ids' => 'selected students',
             'component_ids' => 'selected components',
             'include_statistics' => 'include statistics',
             'include_grade_matrix' => 'include grade matrix',
@@ -111,7 +111,7 @@ class ExportAssessmentRequest extends FormRequest
         return [
             'include_excluded' => $this->boolean('include_excluded'),
             'score_status' => $this->input('score_status'),
-            'student_codes' => $this->input('student_codes', []),
+            'student_ids' => $this->input('student_ids', []),
             'component_ids' => $this->input('component_ids', []),
             'include_statistics' => $this->boolean('include_statistics'),
             'include_grade_matrix' => $this->boolean('include_grade_matrix'),

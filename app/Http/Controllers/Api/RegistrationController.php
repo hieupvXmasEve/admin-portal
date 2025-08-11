@@ -45,7 +45,7 @@ class RegistrationController extends Controller
             'courseOffering.curriculumUnit.unit',
             'courseOffering.lecture',
             'semester',
-        ])->where('student_code', $student->id);
+        ])->where('student_id', $student->id);
 
         if ($request->semester_id) {
             $query->where('semester_id', $request->semester_id);
@@ -200,7 +200,7 @@ class RegistrationController extends Controller
         $student = $request->user();
 
         // Verify the registration belongs to the authenticated student
-        if ($registration->student_code !== $student->id) {
+        if ($registration->student_id !== $student->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized',
@@ -230,7 +230,7 @@ class RegistrationController extends Controller
         $student = $request->user();
 
         // Verify the registration belongs to the authenticated student
-        if ($registration->student_code !== $student->id) {
+        if ($registration->student_id !== $student->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized',
@@ -309,7 +309,7 @@ class RegistrationController extends Controller
 
         // Get student's current registrations for the semester
         $currentRegistrations = CourseRegistration::with('courseOffering')
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('semester_id', $courseOffering->semester_id)
             ->whereIn('registration_status', ['registered', 'confirmed'])
             ->get();

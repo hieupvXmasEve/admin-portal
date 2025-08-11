@@ -136,7 +136,7 @@ class Spring2025RegistrationSeeder extends Seeder
     private function getRetakeUnits(Student $student): array
     {
         // Get units that the student failed in previous semesters
-        $failedUnits = AcademicRecord::where('student_code', $student->id)
+        $failedUnits = AcademicRecord::where('student_id', $student->id)
             ->where('completion_status', 'failed')
             ->where('grade_status', 'final')
             ->pluck('unit_id')
@@ -148,7 +148,7 @@ class Spring2025RegistrationSeeder extends Seeder
     private function canRegisterForUnit(Student $student, int $unitId): bool
     {
         // Check if student has already completed this unit
-        $alreadyCompleted = AcademicRecord::where('student_code', $student->id)
+        $alreadyCompleted = AcademicRecord::where('student_id', $student->id)
             ->where('unit_id', $unitId)
             ->where('completion_status', 'completed')
             ->where('grade_status', 'final')
@@ -214,7 +214,7 @@ class Spring2025RegistrationSeeder extends Seeder
         $retakeFee = $isRetake ? 500.00 : 0.00;
 
         CourseRegistration::create([
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'course_offering_id' => $courseOffering->id,
             'semester_id' => $semester->id,
             'registration_status' => $registrationStatus,
@@ -237,13 +237,13 @@ class Spring2025RegistrationSeeder extends Seeder
     private function createEnrollmentRecord(Student $student, Semester $semester): void
     {
         // Check if enrollment record already exists
-        $existingEnrollment = \App\Models\Enrollment::where('student_code', $student->id)
+        $existingEnrollment = \App\Models\Enrollment::where('student_id', $student->id)
             ->where('semester_id', $semester->id)
             ->first();
 
         if (! $existingEnrollment) {
             \App\Models\Enrollment::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'semester_id' => $semester->id,
                 'curriculum_version_id' => $student->curriculum_version_id,
                 'semester_number' => 2, // Second semester

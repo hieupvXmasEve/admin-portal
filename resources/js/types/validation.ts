@@ -120,7 +120,7 @@ export const ValidationRules = {
 
 export const ValidationMessages = {
     courseRegistration: {
-        student_code: {
+        student_id: {
             required: 'Please select a student',
         },
         course_offering_id: {

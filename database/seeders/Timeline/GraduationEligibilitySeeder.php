@@ -200,14 +200,14 @@ class GraduationEligibilitySeeder extends Seeder
 
         return [
             'eligible' => $allCategoriesMet,
-            'issue' => $allCategoriesMet ? null : 'Incomplete requirements: '.implode(', ', $issues),
+            'issue' => $allCategoriesMet ? null : 'Incomplete requirements: ' . implode(', ', $issues),
             'category_requirements' => $categoryRequirements,
         ];
     }
 
     private function checkActiveHolds(Student $student): array
     {
-        $activeHolds = AcademicHold::where('student_code', $student->id)
+        $activeHolds = AcademicHold::where('student_id', $student->id)
             ->where('status', 'active')
             ->get();
 
@@ -222,7 +222,7 @@ class GraduationEligibilitySeeder extends Seeder
 
         return [
             'eligible' => $eligible,
-            'issue' => $eligible ? null : 'Active holds blocking graduation: '.
+            'issue' => $eligible ? null : 'Active holds blocking graduation: ' .
                 $blockingHolds->pluck('title')->implode(', '),
             'blocking_holds' => $blockingHolds->count(),
         ];
@@ -278,17 +278,17 @@ class GraduationEligibilitySeeder extends Seeder
     {
         $eligibilityNote = $eligible ?
             'ELIGIBLE FOR GRADUATION' :
-            'Graduation pending: '.implode('; ', $issues);
+            'Graduation pending: ' . implode('; ', $issues);
 
         $currentNotes = $student->admission_notes ?? '';
         $student->update([
-            'admission_notes' => trim($currentNotes.' | '.$eligibilityNote),
+            'admission_notes' => trim($currentNotes . ' | ' . $eligibilityNote),
         ]);
 
         if ($eligible) {
-            $this->command->info("  🎓 {$student->student_code}: ELIGIBLE FOR GRADUATION!");
+            $this->command->info("  🎓 {$student->student_id}: ELIGIBLE FOR GRADUATION!");
         } else {
-            $this->command->info("  📋 {$student->student_code}: Pending - ".implode(', ', array_slice($issues, 0, 2)));
+            $this->command->info("  📋 {$student->student_id}: Pending - " . implode(', ', array_slice($issues, 0, 2)));
         }
     }
 

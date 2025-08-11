@@ -11,7 +11,7 @@ interface Hold {
     id: number;
     student: {
         id: number;
-        student_code: string;
+        student_id: string;
         full_name: string;
     };
     hold_type: string;
@@ -32,7 +32,7 @@ const data = computed(() => props.holds.data);
 const columns: ColumnDef<Hold>[] = [
     {
         header: 'Student ID',
-        accessorKey: 'student.student_code',
+        accessorKey: 'student.student_id',
         enableSorting: false,
     },
     {

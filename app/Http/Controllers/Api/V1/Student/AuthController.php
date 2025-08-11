@@ -23,7 +23,7 @@ class AuthController extends Controller
     public function login(LoginRequest $request): JsonResponse
     {
         // Rate limiting key
-        $key = 'login:'.$request->ip();
+        $key = 'login:' . $request->ip();
 
         // Check rate limiting
         if (RateLimiter::tooManyAttempts($key, 5)) {
@@ -79,7 +79,7 @@ class AuthController extends Controller
         return ApiResponse::success([
             'student' => [
                 'id' => $student->id,
-                'student_code' => $student->student_code,
+                'student_id' => $student->student_id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'status' => $student->status,
@@ -143,7 +143,7 @@ class AuthController extends Controller
         return ApiResponse::success([
             'student' => [
                 'id' => $student->id,
-                'student_code' => $student->student_code,
+                'student_id' => $student->student_id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'phone' => $student->phone,
@@ -270,7 +270,7 @@ class AuthController extends Controller
             return ApiResponse::success([
                 'student' => [
                     'id' => $student->id,
-                    'student_code' => $student->student_code,
+                    'student_id' => $student->student_id,
                     'full_name' => $student->full_name,
                     'email' => $student->email,
                     'status' => $student->status,
@@ -283,9 +283,8 @@ class AuthController extends Controller
                 'token_type' => 'Bearer',
                 'expires_at' => $expiresAt->toISOString(),
             ], 'Google login successful');
-
         } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to authenticate with Google: '.$e->getMessage());
+            return ApiResponse::serverError('Failed to authenticate with Google: ' . $e->getMessage());
         }
     }
 }

@@ -5,7 +5,7 @@ import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Head, router } from '@inertiajs/vue3';
@@ -47,7 +47,7 @@ interface ActivityLog {
         name?: string;
         title?: string;
         full_name?: string;
-        student_code?: string;
+        student_id?: string;
         code?: string;
     } | null;
     causer?: {
@@ -112,7 +112,7 @@ const formatSubjectName = (activity: ActivityLog): string => {
     if (!activity.subject) return 'N/A';
 
     const subject = activity.subject;
-    return subject.name || subject.title || subject.full_name || subject.student_code || subject.code || `ID: ${subject.id}`;
+    return subject.name || subject.title || subject.full_name || subject.student_id || subject.code || `ID: ${subject.id}`;
 };
 
 // Helper function to format causer name

@@ -33,7 +33,7 @@ class StudentApplicationController extends Controller
             'search' => $request->get('search'),
             'status' => $request->get('status'),
             'converted' => $request->get('converted'),
-//            'campus_code' => $request->get('campus'),
+            //            'campus_code' => $request->get('campus'),
             'per_page' => $request->get('per_page', 15),
             'sort' => $request->get('sort', 'created_at'),
             'direction' => $request->get('direction', 'desc'),
@@ -41,16 +41,16 @@ class StudentApplicationController extends Controller
 
         $query = StudentApplication::query()
             ->with(['student' => function ($query) {
-                $query->select('id', 'student_code', 'full_name');
+                $query->select('id', 'student_id', 'full_name');
             }]);
 
         // Apply search filter
         if ($filters['search']) {
             $query->where(function ($q) use ($filters) {
-                $q->where('full_name', 'like', '%'.$filters['search'].'%')
-                    ->orWhere('email', 'like', '%'.$filters['search'].'%')
-                    ->orWhere('national_id', 'like', '%'.$filters['search'].'%')
-                    ->orWhere('phone', 'like', '%'.$filters['search'].'%');
+                $q->where('full_name', 'like', '%' . $filters['search'] . '%')
+                    ->orWhere('email', 'like', '%' . $filters['search'] . '%')
+                    ->orWhere('national_id', 'like', '%' . $filters['search'] . '%')
+                    ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
             });
         }
 
@@ -68,10 +68,10 @@ class StudentApplicationController extends Controller
             }
         }
 
-//        // Apply campus filter
-//        if ($filters['campus_code']) {
-//            $query->where('campus_code', $filters['campus_code']);
-//        }
+        //        // Apply campus filter
+        //        if ($filters['campus_code']) {
+        //            $query->where('campus_code', $filters['campus_code']);
+        //        }
 
         // Apply sorting
         $query->orderBy($filters['sort'], $filters['direction']);
@@ -132,7 +132,7 @@ class StudentApplicationController extends Controller
     public function show(StudentApplication $studentApplication)
     {
         $studentApplication->load(['student' => function ($query) {
-            $query->select('id', 'student_code', 'full_name', 'email', 'status');
+            $query->select('id', 'student_id', 'full_name', 'email', 'status');
         }]);
 
         return Inertia::render('student-applications/show', [
@@ -338,7 +338,7 @@ class StudentApplicationController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update application statuses: '.$e->getMessage(),
+                'message' => 'Failed to update application statuses: ' . $e->getMessage(),
             ], 500);
         }
     }

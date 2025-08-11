@@ -19,7 +19,7 @@ class Student extends StudentAuditableModel
     protected $guard = 'student';
 
     protected $fillable = [
-        'student_code',
+        'student_id',
         'full_name',
         'email',
         'phone',
@@ -89,7 +89,7 @@ class Student extends StudentAuditableModel
             'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
             'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
             'high_school_name' => ['nullable', 'string', 'max:255'],
-            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
+            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
             'status' => ['nullable', 'in:active,inactive,suspended,graduated'],
@@ -200,18 +200,18 @@ class Student extends StudentAuditableModel
 
     public function generateStudentId(string $campusCode, int $year): string
     {
-        $lastStudent = static::where('student_code', 'like', $campusCode.$year.'%')
-            ->orderBy('student_code', 'desc')
+        $lastStudent = static::where('student_id', 'like', $campusCode . $year . '%')
+            ->orderBy('student_id', 'desc')
             ->first();
 
         if ($lastStudent) {
-            $lastNumber = (int) substr($lastStudent->student_code, -3);
+            $lastNumber = (int) substr($lastStudent->student_id, -3);
             $newNumber = $lastNumber + 1;
         } else {
             $newNumber = 1;
         }
 
-        return $campusCode.$year.str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
+        return $campusCode . $year . str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
     }
 
     // New Student Management methods

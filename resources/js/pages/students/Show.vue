@@ -108,7 +108,7 @@ console.log('props', props.student);
             </div>
             <div>
                 <h1 class="text-3xl font-bold">{{ student.full_name }}</h1>
-                <p class="text-muted-foreground text-lg">{{ student.student_code }}</p>
+                <p class="text-muted-foreground text-lg">{{ student.student_id }}</p>
             </div>
         </div>
 

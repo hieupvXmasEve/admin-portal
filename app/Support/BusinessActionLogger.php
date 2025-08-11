@@ -246,7 +246,7 @@ class BusinessActionLogger
         $affectedModelsProperties = [];
         if (! empty($this->affectedModels)) {
             $affectedModelsProperties['affected_models'] = collect($this->affectedModels)
-                ->map(fn ($model) => [
+                ->map(fn($model) => [
                     'type' => get_class($model),
                     'id' => $model->getKey(),
                     'identifier' => $this->getModelIdentifier($model),
@@ -285,7 +285,7 @@ class BusinessActionLogger
     protected function getModelIdentifier(Model $model): string
     {
         // Try common identifier fields
-        $identifierFields = ['name', 'title', 'full_name', 'email', 'student_code', 'code'];
+        $identifierFields = ['name', 'title', 'full_name', 'email', 'student_id', 'code'];
 
         foreach ($identifierFields as $field) {
             if (isset($model->$field) && ! empty($model->$field)) {

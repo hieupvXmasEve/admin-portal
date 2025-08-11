@@ -18,7 +18,7 @@ class GradeService
      */
     public function getStudentGrades(Student $student, ?int $semesterId = null, array $filters = []): array
     {
-        $cacheKey = "grades:student:{$student->id}:semester:".($semesterId ?? 'all').':'.md5(serialize($filters));
+        $cacheKey = "grades:student:{$student->id}:semester:" . ($semesterId ?? 'all') . ':' . md5(serialize($filters));
 
         return Cache::remember($cacheKey, 600, function () use ($student, $semesterId, $filters) {
             $query = $student->academicRecords()->with([
@@ -52,7 +52,7 @@ class GradeService
      */
     public function getGPATrend(Student $student, int $semesterCount = 8): array
     {
-        $gpaCalculations = GpaCalculation::where('student_code', $student->id)
+        $gpaCalculations = GpaCalculation::where('student_id', $student->id)
             ->where('calculation_type', 'semester')
             ->with('semester')
             ->orderBy('created_at', 'desc')
@@ -94,7 +94,7 @@ class GradeService
             throw new \Exception('No academic record found for this course');
         }
 
-        $assessmentScores = AssessmentComponentDetailScore::where('student_code', $student->id)
+        $assessmentScores = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->where('course_offering_id', $courseOfferingId)
             ->with([
                 'assessmentComponentDetail.assessmentComponent',
@@ -130,7 +130,7 @@ class GradeService
      */
     public function getAssessments(Student $student, array $filters = []): array
     {
-        $query = AssessmentComponentDetailScore::where('student_code', $student->id)
+        $query = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->with([
                 'assessmentComponentDetail.assessmentComponent.assessmentType',
                 'courseOffering.curriculumUnit.unit',
@@ -155,7 +155,7 @@ class GradeService
      */
     public function getAssessmentDetail(Student $student, int $assessmentId): array
     {
-        $assessment = AssessmentComponentDetailScore::where('student_code', $student->id)
+        $assessment = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->where('id', $assessmentId)
             ->with([
                 'assessmentComponentDetail.assessmentComponent.assessmentType',
@@ -285,7 +285,7 @@ class GradeService
      */
     protected function calculatePerformanceTrends(Student $student): array
     {
-        $recentGPAs = GpaCalculation::where('student_code', $student->id)
+        $recentGPAs = GpaCalculation::where('student_id', $student->id)
             ->where('calculation_type', 'semester')
             ->orderBy('created_at', 'desc')
             ->limit(4)
@@ -328,7 +328,7 @@ class GradeService
 
         if (! empty($filters['unit_code'])) {
             $query->whereHas('unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%'.$filters['unit_code'].'%');
+                $q->where('code', 'like', '%' . $filters['unit_code'] . '%');
             });
         }
 
@@ -360,7 +360,7 @@ class GradeService
 
         if (! empty($filters['course_code'])) {
             $query->whereHas('courseOffering.curriculumUnit.unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%'.$filters['course_code'].'%');
+                $q->where('code', 'like', '%' . $filters['course_code'] . '%');
             });
         }
 
@@ -411,7 +411,7 @@ class GradeService
         }
 
         $mean = $gpas->avg();
-        $variance = $gpas->map(fn ($gpa) => pow($gpa - $mean, 2))->avg();
+        $variance = $gpas->map(fn($gpa) => pow($gpa - $mean, 2))->avg();
         $stdDev = sqrt($variance);
 
         return match (true) {
@@ -491,8 +491,8 @@ class GradeService
 
         $sumX = array_sum($x);
         $sumY = array_sum($y);
-        $sumXY = array_sum(array_map(fn ($i) => $x[$i] * $y[$i], range(0, $n - 1)));
-        $sumX2 = array_sum(array_map(fn ($val) => $val * $val, $x));
+        $sumXY = array_sum(array_map(fn($i) => $x[$i] * $y[$i], range(0, $n - 1)));
+        $sumX2 = array_sum(array_map(fn($val) => $val * $val, $x));
 
         $slope = ($n * $sumXY - $sumX * $sumY) / ($n * $sumX2 - $sumX * $sumX);
         $intercept = ($sumY - $slope * $sumX) / $n;
@@ -614,7 +614,7 @@ class GradeService
         return [
             'performance_level' => $this->getPerformanceLevel($averagePercentage),
             'average_percentage' => round($averagePercentage, 1),
-            'performance_by_type' => $performanceByType->map(fn ($avg) => round($avg, 1))->toArray(),
+            'performance_by_type' => $performanceByType->map(fn($avg) => round($avg, 1))->toArray(),
             'strengths' => $this->identifyStrengths($performanceByType),
             'areas_for_improvement' => $this->identifyWeaknesses($performanceByType),
             'trend' => $this->analyzeAssessmentTrend($completedAssessments),
@@ -708,7 +708,7 @@ class GradeService
      */
     protected function getUpcomingAssessments(Student $student): array
     {
-        $upcomingAssessments = AssessmentComponentDetailScore::where('student_code', $student->id)
+        $upcomingAssessments = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->whereNull('achieved_score')
             ->where('due_date', '>=', now())
             ->with([
@@ -785,7 +785,7 @@ class GradeService
      */
     protected function identifyStrengths(Collection $performanceByType): array
     {
-        return $performanceByType->filter(fn ($avg) => $avg >= 75)
+        return $performanceByType->filter(fn($avg) => $avg >= 75)
             ->keys()
             ->toArray();
     }
@@ -795,7 +795,7 @@ class GradeService
      */
     protected function identifyWeaknesses(Collection $performanceByType): array
     {
-        return $performanceByType->filter(fn ($avg) => $avg < 65)
+        return $performanceByType->filter(fn($avg) => $avg < 65)
             ->keys()
             ->toArray();
     }

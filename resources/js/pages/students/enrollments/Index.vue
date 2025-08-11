@@ -11,7 +11,7 @@ interface Enrollment {
     id: number;
     student: {
         id: number;
-        student_code: string;
+        student_id: string;
         full_name: string;
     };
     semester: {
@@ -34,7 +34,7 @@ const data = computed(() => props.enrollments.data);
 const columns: ColumnDef<Enrollment>[] = [
     {
         header: 'Student ID',
-        accessorKey: 'student.student_code',
+        accessorKey: 'student.student_id',
         enableSorting: false,
     },
     {

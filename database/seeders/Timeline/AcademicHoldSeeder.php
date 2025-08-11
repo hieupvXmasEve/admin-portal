@@ -103,7 +103,7 @@ class AcademicHoldSeeder extends Seeder
         // Academic probation hold (GPA < 2.0)
         if ($gpaCalculation->gpa < 2.0) {
             $holds[] = AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'academic',
                 'hold_category' => 'registration',
                 'title' => 'Academic Probation Hold',
@@ -123,7 +123,7 @@ class AcademicHoldSeeder extends Seeder
         // Academic warning (GPA between 1.5 and 2.0)
         if ($gpaCalculation->gpa >= 1.5 && $gpaCalculation->gpa < 2.0) {
             $holds[] = AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'academic',
                 'hold_category' => 'registration',
                 'title' => 'Academic Warning Hold',
@@ -143,7 +143,7 @@ class AcademicHoldSeeder extends Seeder
         // Excessive failures (more than 2 failed courses)
         if ($gpaCalculation->failed_courses > 2) {
             $holds[] = AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'academic',
                 'hold_category' => 'registration',
                 'title' => 'Excessive Course Failures',
@@ -200,7 +200,7 @@ class AcademicHoldSeeder extends Seeder
         // Academic probation hold (GPA < 2.0)
         if ($gpa < 2.0) {
             $holds[] = AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'academic',
                 'hold_category' => 'registration',
                 'title' => 'Academic Probation Hold',
@@ -220,7 +220,7 @@ class AcademicHoldSeeder extends Seeder
         // Academic warning (GPA between 1.5 and 2.0)
         if ($gpa >= 1.5 && $gpa < 2.0) {
             $holds[] = AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'academic',
                 'hold_category' => 'registration',
                 'title' => 'Academic Warning Hold',
@@ -240,7 +240,7 @@ class AcademicHoldSeeder extends Seeder
         // Excessive failures (more than 2 failed courses)
         if ($failedCourses > 2) {
             $holds[] = AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'academic',
                 'hold_category' => 'registration',
                 'title' => 'Excessive Course Failures',
@@ -292,14 +292,14 @@ class AcademicHoldSeeder extends Seeder
         $holds = [];
 
         // Get academic records with poor attendance
-        $poorAttendanceRecords = AcademicRecord::where('student_code', $student->id)
+        $poorAttendanceRecords = AcademicRecord::where('student_id', $student->id)
             ->where('semester_id', $semester->id)
             ->where('attendance_percentage', '<', 75)
             ->get();
 
         if ($poorAttendanceRecords->count() > 0) {
             $holds[] = AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'academic',
                 'hold_category' => 'registration',
                 'title' => 'Attendance Requirement Violation',
@@ -352,7 +352,7 @@ class AcademicHoldSeeder extends Seeder
             $holdType = $holdTypes[array_rand($holdTypes)];
 
             $holds[] = AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'financial',
                 'hold_category' => $holdType['category'],
                 'title' => $holdType['title'],
@@ -377,14 +377,14 @@ class AcademicHoldSeeder extends Seeder
         $holds = [];
 
         // Simulate prerequisite violations for students who failed courses (5% chance)
-        $failedRecords = AcademicRecord::where('student_code', $student->id)
+        $failedRecords = AcademicRecord::where('student_id', $student->id)
             ->where('semester_id', $semester->id)
             ->where('completion_status', 'failed')
             ->get();
 
         if ($failedRecords->count() > 0 && rand(1, 100) <= 5) {
             $holds[] = AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'academic',
                 'hold_category' => 'registration',
                 'title' => 'Prerequisite Requirements Not Met',

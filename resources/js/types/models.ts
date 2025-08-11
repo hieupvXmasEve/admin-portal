@@ -207,7 +207,7 @@ export interface Building {
 
 export interface Student {
     id: number;
-    student_code: string;
+    student_id: string;
     full_name: string;
     email: string;
     phone: string;
@@ -291,7 +291,7 @@ export interface StudentStats {
 export interface StudentOverview {
     student_info: {
         id: number;
-        student_code: string;
+        student_id: string;
         full_name: string;
         email: string;
         phone?: string;
@@ -613,7 +613,7 @@ export interface StudentAcademicSummary {
 
 export interface Enrollment {
     id: number;
-    student_code: number;
+    student_id: number;
     semester_id: number;
     curriculum_version_id: number;
     semester_number: number;
@@ -628,7 +628,7 @@ export interface Enrollment {
 
 export interface CourseRegistration {
     id: number;
-    student_code: number;
+    student_id: number;
     course_offering_id: number;
     semester_id: number;
     registration_status: 'registered' | 'confirmed' | 'dropped' | 'withdrawn' | 'completed';
@@ -654,7 +654,7 @@ export interface CourseRegistration {
 
 // Form data type for course registration validation
 export interface CourseRegistrationFormData {
-    student_code: string;
+    student_id: string;
     course_offering_id: string;
     notes?: string;
 }
@@ -806,7 +806,7 @@ export interface ClassSession {
 export interface Attendance {
     id: number;
     class_session_id: number;
-    student_code: number;
+    student_id: number;
     recorded_by_lecture_id?: number;
     status: 'present' | 'late' | 'absent' | 'excused';
     check_in_time?: string;
@@ -845,7 +845,7 @@ export interface Attendance {
 
 // Form data types for strict validation
 export interface EnrollmentFormData {
-    student_code: string;
+    student_id: string;
     semester_id: string;
     curriculum_version_id: string;
     semester_number: number;
@@ -918,7 +918,7 @@ export interface LectureFormData {
 
 export interface AcademicHold {
     id: number;
-    student_code: number;
+    student_id: number;
     hold_type: 'financial' | 'academic' | 'disciplinary' | 'administrative' | 'health' | 'library';
     hold_category: 'registration' | 'graduation' | 'transcript' | 'all';
     title: string;

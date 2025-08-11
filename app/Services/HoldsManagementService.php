@@ -18,10 +18,10 @@ class HoldsManagementService
     {
         return DB::transaction(function () use ($data) {
             // Validate student exists
-            $student = Student::findOrFail($data['student_code']);
+            $student = Student::findOrFail($data['student_id']);
 
             // Check for duplicate active holds of the same type
-            $existingHold = AcademicHold::where('student_code', $student->id)
+            $existingHold = AcademicHold::where('student_id', $student->id)
                 ->where('hold_type', $data['hold_type'])
                 ->where('status', 'active')
                 ->first();
@@ -89,7 +89,7 @@ class HoldsManagementService
     public function getStudentHolds(Student $student, ?string $status = null): array
     {
         $query = AcademicHold::with(['placedByUser', 'resolvedByUser'])
-            ->where('student_code', $student->id);
+            ->where('student_id', $student->id);
 
         if ($status) {
             $query->where('status', $status);
@@ -103,7 +103,7 @@ class HoldsManagementService
      */
     public function getRegistrationBlockingHolds(Student $student): array
     {
-        return AcademicHold::where('student_code', $student->id)
+        return AcademicHold::where('student_id', $student->id)
             ->active()
             ->whereIn('hold_category', ['registration', 'all'])
             ->with(['placedByUser'])
@@ -118,7 +118,7 @@ class HoldsManagementService
      */
     public function hasActiveHolds(Student $student, ?string $category = null): bool
     {
-        $query = AcademicHold::where('student_code', $student->id)->active();
+        $query = AcademicHold::where('student_id', $student->id)->active();
 
         if ($category) {
             $query->whereIn('hold_category', [$category, 'all']);
@@ -133,7 +133,7 @@ class HoldsManagementService
     public function createFinancialHold(Student $student, float $amount, string $description, int $placedByUserId): AcademicHold
     {
         return $this->placeHold([
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'hold_type' => 'financial',
             'hold_category' => 'registration',
             'title' => 'Unpaid Tuition',
@@ -151,7 +151,7 @@ class HoldsManagementService
     public function createAcademicHold(Student $student, float $gpa, int $placedByUserId): AcademicHold
     {
         return $this->placeHold([
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'hold_type' => 'academic',
             'hold_category' => 'registration',
             'title' => 'Academic Probation',
@@ -167,7 +167,7 @@ class HoldsManagementService
     public function createAdministrativeHold(Student $student, string $title, string $description, int $placedByUserId, string $category = 'registration'): AcademicHold
     {
         return $this->placeHold([
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'hold_type' => 'administrative',
             'hold_category' => $category,
             'title' => $title,

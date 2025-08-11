@@ -117,7 +117,7 @@ const hasAcademicConcerns = computed(() => {
                 </div>
                 <div class="flex-1">
                     <h2 class="text-2xl font-bold">{{ overview.student_info.full_name }}</h2>
-                    <p class="text-muted-foreground text-lg">{{ overview.student_info.student_code }}</p>
+                    <p class="text-muted-foreground text-lg">{{ overview.student_info.student_id }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
                         <Badge :variant="getStatusBadgeVariant(overview.student_info.status) as any">
                             {{ formatStatus(overview.student_info.status) }}

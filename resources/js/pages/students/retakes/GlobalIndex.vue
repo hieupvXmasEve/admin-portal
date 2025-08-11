@@ -15,7 +15,7 @@ interface Retake {
     id: number;
     student: {
         id: number;
-        student_code: string;
+        student_id: string;
         full_name: string;
     };
     course_offering: {
@@ -55,7 +55,7 @@ const searchForm = reactive({
 const columns: ColumnDef<Retake>[] = [
     {
         header: 'Student ID',
-        accessorKey: 'student.student_code',
+        accessorKey: 'student.student_id',
         enableSorting: false,
     },
     {

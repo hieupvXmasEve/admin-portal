@@ -29,7 +29,7 @@ class ProgramChangeController extends Controller
     {
         $validated = $request->validate([
             'status' => 'nullable|string|in:pending,approved,rejected',
-            'student_code' => 'nullable|exists:students,id',
+            'student_id' => 'nullable|exists:students,id',
             'from_program_id' => 'nullable|exists:programs,id',
             'to_program_id' => 'nullable|exists:programs,id',
         ]);
@@ -118,7 +118,7 @@ class ProgramChangeController extends Controller
             return redirect()
                 ->back()
                 ->withInput()
-                ->with('error', 'Failed to create program change request: '.$e->getMessage());
+                ->with('error', 'Failed to create program change request: ' . $e->getMessage());
         }
     }
 
@@ -160,7 +160,7 @@ class ProgramChangeController extends Controller
 
             return redirect()
                 ->back()
-                ->with('error', 'Failed to approve request: '.$e->getMessage());
+                ->with('error', 'Failed to approve request: ' . $e->getMessage());
         }
     }
 
@@ -202,7 +202,7 @@ class ProgramChangeController extends Controller
 
             return redirect()
                 ->back()
-                ->with('error', 'Failed to reject request: '.$e->getMessage());
+                ->with('error', 'Failed to reject request: ' . $e->getMessage());
         }
     }
 

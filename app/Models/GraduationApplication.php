@@ -11,7 +11,7 @@ class GraduationApplication extends Model
     use HasFactory;
 
     protected $fillable = [
-        'student_code',
+        'student_id',
         'application_date',
         'intended_graduation_date',
         'status',

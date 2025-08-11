@@ -68,14 +68,14 @@ class AutomatedEnrollmentService
 
                 // Skip if student doesn't have curriculum version
                 if (! $student->curriculum_version_id) {
-                    $result['errors'][] = "Student {$student->student_code} has no curriculum version assigned";
+                    $result['errors'][] = "Student {$student->student_id} has no curriculum version assigned";
                     $result['skipped']++;
 
                     continue;
                 }
 
                 // Check if enrollment already exists
-                $existingEnrollment = Enrollment::where('student_code', $studentId)
+                $existingEnrollment = Enrollment::where('student_id', $studentId)
                     ->where('semester_id', $semesterId)
                     ->first();
 
@@ -86,7 +86,7 @@ class AutomatedEnrollmentService
                 }
 
                 // Determine semester number (following SemesterEnrollmentController logic)
-                $latestEnrollment = Enrollment::where('student_code', $studentId)
+                $latestEnrollment = Enrollment::where('student_id', $studentId)
                     ->orderBy('semester_number', 'desc')
                     ->first();
 
@@ -94,14 +94,14 @@ class AutomatedEnrollmentService
 
                 // Validate semester number doesn't exceed reasonable limits
                 if ($semesterNumber > 8) {
-                    $result['errors'][] = "Student {$student->student_code} has exceeded maximum semester limit";
+                    $result['errors'][] = "Student {$student->student_id} has exceeded maximum semester limit";
                     $result['skipped']++;
 
                     continue;
                 }
 
                 Enrollment::create([
-                    'student_code' => $studentId,
+                    'student_id' => $studentId,
                     'semester_id' => $semesterId,
                     'curriculum_version_id' => $student->curriculum_version_id,
                     'semester_number' => $semesterNumber,
@@ -112,7 +112,7 @@ class AutomatedEnrollmentService
             } catch (Exception $e) {
                 $result['errors'][] = "Failed to enroll student ID {$studentId}: {$e->getMessage()}";
                 Log::error('Enrollment creation failed', [
-                    'student_code' => $studentId,
+                    'student_id' => $studentId,
                     'semester_id' => $semesterId,
                     'error' => $e->getMessage(),
                 ]);
@@ -132,7 +132,7 @@ class AutomatedEnrollmentService
         try {
             // Get enrollments for these students in this semester
             $enrollments = Enrollment::where('semester_id', $semesterId)
-                ->whereIn('student_code', $studentIds)
+                ->whereIn('student_id', $studentIds)
                 ->where('status', 'in_progress')
                 ->with(['student.curriculumVersion', 'curriculumVersion'])
                 ->get();
@@ -145,7 +145,7 @@ class AutomatedEnrollmentService
 
             // Group enrollments by curriculum_version_id and semester_number
             $enrollmentGroups = $enrollments->groupBy(function ($enrollment) {
-                return $enrollment->curriculum_version_id.'_'.$enrollment->semester_number;
+                return $enrollment->curriculum_version_id . '_' . $enrollment->semester_number;
             });
 
             $curriculumUnitDemand = [];
@@ -232,7 +232,7 @@ class AutomatedEnrollmentService
 
         // Get all enrollments for this semester that are in progress
         $enrollments = Enrollment::where('semester_id', $semesterId)
-            ->whereIn('student_code', $studentIds)
+            ->whereIn('student_id', $studentIds)
             ->where('status', 'in_progress')
             ->with(['student', 'curriculumVersion'])
             ->get();
@@ -255,7 +255,7 @@ class AutomatedEnrollmentService
                     ->get();
 
                 if ($curriculumUnits->isEmpty()) {
-                    $result['errors'][] = "No curriculum units found for student {$student->student_code} in semester {$enrollment->semester_number}";
+                    $result['errors'][] = "No curriculum units found for student {$student->student_id} in semester {$enrollment->semester_number}";
                     $result['skipped']++;
 
                     continue;
@@ -275,7 +275,7 @@ class AutomatedEnrollmentService
                         }
 
                         // Check if student is already registered
-                        $existingRegistration = CourseRegistration::where('student_code', $student->id)
+                        $existingRegistration = CourseRegistration::where('student_id', $student->id)
                             ->where('course_offering_id', $courseOffering->id)
                             ->where('semester_id', $semesterId)
                             ->whereIn('registration_status', ['registered', 'confirmed'])
@@ -292,7 +292,7 @@ class AutomatedEnrollmentService
 
                         // Create registration
                         CourseRegistration::create([
-                            'student_code' => $student->id,
+                            'student_id' => $student->id,
                             'course_offering_id' => $courseOffering->id,
                             'semester_id' => $semesterId,
                             'registration_status' => 'confirmed',
@@ -312,9 +312,9 @@ class AutomatedEnrollmentService
 
                         $result['created']++;
                     } catch (Exception $e) {
-                        $result['errors'][] = "Failed to register student {$student->student_code} for {$curriculumUnit->unit->code}: {$e->getMessage()}";
+                        $result['errors'][] = "Failed to register student {$student->student_id} for {$curriculumUnit->unit->code}: {$e->getMessage()}";
                         Log::error('Course registration failed', [
-                            'student_code' => $student->id,
+                            'student_id' => $student->id,
                             'course_offering_id' => $courseOffering->id ?? 'unknown',
                             'unit_code' => $curriculumUnit->unit->code,
                             'error' => $e->getMessage(),
@@ -322,10 +322,10 @@ class AutomatedEnrollmentService
                     }
                 }
             } catch (Exception $e) {
-                $result['errors'][] = "Failed to process enrollment for student ID {$enrollment->student_code}: {$e->getMessage()}";
+                $result['errors'][] = "Failed to process enrollment for student ID {$enrollment->student_id}: {$e->getMessage()}";
                 $result['skipped']++;
                 Log::error('Student enrollment processing failed', [
-                    'student_code' => $enrollment->student_code,
+                    'student_id' => $enrollment->student_id,
                     'enrollment_id' => $enrollment->id,
                     'error' => $e->getMessage(),
                 ]);

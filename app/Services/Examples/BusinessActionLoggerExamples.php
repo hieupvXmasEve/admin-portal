@@ -46,7 +46,7 @@ class BusinessActionLoggerExamples
                 ]);
 
                 // Recalculate course grade if needed
-                $this->recalculateCourseGrade($score->student_code, $score->course_offering_id);
+                $this->recalculateCourseGrade($score->student_id, $score->course_offering_id);
 
                 // Check if this affects graduation requirements
                 $graduationImpact = $this->checkGraduationImpact($score);
@@ -186,7 +186,7 @@ class BusinessActionLoggerExamples
             ])
             ->execute(function () use ($student, $semesterId) {
                 // Get academic records for the semester
-                $records = AcademicRecord::where('student_code', $student->id)
+                $records = AcademicRecord::where('student_id', $student->id)
                     ->where('semester_id', $semesterId)
                     ->where('completion_status', 'completed')
                     ->get();
@@ -201,7 +201,7 @@ class BusinessActionLoggerExamples
                 $semesterGPA = $totalCreditHours > 0 ? $totalQualityPoints / $totalCreditHours : 0;
 
                 // Calculate cumulative GPA
-                $allRecords = AcademicRecord::where('student_code', $student->id)
+                $allRecords = AcademicRecord::where('student_id', $student->id)
                     ->where('completion_status', 'completed')
                     ->get();
 
@@ -212,7 +212,7 @@ class BusinessActionLoggerExamples
                 // Store GPA calculation
                 $gpaCalculation = GpaCalculation::updateOrCreate(
                     [
-                        'student_code' => $student->id,
+                        'student_id' => $student->id,
                         'semester_id' => $semesterId,
                         'calculation_type' => 'semester',
                     ],
@@ -232,7 +232,7 @@ class BusinessActionLoggerExamples
                 // Update cumulative GPA record
                 GpaCalculation::updateOrCreate(
                     [
-                        'student_code' => $student->id,
+                        'student_id' => $student->id,
                         'calculation_type' => 'cumulative',
                     ],
                     [
@@ -291,7 +291,7 @@ class BusinessActionLoggerExamples
             ])
             ->execute(function () use ($student) {
                 // Get all academic records
-                $records = AcademicRecord::where('student_code', $student->id)
+                $records = AcademicRecord::where('student_id', $student->id)
                     ->where('completion_status', 'completed')
                     ->with(['unit', 'semester'])
                     ->get();
@@ -338,7 +338,7 @@ class BusinessActionLoggerExamples
                     'total_credits_earned' => $totalCreditsEarned,
                     'cumulative_gpa' => $totalGPA,
                     'requirements_checked' => count($requirementChecks),
-                    'requirements_met' => count(array_filter($requirementChecks, fn ($r) => $r['is_met'])),
+                    'requirements_met' => count(array_filter($requirementChecks, fn($r) => $r['is_met'])),
                     'missing_requirements' => $missingRequirements,
                     'can_graduate' => $allRequirementsMet,
                     'evaluation_summary' => $requirementChecks,
@@ -376,7 +376,7 @@ class BusinessActionLoggerExamples
                 // Create academic record entries for transfer credits
                 foreach ($creditTransferAnalysis['transferable_credits'] as $credit) {
                     AcademicRecord::create([
-                        'student_code' => $student->id,
+                        'student_id' => $student->id,
                         'unit_id' => $credit['unit_id'],
                         'program_id' => $newProgram->id,
                         'campus_id' => $student->campus_id,

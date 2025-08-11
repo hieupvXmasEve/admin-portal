@@ -89,7 +89,7 @@ class GPACalculationService
      */
     public function getGPATrend(Student $student, int $semesterCount = 6): array
     {
-        $gpaCalculations = GpaCalculation::where('student_code', $student->id)
+        $gpaCalculations = GpaCalculation::where('student_id', $student->id)
             ->where('calculation_type', 'semester')
             ->with('semester')
             ->orderBy('created_at', 'desc')
@@ -138,7 +138,7 @@ class GPACalculationService
         return [
             'distribution' => $distribution,
             'percentages' => $totalCourses > 0 ? array_map(
-                fn ($count) => round(($count / $totalCourses) * 100, 1),
+                fn($count) => round(($count / $totalCourses) * 100, 1),
                 $distribution
             ) : array_fill_keys($standardGrades, 0),
             'total_courses' => $totalCourses,
@@ -150,7 +150,7 @@ class GPACalculationService
      */
     public function getAcademicStanding(Student $student): array
     {
-        $latestGPA = GpaCalculation::where('student_code', $student->id)
+        $latestGPA = GpaCalculation::where('student_id', $student->id)
             ->orderBy('created_at', 'desc')
             ->first();
 
@@ -199,7 +199,7 @@ class GPACalculationService
 
         // Calculate consistency (standard deviation)
         $mean = $gpas->avg();
-        $variance = $gpas->map(fn ($gpa) => pow($gpa - $mean, 2))->avg();
+        $variance = $gpas->map(fn($gpa) => pow($gpa - $mean, 2))->avg();
         $stdDev = sqrt($variance);
 
         $consistency = $stdDev < 0.2 ? 'consistent' : ($stdDev < 0.5 ? 'moderate' : 'variable');

@@ -73,7 +73,7 @@ class StudentApplicationService
                 $studentData = $this->mapApplicationToStudentData($application, $conversionData);
 
                 // Generate student code
-                $studentData['student_code'] = $this->codeGenerationService->generateStudentCodeByCampusId($campus->id);
+                $studentData['student_id'] = $this->codeGenerationService->generateStudentCodeByCampusId($campus->id);
 
                 // Validate student data
                 $validator = Validator::make($studentData, Student::validationRules(), Student::validationMessages());

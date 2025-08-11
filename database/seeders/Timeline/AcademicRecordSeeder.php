@@ -76,7 +76,7 @@ class AcademicRecordSeeder extends Seeder
 
         // Create academic record
         AcademicRecord::create([
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'course_offering_id' => $registration->course_offering_id,
             'semester_id' => $semester->id,
             'unit_id' => $unit->id,
@@ -152,7 +152,7 @@ class AcademicRecordSeeder extends Seeder
             $componentWeight = 0;
 
             foreach ($component->details as $detail) {
-                $score = $detail->scores->where('student_code', $registration->student_code)->first();
+                $score = $detail->scores->where('student_id', $registration->student_id)->first();
 
                 if ($score) {
                     $componentScore += $score->percentage * $detail->weight;
@@ -231,7 +231,7 @@ class AcademicRecordSeeder extends Seeder
         $attendedSessions = DB::table('attendances')
             ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
             ->where('class_sessions.course_offering_id', $registration->course_offering_id)
-            ->where('attendances.student_code', $registration->student_code)
+            ->where('attendances.student_id', $registration->student_id)
             ->whereIn('attendances.status', ['present', 'late', 'partial'])
             ->count();
 
@@ -243,7 +243,7 @@ class AcademicRecordSeeder extends Seeder
         return DB::table('attendances')
             ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
             ->where('class_sessions.course_offering_id', $registration->course_offering_id)
-            ->where('attendances.student_code', $registration->student_code)
+            ->where('attendances.student_id', $registration->student_id)
             ->whereIn('attendances.status', ['absent'])
             ->count();
     }

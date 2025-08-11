@@ -65,7 +65,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
         $newHolds = 0;
 
         // Check for active holds
-        $activeHolds = AcademicHold::where('student_code', $student->id)
+        $activeHolds = AcademicHold::where('student_id', $student->id)
             ->where('status', 'active')
             ->get();
 
@@ -75,7 +75,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
         }
 
         // Check GPA requirements
-        $latestGPA = GpaCalculation::where('student_code', $student->id)
+        $latestGPA = GpaCalculation::where('student_id', $student->id)
             ->where('calculation_type', 'cumulative')
             ->latest('calculated_at')
             ->first();
@@ -105,7 +105,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
         // Update student notes if ineligible
         if (! $eligible) {
             $student->update([
-                'admission_notes' => 'Registration eligibility issues: '.implode(', ', $reasons),
+                'admission_notes' => 'Registration eligibility issues: ' . implode(', ', $reasons),
             ]);
         }
 
@@ -174,7 +174,7 @@ class Spring2025RegistrationEligibilitySeeder extends Seeder
     private function createAcademicSuspensionHold(Student $student, Semester $semester): void
     {
         AcademicHold::create([
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'hold_type' => 'academic',
             'hold_category' => 'all',
             'title' => 'Academic Suspension',

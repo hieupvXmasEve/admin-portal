@@ -102,7 +102,7 @@ class SemesterEnrollmentController extends Controller
 
                     // Validate semester number doesn't exceed reasonable limits
                     if ($semesterNumber > 8) {
-                        $errors[] = "Student {$student->student_code} has exceeded maximum semester limit";
+                        $errors[] = "Student {$student->student_id} has exceeded maximum semester limit";
 
                         continue;
                     }
@@ -548,24 +548,24 @@ class SemesterEnrollmentController extends Controller
 
             // 1) Enrollment window validation (semester-level) - Disabled for admin override
             // Admin can override enrollment window restrictions
-//            if (!$forceRegistration && method_exists($semester, 'isRegistrationOpen') && !$semester->isRegistrationOpen()) {
-//                $msg = 'Semester enrollment window is closed. Use force registration to override.';
-//                Log::warning($msg, [
-//                    'semester_id' => $semester->id,
-//                    'enrollment_start_date' => $semester->enrollment_start_date,
-//                    'enrollment_end_date' => $semester->enrollment_end_date,
-//                ]);
-//
-//                return response()->json([
-//                    'success' => false,
-//                    'message' => $msg,
-//                    'data' => [
-//                        'enrollment_start_date' => $semester->enrollment_start_date,
-//                        'enrollment_end_date' => $semester->enrollment_end_date,
-//                        'force_registration_available' => true,
-//                    ],
-//                ], 422);
-//            }
+            //            if (!$forceRegistration && method_exists($semester, 'isRegistrationOpen') && !$semester->isRegistrationOpen()) {
+            //                $msg = 'Semester enrollment window is closed. Use force registration to override.';
+            //                Log::warning($msg, [
+            //                    'semester_id' => $semester->id,
+            //                    'enrollment_start_date' => $semester->enrollment_start_date,
+            //                    'enrollment_end_date' => $semester->enrollment_end_date,
+            //                ]);
+            //
+            //                return response()->json([
+            //                    'success' => false,
+            //                    'message' => $msg,
+            //                    'data' => [
+            //                        'enrollment_start_date' => $semester->enrollment_start_date,
+            //                        'enrollment_end_date' => $semester->enrollment_end_date,
+            //                        'force_registration_available' => true,
+            //                    ],
+            //                ], 422);
+            //            }
 
             // Get all enrollments for this semester that are in progress filtered by campus
             $enrollmentsQuery = Enrollment::query()
@@ -627,7 +627,7 @@ class SemesterEnrollmentController extends Controller
                             $skipped++;
                             $results['skipped'][] = [
                                 'student_id' => $student->id,
-                                'student_code' => $student->student_code,
+                                'student_id' => $student->student_id,
                                 'reason' => 'Student not active',
                             ];
                             continue;
@@ -638,13 +638,13 @@ class SemesterEnrollmentController extends Controller
                             ->where('student_id', $student->id)
                             ->whereIn('hold_category', ['registration', 'all'])
                             ->where('status', 'active')
-                            ->get(['id','hold_type','hold_category','title','description','amount','priority','due_date']);
+                            ->get(['id', 'hold_type', 'hold_category', 'title', 'description', 'amount', 'priority', 'due_date']);
 
                         if ($activeHolds->isNotEmpty()) {
                             $skipped++;
                             $results['failed'][] = [
                                 'student_id' => $student->id,
-                                'student_code' => $student->student_code,
+                                'student_id' => $student->student_id,
                                 'error' => 'Active registration holds',
                                 'holds' => $activeHolds->toArray(),
                             ];
@@ -666,7 +666,7 @@ class SemesterEnrollmentController extends Controller
                             $skipped++;
                             $results['skipped'][] = [
                                 'student_id' => $student->id,
-                                'student_code' => $student->student_code,
+                                'student_id' => $student->student_id,
                                 'reason' => 'No curriculum units in this semester',
                             ];
                             continue;
@@ -677,7 +677,7 @@ class SemesterEnrollmentController extends Controller
                             ->where('student_id', $student->id)
                             ->where(function ($q) {
                                 $q->where('completion_status', 'completed')
-                                  ->orWhere('credit_hours_earned', '>', 0);
+                                    ->orWhere('credit_hours_earned', '>', 0);
                             })
                             ->pluck('unit_id')
                             ->filter()
@@ -688,7 +688,7 @@ class SemesterEnrollmentController extends Controller
                         $activeRegs = CourseRegistration::query()
                             ->where('student_id', $student->id)
                             ->where('semester_id', $semester->id)
-                            ->whereIn('registration_status', ['pending','registered','confirmed'])
+                            ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
                             ->with(['courseOffering:id,semester_id,curriculum_unit_id,schedule_days,schedule_time_start,schedule_time_end,lecture_id'])
                             ->get();
 
@@ -701,14 +701,14 @@ class SemesterEnrollmentController extends Controller
                                 ->where('unit_id', $curriculumUnit->unit_id)
                                 ->where(function ($q) {
                                     $q->where('completion_status', 'completed')
-                                      ->orWhere('credit_hours_earned', '>', 0);
+                                        ->orWhere('credit_hours_earned', '>', 0);
                                 })
                                 ->exists();
                             if ($hasCredit) {
                                 $skipped++;
                                 $results['skipped'][] = [
                                     'student_id' => $student->id,
-                                    'student_code' => $student->student_code,
+                                    'student_id' => $student->student_id,
                                     'unit_id' => $curriculumUnit->unit_id,
                                     'unit_code' => $unitCode,
                                     'reason' => 'Completed or credit already earned',
@@ -742,7 +742,7 @@ class SemesterEnrollmentController extends Controller
                                     if ($cond->requiredUnit) {
                                         $reqId = $cond->requiredUnit->id;
                                         $met = in_array($reqId, $completedUnitIds, true);
-                                        if (! $met && in_array($type, ['co_requisite','concurrent_prerequisite'])) {
+                                        if (! $met && in_array($type, ['co_requisite', 'concurrent_prerequisite'])) {
                                             // Allow concurrent enrollment only if this required unit is also in the plan
                                             $met = $curriculumUnits->contains(fn($cu) => $cu->unit_id === $reqId);
                                         }
@@ -775,7 +775,7 @@ class SemesterEnrollmentController extends Controller
                             if ($prereqFailed) {
                                 $results['failed'][] = [
                                     'student_id' => $student->id,
-                                    'student_code' => $student->student_code,
+                                    'student_id' => $student->student_id,
                                     'unit_id' => $curriculumUnit->unit_id,
                                     'unit_code' => $unitCode,
                                     'error' => 'Prerequisites not satisfied',
@@ -802,7 +802,7 @@ class SemesterEnrollmentController extends Controller
                             if ($offerings->isEmpty()) {
                                 $results['failed'][] = [
                                     'student_id' => $student->id,
-                                    'student_code' => $student->student_code,
+                                    'student_id' => $student->student_id,
                                     'unit_id' => $curriculumUnit->unit_id,
                                     'unit_code' => $unitCode,
                                     'error' => 'No available course offering or registration closed',
@@ -827,7 +827,7 @@ class SemesterEnrollmentController extends Controller
                             if (! $selectedOffering) {
                                 $results['failed'][] = [
                                     'student_id' => $student->id,
-                                    'student_code' => $student->student_code,
+                                    'student_id' => $student->student_id,
                                     'unit_id' => $curriculumUnit->unit_id,
                                     'unit_code' => $unitCode,
                                     'error' => 'No suitable section found',
@@ -839,7 +839,7 @@ class SemesterEnrollmentController extends Controller
                             if (! $selectedOffering->isRegistrationOpen()) {
                                 $results['failed'][] = [
                                     'student_id' => $student->id,
-                                    'student_code' => $student->student_code,
+                                    'student_id' => $student->student_id,
                                     'unit_id' => $curriculumUnit->unit_id,
                                     'unit_code' => $unitCode,
                                     'error' => 'Course offering registration window closed',
@@ -857,7 +857,7 @@ class SemesterEnrollmentController extends Controller
                             if (! $offeringLocked) {
                                 $results['failed'][] = [
                                     'student_id' => $student->id,
-                                    'student_code' => $student->student_code,
+                                    'student_id' => $student->student_id,
                                     'unit_id' => $curriculumUnit->unit_id,
                                     'unit_code' => $unitCode,
                                     'error' => 'Failed to lock course offering',
@@ -870,13 +870,13 @@ class SemesterEnrollmentController extends Controller
                                 ->where('student_id', $student->id)
                                 ->where('course_offering_id', $offeringLocked->id)
                                 ->where('semester_id', $semester->id)
-                                ->whereIn('registration_status', ['pending','registered','confirmed'])
+                                ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
                                 ->exists();
                             if ($alreadyRegistered) {
                                 $skipped++;
                                 $results['skipped'][] = [
                                     'student_id' => $student->id,
-                                    'student_code' => $student->student_code,
+                                    'student_id' => $student->student_id,
                                     'unit_id' => $curriculumUnit->unit_id,
                                     'unit_code' => $unitCode,
                                     'reason' => 'Already registered',
@@ -889,7 +889,7 @@ class SemesterEnrollmentController extends Controller
                             if (! $hasCapacity && ! $forceRegistration) {
                                 $results['skipped'][] = [
                                     'student_id' => $student->id,
-                                    'student_code' => $student->student_code,
+                                    'student_id' => $student->student_id,
                                     'unit_id' => $curriculumUnit->unit_id,
                                     'unit_code' => $unitCode,
                                     'reason' => 'Offering at capacity',
@@ -920,7 +920,7 @@ class SemesterEnrollmentController extends Controller
                                 $skipped++;
                                 $results['skipped'][] = [
                                     'student_id' => $student->id,
-                                    'student_code' => $student->student_code,
+                                    'student_id' => $student->student_id,
                                     'unit_id' => $curriculumUnit->unit_id,
                                     'unit_code' => $unitCode,
                                     'reason' => 'Duplicate or insert failed',
@@ -940,7 +940,7 @@ class SemesterEnrollmentController extends Controller
                             $registrationsCreated++;
                             $results['success'][] = [
                                 'student_id' => $student->id,
-                                'student_code' => $student->student_code,
+                                'student_id' => $student->student_id,
                                 'unit_id' => $curriculumUnit->unit_id,
                                 'unit_code' => $unitCode,
                                 'course_offering_id' => $offeringLocked->id,
@@ -949,8 +949,8 @@ class SemesterEnrollmentController extends Controller
                     } catch (\Throwable $e) {
                         $results['failed'][] = [
                             'student_id' => $student->id ?? null,
-                            'student_code' => $student->student_code ?? null,
-                            'error' => 'Processing error: '.$e->getMessage(),
+                            'student_id' => $student->student_id ?? null,
+                            'error' => 'Processing error: ' . $e->getMessage(),
                         ];
                         Log::error('Student enrollment processing failed', [
                             'student_id' => $student->id ?? null,
@@ -1155,7 +1155,7 @@ class SemesterEnrollmentController extends Controller
                 Log::info('Available Courses', ['available_courses' => $availableCourses]);
                 if (!empty($availableCourses)) {
                     $studentsWithCourses[] = [
-                        'student_code' => $student->student_code,
+                        'student_id' => $student->student_id,
                         'student_name' => $student->full_name,
                         'semester_number' => $enrollment->semester_number,
                         'available_courses' => $availableCourses,

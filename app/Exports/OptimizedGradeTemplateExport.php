@@ -55,7 +55,7 @@ class OptimizedGradeTemplateExport implements FromCollection, WithColumnWidths, 
         // If no students found, create a placeholder row
         if ($students->isEmpty()) {
             $emptyStudent = new \stdClass;
-            $emptyStudent->student_code = 'No students enrolled';
+            $emptyStudent->student_id = 'No students enrolled';
             $emptyStudent->full_name = '';
             $emptyStudent->email = '';
             $emptyStudent->current_score = null;
@@ -96,7 +96,7 @@ class OptimizedGradeTemplateExport implements FromCollection, WithColumnWidths, 
         $score = $student->current_score;
 
         return [
-            $student->student_code,
+            $student->student_id,
             $student->full_name ?? '',
             $student->email ?? '',
             $score?->points_earned ?? 0,

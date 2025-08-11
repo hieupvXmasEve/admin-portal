@@ -232,7 +232,7 @@ class AssessmentComponent extends Model
         return AssessmentComponentDetailScore::whereHas('assessmentComponentDetail', function ($query) {
             $query->where('assessment_component_id', $this->id);
         })
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->with('assessmentComponentDetail')
             ->get();
     }

@@ -36,7 +36,7 @@ class AttendanceController extends Controller
                         ->orWhere('email', 'like', "%{$search}%");
                 })
                     ->orWhereHas('student', function ($q) use ($search) {
-                        $q->where('student_code', 'like', "%{$search}%");
+                        $q->where('student_id', 'like', "%{$search}%");
                     })
                     ->orWhereHas('classSession', function ($q) use ($search) {
                         $q->where('session_title', 'like', "%{$search}%");
@@ -171,7 +171,7 @@ class AttendanceController extends Controller
     {
         $validated = $request->validate([
             'class_session_id' => 'required|exists:class_sessions,id',
-            'student_code' => 'required|exists:students,id',
+            'student_id' => 'required|exists:students,id',
             'status' => 'required|in:present,late,absent,excused',
             'check_in_time' => 'nullable|date',
             'check_out_time' => 'nullable|date|after:check_in_time',
@@ -246,7 +246,7 @@ class AttendanceController extends Controller
     {
         $validated = $request->validate([
             'class_session_id' => 'required|exists:class_sessions,id',
-            'student_code' => 'required|exists:students,id',
+            'student_id' => 'required|exists:students,id',
             'status' => 'required|in:present,late,absent,excused',
             'check_in_time' => 'nullable|date',
             'check_out_time' => 'nullable|date|after:check_in_time',

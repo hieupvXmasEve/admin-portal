@@ -86,12 +86,12 @@ const columns: ColumnDef<Student>[] = [
         },
     },
     {
-        accessorKey: 'student_code',
+        accessorKey: 'student_id',
         header: 'Student ID',
         enableSorting: true,
         cell: ({ row }) => {
             const student = row.original;
-            return h('div', { class: 'font-medium' }, student.student_code);
+            return h('div', { class: 'font-medium' }, student.student_id);
         },
     },
     {

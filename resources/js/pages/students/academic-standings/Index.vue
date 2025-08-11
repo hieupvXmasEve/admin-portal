@@ -11,7 +11,7 @@ interface AcademicStanding {
     id: number;
     student: {
         id: number;
-        student_code: string;
+        student_id: string;
         full_name: string;
     };
     semester: {
@@ -45,7 +45,7 @@ const data = computed(() => props.standings.data);
 const columns: ColumnDef<AcademicStanding>[] = [
     {
         header: 'Student ID',
-        accessorKey: 'student.student_code',
+        accessorKey: 'student.student_id',
         enableSorting: false,
     },
     {

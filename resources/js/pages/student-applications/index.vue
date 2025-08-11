@@ -10,14 +10,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useApi } from '@/composables/useApiRequest';
+import { createColumns } from '@/lib/table-utils';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
 import { AlertCircle, CheckCircle2, ChevronDown, Clock, Eye, RefreshCw, Trash2, Users, XCircle } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
-import { createColumns } from '@/lib/table-utils';
-import { useApi } from '@/composables/useApiRequest';
 
 // Types
 interface StudentApplication {
@@ -31,7 +31,7 @@ interface StudentApplication {
     updated_at: string;
     student?: {
         id: number;
-        student_code: string;
+        student_id: string;
         full_name: string;
     };
 }
@@ -180,7 +180,7 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
         cell: ({ row }) => {
             const application = row.original;
             if (application.student) {
-                return h('div', { class: 'text-sm' }, [h('div', { class: 'font-medium text-green-600' }, application.student.student_code), h('div', { class: 'text-xs text-muted-foreground' }, 'Converted')]);
+                return h('div', { class: 'text-sm' }, [h('div', { class: 'font-medium text-green-600' }, application.student.student_id), h('div', { class: 'text-xs text-muted-foreground' }, 'Converted')]);
             }
             return h('span', { class: 'text-xs text-muted-foreground' }, 'Not converted');
         },
@@ -538,10 +538,10 @@ const clearFilters = () => {
 
     <!-- Applications Table -->
     <CardContent class="p-0">
-            <DataTable ref="dataTableRef" :data="applications.data" :columns="suggestedCoursesColumns" :enable-row-selection="true" @selection-change="onSelectionChange" empty-message="No applications found" />
+        <DataTable ref="dataTableRef" :data="applications.data" :columns="suggestedCoursesColumns" :enable-row-selection="true" @selection-change="onSelectionChange" empty-message="No applications found" />
 
-            <DataPagination :pagination-data="applications" item-name="applications" @navigate="onNavigate" @page-size-change="onPageSizeChange" />
-        </CardContent>
+        <DataPagination :pagination-data="applications" item-name="applications" @navigate="onNavigate" @page-size-change="onPageSizeChange" />
+    </CardContent>
 
     <!-- Status Update Dialog -->
     <Dialog v-model:open="showStatusUpdateDialog">

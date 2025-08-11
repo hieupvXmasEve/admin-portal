@@ -14,7 +14,7 @@ class AssessmentComponentDetailScore extends AuditableModel
 
     protected $fillable = [
         'assessment_component_detail_id',
-        'student_code',
+        'student_id',
         'course_offering_id',
         'graded_by_lecture_id',
         'points_earned',
@@ -78,7 +78,7 @@ class AssessmentComponentDetailScore extends AuditableModel
         $assessment = $this->assessmentComponentDetail;
 
         if ($student && $assessment) {
-            return "Assessment Score - Student: {$student->student_code} ({$student->full_name}) - Assessment: {$assessment->name}";
+            return "Assessment Score - Student: {$student->student_id} ({$student->full_name}) - Assessment: {$assessment->name}";
         }
 
         return "Assessment Score ID {$this->getKey()}";
@@ -106,7 +106,7 @@ class AssessmentComponentDetailScore extends AuditableModel
     public function getExtraLogProperties(): array
     {
         return [
-            'student_code' => $this->student_code,
+            'student_id' => $this->student_id,
             'course_offering_id' => $this->course_offering_id,
             'assessment_component_detail_id' => $this->assessment_component_detail_id,
             'points_earned' => $this->points_earned,
@@ -340,7 +340,7 @@ class AssessmentComponentDetailScore extends AuditableModel
             'action' => 'late_excuse_requested',
             'excuse' => $excuse,
             'requested_at' => now()->toISOString(),
-            'requested_by' => $this->student_code,
+            'requested_by' => $this->student_id,
         ];
         $this->score_history = $history;
 
@@ -483,7 +483,7 @@ class AssessmentComponentDetailScore extends AuditableModel
         ];
 
         if (! in_array($status, $validStatuses)) {
-            throw new \InvalidArgumentException('Invalid integrity status: '.$status);
+            throw new \InvalidArgumentException('Invalid integrity status: ' . $status);
         }
 
         $previousStatus = $this->integrity_status;
@@ -582,7 +582,7 @@ class AssessmentComponentDetailScore extends AuditableModel
             'action' => 'appeal_requested',
             'appeal_reason' => $reason,
             'requested_at' => now()->toISOString(),
-            'requested_by' => $this->student_code,
+            'requested_by' => $this->student_id,
         ];
         $this->score_history = $history;
 
@@ -631,7 +631,7 @@ class AssessmentComponentDetailScore extends AuditableModel
         // Update score history
         $history = $this->score_history ?? [];
         $history[] = [
-            'action' => 'appeal_'.$decision,
+            'action' => 'appeal_' . $decision,
             'decision' => $decision,
             'reviewer_notes' => $reviewerNotes,
             'instructor_feedback' => $instructorFeedback,

@@ -21,7 +21,7 @@ class ClassSessionRepository
             ->whereHas('courseOffering', function (Builder $query) use ($student, $semester) {
                 $query->where('semester_id', $semester->id)
                     ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                        $regQuery->where('student_code', $student->id)
+                        $regQuery->where('student_id', $student->id)
                             ->where('registration_status', 'registered');
                     });
             })
@@ -44,7 +44,7 @@ class ClassSessionRepository
     {
         return $classSession->courseOffering
             ->courseRegistrations()
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('registration_status', 'registered')
             ->exists();
     }
@@ -120,7 +120,7 @@ class ClassSessionRepository
         $todaySession = ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
             $query->where('semester_id', $currentSemester->id)
                 ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                    $regQuery->where('student_code', $student->id)
+                    $regQuery->where('student_id', $student->id)
                         ->where('registration_status', 'registered');
                 });
         })
@@ -144,7 +144,7 @@ class ClassSessionRepository
             $nextSession = ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
                 $query->where('semester_id', $currentSemester->id)
                     ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                        $regQuery->where('student_code', $student->id)
+                        $regQuery->where('student_id', $student->id)
                             ->where('registration_status', 'registered');
                     });
             })
@@ -177,7 +177,7 @@ class ClassSessionRepository
         return ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
             $query->where('semester_id', $currentSemester->id)
                 ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                    $regQuery->where('student_code', $student->id)
+                    $regQuery->where('student_id', $student->id)
                         ->where('registration_status', 'registered');
                 });
         })
@@ -208,7 +208,7 @@ class ClassSessionRepository
         return ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
             $query->where('semester_id', $currentSemester->id)
                 ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                    $regQuery->where('student_code', $student->id)
+                    $regQuery->where('student_id', $student->id)
                         ->where('registration_status', 'registered');
                 });
         })
@@ -243,7 +243,7 @@ class ClassSessionRepository
 
         if (! empty($filters['lecturer_name'])) {
             $query->whereHas('courseOffering.lecturer', function (Builder $q) use ($filters) {
-                $q->where('full_name', 'like', '%'.$filters['lecturer_name'].'%');
+                $q->where('full_name', 'like', '%' . $filters['lecturer_name'] . '%');
             });
         }
 
@@ -261,7 +261,7 @@ class ClassSessionRepository
 
         if (! empty($filters['course_code'])) {
             $query->whereHas('courseOffering.curriculumUnit.unit', function (Builder $q) use ($filters) {
-                $q->where('code', 'like', '%'.$filters['course_code'].'%');
+                $q->where('code', 'like', '%' . $filters['course_code'] . '%');
             });
         }
 

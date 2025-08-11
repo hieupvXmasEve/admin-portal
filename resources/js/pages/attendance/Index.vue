@@ -143,7 +143,7 @@ const columns: ColumnDef<Attendance>[] = [
             const attendance = row.original;
             return h('div', { class: 'space-y-1' }, [
                 h('div', { class: 'flex items-center gap-2' }, [h(User, { class: 'h-4 w-4' }), h('span', { class: 'font-medium' }, attendance.student?.full_name)]),
-                h('div', { class: 'text-xs text-muted-foreground' }, attendance.student?.student_code),
+                h('div', { class: 'text-xs text-muted-foreground' }, attendance.student?.student_id),
                 h('div', { class: 'text-xs text-muted-foreground' }, attendance.student?.email),
             ]);
         },
