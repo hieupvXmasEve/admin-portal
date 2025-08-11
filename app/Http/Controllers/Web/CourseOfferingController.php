@@ -10,6 +10,7 @@ use App\Http\Requests\StoreCourseOfferingRequest;
 use App\Http\Requests\UpdateCourseOfferingRequest;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Models\ClassSession;
 use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
@@ -42,7 +43,7 @@ class CourseOfferingController extends Controller
             ->where('campus_id', app('campus')->id)
             ->orderBy('semester_id', 'desc')
             ->orderBy('section_code');
-        Log::info('CourseOffering: '.json_encode(CourseOffering::select(['id', 'lecture_id', 'semester_id', 'curriculum_unit_id', 'section_code'])->get()));
+
         // Apply filters
         if ($request->filled('search')) {
             $search = $request->search;
@@ -72,7 +73,6 @@ class CourseOfferingController extends Controller
 
         // Get filter options
         $semesters = Semester::orderBy('start_date', 'desc')->get(['id', 'name', 'code']);
-
         return Inertia::render('course-offerings/Index', [
             'courseOfferings' => $courseOfferings,
             'filters' => $request->only(['search', 'semester_id', 'enrollment_status', 'delivery_mode']),
@@ -271,16 +271,72 @@ class CourseOfferingController extends Controller
         ]);
 
         // Get available rooms for class session generation
+        $conflictingRoomIds = [];
+
+        // Only filter by schedule if the offering has defined days and time range
+        $scheduleDays = $courseOffering->schedule_days ?? [];
+        $startTime = $courseOffering->schedule_time_start ? $courseOffering->schedule_time_start->format('H:i') : null;
+        $endTime = $courseOffering->schedule_time_end ? $courseOffering->schedule_time_end->format('H:i') : null;
+
+        if (! empty($scheduleDays) && $startTime && $endTime) {
+            // Map schedule days to MySQL WEEKDAY() indexes (Monday=0 ... Sunday=6)
+            $dayToIndex = [
+                'monday' => 0,
+                'tuesday' => 1,
+                'wednesday' => 2,
+                'thursday' => 3,
+                'friday' => 4,
+                'saturday' => 5,
+                'sunday' => 6,
+            ];
+            $weekdayIndexes = collect($scheduleDays)
+                ->map(fn($d) => strtolower($d))
+                ->map(fn($d) => $dayToIndex[$d] ?? null)
+                ->filter(static fn($v) => $v !== null)
+                ->values()
+                ->all();
+
+            if (! empty($weekdayIndexes)) {
+                $roomIdsInCampus = Room::forCampus(app('campus')->id)->pluck('id');
+
+                $conflictingRoomIds = ClassSession::whereIn('room_id', $roomIdsInCampus)
+                    ->whereIn(DB::raw('WEEKDAY(session_date)'), $weekdayIndexes)
+                    ->where('status', '!=', 'cancelled')
+                    ->where(function ($q) use ($startTime, $endTime) {
+                        $q->where(function ($subQ) use ($startTime) {
+                            // Existing session overlaps new start
+                            $subQ->whereTime('start_time', '<=', $startTime)
+                                ->whereTime('end_time', '>', $startTime);
+                        })->orWhere(function ($subQ) use ($endTime) {
+                            // Existing session overlaps new end
+                            $subQ->whereTime('start_time', '<', $endTime)
+                                ->whereTime('end_time', '>=', $endTime);
+                        })->orWhere(function ($subQ) use ($startTime, $endTime) {
+                            // Existing session fully within the new window
+                            $subQ->whereTime('start_time', '>=', $startTime)
+                                ->whereTime('end_time', '<=', $endTime);
+                        });
+                    })
+                    ->pluck('room_id')
+                    ->toArray();
+            }
+        }
+
         $availableRooms = Room::bookable()
             ->withStatus(Room::STATUS_AVAILABLE)
+            ->forCampus(app('campus')->id)
+            ->when(! empty($conflictingRoomIds), function ($q) use ($conflictingRoomIds) {
+                $q->whereNotIn('id', $conflictingRoomIds);
+            })
             ->orderBy('building')
             ->orderBy('name')
-            ->forCampus(app('campus')->id)
             ->get(['id', 'name', 'code', 'building', 'capacity', 'type']);
 
+        $canGenerateClassSessions = $courseOffering->canGenerateClassSessions();
         return Inertia::render('course-offerings/Show', [
             'courseOffering' => $courseOffering,
             'availableRooms' => $availableRooms,
+            'canGenerateClassSessions' => $canGenerateClassSessions,
         ]);
     }
 
@@ -320,10 +376,10 @@ class CourseOfferingController extends Controller
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering updated successfully.');
         } catch (\Throwable $th) {
-            Log::error('Failed to update course offering: '.$th->getMessage());
+            Log::error('Failed to update course offering: ' . $th->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to update course offering: '.$th->getMessage());
+                ->with('error', 'Failed to update course offering: ' . $th->getMessage());
         }
     }
 
@@ -431,7 +487,7 @@ class CourseOfferingController extends Controller
 
         $courseOffering->load([
             'semester',
-            'unit',
+            'curriculumUnit.unit',
             'lecture',
             'courseRegistrations.student',
         ]);
@@ -496,7 +552,7 @@ class CourseOfferingController extends Controller
         }
 
         $sections = $request->sections;
-        $totalStudentsAssigned = collect($sections)->sum(fn ($section) => count($section['student_codes']));
+        $totalStudentsAssigned = collect($sections)->sum(fn($section) => count($section['student_codes']));
 
         if ($totalStudentsAssigned !== $courseOffering->current_enrollment) {
             return Redirect::back()
@@ -544,7 +600,7 @@ class CourseOfferingController extends Controller
                 // Prepare registration updates for this section
                 foreach ($sectionData['student_codes'] as $studentId) {
                     $registrationUpdates[] = [
-                        'student_code' => $studentId,
+                        'student_id' => $studentId,
                         'new_course_offering_id' => $newOffering->id,
                     ];
                 }
@@ -554,7 +610,7 @@ class CourseOfferingController extends Controller
             // First, move active students to their assigned sections
             foreach ($registrationUpdates as $update) {
                 CourseRegistration::where('course_offering_id', $courseOffering->id)
-                    ->where('student_code', $update['student_code'])
+                    ->where('student_id', $update['student_id'])
                     ->whereIn('registration_status', ['registered', 'confirmed'])
                     ->update(['course_offering_id' => $update['new_course_offering_id']]);
             }
@@ -571,12 +627,12 @@ class CourseOfferingController extends Controller
             DB::commit();
 
             return Redirect::route(CourseOfferingRoutes::INDEX)
-                ->with('success', 'Course offering successfully split into '.count($sections).' sections. The original course offering has been deleted.');
+                ->with('success', 'Course offering successfully split into ' . count($sections) . ' sections. The original course offering has been deleted.');
         } catch (\Exception $e) {
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to split course offering: '.$e->getMessage());
+                ->with('error', 'Failed to split course offering: ' . $e->getMessage());
         }
     }
 
@@ -658,7 +714,7 @@ class CourseOfferingController extends Controller
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to assign lectures: '.$e->getMessage());
+                ->with('error', 'Failed to assign lectures: ' . $e->getMessage());
         }
     }
 
@@ -679,7 +735,7 @@ class CourseOfferingController extends Controller
 
             $updatedCount = CourseRegistration::where('course_offering_id', $courseOffering->id)
                 ->where('registration_status', $request->from_status)
-                ->whereIn('student_code', $request->student_codes)
+                ->whereIn('student_id', $request->student_codes)
                 ->update([
                     'registration_status' => $request->to_status,
                     'updated_at' => now(),
@@ -716,7 +772,7 @@ class CourseOfferingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update registration status: '.$e->getMessage(),
+                'message' => 'Failed to update registration status: ' . $e->getMessage(),
             ], 500);
         }
     }

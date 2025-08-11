@@ -10,7 +10,7 @@ import { useApi } from '@/composables/useApiRequest';
 import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -20,10 +20,10 @@ interface Props {
         class_sessions?: ClassSession[];
     };
     availableRooms: Room[];
+    canGenerateClassSessions: boolean;
 }
 
 const props = defineProps<Props>();
-console.log(props.courseOffering);
 
 const api = useApi();
 // const showStatusModal = ref(false);
@@ -87,13 +87,13 @@ const formatDateTime = (dateString: string | null | undefined): string => {
 
 const enrollmentPercentage = props.courseOffering.max_capacity > 0 ? Math.round((props.courseOffering.current_enrollment / props.courseOffering.max_capacity) * 100) : 0;
 
-const handleStatusUpdate = () => {
-    // Refresh the page to get updated registration data
-    router.reload({
-        only: ['courseOffering'],
-    });
-    toast.success('Registration status updated successfully');
-};
+// const handleStatusUpdate = () => {
+//     // Refresh the page to get updated registration data
+//     router.reload({
+//         only: ['courseOffering'],
+//     });
+//     toast.success('Registration status updated successfully');
+// };
 
 // Class sessions management functions
 const generateClassSessions = async (roomId: number) => {
@@ -102,7 +102,6 @@ const generateClassSessions = async (roomId: number) => {
         const result = await api.post(`/api/course-offerings/${props.courseOffering.id}/class-sessions/generate`, {
             room_id: roomId,
         });
-        console.log('result.data', result.data);
         if (result.data?.value?.success) {
             classSessions.value = result.data.value.data.sessions;
             toast.success(`${result.data.value.data.sessions_count} class sessions generated successfully`);
@@ -159,6 +158,9 @@ const getSessionStatusVariant = (status: string) => {
             return 'secondary';
     }
 };
+const editCourseOffering = () => {
+    router.visit(`/course-offerings/${props.courseOffering.id}/edit`);
+};
 </script>
 
 <template>
@@ -178,6 +180,10 @@ const getSessionStatusVariant = (status: string) => {
                     Split into Sections
                 </Button>
             </Link>
+            <Button variant="outline" size="sm" @click="editCourseOffering">
+                <Edit class="mr-2 h-4 w-4" />
+                Edit
+            </Button>
             <Link href="/course-offerings">
                 <Button variant="outline" size="sm">
                     <ArrowLeft class="mr-2 h-4 w-4" />
@@ -350,11 +356,11 @@ const getSessionStatusVariant = (status: string) => {
                 <div class="space-y-4">
                     <!-- schedule day -->
                     <div>
-                        <p class="text-muted-foreground text-sm font-medium">Schedule</p>
+                        <p class="text-muted-foreground text-sm font-medium">Schedule Day</p>
                         <p class="text-sm">{{ courseOffering.schedule_days?.join(', ') ?? 'Not set' }}</p>
                     </div>
                     <div>
-                        <p class="text-muted-foreground text-sm font-medium">Schedule</p>
+                        <p class="text-muted-foreground text-sm font-medium">Schedule Time</p>
                         <p class="text-sm">{{ courseOffering.schedule_time_start }} - {{ courseOffering.schedule_time_end }}</p>
                     </div>
                 </div>
@@ -389,7 +395,11 @@ const getSessionStatusVariant = (status: string) => {
                                 <Trash2 class="mr-2 h-4 w-4" />
                                 Delete All
                             </Button>
-                            <RoomSelectionModal :available-rooms="availableRooms" :is-generating="isGenerating" @generate="generateClassSessions" />
+                            <RoomSelectionModal v-if="canGenerateClassSessions" :available-rooms="availableRooms" :is-generating="isGenerating" @generate="generateClassSessions" />
+                            <div v-else>
+                                <!-- Notice for user need required fields: schedule day, schedule time start, schedule time end -->
+                                <p class="text-sm text-red-400">Please set the schedule days, start time, end time, and ensure the unit has a complete syllabus before generating class sessions.</p>
+                            </div>
                         </div>
                     </div>
                     <div v-else>

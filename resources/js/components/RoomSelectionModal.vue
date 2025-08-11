@@ -30,7 +30,6 @@ interface Emits {
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
-console.log('props', props.availableRooms);
 const open = ref(false);
 const selectedRoomId = ref<number | null>(null);
 const search = shallowRef('');

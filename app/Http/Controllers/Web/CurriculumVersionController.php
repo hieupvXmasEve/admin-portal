@@ -195,7 +195,7 @@ class CurriculumVersionController extends Controller
 
         // Calculate additional statistics
         $total = array_sum($counts);
-        
+
         // Get enrollment trends (last 6 months)
         $enrollmentTrends = DB::table('students')
             ->where('curriculum_version_id', $curriculumVersion->id)
@@ -612,13 +612,10 @@ class CurriculumVersionController extends Controller
             $query->where('semester_number', $request->semester_number);
         }
 
-        // Pagination
-        $perPage = $request->per_page ?? 15;
         $units = $query->orderBy('year_level')
             ->orderBy('semester_number')
             ->orderBy('created_at')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->get();
 
         // Calculate units statistics
         $unitsStats = $this->calculateUnitsStatistics($curriculumVersion);

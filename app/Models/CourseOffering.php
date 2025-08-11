@@ -60,10 +60,6 @@ class CourseOffering extends AuditableModel
         'credit_hours',
         'status',
         'max_enrollment',
-        'tuition_per_credit',
-        'additional_fees',
-        'drop_deadline',
-        'withdrawal_deadline',
     ];
 
     // Validation Rules
@@ -175,7 +171,7 @@ class CourseOffering extends AuditableModel
 
     public function getCreditHoursAttribute(): ?int
     {
-        return $this->curriculumUnit?->unit ? (int) $this->curriculumUnit->unit->credit_points : null;
+        return $this->curriculumUnit?->unit ? (int)$this->curriculumUnit->unit->credit_points : null;
     }
 
     public function getStatusAttribute(): string
@@ -186,32 +182,6 @@ class CourseOffering extends AuditableModel
     public function getMaxEnrollmentAttribute(): int
     {
         return $this->max_capacity ?? 0;
-    }
-
-    public function getTuitionPerCreditAttribute(): float
-    {
-        // Default tuition per credit - this should be configurable
-        return 500.00;
-    }
-
-    public function getAdditionalFeesAttribute(): float
-    {
-        // Default additional fees - this should be configurable
-        return 50.00;
-    }
-
-    public function getDropDeadlineAttribute(): ?string
-    {
-        // Calculate drop deadline based on semester dates
-        // For now, return null - this should be implemented based on business rules
-        return null;
-    }
-
-    public function getWithdrawalDeadlineAttribute(): ?string
-    {
-        // Calculate withdrawal deadline based on semester dates
-        // For now, return null - this should be implemented based on business rules
-        return null;
     }
 
     // Helper methods
@@ -239,7 +209,7 @@ class CourseOffering extends AuditableModel
     {
         return $this->is_active
             && $this->enrollment_status === 'open'
-            && ! $this->isFull()
+            && !$this->isFull()
             && $this->isRegistrationOpen();
     }
 
@@ -248,23 +218,32 @@ class CourseOffering extends AuditableModel
         return $this->is_active
             && in_array($this->enrollment_status, ['open', 'waitlist_only'])
             && $this->isFull()
-            && ! $this->isWaitlistFull()
+            && !$this->isWaitlistFull()
             && $this->isRegistrationOpen();
+    }
+
+    public function canGenerateClassSessions(): bool
+    {
+        $syllabus = $this->curriculumUnit->syllabus ?? null;
+        return $this->schedule_days !== null
+            && $this->schedule_time_start !== null
+            && $this->schedule_time_end !== null
+            && $syllabus?->hasCompleteTotalHoursAndPerSessionHours();
     }
 
     public function isRegistrationOpen(): bool
     {
         $now = Carbon::now()->toDateString();
 
-        $startOk = ! $this->registration_start_date || $this->registration_start_date <= $now;
-        $endOk = ! $this->registration_end_date || $this->registration_end_date >= $now;
+        $startOk = !$this->registration_start_date || $this->registration_start_date <= $now;
+        $endOk = !$this->registration_end_date || $this->registration_end_date >= $now;
 
         return $startOk && $endOk;
     }
 
     public function getEnrollmentStatusText(): string
     {
-        if (! $this->isRegistrationOpen()) {
+        if (!$this->isRegistrationOpen()) {
             return 'Registration Closed';
         }
 
@@ -360,7 +339,7 @@ class CourseOffering extends AuditableModel
     // Helper methods for instructor assignment
     public function hasInstructor(): bool
     {
-        return ! is_null($this->lecture_id);
+        return !is_null($this->lecture_id);
     }
 
     public function needsInstructorBeforeClasses(): bool
@@ -370,7 +349,7 @@ class CourseOffering extends AuditableModel
         }
 
         // Check if semester has started
-        if (! $this->semester) {
+        if (!$this->semester) {
             return true; // Default to needing instructor if no semester info
         }
 
@@ -434,15 +413,6 @@ class CourseOffering extends AuditableModel
         } elseif ($this->enrollment_status === 'waitlist_only' && $this->current_enrollment < $this->max_capacity) {
             $this->update(['enrollment_status' => 'open']);
         }
-    }
-
-    public function getTotalTuition(): float
-    {
-        $creditHours = $this->getCreditHoursAttribute();
-        $tuitionPerCredit = $this->getTuitionPerCreditAttribute();
-        $additionalFees = $this->getAdditionalFeesAttribute();
-
-        return ($creditHours * $tuitionPerCredit) + $additionalFees;
     }
 
     // Teaching Assignment Scopes
@@ -511,7 +481,7 @@ class CourseOffering extends AuditableModel
     public function canBeAssignedTo(Lecture $lecturer): bool
     {
         // Check if lecturer is available for assignment
-        if (! $lecturer->isAvailableForAssignment()) {
+        if (!$lecturer->isAvailableForAssignment()) {
             return false;
         }
 
@@ -550,10 +520,20 @@ class CourseOffering extends AuditableModel
     protected function getStandardLogFields(): array
     {
         return [
-            'semester_id', 'curriculum_unit_id', 'lecture_id', 'campus_id',
-            'section_code', 'max_capacity', 'current_enrollment',
-            'delivery_mode', 'schedule_days', 'schedule_time_start', 'schedule_time_end',
-            'location', 'is_active', 'enrollment_status',
+            'semester_id',
+            'curriculum_unit_id',
+            'lecture_id',
+            'campus_id',
+            'section_code',
+            'max_capacity',
+            'current_enrollment',
+            'delivery_mode',
+            'schedule_days',
+            'schedule_time_start',
+            'schedule_time_end',
+            'location',
+            'is_active',
+            'enrollment_status',
         ];
     }
 
@@ -596,7 +576,7 @@ class CourseOffering extends AuditableModel
             'max_capacity' => $this->max_capacity,
             'current_enrollment' => $this->current_enrollment,
             'enrollment_status' => $this->enrollment_status,
-            'instructor_assigned' => ! is_null($this->lecture_id),
+            'instructor_assigned' => !is_null($this->lecture_id),
         ];
     }
 }

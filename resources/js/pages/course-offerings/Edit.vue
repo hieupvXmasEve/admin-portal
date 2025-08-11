@@ -5,11 +5,12 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { CourseOffering, Lecture, Semester, Unit } from '@/types/models';
+import type { CourseOffering, Lecture } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
+import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
 interface Props {
@@ -18,7 +19,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
+console.log('%c props', 'color: red', props.courseOffering);
 // Define validation schema following development standards
 const formSchema = toTypedSchema(
     z.object({
@@ -66,9 +67,10 @@ const { handleSubmit, isSubmitting } = useForm({
         notes: props.courseOffering.notes || '',
     },
 });
-console.log('schedule_time_start', props.courseOffering.schedule_time_start);
 const onSubmit = handleSubmit((values) => {
     const formData = {
+        semester_id: props.courseOffering.semester_id,
+        curriculum_unit_id: props.courseOffering.curriculum_unit_id,
         lecture_id: values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
         max_capacity: Number(values.max_capacity),
@@ -84,10 +86,12 @@ const onSubmit = handleSubmit((values) => {
         special_requirements: values.special_requirements || null,
         notes: values.notes || null,
     };
+    console.log('%c formData', 'color: red', formData);
 
     router.put(`/course-offerings/${props.courseOffering.id}`, formData, {
         onSuccess: () => {
             // Success handled by redirect
+            toast.success('Course offering updated successfully');
         },
         onError: (errors) => {
             console.error('Validation errors:', errors);
@@ -139,14 +143,20 @@ const enrollmentStatusOptions = [
                         <div class="flex items-start">
                             <div class="flex-shrink-0">
                                 <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd" />
+                                    <path
+                                        fill-rule="evenodd"
+                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
+                                        clip-rule="evenodd"
+                                    />
                                 </svg>
                             </div>
                             <div class="ml-3 flex-1">
                                 <h3 class="text-sm font-medium text-blue-800">Semester</h3>
                                 <div class="mt-1 text-sm text-blue-700">
-                                    <p><strong>{{ courseOffering.semester?.name }}</strong> ({{ courseOffering.semester?.code }})</p>
-                                    <p class="text-xs mt-1" v-if="courseOffering.semester">
+                                    <p>
+                                        <strong>{{ courseOffering.semester?.name }}</strong> ({{ courseOffering.semester?.code }})
+                                    </p>
+                                    <p class="mt-1 text-xs" v-if="courseOffering.semester">
                                         {{ new Date(courseOffering.semester.start_date).toLocaleDateString() }} -
                                         {{ new Date(courseOffering.semester.end_date).toLocaleDateString() }}
                                     </p>
@@ -166,8 +176,10 @@ const enrollmentStatusOptions = [
                             <div class="ml-3 flex-1">
                                 <h3 class="text-sm font-medium text-green-800">Curriculum Unit</h3>
                                 <div class="mt-1 text-sm text-green-700">
-                                    <p><strong>{{ courseOffering.curriculum_unit?.unit?.code }} - {{ courseOffering.curriculum_unit?.unit?.name }}</strong></p>
-                                    <p class="text-xs mt-1" v-if="courseOffering.curriculum_unit?.unit">
+                                    <p>
+                                        <strong>{{ courseOffering.curriculum_unit?.unit?.code }} - {{ courseOffering.curriculum_unit?.unit?.name }}</strong>
+                                    </p>
+                                    <p class="mt-1 text-xs" v-if="courseOffering.curriculum_unit?.unit">
                                         {{ courseOffering.curriculum_unit.unit.credit_points }} credits
                                         <template v-if="courseOffering.curriculum_unit.year_level && courseOffering.curriculum_unit.semester_number">
                                             • Y{{ courseOffering.curriculum_unit.year_level }}S{{ courseOffering.curriculum_unit.semester_number }}
@@ -262,11 +274,7 @@ const enrollmentStatusOptions = [
                             <FormLabel>Schedule Days</FormLabel>
                             <FormControl>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div
-                                        v-for="day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']"
-                                        :key="day"
-                                        class="flex items-center space-x-2"
-                                    >
+                                    <div v-for="day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']" :key="day" class="flex items-center space-x-2">
                                         <input
                                             :id="day"
                                             type="checkbox"
