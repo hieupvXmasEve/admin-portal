@@ -1,25 +1,13 @@
 <script setup lang="ts">
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { UnitData as Unit } from '@/types/Unit';
 import { curriculumRoutes, syllabusRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, CheckCircle, Clock, Edit, FileText, GitBranch, GraduationCap, Network, Shield, Target, Trash2 } from 'lucide-vue-next';
-import { ref } from 'vue';
-import { toast } from 'vue-sonner';
+import { ArrowLeft, BookOpen, CheckCircle, Clock, Edit, FileText, GitBranch, GraduationCap, Network, Shield, Target } from 'lucide-vue-next';
 
 interface Syllabus {
     id: number;
@@ -91,29 +79,20 @@ const props = defineProps<{
     canEdit: boolean;
     canDelete: boolean;
 }>();
-console.log(props.unit);
+// console.log(props.unit);
 
-// Delete confirmation
-const isDeleting = ref(false);
-
-const deleteUnit = () => {
-    isDeleting.value = true;
-
-    router.delete(`/units/${props.unit.id}`, {
-        onSuccess: () => {
-            toast.success('Unit deleted successfully');
-        },
-        onError: () => {
-            toast.error('Failed to delete unit');
-            isDeleting.value = false;
-        },
-    });
-};
+// Module navigation với return param
+const { navigateBack } = useModuleNavigation({
+    moduleIndexRoute: 'units.index',
+});
 
 // Helper functions
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
 };
+
+// Lưu function để tương thích với template có sẵn
+const navigateBackToUnits = navigateBack;
 
 const getConditionTypeColor = (type: string) => {
     switch (type) {
@@ -158,7 +137,7 @@ const getConditionTypeIcon = (type: string) => {
 };
 
 const getUnitTypeColor = (unitTypeCode: string) => {
-    console.log('unitTypeCode', unitTypeCode)
+    console.log('unitTypeCode', unitTypeCode);
     switch (unitTypeCode?.toLowerCase()) {
         case 'core':
             return 'bg-red-100 text-red-800';
@@ -198,11 +177,7 @@ const getAssessmentTypeColor = (type: string) => {
 
 // Check if unit has any relationships
 const hasRelationships = () => {
-    return (
-        (props.unit.prerequisite_groups && props.unit.prerequisite_groups.length > 0) ||
-        (props.equivalentUnits && props.equivalentUnits.length > 0) ||
-        (props.unit.curriculum_units && props.unit.curriculum_units.length > 0)
-    );
+    return (props.unit.prerequisite_groups && props.unit.prerequisite_groups.length > 0) || (props.equivalentUnits && props.equivalentUnits.length > 0) || (props.unit.curriculum_units && props.unit.curriculum_units.length > 0);
 };
 </script>
 
@@ -218,35 +193,10 @@ const hasRelationships = () => {
             <p class="text-xl text-gray-700">{{ unit.name }}</p>
         </div>
         <div class="flex items-center gap-3">
-            <Button variant="outline" @click="router.visit(curriculumRoutes.units.index())">
+            <Button variant="outline" @click="navigateBackToUnits">
                 <ArrowLeft class="mr-2 h-4 w-4" />
-                Back to Units
+                Back
             </Button>
-            <Button v-if="canEdit" variant="outline" @click="router.visit(curriculumRoutes.units.edit(unit.id))">
-                <Edit class="mr-2 h-4 w-4" />
-                Edit
-            </Button>
-            <AlertDialog v-if="canDelete">
-                <AlertDialogTrigger as-child>
-                    <Button variant="destructive" :disabled="isDeleting">
-                        <Trash2 class="mr-2 h-4 w-4" />
-                        {{ isDeleting ? 'Deleting...' : 'Delete' }}
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Unit</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete unit <strong>{{ unit.code }}</strong
-                            >? This action cannot be undone and will remove all related data.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction @click="deleteUnit" class="bg-red-600 hover:bg-red-700"> Delete Unit </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     </div>
 
@@ -452,7 +402,7 @@ const hasRelationships = () => {
                     v-for="equivalent in equivalentUnits"
                     :key="equivalent.id"
                     class="cursor-pointer rounded-lg border p-3 transition-colors hover:bg-gray-50"
-                    @click="router.visit(curriculumRoutes.units.show(equivalent.unit.id))"
+                    @click="router.visit(curriculumRoutes.units.show(equivalent.unit.id), { preserveScroll: true, preserveState: true })"
                 >
                     <div class="mb-2 flex items-start justify-between">
                         <div>
@@ -461,20 +411,13 @@ const hasRelationships = () => {
                         </div>
                         <div class="flex items-center gap-2">
                             <Badge class="bg-purple-100 text-xs text-purple-800"> {{ equivalent.unit.credit_points }} CP </Badge>
-                            <Badge
-                                class="text-xs"
-                                :class="
-                                    equivalent.relationship_type === 'equivalent_to' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                                "
-                            >
+                            <Badge class="text-xs" :class="equivalent.relationship_type === 'equivalent_to' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'">
                                 {{ equivalent.relationship_type === 'equivalent_to' ? 'Replaces' : 'Replaced by' }}
                             </Badge>
                         </div>
                     </div>
                     <p v-if="equivalent.reason" class="mb-1 text-xs text-gray-500">{{ equivalent.reason }}</p>
-                    <p v-if="equivalent.valid_from_semester" class="text-xs text-gray-400">
-                        Valid from {{ equivalent.valid_from_semester.term }} {{ equivalent.valid_from_semester.year }}
-                    </p>
+                    <p v-if="equivalent.valid_from_semester" class="text-xs text-gray-400">Valid from {{ equivalent.valid_from_semester.term }} {{ equivalent.valid_from_semester.year }}</p>
                 </div>
             </div>
         </CardContent>
@@ -491,11 +434,7 @@ const hasRelationships = () => {
         </CardHeader>
         <CardContent>
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <div
-                    v-for="curriculumUnit in unit.curriculum_units"
-                    :key="curriculumUnit.id"
-                    class="rounded-lg border p-4 transition-colors hover:bg-gray-50"
-                >
+                <div v-for="curriculumUnit in unit.curriculum_units" :key="curriculumUnit.id" class="rounded-lg border p-4 transition-colors hover:bg-gray-50">
                     <div class="mb-3 flex items-start justify-between">
                         <div class="flex-1">
                             <p class="text-sm font-semibold">{{ curriculumUnit.curriculum_version.program.name }}</p>
@@ -505,9 +444,7 @@ const hasRelationships = () => {
                             <p class="mt-1 text-xs text-gray-500">
                                 {{ curriculumUnit.curriculum_version.version_code }}
                             </p>
-                            <p v-if="curriculumUnit.semester" class="text-xs text-gray-500">
-                                {{ curriculumUnit.semester.term }} {{ curriculumUnit.semester.year }}
-                            </p>
+                            <p v-if="curriculumUnit.semester" class="text-xs text-gray-500">{{ curriculumUnit.semester.term }} {{ curriculumUnit.semester.year }}</p>
                         </div>
                         <Badge v-if="curriculumUnit.type" :class="getUnitTypeColor(curriculumUnit.type)" class="text-xs">
                             {{ curriculumUnit.type?.toUpperCase() }}
@@ -547,12 +484,7 @@ const hasRelationships = () => {
         </CardHeader>
         <CardContent v-if="unit.syllabus && unit.syllabus.length > 0">
             <div class="space-y-4">
-                <div
-                    v-for="syllabus in unit.syllabus"
-                    :key="syllabus.id"
-                    class="rounded-lg border p-4 transition-colors hover:bg-gray-50"
-                    :class="syllabus.is_active ? 'border-green-200 bg-green-50' : ''"
-                >
+                <div v-for="syllabus in unit.syllabus" :key="syllabus.id" class="rounded-lg border p-4 transition-colors hover:bg-gray-50" :class="syllabus.is_active ? 'border-green-200 bg-green-50' : ''">
                     <div class="mb-3 flex items-start justify-between">
                         <div class="flex-1">
                             <div class="mb-2 flex items-center gap-2">
@@ -565,9 +497,7 @@ const hasRelationships = () => {
                             <div class="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                                 <div v-if="syllabus.effective_from_semester">
                                     <span class="font-medium text-gray-500">Effective From:</span>
-                                    <span class="ml-1">
-                                        {{ syllabus.effective_from_semester.term }} {{ syllabus.effective_from_semester.year }}
-                                    </span>
+                                    <span class="ml-1"> {{ syllabus.effective_from_semester.term }} {{ syllabus.effective_from_semester.year }} </span>
                                 </div>
                                 <div v-if="syllabus.total_hours">
                                     <span class="font-medium text-gray-500">Total Hours:</span>
@@ -596,11 +526,7 @@ const hasRelationships = () => {
                     <div v-if="syllabus.assessment_components && syllabus.assessment_components.length > 0" class="mt-3">
                         <h4 class="mb-2 text-sm font-medium text-gray-700">Assessment Components</h4>
                         <div class="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                            <div
-                                v-for="component in syllabus.assessment_components.slice(0, 6)"
-                                :key="component.id"
-                                class="rounded border bg-white p-2"
-                            >
+                            <div v-for="component in syllabus.assessment_components.slice(0, 6)" :key="component.id" class="rounded border bg-white p-2">
                                 <div class="flex items-center justify-between">
                                     <span class="text-sm font-medium">{{ component.name }}</span>
                                     <div class="flex items-center gap-1">
@@ -617,12 +543,7 @@ const hasRelationships = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div
-                                v-if="syllabus.assessment_components.length > 6"
-                                class="flex items-center justify-center rounded border border-dashed p-2 text-sm text-gray-500"
-                            >
-                                +{{ syllabus.assessment_components.length - 6 }} more
-                            </div>
+                            <div v-if="syllabus.assessment_components.length > 6" class="flex items-center justify-center rounded border border-dashed p-2 text-sm text-gray-500">+{{ syllabus.assessment_components.length - 6 }} more</div>
                         </div>
                     </div>
 
@@ -641,10 +562,7 @@ const hasRelationships = () => {
         <CardContent class="flex flex-col items-center justify-center py-12 text-center">
             <BookOpen class="mb-4 h-16 w-16 text-gray-400" />
             <h3 class="mb-2 text-xl font-semibold text-gray-900">No Relationships</h3>
-            <p class="max-w-md text-gray-500">
-                This unit doesn't have any prerequisites, equivalencies, or curriculum relationships yet. You can add these relationships by editing
-                the unit.
-            </p>
+            <p class="max-w-md text-gray-500">This unit doesn't have any prerequisites, equivalencies, or curriculum relationships yet. You can add these relationships by editing the unit.</p>
             <Button v-if="canEdit" class="mt-4" as="a" :href="`/units/edit/${unit.id}`">
                 <Edit class="mr-2 h-4 w-4" />
                 Add Relationships

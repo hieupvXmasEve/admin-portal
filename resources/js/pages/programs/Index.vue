@@ -2,16 +2,7 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -201,7 +192,8 @@ const submitDelete = () => {
 
 // View program function
 const viewProgram = (program: Program) => {
-    router.visit(route('programs.show', program.id));
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    router.visit(`${route('programs.show', program.id)}${search || ''}`);
 };
 
 // Server-side filtering functions
@@ -285,9 +277,7 @@ const columns: ColumnDef<Program>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const description = row.original.description;
-            return description
-                ? h('div', { class: 'text-sm text-gray-600 max-w-xs truncate' }, description)
-                : h('span', { class: 'text-gray-400' }, 'No description');
+            return description ? h('div', { class: 'text-sm text-gray-600 max-w-xs truncate' }, description) : h('span', { class: 'text-gray-400' }, 'No description');
         },
     },
     {
@@ -296,9 +286,7 @@ const columns: ColumnDef<Program>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const count = row.original.specializations_count;
-            return count > 0
-                ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800' }, count)
-                : h('span', { class: 'text-gray-400' }, 'None');
+            return count > 0 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800' }, count) : h('span', { class: 'text-gray-400' }, 'None');
         },
     },
     {
@@ -307,9 +295,7 @@ const columns: ColumnDef<Program>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const count = row.original.curriculum_versions_count;
-            return count > 0
-                ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800' }, count)
-                : h('span', { class: 'text-gray-400' }, 'None');
+            return count > 0 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800' }, count) : h('span', { class: 'text-gray-400' }, 'None');
         },
     },
     {

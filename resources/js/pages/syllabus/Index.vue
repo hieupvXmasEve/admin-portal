@@ -1,15 +1,5 @@
 <script setup lang="ts">
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -97,16 +87,11 @@ const isDeleting = ref<number | null>(null);
 // Filtered syllabi
 const filteredSyllabi = computed(() => {
     return props.syllabus.filter((syllabus) => {
-        const matchesVersion =
-            !searchVersion.value || (syllabus.version && syllabus.version.toLowerCase().includes(searchVersion.value.toLowerCase()));
+        const matchesVersion = !searchVersion.value || (syllabus.version && syllabus.version.toLowerCase().includes(searchVersion.value.toLowerCase()));
 
-        const matchesSemester =
-            !filterSemester.value || (syllabus.curriculum_unit?.semester && syllabus.curriculum_unit.semester.id.toString() === filterSemester.value);
+        const matchesSemester = !filterSemester.value || (syllabus.curriculum_unit?.semester && syllabus.curriculum_unit.semester.id.toString() === filterSemester.value);
 
-        const matchesActive =
-            !filterActive.value ||
-            (filterActive.value === 'active' && syllabus.is_active) ||
-            (filterActive.value === 'inactive' && !syllabus.is_active);
+        const matchesActive = !filterActive.value || (filterActive.value === 'active' && syllabus.is_active) || (filterActive.value === 'inactive' && !syllabus.is_active);
 
         return matchesVersion && matchesSemester && matchesActive;
     });
@@ -187,7 +172,7 @@ const getCurrentSemesterStatus = (syllabus: Syllabus) => {
         <div class="flex items-center gap-3">
             <Button variant="outline" @click="router.visit(`/units/${unit.id}`)">
                 <ArrowLeft class="mr-2 h-4 w-4" />
-                Back to Unit
+                Back
             </Button>
             <Button @click="router.visit(`/units/${unit.id}/syllabus/create`)">
                 <Plus class="mr-2 h-4 w-4" />
@@ -255,12 +240,7 @@ const getCurrentSemesterStatus = (syllabus: Syllabus) => {
                         <TableCell class="text-right">
                             <div class="flex items-center justify-end gap-1">
                                 <!-- Toggle Active -->
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    @click="toggleActive(syllabus.id)"
-                                    :title="syllabus.is_active ? 'Deactivate' : 'Activate'"
-                                >
+                                <Button variant="ghost" size="sm" @click="toggleActive(syllabus.id)" :title="syllabus.is_active ? 'Deactivate' : 'Activate'">
                                     <ToggleRight v-if="syllabus.is_active" class="h-4 w-4 text-green-600" />
                                     <ToggleLeft v-else class="h-4 w-4 text-gray-400" />
                                 </Button>
@@ -271,12 +251,7 @@ const getCurrentSemesterStatus = (syllabus: Syllabus) => {
                                 </Button>
 
                                 <!-- Edit -->
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    @click="router.visit(`/units/${unit.id}/syllabus/${syllabus.id}/edit`)"
-                                    title="Edit"
-                                >
+                                <Button variant="ghost" size="sm" @click="router.visit(`/units/${unit.id}/syllabus/${syllabus.id}/edit`)" title="Edit">
                                     <Edit class="h-4 w-4" />
                                 </Button>
 
@@ -295,16 +270,11 @@ const getCurrentSemesterStatus = (syllabus: Syllabus) => {
                                     <AlertDialogContent>
                                         <AlertDialogHeader>
                                             <AlertDialogTitle>Delete Syllabus</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Are you sure you want to delete syllabus "{{ syllabus.version || 'Untitled' }}"? This action cannot be
-                                                undone.
-                                            </AlertDialogDescription>
+                                            <AlertDialogDescription> Are you sure you want to delete syllabus "{{ syllabus.version || 'Untitled' }}"? This action cannot be undone. </AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction @click="deleteSyllabus(syllabus.id)" class="bg-red-600 hover:bg-red-700">
-                                                Delete
-                                            </AlertDialogAction>
+                                            <AlertDialogAction @click="deleteSyllabus(syllabus.id)" class="bg-red-600 hover:bg-red-700"> Delete </AlertDialogAction>
                                         </AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
@@ -321,9 +291,7 @@ const getCurrentSemesterStatus = (syllabus: Syllabus) => {
         <CardContent class="flex flex-col items-center justify-center py-12 text-center">
             <FileText class="mb-4 h-16 w-16 text-gray-400" />
             <h3 class="mb-2 text-xl font-semibold text-gray-900">No Syllabus</h3>
-            <p class="max-w-md text-gray-500">
-                This unit doesn't have any syllabus yet. Create the first syllabus to define the course structure and assessment components.
-            </p>
+            <p class="max-w-md text-gray-500">This unit doesn't have any syllabus yet. Create the first syllabus to define the course structure and assessment components.</p>
             <Button class="mt-4" @click="router.visit(`/units/${unit.id}/syllabus/create`)">
                 <Plus class="mr-2 h-4 w-4" />
                 Create First Syllabus

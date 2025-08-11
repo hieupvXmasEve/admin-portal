@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Constants\UnitRoutes;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Web\Units\UnitExportController;
 use App\Http\Requests\Unit\StoreUnitRequest;
 use App\Http\Requests\Unit\UpdateUnitRequest;
 use App\Models\Unit;
@@ -85,10 +86,16 @@ class UnitController extends Controller
         try {
             $this->unitService->createUnit($request->validated());
 
+            // Redirect to return URL if provided, otherwise to index
+            $returnUrl = $request->input('return');
+            if ($returnUrl && $this->isValidReturnUrl($returnUrl)) {
+                return redirect($returnUrl)->with('success', 'Unit created successfully.');
+            }
+
             return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit created successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to create unit: '.$e->getMessage()])
+                ->withErrors(['error' => 'Failed to create unit: ' . $e->getMessage()])
                 ->withInput();
         }
     }
@@ -136,7 +143,7 @@ class UnitController extends Controller
                 'syllabus_count' => $unit->syllabus()->count(),
                 'active_syllabus_count' => $unit->syllabus()->where('is_active', true)->count(),
             ],
-//            'canEdit' => $this->validationService->canEditUnit($unit),
+            //            'canEdit' => $this->validationService->canEditUnit($unit),
             'canEdit' => true,
             'canDelete' => $this->validationService->canDeleteUnit($unit)['allowed'],
         ]);
@@ -170,7 +177,7 @@ class UnitController extends Controller
         return Inertia::render('units/Edit', [
             'unit' => $unitData,
             'prerequisiteDescriptions' => $prerequisiteDescriptions,
-            'editRestrictions' => $this->validationService->getEditRestrictions($unit),
+            // 'editRestrictions' => $this->validationService->getEditRestrictions($unit),
         ]);
     }
 
@@ -211,15 +218,21 @@ class UnitController extends Controller
         try {
             $this->unitService->updateUnit($unit, $request->validated());
 
+            // Redirect to return URL if provided, otherwise to index
+            $returnUrl = $request->input('return');
+            if ($returnUrl && $this->isValidReturnUrl($returnUrl)) {
+                return redirect($returnUrl)->with('success', 'Unit updated successfully.');
+            }
+
             return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->withErrors(['error' => 'Failed to update unit: '.$e->getMessage()])
+                ->withErrors(['error' => 'Failed to update unit: ' . $e->getMessage()])
                 ->withInput();
         }
     }
 
-    public function destroy(Unit $unit)
+    public function destroy(Request $request, Unit $unit)
     {
         $canDelete = $this->validationService->canDeleteUnit($unit);
 
@@ -231,10 +244,22 @@ class UnitController extends Controller
         try {
             $this->unitService->deleteUnit($unit);
 
+            // Redirect to return URL if provided, otherwise to index
+            $returnUrl = $request->input('return');
+            if ($returnUrl && $this->isValidReturnUrl($returnUrl)) {
+                return redirect($returnUrl)->with('success', 'Unit deleted successfully.');
+            }
+
             return redirect()->route(UnitRoutes::INDEX)->with('success', 'Unit deleted successfully.');
         } catch (\Exception $e) {
+            // Always redirect to return URL or index on error
+            $returnUrl = $request->input('return');
+            if ($returnUrl && $this->isValidReturnUrl($returnUrl)) {
+                return redirect($returnUrl)->with('error', 'Failed to delete unit: ' . $e->getMessage());
+            }
+
             return redirect()->route(UnitRoutes::INDEX)
-                ->with('error', 'Failed to delete unit: '.$e->getMessage());
+                ->with('error', 'Failed to delete unit: ' . $e->getMessage());
         }
     }
 
@@ -252,7 +277,7 @@ class UnitController extends Controller
         if (! empty($validated['exclude'])) {
             $excludeIds = array_filter(
                 array_map('intval', explode(',', $validated['exclude'])),
-                fn ($id) => $id > 0
+                fn($id) => $id > 0
             );
         }
 
@@ -296,9 +321,31 @@ class UnitController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'valid' => false,
-                'message' => 'Error validating expression: '.$e->getMessage(),
+                'message' => 'Error validating expression: ' . $e->getMessage(),
             ], 400);
         }
+    }
+
+    /**
+     * Validate if return URL is safe for redirection
+     */
+    private function isValidReturnUrl(?string $url): bool
+    {
+        if (!$url) {
+            return false;
+        }
+
+        // Parse URL to get components
+        $parsed = parse_url($url);
+
+        // Only allow relative URLs or URLs from the same domain
+        if (isset($parsed['host'])) {
+            $currentHost = parse_url(config('app.url'), PHP_URL_HOST);
+            return $parsed['host'] === $currentHost;
+        }
+
+        // Allow relative paths that start with /
+        return str_starts_with($url, '/');
     }
 
     public function validateCode(Request $request)
@@ -357,14 +404,14 @@ class UnitController extends Controller
                 'success' => true,
                 'deleted' => $deleted,
                 'failed' => $failed,
-                'message' => count($deleted).' units deleted successfully.',
+                'message' => count($deleted) . ' units deleted successfully.',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk delete failed: '.$e->getMessage(),
+                'message' => 'Bulk delete failed: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -383,7 +430,7 @@ class UnitController extends Controller
         ]);
 
         // Use the UnitExportController
-        return app(\App\Http\Controllers\Units\UnitExportController::class)
+        return app(UnitExportController::class)
             ->exportExcelWithCurrentFilters($request);
     }
 }

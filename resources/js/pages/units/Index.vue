@@ -1,25 +1,20 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTableFilters } from '@/composables/useFilters';
+import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { PaginatedResponse } from '@/types';
 import { curriculumRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { useDebounceFn } from '@vueuse/core';
+// import { useDebounceFn } from '@vueuse/core';
 import { Edit, Eye, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
@@ -45,28 +40,40 @@ interface Statistics {
     avg_credit_points: number;
 }
 
+interface UnitsFilters {
+    search?: string;
+    sort?: string;
+    direction?: string;
+    per_page?: number;
+    page?: number;
+    credit_points?: number;
+    has_prerequisites?: boolean;
+    has_equivalents?: boolean;
+    in_curriculum?: boolean;
+    min_credit_points?: number;
+    max_credit_points?: number;
+}
+
 const props = defineProps<{
     units: PaginatedResponse<Unit>;
-    filters?: {
-        search?: string;
-        sort?: string;
-        direction?: string;
-        per_page?: number;
-    };
+    filters?: UnitsFilters;
     statistics: Statistics;
 }>();
 
 // Reactive data
 const data = computed(() => props.units.data);
 
-// Filter state - Initialize with props or defaults (like Users page)
-const filters = ref({
-    search: props.filters?.search || '',
-    sort: props.filters?.sort || '',
-    direction: props.filters?.direction || 'asc',
-    per_page: props.filters?.per_page || 15,
-});
+// Use unified filters - simple and powerful
+const { filters, hasActiveFilters, debouncedApplyFilters, clearFilters, handlePaginationNavigate, handlePageSizeChange, appendCurrentQueryTo, updateFieldDebounced } = useTableFilters<UnitsFilters>(
+    curriculumRoutes.units.index(),
+    props.filters || {},
+    ['units', 'filters'] // Use correct keys that match backend response
+);
 
+// Module navigation với return param
+const { getLinkUrlWithReturn } = useModuleNavigation({
+    moduleIndexRoute: 'units.index'
+});
 // Selected rows for bulk actions
 const selectedRows = ref<number[]>([]);
 
@@ -79,12 +86,16 @@ const bulkDeleteDialogOpen = ref(false);
 
 // Edit unit function
 const editUnit = (unit: Unit) => {
-    router.visit(curriculumRoutes.units.edit(unit.id));
+    const editUrl = getLinkUrlWithReturn('units.edit', { unit: unit.id });
+    router.visit(editUrl, { preserveScroll: true, preserveState: true });
 };
 
 // View unit function
 const viewUnit = (unit: Unit) => {
-    router.visit(curriculumRoutes.units.show(unit.id));
+    const showUrl = getLinkUrlWithReturn('units.show', { unit: unit.id });
+    console.log('Current URL:', window.location.href);
+    console.log('Generated show URL:', showUrl);
+    router.visit(showUrl, { preserveScroll: true, preserveState: true });
 };
 
 // Delete unit function
@@ -110,51 +121,16 @@ const confirmDelete = () => {
     }
 };
 
-// Server-side filtering functions
-const applyFilters = (newFilters: typeof filters.value) => {
-    const params = new URLSearchParams();
+// handled by composable
 
-    if (newFilters.search) params.set('search', newFilters.search);
-    if (newFilters.sort) params.set('sort', newFilters.sort);
-    if (newFilters.direction) params.set('direction', newFilters.direction);
-    if (newFilters.per_page) params.set('per_page', newFilters.per_page.toString());
-
-    const url = `${curriculumRoutes.units.index()}${params.toString() ? '?' + params.toString() : ''}`;
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['units', 'filters'],
-    });
-};
-
-// Debounced filter functions
-const debouncedApplyFilters = useDebounceFn((newFilters) => {
-    applyFilters(newFilters);
-}, 500);
-
+// Simplified with helper method
 const updateSearchFilter = (value: string | number) => {
-    filters.value.search = String(value);
-    debouncedApplyFilters(filters.value);
+    updateFieldDebounced('search', String(value));
 };
 
-const clearFilters = () => {
-    filters.value = {
-        search: '',
-        sort: '',
-        direction: 'asc',
-        per_page: 15,
-    };
-    router.visit(curriculumRoutes.units.index(), {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['units', 'filters'],
-    });
-};
+// provided by composable
 
-const hasActiveFilters = computed(() => {
-    return filters.value.search;
-});
+// provided by composable
 
 // Bulk delete functionality
 const isBulkDeleting = ref(false);
@@ -227,6 +203,17 @@ const exportToExcel = async () => {
     }
 };
 
+// Navigate to import/create với return param
+const navigateToImport = () => {
+    const importUrl = getLinkUrlWithReturn('units.import');
+    router.visit(importUrl, { preserveScroll: true, preserveState: true });
+};
+
+const navigateToCreate = () => {
+    const createUrl = getLinkUrlWithReturn('units.create');
+    router.visit(createUrl, { preserveScroll: true, preserveState: true });
+};
+
 // Column definitions
 const columns: ColumnDef<Unit>[] = [
     {
@@ -269,9 +256,7 @@ const columns: ColumnDef<Unit>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const count = row.original.prerequisite_conditions_count;
-            return count > 0
-                ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800' }, count)
-                : h('span', { class: 'text-gray-400' }, 'None');
+            return count > 0 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800' }, count) : h('span', { class: 'text-gray-400' }, 'None');
         },
     },
     {
@@ -280,9 +265,7 @@ const columns: ColumnDef<Unit>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const count = row.original.equivalent_units_count;
-            return count > 0
-                ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800' }, count)
-                : h('span', { class: 'text-gray-400' }, 'None');
+            return count > 0 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800' }, count) : h('span', { class: 'text-gray-400' }, 'None');
         },
     },
     {
@@ -291,9 +274,7 @@ const columns: ColumnDef<Unit>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const count = row.original.curriculum_units_count;
-            return count > 0
-                ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800' }, count)
-                : h('span', { class: 'text-gray-400' }, 'None');
+            return count > 0 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800' }, count) : h('span', { class: 'text-gray-400' }, 'None');
         },
     },
     {
@@ -302,9 +283,7 @@ const columns: ColumnDef<Unit>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const count = row.original.syllabus_count;
-            return count > 0
-                ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800' }, count)
-                : h('span', { class: 'text-gray-400' }, 'None');
+            return count > 0 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800' }, count) : h('span', { class: 'text-gray-400' }, 'None');
         },
     },
     {
@@ -316,19 +295,7 @@ const columns: ColumnDef<Unit>[] = [
     },
 ];
 
-// Pagination navigation
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['units'],
-    });
-};
-
-const handlePageSizeChange = (pageSize: number) => {
-    filters.value.per_page = pageSize;
-    applyFilters(filters.value);
-};
+// provided by composable
 </script>
 
 <template>
@@ -375,29 +342,12 @@ const handlePageSizeChange = (pageSize: number) => {
                 <FileSpreadsheet class="h-4 w-4" />
                 {{ isExporting ? 'Exporting...' : 'Export Excel' }}
             </Button>
-            <Button
-                @click="
-                    () => {
-                        console.log('Attempting to navigate to /units/import');
-                        router.visit(curriculumRoutes.units.import(), {
-                            onError: (errors) => {
-                                console.error('Navigation error:', errors);
-                                toast.error('Failed to navigate to import page');
-                            },
-                            onSuccess: () => {
-                                console.log('Navigation successful');
-                            },
-                        });
-                    }
-                "
-                variant="outline"
-                class="flex items-center gap-2"
-            >
+            <Button @click="navigateToImport" variant="outline" class="flex items-center gap-2">
                 <Upload class="h-4 w-4" />
                 Import Excel
             </Button>
 
-            <Button size="sm" @click="router.visit(curriculumRoutes.units.create())">
+            <Button size="sm" @click="navigateToCreate">
                 <Plus class="mr-2 h-4 w-4" />
                 Add Unit
             </Button>
@@ -405,11 +355,16 @@ const handlePageSizeChange = (pageSize: number) => {
     </div>
 
     <!-- Filters Section -->
-    <div class="flex flex-wrap items-center gap-4 rounded-lg">
+    <div class="flex flex-wrap items-center gap-4 rounded-lg p-4 bg-muted/20 border">
         <div class="min-w-[200px] flex-1">
             <div class="relative">
                 <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input placeholder="Search units..." :model-value="filters.search" @update:model-value="updateSearchFilter" class="pl-9" />
+                <Input 
+                    placeholder="Search units..." 
+                    :model-value="filters.search" 
+                    @update:model-value="updateSearchFilter" 
+                    class="pl-9" 
+                />
             </div>
         </div>
 
@@ -491,8 +446,7 @@ const handlePageSizeChange = (pageSize: number) => {
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Multiple Units</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected units? This action cannot be undone and will
-                    permanently remove all selected units from the system.
+                    Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected units? This action cannot be undone and will permanently remove all selected units from the system.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

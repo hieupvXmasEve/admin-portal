@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useApi } from '@/composables/useApiRequest';
+import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { EquivalentUnit, FormDefaults, PrerequisiteGroup, Unit } from '@/types/Unit';
 import { curriculumRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
@@ -40,6 +41,11 @@ const showUnitSearch = ref(false);
 
 // API instance
 const api = useApi();
+
+// Module navigation với return param
+const { navigateBack, getReturnUrl } = useModuleNavigation({
+    moduleIndexRoute: 'units.index',
+});
 
 // Debounced code validation
 let codeValidationTimeout: number;
@@ -82,10 +88,7 @@ const searchUnits = async (query: string) => {
 
     try {
         // Get IDs of already selected units to exclude them
-        const excludeIds = [
-            ...prerequisiteGroups.value.flatMap((g) => g.conditions.map((c) => c.required_unit_id)),
-            ...equivalentUnits.value.map((e) => e.unit.id),
-        ].filter(Boolean);
+        const excludeIds = [...prerequisiteGroups.value.flatMap((g) => g.conditions.map((c) => c.required_unit_id)), ...equivalentUnits.value.map((e) => e.unit.id)].filter(Boolean);
 
         const params = {
             q: query,
@@ -155,6 +158,12 @@ const handleSubmit = () => {
         }));
     }
 
+    // Add return parameter if exists
+    const returnUrl = getReturnUrl();
+    if (returnUrl) {
+        formData.return = returnUrl;
+    }
+
     console.log('prerequisiteGroups', prerequisiteGroups.value);
     console.log('formData', formData);
 
@@ -214,6 +223,12 @@ const openUnitSearch = () => {
 const selectUnit = (unit: Unit) => {
     addEquivalentUnit(unit);
 };
+
+// URL helpers
+const indexWithCurrentQuery = (): string => {
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    return `${curriculumRoutes.units.index()}${search || ''}`;
+};
 </script>
 
 <template>
@@ -222,9 +237,9 @@ const selectUnit = (unit: Unit) => {
     <!-- Header -->
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Create Unit</h1>
-        <Button variant="outline" size="sm" @click="router.visit(curriculumRoutes.units.index())">
+        <Button variant="outline" size="sm" @click="navigateBack">
             <ArrowLeft class="mr-2 h-4 w-4" />
-            Back to Units
+            Back
         </Button>
     </div>
 
@@ -281,14 +296,7 @@ const selectUnit = (unit: Unit) => {
                 <!-- Unit Name -->
                 <div class="space-y-2">
                     <Label for="name">Unit Name *</Label>
-                    <Input
-                        id="name"
-                        v-model="form.name"
-                        placeholder="e.g., Introduction to Computer Science"
-                        :class="{ 'border-red-500': form.errors.name }"
-                        maxlength="255"
-                        required
-                    />
+                    <Input id="name" v-model="form.name" placeholder="e.g., Introduction to Computer Science" :class="{ 'border-red-500': form.errors.name }" maxlength="255" required />
                     <p v-if="form.errors.name" class="text-sm text-red-600">
                         {{ form.errors.name }}
                     </p>
@@ -323,8 +331,8 @@ const selectUnit = (unit: Unit) => {
             <CardHeader>
                 <CardTitle>Prerequisites</CardTitle>
                 <CardDescription>
-                    Define prerequisite requirements using five types: P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A
-                    (Anti-requisite), and AK (Assumed Knowledge). Group conditions with AND/OR logic operators for complex requirements.
+                    Define prerequisite requirements using five types: P (Prerequisite), Co-req (Co-requisite), Concurrent-req (Concurrent), A (Anti-requisite), and AK (Assumed Knowledge). Group conditions with AND/OR logic operators for complex
+                    requirements.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -365,12 +373,7 @@ const selectUnit = (unit: Unit) => {
                         </div>
                         <div>
                             <Label :for="`reason-${index}`" class="text-xs">Reason (optional)</Label>
-                            <Input
-                                :id="`reason-${index}`"
-                                v-model="equivalent.reason"
-                                placeholder="e.g., Curriculum update, Content overlap"
-                                class="mt-1"
-                            />
+                            <Input :id="`reason-${index}`" v-model="equivalent.reason" placeholder="e.g., Curriculum update, Content overlap" class="mt-1" />
                         </div>
                     </div>
                 </div>
@@ -401,12 +404,7 @@ const selectUnit = (unit: Unit) => {
                     </div>
 
                     <div v-else-if="unitSearchResults.length > 0" class="max-h-60 space-y-2 overflow-y-auto">
-                        <div
-                            v-for="unit in unitSearchResults"
-                            :key="unit.id"
-                            class="cursor-pointer rounded-lg border p-3 hover:bg-gray-50"
-                            @click="selectUnit(unit)"
-                        >
+                        <div v-for="unit in unitSearchResults" :key="unit.id" class="cursor-pointer rounded-lg border p-3 hover:bg-gray-50" @click="selectUnit(unit)">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <code class="font-mono text-sm">{{ unit.code }}</code>
@@ -433,9 +431,7 @@ const selectUnit = (unit: Unit) => {
 
         <!-- Form Actions -->
         <div class="flex items-center justify-end space-x-4 pt-6">
-            <Button type="button" variant="outline" @click="router.visit(curriculumRoutes.units.index())" :disabled="form.processing">
-                Cancel
-            </Button>
+            <Button type="button" variant="outline" @click="navigateBack" :disabled="form.processing"> Cancel </Button>
             <Button type="submit" :disabled="form.processing || codeValidation?.valid === false">
                 <Save class="mr-2 h-4 w-4" />
                 {{ form.processing ? 'Creating...' : 'Create Unit' }}

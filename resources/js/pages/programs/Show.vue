@@ -2,16 +2,7 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -129,9 +120,7 @@ const specializationColumns: ColumnDef<Specialization>[] = [
             return h('div', { class: 'space-y-1' }, [
                 h('div', { class: 'flex items-center gap-2' }, [
                     h('span', { class: 'font-medium' }, spec.name),
-                    spec.is_active
-                        ? h(Badge, { variant: 'secondary', class: 'border-green-200 bg-green-100 text-xs text-green-700' }, () => 'Active')
-                        : h(Badge, { variant: 'outline', class: 'text-xs' }, () => 'Inactive'),
+                    spec.is_active ? h(Badge, { variant: 'secondary', class: 'border-green-200 bg-green-100 text-xs text-green-700' }, () => 'Active') : h(Badge, { variant: 'outline', class: 'text-xs' }, () => 'Inactive'),
                 ]),
                 spec.code ? h('div', { class: 'text-xs text-muted-foreground' }, `Code: ${spec.code}`) : null,
                 spec.description ? h('div', { class: 'text-xs text-muted-foreground line-clamp-1' }, spec.description) : null,
@@ -202,10 +191,7 @@ const specializationPaginationData = computed(() => ({
     last_page: Math.ceil(paginatedSpecializations.value.total / 10),
     per_page: 10,
     prev_page_url: specializationFilters.value.page > 1 ? `?page=${specializationFilters.value.page - 1}` : null,
-    next_page_url:
-        specializationFilters.value.page < Math.ceil(paginatedSpecializations.value.total / 10)
-            ? `?page=${specializationFilters.value.page + 1}`
-            : null,
+    next_page_url: specializationFilters.value.page < Math.ceil(paginatedSpecializations.value.total / 10) ? `?page=${specializationFilters.value.page + 1}` : null,
     links: [] as any[],
 }));
 
@@ -216,6 +202,12 @@ const formatDate = (dateString: string): string => {
         day: 'numeric',
     });
 };
+
+// Preserve current query when navigating back to programs
+const backToProgramsUrl = computed(() => {
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    return route('programs.index') + (search || '');
+});
 
 // Modal states
 const showCreateModal = ref(false);
@@ -405,7 +397,7 @@ const confirmDelete = async () => {
             </div>
 
             <div class="flex flex-wrap gap-2">
-                <Link :href="route('programs.index')">
+                <Link :href="backToProgramsUrl">
                     <Button variant="outline">
                         <ArrowLeft class="mr-2 h-4 w-4" />
                         Back to Programs
@@ -463,12 +455,7 @@ const confirmDelete = async () => {
 
             <!-- Search Filter -->
             <div class="mt-2">
-                <DebouncedInput
-                    v-model="specializationFilters.search"
-                    @debounced="handleSpecializationSearch"
-                    placeholder="Search specializations..."
-                    class="max-w-sm"
-                />
+                <DebouncedInput v-model="specializationFilters.search" @debounced="handleSpecializationSearch" placeholder="Search specializations..." class="max-w-sm" />
             </div>
         </CardHeader>
         <CardContent class="px-6">
@@ -530,12 +517,7 @@ const confirmDelete = async () => {
                             <FormItem>
                                 <FormLabel for="create-description">Description</FormLabel>
                                 <FormControl>
-                                    <Textarea
-                                        id="create-description"
-                                        placeholder="Specialization description (optional)"
-                                        rows="3"
-                                        v-bind="componentField"
-                                    />
+                                    <Textarea id="create-description" placeholder="Specialization description (optional)" rows="3" v-bind="componentField" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -612,12 +594,7 @@ const confirmDelete = async () => {
                             <FormItem>
                                 <FormLabel for="edit-description">Description</FormLabel>
                                 <FormControl>
-                                    <Textarea
-                                        id="edit-description"
-                                        placeholder="Specialization description (optional)"
-                                        rows="3"
-                                        v-bind="componentField"
-                                    />
+                                    <Textarea id="edit-description" placeholder="Specialization description (optional)" rows="3" v-bind="componentField" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -658,13 +635,9 @@ const confirmDelete = async () => {
                     Are you sure you want to delete specialization <strong>{{ selectedSpecialization?.name }}</strong
                     >? <br /><br />
                     This action cannot be undone and will permanently remove this specialization from the system.
-                    <span
-                        v-if="selectedSpecialization?.curriculum_versions_count && selectedSpecialization.curriculum_versions_count > 0"
-                        class="text-destructive"
-                    >
+                    <span v-if="selectedSpecialization?.curriculum_versions_count && selectedSpecialization.curriculum_versions_count > 0" class="text-destructive">
                         <br /><br />
-                        <strong>Warning:</strong> This specialization has {{ selectedSpecialization.curriculum_versions_count }} curriculum versions
-                        that will also be affected.
+                        <strong>Warning:</strong> This specialization has {{ selectedSpecialization.curriculum_versions_count }} curriculum versions that will also be affected.
                     </span>
                 </AlertDialogDescription>
             </AlertDialogHeader>
