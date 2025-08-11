@@ -16,7 +16,7 @@ class StudentNoteResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'student_code' => $this->student_code,
+            'student_id' => $this->student_id,
             'course_offering_id' => $this->course_offering_id,
             'note_type' => $this->note_type,
             'title' => $this->title,

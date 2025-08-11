@@ -82,7 +82,7 @@ class AcademicRecord extends AuditableModel
         $semester = $this->semester;
 
         if ($student && $unit && $semester) {
-            return "Academic Record - Student: {$student->student_code} ({$student->full_name}) - Unit: {$unit->code} - Semester: {$semester->name}";
+            return "Academic Record - Student: {$student->student_id} ({$student->full_name}) - Unit: {$unit->code} - Semester: {$semester->name}";
         }
 
         return "Academic Record ID {$this->getKey()}";

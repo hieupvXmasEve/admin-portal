@@ -73,7 +73,7 @@ class AttendanceSeeder extends Seeder
 
             $attendance = Attendance::create([
                 'class_session_id' => $session->id,
-                'student_code' => $registration->student_code,
+                'student_id' => $registration->student_id,
                 'recorded_by_lecture_id' => $session->instructor_id,
                 'status' => $attendanceStatus,
                 'check_in_time' => $this->getCheckInTime($session, $attendanceStatus),

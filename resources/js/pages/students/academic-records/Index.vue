@@ -29,7 +29,7 @@ interface AcademicRecord {
 interface Props {
     student: {
         id: number;
-        student_code: string;
+        student_id: string;
         full_name: string;
         program?: { name: string };
         specialization?: { name: string };
@@ -176,7 +176,7 @@ const handlePageSizeChange = (pageSize: number) => {
                     <div>
                         <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Academic Records - {{ student.full_name }}</h2>
                         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            Student ID: {{ student.student_code }} |
+                            Student ID: {{ student.student_id }} |
                             {{ student.program?.name }}
                             <span v-if="student.specialization">- {{ student.specialization.name }}</span>
                         </p>

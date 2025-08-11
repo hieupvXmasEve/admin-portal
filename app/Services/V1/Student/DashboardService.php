@@ -124,7 +124,7 @@ class DashboardService
      */
     public function getAcademicHolds(Student $student): array
     {
-        $holds = AcademicHold::where('student_code', $student->id)
+        $holds = AcademicHold::where('student_id', $student->id)
             ->where('status', 'active')
             ->orderBy('priority', 'desc')
             ->orderBy('placed_date', 'desc')
@@ -165,11 +165,11 @@ class DashboardService
         $upcomingAssessments = AssessmentComponentDetailScore::whereHas('courseOffering', function ($query) use ($student, $currentSemester) {
             $query->where('semester_id', $currentSemester->id)
                 ->whereHas('courseRegistrations', function ($regQuery) use ($student) {
-                    $regQuery->where('student_code', $student->id)
+                    $regQuery->where('student_id', $student->id)
                         ->where('registration_status', 'registered');
                 });
         })
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->whereNull('submitted_at')
             ->with(['assessmentComponentDetail.assessmentComponent', 'courseOffering.curriculumUnit.unit'])
             ->orderBy('due_date')
@@ -225,7 +225,7 @@ class DashboardService
                 ->where('completion_status', 'completed')
                 ->count(),
             'current_semester_courses' => $student->courseRegistrations()
-                ->whereHas('semester', fn ($q) => $q->where('is_active', true))
+                ->whereHas('semester', fn($q) => $q->where('is_active', true))
                 ->where('registration_status', 'registered')
                 ->count(),
             'attendance_rate' => $this->calculateOverallAttendanceRate($student),
@@ -238,7 +238,7 @@ class DashboardService
     protected function isOnTrackForGraduation(Student $student): bool
     {
         // Simple logic - can be enhanced
-        $latestGPA = GpaCalculation::where('student_code', $student->id)
+        $latestGPA = GpaCalculation::where('student_id', $student->id)
             ->orderBy('created_at', 'desc')
             ->first();
 
@@ -250,7 +250,7 @@ class DashboardService
      */
     protected function getProjectedGraduation(Student $student): ?string
     {
-        $latestGPA = GpaCalculation::where('student_code', $student->id)
+        $latestGPA = GpaCalculation::where('student_id', $student->id)
             ->orderBy('created_at', 'desc')
             ->first();
 

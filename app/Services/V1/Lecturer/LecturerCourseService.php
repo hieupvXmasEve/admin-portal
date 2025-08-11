@@ -167,8 +167,8 @@ class LecturerCourseService
             $finalScore = $this->calculateStudentFinalScore($student->id, $courseOfferingId);
 
             return [
-                'student_code' => $student->id,
-                'student_number' => $student->student_code,
+                'student_id' => $student->id,
+                'student_number' => $student->student_id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'registration_date' => $registration->created_at->format('Y-m-d'),
@@ -287,7 +287,7 @@ class LecturerCourseService
         if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->whereHas('student', function ($q) use ($search) {
-                $q->where('student_code', 'like', "%{$search}%")
+                $q->where('student_id', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
@@ -478,7 +478,7 @@ class LecturerCourseService
             // Get course offering to access syllabus
             $courseOffering = CourseOffering::with([
                 'syllabus.assessmentComponents.details.scores' => function ($q) use ($studentId) {
-                    $q->where('student_code', $studentId)
+                    $q->where('student_id', $studentId)
                         ->where('score_excluded', false)
                         ->whereIn('score_status', ['final', 'graded'])
                         ->whereNotNull('percentage_score')
@@ -517,7 +517,7 @@ class LecturerCourseService
         } catch (\Exception $e) {
             // Log error but don't break the API response
             Log::error('Failed to calculate student final score', [
-                'student_code' => $studentId,
+                'student_id' => $studentId,
                 'course_offering_id' => $courseOfferingId,
                 'error' => $e->getMessage(),
             ]);

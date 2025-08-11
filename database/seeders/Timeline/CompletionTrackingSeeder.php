@@ -66,7 +66,7 @@ class CompletionTrackingSeeder extends Seeder
         $creditCompletionPercentage = $totalRequiredCredits > 0 ? ($completedCredits / $totalRequiredCredits) * 100 : 0;
 
         // Get current GPA
-        $latestGPA = GpaCalculation::where('student_code', $student->id)
+        $latestGPA = GpaCalculation::where('student_id', $student->id)
             ->where('calculation_type', 'cumulative')
             ->latest('calculated_at')
             ->first();
@@ -202,16 +202,16 @@ class CompletionTrackingSeeder extends Seeder
         // Update student record
         $currentNotes = $student->admission_notes ?? '';
         $student->update([
-            'admission_notes' => trim($currentNotes.' | '.$completionNotes),
+            'admission_notes' => trim($currentNotes . ' | ' . $completionNotes),
         ]);
 
         // Log significant milestones
         if ($completionData['status'] === 'near_graduation') {
-            $this->command->info("  🎓 {$student->student_code}: Near graduation ({$completionData['unit_completion_percentage']}% complete)");
+            $this->command->info("  🎓 {$student->student_id}: Near graduation ({$completionData['unit_completion_percentage']}% complete)");
         } elseif ($completionData['status'] === 'at_risk') {
-            $this->command->info("  ⚠️ {$student->student_code}: At risk (GPA: {$completionData['current_gpa']}, {$completionData['unit_completion_percentage']}% complete)");
+            $this->command->info("  ⚠️ {$student->student_id}: At risk (GPA: {$completionData['current_gpa']}, {$completionData['unit_completion_percentage']}% complete)");
         } elseif ($completionData['status'] === 'ahead_of_schedule') {
-            $this->command->info("  🚀 {$student->student_code}: Ahead of schedule ({$completionData['unit_completion_percentage']}% complete)");
+            $this->command->info("  🚀 {$student->student_id}: Ahead of schedule ({$completionData['unit_completion_percentage']}% complete)");
         }
     }
 
@@ -220,14 +220,14 @@ class CompletionTrackingSeeder extends Seeder
         $notes = [];
 
         $notes[] = "Completion: {$data['unit_completion_percentage']}% units, {$data['credit_completion_percentage']}% credits";
-        $notes[] = 'Status: '.str_replace('_', ' ', ucwords($data['status']));
+        $notes[] = 'Status: ' . str_replace('_', ' ', ucwords($data['status']));
         $notes[] = "GPA: {$data['current_gpa']}";
         $notes[] = "Est. graduation: {$data['estimated_graduation_semester']}";
 
         // Add category-specific notes
         foreach ($data['completion_by_category'] as $category => $info) {
             if ($info['required'] > 0) {
-                $notes[] = ucfirst($category).": {$info['completed']}/{$info['required']} ({$info['percentage']}%)";
+                $notes[] = ucfirst($category) . ": {$info['completed']}/{$info['required']} ({$info['percentage']}%)";
             }
         }
 

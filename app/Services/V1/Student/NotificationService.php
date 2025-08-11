@@ -17,7 +17,7 @@ class NotificationService
      */
     public function getNotifications(Student $student, array $filters = []): array
     {
-        $cacheKey = "notifications:student:{$student->id}:".md5(serialize($filters));
+        $cacheKey = "notifications:student:{$student->id}:" . md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($student, $filters) {
             $query = $student->notifications()->with(['notificationType']);
@@ -169,13 +169,13 @@ class NotificationService
      */
     public function getNotificationPreferences(Student $student): array
     {
-        $preferences = NotificationPreference::where('student_code', $student->id)->get();
+        $preferences = NotificationPreference::where('student_id', $student->id)->get();
 
         $defaultPreferences = $this->getDefaultPreferences();
 
         // Merge with existing preferences
         foreach ($preferences as $preference) {
-            $key = $preference->notification_type.'.'.$preference->channel;
+            $key = $preference->notification_type . '.' . $preference->channel;
             if (isset($defaultPreferences[$preference->notification_type][$preference->channel])) {
                 $defaultPreferences[$preference->notification_type][$preference->channel]['enabled'] = $preference->is_enabled;
             }
@@ -197,7 +197,7 @@ class NotificationService
                 foreach ($channels as $channel => $settings) {
                     NotificationPreference::updateOrCreate(
                         [
-                            'student_code' => $student->id,
+                            'student_id' => $student->id,
                             'notification_type' => $notificationType,
                             'channel' => $channel,
                         ],

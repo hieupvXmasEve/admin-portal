@@ -13,7 +13,7 @@ import { computed, h, reactive, ref } from 'vue';
 
 interface Student {
     id: number;
-    student_code: string;
+    student_id: string;
     full_name: string;
     email: string;
     program?: { name: string };
@@ -45,7 +45,7 @@ const data = computed(() => props.students.data);
 const tableColumns: ColumnDef<Student>[] = [
     {
         header: 'Student ID',
-        accessorKey: 'student_code',
+        accessorKey: 'student_id',
         enableSorting: false,
     },
     {

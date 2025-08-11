@@ -114,7 +114,7 @@ class AssessmentReportService
         // Calculate histogram data (10-point intervals)
         $histogram = [];
         for ($i = 0; $i < 100; $i += 10) {
-            $rangeLabel = $i.'-'.($i + 9);
+            $rangeLabel = $i . '-' . ($i + 9);
             $count = $percentageScores->filter(function ($score) use ($i) {
                 return $score >= $i && $score < ($i + 10);
             })->count();
@@ -561,7 +561,7 @@ class AssessmentReportService
             $query->whereIn('assessment_component_id', $componentIds);
         })
             ->where('course_offering_id', $courseOffering->id)
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->with(['assessmentComponentDetail.assessmentComponent'])
             ->get();
 
@@ -644,7 +644,7 @@ class AssessmentReportService
             $query->whereIn('assessment_component_id', $componentIds);
         })
             ->where('course_offering_id', $courseOffering->id)
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('score_status', 'final')
             ->where('score_excluded', false)
             ->whereNotNull('percentage_score')
@@ -1014,8 +1014,8 @@ class AssessmentReportService
             ->sortBy('display_name');
 
         // Apply student filter if provided
-        if (! empty($filters['student_codes'])) {
-            $students = $students->whereIn('id', $filters['student_codes']);
+        if (! empty($filters['student_ids'])) {
+            $students = $students->whereIn('id', $filters['student_ids']);
         }
 
         // Get assessment components
@@ -1060,15 +1060,15 @@ class AssessmentReportService
                 return $query->where('acds.score_excluded', false);
             })
             ->whereNull('acds.deleted_at')
-            ->when(! empty($filters['student_codes']), function ($query) use ($filters) {
-                return $query->whereIn('acds.student_code', $filters['student_codes']);
+            ->when(! empty($filters['student_ids']), function ($query) use ($filters) {
+                return $query->whereIn('acds.student_id', $filters['student_ids']);
             })
             ->when(! empty($filters['component_ids']), function ($query) use ($filters) {
                 return $query->whereIn('ac.id', $filters['component_ids']);
             })
             ->select([
                 'acds.id as score_id',
-                'acds.student_code',
+                'acds.student_id',
                 'acd.id as detail_id',
                 'ac.id as component_id',
                 'acds.points_earned',
@@ -1093,7 +1093,7 @@ class AssessmentReportService
         // Index scores by student and detail for efficient lookup
         $scoresIndex = [];
         foreach ($allScores as $score) {
-            $scoresIndex[$score->student_code][$score->detail_id] = $score;
+            $scoresIndex[$score->student_id][$score->detail_id] = $score;
         }
 
         // Build grade matrix with enhanced statistics
@@ -1109,7 +1109,7 @@ class AssessmentReportService
             $studentRow = [
                 'student' => [
                     'id' => $student->id,
-                    'student_code' => $student->student_code,
+                    'student_id' => $student->student_id,
                     'name' => $student->display_name,
                     'first_name' => $student->first_name,
                     'last_name' => $student->last_name,
@@ -1462,13 +1462,13 @@ class AssessmentReportService
 
         // Calculate performance metrics
         $performanceMetrics = [
-            'students_above_90' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] >= 90)),
-            'students_above_80' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] >= 80)),
-            'students_above_70' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] >= 70)),
-            'students_below_60' => count(array_filter($gradeMatrix, fn ($row) => $row['final_percentage'] < 60)),
-            'students_with_missing' => count(array_filter($gradeMatrix, fn ($row) => $row['missing_assessments'] > 0)),
-            'students_with_late' => count(array_filter($gradeMatrix, fn ($row) => $row['late_submissions'] > 0)),
-            'students_with_bonus' => count(array_filter($gradeMatrix, fn ($row) => $row['bonus_points_total'] > 0)),
+            'students_above_90' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 90)),
+            'students_above_80' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 80)),
+            'students_above_70' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 70)),
+            'students_below_60' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] < 60)),
+            'students_with_missing' => count(array_filter($gradeMatrix, fn($row) => $row['missing_assessments'] > 0)),
+            'students_with_late' => count(array_filter($gradeMatrix, fn($row) => $row['late_submissions'] > 0)),
+            'students_with_bonus' => count(array_filter($gradeMatrix, fn($row) => $row['bonus_points_total'] > 0)),
         ];
 
         return [
@@ -1648,7 +1648,7 @@ class AssessmentReportService
                 $atRiskStudents[] = [
                     'student' => [
                         'id' => $student->id,
-                        'student_code' => $student->student_code,
+                        'student_id' => $student->student_id,
                         'name' => $student->display_name,
                         'email' => $student->email,
                     ],
@@ -1791,7 +1791,7 @@ class AssessmentReportService
                 $exceptionalStudents[] = [
                     'student' => [
                         'id' => $student->id,
-                        'student_code' => $student->student_code,
+                        'student_id' => $student->student_id,
                         'name' => $student->display_name,
                         'email' => $student->email,
                     ],
@@ -1859,7 +1859,7 @@ class AssessmentReportService
         ];
 
         foreach ($integrityScores as $score) {
-            $studentId = $score->student_code;
+            $studentId = $score->student_id;
             $componentId = $score->assessmentComponentDetail->assessmentComponent->id;
 
             // Track student-level issues
@@ -1867,7 +1867,7 @@ class AssessmentReportService
                 $studentIntegrityIssues[$studentId] = [
                     'student' => [
                         'id' => $score->student->id,
-                        'student_code' => $score->student->student_code,
+                        'student_id' => $score->student->student_id,
                         'name' => $score->student->display_name,
                         'email' => $score->student->email,
                     ],
@@ -2082,7 +2082,7 @@ class AssessmentReportService
                 'bin' => $i + 1,
                 'range_min' => round($rangeMin, 1),
                 'range_max' => round($rangeMax, 1),
-                'range_label' => round($rangeMin, 1).'-'.round($rangeMax, 1).'%',
+                'range_label' => round($rangeMin, 1) . '-' . round($rangeMax, 1) . '%',
                 'count' => $count,
                 'percentage' => $scores->count() > 0 ? round(($count / $scores->count()) * 100, 2) : 0,
                 'density' => $scores->count() > 0 ? round($count / ($scores->count() * $binSize), 4) : 0,

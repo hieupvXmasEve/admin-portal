@@ -88,7 +88,7 @@ class LecturerStudentService
      */
     public function getStudentAlerts(Lecture $lecturer, array $filters = []): array
     {
-        $cacheKey = "lecturer-student-alerts:{$lecturer->id}:".md5(serialize($filters));
+        $cacheKey = "lecturer-student-alerts:{$lecturer->id}:" . md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($lecturer, $filters) {
             $alerts = [];
@@ -99,7 +99,7 @@ class LecturerStudentService
                 $alerts[] = [
                     'type' => 'low_attendance',
                     'priority' => $student['attendance_percentage'] < 50 ? 'high' : 'medium',
-                    'student_code' => $student['student_code'],
+                    'student_id' => $student['student_id'],
                     'student_name' => $student['student_name'],
                     'course_code' => $student['course_code'],
                     'attendance_percentage' => $student['attendance_percentage'],
@@ -114,7 +114,7 @@ class LecturerStudentService
                 $alerts[] = [
                     'type' => 'consecutive_absence',
                     'priority' => 'high',
-                    'student_code' => $student['student_code'],
+                    'student_id' => $student['student_id'],
                     'student_name' => $student['student_name'],
                     'course_code' => $student['course_code'],
                     'consecutive_absences' => $student['consecutive_absences'],
@@ -129,7 +129,7 @@ class LecturerStudentService
                 $alerts[] = [
                     'type' => 'no_recent_attendance',
                     'priority' => 'medium',
-                    'student_code' => $student['student_code'],
+                    'student_id' => $student['student_id'],
                     'student_name' => $student['student_name'],
                     'course_code' => $student['course_code'],
                     'days_since_attendance' => $student['days_since_attendance'],
@@ -162,7 +162,7 @@ class LecturerStudentService
         }
 
         $note = StudentNote::create([
-            'student_code' => $studentId,
+            'student_id' => $studentId,
             'lecture_id' => $lecturer->id,
             'course_offering_id' => $noteData['course_offering_id'] ?? null,
             'note_type' => $noteData['note_type'] ?? 'general',
@@ -355,7 +355,7 @@ class LecturerStudentService
      */
     protected function getStudentNotes(Student $student, Lecture $lecturer): array
     {
-        $notes = StudentNote::where('student_code', $student->id)
+        $notes = StudentNote::where('student_id', $student->id)
             ->where('lecture_id', $lecturer->id)
             ->orderBy('created_at', 'desc')
             ->get();

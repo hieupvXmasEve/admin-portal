@@ -159,7 +159,7 @@ abstract class AuditableModel extends Model
     protected function getIdentifierForLog(): string
     {
         // Try common identifier fields in order of preference
-        $identifierFields = ['name', 'title', 'code', 'full_name', 'student_code', 'email'];
+        $identifierFields = ['name', 'title', 'code', 'full_name', 'student_id', 'email'];
 
         foreach ($identifierFields as $field) {
             if (isset($this->attributes[$field]) && ! empty($this->attributes[$field])) {

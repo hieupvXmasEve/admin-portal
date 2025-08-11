@@ -200,7 +200,7 @@ class LecturerApiAuthorization
         // Lecturer can access student data if they teach any course the student is enrolled in
         return $lecturer->courseOfferings()
             ->whereHas('courseRegistrations', function ($query) use ($studentId) {
-                $query->where('student_code', $studentId)
+                $query->where('student_id', $studentId)
                     ->where('registration_status', 'enrolled');
             })
             ->exists();

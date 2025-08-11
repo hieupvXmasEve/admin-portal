@@ -47,7 +47,7 @@ class CourseRetakeController extends Controller
             $search = $validated['search'];
             $retakesQuery->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_code', 'like', "%{$search}%");
+                    ->orWhere('student_id', 'like', "%{$search}%");
             });
         }
 

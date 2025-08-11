@@ -19,7 +19,7 @@ class SessionAttendanceResource extends JsonResource
 
             'students' => collect($this->resource['students'])->map(function ($student) {
                 return [
-                    'student_code' => $student['student_code'],
+                    'student_id' => $student['student_id'],
                     'student_number' => $student['student_number'],
                     'full_name' => $student['full_name'],
                     'email' => $student['email'],

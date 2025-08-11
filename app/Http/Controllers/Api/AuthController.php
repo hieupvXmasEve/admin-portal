@@ -99,7 +99,7 @@ class AuthController extends Controller
             'data' => [
                 'student' => [
                     'id' => $student->id,
-                    'student_code' => $student->student_code,
+                    'student_id' => $student->student_id,
                     'full_name' => $student->full_name,
                     'email' => $student->email,
                     'phone' => $student->phone,

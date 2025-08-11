@@ -44,10 +44,10 @@ class AcademicRecordService
     public function createOrUpdateRecord(Student $student, array $data): AcademicRecord
     {
         return DB::transaction(function () use ($student, $data) {
-            $recordData = array_merge($data, ['student_code' => $student->id]);
+            $recordData = array_merge($data, ['student_id' => $student->id]);
 
             // Check if record already exists
-            $existingRecord = AcademicRecord::where('student_code', $student->id)
+            $existingRecord = AcademicRecord::where('student_id', $student->id)
                 ->where('semester_id', $data['semester_id'])
                 ->where('unit_id', $data['unit_id'])
                 ->first();
@@ -66,7 +66,7 @@ class AcademicRecordService
             $this->calculateCumulativeGPA($student);
 
             Log::info('Academic record updated', [
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'unit_id' => $data['unit_id'],
                 'semester_id' => $data['semester_id'],
                 'final_grade' => $data['final_grade'] ?? null,
@@ -108,7 +108,7 @@ class AcademicRecordService
             // Store or update GPA calculation
             GpaCalculation::updateOrCreate(
                 [
-                    'student_code' => $student->id,
+                    'student_id' => $student->id,
                     'semester_id' => $semesterId,
                 ],
                 [
@@ -155,7 +155,7 @@ class AcademicRecordService
             // This could be stored in a separate field or calculated on-demand
 
             Log::info('Cumulative GPA calculated', [
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'cumulative_gpa' => $cumulativeGPA,
                 'total_credits' => $totalCredits,
             ]);

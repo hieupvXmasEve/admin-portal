@@ -29,7 +29,7 @@ const formSchema = toTypedSchema(
     z
         .object({
             class_session_id: z.string().min(1, 'Class session is required'),
-            student_code: z.string().min(1, 'Student is required'),
+            student_id: z.string().min(1, 'Student is required'),
             status: z.enum(['present', 'late', 'absent', 'excused'], {
                 required_error: 'Attendance status is required',
             }),
@@ -79,7 +79,7 @@ const { handleSubmit, values } = useForm({
     validationSchema: formSchema,
     initialValues: {
         class_session_id: props.preselectedSessionId?.toString() || '',
-        student_code: '',
+        student_id: '',
         status: 'present',
         check_in_time: '',
         check_out_time: '',
@@ -101,7 +101,7 @@ const onSubmit = handleSubmit((formValues) => {
     const data = {
         ...formValues,
         class_session_id: parseInt(formValues.class_session_id),
-        student_code: parseInt(formValues.student_code),
+        student_id: parseInt(formValues.student_id),
     };
 
     router.post('/attendance', data, {
@@ -214,7 +214,7 @@ const showExcuseReason = computed(() => {
                             </FormField>
 
                             <!-- Student -->
-                            <FormField v-slot="{ componentField }" name="student_code">
+                            <FormField v-slot="{ componentField }" name="student_id">
                                 <FormItem>
                                     <FormLabel>Student *</FormLabel>
                                     <Select v-bind="componentField">
@@ -224,7 +224,7 @@ const showExcuseReason = computed(() => {
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            <SelectItem v-for="student in students" :key="student.id" :value="student.id.toString()"> {{ student.student_code }} - {{ student.full_name }} </SelectItem>
+                                            <SelectItem v-for="student in students" :key="student.id" :value="student.id.toString()"> {{ student.student_id }} - {{ student.full_name }} </SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />

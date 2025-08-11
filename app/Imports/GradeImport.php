@@ -112,7 +112,7 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
             // Update score with validated data
             $this->updateScore($score, $validatedData, $rowNumber);
         } catch (\Exception $e) {
-            $this->addError($rowNumber, 'Unexpected error: '.$e->getMessage(), $row->toArray());
+            $this->addError($rowNumber, 'Unexpected error: ' . $e->getMessage(), $row->toArray());
 
             if (! $this->options['skip_errors']) {
                 throw $e;
@@ -126,7 +126,7 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
     protected function validateRowData(Collection $row, int $rowNumber): ?array
     {
         $data = [
-            'student_code' => $row->get('student_code'),
+            'student_id' => $row->get('student_id'),
             'points_earned' => $row->get('points_earned'),
             'percentage_score' => $row->get('percentage_score'),
             'letter_grade' => $row->get('letter_grade'),
@@ -140,7 +140,7 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
         ];
 
         $rules = [
-            'student_code' => 'required|string',
+            'student_id' => 'required|string',
             'points_earned' => 'nullable|numeric|min:0',
             'percentage_score' => 'nullable|numeric|min:0|max:100',
             'letter_grade' => ['nullable', 'string', 'max:5', Rule::in(['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F', 'I', 'W', 'P', 'NP'])],
@@ -155,7 +155,7 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
 
         // Add max points validation if available
         if ($this->assessmentComponentDetail->max_points) {
-            $rules['points_earned'] .= '|max:'.$this->assessmentComponentDetail->max_points;
+            $rules['points_earned'] .= '|max:' . $this->assessmentComponentDetail->max_points;
         }
 
         $validator = Validator::make($data, $rules);
@@ -176,12 +176,12 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
      */
     protected function findStudent(array $data): ?Student
     {
-        // First try by student_code
-        $student = Student::where('student_code', $data['student_code'])->first();
+        // First try by student_id
+        $student = Student::where('student_id', $data['student_id'])->first();
 
         if (! $student) {
             // Try by email as fallback
-            $student = Student::where('email', $data['student_code'])->first();
+            $student = Student::where('email', $data['student_id'])->first();
         }
 
         return $student;
@@ -193,7 +193,7 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
     protected function isStudentEnrolled(Student $student): bool
     {
         return DB::table('course_registrations')
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('course_offering_id', $this->courseOffering->id)
             ->whereIn('registration_status', ['registered', 'confirmed'])
             ->exists();
@@ -206,7 +206,7 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
     {
         $score = AssessmentComponentDetailScore::where([
             'assessment_component_detail_id' => $this->assessmentComponentDetail->id,
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'course_offering_id' => $this->courseOffering->id,
         ])->first();
 
@@ -226,7 +226,7 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
         if (in_array($this->options['update_mode'], ['create_missing', 'update_and_create'])) {
             $score = new AssessmentComponentDetailScore([
                 'assessment_component_detail_id' => $this->assessmentComponentDetail->id,
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'course_offering_id' => $this->courseOffering->id,
                 'graded_by_lecture_id' => $this->lecturerId,
                 'graded_at' => now(),
@@ -255,9 +255,9 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
             $data['percentage_score'] = ($data['points_earned'] / $this->assessmentComponentDetail->max_points) * 100;
         }
 
-        // Remove student_code from data as we already have the correct student
+        // Remove student_id from data as we already have the correct student
         $scoreData = array_filter($data, function ($value, $key) {
-            return $value !== null && $value !== '' && $key !== 'student_code';
+            return $value !== null && $value !== '' && $key !== 'student_id';
         }, ARRAY_FILTER_USE_BOTH);
 
         // Update score fields
@@ -326,7 +326,7 @@ class GradeImport implements ToCollection, WithBatchInserts, WithChunkReading, W
     public function rules(): array
     {
         return [
-            'student_code' => 'required',
+            'student_id' => 'required',
         ];
     }
 

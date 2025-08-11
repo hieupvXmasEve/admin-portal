@@ -179,7 +179,7 @@ const withdrawRegistration = () => {
                         </div>
                         <div>
                             <label class="text-muted-foreground text-sm font-medium">Student ID</label>
-                            <p class="mt-1 text-sm">{{ registration.student.student_code }}</p>
+                            <p class="mt-1 text-sm">{{ registration.student.student_id }}</p>
                         </div>
                         <div>
                             <label class="text-muted-foreground text-sm font-medium">Email</label>

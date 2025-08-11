@@ -126,7 +126,7 @@ class DropoutScenarioSeeder extends Seeder
         // Update student status to inactive (withdrawn is not a valid enum value)
         $student->update([
             'status' => 'inactive',
-            'admission_notes' => ($student->admission_notes ?? '').
+            'admission_notes' => ($student->admission_notes ?? '') .
                 " | Withdrawn: {$dropoutType['reason']} (Date: {$dropoutDate->format('Y-m-d')})",
         ]);
 
@@ -155,7 +155,7 @@ class DropoutScenarioSeeder extends Seeder
     private function withdrawFromCurrentCourses(Student $student, Carbon $dropoutDate, array $dropoutType): void
     {
         // Get current semester registrations
-        $currentRegistrations = CourseRegistration::where('student_code', $student->id)
+        $currentRegistrations = CourseRegistration::where('student_id', $student->id)
             ->where('registration_status', 'registered')
             ->whereHas('semester', function ($query) use ($dropoutDate) {
                 $query->where('start_date', '<=', $dropoutDate)
@@ -178,12 +178,12 @@ class DropoutScenarioSeeder extends Seeder
     private function createDropoutHold(Student $student, array $dropoutType, Carbon $dropoutDate): void
     {
         AcademicHold::create([
-            'student_code' => $student->id,
+            'student_id' => $student->id,
             'hold_type' => 'administrative',
             'hold_category' => 'all', // Use 'all' for withdrawal processing holds
             'title' => 'Student Withdrawal Processing',
-            'description' => "Student withdrawn: {$dropoutType['reason']}. ".
-                ($dropoutType['voluntary'] ? 'Voluntary withdrawal.' : 'Involuntary withdrawal.').
+            'description' => "Student withdrawn: {$dropoutType['reason']}. " .
+                ($dropoutType['voluntary'] ? 'Voluntary withdrawal.' : 'Involuntary withdrawal.') .
                 ' Exit interview and documentation required.',
             'amount' => null,
             'priority' => 'medium',
@@ -205,13 +205,13 @@ class DropoutScenarioSeeder extends Seeder
         if ($refundPercentage > 0) {
             // Create refund hold/record
             AcademicHold::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'hold_type' => 'financial',
                 'hold_category' => 'all', // Use 'all' for refund processing holds
                 'title' => 'Tuition Refund Processing',
-                'description' => "Refund processing: {$refundPercentage}% refund eligible due to ".
+                'description' => "Refund processing: {$refundPercentage}% refund eligible due to " .
                     "withdrawal within refund period. Reason: {$dropoutType['reason']}",
-                'amount' => -($refundPercentage * 10), // Negative amount indicates refund
+                'amount' => - ($refundPercentage * 10), // Negative amount indicates refund
                 'priority' => 'low',
                 'status' => 'active',
                 'placed_date' => $dropoutDate,
@@ -255,7 +255,7 @@ class DropoutScenarioSeeder extends Seeder
     private function logDropout(Student $student, array $dropoutType): void
     {
         $voluntaryStatus = $dropoutType['voluntary'] ? 'Voluntary' : 'Involuntary';
-        $this->command->info("  📉 {$student->student_code}: {$dropoutType['category']} ({$voluntaryStatus})");
+        $this->command->info("  📉 {$student->student_id}: {$dropoutType['category']} ({$voluntaryStatus})");
     }
 
     private function displayDropoutStatistics(array $stats, int $totalDropouts): void

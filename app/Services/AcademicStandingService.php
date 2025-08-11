@@ -26,12 +26,12 @@ class AcademicStandingService
             $standing = $this->determineStanding($cumulativeGPA, $totalCredits);
 
             // Deactivate previous standings for this semester
-            AcademicStanding::where('student_code', $student->id)
+            AcademicStanding::where('student_id', $student->id)
                 ->where('semester_id', $semester->id)
                 ->update(['is_active' => false]);
 
             $academicStanding = AcademicStanding::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'semester_id' => $semester->id,
                 'standing' => $standing,
                 'gpa' => $semesterGPA,
@@ -43,7 +43,7 @@ class AcademicStandingService
             ]);
 
             Log::info('Academic standing updated', [
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'semester_id' => $semester->id,
                 'standing' => $standing,
                 'gpa' => $semesterGPA,
@@ -79,7 +79,7 @@ class AcademicStandingService
                 $this->calculateAndUpdateStanding($student, $semester, $creator);
                 $updated++;
             } catch (\Exception $e) {
-                $errors[] = "Student {$student->id}: ".$e->getMessage();
+                $errors[] = "Student {$student->id}: " . $e->getMessage();
             }
         }
 

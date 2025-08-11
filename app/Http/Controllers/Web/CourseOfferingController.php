@@ -498,7 +498,7 @@ class CourseOfferingController extends Controller
             ->map(function ($registration) {
                 return [
                     'id' => $registration->student->id,
-                    'student_code' => $registration->student->student_code,
+                    'student_id' => $registration->student->student_id,
                     'full_name' => $registration->student->full_name,
                     'email' => $registration->student->email,
                     'registration_id' => $registration->id,
@@ -536,8 +536,8 @@ class CourseOfferingController extends Controller
                 }
             }],
             'sections.*.location' => 'nullable|string|max:255',
-            'sections.*.student_codes' => 'required|array',
-            'sections.*.student_codes.*' => 'exists:students,id',
+            'sections.*.student_ids' => 'required|array',
+            'sections.*.student_ids.*' => 'exists:students,id',
         ]);
 
         // Check if this course offering can be split
@@ -552,7 +552,7 @@ class CourseOfferingController extends Controller
         }
 
         $sections = $request->sections;
-        $totalStudentsAssigned = collect($sections)->sum(fn($section) => count($section['student_codes']));
+        $totalStudentsAssigned = collect($sections)->sum(fn($section) => count($section['student_ids']));
 
         if ($totalStudentsAssigned !== $courseOffering->current_enrollment) {
             return Redirect::back()
@@ -574,12 +574,13 @@ class CourseOfferingController extends Controller
 
                 // Create new course offering for this section
                 $newOffering = CourseOffering::create([
+                    'campus_id' => app('campus')->id,
                     'semester_id' => $courseOffering->semester_id,
                     'curriculum_unit_id' => $courseOffering->curriculum_unit_id,
                     'lecture_id' => $lectureId,
                     'section_code' => $sectionData['section_code'],
                     'max_capacity' => $sectionData['max_capacity'],
-                    'current_enrollment' => count($sectionData['student_codes']),
+                    'current_enrollment' => count($sectionData['student_ids']),
                     'waitlist_capacity' => $courseOffering->waitlist_capacity,
                     'current_waitlist' => 0,
                     'delivery_mode' => $courseOffering->delivery_mode,
@@ -598,7 +599,7 @@ class CourseOfferingController extends Controller
                 $newOfferings[] = $newOffering;
 
                 // Prepare registration updates for this section
-                foreach ($sectionData['student_codes'] as $studentId) {
+                foreach ($sectionData['student_ids'] as $studentId) {
                     $registrationUpdates[] = [
                         'student_id' => $studentId,
                         'new_course_offering_id' => $newOffering->id,
@@ -726,8 +727,8 @@ class CourseOfferingController extends Controller
         $request->validate([
             'from_status' => 'required|in:registered,confirmed,dropped,withdrawn,completed',
             'to_status' => 'required|in:registered,confirmed,dropped,withdrawn,completed',
-            'student_codes' => 'required|array',
-            'student_codes.*' => 'exists:students,id',
+            'student_ids' => 'required|array',
+            'student_ids.*' => 'exists:students,id',
         ]);
 
         try {
@@ -735,7 +736,7 @@ class CourseOfferingController extends Controller
 
             $updatedCount = CourseRegistration::where('course_offering_id', $courseOffering->id)
                 ->where('registration_status', $request->from_status)
-                ->whereIn('student_id', $request->student_codes)
+                ->whereIn('student_id', $request->student_ids)
                 ->update([
                     'registration_status' => $request->to_status,
                     'updated_at' => now(),

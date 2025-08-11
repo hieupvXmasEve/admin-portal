@@ -13,7 +13,7 @@ class GpaCalculation extends AuditableModel
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'student_code',
+        'student_id',
         'semester_id',
         'program_id',
         'calculation_type',
@@ -251,6 +251,6 @@ class GpaCalculation extends AuditableModel
             return 'N/A';
         }
 
-        return $this->class_rank.$this->getRankingSuffix().' of '.$this->class_size;
+        return $this->class_rank . $this->getRankingSuffix() . ' of ' . $this->class_size;
     }
 }

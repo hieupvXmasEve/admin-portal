@@ -292,7 +292,7 @@ class SemesterManagementService
             ->active()
             ->with('courseOffering.curriculumUnit.unit')
             ->get()
-            ->groupBy('student_code');
+            ->groupBy('student_id');
 
         $fullTimeStudents = 0;
         $partTimeStudents = 0;
@@ -465,9 +465,9 @@ class SemesterManagementService
         // If semester starts in fall (Aug-Dec), academic year is current-next
         // If semester starts in spring/summer (Jan-Jul), academic year is previous-current
         if ($date->month >= 8) {
-            return "{$year}-".($year + 1);
+            return "{$year}-" . ($year + 1);
         } else {
-            return ($year - 1)."-{$year}";
+            return ($year - 1) . "-{$year}";
         }
     }
 

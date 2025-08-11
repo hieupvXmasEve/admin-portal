@@ -44,20 +44,20 @@ class AssessmentExportService implements WithMultipleSheets
         $this->filters = array_merge([
             'include_excluded' => false,
             'score_status' => 'final',
-            'student_codes' => [],
+            'student_ids' => [],
             'component_ids' => [],
             'include_statistics' => true,
             'include_grade_matrix' => true,
         ], $filters);
 
         // Create temporary file
-        $fileName = 'assessment_export_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.xlsx';
+        $fileName = 'assessment_export_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
 
         // Use Laravel Excel to export to the local disk
-        Excel::store($this, 'temp/'.$fileName, 'local');
+        Excel::store($this, 'temp/' . $fileName, 'local');
 
         // Return the actual file path where it was stored
-        return Storage::disk('local')->path('temp/'.$fileName);
+        return Storage::disk('local')->path('temp/' . $fileName);
     }
 
     /**
@@ -75,13 +75,13 @@ class AssessmentExportService implements WithMultipleSheets
         ], $options);
 
         // Create temporary file name
-        $fileName = 'assessment_report_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.pdf';
+        $fileName = 'assessment_report_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.pdf';
 
         // Create PDF export using Excel package with DOMPDF
-        Excel::store(new PdfReportSheet($courseOffering, $this->reportService, $this->filters), 'temp/'.$fileName, 'local', \Maatwebsite\Excel\Excel::DOMPDF);
+        Excel::store(new PdfReportSheet($courseOffering, $this->reportService, $this->filters), 'temp/' . $fileName, 'local', \Maatwebsite\Excel\Excel::DOMPDF);
 
         // Return the actual file path where it was stored
-        return Storage::disk('local')->path('temp/'.$fileName);
+        return Storage::disk('local')->path('temp/' . $fileName);
     }
 
     /**
@@ -97,7 +97,7 @@ class AssessmentExportService implements WithMultipleSheets
             $component = $detail->assessmentComponent;
 
             $formattedData[] = [
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'student_name' => $student->user->name,
                 'student_email' => $student->user->email,
                 'student_number' => $student->student_number,
@@ -193,8 +193,8 @@ class AssessmentExportService implements WithMultipleSheets
             $query->where('score_status', $this->filters['score_status']);
         }
 
-        if (! empty($this->filters['student_codes'])) {
-            $query->whereIn('student_code', $this->filters['student_codes']);
+        if (! empty($this->filters['student_ids'])) {
+            $query->whereIn('student_id', $this->filters['student_ids']);
         }
 
         if (! empty($this->filters['component_ids'])) {
@@ -203,7 +203,7 @@ class AssessmentExportService implements WithMultipleSheets
             });
         }
 
-        return $query->orderBy('student_code')
+        return $query->orderBy('student_id')
             ->orderBy('assessment_component_detail_id')
             ->get();
     }
@@ -261,7 +261,7 @@ class GradeMatrixSheet implements FromCollection, WithColumnWidths, WithHeadings
 
         return collect($this->gradeMatrix['students'])->map(function ($student) {
             $row = [
-                'student_code' => $student['id'],
+                'student_id' => $student['id'],
                 'student_name' => $student['name'],
                 'student_number' => $student['student_number'] ?? '',
                 'email' => $student['email'] ?? '',
@@ -270,7 +270,7 @@ class GradeMatrixSheet implements FromCollection, WithColumnWidths, WithHeadings
             // Add component scores
             foreach ($this->gradeMatrix['components'] as $component) {
                 $score = $student['component_scores'][$component['id']] ?? null;
-                $row['component_'.$component['id']] = $score !== null ? $score : '';
+                $row['component_' . $component['id']] = $score !== null ? $score : '';
             }
 
             // Add weighted total
@@ -292,7 +292,7 @@ class GradeMatrixSheet implements FromCollection, WithColumnWidths, WithHeadings
 
         // Add component headings
         foreach ($this->gradeMatrix['components'] as $component) {
-            $headings[] = $component['name'].' ('.$component['weight'].'%)';
+            $headings[] = $component['name'] . ' (' . $component['weight'] . '%)';
         }
 
         $headings[] = 'Weighted Total (%)';
@@ -371,7 +371,7 @@ class DetailedScoresSheet implements FromCollection, WithColumnWidths, WithHeadi
     {
         return $this->scores->map(function ($score) {
             return [
-                'student_code' => $score->student->id,
+                'student_id' => $score->student->id,
                 'student_name' => $score->student->user->name,
                 'student_number' => $score->student->student_number ?? '',
                 'student_email' => $score->student->user->email,
@@ -528,19 +528,19 @@ class StatisticsSheet implements FromCollection, WithColumnWidths, WithHeadings,
         // Assessment Structure
         $data[] = ['Assessment Structure', 'Total Components', $this->statistics['assessment_structure']['total_components'], ''];
         $data[] = ['Assessment Structure', 'Total Details', $this->statistics['assessment_structure']['total_details'], ''];
-        $data[] = ['Assessment Structure', 'Total Weight', $this->statistics['assessment_structure']['total_weight'].'%', ''];
+        $data[] = ['Assessment Structure', 'Total Weight', $this->statistics['assessment_structure']['total_weight'] . '%', ''];
         $data[] = ['Assessment Structure', 'Weight Complete', $this->statistics['assessment_structure']['weight_complete'] ? 'Yes' : 'No', ''];
         $data[] = ['', '', '', ''];
 
         // Score Statistics
-        $data[] = ['Score Statistics', 'Average Score', $this->statistics['score_statistics']['average_score'].'%', ''];
-        $data[] = ['Score Statistics', 'Highest Score', $this->statistics['score_statistics']['highest_score'].'%', ''];
-        $data[] = ['Score Statistics', 'Lowest Score', $this->statistics['score_statistics']['lowest_score'].'%', ''];
+        $data[] = ['Score Statistics', 'Average Score', $this->statistics['score_statistics']['average_score'] . '%', ''];
+        $data[] = ['Score Statistics', 'Highest Score', $this->statistics['score_statistics']['highest_score'] . '%', ''];
+        $data[] = ['Score Statistics', 'Lowest Score', $this->statistics['score_statistics']['lowest_score'] . '%', ''];
         $data[] = ['Score Statistics', 'Total Graded Submissions', $this->statistics['score_statistics']['total_graded_submissions'], ''];
         $data[] = ['', '', '', ''];
 
         // Completion Statistics
-        $data[] = ['Completion', 'Completion Rate', $this->statistics['completion_statistics']['completion_rate'].'%', ''];
+        $data[] = ['Completion', 'Completion Rate', $this->statistics['completion_statistics']['completion_rate'] . '%', ''];
         $data[] = ['Completion', 'Completed Assessments', $this->statistics['completion_statistics']['completed_assessments'], ''];
         $data[] = ['Completion', 'Pending Assessments', $this->statistics['completion_statistics']['pending_assessments'], ''];
         $data[] = ['Completion', 'Total Assessments', $this->statistics['completion_statistics']['total_assessments'], ''];
@@ -738,9 +738,9 @@ class PdfReportSheet implements FromCollection, WithColumnWidths, WithHeadings, 
 
         // Course Information
         $data[] = ['ASSESSMENT REPORT', '', '', ''];
-        $data[] = ['Course:', $this->courseOffering->course_code.' - '.$this->courseOffering->course_title, '', ''];
+        $data[] = ['Course:', $this->courseOffering->course_code . ' - ' . $this->courseOffering->course_title, '', ''];
         $data[] = ['Section:', $this->courseOffering->section_code, '', ''];
-        $data[] = ['Semester:', $this->courseOffering->semester->name.' '.$this->courseOffering->semester->year, '', ''];
+        $data[] = ['Semester:', $this->courseOffering->semester->name . ' ' . $this->courseOffering->semester->year, '', ''];
         $data[] = ['Instructor:', $this->courseOffering->lecture?->display_name ?? 'Not assigned', '', ''];
         $data[] = ['Generated:', now()->format('F j, Y \a\t g:i A'), '', ''];
         $data[] = ['', '', '', ''];
@@ -749,9 +749,9 @@ class PdfReportSheet implements FromCollection, WithColumnWidths, WithHeadings, 
         $data[] = ['STATISTICS SUMMARY', '', '', ''];
         $data[] = ['Enrolled Students:', $statistics['enrollment_statistics']['total_enrolled_students'], '', ''];
         $data[] = ['Assessment Components:', $statistics['assessment_structure']['total_components'], '', ''];
-        $data[] = ['Total Weight:', $statistics['assessment_structure']['total_weight'].'%', '', ''];
-        $data[] = ['Average Score:', $statistics['score_statistics']['average_score'].'%', '', ''];
-        $data[] = ['Completion Rate:', $statistics['completion_statistics']['completion_rate'].'%', '', ''];
+        $data[] = ['Total Weight:', $statistics['assessment_structure']['total_weight'] . '%', '', ''];
+        $data[] = ['Average Score:', $statistics['score_statistics']['average_score'] . '%', '', ''];
+        $data[] = ['Completion Rate:', $statistics['completion_statistics']['completion_rate'] . '%', '', ''];
         $data[] = ['', '', '', ''];
 
         // Grade Matrix Header
@@ -761,7 +761,7 @@ class PdfReportSheet implements FromCollection, WithColumnWidths, WithHeadings, 
             // Component headers
             $headerRow = ['Student Name'];
             foreach ($gradeMatrix['components'] as $component) {
-                $headerRow[] = $component['name'].' ('.$component['weight'].'%)';
+                $headerRow[] = $component['name'] . ' (' . $component['weight'] . '%)';
             }
             $headerRow[] = 'Total (%)';
             $data[] = $headerRow;

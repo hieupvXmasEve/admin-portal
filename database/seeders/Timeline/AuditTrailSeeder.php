@@ -94,7 +94,7 @@ class AuditTrailSeeder extends Seeder
     private function auditAcademicRecord(Student $student, AcademicRecord $record): void
     {
         $auditData = [
-            'student_code' => $student->student_code,
+            'student_id' => $student->student_id,
             'record_type' => 'academic_record',
             'record_id' => $record->id,
             'action' => 'grade_finalized',
@@ -119,7 +119,7 @@ class AuditTrailSeeder extends Seeder
     private function auditCourseRegistration(Student $student, CourseRegistration $registration): void
     {
         $auditData = [
-            'student_code' => $student->student_code,
+            'student_id' => $student->student_id,
             'record_type' => 'course_registration',
             'record_id' => $registration->id,
             'action' => $this->getRegistrationAction($registration),
@@ -155,7 +155,7 @@ class AuditTrailSeeder extends Seeder
     {
         // Audit hold placement
         $placementAudit = [
-            'student_code' => $student->student_code,
+            'student_id' => $student->student_id,
             'record_type' => 'academic_hold',
             'record_id' => $hold->id,
             'action' => 'hold_placed',
@@ -190,7 +190,7 @@ class AuditTrailSeeder extends Seeder
     private function auditGpaCalculation(Student $student, GpaCalculation $gpaCalc): void
     {
         $auditData = [
-            'student_code' => $student->student_code,
+            'student_id' => $student->student_id,
             'record_type' => 'gpa_calculation',
             'record_id' => $gpaCalc->id,
             'action' => 'gpa_calculated',
@@ -219,7 +219,7 @@ class AuditTrailSeeder extends Seeder
 
         foreach ($statusChanges as $change) {
             $auditData = [
-                'student_code' => $student->student_code,
+                'student_id' => $student->student_id,
                 'record_type' => 'student_status',
                 'record_id' => $student->id,
                 'action' => 'status_change',
@@ -288,7 +288,7 @@ class AuditTrailSeeder extends Seeder
     private function extractDateFromNotes(string $notes, string $keyword): Carbon
     {
         // Simple date extraction - look for dates after keywords
-        $pattern = '/'.preg_quote($keyword).'.*?(\d{4}-\d{2}-\d{2})/';
+        $pattern = '/' . preg_quote($keyword) . '.*?(\d{4}-\d{2}-\d{2})/';
         if (preg_match($pattern, $notes, $matches)) {
             return Carbon::parse($matches[1]);
         }
@@ -316,7 +316,7 @@ class AuditTrailSeeder extends Seeder
     {
         // In a real system, this would insert into an audit_log table
         // For this seeder, we'll update the student's notes with audit summary
-        $student = Student::where('student_code', $auditData['student_code'])->first();
+        $student = Student::where('student_id', $auditData['student_id'])->first();
 
         if ($student) {
             $timestamp = $auditData['timestamp'] ?? now();
@@ -326,7 +326,7 @@ class AuditTrailSeeder extends Seeder
             // Only add if not already present (to avoid duplicates)
             if (! str_contains($currentNotes, $auditSummary)) {
                 $student->update([
-                    'admission_notes' => trim($currentNotes.' | '.$auditSummary),
+                    'admission_notes' => trim($currentNotes . ' | ' . $auditSummary),
                 ]);
             }
         }
@@ -334,7 +334,7 @@ class AuditTrailSeeder extends Seeder
 
     private function generateRandomIP(): string
     {
-        return rand(10, 192).'.'.rand(0, 255).'.'.rand(0, 255).'.'.rand(1, 254);
+        return rand(10, 192) . '.' . rand(0, 255) . '.' . rand(0, 255) . '.' . rand(1, 254);
     }
 
     private function createSystemAuditSummaries(array $stats): void

@@ -78,7 +78,7 @@ class GradeTemplateExport implements FromCollection, WithColumnWidths, WithEvent
         $score = $student->scores->first(); // Current score for this assessment detail
 
         return [
-            $student->student_code,
+            $student->student_id,
             $student->full_name,
             $student->email,
             $score?->points_earned ?? 0,
@@ -251,7 +251,7 @@ class GradeTemplateExport implements FromCollection, WithColumnWidths, WithEvent
 
         $instructions = [
             '1. Do not modify Student ID, Student Name, or Email columns',
-            '2. Points Earned should not exceed Max Points ('.($this->assessmentComponentDetail->max_points ?? 100).')',
+            '2. Points Earned should not exceed Max Points (' . ($this->assessmentComponentDetail->max_points ?? 100) . ')',
             '3. Percentage Score will be calculated automatically if Points Earned is provided',
             '4. Use the dropdown menus for Letter Grade, Status, and Score Status',
             '5. Bonus Points and Late Penalty Applied should be positive numbers',

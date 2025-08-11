@@ -635,7 +635,7 @@ class AssessmentController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to retrieve student grading data', [
                 'course_offering_id' => $courseOffering->id,
-                'student_code' => $student->id,
+                'student_id' => $student->student_id,
                 'lecturer_id' => $lecturer->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -817,11 +817,11 @@ class AssessmentController extends Controller
                         $score->update($updateData);
                         $updatedScores[] = [
                             'id' => $score->id,
-                            'student_code' => $score->student_code,
+                            'student_id' => $score->student_id,
                             'assessment_component_detail_id' => $score->assessment_component_detail_id,
                         ];
                     } catch (\Exception $e) {
-                        $errors[] = "Failed to update score ID {$scoreData['id']}: ".$e->getMessage();
+                        $errors[] = "Failed to update score ID {$scoreData['id']}: " . $e->getMessage();
                     }
                 }
             });

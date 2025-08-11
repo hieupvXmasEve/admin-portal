@@ -78,11 +78,11 @@ const filteredStudents = computed(() => {
 // DataTable columns
 const baseColumns: ColumnDef<CourseRegistration>[] = [
     {
-        accessorKey: 'student.student_code',
+        accessorKey: 'student.student_id',
         header: 'Student ID',
         cell: ({ row }) => {
             const registration = row.original;
-            return h('span', { class: 'font-medium' }, registration.student?.student_code || 'N/A');
+            return h('span', { class: 'font-medium' }, registration.student?.student_id || 'N/A');
         },
     },
     {
@@ -162,7 +162,7 @@ const onSubmit = handleSubmit(async (values) => {
         const { data: response, error } = await apiCall(`/api/course-offerings/${props.courseOffering.id}/bulk-update-status`, {
             from_status: values.fromStatus,
             to_status: values.toStatus,
-            student_codes: values.studentIds,
+            student_ids: values.studentIds,
         });
 
         if (error.value) {

@@ -44,7 +44,7 @@ interface Unit {
 
 interface Enrollment {
     id: number;
-    student_code: number;
+    student_id: number;
     semester_id: number;
     curriculum_version_id: number;
     semester_number: number;
@@ -489,11 +489,7 @@ onMounted(() => {
                                     <Loader2 v-if="loading.generate" class="mr-2 h-4 w-4 animate-spin" />
                                     Generate Enrollments
                                 </Button>
-                                <Button
-                                    @click="bulkRegisterStudents"
-                                    :disabled="loading.bulkRegister || enrollmentStats.total_enrolled === 0"
-                                    variant="outline"
-                                >
+                                <Button @click="bulkRegisterStudents" :disabled="loading.bulkRegister || enrollmentStats.total_enrolled === 0" variant="outline">
                                     <Loader2 v-if="loading.bulkRegister" class="mr-2 h-4 w-4 animate-spin" />
                                     <Users class="mr-2 h-4 w-4" />
                                     Auto Register Students
@@ -511,12 +507,10 @@ onMounted(() => {
 
                         <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
                             <div class="flex items-start gap-3">
-                                <Users class="h-5 w-5 text-amber-600 mt-0.5" />
+                                <Users class="mt-0.5 h-5 w-5 text-amber-600" />
                                 <div class="flex-1">
                                     <h4 class="text-sm font-medium text-amber-800">Automatic Course Registration</h4>
-                                    <p class="text-sm text-amber-700 mt-1">
-                                        After opening course offerings, use "Auto Register Students" to automatically register enrolled students for their required courses based on their curriculum.
-                                    </p>
+                                    <p class="mt-1 text-sm text-amber-700">After opening course offerings, use "Auto Register Students" to automatically register enrolled students for their required courses based on their curriculum.</p>
                                 </div>
                             </div>
                         </div>

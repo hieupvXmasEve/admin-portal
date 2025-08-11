@@ -21,7 +21,7 @@ class StudentFactory extends Factory
     public function definition(): array
     {
         return [
-            'student_code' => fake()->unique()->numerify('STU########'),
+            'student_id' => fake()->unique()->numerify('STU########'),
             'full_name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'phone' => fake()->phoneNumber(),
@@ -44,7 +44,7 @@ class StudentFactory extends Factory
      */
     public function inactive(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => 'inactive',
             'academic_status' => 'inactive',
         ]);
@@ -55,7 +55,7 @@ class StudentFactory extends Factory
      */
     public function graduated(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'status' => 'graduated',
             'academic_status' => 'graduated',
         ]);
@@ -66,7 +66,7 @@ class StudentFactory extends Factory
      */
     public function forCampus(Campus $campus): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'campus_id' => $campus->id,
         ]);
     }
@@ -76,7 +76,7 @@ class StudentFactory extends Factory
      */
     public function forProgram(Program $program): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'program_id' => $program->id,
         ]);
     }
@@ -86,7 +86,7 @@ class StudentFactory extends Factory
      */
     public function withSpecialization(Specialization $specialization): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'specialization_id' => $specialization->id,
             'program_id' => $specialization->program_id,
         ]);

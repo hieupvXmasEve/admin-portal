@@ -39,7 +39,7 @@ class EnrollStudentsToProgramSeeder extends Seeder
 
         foreach ($eligibleStudents as $student) {
             // Check if student already has enrollment for this semester
-            $existingEnrollment = Enrollment::where('student_code', $student->id)
+            $existingEnrollment = Enrollment::where('student_id', $student->id)
                 ->where('semester_id', $firstSemester->id)
                 ->first();
 
@@ -52,12 +52,12 @@ class EnrollStudentsToProgramSeeder extends Seeder
 
                 // Create enrollment record
                 Enrollment::create([
-                    'student_code' => $student->id,
+                    'student_id' => $student->id,
                     'semester_id' => $firstSemester->id,
                     'curriculum_version_id' => $student->curriculum_version_id,
                     'semester_number' => $semesterNumber,
                     'status' => 'in_progress',
-                    'notes' => 'Initial enrollment into program for semester #'.$semesterNumber,
+                    'notes' => 'Initial enrollment into program for semester #' . $semesterNumber,
                 ]);
 
                 $enrollmentCount++;

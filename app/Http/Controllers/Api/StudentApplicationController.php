@@ -33,8 +33,7 @@ class StudentApplicationController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('national_id', 'like', "%{$search}%")
-                    ->orWhere('student_code', 'like', "%{$search}%");
+                    ->orWhere('national_id', 'like', "%{$search}%");
             });
         }
 
@@ -131,7 +130,7 @@ class StudentApplicationController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update application status: '.$e->getMessage(),
+                'message' => 'Failed to update application status: ' . $e->getMessage(),
             ], 500);
         }
     }

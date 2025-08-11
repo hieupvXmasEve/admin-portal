@@ -257,7 +257,7 @@ const hasActiveFilters = computed(() => {
                 <div class="flex items-center justify-between">
                     <div class="space-y-2">
                         <div class="flex items-center gap-3">
-                            <h3 class="text-lg font-semibold">Student ID: {{ registration.student_code }}</h3>
+                            <h3 class="text-lg font-semibold">Student ID: {{ registration.student_id }}</h3>
                             <Badge variant="outline">Registration #{{ registration.id }}</Badge>
                         </div>
                         <h4 class="text-muted-foreground text-base">{{ registration.course_offering?.course_code }} - {{ registration.course_offering?.course_title }}</h4>

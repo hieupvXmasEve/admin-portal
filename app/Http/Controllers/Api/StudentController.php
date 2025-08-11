@@ -68,7 +68,7 @@ class StudentController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create student: '.$e->getMessage(),
+                'message' => 'Failed to create student: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -121,7 +121,7 @@ class StudentController extends Controller
             'data' => [
                 'student' => [
                     'id' => $student->id,
-                    'student_code' => $student->student_code,
+                    'student_id' => $student->student_id,
                     'full_name' => $student->full_name,
                     'email' => $student->email,
                     'phone' => $student->phone,
@@ -221,7 +221,7 @@ class StudentController extends Controller
             'courseOffering.curriculumUnit.unit',
             'semester',
         ])
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->orderBy('semester_id', 'desc')
             ->orderBy('registration_date', 'desc')
             ->get();
@@ -377,7 +377,7 @@ class StudentController extends Controller
         }
 
         // Calculate completed credits
-        $completedRegistrations = CourseRegistration::where('student_code', $student->id)
+        $completedRegistrations = CourseRegistration::where('student_id', $student->id)
             ->where('registration_status', 'completed')
             ->passing()
             ->with('courseOffering.curriculumUnit.unit')

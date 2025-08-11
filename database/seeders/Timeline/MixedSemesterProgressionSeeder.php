@@ -184,7 +184,7 @@ class MixedSemesterProgressionSeeder extends Seeder
 
         $currentNotes = $student->admission_notes ?? '';
         $student->update([
-            'admission_notes' => trim($currentNotes.' | '.$planNote),
+            'admission_notes' => trim($currentNotes . ' | ' . $planNote),
         ]);
     }
 
@@ -194,10 +194,10 @@ class MixedSemesterProgressionSeeder extends Seeder
 
         $currentNotes = $student->admission_notes ?? '';
         $student->update([
-            'admission_notes' => trim($currentNotes.' | '.$progressionNote),
+            'admission_notes' => trim($currentNotes . ' | ' . $progressionNote),
         ]);
 
-        $this->command->info("  📋 {$student->student_code}: {$progressionType['description']}");
+        $this->command->info("  📋 {$student->student_id}: {$progressionType['description']}");
     }
 
     private function createSampleFutureSemesters(): \Illuminate\Database\Eloquent\Collection
@@ -218,8 +218,8 @@ class MixedSemesterProgressionSeeder extends Seeder
                     'name' => $data['name'],
                     'start_date' => $data['start'],
                     'end_date' => $data['end'],
-                    'enrollment_start_date' => date('Y-m-d', strtotime($data['start'].' -30 days')),
-                    'enrollment_end_date' => date('Y-m-d', strtotime($data['start'].' +14 days')),
+                    'enrollment_start_date' => date('Y-m-d', strtotime($data['start'] . ' -30 days')),
+                    'enrollment_end_date' => date('Y-m-d', strtotime($data['start'] . ' +14 days')),
                     'is_active' => true,
                     'is_current' => false,
                 ]

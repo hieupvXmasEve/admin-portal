@@ -46,7 +46,7 @@ class CourseRegistrationService
             ->get()
             ->unique('curriculum_unit_id') // giữ lại 1 section/môn
             ->values();
-        Log::info('Course offerings: '.json_encode($courseOfferings));
+        Log::info('Course offerings: ' . json_encode($courseOfferings));
         // B2: Lấy danh sách curriculum_unit_id mà sinh viên đã đăng ký (không lấy course_offering_id nữa)
         $registeredCurriculumUnitIds = $student->courseRegistrations()
             ->where('semester_id', $currentSemester->id)
@@ -57,7 +57,7 @@ class CourseRegistrationService
             ->filter() // loại null (phòng trường hợp course_offering bị xóa)
             ->unique()
             ->toArray();
-        Log::info('Registered curriculum unit IDs: '.json_encode($registeredCurriculumUnitIds));
+        Log::info('Registered curriculum unit IDs: ' . json_encode($registeredCurriculumUnitIds));
 
         // B3: Loại những môn đã đăng ký (dù khác section)
         return $courseOfferings->reject(function ($offering) use ($registeredCurriculumUnitIds) {
@@ -84,7 +84,7 @@ class CourseRegistrationService
         return DB::transaction(function () use ($student, $courseOffering) {
             // Create registration record
             $registration = CourseRegistration::create([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'course_offering_id' => $courseOffering->id,
                 'semester_id' => $courseOffering->semester_id,
                 'registration_status' => 'registered',
@@ -105,12 +105,12 @@ class CourseRegistrationService
      */
     public function dropCourse(Student $student, CourseRegistration $registration): bool
     {
-        if ($registration->student_code !== $student->id) {
+        if ($registration->student_id !== $student->id) {
             throw new BusinessLogicException('You can only drop your own registrations');
         }
 
         if (! in_array($registration->registration_status, ['registered', 'pending'])) {
-            throw new BusinessLogicException('Cannot drop course with status: '.$registration->registration_status);
+            throw new BusinessLogicException('Cannot drop course with status: ' . $registration->registration_status);
         }
 
         // Check drop deadline

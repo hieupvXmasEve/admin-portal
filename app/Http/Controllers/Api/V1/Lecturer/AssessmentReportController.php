@@ -76,7 +76,7 @@ class AssessmentReportController extends Controller
             $filters = [
                 'include_excluded' => $request->boolean('include_excluded', false),
                 'score_status' => $request->input('score_status', 'final'),
-                'student_codes' => $request->input('student_codes', []),
+                'student_ids' => $request->input('student_ids', []),
                 'component_ids' => $request->input('component_ids', []),
             ];
 
@@ -181,7 +181,7 @@ class AssessmentReportController extends Controller
             $filePath = $this->assessmentExportService->exportToExcel($courseOffering, $filters);
 
             // Generate download filename
-            $downloadName = 'assessment_export_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.xlsx';
+            $downloadName = 'assessment_export_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [
@@ -218,7 +218,7 @@ class AssessmentReportController extends Controller
             $filePath = $this->assessmentExportService->exportToPdf($courseOffering, $options);
 
             // Generate download filename
-            $downloadName = 'assessment_report_'.$courseOffering->course_code.'_'.now()->format('Y-m-d_H-i-s').'.pdf';
+            $downloadName = 'assessment_report_' . $courseOffering->course_code . '_' . now()->format('Y-m-d_H-i-s') . '.pdf';
 
             // Return file download response
             return response()->download($filePath, $downloadName, [

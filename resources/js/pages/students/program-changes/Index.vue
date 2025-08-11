@@ -11,7 +11,7 @@ interface ProgramChange {
     id: number;
     student: {
         id: number;
-        student_code: string;
+        student_id: string;
         full_name: string;
     };
     current_program: {
@@ -42,7 +42,7 @@ const data = computed(() => props.programChanges.data);
 const columns: ColumnDef<ProgramChange>[] = [
     {
         header: 'Student ID',
-        accessorKey: 'student.student_code',
+        accessorKey: 'student.student_id',
         enableSorting: false,
     },
     {

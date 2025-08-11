@@ -23,12 +23,12 @@ class StudentCodeGenerationService
 
         // Format: CAMPUSCODE + YEAR + 3-digit sequence number
         // Example: SAI20250001, HCM20250002
-        $prefix = $campusCode.$year;
+        $prefix = $campusCode . $year;
 
         // Get the next sequence number for this campus and year
         $sequenceNumber = $this->getNextSequenceNumber($prefix);
 
-        return $prefix.str_pad((string) $sequenceNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad((string) $sequenceNumber, 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -62,14 +62,14 @@ class StudentCodeGenerationService
         // Use database transaction to ensure uniqueness
         return DB::transaction(function () use ($prefix) {
             // Get the highest existing sequence number for this prefix
-            $lastStudent = Student::where('student_code', 'like', $prefix.'%')
-                ->orderBy('student_code', 'desc')
+            $lastStudent = Student::where('student_id', 'like', $prefix . '%')
+                ->orderBy('student_id', 'desc')
                 ->lockForUpdate() // Prevent race conditions
                 ->first();
 
             if ($lastStudent) {
                 // Extract the sequence number from the last student code
-                $lastSequence = (int) substr($lastStudent->student_code, strlen($prefix));
+                $lastSequence = (int) substr($lastStudent->student_id, strlen($prefix));
 
                 return $lastSequence + 1;
             }
@@ -100,7 +100,7 @@ class StudentCodeGenerationService
      */
     public function studentCodeExists(string $studentCode): bool
     {
-        return Student::where('student_code', $studentCode)->exists();
+        return Student::where('student_id', $studentCode)->exists();
     }
 
     /**
@@ -114,7 +114,7 @@ class StudentCodeGenerationService
     public function generateMultipleStudentCodes(string $campusCode, int $count, ?int $year = null): array
     {
         $year = $year ?? now()->year;
-        $prefix = $campusCode.$year;
+        $prefix = $campusCode . $year;
 
         return DB::transaction(function () use ($prefix, $count) {
             $codes = [];
@@ -122,7 +122,7 @@ class StudentCodeGenerationService
 
             for ($i = 0; $i < $count; $i++) {
                 $sequenceNumber = $startingSequence + $i;
-                $codes[] = $prefix.str_pad((string) $sequenceNumber, 4, '0', STR_PAD_LEFT);
+                $codes[] = $prefix . str_pad((string) $sequenceNumber, 4, '0', STR_PAD_LEFT);
             }
 
             return $codes;

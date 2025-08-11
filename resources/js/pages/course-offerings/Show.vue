@@ -510,7 +510,7 @@ const editCourseOffering = () => {
                                         {{ index + 1 }}
                                     </TableCell>
                                     <TableCell class="font-medium">
-                                        {{ registration.student?.student_code }}
+                                        {{ registration.student?.student_id }}
                                     </TableCell>
                                     <TableCell>
                                         {{ registration.student?.full_name }}

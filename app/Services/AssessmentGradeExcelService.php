@@ -42,7 +42,7 @@ class AssessmentGradeExcelService
 
             // Generate filename first
             $fileName = $this->generateExportFileName($assessmentComponentDetail, $courseOffering);
-            $filePath = 'temp/'.$fileName;
+            $filePath = 'temp/' . $fileName;
 
             // Use optimized export with memory management
             $export = new \App\Exports\OptimizedGradeTemplateExport(
@@ -74,7 +74,7 @@ class AssessmentGradeExcelService
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            throw new \Exception('Failed to generate grade template: '.$e->getMessage());
+            throw new \Exception('Failed to generate grade template: ' . $e->getMessage());
         }
     }
 
@@ -124,7 +124,7 @@ class AssessmentGradeExcelService
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            throw new \Exception('Failed to import grades: '.$e->getMessage());
+            throw new \Exception('Failed to import grades: ' . $e->getMessage());
         }
     }
 
@@ -170,7 +170,7 @@ class AssessmentGradeExcelService
                 'error' => $e->getMessage(),
             ]);
 
-            throw new \Exception('Failed to preview import: '.$e->getMessage());
+            throw new \Exception('Failed to preview import: ' . $e->getMessage());
         }
     }
 
@@ -184,14 +184,14 @@ class AssessmentGradeExcelService
     ): \Illuminate\Database\Eloquent\Builder {
         return Student::select(
             'students.id',
-            'students.student_code',
+            'students.student_id',
             'students.full_name',
             'students.email'
         )
-            ->join('course_registrations', 'students.id', '=', 'course_registrations.student_code')
+            ->join('course_registrations', 'students.id', '=', 'course_registrations.student_id')
             ->where('course_registrations.course_offering_id', $courseOffering->id)
             ->whereIn('course_registrations.registration_status', ['registered', 'confirmed'])
-            ->orderBy('students.student_code');
+            ->orderBy('students.student_id');
     }
 
     /**
@@ -231,7 +231,7 @@ class AssessmentGradeExcelService
             'private_notes',
             'id'
         )
-            ->where('student_code', $student->id)
+            ->where('student_id', $student->id)
             ->where('assessment_component_detail_id', $assessmentComponentDetail->id)
             ->where('course_offering_id', $courseOffering->id)
             ->first();
@@ -285,7 +285,7 @@ class AssessmentGradeExcelService
      */
     protected function getTotalStudentCount(CourseOffering $courseOffering): int
     {
-        return Student::join('course_registrations', 'students.id', '=', 'course_registrations.student_code')
+        return Student::join('course_registrations', 'students.id', '=', 'course_registrations.student_id')
             ->where('course_registrations.course_offering_id', $courseOffering->id)
             ->whereIn('course_registrations.registration_status', ['registered', 'confirmed'])
             ->count();
@@ -335,7 +335,7 @@ class AssessmentGradeExcelService
             return $deletedCount;
         }
 
-        $files = glob($tempPath.'/grade_template_*.xlsx');
+        $files = glob($tempPath . '/grade_template_*.xlsx');
         $cutoffTime = time() - (24 * 60 * 60); // 24 hours ago
 
         foreach ($files as $file) {

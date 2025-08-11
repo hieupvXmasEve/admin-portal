@@ -31,7 +31,7 @@ class ProfileResource extends JsonResource
     protected function formatPersonalInfo(array $personalInfo): array
     {
         return [
-            'student_code' => $personalInfo['student_code'],
+            'student_id' => $personalInfo['student_id'],
             'name' => [
                 'first_name' => $personalInfo['first_name'],
                 'last_name' => $personalInfo['last_name'],
@@ -66,20 +66,20 @@ class ProfileResource extends JsonResource
                 'code' => $academicInfo['program']['code'],
                 'degree_type' => $academicInfo['program']['degree_type'],
                 'duration_years' => $academicInfo['program']['duration_years'],
-                'display_name' => $academicInfo['program']['code'].' - '.$academicInfo['program']['name'],
+                'display_name' => $academicInfo['program']['code'] . ' - ' . $academicInfo['program']['name'],
             ],
             'curriculum_version' => [
                 'id' => $academicInfo['curriculum_version']['id'],
                 'version' => $academicInfo['curriculum_version']['version'],
                 'effective_date' => $academicInfo['curriculum_version']['effective_date'],
-                'display' => 'Version '.$academicInfo['curriculum_version']['version'],
+                'display' => 'Version ' . $academicInfo['curriculum_version']['version'],
             ],
             'campus' => [
                 'id' => $academicInfo['campus']['id'],
                 'name' => $academicInfo['campus']['name'],
                 'code' => $academicInfo['campus']['code'],
                 'location' => $academicInfo['campus']['location'],
-                'display_name' => $academicInfo['campus']['name'].' ('.$academicInfo['campus']['code'].')',
+                'display_name' => $academicInfo['campus']['name'] . ' (' . $academicInfo['campus']['code'] . ')',
             ],
             'enrollment' => [
                 'enrollment_date' => $academicInfo['enrollment_date'],

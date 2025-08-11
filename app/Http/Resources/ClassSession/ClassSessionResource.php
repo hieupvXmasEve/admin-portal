@@ -98,7 +98,7 @@ class ClassSessionResource extends JsonResource
                 return $this->attendances->map(function ($attendance) {
                     return [
                         'id' => $attendance->id,
-                        'student_code' => $attendance->student_code,
+                        'student_id' => $attendance->student_id,
                         'status' => $attendance->status,
                         'status_badge_color' => $attendance->status_badge_color,
                         'check_in_time' => $attendance->check_in_time?->format('H:i'),
@@ -111,7 +111,7 @@ class ClassSessionResource extends JsonResource
                         'is_verified' => $attendance->is_verified,
                         'student' => $attendance->student ? [
                             'id' => $attendance->student->id,
-                            'student_code' => $attendance->student->student_code,
+                            'student_id' => $attendance->student->student_id,
                             'user' => $attendance->student->user ? [
                                 'id' => $attendance->student->user->id,
                                 'name' => $attendance->student->user->name,

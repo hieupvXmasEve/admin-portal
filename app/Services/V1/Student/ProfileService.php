@@ -127,7 +127,7 @@ class ProfileService
     protected function getPersonalInfo(Student $student): array
     {
         return [
-            'student_code' => $student->student_code,
+            'student_id' => $student->student_id,
             'first_name' => $student->first_name,
             'last_name' => $student->last_name,
             'full_name' => $student->full_name,
@@ -260,7 +260,7 @@ class ProfileService
             'percentage' => $percentage,
             'completed_fields' => $completedCount,
             'total_fields' => $totalFields,
-            'missing_fields' => array_keys(array_filter($fields, fn ($completed) => ! $completed)),
+            'missing_fields' => array_keys(array_filter($fields, fn($completed) => ! $completed)),
             'status' => $this->getCompletionStatus($percentage),
         ];
     }
@@ -513,7 +513,7 @@ class ProfileService
             $achievements[] = [
                 'type' => 'deans_list',
                 'title' => 'Dean\'s List',
-                'description' => 'Achieved GPA of '.round($achievement->gpa, 2),
+                'description' => 'Achieved GPA of ' . round($achievement->gpa, 2),
                 'semester' => $achievement->semester->name,
                 'date' => $achievement->created_at->toDateString(),
             ];

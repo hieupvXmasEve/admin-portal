@@ -68,7 +68,7 @@ class GPACalculationSeeder extends Seeder
                     $this->command->info("  Calculated GPA for {$calculationCount} students...");
                 }
             } catch (\Exception $e) {
-                $this->command->error("  Failed to calculate GPA for student {$student->id}: ".$e->getMessage());
+                $this->command->error("  Failed to calculate GPA for student {$student->id}: " . $e->getMessage());
                 throw $e; // Re-throw to stop execution
             }
         }
@@ -83,7 +83,7 @@ class GPACalculationSeeder extends Seeder
         // Use database transaction to ensure atomicity
         DB::transaction(function () use ($student, $semester) {
             // Get all academic records for this student up to this semester
-            $allRecords = AcademicRecord::where('student_code', $student->id)
+            $allRecords = AcademicRecord::where('student_id', $student->id)
                 ->where('grade_status', 'final')
                 ->where('excluded_from_gpa', false)
                 ->orderBy('semester_id')
@@ -111,23 +111,23 @@ class GPACalculationSeeder extends Seeder
 
             // Check if semester GPA already exists
             $existingSemester = GpaCalculation::where([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'semester_id' => $semester->id,
                 'calculation_type' => 'semester',
             ])->first();
 
-            $this->command->info('      Existing semester GPA record: '.($existingSemester ? 'YES (ID: '.$existingSemester->id.')' : 'NO'));
+            $this->command->info('      Existing semester GPA record: ' . ($existingSemester ? 'YES (ID: ' . $existingSemester->id . ')' : 'NO'));
 
             try {
                 // Check for existing record first
                 $semesterRecord = GpaCalculation::where([
-                    'student_code' => $student->id,
+                    'student_id' => $student->id,
                     'semester_id' => $semester->id,
                     'calculation_type' => 'semester',
                 ])->first();
 
                 $semesterData = [
-                    'student_code' => $student->id,
+                    'student_id' => $student->id,
                     'semester_id' => $semester->id,
                     'calculation_type' => 'semester',
                     'program_id' => $student->program_id,
@@ -162,7 +162,7 @@ class GPACalculationSeeder extends Seeder
                         // If we get a duplicate key error, try to find the existing record again
                         $this->command->warn('      Duplicate key for semester GPA, retrying...');
                         $semesterRecord = GpaCalculation::where([
-                            'student_code' => $student->id,
+                            'student_id' => $student->id,
                             'semester_id' => $semester->id,
                             'calculation_type' => 'semester',
                         ])->first();
@@ -175,7 +175,7 @@ class GPACalculationSeeder extends Seeder
                     }
                 }
             } catch (\Exception $e) {
-                $this->command->error("      Failed to create semester GPA for student {$student->id}: ".$e->getMessage());
+                $this->command->error("      Failed to create semester GPA for student {$student->id}: " . $e->getMessage());
 
                 // Don't throw - continue with other students
                 return;
@@ -183,23 +183,23 @@ class GPACalculationSeeder extends Seeder
 
             // Check if cumulative GPA already exists
             $existingCumulative = GpaCalculation::where([
-                'student_code' => $student->id,
+                'student_id' => $student->id,
                 'semester_id' => $semester->id,
                 'calculation_type' => 'cumulative',
             ])->first();
 
-            $this->command->info('      Existing cumulative GPA record: '.($existingCumulative ? 'YES (ID: '.$existingCumulative->id.')' : 'NO'));
+            $this->command->info('      Existing cumulative GPA record: ' . ($existingCumulative ? 'YES (ID: ' . $existingCumulative->id . ')' : 'NO'));
 
             try {
                 // Check for existing record first
                 $cumulativeRecord = GpaCalculation::where([
-                    'student_code' => $student->id,
+                    'student_id' => $student->id,
                     'semester_id' => $semester->id,
                     'calculation_type' => 'cumulative',
                 ])->first();
 
                 $cumulativeData = [
-                    'student_code' => $student->id,
+                    'student_id' => $student->id,
                     'semester_id' => $semester->id,
                     'calculation_type' => 'cumulative',
                     'program_id' => $student->program_id,
@@ -234,7 +234,7 @@ class GPACalculationSeeder extends Seeder
                         // If we get a duplicate key error, try to find the existing record again
                         $this->command->warn('      Duplicate key for cumulative GPA, retrying...');
                         $cumulativeRecord = GpaCalculation::where([
-                            'student_code' => $student->id,
+                            'student_id' => $student->id,
                             'semester_id' => $semester->id,
                             'calculation_type' => 'cumulative',
                         ])->first();
@@ -247,7 +247,7 @@ class GPACalculationSeeder extends Seeder
                     }
                 }
             } catch (\Exception $e) {
-                $this->command->error("      Failed to create cumulative GPA for student {$student->id}: ".$e->getMessage());
+                $this->command->error("      Failed to create cumulative GPA for student {$student->id}: " . $e->getMessage());
 
                 // Don't throw - continue with other students
                 return;

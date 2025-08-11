@@ -36,13 +36,13 @@ class CreateActiveStudentsSeeder extends Seeder
         // Get required data
         // get campus Hanoi
         $campus = Campus::where('code', 'HN')->first();
-//        $programs = Program::get();
+        //        $programs = Program::get();
         $program = Program::where('code', 'AI')->first();
         $curriculumVersions = CurriculumVersion::all();
 
-//        if ($programs->isEmpty() || $curriculumVersions->isEmpty()) {
-//            throw new \Exception(message: 'Required data not found. Please run InitialSetup seeders first.');
-//        }
+        //        if ($programs->isEmpty() || $curriculumVersions->isEmpty()) {
+        //            throw new \Exception(message: 'Required data not found. Please run InitialSetup seeders first.');
+        //        }
 
         $faker = Faker::create();
         $createdCount = 0;
@@ -50,12 +50,12 @@ class CreateActiveStudentsSeeder extends Seeder
         // Create 100 students
         for ($i = 1; $i <= 100; $i++) {
             // $campus = $campuses->random();
-//            $program = $programs->random();
+            //            $program = $programs->random();
             //            $specialization = $program->specializations->random();
 
             // Find curriculum version for this program/specialization
             $curriculumVersion = $curriculumVersions->where('program_id', $program->id)
-//                ->where('specialization_id', $specialization->id)
+                //                ->where('specialization_id', $specialization->id)
                 ->first();
 
             if (! $curriculumVersion) {
@@ -74,23 +74,23 @@ class CreateActiveStudentsSeeder extends Seeder
             $firstName = $faker->firstName($gender);
             // generate unique last name with fallback
             $lastName = $faker->lastName;
-            $fullName = $firstName.' '.$lastName;
+            $fullName = $firstName . ' ' . $lastName;
 
             // Generate unique student ID based on campus and year
             $year = 2024;
             $campusCode = $this->getCampusCode($campus->name);
             $studentId = $this->generateStudentId($campusCode, $year, $i);
-            while (Student::where('student_code', $studentId)->exists()) {
+            while (Student::where('student_id', $studentId)->exists()) {
                 $i++;
                 $studentId = $this->generateStudentId($campusCode, $year, $i);
             }
 
             // Generate unique email
-            $baseEmail = strtolower($firstName.'.'.$lastName.'@student.swinburne.edu.au');
+            $baseEmail = strtolower($firstName . '.' . $lastName . '@student.swinburne.edu.au');
             $email = $baseEmail;
             $counter = 1;
             while (User::where('email', $email)->exists() || Student::where('email', $email)->exists()) {
-                $email = strtolower($firstName.'.'.$lastName.$counter.'@student.swinburne.edu.au');
+                $email = strtolower($firstName . '.' . $lastName . $counter . '@student.swinburne.edu.au');
                 $counter++;
             }
 
@@ -100,7 +100,7 @@ class CreateActiveStudentsSeeder extends Seeder
 
             // Create student with active status
             $student = Student::create([
-                'student_code' => $studentId,
+                'student_id' => $studentId,
                 'full_name' => $fullName,
                 'email' => $i == 1 ? 'hieunuce11@gmail.com' : $email,
                 'password' => Hash::make('1234'),
@@ -119,7 +119,7 @@ class CreateActiveStudentsSeeder extends Seeder
                 'emergency_contact_name' => $faker->name,
                 'emergency_contact_phone' => $faker->phoneNumber,
                 'emergency_contact_relationship' => $faker->randomElement(['Parent', 'Guardian', 'Spouse', 'Sibling']),
-                'high_school_name' => $faker->company.' High School',
+                'high_school_name' => $faker->company . ' High School',
                 'high_school_graduation_year' => $faker->numberBetween(2020, 2024),
                 'entrance_exam_score' => $faker->randomFloat(2, 60, 100),
                 'admission_notes' => 'Admitted based on academic merit and entrance exam score.',
@@ -175,7 +175,7 @@ class CreateActiveStudentsSeeder extends Seeder
      */
     private function generateStudentId(string $campusCode, int $year, int $sequence): string
     {
-        return $campusCode.$year.str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
+        return $campusCode . $year . str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
     }
 
     /**

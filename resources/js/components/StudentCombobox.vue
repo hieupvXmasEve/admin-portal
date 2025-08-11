@@ -58,7 +58,7 @@ const apiError = ref<string | null>(null);
 // Computed properties
 const displayValue = computed(() => {
     if (selectedStudent.value) {
-        return `${selectedStudent.value.full_name} (${selectedStudent.value.student_code})`;
+        return `${selectedStudent.value.full_name} (${selectedStudent.value.student_id})`;
     }
     return props.placeholder;
 });
@@ -272,7 +272,7 @@ onMounted(() => {
                                         </Badge>
                                     </div>
                                     <div class="text-muted-foreground flex items-center gap-2 text-xs">
-                                        <span>{{ student.student_code }}</span>
+                                        <span>{{ student.student_id }}</span>
                                         <span>•</span>
                                         <span class="truncate">{{ student.email }}</span>
                                     </div>

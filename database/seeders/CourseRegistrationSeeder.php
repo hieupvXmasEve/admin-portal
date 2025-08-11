@@ -40,7 +40,7 @@ class CourseRegistrationSeeder extends Seeder
 
             foreach ($eligibleCourses as $courseOffering) {
                 CourseRegistration::firstOrCreate([
-                    'student_code' => $student->id,
+                    'student_id' => $student->id,
                     'course_offering_id' => $courseOffering->id,
                     'semester_id' => $semester->id,
                 ], [
