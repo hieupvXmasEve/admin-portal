@@ -133,7 +133,7 @@ class LecturerDashboardService
             'low_attendance_students' => $lowAttendanceStudents,
             'recently_absent_students' => $absentStudents,
             'critical_alerts' => array_merge(
-                array_filter($lowAttendanceStudents, fn ($s) => $s['attendance_percentage'] < 50),
+                array_filter($lowAttendanceStudents, fn($s) => $s['attendance_percentage'] < 50),
                 $absentStudents
             ),
         ];
@@ -210,7 +210,7 @@ class LecturerDashboardService
     {
         $query = $lecturer->classSessions()
             ->with(['courseOffering.curriculumUnit'])
-            ->where('attendance_marked', false)
+            ->whereDoesntHave('attendances')
             ->where('session_date', '<', now()->subHours(2))
             ->where('status', 'completed');
 

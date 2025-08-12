@@ -75,12 +75,15 @@ class AuthController extends Controller
         // Create token
         $token = $lecturer->createToken('lecturer-api', ['lecturer:access'])->plainTextToken;
 
-        return ApiResponse::success([
+        return ApiResponse::success(
+            data: [
 //            'lecturer' => new LecturerResource($lecturer),
-            'token' => $token,
-            'token_type' => 'Bearer',
-            'expires_in' => config('sanctum.expiration', 525600), // minutes
-        ], 'Login successful');
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'expires_in' => config('sanctum.expiration', 525600), // minutes
+            ],
+            message: 'Login successful'
+        );
     }
 
     /**
@@ -101,12 +104,15 @@ class AuthController extends Controller
         // Create new token
         $token = $lecturer->createToken('lecturer-api', ['lecturer:access'])->plainTextToken;
 
-        return ApiResponse::success([
-            'lecturer' => new LecturerResource($lecturer),
-            'token' => $token,
-            'token_type' => 'Bearer',
-            'expires_in' => config('sanctum.expiration', 525600),
-        ], 'Token refreshed successfully');
+        return ApiResponse::success(
+            data: [
+                'lecturer' => new LecturerResource($lecturer),
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'expires_in' => config('sanctum.expiration', 525600),
+            ],
+            message: 'Token refreshed successfully'
+        );
     }
 
     /**
@@ -122,7 +128,10 @@ class AuthController extends Controller
             $request->user()->currentAccessToken()->delete();
         }
 
-        return ApiResponse::success(null, 'Logged out successfully');
+        return ApiResponse::success(
+            data: null,
+            message: 'Logged out successfully'
+        );
     }
 
     /**
@@ -141,8 +150,8 @@ class AuthController extends Controller
         $lecturer->load(['campus', 'courseOfferings.curriculumUnit', 'courseOfferings.semester']);
 
         return ApiResponse::success(
-            new LecturerResource($lecturer),
-            'Profile retrieved successfully'
+            data: new LecturerResource($lecturer),
+            message: 'Profile retrieved successfully'
         );
     }
 
@@ -209,12 +218,15 @@ class AuthController extends Controller
             $deviceName = $request->device_name ?? 'Lecturer Portal (Google)';
             $token = $lecturer->createToken($deviceName, ['lecturer:access'])->plainTextToken;
 
-            return ApiResponse::success([
-                'lecturer' => new LecturerResource($lecturer),
-                'token' => $token,
-                'token_type' => 'Bearer',
-                'expires_in' => config('sanctum.expiration', 525600), // minutes
-            ], 'Google login successful');
+            return ApiResponse::success(
+                data: [
+                    'lecturer' => new LecturerResource($lecturer),
+                    'token' => $token,
+                    'token_type' => 'Bearer',
+                    'expires_in' => config('sanctum.expiration', 525600), // minutes
+                ],
+                message: 'Google login successful'
+            );
 
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to authenticate with Google: '.$e->getMessage());

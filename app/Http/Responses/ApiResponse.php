@@ -4,171 +4,152 @@ declare(strict_types=1);
 
 namespace App\Http\Responses;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 
-class ApiResponse
+final class ApiResponse
 {
     /**
-     * Create a successful API response
+     * Base success response
      */
     public static function success(
         mixed $data = null,
-        string $message = 'Operation successful',
-        int $statusCode = Response::HTTP_OK
+        array $meta = [],
+        ?string $message = null,
+        int $status = Response::HTTP_OK
     ): JsonResponse {
-        $response = [
-            'success' => true,
-            'message' => $message,
+        $body = [
+            'success'   => true,
             'timestamp' => now()->toISOString(),
         ];
 
         if ($data !== null) {
-            $response['data'] = $data;
+            $body['data'] = $data;
         }
 
-        return response()->json($response, $statusCode);
+        if (!empty($meta)) {
+            $body['meta'] = $meta;
+        }
+
+        if ($message !== null) {
+            $body['message'] = $message;
+        }
+
+        return response()->json($body, $status);
     }
 
     /**
-     * Create an error API response
+     * Base error response (unified envelope)
      */
     public static function error(
         string $message,
-        array $errors = [],
-        string $errorCode = 'GENERAL_ERROR',
-        int $statusCode = Response::HTTP_BAD_REQUEST
+        array $errors = [], // each item: ['code' => ?, 'field' => ?, 'detail' => ?]
+        int $status = Response::HTTP_BAD_REQUEST
     ): JsonResponse {
         return response()->json([
-            'success' => false,
-            'message' => $message,
-            'errors' => $errors,
-            'error_code' => $errorCode,
+            'success'   => false,
+            'message'   => $message,
+            'errors'    => array_values($errors), // normalize to indexed array
             'timestamp' => now()->toISOString(),
-        ], $statusCode);
+        ], $status);
     }
 
     /**
-     * Create a validation error response
+     * Validation error (422)
+     * Accepts Laravel validator errors or normalized array
      */
     public static function validationError(
         array $errors,
         string $message = 'Validation failed'
     ): JsonResponse {
-        return self::error(
-            $message,
-            $errors,
-            'VALIDATION_ERROR',
-            Response::HTTP_UNPROCESSABLE_ENTITY
-        );
+        // Nếu $errors là dạng ["field" => ["msg1","msg2"]], chuyển sang itemized
+        $normalized = [];
+        foreach ($errors as $field => $messages) {
+            foreach ((array)$messages as $detail) {
+                $normalized[] = [
+                    'code'   => 'VALIDATION_ERROR',
+                    'field'  => (string) $field,
+                    'detail' => (string) $detail,
+                ];
+            }
+        }
+
+        return self::error($message, $normalized, Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
     /**
-     * Create an authentication error response
+     * Auth/Authorization helpers
      */
-    public static function authenticationError(
-        string $message = 'Authentication failed'
-    ): JsonResponse {
-        return self::error(
-            $message,
-            [],
-            'AUTHENTICATION_ERROR',
-            Response::HTTP_UNAUTHORIZED
-        );
+    public static function authenticationError(string $message = 'Unauthorized'): JsonResponse
+    {
+        return self::error($message, [
+            ['code' => 'AUTHENTICATION_ERROR', 'field' => null, 'detail' => null],
+        ], Response::HTTP_UNAUTHORIZED);
+    }
+
+    public static function authorizationError(string $message = 'Forbidden'): JsonResponse
+    {
+        return self::error($message, [
+            ['code' => 'AUTHORIZATION_ERROR', 'field' => null, 'detail' => null],
+        ], Response::HTTP_FORBIDDEN);
     }
 
     /**
-     * Create an authorization error response
+     * Not found, server error, business logic, rate limit
      */
-    public static function authorizationError(
-        string $message = 'Access denied'
-    ): JsonResponse {
-        return self::error(
-            $message,
-            [],
-            'AUTHORIZATION_ERROR',
-            Response::HTTP_FORBIDDEN
-        );
+    public static function notFound(string $message = 'Resource not found'): JsonResponse
+    {
+        return self::error($message, [
+            ['code' => 'NOT_FOUND', 'field' => null, 'detail' => null],
+        ], Response::HTTP_NOT_FOUND);
     }
 
-    /**
-     * Create a not found error response
-     */
-    public static function notFound(
-        string $message = 'Resource not found'
-    ): JsonResponse {
-        return self::error(
-            $message,
-            [],
-            'NOT_FOUND',
-            Response::HTTP_NOT_FOUND
-        );
+    public static function serverError(string $message = 'Internal server error'): JsonResponse
+    {
+        return self::error($message, [
+            ['code' => 'SERVER_ERROR', 'field' => null, 'detail' => null],
+        ], Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 
-    /**
-     * Create a server error response
-     */
-    public static function serverError(
-        string $message = 'Internal server error'
-    ): JsonResponse {
-        return self::error(
-            $message,
-            [],
-            'SERVER_ERROR',
-            Response::HTTP_INTERNAL_SERVER_ERROR
-        );
-    }
-
-    /**
-     * Create a business logic error response
-     */
     public static function businessLogicError(
         string $message,
         array $errors = []
     ): JsonResponse {
-        return self::error(
-            $message,
-            $errors,
-            'BUSINESS_LOGIC_ERROR',
-            Response::HTTP_UNPROCESSABLE_ENTITY
-        );
+        // Nếu caller chỉ truyền message chung, vẫn tạo 1 item code chuẩn
+        $errors = empty($errors)
+            ? [['code' => 'BUSINESS_LOGIC_ERROR', 'field' => null, 'detail' => null]]
+            : $errors;
+
+        return self::error($message, $errors, Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    public static function rateLimitError(string $message = 'Too many requests'): JsonResponse
+    {
+        return self::error($message, [
+            ['code' => 'RATE_LIMIT', 'field' => null, 'detail' => null],
+        ], Response::HTTP_TOO_MANY_REQUESTS);
     }
 
     /**
-     * Create a rate limit error response
-     */
-    public static function rateLimitError(
-        string $message = 'Too many requests'
-    ): JsonResponse {
-        return self::error(
-            $message,
-            [],
-            'RATE_LIMIT_ERROR',
-            Response::HTTP_TOO_MANY_REQUESTS
-        );
-    }
-
-    /**
-     * Create a paginated response
+     * Paginated response using the unified meta
      */
     public static function paginated(
-        $paginatedData,
-        string $message = 'Data retrieved successfully'
+        LengthAwarePaginator $paginator,
+        ?string $message = null
     ): JsonResponse {
-        return response()->json([
-            'success' => true,
-            'message' => $message,
-            'data' => $paginatedData->items(),
-            'pagination' => [
-                'current_page' => $paginatedData->currentPage(),
-                'last_page' => $paginatedData->lastPage(),
-                'per_page' => $paginatedData->perPage(),
-                'total' => $paginatedData->total(),
-                'from' => $paginatedData->firstItem(),
-                'to' => $paginatedData->lastItem(),
-                'has_more_pages' => $paginatedData->hasMorePages(),
-            ],
-            'timestamp' => now()->toISOString(),
-        ]);
+        $meta = [
+            'page'        => $paginator->currentPage(),
+            'per_page'    => $paginator->perPage(),
+            'total'       => $paginator->total(),
+            'total_pages' => $paginator->lastPage(),
+        ];
+
+        return self::success(
+            data: $paginator->items(),
+            meta: $meta,
+            message: $message ?? 'Data retrieved successfully',
+            status: Response::HTTP_OK
+        );
     }
 }
