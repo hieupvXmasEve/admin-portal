@@ -129,12 +129,26 @@ class ClassSession extends Model
 
     public function getFormattedTimeAttribute(): string
     {
-        return $this->start_time->format('g:i A').' - '.$this->end_time->format('g:i A');
+        return $this->start_time->format('g:i A') . ' - ' . $this->end_time->format('g:i A');
     }
 
     public function getDurationInMinutesAttribute(): int
     {
         return (int) $this->start_time->diffInMinutes($this->end_time);
+    }
+
+    /**
+     * Derived attribute: a session is considered "attendance marked" if there is at least
+     * one attendance record associated with it. This avoids relying on a non-existent
+     * database column and keeps truth derived from `attendances`.
+     */
+    public function getAttendanceMarkedAttribute(): bool
+    {
+        if ($this->relationLoaded('attendances')) {
+            return $this->attendances->isNotEmpty();
+        }
+
+        return $this->attendances()->exists();
     }
 
     // Helper methods

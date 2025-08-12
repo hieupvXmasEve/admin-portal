@@ -8,9 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\DashboardFilterRequest;
 use App\Http\Resources\Api\V1\Lecturer\DashboardResource;
 use App\Http\Responses\ApiResponse;
+use App\Models\Semester;
 use App\Services\V1\Lecturer\LecturerDashboardService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
@@ -28,15 +30,21 @@ class DashboardController extends Controller
 
         try {
             $filters = $request->validated();
-            $semesterId = $filters['semester_id'] ?? null;
-
+            //            $semesterId = $filters['semester_id'] ?? null;
+            //            Get semester has is_active is true
+            $semesterId = Semester::firstWhere('is_active', true)->id;
+            Log::info('$semesterId ', [
+                'semester id' => $semesterId,
+                '$lecturer' => $lecturer
+            ]);
             $dashboardData = $this->dashboardService->getDashboardData($lecturer, $semesterId);
 
             return ApiResponse::success(
-                new DashboardResource($dashboardData),
-                'Dashboard data retrieved successfully'
+                data: new DashboardResource($dashboardData),
+                message: 'Dashboard data retrieved successfully'
             );
         } catch (\Exception $e) {
+            Log::error($e->getMessage());
             return ApiResponse::serverError('Failed to retrieve dashboard data');
         }
     }
@@ -56,8 +64,8 @@ class DashboardController extends Controller
             $teachingSummary = $this->dashboardService->getTeachingSummary($lecturer, $semester);
 
             return ApiResponse::success(
-                $teachingSummary,
-                'Teaching summary retrieved successfully'
+                data: $teachingSummary,
+                message: 'Teaching summary retrieved successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to retrieve teaching summary');
@@ -79,8 +87,8 @@ class DashboardController extends Controller
             $attendanceOverview = $this->dashboardService->getAttendanceOverview($lecturer, $semester);
 
             return ApiResponse::success(
-                $attendanceOverview,
-                'Attendance overview retrieved successfully'
+                data: $attendanceOverview,
+                message: 'Attendance overview retrieved successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to retrieve attendance overview');
@@ -102,8 +110,8 @@ class DashboardController extends Controller
             $studentAlerts = $this->dashboardService->getStudentAlerts($lecturer, $semester);
 
             return ApiResponse::success(
-                $studentAlerts,
-                'Student alerts retrieved successfully'
+                data: $studentAlerts,
+                message: 'Student alerts retrieved successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to retrieve student alerts');
@@ -119,14 +127,14 @@ class DashboardController extends Controller
         $lecturer = $request->user();
 
         try {
-            $limit = (int) $request->query('limit', 5);
+            $limit = (int)$request->query('limit', 5);
             $limit = min(max($limit, 1), 20); // Ensure limit is between 1 and 20
 
             $upcomingSessions = $this->dashboardService->getUpcomingSessions($lecturer, $limit);
 
             return ApiResponse::success(
-                $upcomingSessions,
-                'Upcoming sessions retrieved successfully'
+                data: $upcomingSessions,
+                message: 'Upcoming sessions retrieved successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to retrieve upcoming sessions');
@@ -142,14 +150,14 @@ class DashboardController extends Controller
         $lecturer = $request->user();
 
         try {
-            $limit = (int) $request->query('limit', 10);
+            $limit = (int)$request->query('limit', 10);
             $limit = min(max($limit, 1), 50); // Ensure limit is between 1 and 50
 
             $recentActivities = $this->dashboardService->getRecentActivities($lecturer, $limit);
 
             return ApiResponse::success(
-                $recentActivities,
-                'Recent activities retrieved successfully'
+                data: $recentActivities,
+                message: 'Recent activities retrieved successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to retrieve recent activities');

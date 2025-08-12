@@ -254,7 +254,7 @@ class LecturerAttendanceService
                 : 'Attendance records already exist for all enrolled students';
 
             if ($existingCount > 0 && count($createdRecords) > 0) {
-                $message = "Generated {count($createdRecords)} new records. {$existingCount} records already existed.";
+                $message = 'Generated ' . count($createdRecords) . ' new records. ' . $existingCount . ' records already existed.';
             }
 
             return [
@@ -306,7 +306,7 @@ class LecturerAttendanceService
 
         // Sessions requiring attention (unmarked attendance)
         $unmmarkedSessions = ClassSession::where('lecture_id', $lecturer->id)
-            ->where('attendance_marked', false)
+            ->whereDoesntHave('attendances')
             ->where('session_date', '<', now()->subHours(2))
             ->where('status', 'completed')
             ->with('courseOffering.curriculumUnit')
@@ -388,9 +388,9 @@ class LecturerAttendanceService
 
         if (! empty($filters['attendance_status'])) {
             if ($filters['attendance_status'] === 'marked') {
-                $query->where('attendance_marked', true);
+                $query->whereHas('attendances');
             } elseif ($filters['attendance_status'] === 'unmarked') {
-                $query->where('attendance_marked', false);
+                $query->whereDoesntHave('attendances');
             }
         }
 
@@ -449,7 +449,6 @@ class LecturerAttendanceService
             : 0;
 
         $session->update([
-            'attendance_marked' => true,
             'actual_attendees' => $totalAttendances,
             'attendance_percentage' => $attendancePercentage,
         ]);
