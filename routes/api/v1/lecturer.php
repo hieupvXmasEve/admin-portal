@@ -25,15 +25,15 @@ use Illuminate\Support\Facades\Route;
 // Public authentication routes
 Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])
-        ->middleware(['lecturer.api.rate:lecturer-auth'])
+//        ->middleware(['lecturer.api.rate:lecturer-auth'])
         ->name('login');
 
     Route::post('/login/google', [AuthController::class, 'loginWithGoogle'])
-        ->middleware(['lecturer.api.rate:lecturer-auth'])
+//        ->middleware(['lecturer.api.rate:lecturer-auth'])
         ->name('login.google');
 
     Route::post('/refresh', [AuthController::class, 'refresh'])
-        ->middleware(['lecturer.api.rate:lecturer-auth'])
+//        ->middleware(['lecturer.api.rate:lecturer-auth'])
         ->name('refresh');
 });
 
@@ -41,7 +41,7 @@ Route::prefix('auth')->name('auth.')->group(function () {
 Route::middleware([
     'auth:sanctum',
     'lecturer.api.auth',
-    'lecturer.api.rate:lecturer-api',
+//    'lecturer.api.rate:lecturer-api',
     'api.logging',
 ])->group(function () {
 
@@ -54,7 +54,7 @@ Route::middleware([
     // Dashboard endpoints
     Route::prefix('dashboard')->name('dashboard.')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])
-            ->middleware(['lecturer.api.rate:lecturer-dashboard'])
+//            ->middleware(['lecturer.api.rate:lecturer-dashboard'])
             ->name('index');
 
         Route::get('/teaching-summary', [DashboardController::class, 'teachingSummary'])->name('teaching-summary');
@@ -67,7 +67,7 @@ Route::middleware([
     // Course management endpoints
     Route::prefix('courses')->name('courses.')->group(function () {
         Route::get('/', [CourseController::class, 'index'])
-            ->middleware(['lecturer.api.rate:lecturer-course-management'])
+//            ->middleware(['lecturer.api.rate:lecturer-course-management'])
             ->name('index');
 
         Route::get('/summary', [CourseController::class, 'summary'])->name('summary');
@@ -83,7 +83,7 @@ Route::middleware([
     // Attendance management endpoints
     Route::prefix('attendance')->name('attendance.')->group(function () {
         Route::get('/', [AttendanceController::class, 'index'])
-            ->middleware(['lecturer.api.rate:lecturer-attendance'])
+//            ->middleware(['lecturer.api.rate:lecturer-attendance'])
             ->name('index');
 
         Route::get('/summary', [AttendanceController::class, 'summary'])->name('summary');
@@ -102,7 +102,7 @@ Route::middleware([
     // Timetable and session management endpoints
     Route::prefix('timetable')->name('timetable.')->group(function () {
         Route::get('/', [TimetableController::class, 'index'])
-            ->middleware(['lecturer.api.rate:lecturer-timetable'])
+//            ->middleware(['lecturer.api.rate:lecturer-timetable'])
             ->name('index');
 
         Route::get('/summary', [TimetableController::class, 'summary'])->name('summary');
@@ -122,7 +122,7 @@ Route::middleware([
     // Student management endpoints
     Route::prefix('students')->name('students.')->group(function () {
         Route::get('/', [StudentController::class, 'index'])
-            ->middleware(['lecturer.api.rate:lecturer-student-management'])
+//            ->middleware(['lecturer.api.rate:lecturer-student-management'])
             ->name('index');
 
         Route::get('/summary', [StudentController::class, 'summary'])->name('summary');
@@ -140,7 +140,7 @@ Route::middleware([
     // Assessment management endpoints
     Route::prefix('courses/{courseOffering}/assessments')->name('assessments.')->group(function () {
         Route::get('/', [AssessmentController::class, 'index'])
-            ->middleware(['lecturer.api.rate:lecturer-assessment-management'])
+//            ->middleware(['lecturer.api.rate:lecturer-assessment-management'])
             ->name('index');
 
         Route::post('/', [AssessmentController::class, 'store'])->name('store');

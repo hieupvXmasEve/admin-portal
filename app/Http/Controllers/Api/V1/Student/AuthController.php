@@ -76,22 +76,25 @@ class AuthController extends Controller
 
         $token = $student->createToken($deviceName, ['student'], $expiresAt)->plainTextToken;
 
-        return ApiResponse::success([
-            'student' => [
-                'id' => $student->id,
-                'student_id' => $student->student_id,
-                'full_name' => $student->full_name,
-                'email' => $student->email,
-                'status' => $student->status,
-                'campus' => $student->campus?->name,
-                'program' => $student->program?->name,
-                'specialization' => $student->specialization?->name,
-                'avatar_url' => $student->avatar_url,
+        return ApiResponse::success(
+            data: [
+                'student' => [
+                    'id' => $student->id,
+                    'student_id' => $student->student_id,
+                    'full_name' => $student->full_name,
+                    'email' => $student->email,
+                    'status' => $student->status,
+                    'campus' => $student->campus?->name,
+                    'program' => $student->program?->name,
+                    'specialization' => $student->specialization?->name,
+                    'avatar_url' => $student->avatar_url,
+                ],
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'expires_at' => $expiresAt->toISOString(),
             ],
-            'token' => $token,
-            'token_type' => 'Bearer',
-            'expires_at' => $expiresAt->toISOString(),
-        ], 'Login successful');
+            message: 'Login successful'
+        );
     }
 
     /**
@@ -116,11 +119,14 @@ class AuthController extends Controller
 
         $token = $student->createToken($deviceName, ['student'], $expiresAt)->plainTextToken;
 
-        return ApiResponse::success([
-            'token' => $token,
-            'token_type' => 'Bearer',
-            'expires_at' => $expiresAt->toISOString(),
-        ], 'Token refreshed successfully');
+        return ApiResponse::success(
+            data: [
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'expires_at' => $expiresAt->toISOString(),
+            ],
+            message: 'Token refreshed successfully'
+        );
     }
 
     /**
@@ -130,7 +136,10 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return ApiResponse::success(null, 'Logged out successfully');
+        return ApiResponse::success(
+            data: null,
+            message: 'Logged out successfully'
+        );
     }
 
     /**
@@ -140,40 +149,43 @@ class AuthController extends Controller
     {
         $student = $request->user();
 
-        return ApiResponse::success([
-            'student' => [
-                'id' => $student->id,
-                'student_id' => $student->student_id,
-                'full_name' => $student->full_name,
-                'email' => $student->email,
-                'phone' => $student->phone,
-                'status' => $student->status,
-                'academic_status' => $student->academic_status,
-                'campus' => [
-                    'id' => $student->campus?->id,
-                    'name' => $student->campus?->name,
-                    'code' => $student->campus?->code,
+        return ApiResponse::success(
+            data: [
+                'student' => [
+                    'id' => $student->id,
+                    'student_id' => $student->student_id,
+                    'full_name' => $student->full_name,
+                    'email' => $student->email,
+                    'phone' => $student->phone,
+                    'status' => $student->status,
+                    'academic_status' => $student->academic_status,
+                    'campus' => [
+                        'id' => $student->campus?->id,
+                        'name' => $student->campus?->name,
+                        'code' => $student->campus?->code,
+                    ],
+                    'program' => [
+                        'id' => $student->program?->id,
+                        'name' => $student->program?->name,
+                        'code' => $student->program?->code,
+                    ],
+                    'specialization' => $student->specialization ? [
+                        'id' => $student->specialization->id,
+                        'name' => $student->specialization->name,
+                    ] : null,
+                    'curriculum_version' => [
+                        'id' => $student->curriculumVersion?->id,
+                        'name' => $student->curriculumVersion?->name,
+                        'version' => $student->curriculumVersion?->version,
+                    ],
+                    'avatar_url' => $student->avatar_url,
+                    'admission_date' => $student->admission_date?->toDateString(),
+                    'expected_graduation_date' => $student->expected_graduation_date?->toDateString(),
+                    'last_login_at' => $student->last_login_at?->toISOString(),
                 ],
-                'program' => [
-                    'id' => $student->program?->id,
-                    'name' => $student->program?->name,
-                    'code' => $student->program?->code,
-                ],
-                'specialization' => $student->specialization ? [
-                    'id' => $student->specialization->id,
-                    'name' => $student->specialization->name,
-                ] : null,
-                'curriculum_version' => [
-                    'id' => $student->curriculumVersion?->id,
-                    'name' => $student->curriculumVersion?->name,
-                    'version' => $student->curriculumVersion?->version,
-                ],
-                'avatar_url' => $student->avatar_url,
-                'admission_date' => $student->admission_date?->toDateString(),
-                'expected_graduation_date' => $student->expected_graduation_date?->toDateString(),
-                'last_login_at' => $student->last_login_at?->toISOString(),
             ],
-        ], 'Student profile retrieved successfully');
+            message: 'Student profile retrieved successfully'
+        );
     }
 
     /**
@@ -221,17 +233,21 @@ class AuthController extends Controller
                         'email_verified_at' => now(),
                     ]);
 
-                    return ApiResponse::success([
-                        'student' => [
-                            'id' => $student->id,
-                            'full_name' => $student->full_name,
-                            'email' => $student->email,
-                            'status' => $student->status,
+                    return ApiResponse::success(
+                        data: [
+                            'student' => [
+                                'id' => $student->id,
+                                'full_name' => $student->full_name,
+                                'email' => $student->email,
+                                'status' => $student->status,
+                            ],
                         ],
-                    ], 'Student account created successfully. Please wait for admin approval.', 201);
+                        message: 'Student account created successfully. Please wait for admin approval.',
+                        status: 201
+                    );
                 }
 
-                return ApiResponse::notFoundError('No student account found with this email. Please contact your administrator.');
+                return ApiResponse::notFound('No student account found with this email. Please contact your administrator.');
             }
 
             // Update OAuth provider data if not set
@@ -267,22 +283,25 @@ class AuthController extends Controller
             $expiresAt = now()->addHours(8);
             $token = $student->createToken($deviceName, ['student'], $expiresAt)->plainTextToken;
 
-            return ApiResponse::success([
-                'student' => [
-                    'id' => $student->id,
-                    'student_id' => $student->student_id,
-                    'full_name' => $student->full_name,
-                    'email' => $student->email,
-                    'status' => $student->status,
-                    'campus' => $student->campus?->name,
-                    'program' => $student->program?->name,
-                    'specialization' => $student->specialization?->name,
-                    'avatar_url' => $student->avatar_url,
+            return ApiResponse::success(
+                data: [
+                    'student' => [
+                        'id' => $student->id,
+                        'student_id' => $student->student_id,
+                        'full_name' => $student->full_name,
+                        'email' => $student->email,
+                        'status' => $student->status,
+                        'campus' => $student->campus?->name,
+                        'program' => $student->program?->name,
+                        'specialization' => $student->specialization?->name,
+                        'avatar_url' => $student->avatar_url,
+                    ],
+                    'token' => $token,
+                    'token_type' => 'Bearer',
+                    'expires_at' => $expiresAt->toISOString(),
                 ],
-                'token' => $token,
-                'token_type' => 'Bearer',
-                'expires_at' => $expiresAt->toISOString(),
-            ], 'Google login successful');
+                message: 'Google login successful'
+            );
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to authenticate with Google: ' . $e->getMessage());
         }

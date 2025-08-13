@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\User;
+use App\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -26,28 +27,18 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
+            return ApiResponse::validationError($validator->errors()->toArray());
         }
 
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password ?? '')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid credentials',
-            ], 401);
+            return ApiResponse::authenticationError('Invalid credentials');
         }
 
         // Check if student account is active
         if ($user->status !== 'active') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Account is not active',
-            ], 403);
+            return ApiResponse::authorizationError('Account is not active');
         }
 
         // Update last login
@@ -57,10 +48,8 @@ class AuthController extends Controller
         $deviceName = $request->device_name ?? 'Student Portal';
         $token = $user->createToken($deviceName, ['student'])->plainTextToken;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful',
-            'data' => [
+        return ApiResponse::success(
+            data: [
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -71,7 +60,8 @@ class AuthController extends Controller
                 'token' => $token,
                 'token_type' => 'Bearer',
             ],
-        ]);
+            message: 'Login successful'
+        );
     }
 
     /**
@@ -81,10 +71,10 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Logout successful',
-        ]);
+        return ApiResponse::success(
+            data: null,
+            message: 'Logout successful'
+        );
     }
 
     /**
@@ -94,9 +84,8 @@ class AuthController extends Controller
     {
         $student = $request->user()->load(['campus', 'program', 'specialization']);
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return ApiResponse::success(
+            data: [
                 'student' => [
                     'id' => $student->id,
                     'student_id' => $student->student_id,
@@ -129,7 +118,8 @@ class AuthController extends Controller
                     'has_active_holds' => $student->hasActiveHolds(),
                 ],
             ],
-        ]);
+            message: 'Profile retrieved successfully'
+        );
     }
 
     /**
@@ -147,14 +137,13 @@ class AuthController extends Controller
         $deviceName = $currentToken->name ?? 'Student Portal';
         $newToken = $student->createToken($deviceName, ['student'])->plainTextToken;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Token refreshed successfully',
-            'data' => [
+        return ApiResponse::success(
+            data: [
                 'token' => $newToken,
                 'token_type' => 'Bearer',
             ],
-        ]);
+            message: 'Token refreshed successfully'
+        );
     }
 
     /**
@@ -165,10 +154,7 @@ class AuthController extends Controller
         // This endpoint might be disabled in production
         // Only allow registration if explicitly enabled
         if (! config('app.allow_student_registration', false)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Student registration is not available',
-            ], 403);
+            return ApiResponse::authorizationError('Student registration is not available');
         }
 
         $validator = Validator::make($request->all(), [
@@ -180,11 +166,7 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
+            return ApiResponse::validationError($validator->errors()->toArray());
         }
 
         // Create student with minimal information
@@ -198,10 +180,8 @@ class AuthController extends Controller
             'status' => 'inactive', // Requires admin activation
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Registration successful. Please wait for admin approval.',
-            'data' => [
+        return ApiResponse::success(
+            data: [
                 'student' => [
                     'id' => $student->id,
                     'full_name' => $student->full_name,
@@ -209,7 +189,9 @@ class AuthController extends Controller
                     'status' => $student->status,
                 ],
             ],
-        ], 201);
+            message: 'Registration successful. Please wait for admin approval.',
+            status: 201
+        );
     }
 
     /**
@@ -222,20 +204,16 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
+            return ApiResponse::validationError($validator->errors()->toArray());
         }
 
         // TODO: Implement password reset email sending
         // This would typically send a password reset link to the student's email
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Password reset link sent to your email',
-        ]);
+        return ApiResponse::success(
+            data: null,
+            message: 'Password reset link sent to your email'
+        );
     }
 
     /**
@@ -250,20 +228,16 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
+            return ApiResponse::validationError($validator->errors()->toArray());
         }
 
         // TODO: Implement password reset token validation
         // This would validate the reset token and update the password
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Password reset successful',
-        ]);
+        return ApiResponse::success(
+            data: null,
+            message: 'Password reset successful'
+        );
     }
 
     /**
@@ -273,9 +247,8 @@ class AuthController extends Controller
     {
         $lecturer = $request->user()->load(['campus']);
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return ApiResponse::success(
+            data: [
                 'lecturer' => [
                     'id' => $lecturer->id,
                     'employee_id' => $lecturer->employee_id,
@@ -317,7 +290,8 @@ class AuthController extends Controller
                     'is_available_for_assignment' => $lecturer->is_available_for_assignment,
                 ],
             ],
-        ]);
+            message: 'Profile retrieved successfully'
+        );
     }
 
     /**
@@ -327,9 +301,9 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Lecturer logout successful',
-        ]);
+        return ApiResponse::success(
+            data: null,
+            message: 'Lecturer logout successful'
+        );
     }
 }

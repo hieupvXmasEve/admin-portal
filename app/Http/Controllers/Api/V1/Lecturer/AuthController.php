@@ -36,16 +36,13 @@ class AuthController extends Controller
 
         // Find lecturer
         $lecturer = Lecture::where('email', $request->email)->first();
-        Log::debug('Created user password hash', ['hash' => $lecturer->password]);
-        Log::debug('Request password', ['password' => $request->password]);
-        Log::debug('Raw password', ['value' => bin2hex($request->password)]);
-        $hash = '$2y$12$K.2v568pEq8RvrFptjCAC.i0mz1Zcce2fGc1MGDfaQS5m3.6Omyty';
-        Log::debug('check pass', [
-            'result' => Hash::check($request->password, $hash),
-        ]);
-        Log::debug('Password match:', [
-            'result' => Hash::check($request->password, '$2y$12$zziCBIe4C97oqs4IT1Mp7u6xudoNnsjIbPiakbq7U/Ik4rUdYxdhm'),
-        ]);
+
+        // Avoid logging sensitive credentials. Only minimal, safe info.
+        if ($lecturer) {
+            Log::debug('Lecturer found for login attempt', ['lecturer_id' => $lecturer->id]);
+        } else {
+            Log::debug('No lecturer account found for provided email');
+        }
 
         if (! $lecturer || ! Hash::check($request->password, $lecturer->password ?? '')) {
             // RateLimiter::hit($key, 900); // 15 minutes
