@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
-    
+
     // Email Configuration Management
     Route::prefix('email-configurations')->group(function () {
         Route::get('/', [EmailConfigurationController::class, 'index'])->name('email-configurations.index');
@@ -26,9 +26,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::put('/{configuration}', [EmailConfigurationController::class, 'update'])->name('email-configurations.update');
         Route::delete('/{configuration}', [EmailConfigurationController::class, 'destroy'])->name('email-configurations.destroy');
         Route::post('/{configuration}/test', [EmailConfigurationController::class, 'test'])->name('email-configurations.test');
+        Route::post('/test-data', [EmailConfigurationController::class, 'testData'])->name('email-configurations.test-data');
         Route::post('/{configuration}/activate', [EmailConfigurationController::class, 'setActive'])->name('email-configurations.activate');
-        Route::get('/{configuration}/export', [EmailConfigurationController::class, 'export'])->name('email-configurations.export');
-        Route::post('/import', [EmailConfigurationController::class, 'import'])->name('email-configurations.import');
     });
 
     // Email Template Management
@@ -55,5 +54,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::get('/statistics', [EmailController::class, 'statistics'])->name('emails.statistics');
         Route::get('/logs/{emailLog}', [EmailController::class, 'showLog'])->name('emails.show-log');
         Route::post('/logs/{emailLog}/retry', [EmailController::class, 'retryEmail'])->name('emails.retry');
+        Route::get('/user-roles', [EmailController::class, 'getUserRoles'])->name('emails.user-roles');
+        Route::get('/campuses', [EmailController::class, 'getCampuses'])->name('emails.campuses');
     });
 });

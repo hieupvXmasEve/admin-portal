@@ -21,8 +21,8 @@ class EmailConfigurationController extends Controller
      */
     public function index(): JsonResponse
     {
-        $configurations = $this->smtpService->getAllConfigurations();
-        $statistics = $this->smtpService->getConfigurationStatistics();
+        $configurations = $this->smtpService->getAll();
+        $statistics = $this->smtpService->getStatistics();
 
         return response()->json([
             'success' => true,
@@ -38,8 +38,8 @@ class EmailConfigurationController extends Controller
     {
         try {
             $validated = $request->validate(EmailConfiguration::validationRules());
-            
-            $configuration = $this->smtpService->createConfiguration($validated);
+
+            $configuration = $this->smtpService->create($validated);
 
             return response()->json([
                 'success' => true,
@@ -81,15 +81,15 @@ class EmailConfigurationController extends Controller
             $rules = EmailConfiguration::validationRules();
             // Make password optional for updates
             $rules['password'] = 'nullable|string|max:255';
-            
+
             $validated = $request->validate($rules);
-            
+
             // Don't update password if not provided
             if (empty($validated['password'])) {
                 unset($validated['password']);
             }
-            
-            $configuration = $this->smtpService->updateConfiguration($configuration, $validated);
+
+            $configuration = $this->smtpService->update($configuration, $validated);
 
             return response()->json([
                 'success' => true,
@@ -117,7 +117,7 @@ class EmailConfigurationController extends Controller
     public function destroy(EmailConfiguration $configuration): JsonResponse
     {
         try {
-            $this->smtpService->deleteConfiguration($configuration);
+            $this->smtpService->delete($configuration);
 
             return response()->json([
                 'success' => true,
@@ -160,12 +160,42 @@ class EmailConfigurationController extends Controller
     }
 
     /**
+     * Test connection with configuration data (before saving).
+     */
+    public function testData(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate(EmailConfiguration::validationRules());
+
+            $result = $this->smtpService->testConnectionWithData($validated);
+
+            return response()->json([
+                'success' => $result['success'],
+                'message' => $result['message'],
+                'data' => $result,
+            ], $result['success'] ? 200 : 400);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to test email configuration',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Set configuration as active.
      */
     public function setActive(EmailConfiguration $configuration): JsonResponse
     {
         try {
-            $this->smtpService->setActiveConfiguration($configuration);
+            $configuration->setAsActive();
 
             return response()->json([
                 'success' => true,
@@ -181,62 +211,5 @@ class EmailConfigurationController extends Controller
         }
     }
 
-    /**
-     * Export configuration (without sensitive data).
-     */
-    public function export(EmailConfiguration $configuration): JsonResponse
-    {
-        try {
-            $exported = $this->smtpService->exportConfiguration($configuration);
 
-            return response()->json([
-                'success' => true,
-                'data' => $exported,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to export email configuration',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Import configuration from backup.
-     */
-    public function import(Request $request): JsonResponse
-    {
-        try {
-            $validated = $request->validate([
-                'configuration' => 'required|array',
-                'password' => 'nullable|string',
-            ]);
-
-            $configData = $validated['configuration'];
-            if (!empty($validated['password'])) {
-                $configData['password'] = $validated['password'];
-            }
-
-            $configuration = $this->smtpService->importConfiguration($configData);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Email configuration imported successfully',
-                'data' => $configuration,
-            ], 201);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to import email configuration',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
 }

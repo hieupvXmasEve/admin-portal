@@ -29,7 +29,7 @@ class NotificationService
     ): array {
         // Get appropriate template for the event
         $template = EmailTemplate::getLatestVersion($eventType);
-        
+
         if (!$template) {
             Log::warning('No email template found for event type', ['event_type' => $eventType]);
             return ['success' => false, 'message' => 'No template found for notification type'];
@@ -152,6 +152,10 @@ class NotificationService
 
             case 'assessment_deadline_approaching':
                 $results = $this->sendAssessmentDeadlineReminder($data);
+                break;
+
+            case 'assessment_final_reminder':
+                $results = $this->sendAssessmentFinalReminder($data);
                 break;
 
             case 'system_maintenance':
@@ -286,6 +290,202 @@ class NotificationService
     }
 
     /**
+     * Send assessment final reminder (critical deadline)
+     */
+    protected function sendAssessmentFinalReminder(array $data): array
+    {
+        $recipients = $data['recipients'] ?? [];
+        $assessmentInfo = $data['assessment_info'] ?? [];
+
+        return $this->sendAcademicNotification(
+            UserEmailPreference::TYPE_ASSESSMENT_DEADLINE,
+            $recipients,
+            [
+                'assessment_name' => $assessmentInfo['name'] ?? '',
+                'course_name' => $assessmentInfo['course'] ?? '',
+                'deadline' => $assessmentInfo['deadline'] ?? '',
+                'deadline_text' => 'in ' . ($assessmentInfo['hours_until_deadline'] ?? 2) . ' hours',
+                'submission_link' => $assessmentInfo['link'] ?? '',
+                'is_final_reminder' => true,
+                'urgency_level' => 'critical',
+            ]
+        );
+    }
+
+    /**
+     * Route notifications based on user roles and event type
+     */
+    public function routeNotificationByRole(
+        string $eventType,
+        array $data = [],
+        array $targetRoles = []
+    ): array {
+        $results = [];
+
+        foreach ($targetRoles as $role) {
+            try {
+                $recipients = $this->getRecipientsByRole($role, $data);
+
+                if ($recipients->isNotEmpty()) {
+                    $roleResult = $this->sendAcademicNotification(
+                        $eventType,
+                        $recipients,
+                        $data
+                    );
+
+                    $results[$role] = $roleResult;
+
+                    Log::info('Role-based notification sent', [
+                        'event_type' => $eventType,
+                        'role' => $role,
+                        'recipients_count' => $recipients->count(),
+                        'sent_count' => $roleResult['total_sent'] ?? 0,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to send role-based notification', [
+                    'event_type' => $eventType,
+                    'role' => $role,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $results[$role] = [
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Get recipients by role with optional filtering
+     */
+    protected function getRecipientsByRole(string $role, array $data = []): Collection
+    {
+        $query = User::whereHas('campusUserRoles', function ($query) use ($role) {
+            $query->whereHas('role', function ($roleQuery) use ($role) {
+                $roleQuery->where('name', $role);
+            });
+        });
+
+        // Apply additional filters based on data context
+        if (isset($data['campus_id'])) {
+            $query->whereHas('campusUserRoles', function ($campusQuery) use ($data) {
+                $campusQuery->where('campus_id', $data['campus_id']);
+            });
+        }
+
+        if (isset($data['program_id']) && $role === 'student') {
+            $query->whereHas('student', function ($studentQuery) use ($data) {
+                $studentQuery->where('program_id', $data['program_id']);
+            });
+        }
+
+        if (isset($data['course_offering_id']) && in_array($role, ['lecturer', 'student'])) {
+            if ($role === 'lecturer') {
+                // Get lecturers assigned to this course offering
+                $query->whereHas('teachingAssignments', function ($teachingQuery) use ($data) {
+                    $teachingQuery->where('course_offering_id', $data['course_offering_id']);
+                });
+            } elseif ($role === 'student') {
+                // Get students enrolled in this course offering
+                $query->whereHas('student.enrollments', function ($enrollmentQuery) use ($data) {
+                    $enrollmentQuery->where('course_offering_id', $data['course_offering_id']);
+                });
+            }
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Schedule recurring reminders
+     */
+    public function scheduleRecurringReminder(
+        string $type,
+        Collection|array $recipients,
+        string $frequency, // 'daily', 'weekly', 'monthly'
+        \DateTimeInterface $startDate,
+        ?\DateTimeInterface $endDate = null,
+        array $data = []
+    ): array {
+        $scheduledJobs = [];
+        $currentDate = clone $startDate;
+        $endDate = $endDate ?? $startDate->modify('+1 year');
+
+        while ($currentDate <= $endDate) {
+            $scheduledJobs[] = [
+                'scheduled_for' => $currentDate->format('Y-m-d H:i:s'),
+                'job_id' => dispatch(new ProcessNotificationJob(
+                    $type,
+                    $recipients instanceof Collection ? $recipients->toArray() : $recipients,
+                    array_merge($data, [
+                        'is_recurring' => true,
+                        'frequency' => $frequency,
+                        'occurrence_date' => $currentDate->format('Y-m-d'),
+                    ])
+                ))->delay($currentDate),
+            ];
+
+            // Calculate next occurrence
+            $currentDate = match ($frequency) {
+                'daily' => $currentDate->modify('+1 day'),
+                'weekly' => $currentDate->modify('+1 week'),
+                'monthly' => $currentDate->modify('+1 month'),
+                default => $currentDate->modify('+1 day'),
+            };
+        }
+
+        Log::info('Recurring reminders scheduled', [
+            'type' => $type,
+            'frequency' => $frequency,
+            'recipients_count' => count($recipients),
+            'occurrences' => count($scheduledJobs),
+            'start_date' => $startDate->format('Y-m-d H:i:s'),
+            'end_date' => $endDate->format('Y-m-d H:i:s'),
+        ]);
+
+        return $scheduledJobs;
+    }
+
+    /**
+     * Send notification with priority handling
+     */
+    public function sendPriorityNotification(
+        string $eventType,
+        Collection|array $recipients,
+        array $data = [],
+        string $priority = 'normal' // 'low', 'normal', 'high', 'critical'
+    ): array {
+        // Add priority information to data
+        $data['priority'] = $priority;
+        $data['priority_timestamp'] = now()->toISOString();
+
+        // For critical notifications, bypass user preferences
+        $checkPreferences = $priority !== 'critical';
+
+        $result = $this->sendAcademicNotification(
+            $eventType,
+            $recipients,
+            $data,
+            $checkPreferences
+        );
+
+        // Log priority notifications
+        Log::info('Priority notification sent', [
+            'event_type' => $eventType,
+            'priority' => $priority,
+            'recipients_count' => count($recipients),
+            'sent_count' => $result['total_sent'] ?? 0,
+            'bypassed_preferences' => !$checkPreferences,
+        ]);
+
+        return $result;
+    }
+
+    /**
      * Get user email from various recipient types
      */
     protected function getUserEmail($recipient): ?string
@@ -317,7 +517,7 @@ class NotificationService
             $variables['user_name'] = $recipient->name;
             $variables['user_email'] = $recipient->email;
             $variables['user_id'] = $recipient->id;
-            
+
             // Add role-specific variables
             if (method_exists($recipient, 'hasRole')) {
                 if ($recipient->hasRole('student')) {

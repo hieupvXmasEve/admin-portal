@@ -330,7 +330,7 @@ class EmailController extends Controller
 
             // Reset status and dispatch job again
             $emailLog->update(['status' => EmailLog::STATUS_PENDING]);
-            
+
             // We need to retrieve the original content - for simplicity, we'll send a basic retry
             $this->emailService->sendSingleEmail(
                 $emailLog->recipient,
@@ -349,6 +349,50 @@ class EmailController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retry email',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user roles for bulk email recipient selection.
+     */
+    public function getUserRoles(): JsonResponse
+    {
+        try {
+            // This would typically come from a RoleService or similar
+            $roles = \App\Models\Role::withCount('users')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $roles,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve user roles',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get campuses for bulk email recipient selection.
+     */
+    public function getCampuses(): JsonResponse
+    {
+        try {
+            // This would typically come from a CampusService or similar
+            $campuses = \App\Models\Campus::withCount('users')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $campuses,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve campuses',
                 'error' => $e->getMessage(),
             ], 500);
         }
