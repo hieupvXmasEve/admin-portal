@@ -6,10 +6,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Enrollment extends Model
+class Enrollment extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\EnrollmentFactory> */
     use HasFactory;
@@ -134,5 +133,114 @@ class Enrollment extends Model
     public function scopeBySemesterNumber(Builder $query, int $semesterNumber): void
     {
         $query->where('semester_number', $semesterNumber);
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure comprehensive logging for enrollments (critical academic data)
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get comprehensive fields for logging
+     */
+    protected function getComprehensiveLogFields(): array
+    {
+        return [
+            'student_id',
+            'semester_id',
+            'curriculum_version_id',
+            'semester_number',
+            'status',
+            'notes',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $studentName = $this->student?->full_name ?? "Student ID {$this->student_id}";
+        $semesterCode = $this->semester?->code ?? "Semester ID {$this->semester_id}";
+        $semesterNum = $this->semester_number;
+
+        return "{$studentName} - {$semesterCode} (Semester {$semesterNum})";
+    }
+
+    /**
+     * Custom activity descriptions for enrollment events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Enrolled student: {$identifier}",
+            'updated' => "Updated enrollment: {$identifier}",
+            'deleted' => "Removed enrollment: {$identifier}",
+            'restored' => "Restored enrollment: {$identifier}",
+            default => "{$eventName} enrollment: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'student_name' => $this->student?->full_name,
+            'student_email' => $this->student?->email,
+            'student_campus_id' => $this->student?->campus_id,
+            'semester_code' => $this->semester?->code,
+            'semester_name' => $this->semester?->name,
+            'program_name' => $this->curriculumVersion?->program?->name,
+            'specialization_name' => $this->curriculumVersion?->specialization?->name,
+            'curriculum_version_code' => $this->curriculumVersion?->version_code,
+            'academic_year' => $this->calculateAcademicYear(),
+            'enrollment_status' => $this->status,
+            'is_active_semester' => $this->semester?->is_active ?? false,
+        ];
+
+        // Add status change tracking
+        if ($this->isDirty('status') && $this->exists) {
+            $properties['status_change'] = [
+                'from' => $this->getOriginal('status'),
+                'to' => $this->status,
+                'changed_at' => now()->toDateTimeString(),
+            ];
+        }
+
+        // Add semester progression tracking
+        if ($this->isDirty('semester_number') && $this->exists) {
+            $properties['semester_progression'] = [
+                'from_semester' => $this->getOriginal('semester_number'),
+                'to_semester' => $this->semester_number,
+                'progression_type' => $this->semester_number > $this->getOriginal('semester_number') ? 'advance' : 'repeat',
+            ];
+        }
+
+        return $properties;
+    }
+
+    /**
+     * Calculate academic year based on semester number
+     */
+    private function calculateAcademicYear(): int
+    {
+        return (int) ceil($this->semester_number / 2);
+    }
+
+    /**
+     * Override to include campus context from student
+     */
+    protected function getCampusIdForLogging(): ?int
+    {
+        return $this->student?->campus_id ?? parent::getCampusIdForLogging();
     }
 }

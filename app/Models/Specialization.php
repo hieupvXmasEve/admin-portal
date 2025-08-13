@@ -6,11 +6,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Specialization extends Model
+class Specialization extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\SpecializationFactory> */
     use HasFactory;
@@ -155,6 +154,150 @@ class Specialization extends Model
             'code.unique' => 'This specialization code is already taken',
             'description.max' => 'Description cannot exceed 1000 characters',
             'is_active.boolean' => 'Active status must be true or false',
+        ];
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure comprehensive logging for specializations (critical academic structure)
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get comprehensive fields for logging
+     */
+    protected function getComprehensiveLogFields(): array
+    {
+        return [
+            'program_id',
+            'name',
+            'code',
+            'description',
+            'is_active',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $programName = $this->program?->name ?? "Program ID {$this->program_id}";
+        return "{$this->name} ({$this->code}) - {$programName}";
+    }
+
+    /**
+     * Custom activity descriptions for specialization events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created specialization: {$identifier}",
+            'updated' => "Updated specialization: {$identifier}",
+            'deleted' => "Removed specialization: {$identifier}",
+            'restored' => "Restored specialization: {$identifier}",
+            default => "{$eventName} specialization: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'specialization_code' => $this->code,
+            'specialization_name' => $this->name,
+            'program_code' => $this->program?->code,
+            'program_name' => $this->program?->name,
+            'is_active' => $this->is_active,
+            'curriculum_versions_count' => $this->curriculumVersions()->count(),
+            'active_curriculum_versions' => $this->curriculumVersions()->where('is_active', true)->count(),
+            'total_students' => $this->getStudentCount(),
+            'active_students' => $this->getActiveStudentCount(),
+        ];
+
+        // Track activation/deactivation
+        if ($this->isDirty('is_active') && $this->exists) {
+            $properties['activation_change'] = [
+                'from' => $this->getOriginal('is_active') ? 'active' : 'inactive',
+                'to' => $this->is_active ? 'active' : 'inactive',
+                'changed_at' => now()->toDateTimeString(),
+                'impact' => [
+                    'affected_curriculum_versions' => $this->curriculumVersions()->pluck('version_code')->toArray(),
+                    'affected_students' => $this->getAffectedStudentIds(),
+                ],
+            ];
+        }
+
+        // Track program change (shouldn't normally happen, but critical if it does)
+        if ($this->isDirty('program_id') && $this->exists) {
+            $oldProgram = Program::find($this->getOriginal('program_id'));
+            $newProgram = Program::find($this->program_id);
+            
+            $properties['program_change'] = [
+                'from_program' => $oldProgram?->name,
+                'to_program' => $newProgram?->name,
+                'change_type' => 'program_transfer',
+                'requires_curriculum_review' => true,
+            ];
+        }
+
+        // Add specialization structure details
+        $properties['specialization_structure'] = $this->getSpecializationStructure();
+
+        return $properties;
+    }
+
+    /**
+     * Get total student count for this specialization
+     */
+    private function getStudentCount(): int
+    {
+        return Student::where('specialization_id', $this->id)->count();
+    }
+
+    /**
+     * Get active student count for this specialization
+     */
+    private function getActiveStudentCount(): int
+    {
+        return Student::where('specialization_id', $this->id)
+            ->where('status', 'active')
+            ->count();
+    }
+
+    /**
+     * Get IDs of students affected by specialization changes
+     */
+    private function getAffectedStudentIds(): array
+    {
+        return Student::where('specialization_id', $this->id)
+            ->whereIn('status', ['active', 'suspended'])
+            ->pluck('student_id')
+            ->toArray();
+    }
+
+    /**
+     * Get specialization structure summary
+     */
+    private function getSpecializationStructure(): array
+    {
+        $allUnits = $this->getAllUnits();
+        
+        return [
+            'total_units' => $allUnits->count(),
+            'program_units' => $allUnits->where('source', 'program')->count(),
+            'specialization_units' => $allUnits->where('source', 'specialization')->count(),
+            'required_units' => $allUnits->where('is_required', true)->count(),
+            'elective_units' => $allUnits->where('is_required', false)->count(),
+            'units_by_year' => $allUnits->groupBy('year_level')->map->count()->toArray(),
         ];
     }
 }

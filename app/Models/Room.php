@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Room extends Model
+class Room extends AuditableModel
 {
     use HasFactory, SoftDeletes;
 
@@ -176,5 +175,69 @@ class Room extends Model
     public function requiresApproval(): bool
     {
         return $this->requires_approval;
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure minimal logging for infrastructure data
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_MINIMAL;
+    }
+
+    /**
+     * Get minimal fields for logging
+     */
+    protected function getMinimalLogFields(): array
+    {
+        return [
+            'campus_id',
+            'name',
+            'code',
+            'building',
+            'type',
+            'capacity',
+            'status',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        return $this->getFullCodeAttribute() . " - {$this->name}";
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'room_type' => $this->type,
+            'capacity' => $this->capacity,
+            'campus_name' => $this->campus?->name,
+        ];
+
+        // Track status changes
+        if ($this->isDirty('status') && $this->exists) {
+            $properties['status_change'] = [
+                'from' => $this->getOriginal('status'),
+                'to' => $this->status,
+            ];
+        }
+
+        return $properties;
+    }
+
+    /**
+     * Override to include campus context
+     */
+    protected function getCampusIdForLogging(): ?int
+    {
+        return $this->campus_id ?? parent::getCampusIdForLogging();
     }
 }

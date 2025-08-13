@@ -6,10 +6,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class GraduationRequirement extends Model
+class GraduationRequirement extends AuditableModel
 {
     use HasFactory;
 
@@ -182,5 +181,109 @@ class GraduationRequirement extends Model
                 $q->whereNull('effective_to')
                     ->orWhere('effective_to', '>=', $date);
             });
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure standard logging for static requirements
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_STANDARD;
+    }
+
+    /**
+     * Get standard fields for logging
+     */
+    protected function getStandardLogFields(): array
+    {
+        return [
+            'program_id',
+            'specialization_id',
+            'total_credits_required',
+            'minimum_gpa',
+            'required_internship',
+            'required_thesis',
+            'required_english_certification',
+            'effective_from',
+            'effective_to',
+            'is_active',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $programName = $this->program?->name ?? "Program ID {$this->program_id}";
+        $specializationName = $this->specialization?->name ?? 'General';
+        
+        return "{$programName} - {$specializationName}";
+    }
+
+    /**
+     * Custom activity descriptions
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created graduation requirements: {$identifier}",
+            'updated' => "Updated graduation requirements: {$identifier}",
+            'deleted' => "Archived graduation requirements: {$identifier}",
+            'restored' => "Restored graduation requirements: {$identifier}",
+            default => "{$eventName} graduation requirements: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'program_name' => $this->program?->name,
+            'specialization_name' => $this->specialization?->name ?? 'General Program',
+            'credit_requirements' => $this->getBreakdownCredits(),
+            'gpa_requirements' => $this->getGpaRequirements(),
+            'other_requirements' => $this->getOtherRequirements(),
+            'effective_period' => [
+                'from' => $this->effective_from?->format('Y-m-d'),
+                'to' => $this->effective_to?->format('Y-m-d'),
+            ],
+            'is_currently_active' => $this->isCurrentlyActive(),
+        ];
+
+        // Track activation changes
+        if ($this->isDirty('is_active') && $this->exists) {
+            $properties['activation_change'] = [
+                'from' => $this->getOriginal('is_active') ? 'active' : 'inactive',
+                'to' => $this->is_active ? 'active' : 'inactive',
+                'timestamp' => now()->toDateTimeString(),
+            ];
+        }
+
+        // Track credit requirement changes
+        if ($this->isDirty('total_credits_required') && $this->exists) {
+            $properties['credit_change'] = [
+                'from' => $this->getOriginal('total_credits_required'),
+                'to' => $this->total_credits_required,
+                'impact' => 'affects_graduation_eligibility',
+            ];
+        }
+
+        // Track GPA requirement changes
+        if ($this->isDirty('minimum_gpa') && $this->exists) {
+            $properties['gpa_change'] = [
+                'from' => $this->getOriginal('minimum_gpa'),
+                'to' => $this->minimum_gpa,
+                'impact' => 'affects_graduation_eligibility',
+            ];
+        }
+
+        return $properties;
     }
 }

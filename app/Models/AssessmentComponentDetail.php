@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class AssessmentComponentDetail extends Model
+class AssessmentComponentDetail extends AuditableModel
 {
     use HasFactory;
 
@@ -37,5 +36,76 @@ class AssessmentComponentDetail extends Model
     public function scores(): HasMany
     {
         return $this->hasMany(AssessmentComponentDetailScore::class);
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure standard logging for assessment details
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_STANDARD;
+    }
+
+    /**
+     * Get standard fields for logging
+     */
+    protected function getStandardLogFields(): array
+    {
+        return [
+            'assessment_component_id',
+            'name',
+            'weight',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $componentName = $this->assessmentComponent?->name ?? "Component ID {$this->assessment_component_id}";
+        return "{$this->name} - {$componentName}";
+    }
+
+    /**
+     * Custom activity descriptions
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Added assessment detail: {$identifier}",
+            'updated' => "Updated assessment detail: {$identifier}",
+            'deleted' => "Removed assessment detail: {$identifier}",
+            default => "{$eventName} assessment detail: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'detail_name' => $this->name,
+            'detail_weight' => $this->weight,
+            'parent_component' => $this->assessmentComponent?->name,
+            'parent_weight' => $this->assessmentComponent?->weight,
+            'unit_code' => $this->assessmentComponent?->syllabus?->curriculumUnit?->unit?->code,
+        ];
+
+        // Track weight changes
+        if ($this->isDirty('weight') && $this->exists) {
+            $properties['weight_change'] = [
+                'from' => $this->getOriginal('weight'),
+                'to' => $this->weight,
+                'parent_total_weight' => $this->assessmentComponent?->getTotalDetailWeightAttribute(),
+            ];
+        }
+
+        return $properties;
     }
 }

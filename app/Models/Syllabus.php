@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Syllabus extends Model
+class Syllabus extends AuditableModel
 {
     use HasFactory;
 
@@ -113,5 +112,117 @@ class Syllabus extends Model
     public function hasCompleteTotalHoursAndPerSessionHours(): bool
     {
         return $this->total_hours !== null && $this->hours_per_session !== null && $this->total_hours > 0 && $this->hours_per_session > 0;
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure comprehensive logging for syllabus (course content structure)
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get comprehensive fields for logging
+     */
+    protected function getComprehensiveLogFields(): array
+    {
+        return [
+            'curriculum_unit_id',
+            'version',
+            'description',
+            'total_hours',
+            'hours_per_session',
+            'is_active',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $unitCode = $this->curriculumUnit?->unit?->code ?? 'N/A';
+        $unitName = $this->curriculumUnit?->unit?->name;
+        
+        return "{$unitCode} - {$unitName} (v{$this->version})";
+    }
+
+    /**
+     * Custom activity descriptions
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created syllabus: {$identifier}",
+            'updated' => "Updated syllabus: {$identifier}",
+            'deleted' => "Archived syllabus: {$identifier}",
+            'restored' => "Restored syllabus: {$identifier}",
+            default => "{$eventName} syllabus: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'unit_code' => $this->curriculumUnit?->unit?->code,
+            'unit_name' => $this->curriculumUnit?->unit?->name,
+            'curriculum_version' => $this->curriculumUnit?->curriculumVersion?->version_code,
+            'program' => $this->curriculumUnit?->curriculumVersion?->program?->name,
+            'specialization' => $this->curriculumUnit?->curriculumVersion?->specialization?->name,
+            'semester' => $this->curriculumUnit?->semester?->code,
+            'syllabus_version' => $this->version,
+            'total_hours' => $this->total_hours,
+            'hours_per_session' => $this->hours_per_session,
+            'assessment_structure' => [
+                'total_weight' => $this->getTotalAssessmentWeightAttribute(),
+                'is_complete' => $this->hasCompleteAssessmentStructure(),
+                'components_count' => $this->assessmentComponents()->count(),
+            ],
+            'is_active' => $this->is_active,
+        ];
+
+        // Track activation changes
+        if ($this->isDirty('is_active') && $this->exists) {
+            $properties['activation_change'] = [
+                'from' => $this->getOriginal('is_active') ? 'active' : 'inactive',
+                'to' => $this->is_active ? 'active' : 'inactive',
+                'timestamp' => now()->toDateTimeString(),
+            ];
+        }
+
+        // Track version changes
+        if ($this->isDirty('version') && $this->exists) {
+            $properties['version_change'] = [
+                'from' => $this->getOriginal('version'),
+                'to' => $this->version,
+                'requires_review' => true,
+            ];
+        }
+
+        // Track hours changes
+        if (($this->isDirty('total_hours') || $this->isDirty('hours_per_session')) && $this->exists) {
+            $properties['hours_change'] = [
+                'total_hours' => [
+                    'from' => $this->getOriginal('total_hours'),
+                    'to' => $this->total_hours,
+                ],
+                'hours_per_session' => [
+                    'from' => $this->getOriginal('hours_per_session'),
+                    'to' => $this->hours_per_session,
+                ],
+                'sessions_count' => $this->total_hours && $this->hours_per_session ? 
+                    ceil($this->total_hours / $this->hours_per_session) : null,
+            ];
+        }
+
+        return $properties;
     }
 }
