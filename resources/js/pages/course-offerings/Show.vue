@@ -296,8 +296,8 @@ const editCourseOffering = () => {
 
                     <div v-if="courseOffering.curriculum_unit">
                         <p class="text-muted-foreground text-sm font-medium">Unit</p>
-                        <Link :href="`/units/${courseOffering.curriculum_unit.unit.id}`" class="flex items-center gap-2 text-lg font-semibold">
-                            {{ courseOffering.curriculum_unit.unit.code }} - {{ courseOffering.curriculum_unit.unit.name }}
+                        <Link :href="`/units/${courseOffering.curriculum_unit.unit.id}`" class="text-green-400 flex items-center gap-2 text-lg font-semibold">
+                            <span class="flex-1">{{ courseOffering.curriculum_unit.unit.code }} - {{ courseOffering.curriculum_unit.unit.name }}</span>
                             <ExternalLink class="h-4 w-4" />
                         </Link>
                     </div>

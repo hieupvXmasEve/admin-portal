@@ -4,41 +4,41 @@ import { format, parseISO } from 'date-fns'
 import { z } from 'zod'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
-import { 
-  Sheet, 
-  SheetContent, 
-  SheetDescription, 
-  SheetHeader, 
-  SheetTitle 
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  User, 
-  BookOpen, 
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  User,
+  BookOpen,
   AlertTriangle,
   Save,
   X
 } from 'lucide-vue-next'
 import { useAdminSchedule } from '@/composables/useAdminSchedule'
-import type { 
-  ScheduleSession, 
-  DetailedScheduleSession, 
+import type {
+  ScheduleSession,
+  DetailedScheduleSession,
   SessionUpdateData,
-  ConflictError 
+  ConflictError
 } from '@/types/schedule'
 
 // Props
@@ -101,9 +101,9 @@ const selectedRoom = computed(() => {
 // Room options grouped by campus
 const roomsByCapmus = computed(() => {
   if (!scheduleApi.filterOptions.value) return {}
-  
+
   const grouped: Record<string, typeof scheduleApi.filterOptions.value.rooms> = {}
-  
+
   scheduleApi.filterOptions.value.rooms.forEach(room => {
     const campusName = room.campus.name
     if (!grouped[campusName]) {
@@ -111,19 +111,19 @@ const roomsByCapmus = computed(() => {
     }
     grouped[campusName].push(room)
   })
-  
+
   return grouped
 })
 
 // Methods
 const loadSessionDetails = async () => {
   if (!props.session) return
-  
+
   isLoading.value = true
   try {
     await scheduleApi.fetchSessionDetails(props.session.id)
     detailedSession.value = scheduleApi.selectedSession.value as unknown as DetailedScheduleSession | null
-    
+
     // Populate form with current session data
     if (detailedSession.value?.schedule && detailedSession.value?.room) {
       setFieldValue('session_date', detailedSession.value.schedule.date)
@@ -140,10 +140,10 @@ const loadSessionDetails = async () => {
 
 const onSubmit = handleSubmit(async (formValues) => {
   if (!props.session) return
-  
+
   isLoading.value = true
   conflictError.value = null
-  
+
   try {
     const updateData: SessionUpdateData = {
       session_date: formValues.session_date,
@@ -151,9 +151,9 @@ const onSubmit = handleSubmit(async (formValues) => {
       end_time: formValues.end_time,
       room_id: formValues.room_id,
     }
-    
+
     const updatedSession = await scheduleApi.updateSession(props.session.id, updateData)
-    
+
     if (updatedSession) {
       emit('session-updated', updatedSession as unknown as DetailedScheduleSession)
     }
@@ -217,7 +217,7 @@ onMounted(async () => {
 
 <template>
   <Sheet :open="isOpen" @update:open="isOpen = $event">
-    <SheetContent class="w-full sm:max-w-lg overflow-y-auto">
+    <SheetContent class="w-full sm:max-w-lg overflow-y-auto py-4">
       <SheetHeader>
         <SheetTitle class="flex items-center space-x-2">
           <Calendar class="h-5 w-5" />
@@ -237,7 +237,7 @@ onMounted(async () => {
       </div>
 
       <!-- Session Details & Edit Form -->
-      <div v-else-if="detailedSession" class="space-y-6 mt-6">
+      <div v-else-if="detailedSession" class="space-y-6 px-4">
         <!-- Current Session Info -->
         <div class="space-y-4">
           <div class="space-y-2">
@@ -306,7 +306,7 @@ onMounted(async () => {
                 {{ errors.start_time }}
               </p>
             </div>
-            
+
             <div class="space-y-2">
               <Label for="end_time">End Time</Label>
               <Input
@@ -324,11 +324,11 @@ onMounted(async () => {
           <!-- Room Selection -->
           <div class="space-y-2">
             <Label for="room">Room</Label>
-            <Select 
+            <Select
               :value="values.room_id?.toString() || ''"
               onValueChange="(value) => setFieldValue('room_id', parseInt(value))"
             >
-              <SelectTrigger 
+              <SelectTrigger
                 id="room"
                 :class="{ 'border-destructive': errors.room_id }"
               >
@@ -339,7 +339,7 @@ onMounted(async () => {
                   <div class="px-2 py-1 text-sm font-semibold text-muted-foreground">
                     {{ campusName }}
                   </div>
-                  <SelectItem 
+                  <SelectItem
                     v-for="room in rooms"
                     :key="room.id"
                     :value="room.id.toString()"
@@ -359,7 +359,7 @@ onMounted(async () => {
           </div>
 
           <!-- Preview of Changes -->
-          <div 
+          <div
             v-if="values.session_date && values.start_time && values.end_time && selectedRoom"
             class="space-y-2 p-3 bg-muted/50 rounded-lg"
           >
@@ -382,17 +382,17 @@ onMounted(async () => {
 
           <!-- Action Buttons -->
           <div class="flex space-x-2 pt-4">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               class="flex-1"
               :disabled="isLoading"
             >
               <Save class="h-4 w-4 mr-2" />
               {{ isLoading ? 'Saving...' : 'Save Changes' }}
             </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               @click="handleClose"
               :disabled="isLoading"
             >
