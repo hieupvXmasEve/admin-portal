@@ -6,11 +6,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-class CurriculumUnit extends Model
+class CurriculumUnit extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\CurriculumUnitFactory> */
     use HasFactory;
@@ -298,5 +297,109 @@ class CurriculumUnit extends Model
 
         // Basic validation - can be extended with more business rules
         return $unit->credit_points >= $this->unit->credit_points * 0.8; // At least 80% of credit points
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure comprehensive logging for curriculum units (critical academic relationships)
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get comprehensive fields for logging
+     */
+    protected function getComprehensiveLogFields(): array
+    {
+        return [
+            'curriculum_version_id',
+            'unit_id',
+            'semester_id',
+            'unit_scope',
+            'year_level',
+            'semester_number',
+            'note',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $unitCode = $this->unit?->code ?? "Unit ID {$this->unit_id}";
+        $unitName = $this->unit?->name;
+        $academicPeriod = $this->getAcademicPeriod() ?? 'N/A';
+        
+        return "{$unitCode} - {$unitName} ({$academicPeriod})";
+    }
+
+    /**
+     * Custom activity descriptions for curriculum unit events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Added unit to curriculum: {$identifier}",
+            'updated' => "Updated curriculum unit: {$identifier}",
+            'deleted' => "Removed unit from curriculum: {$identifier}",
+            'restored' => "Restored curriculum unit: {$identifier}",
+            default => "{$eventName} curriculum unit: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'unit_code' => $this->unit?->code,
+            'unit_name' => $this->unit?->name,
+            'credit_points' => $this->unit?->credit_points,
+            'curriculum_version' => $this->curriculumVersion?->version_code,
+            'program' => $this->curriculumVersion?->program?->name,
+            'specialization' => $this->curriculumVersion?->specialization?->name,
+            'semester' => $this->semester?->code,
+            'academic_period' => $this->getAcademicPeriod(),
+            'unit_scope' => $this->unit_scope,
+            'is_core' => $this->isCore(),
+            'is_elective' => $this->isElective(),
+            'has_syllabus' => $this->syllabus()->exists(),
+        ];
+
+        // Track year level changes
+        if ($this->isDirty('year_level') && $this->exists) {
+            $properties['year_level_change'] = [
+                'from' => $this->getOriginal('year_level'),
+                'to' => $this->year_level,
+                'impact' => 'affects_student_progression',
+            ];
+        }
+
+        // Track semester changes
+        if ($this->isDirty('semester_number') && $this->exists) {
+            $properties['semester_change'] = [
+                'from' => $this->getOriginal('semester_number'),
+                'to' => $this->semester_number,
+                'academic_impact' => 'affects_course_scheduling',
+            ];
+        }
+
+        // Track unit scope changes
+        if ($this->isDirty('unit_scope') && $this->exists) {
+            $properties['scope_change'] = [
+                'from' => $this->getOriginal('unit_scope'),
+                'to' => $this->unit_scope,
+                'affects_eligibility' => true,
+            ];
+        }
+
+        return $properties;
     }
 }

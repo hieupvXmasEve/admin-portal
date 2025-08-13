@@ -3,12 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Building extends Model
+class Building extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\BuildingFactory> */
     use HasFactory, SoftDeletes;
@@ -86,5 +85,43 @@ class Building extends Model
     {
         // return $this->rooms()->count();
         return 0; // Placeholder until Room model is implemented
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure minimal logging for infrastructure data
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_MINIMAL;
+    }
+
+    /**
+     * Get minimal fields for logging
+     */
+    protected function getMinimalLogFields(): array
+    {
+        return [
+            'campus_id',
+            'name',
+            'code',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        return "{$this->code} - {$this->name}";
+    }
+
+    /**
+     * Override to include campus context
+     */
+    protected function getCampusIdForLogging(): ?int
+    {
+        return $this->campus_id ?? parent::getCampusIdForLogging();
     }
 }

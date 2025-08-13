@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class ClassSession extends Model
+class ClassSession extends AuditableModel
 {
     use HasFactory;
 
@@ -195,6 +194,119 @@ class ClassSession extends Model
             'excused' => $excused,
             'attendance_percentage' => $total > 0 ? round(($present + $late) / $total * 100, 1) : 0,
         ];
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure standard logging for scheduling data
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_STANDARD;
+    }
+
+    /**
+     * Get standard fields for logging
+     */
+    protected function getStandardLogFields(): array
+    {
+        return [
+            'course_offering_id',
+            'room_id',
+            'lecture_id',
+            'session_title',
+            'session_date',
+            'start_time',
+            'end_time',
+            'session_type',
+            'delivery_mode',
+            'status',
+            'attendance_required',
+            'is_assessment',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $unitCode = $this->courseOffering?->unit?->code ?? 'N/A';
+        $sessionDate = $this->session_date?->format('Y-m-d') ?? 'N/A';
+        
+        return "{$unitCode} - Session on {$sessionDate}";
+    }
+
+    /**
+     * Custom activity descriptions
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Scheduled class session: {$identifier}",
+            'updated' => "Updated class session: {$identifier}",
+            'deleted' => "Cancelled class session: {$identifier}",
+            'restored' => "Restored class session: {$identifier}",
+            default => "{$eventName} class session: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'unit_code' => $this->courseOffering?->unit?->code,
+            'unit_name' => $this->courseOffering?->unit?->name,
+            'session_title' => $this->session_title,
+            'session_date' => $this->session_date?->format('Y-m-d'),
+            'session_time' => $this->getFormattedTimeAttribute(),
+            'room' => $this->room?->getFullCodeAttribute(),
+            'instructor' => $this->lecture?->name,
+            'delivery_mode' => $this->delivery_mode,
+            'attendance_tracking' => $this->attendance_tracking_enabled,
+        ];
+
+        // Track status changes
+        if ($this->isDirty('status') && $this->exists) {
+            $properties['status_change'] = [
+                'from' => $this->getOriginal('status'),
+                'to' => $this->status,
+                'timestamp' => now()->toDateTimeString(),
+            ];
+
+            // Special handling for cancellation
+            if ($this->status === 'cancelled') {
+                $properties['cancellation'] = [
+                    'reason' => $this->cancellation_reason,
+                    'cancelled_at' => $this->cancelled_at?->toDateTimeString(),
+                ];
+            }
+        }
+
+        // Track room changes
+        if ($this->isDirty('room_id') && $this->exists) {
+            $oldRoom = Room::find($this->getOriginal('room_id'));
+            $properties['room_change'] = [
+                'from' => $oldRoom?->getFullCodeAttribute(),
+                'to' => $this->room?->getFullCodeAttribute(),
+            ];
+        }
+
+        // Track time changes
+        if (($this->isDirty('start_time') || $this->isDirty('end_time')) && $this->exists) {
+            $properties['time_change'] = [
+                'from' => $this->getOriginal('start_time') . ' - ' . $this->getOriginal('end_time'),
+                'to' => $this->start_time . ' - ' . $this->end_time,
+                'notification_required' => true,
+            ];
+        }
+
+        return $properties;
     }
 
     public function getStatusBadgeColorAttribute(): string

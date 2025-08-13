@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class AssessmentComponent extends Model
+class AssessmentComponent extends AuditableModel
 {
     use HasFactory;
 
@@ -235,5 +234,127 @@ class AssessmentComponent extends Model
             ->where('student_id', $student->id)
             ->with('assessmentComponentDetail')
             ->get();
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure comprehensive logging for assessment components (critical academic structure)
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get comprehensive fields for logging
+     */
+    protected function getComprehensiveLogFields(): array
+    {
+        return [
+            'syllabus_id',
+            'name',
+            'weight',
+            'type',
+            'is_required_to_sit_final_exam',
+            'description',
+            'code',
+            'due_date',
+            'is_group_work',
+            'is_published',
+            'scores_published',
+            'is_extra_credit',
+            'status',
+            'category',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $syllabusUnit = $this->syllabus?->curriculumUnit?->unit;
+        $unitCode = $syllabusUnit?->code ?? 'N/A';
+        
+        return "{$this->name} ({$this->type}) - {$unitCode}";
+    }
+
+    /**
+     * Custom activity descriptions for assessment component events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created assessment component: {$identifier}",
+            'updated' => "Updated assessment component: {$identifier}",
+            'deleted' => "Removed assessment component: {$identifier}",
+            'restored' => "Restored assessment component: {$identifier}",
+            default => "{$eventName} assessment component: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'component_name' => $this->name,
+            'component_type' => $this->type,
+            'weight_percentage' => $this->weight,
+            'unit_code' => $this->syllabus?->curriculumUnit?->unit?->code,
+            'unit_name' => $this->syllabus?->curriculumUnit?->unit?->name,
+            'syllabus_version' => $this->syllabus?->version,
+            'total_detail_weight' => $this->getTotalDetailWeightAttribute(),
+            'has_details' => $this->hasDetails(),
+            'affects_final_exam' => $this->is_required_to_sit_final_exam,
+            'is_group_assessment' => $this->is_group_work,
+            'publication_status' => [
+                'is_published' => $this->is_published,
+                'scores_published' => $this->scores_published,
+            ],
+        ];
+
+        // Track weight changes (critical for grading)
+        if ($this->isDirty('weight') && $this->exists) {
+            $properties['weight_change'] = [
+                'from' => $this->getOriginal('weight'),
+                'to' => $this->weight,
+                'validation' => $this->validateTotalWeight($this->weight),
+                'impact' => 'affects_grade_calculation',
+            ];
+        }
+
+        // Track due date changes
+        if ($this->isDirty('due_date') && $this->exists) {
+            $properties['due_date_change'] = [
+                'from' => $this->getOriginal('due_date'),
+                'to' => $this->due_date,
+                'notification_required' => true,
+            ];
+        }
+
+        // Track publication status changes
+        if ($this->isDirty('is_published') && $this->exists) {
+            $properties['publication_change'] = [
+                'from' => $this->getOriginal('is_published') ? 'published' : 'unpublished',
+                'to' => $this->is_published ? 'published' : 'unpublished',
+                'timestamp' => now()->toDateTimeString(),
+            ];
+        }
+
+        // Track score publication
+        if ($this->isDirty('scores_published') && $this->exists) {
+            $properties['score_publication'] = [
+                'published' => $this->scores_published,
+                'timestamp' => now()->toDateTimeString(),
+                'affects_students' => true,
+            ];
+        }
+
+        return $properties;
     }
 }

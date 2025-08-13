@@ -6,11 +6,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class CurriculumVersion extends Model
+class CurriculumVersion extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\CurriculumVersionFactory> */
     use HasFactory;
@@ -194,5 +193,138 @@ class CurriculumVersion extends Model
     public function scopeForProgram(Builder $query, Program $program): void
     {
         $query->where('program_id', $program->id);
+    }
+
+    // ========== AUDIT LOGGING CONFIGURATION ==========
+
+    /**
+     * Configure comprehensive logging for curriculum versions (critical academic data)
+     */
+    protected function getLoggingLevel(): string
+    {
+        return static::LOG_LEVEL_COMPREHENSIVE;
+    }
+
+    /**
+     * Get comprehensive fields for logging
+     */
+    protected function getComprehensiveLogFields(): array
+    {
+        return [
+            'program_id',
+            'specialization_id',
+            'version_code',
+            'semester_id',
+            'notes',
+            'is_active',
+        ];
+    }
+
+    /**
+     * Get identifier for logging
+     */
+    protected function getIdentifierForLog(): string
+    {
+        $programName = $this->program?->name ?? "Program ID {$this->program_id}";
+        $specializationName = $this->specialization?->name ?? 'General';
+        $versionCode = $this->version_code;
+
+        return "{$programName} - {$specializationName} (v{$versionCode})";
+    }
+
+    /**
+     * Custom activity descriptions for curriculum version events
+     */
+    public function getDescriptionForEvent(string $eventName): string
+    {
+        $identifier = $this->getIdentifierForLog();
+
+        return match ($eventName) {
+            'created' => "Created curriculum version: {$identifier}",
+            'updated' => "Updated curriculum version: {$identifier}",
+            'deleted' => "Archived curriculum version: {$identifier}",
+            'restored' => "Restored curriculum version: {$identifier}",
+            default => "{$eventName} curriculum version: {$identifier}",
+        };
+    }
+
+    /**
+     * Additional properties to log
+     */
+    protected function getCustomLogProperties(): array
+    {
+        $properties = [
+            'program_code' => $this->program?->code,
+            'program_name' => $this->program?->name,
+            'specialization_code' => $this->specialization?->code,
+            'specialization_name' => $this->specialization?->name ?? 'General Program',
+            'version_code' => $this->version_code,
+            'effective_from_semester' => $this->effectiveFromSemester?->code,
+            'is_active' => $this->is_active,
+            'total_units' => $this->curriculumUnits()->count(),
+            'required_units' => $this->requiredUnits()->count(),
+            'elective_units' => $this->electiveUnits()->count(),
+            'affected_students_count' => $this->students()->count(),
+            'active_enrollments_count' => $this->enrollments()->where('status', 'in_progress')->count(),
+        ];
+
+        // Track activation/deactivation
+        if ($this->isDirty('is_active') && $this->exists) {
+            $properties['activation_change'] = [
+                'from' => $this->getOriginal('is_active') ? 'active' : 'inactive',
+                'to' => $this->is_active ? 'active' : 'inactive',
+                'changed_at' => now()->toDateTimeString(),
+                'affected_students' => $this->students()->pluck('student_id')->toArray(),
+            ];
+        }
+
+        // Track version changes
+        if ($this->isDirty('version_code') && $this->exists) {
+            $properties['version_change'] = [
+                'from_version' => $this->getOriginal('version_code'),
+                'to_version' => $this->version_code,
+                'change_type' => 'version_update',
+            ];
+        }
+
+        // Track semester effectiveness change
+        if ($this->isDirty('semester_id') && $this->exists) {
+            $oldSemester = Semester::find($this->getOriginal('semester_id'));
+            $newSemester = Semester::find($this->semester_id);
+            
+            $properties['effectiveness_change'] = [
+                'from_semester' => $oldSemester?->code,
+                'to_semester' => $newSemester?->code,
+                'impact' => 'curriculum_applicability_changed',
+            ];
+        }
+
+        // Add curriculum structure summary
+        $properties['curriculum_structure'] = $this->getCurriculumStructureSummary();
+
+        return $properties;
+    }
+
+    /**
+     * Get curriculum structure summary for logging
+     */
+    private function getCurriculumStructureSummary(): array
+    {
+        $unitsByYear = [];
+        for ($year = 1; $year <= 4; $year++) {
+            $unitsByYear["year_{$year}"] = $this->unitsByYearLevel($year)->count();
+        }
+
+        return [
+            'by_year' => $unitsByYear,
+            'by_type' => [
+                'core' => $this->unitsByGroupType('core')->count(),
+                'elective' => $this->unitsByGroupType('elective')->count(),
+                'specialization' => $this->unitsByGroupType('specialization')->count(),
+            ],
+            'total_credit_points' => $this->curriculumUnits()
+                ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
+                ->sum('units.credit_points'),
+        ];
     }
 }
