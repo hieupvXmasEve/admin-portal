@@ -227,6 +227,22 @@ class User extends UserAuditableModel
     }
 
     /**
+     * Email preferences relationship
+     */
+    public function emailPreferences()
+    {
+        return $this->hasMany(UserEmailPreference::class);
+    }
+
+    /**
+     * Email logs relationship
+     */
+    public function emailLogs()
+    {
+        return $this->hasMany(EmailLog::class);
+    }
+
+    /**
      * Available user status constants
      */
     public const STATUS_ACTIVE = 'active';
