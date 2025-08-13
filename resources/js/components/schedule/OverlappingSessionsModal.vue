@@ -80,7 +80,7 @@ const getSessionBadgeColor = (status: string) => {
 
 const handleEditSession = (session: ScheduleSession) => {
   emit('edit-session', session)
-  isOpen.value = false
+  // isOpen.value = false
 }
 
 const formatTimeRange = (startTime: string, endTime: string) => {
@@ -90,7 +90,7 @@ const formatTimeRange = (startTime: string, endTime: string) => {
 
 <template>
   <Dialog :open="isOpen" @update:open="isOpen = $event">
-    <DialogContent class="max-w-2xl max-h-[80vh]">
+    <DialogContent class="max-w-2xl max-h-[90vh]">
       <DialogHeader>
         <DialogTitle class="flex items-center space-x-2">
           <Users class="h-5 w-5" />
@@ -119,12 +119,12 @@ const formatTimeRange = (startTime: string, endTime: string) => {
         </div>
 
         <!-- Sessions List -->
-        <ScrollArea class="max-h-[400px]">
-          <div class="space-y-3">
+        <ScrollArea class="h-[400px]" type="auto">
+          <div class="space-y-3 px-2">
             <Card
               v-for="session in sortedSessions"
               :key="session.id"
-              class="cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] border-l-4"
+              class="cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] border-l-4 py-0"
               :class="{
                 'border-l-blue-500 bg-blue-50 hover:bg-blue-100': session.status === 'scheduled',
                 'border-l-yellow-500 bg-yellow-50 hover:bg-yellow-100': session.status === 'in_progress',
@@ -134,7 +134,7 @@ const formatTimeRange = (startTime: string, endTime: string) => {
               @click="handleEditSession(session)"
             >
               <CardContent class="p-4">
-                <div class="space-y-3">
+                <div class="space-y-1">
                   <!-- Header with unit code and status -->
                   <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-2">

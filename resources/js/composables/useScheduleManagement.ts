@@ -8,7 +8,7 @@ export function useScheduleManagement() {
   // Time slots for the grid (8:00 AM to 8:00 PM)
   const timeSlots = computed<TimeSlot[]>(() => {
     const slots: TimeSlot[] = []
-    for (let hour = 8; hour <= 20; hour++) {
+    for (let hour = 7; hour <= 20; hour++) {
       slots.push({
         hour,
         displayTime: format(new Date().setHours(hour, 0, 0, 0), 'HH:mm'),
