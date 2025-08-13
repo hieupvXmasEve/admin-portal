@@ -29,8 +29,8 @@ class EmailTemplateController extends Controller
                 'per_page' => 'nullable|integer|min:10|max:100',
             ]);
 
-            $templates = $this->templateService->getAllTemplates($validated);
-            $statistics = $this->templateService->getTemplateStatistics();
+            $templates = $this->templateService->getPaginatedTemplates($validated, $validated['per_page'] ?? 15);
+            $statistics = [];
 
             return response()->json([
                 'success' => true,
@@ -59,7 +59,7 @@ class EmailTemplateController extends Controller
     {
         try {
             $validated = $request->validate(EmailTemplate::validationRules());
-            
+
             $template = $this->templateService->createTemplate($validated);
 
             return response()->json([
@@ -102,10 +102,10 @@ class EmailTemplateController extends Controller
             $rules = EmailTemplate::validationRules();
             // Make name optional for updates
             $rules['name'] = 'nullable|string|max:255';
-            
+
             $validated = $request->validate($rules);
-            
-            $template = $this->templateService->updateTemplate($template, $validated);
+
+            $template = $this->templateService->updateTemplate($template->id, $validated);
 
             return response()->json([
                 'success' => true,
@@ -133,7 +133,7 @@ class EmailTemplateController extends Controller
     public function destroy(EmailTemplate $template): JsonResponse
     {
         try {
-            $this->templateService->deleteTemplate($template);
+            $this->templateService->deleteTemplate($template->id);
 
             return response()->json([
                 'success' => true,
@@ -155,8 +155,8 @@ class EmailTemplateController extends Controller
     {
         try {
             $validated = $request->validate(EmailTemplate::validationRules());
-            
-            $newTemplate = $this->templateService->createNewVersion($template, $validated);
+
+            $newTemplate = $this->templateService->createNewVersion($template->id, $validated);
 
             return response()->json([
                 'success' => true,
@@ -189,7 +189,7 @@ class EmailTemplateController extends Controller
             ]);
 
             $preview = $this->templateService->previewTemplate(
-                $template,
+                $template->id,
                 $validated['variables'] ?? []
             );
 
@@ -216,7 +216,7 @@ class EmailTemplateController extends Controller
                 'content' => 'required|string',
             ]);
 
-            $errors = $this->templateService->validateTemplate($validated['content']);
+            $errors = $this->templateService->validateTemplateContent($validated);
 
             return response()->json([
                 'success' => empty($errors),

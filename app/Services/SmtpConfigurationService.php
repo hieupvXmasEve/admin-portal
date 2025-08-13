@@ -3,362 +3,456 @@
 namespace App\Services;
 
 use App\Models\EmailConfiguration;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mailer\Exception\TransportException;
+use Exception;
 
 class SmtpConfigurationService
 {
     /**
      * Create a new SMTP configuration
      */
-    public function createConfiguration(array $data): EmailConfiguration
+    public function create(array $data): EmailConfiguration
     {
-        // Validate the data
-        $this->validateConfigurationData($data);
+        $this->validateConfiguration($data);
 
-        // Create the configuration
-        $config = EmailConfiguration::create($data);
+        $configuration = EmailConfiguration::create($data);
 
-        Log::info('SMTP configuration created', [
-            'config_id' => $config->id,
-            'name' => $config->name,
-            'host' => $config->host,
-        ]);
+        // If this is the first configuration or marked as active, set it as active
+        if ($data['is_active'] ?? false || EmailConfiguration::count() === 1) {
+            $configuration->setAsActive();
+        }
 
-        return $config;
+        return $configuration;
     }
 
     /**
      * Update an existing SMTP configuration
      */
-    public function updateConfiguration(EmailConfiguration $config, array $data): EmailConfiguration
+    public function update(EmailConfiguration $configuration, array $data): EmailConfiguration
     {
-        // Validate the data
-        $this->validateConfigurationData($data, $config->id);
+        $this->validateConfiguration($data, $configuration->id);
 
-        // Update the configuration
-        $config->update($data);
+        $configuration->update($data);
 
-        Log::info('SMTP configuration updated', [
-            'config_id' => $config->id,
-            'name' => $config->name,
-            'host' => $config->host,
-        ]);
+        // If marked as active, set it as the active configuration
+        if ($data['is_active'] ?? false) {
+            $configuration->setAsActive();
+        }
 
-        return $config->fresh();
+        return $configuration->fresh();
     }
 
     /**
      * Delete an SMTP configuration
      */
-    public function deleteConfiguration(EmailConfiguration $config): bool
+    public function delete(EmailConfiguration $configuration): bool
     {
-        if ($config->is_active) {
-            throw new \InvalidArgumentException('Cannot delete active SMTP configuration');
+        // Prevent deletion of active configuration if it's the only one
+        if ($configuration->is_active && EmailConfiguration::where('id', '!=', $configuration->id)->count() === 0) {
+            throw new Exception('Cannot delete the only active email configuration.');
         }
 
-        $configId = $config->id;
-        $configName = $config->name;
-        
-        $deleted = $config->delete();
-
-        if ($deleted) {
-            Log::info('SMTP configuration deleted', [
-                'config_id' => $configId,
-                'name' => $configName,
-            ]);
-        }
-
-        return $deleted;
-    }
-
-    /**
-     * Set a configuration as active
-     */
-    public function setActiveConfiguration(EmailConfiguration $config): bool
-    {
-        $result = $config->setAsActive();
-
-        if ($result) {
-            Log::info('SMTP configuration set as active', [
-                'config_id' => $config->id,
-                'name' => $config->name,
-                'host' => $config->host,
-            ]);
-        }
-
-        return $result;
-    }
-
-    /**
-     * Test SMTP connection
-     */
-    public function testConnection(EmailConfiguration $config): array
-    {
-        try {
-            if (!$config->isTestable()) {
-                return [
-                    'success' => false,
-                    'message' => 'Configuration is not complete for testing',
-                    'errors' => ['Missing required fields for SMTP testing'],
-                ];
-            }
-
-            // Create SMTP transport for testing
-            $transport = $this->createSmtpTransport($config);
-
-            // Test the connection with timeout
-            $startTime = microtime(true);
-            $this->testSmtpTransport($transport, $config);
-            $connectionTime = round((microtime(true) - $startTime) * 1000, 2);
-
-            $testResult = [
-                'success' => true,
-                'message' => 'SMTP connection successful',
-                'host' => $config->host,
-                'port' => $config->port,
-                'encryption' => $config->encryption,
-                'connection_time_ms' => $connectionTime,
-                'tested_at' => now()->toISOString(),
-            ];
-
-            // Update test result in configuration
-            $config->update([
-                'last_tested_at' => now(),
-                'test_result' => json_encode($testResult),
-            ]);
-
-            Log::info('SMTP connection test successful', [
-                'config_id' => $config->id,
-                'host' => $config->host,
-                'port' => $config->port,
-                'connection_time_ms' => $connectionTime,
-            ]);
-
-            return $testResult;
-        } catch (TransportException $e) {
-            return $this->handleConnectionError($config, $e, 'SMTP Transport Error');
-        } catch (\Exception $e) {
-            return $this->handleConnectionError($config, $e, 'Connection Error');
-        }
-    }
-
-    /**
-     * Create SMTP transport for testing
-     */
-    protected function createSmtpTransport(EmailConfiguration $config): EsmtpTransport
-    {
-        $dsn = $this->buildSmtpDsn($config);
-        $transport = EsmtpTransport::fromDsn($dsn);
-
-        // Set timeout for connection testing
-        $transport->setTimeout(10); // 10 seconds timeout
-
-        return $transport;
-    }
-
-    /**
-     * Build SMTP DSN from configuration
-     */
-    protected function buildSmtpDsn(EmailConfiguration $config): string
-    {
-        $scheme = 'smtp';
-        if ($config->encryption === 'ssl') {
-            $scheme = 'smtps';
-        }
-
-        $dsn = "{$scheme}://";
-
-        if ($config->username && $config->password) {
-            $dsn .= urlencode($config->username) . ':' . urlencode($config->password) . '@';
-        }
-
-        $dsn .= $config->host . ':' . $config->port;
-
-        if ($config->encryption === 'tls') {
-            $dsn .= '?encryption=tls';
-        }
-
-        return $dsn;
-    }
-
-    /**
-     * Test SMTP transport connection
-     */
-    protected function testSmtpTransport(EsmtpTransport $transport, EmailConfiguration $config): void
-    {
-        // Start the transport to test connection
-        $transport->start();
-
-        // If we get here, the connection was successful
-        // We can optionally send a test EHLO command
-        try {
-            // The transport start() method already tests the connection
-            // Additional validation could be added here if needed
-        } finally {
-            // Always stop the transport
-            $transport->stop();
-        }
-    }
-
-    /**
-     * Handle connection errors
-     */
-    protected function handleConnectionError(EmailConfiguration $config, \Exception $e, string $errorType): array
-    {
-        $errorMessage = $this->parseErrorMessage($e->getMessage());
-
-        $errorResult = [
-            'success' => false,
-            'message' => "{$errorType}: {$errorMessage}",
-            'error' => $e->getMessage(),
-            'error_type' => $errorType,
-            'tested_at' => now()->toISOString(),
-        ];
-
-        // Update test result in configuration
-        $config->update([
-            'last_tested_at' => now(),
-            'test_result' => json_encode($errorResult),
-        ]);
-
-        Log::error('SMTP connection test failed', [
-            'config_id' => $config->id,
-            'host' => $config->host,
-            'port' => $config->port,
-            'error_type' => $errorType,
-            'error' => $e->getMessage(),
-        ]);
-
-        return $errorResult;
-    }
-
-    /**
-     * Parse error message to provide user-friendly feedback
-     */
-    protected function parseErrorMessage(string $error): string
-    {
-        // Common SMTP error patterns and user-friendly messages
-        $patterns = [
-            '/Connection refused/' => 'Connection refused - check host and port',
-            '/Connection timed out/' => 'Connection timed out - check host and firewall',
-            '/Authentication failed/' => 'Authentication failed - check username and password',
-            '/SSL.*error/' => 'SSL/TLS error - check encryption settings',
-            '/Name or service not known/' => 'Host not found - check hostname',
-            '/Network is unreachable/' => 'Network unreachable - check network connectivity',
-        ];
-
-        foreach ($patterns as $pattern => $message) {
-            if (preg_match($pattern, $error)) {
-                return $message;
+        // If deleting active configuration, activate another one
+        if ($configuration->is_active) {
+            $nextConfig = EmailConfiguration::where('id', '!=', $configuration->id)->first();
+            if ($nextConfig) {
+                $nextConfig->setAsActive();
             }
         }
 
-        return 'Connection failed - check configuration';
+        return $configuration->delete();
     }
 
     /**
      * Get all SMTP configurations
      */
-    public function getAllConfigurations(): \Illuminate\Database\Eloquent\Collection
+    public function getAll(): \Illuminate\Database\Eloquent\Collection
     {
         return EmailConfiguration::orderBy('is_active', 'desc')
-            ->orderBy('created_at', 'desc')
+            ->orderBy('name')
             ->get();
     }
 
     /**
      * Get active SMTP configuration
      */
-    public function getActiveConfiguration(): ?EmailConfiguration
+    public function getActive(): ?EmailConfiguration
     {
         return EmailConfiguration::getActive();
     }
 
     /**
-     * Validate configuration data
+     * Test SMTP connection with given configuration
      */
-    protected function validateConfigurationData(array $data, ?int $excludeId = null): void
+    public function testConnection(EmailConfiguration $configuration): array
+    {
+        try {
+            // Validate that configuration has required fields for testing
+            if (!$configuration->isTestable()) {
+                return [
+                    'success' => false,
+                    'message' => 'Configuration is missing required fields for testing (host, port, from_address).',
+                    'error_code' => 'MISSING_REQUIRED_FIELDS'
+                ];
+            }
+
+            // Create transport with configuration
+            $transport = new EsmtpTransport(
+                $configuration->host,
+                $configuration->port,
+                $configuration->encryption === 'ssl'
+            );
+
+            // Set encryption if specified
+            if ($configuration->encryption === 'tls') {
+                $transport->setEncryption('tls');
+            }
+
+            // Set authentication if provided
+            if ($configuration->username && $configuration->password) {
+                $transport->setUsername($configuration->username);
+                $transport->setPassword($configuration->password);
+            }
+
+            // Test the connection by starting transport
+            $transport->start();
+            $transport->stop();
+
+            // Update configuration with successful test result
+            $configuration->update([
+                'last_tested_at' => now(),
+                'test_result' => 'success'
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'SMTP connection successful.',
+                'tested_at' => $configuration->last_tested_at->toISOString()
+            ];
+
+        } catch (TransportException $e) {
+            $errorMessage = $this->parseTransportError($e->getMessage());
+
+            // Update configuration with failed test result
+            $configuration->update([
+                'last_tested_at' => now(),
+                'test_result' => 'failed: ' . $errorMessage
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $errorMessage,
+                'error_code' => 'TRANSPORT_ERROR',
+                'technical_details' => $e->getMessage()
+            ];
+
+        } catch (Exception $e) {
+            // Update configuration with failed test result
+            $configuration->update([
+                'last_tested_at' => now(),
+                'test_result' => 'failed: ' . $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Connection test failed: ' . $e->getMessage(),
+                'error_code' => 'GENERAL_ERROR',
+                'technical_details' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Test connection with array data (before saving)
+     */
+    public function testConnectionWithData(array $data): array
+    {
+        try {
+            $this->validateConfiguration($data);
+
+            // Create temporary configuration object for testing
+            $tempConfig = new EmailConfiguration($data);
+
+            return $this->testConnection($tempConfig);
+
+        } catch (ValidationException $e) {
+            return [
+                'success' => false,
+                'message' => 'Configuration validation failed.',
+                'error_code' => 'VALIDATION_ERROR',
+                'errors' => $e->errors()
+            ];
+        }
+    }
+
+    /**
+     * Apply configuration to Laravel Mail system
+     */
+    public function applyConfiguration(EmailConfiguration $configuration): void
+    {
+        $mailConfig = $configuration->toMailConfig();
+
+        // Update runtime mail configuration
+        Config::set('mail.mailers.smtp', $mailConfig);
+        Config::set('mail.default', 'smtp');
+        Config::set('mail.from', $mailConfig['from']);
+
+        // Purge mail manager to force reload
+        Mail::purge('smtp');
+    }
+
+    /**
+     * Validate SMTP configuration data
+     */
+    public function validateConfiguration(array $data, ?int $excludeId = null): void
     {
         $rules = EmailConfiguration::validationRules();
-        
-        // Add unique name validation
-        $nameRule = 'required|string|max:255|unique:email_configurations,name';
-        if ($excludeId) {
-            $nameRule .= ',' . $excludeId;
-        }
-        $rules['name'] = $nameRule;
 
-        $validator = validator($data, $rules);
+        // Add unique rule for name if needed
+        if (isset($data['name'])) {
+            $nameRule = 'required|string|max:255|unique:email_configurations,name';
+            if ($excludeId) {
+                $nameRule .= ',' . $excludeId;
+            }
+            $rules['name'] = $nameRule;
+        }
+
+        $validator = Validator::make($data, $rules);
 
         if ($validator->fails()) {
             throw new ValidationException($validator);
         }
+
+        // Additional business logic validation
+        $this->validateBusinessRules($data);
+    }
+
+    /**
+     * Validate business rules for SMTP configuration
+     */
+    private function validateBusinessRules(array $data): void
+    {
+        // Validate port ranges for different encryption types
+        if (isset($data['port']) && isset($data['encryption'])) {
+            $port = (int) $data['port'];
+            $encryption = $data['encryption'];
+
+            $commonPorts = [
+                'none' => [25, 587],
+                'tls' => [587, 2587],
+                'ssl' => [465, 993, 995]
+            ];
+
+            if (isset($commonPorts[$encryption]) && !in_array($port, $commonPorts[$encryption])) {
+                // This is a warning, not a hard validation error
+                // We'll allow it but could log a warning
+            }
+        }
+
+        // Validate daily and rate limits
+        if (isset($data['daily_limit']) && isset($data['rate_limit'])) {
+            $dailyLimit = (int) $data['daily_limit'];
+            $rateLimit = (int) $data['rate_limit'];
+
+            if ($rateLimit > $dailyLimit) {
+                throw ValidationException::withMessages([
+                    'rate_limit' => ['Rate limit cannot exceed daily limit.']
+                ]);
+            }
+        }
+
+        // Validate from_address domain if host is provided
+        if (isset($data['from_address']) && isset($data['host'])) {
+            $fromDomain = substr(strrchr($data['from_address'], "@"), 1);
+            $host = $data['host'];
+
+            // Check if from_address domain matches or is subdomain of host
+            if (!empty($fromDomain) && !str_contains($host, $fromDomain) && !str_contains($fromDomain, $host)) {
+                // This is a warning, not a hard validation error
+                // Some SMTP servers allow sending from different domains
+            }
+        }
+    }
+
+    /**
+     * Parse transport error messages to user-friendly format
+     */
+    private function parseTransportError(string $error): string
+    {
+        $errorMappings = [
+            'Connection refused' => 'Unable to connect to SMTP server. Please check host and port.',
+            'Connection timed out' => 'Connection to SMTP server timed out. Please check host and port.',
+            'Authentication failed' => 'SMTP authentication failed. Please check username and password.',
+            'SSL/TLS handshake failed' => 'SSL/TLS connection failed. Please check encryption settings.',
+            'Certificate verification failed' => 'SSL certificate verification failed. Please check server certificate.',
+            'Username/Password not accepted' => 'SMTP credentials were rejected. Please check username and password.',
+            'Relay access denied' => 'SMTP server denied relay access. Please check server configuration.',
+        ];
+
+        foreach ($errorMappings as $pattern => $message) {
+            if (str_contains(strtolower($error), strtolower($pattern))) {
+                return $message;
+            }
+        }
+
+        // Return original error if no mapping found
+        return 'SMTP connection failed: ' . $error;
     }
 
     /**
      * Get configuration statistics
      */
-    public function getConfigurationStatistics(): array
+    public function getStatistics(): array
     {
         $total = EmailConfiguration::count();
         $active = EmailConfiguration::where('is_active', true)->count();
         $tested = EmailConfiguration::whereNotNull('last_tested_at')->count();
-        $working = EmailConfiguration::whereNotNull('last_tested_at')
-            ->where('test_result', 'like', '%success%')
-            ->count();
+        $successful = EmailConfiguration::where('test_result', 'success')->count();
 
         return [
-            'total' => $total,
-            'active' => $active,
-            'tested' => $tested,
-            'working' => $working,
-            'untested' => $total - $tested,
+            'total_configurations' => $total,
+            'active_configurations' => $active,
+            'tested_configurations' => $tested,
+            'successful_tests' => $successful,
+            'test_success_rate' => $tested > 0 ? round(($successful / $tested) * 100, 2) : 0
         ];
     }
 
     /**
-     * Export configuration for backup (without sensitive data)
+     * Rotate credentials for a configuration
      */
-    public function exportConfiguration(EmailConfiguration $config): array
+    public function rotateCredentials(EmailConfiguration $configuration, string $newPassword): EmailConfiguration
     {
-        return [
-            'name' => $config->name,
-            'host' => $config->host,
-            'port' => $config->port,
-            'username' => $config->username,
-            'encryption' => $config->encryption,
-            'from_address' => $config->from_address,
-            'from_name' => $config->from_name,
-            'daily_limit' => $config->daily_limit,
-            'rate_limit' => $config->rate_limit,
-            'exported_at' => now()->toISOString(),
-        ];
+        $configuration->update([
+            'password' => $newPassword,
+            'last_tested_at' => null,
+            'test_result' => null
+        ]);
+
+        return $configuration->fresh();
     }
 
     /**
-     * Import configuration from backup
+     * Rotate password encryption for enhanced security
      */
-    public function importConfiguration(array $data): EmailConfiguration
+    public function rotatePasswordEncryption(EmailConfiguration $configuration): bool
     {
-        // Remove export metadata
-        unset($data['exported_at']);
-        
-        // Set as inactive by default
-        $data['is_active'] = false;
-        
-        // Ensure unique name
-        $originalName = $data['name'];
-        $counter = 1;
-        while (EmailConfiguration::where('name', $data['name'])->exists()) {
-            $data['name'] = $originalName . ' (Imported ' . $counter . ')';
-            $counter++;
+        return $configuration->rotatePasswordEncryption();
+    }
+
+    /**
+     * Check configurations that need password rotation
+     */
+    public function getConfigurationsNeedingRotation(int $maxAgeInDays = 90): \Illuminate\Database\Eloquent\Collection
+    {
+        return EmailConfiguration::all()->filter(function ($config) use ($maxAgeInDays) {
+            return $config->needsPasswordRotation($maxAgeInDays);
+        });
+    }
+
+    /**
+     * Bulk rotate password encryption for all configurations
+     */
+    public function bulkRotatePasswordEncryption(int $maxAgeInDays = 90): array
+    {
+        $configurations = $this->getConfigurationsNeedingRotation($maxAgeInDays);
+        $results = [
+            'total' => $configurations->count(),
+            'successful' => 0,
+            'failed' => 0,
+            'errors' => []
+        ];
+
+        foreach ($configurations as $configuration) {
+            try {
+                if ($this->rotatePasswordEncryption($configuration)) {
+                    $results['successful']++;
+                } else {
+                    $results['failed']++;
+                    $results['errors'][] = "Failed to rotate encryption for configuration: {$configuration->name}";
+                }
+            } catch (Exception $e) {
+                $results['failed']++;
+                $results['errors'][] = "Error rotating encryption for {$configuration->name}: " . $e->getMessage();
+            }
         }
 
-        return $this->createConfiguration($data);
+        return $results;
+    }
+
+    /**
+     * Validate password integrity for all configurations
+     */
+    public function validateAllPasswordIntegrity(): array
+    {
+        $configurations = EmailConfiguration::whereNotNull('password')->get();
+        $results = [
+            'total' => $configurations->count(),
+            'valid' => 0,
+            'invalid' => 0,
+            'invalid_configurations' => []
+        ];
+
+        foreach ($configurations as $configuration) {
+            if ($configuration->validatePasswordIntegrity()) {
+                $results['valid']++;
+            } else {
+                $results['invalid']++;
+                $results['invalid_configurations'][] = [
+                    'id' => $configuration->id,
+                    'name' => $configuration->name,
+                    'encrypted_at' => $configuration->password_encrypted_at?->toISOString()
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Get security audit report for all configurations
+     */
+    public function getSecurityAuditReport(): array
+    {
+        $configurations = EmailConfiguration::all();
+        $report = [
+            'total_configurations' => $configurations->count(),
+            'configurations_with_passwords' => 0,
+            'configurations_needing_rotation' => 0,
+            'configurations_with_backups' => 0,
+            'configurations_with_integrity_issues' => 0,
+            'encryption_metadata' => []
+        ];
+
+        foreach ($configurations as $configuration) {
+            if (!empty($configuration->password)) {
+                $report['configurations_with_passwords']++;
+
+                if ($configuration->needsPasswordRotation()) {
+                    $report['configurations_needing_rotation']++;
+                }
+
+                if (!empty($configuration->credential_backup)) {
+                    $report['configurations_with_backups']++;
+                }
+
+                if (!$configuration->validatePasswordIntegrity()) {
+                    $report['configurations_with_integrity_issues']++;
+                }
+
+                $report['encryption_metadata'][] = [
+                    'id' => $configuration->id,
+                    'name' => $configuration->name,
+                    'metadata' => $configuration->getEncryptionMetadata()
+                ];
+            }
+        }
+
+        return $report;
     }
 }

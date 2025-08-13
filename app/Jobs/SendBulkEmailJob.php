@@ -43,7 +43,8 @@ class SendBulkEmailJob implements ShouldQueue
         protected ?int $templateId = null,
         protected array $attachments = [],
         protected ?int $userId = null,
-        protected ?string $batchId = null
+        protected ?string $batchId = null,
+        protected ?int $chunkIndex = null
     ) {
         $this->onQueue('bulk-emails');
     }
@@ -110,6 +111,7 @@ class SendBulkEmailJob implements ShouldQueue
 
         Log::info('Bulk email batch processed', [
             'batch_id' => $this->batchId,
+            'chunk_index' => $this->chunkIndex,
             'success' => $successCount,
             'failed' => $failureCount,
             'total' => count($this->recipients),
