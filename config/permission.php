@@ -220,6 +220,42 @@ return [
         'system_logs' => [
             'view_system_log' => 'view_system_log',
         ],
+
+        // Email Management
+        'email_configurations' => [
+            'view_email_configuration' => 'view_email_configuration',
+            'create_email_configuration' => 'create_email_configuration',
+            'edit_email_configuration' => 'edit_email_configuration',
+            'delete_email_configuration' => 'delete_email_configuration',
+            'test_email_configuration' => 'test_email_configuration',
+        ],
+
+        'email_templates' => [
+            'view_email_template' => 'view_email_template',
+            'create_email_template' => 'create_email_template',
+            'edit_email_template' => 'edit_email_template',
+            'delete_email_template' => 'delete_email_template',
+            'preview_email_template' => 'preview_email_template',
+        ],
+
+        'email_sending' => [
+            'send_single_email' => 'send_single_email',
+            'send_bulk_email' => 'send_bulk_email',
+            'view_email_queue' => 'view_email_queue',
+            'manage_email_queue' => 'manage_email_queue',
+        ],
+
+        'email_logs' => [
+            'view_email_log' => 'view_email_log',
+            'export_email_log' => 'export_email_log',
+            'delete_email_log' => 'delete_email_log',
+        ],
+
+        'email_preferences' => [
+            'view_email_preference' => 'view_email_preference',
+            'edit_email_preference' => 'edit_email_preference',
+            'manage_user_email_preferences' => 'manage_user_email_preferences',
+        ],
     ],
 
     // Simplified module structure
@@ -234,6 +270,7 @@ return [
         'financial' => ['fees'],
         'reporting' => ['queries', 'reports'],
         'teaching' => ['teaching_assignments', 'lecturers'],
+        'email_management' => ['email_configurations', 'email_templates', 'email_sending', 'email_logs', 'email_preferences'],
     ],
 
     'actions' => [
