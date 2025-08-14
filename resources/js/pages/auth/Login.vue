@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { AUTH_ROUTE_NAMES } from '@/constants/auth-routes';
+import { useSystemConfig } from '@/composables/useSystemConfig';
 import { Head } from '@inertiajs/vue3';
 import { AlertTriangle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -18,6 +19,9 @@ const props = withDefaults(defineProps<Props>(), {
     error: '',
     email: '',
 });
+
+// System configuration
+const { get, getLogoFull } = useSystemConfig()
 
 const isLoading = ref(false);
 
@@ -38,6 +42,7 @@ const handleGoogleSignIn = async () => {
         isLoading.value = false;
     }
 };
+
 </script>
 <template>
     <Head title="Login" />
@@ -46,11 +51,10 @@ const handleGoogleSignIn = async () => {
             <!-- University Header -->
             <header class="mb-8 text-center">
                 <div class="border-background mx-auto mb-6 flex w-44 items-center justify-center rounded-2xl border-4 shadow-2xl backdrop-blur-sm">
-                    <img src="/logo-asia.png" alt="Asia Vietnam University Logo" class="size-full object-contain" />
+                    <img :src="getLogoFull" alt="Asia Vietnam University Logo" class="size-full object-contain" />
                 </div>
                 <div class="space-y-2">
-                    <h1 class="text-foreground text-3xl font-bold tracking-tight">Asia Vietnam</h1>
-                    <p class="text-primary text-lg font-medium">University Portal</p>
+                    <h1 class="text-foreground text-3xl font-bold tracking-tight">{{ get('app_name', 'Admin portal') }}</h1>
                     <p class="text-muted-foreground text-sm">Administrator & Staff Access System</p>
                 </div>
             </header>
@@ -92,7 +96,7 @@ const handleGoogleSignIn = async () => {
                                     <span>{{ isLoading ? 'Signing in...' : 'Sign in with Google' }}</span>
                                 </div>
                             </Button>
-                            <p class="text-muted-foreground text-center text-xs">Use your @asia.edu.vn or authorized institutional account</p>
+<!--                            <p class="text-muted-foreground text-center text-xs">Use your @asia.edu.vn or authorized institutional account</p>-->
                         </div>
                     </form>
 
@@ -113,9 +117,9 @@ const handleGoogleSignIn = async () => {
             <footer class="mt-8 space-y-4 text-center">
                 <div class="text-muted-foreground flex items-center justify-center space-x-2 text-sm">
                     <span role="img" aria-label="Vietnam flag">🇻🇳</span>
-                    <span>Vietnam</span>
+                    <span>{{ get('country', 'Vietnam') }}</span>
                 </div>
-                <p class="text-muted-foreground text-sm">© 2024 Asia Vietnam University. All rights reserved.</p>
+                <p class="text-muted-foreground text-sm">{{ get('copyright_text', '© 2025 Asia Vietnam University. All rights reserved.') }}</p>
                 <nav class="text-muted-foreground flex justify-center space-x-6 text-xs" aria-label="Legal links">
                     <button type="button" class="hover:text-primary focus:ring-ring transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none">Privacy Policy</button>
                     <button type="button" class="hover:text-primary focus:ring-ring transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none">Terms of Service</button>

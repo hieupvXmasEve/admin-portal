@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\SystemConfigController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -14,6 +15,12 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+
+// System configuration endpoints
+Route::get('/system-config', [SystemConfigController::class, 'index'])->name('api.system-config.index');
+Route::put('/system-config', [SystemConfigController::class, 'update'])->name('api.system-config.update');
+Route::post('/system-config/upload', [SystemConfigController::class, 'uploadFile'])->name('api.system-config.upload');
+Route::get('/system-config/{key}', [SystemConfigController::class, 'show'])->name('api.system-config.show');
 
 // Health check endpoint
 Route::get('/health', function () {

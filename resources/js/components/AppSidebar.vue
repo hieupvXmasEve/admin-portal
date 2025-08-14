@@ -7,11 +7,10 @@ import { usePermissions } from '@/composables/usePermissions';
 import { Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import NavUser from './NavUser.vue';
-
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+import { useSystemConfig } from '@/composables/useSystemConfig';
 
 const { filterMenuItems } = usePermissions();
-
+const {get} = useSystemConfig()
 // Filter menu items based on user permissions
 const filteredMenuItems = computed(() => filterMenuItems(mainNavItems));
 </script>
@@ -27,8 +26,8 @@ const filteredMenuItems = computed(() => filterMenuItems(mainNavItems));
                                 <AppLogo />
                             </div>
                             <div class="grid flex-1 text-left text-sm leading-tight">
-                                <span class="truncate font-semibold">{{ appName }}</span>
-                                <span class="truncate text-xs">Admin Panel</span>
+                                <span class="truncate font-semibold">{{ get('app_name') }}</span>
+<!--                                <span class="truncate text-xs">Admin Panel</span>-->
                             </div>
                         </Link>
                     </SidebarMenuButton>
