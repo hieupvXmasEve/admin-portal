@@ -26,10 +26,10 @@ return new class extends Migration
             $table->integer('rate_limit')->default(60)->comment('Emails per minute limit');
             $table->timestamp('last_tested_at')->nullable()->comment('Last connection test timestamp');
             $table->text('test_result')->nullable()->comment('Last connection test result');
-            $table->string('password_salt', 64)->nullable()->after('password');
-            $table->string('password_verification_hash')->nullable()->after('password_salt');
-            $table->timestamp('password_encrypted_at')->nullable()->after('password_verification_hash');
-            $table->longText('credential_backup')->nullable()->after('password_encrypted_at');
+            $table->string('password_salt', 64)->nullable();
+            $table->string('password_verification_hash')->nullable();
+            $table->timestamp('password_encrypted_at')->nullable();
+            $table->longText('credential_backup')->nullable();
 
             $table->timestamps();
 
