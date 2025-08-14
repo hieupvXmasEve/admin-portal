@@ -32,6 +32,7 @@ class EmailController extends Controller
                 'subject' => 'required|string|max:255',
                 'content' => 'required|string',
                 'template_id' => 'nullable|exists:email_templates,id',
+                'template_variables' => 'nullable|array',
                 'attachments' => 'nullable|array',
                 'attachments.*' => 'file|max:10240', // 10MB max per file
             ]);
@@ -55,7 +56,8 @@ class EmailController extends Controller
                 $validated['content'],
                 $template,
                 $attachmentPaths,
-                Auth::user()
+                Auth::user(),
+                $validated['template_variables'] ?? []
             );
 
             return response()->json([
@@ -93,6 +95,7 @@ class EmailController extends Controller
                 'subject' => 'required|string|max:255',
                 'content' => 'required|string',
                 'template_id' => 'nullable|exists:email_templates,id',
+                'template_variables' => 'nullable|array',
                 'attachments' => 'nullable|array',
                 'attachments.*' => 'file|max:10240',
                 'chunk_size' => 'nullable|integer|min:10|max:500',
@@ -111,23 +114,21 @@ class EmailController extends Controller
                 }
             }
 
-            $batchId = $this->emailService->sendBulkEmail(
+            $result = $this->emailService->sendBulkEmail(
                 $validated['recipients'],
                 $validated['subject'],
                 $validated['content'],
                 $template,
                 $attachmentPaths,
                 Auth::user(),
-                $validated['chunk_size'] ?? 100
+                $validated['template_variables'] ?? [], // templateVariables
+                $validated['chunk_size'] ?? 100 // chunkSize
             );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Bulk email batch queued for sending',
-                'data' => [
-                    'batch_id' => $batchId,
-                    'total_recipients' => count($validated['recipients']),
-                ],
+                'data' => $result,
             ]);
         } catch (ValidationException $e) {
             return response()->json([

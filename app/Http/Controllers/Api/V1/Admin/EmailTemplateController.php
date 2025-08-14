@@ -24,7 +24,7 @@ class EmailTemplateController extends Controller
         try {
             $validated = $request->validate([
                 'type' => 'nullable|string',
-                'is_active' => 'nullable|boolean',
+                'is_active' => 'required|in:all,active,inactive',
                 'search' => 'nullable|string',
                 'per_page' => 'nullable|integer|min:10|max:100',
             ]);

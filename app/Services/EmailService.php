@@ -80,11 +80,16 @@ class EmailService
             // Render template content if template is provided
             $htmlContent = $content;
             $textContent = null;
+            $finalSubject = $subject;
 
             if ($template) {
                 $rendered = $this->renderTemplate($template, $templateVariables);
                 $htmlContent = $rendered['html'] ?? $content;
                 $textContent = $rendered['text'] ?? null;
+                $finalSubject = $rendered['subject'] ?? $subject;
+                
+                // Update email log with rendered subject
+                $emailLog->update(['subject' => $finalSubject]);
             }
 
             // Validate final content
@@ -347,11 +352,13 @@ class EmailService
             // Render template content if provided
             $htmlContent = $content;
             $textContent = null;
+            $finalSubject = $subject;
 
             if ($template) {
                 $rendered = $this->renderTemplate($template, $templateVariables);
                 $htmlContent = $rendered['html'] ?? $content;
                 $textContent = $rendered['text'] ?? null;
+                $finalSubject = $rendered['subject'] ?? $subject;
             }
 
             // Validate rendered content
@@ -364,7 +371,7 @@ class EmailService
             foreach ($chunks as $chunkIndex => $chunk) {
                 $jobs[] = new SendBulkEmailJob(
                     $chunk,
-                    $subject,
+                    $finalSubject,
                     $htmlContent,
                     $textContent,
                     $template?->id,

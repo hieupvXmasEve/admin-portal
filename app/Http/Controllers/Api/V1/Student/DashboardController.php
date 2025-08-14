@@ -11,6 +11,7 @@ use App\Http\Responses\ApiResponse;
 use App\Services\V1\Student\DashboardService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
@@ -30,9 +31,11 @@ class DashboardController extends Controller
 
             return ApiResponse::success(
                 new DashboardResource($dashboardData),
+                [],
                 'Dashboard data retrieved successfully'
             );
         } catch (\Exception $e) {
+            Log::error($e->getMessage());
             return ApiResponse::serverError('Failed to retrieve dashboard data');
         }
     }
@@ -49,6 +52,7 @@ class DashboardController extends Controller
 
             return ApiResponse::success(
                 new GPAResource($gpaData),
+                [],
                 'GPA data retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -68,6 +72,7 @@ class DashboardController extends Controller
 
             return ApiResponse::success(
                 $creditProgress,
+                [],
                 'Credit progress retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -87,6 +92,7 @@ class DashboardController extends Controller
 
             return ApiResponse::success(
                 $academicHolds,
+                [],
                 'Academic holds retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -106,6 +112,7 @@ class DashboardController extends Controller
 
             return ApiResponse::success(
                 $upcomingAssessments,
+                [],
                 'Upcoming assessments retrieved successfully'
             );
         } catch (\Exception $e) {

@@ -102,15 +102,20 @@ class SmtpConfigurationService
             }
 
             // Create transport with configuration
+            // EsmtpTransport constructor 3rd param is a boolean: true for implicit TLS (SMTPS/"ssl"), false otherwise
             $transport = new EsmtpTransport(
                 $configuration->host,
                 $configuration->port,
                 $configuration->encryption === 'ssl'
             );
 
-            // Set encryption if specified
+            // Control STARTTLS (explicit TLS) behavior
+            // - 'tls': allow/attempt STARTTLS if server supports it (default true, set explicitly for clarity)
+            // - 'none': disable STARTTLS entirely
             if ($configuration->encryption === 'tls') {
-                $transport->setEncryption('tls');
+                $transport->setAutoTls(true);
+            } elseif ($configuration->encryption === 'none') {
+                $transport->setAutoTls(false);
             }
 
             // Set authentication if provided
@@ -124,25 +129,38 @@ class SmtpConfigurationService
             $transport->stop();
 
             // Update configuration with successful test result
-            $configuration->update([
-                'last_tested_at' => now(),
-                'test_result' => 'success'
-            ]);
+            $testedAt = now();
+            if ($configuration->exists) {
+                $configuration->update([
+                    'last_tested_at' => $testedAt,
+                    'test_result' => 'success'
+                ]);
+            } else {
+                // For unsaved models (e.g., test-data), set values in-memory
+                $configuration->last_tested_at = $testedAt;
+                $configuration->test_result = 'success';
+            }
 
             return [
                 'success' => true,
                 'message' => 'SMTP connection successful.',
-                'tested_at' => $configuration->last_tested_at->toISOString()
+                'tested_at' => $testedAt->toISOString()
             ];
 
         } catch (TransportException $e) {
             $errorMessage = $this->parseTransportError($e->getMessage());
 
             // Update configuration with failed test result
-            $configuration->update([
-                'last_tested_at' => now(),
-                'test_result' => 'failed: ' . $errorMessage
-            ]);
+            $testedAt = now();
+            if ($configuration->exists) {
+                $configuration->update([
+                    'last_tested_at' => $testedAt,
+                    'test_result' => 'failed: ' . $errorMessage
+                ]);
+            } else {
+                $configuration->last_tested_at = $testedAt;
+                $configuration->test_result = 'failed: ' . $errorMessage;
+            }
 
             return [
                 'success' => false,
@@ -153,10 +171,16 @@ class SmtpConfigurationService
 
         } catch (Exception $e) {
             // Update configuration with failed test result
-            $configuration->update([
-                'last_tested_at' => now(),
-                'test_result' => 'failed: ' . $e->getMessage()
-            ]);
+            $testedAt = now();
+            if ($configuration->exists) {
+                $configuration->update([
+                    'last_tested_at' => $testedAt,
+                    'test_result' => 'failed: ' . $e->getMessage()
+                ]);
+            } else {
+                $configuration->last_tested_at = $testedAt;
+                $configuration->test_result = 'failed: ' . $e->getMessage();
+            }
 
             return [
                 'success' => false,

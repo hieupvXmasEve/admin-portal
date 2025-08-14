@@ -27,8 +27,8 @@ class EmailTemplateService
             $query->where('name', 'like', '%' . $filters['name'] . '%');
         }
 
-        if (isset($filters['is_active'])) {
-            $query->where('is_active', $filters['is_active']);
+        if ($filters['is_active'] !== 'all') {
+            $query->where('is_active', $filters['is_active'] === 'active');
         }
 
         if (!empty($filters['search'])) {

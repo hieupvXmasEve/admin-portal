@@ -13,7 +13,7 @@ class Campus extends AuditableModel
 
     public function users()
     {
-        return $this->belongsToMany(User::class, 'campus_user_roles')
+        return $this->belongsToMany(User::class, 'campus_user_roles', 'campus_id', 'user_id')
             ->withPivot('role_id')
             ->withTimestamps();
     }

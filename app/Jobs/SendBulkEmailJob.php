@@ -43,7 +43,7 @@ class SendBulkEmailJob implements ShouldQueue
         protected ?int $templateId = null,
         protected array $attachments = [],
         protected ?int $userId = null,
-        protected ?string $batchId = null,
+        protected ?string $customBatchId = null,
         protected ?int $chunkIndex = null
     ) {
         $this->onQueue('bulk-emails');
@@ -71,7 +71,7 @@ class SendBulkEmailJob implements ShouldQueue
                     'template_id' => $this->templateId,
                     'status' => EmailLog::STATUS_PENDING,
                     'user_id' => $this->userId,
-                    'batch_id' => $this->batchId,
+                    'batch_id' => $this->customBatchId,
                     'metadata' => [
                         'attachments' => array_map(fn($file) => basename($file), $this->attachments),
                         'bulk_send' => true,
@@ -93,7 +93,7 @@ class SendBulkEmailJob implements ShouldQueue
                 $failureCount++;
                 Log::error('Failed to queue bulk email', [
                     'recipient' => $recipient,
-                    'batch_id' => $this->batchId,
+                    'batch_id' => $this->customBatchId,
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -101,7 +101,7 @@ class SendBulkEmailJob implements ShouldQueue
             // Check if batch is cancelled
             if ($this->batch() && $this->batch()->cancelled()) {
                 Log::info('Bulk email batch cancelled', [
-                    'batch_id' => $this->batchId,
+                    'batch_id' => $this->customBatchId,
                     'processed' => $successCount + $failureCount,
                     'total' => count($this->recipients),
                 ]);
@@ -110,7 +110,7 @@ class SendBulkEmailJob implements ShouldQueue
         }
 
         Log::info('Bulk email batch processed', [
-            'batch_id' => $this->batchId,
+            'batch_id' => $this->customBatchId,
             'chunk_index' => $this->chunkIndex,
             'success' => $successCount,
             'failed' => $failureCount,
@@ -124,7 +124,7 @@ class SendBulkEmailJob implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         Log::error('Bulk email job failed', [
-            'batch_id' => $this->batchId,
+            'batch_id' => $this->customBatchId,
             'recipients_count' => count($this->recipients),
             'error' => $exception->getMessage(),
         ]);

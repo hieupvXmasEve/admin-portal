@@ -46,7 +46,7 @@ Route::middleware([
     // Dashboard endpoints
     Route::prefix('dashboard')->name('dashboard.')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])
-            ->middleware(['student.api.rate:student-dashboard'])
+//            ->middleware(['student.api.rate:student-dashboard'])
             ->name('index');
 
         Route::get('/gpa', [DashboardController::class, 'gpa'])->name('gpa');

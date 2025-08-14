@@ -16,7 +16,7 @@ import {
     UNIT_ROUTE_NAMES,
     USER_ROUTE_NAMES,
 } from '@/constants';
-import { SYSTEM_ACTIVITY_LOG_ROUTE_NAMES } from '@/constants/system-routes';
+import { SYSTEM_ACTIVITY_LOG_ROUTE_NAMES, SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES } from '@/constants/system-routes';
 import { route } from 'ziggy-js';
 
 /**
@@ -79,6 +79,12 @@ export const systemRoutes = {
     // activity logs
     activityLogs: {
         index: () => route(SYSTEM_ACTIVITY_LOG_ROUTE_NAMES.INDEX),
+    },
+    // email
+    emailConfiguration: {
+        index: () => route(SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES.INDEX),
+        templates: () => route(SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES.TEMPLATES),
+        bulkEmail: () => route(SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES.BULK_EMAIL),
     },
 } as const;
 
