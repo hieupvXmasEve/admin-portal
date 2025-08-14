@@ -1,3 +1,11 @@
+export const SYSTEM_CONFIG_ROUTE_NAMES = {
+    INDEX: 'system.config.index',
+} as const;
+
+export const SYSTEM_CONFIG_ROUTE_PATHS = {
+    INDEX: '/systems/config',
+} as const;
+
 export const SYSTEM_ACTIVITY_LOG_ROUTE_NAMES = {
     INDEX: 'system.activity-logs.index',
 } as const;
