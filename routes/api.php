@@ -35,7 +35,3 @@ Route::prefix('v1/student')->name('v1.student.')->group(function () {
 Route::prefix('v1/lecturer')->name('v1.lecturer.')->group(function () {
     require __DIR__.'/api/v1/lecturer.php';
 });
-// Admin
-Route::prefix('v1/admin')->name('v1.admin.')->group(function () {
-    require __DIR__.'/api/v1/admin.php';
-});

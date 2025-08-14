@@ -37,6 +37,24 @@ const progressPercentage = computed(() => {
     return Math.round((progress.value.completed / progress.value.total) * 100)
 })
 
+// Define functions before they're used in watchers
+const stopProgressMonitoring = () => {
+    if (progressInterval) {
+        clearInterval(progressInterval)
+        progressInterval = null
+    }
+}
+
+const startProgressMonitoring = (batchId: string) => {
+    // Initial load
+    fetchProgress(batchId)
+
+    // Set up polling
+    progressInterval = setInterval(() => {
+        fetchProgress(batchId)
+    }, 2000) // Poll every 2 seconds
+}
+
 // Watch for batch ID changes to start monitoring
 watch(() => props.batchId, (batchId) => {
     if (batchId && props.open) {
@@ -54,23 +72,6 @@ watch(() => props.open, (open) => {
         startProgressMonitoring(props.batchId)
     }
 })
-
-const startProgressMonitoring = (batchId: string) => {
-    // Initial load
-    fetchProgress(batchId)
-
-    // Set up polling
-    progressInterval = setInterval(() => {
-        fetchProgress(batchId)
-    }, 2000) // Poll every 2 seconds
-}
-
-const stopProgressMonitoring = () => {
-    if (progressInterval) {
-        clearInterval(progressInterval)
-        progressInterval = null
-    }
-}
 
 const fetchProgress = async (batchId: string) => {
     try {

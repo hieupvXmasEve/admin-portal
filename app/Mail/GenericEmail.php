@@ -17,10 +17,10 @@ class GenericEmail extends Mailable
      * Create a new message instance.
      */
     public function __construct(
-        protected string $subject,
-        protected string $htmlContent,
-        protected ?string $textContent = null,
-        protected array $attachments = []
+        public string $emailSubject,
+        public string $htmlContent,
+        public ?string $textContent = null,
+        public array $emailAttachments = []
     ) {
         //
     }
@@ -31,7 +31,7 @@ class GenericEmail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: $this->subject,
+            subject: $this->emailSubject,
         );
     }
 
@@ -41,8 +41,11 @@ class GenericEmail extends Mailable
     public function content(): Content
     {
         return new Content(
-            htmlString: $this->htmlContent,
-            text: $this->textContent,
+            view: 'emails.generic',
+            with: [
+                'htmlContent' => $this->htmlContent,
+                'textContent' => $this->textContent
+            ]
         );
     }
 
@@ -55,7 +58,7 @@ class GenericEmail extends Mailable
     {
         $mailAttachments = [];
 
-        foreach ($this->attachments as $attachment) {
+        foreach ($this->emailAttachments as $attachment) {
             if (is_string($attachment) && file_exists($attachment)) {
                 $mailAttachments[] = Attachment::fromPath($attachment);
             } elseif (is_array($attachment) && isset($attachment['path'])) {

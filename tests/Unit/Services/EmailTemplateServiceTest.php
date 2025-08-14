@@ -505,7 +505,7 @@ class EmailTemplateServiceTest extends TestCase
     }
 
     /** @test */
-    public function it_searches_templates_by_content()
+    public function it_searches_templates_by_name_and_content()
     {
         EmailTemplate::factory()->create([
             'name' => 'welcome_template',

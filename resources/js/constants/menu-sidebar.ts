@@ -18,12 +18,15 @@ import {
     Layers,
     LayoutDashboard,
     LineChart,
+    Mail,
+    MailPlus,
     PieChart,
     Presentation,
     RefreshCw,
     Repeat,
     School,
     Settings,
+    Settings2,
     ShieldCheck,
     Star,
     Target,
@@ -444,7 +447,7 @@ export const mainNavItems: NavItem[] = [
             },
         ],
     },
-    // System logs
+    // System
     {
         title: 'System',
         href: '#',
@@ -455,6 +458,37 @@ export const mainNavItems: NavItem[] = [
                 href: systemRoutes.activityLogs.index(),
                 icon: Clock,
                 requiredPermissions: ['view_system_log'],
+            },
+            {
+                title: 'Email Monitoring',
+                href: '/admin/email-monitoring',
+                icon: BarChart3,
+                requiredPermissions: ['view_email_system'],
+            },
+        ],
+    },
+    {
+        title: 'Email',
+        href: '#',
+        icon: Mail,
+        children: [
+            {
+                title: 'Email Configuration',
+                href: systemRoutes.emailConfiguration.index(),
+                icon: Settings2,
+                // requiredPermissions: ['view_email_configuration'],
+            },
+            {
+                title: 'Email Templates',
+                href: systemRoutes.emailConfiguration.templates(),
+                icon: FileText,
+                // requiredPermissions: ['view_email_template'],
+            },
+            {
+                title: 'Bulk Email',
+                href: systemRoutes.emailConfiguration.bulkEmail(),
+                icon: MailPlus,
+                // requiredPermissions: ['view_email_template'],
             },
         ],
     },

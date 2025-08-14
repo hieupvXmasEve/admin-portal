@@ -172,7 +172,10 @@ class DashboardService
             ->where('student_id', $student->id)
             ->whereNull('submitted_at')
             ->with(['assessmentComponentDetail.assessmentComponent', 'courseOffering.curriculumUnit.unit'])
-            ->orderBy('due_date')
+            ->join('assessment_component_details', 'assessment_component_detail_scores.assessment_component_detail_id', '=', 'assessment_component_details.id')
+            ->join('assessment_components', 'assessment_component_details.assessment_component_id', '=', 'assessment_components.id')
+            ->orderBy('assessment_components.due_date')
+            ->select('assessment_component_detail_scores.*')
             ->limit(10)
             ->get();
 
@@ -185,7 +188,7 @@ class DashboardService
                     'type' => $assessment->assessmentComponentDetail->assessmentComponent->type,
                     'course_code' => $assessment->courseOffering->curriculumUnit->unit->code,
                     'course_name' => $assessment->courseOffering->curriculumUnit->unit->name,
-                    'due_date' => $assessment->due_date?->toDateString(),
+                    'due_date' => $assessment->assessmentComponentDetail->assessmentComponent->due_date?->toDateString(),
                     'max_score' => $assessment->max_score,
                     'weight' => $assessment->assessmentComponentDetail->weight,
                     'status' => $assessment->submission_status,
