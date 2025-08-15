@@ -268,7 +268,7 @@ const handleLogoTextUpload = (event: Event) => {
                             <span class="text-sm text-muted-foreground">Current:</span>
                             <img
                                 v-if="form.logo_full"
-                                :src="form.logo_full"
+                                :src="`${form.logo_full}?v=${imageCacheBuster}`"
                                 alt="Full Logo"
                                 class="h-28 w-auto object-contain"
                                 @error="() => {}"
@@ -316,7 +316,7 @@ const handleLogoTextUpload = (event: Event) => {
                             <span class="text-sm text-muted-foreground">Current:</span>
                             <img
                                 v-if="form.logo_text"
-                                :src="form.logo_text"
+                                :src="`${form.logo_text}?v=${imageCacheBuster}`"
                                 alt="Text Logo"
                                 class="h-28 w-auto object-contain"
                                 @error="() => {}"
