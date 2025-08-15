@@ -174,7 +174,7 @@ const formatTimeRange = (startTime: string, endTime: string) => {
                     <!-- Room -->
                     <div class="flex items-center space-x-2 text-muted-foreground">
                       <MapPin class="h-4 w-4" />
-                      <span>{{ session.room }}</span>
+                      <span>Room: {{ session.room }}</span>
                     </div>
 
                     <!-- Lecturer -->

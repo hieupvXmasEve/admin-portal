@@ -138,11 +138,14 @@ class AdminScheduleService
                         'email' => $lecturer->email,
                     ];
                 }),
-            'rooms' => Room::with('campus:id,name')
-                ->select('id', 'name', 'code', 'building', 'campus_id')
-                ->orderBy('building')
-                ->orderBy('name')
-                ->get(),
+            'rooms' => Room::with(['campus:id,name', 'building:id,name,code'])
+                ->select('id', 'name', 'code', 'building_id', 'campus_id')
+                ->get()
+                ->sortBy(function ($room) {
+                    return $room->building ? $room->building->name : 'ZZZ'; // Sort rooms without building to the end
+                })
+                ->sortBy('name')
+                ->values(),
         ];
     }
 

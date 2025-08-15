@@ -18,7 +18,7 @@ class RoomService
     public function getPaginatedRooms(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = Room::query()
-            ->with('campus')
+            ->with(['campus', 'building'])
             ->forCampus(app('campus')->id);
 
         $this->applyFilters($query, $filters);
@@ -32,7 +32,7 @@ class RoomService
     public function getAllRooms(): Collection
     {
         return Room::query()
-            ->with('campus')
+            ->with(['campus', 'building'])
             ->forCampus(app('campus')->id)
             ->get();
     }
@@ -43,7 +43,7 @@ class RoomService
     public function findRoom(int $id): ?Room
     {
         return Room::query()
-            ->with('campus')
+            ->with(['campus', 'building'])
             ->forCampus(app('campus')->id)
             ->find($id);
     }
@@ -82,7 +82,7 @@ class RoomService
 
             $room->update($data);
 
-            return $room->fresh('campus');
+            return $room->fresh(['campus', 'building']);
         });
     }
 
@@ -102,7 +102,7 @@ class RoomService
     public function getRoomsByType(string $type): Collection
     {
         return Room::query()
-            ->with('campus')
+            ->with(['campus', 'building'])
             ->forCampus(app('campus')->id)
             ->ofType($type)
             ->get();
@@ -114,7 +114,7 @@ class RoomService
     public function getAvailableRooms(): Collection
     {
         return Room::query()
-            ->with('campus')
+            ->with(['campus', 'building'])
             ->forCampus(app('campus')->id)
             ->withStatus(Room::STATUS_AVAILABLE)
             ->bookable()
@@ -127,7 +127,7 @@ class RoomService
     public function getRoomsWithMinimumCapacity(int $capacity): Collection
     {
         return Room::query()
-            ->with('campus')
+            ->with(['campus', 'building'])
             ->forCampus(app('campus')->id)
             ->withMinimumCapacity($capacity)
             ->get();
@@ -175,8 +175,11 @@ class RoomService
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', $search)
                     ->orWhere('code', 'like', $search)
-                    ->orWhere('building', 'like', $search)
-                    ->orWhere('description', 'like', $search);
+                    ->orWhere('description', 'like', $search)
+                    ->orWhereHas('building', function ($buildingQuery) use ($search) {
+                        $buildingQuery->where('name', 'like', $search)
+                            ->orWhere('code', 'like', $search);
+                    });
             });
         }
 
@@ -188,8 +191,8 @@ class RoomService
             $query->withStatus($filters['status']);
         }
 
-        if (! empty($filters['building'])) {
-            $query->where('building', $filters['building']);
+        if (! empty($filters['building_id'])) {
+            $query->where('building_id', $filters['building_id']);
         }
 
         if (! empty($filters['floor'])) {

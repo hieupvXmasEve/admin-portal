@@ -32,7 +32,11 @@ class ScheduleSessionResource extends JsonResource
                 'id' => $this->room->id ?? null,
                 'name' => $this->room->name ?? 'TBA',
                 'code' => $this->room->code ?? null,
-                'building' => $this->room->building ?? null,
+                'building' => $this->room->building ? [
+                    'id' => $this->room->building->id,
+                    'name' => $this->room->building->name,
+                    'code' => $this->room->building->code,
+                ] : null,
                 'fullCode' => $this->room->full_code ?? 'TBA',
             ],
             'campus' => [

@@ -24,7 +24,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
+console.log('%c props', 'color: red', props.courseOffering.class_sessions);
 const api = useApi();
 // const showStatusModal = ref(false);
 const isGenerating = ref(false);
@@ -103,6 +103,7 @@ const generateClassSessions = async (roomId: number) => {
             room_id: roomId,
         });
         if (result.data?.value?.success) {
+
             classSessions.value = result.data.value.data.sessions;
             toast.success(`${result.data.value.data.sessions_count} class sessions generated successfully`);
             router.reload({
@@ -409,6 +410,7 @@ const editCourseOffering = () => {
                                     <TableHead>Session</TableHead>
                                     <TableHead>Date</TableHead>
                                     <TableHead>Time</TableHead>
+                                    <TableHead>Room</TableHead>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Duration</TableHead>
@@ -432,6 +434,7 @@ const editCourseOffering = () => {
                                         {{ formatDate(session.session_date) }}
                                     </TableCell>
                                     <TableCell> {{ session.start_time }} - {{ session.end_time }}</TableCell>
+                                    <TableCell> {{ session?.room.name}}</TableCell>
                                     <TableCell>
                                         <Badge :variant="session.is_assessment ? 'secondary' : 'outline'">
                                             {{ session.session_type.toUpperCase() }}

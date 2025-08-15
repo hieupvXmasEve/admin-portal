@@ -39,19 +39,19 @@ class RoomController extends Controller
             'search' => 'nullable|string|max:255',
             'type' => 'nullable|string|in:'.implode(',', Room::getTypes()),
             'status' => 'nullable|string|in:'.implode(',', Room::getStatuses()),
-            'building' => 'nullable|string|max:255',
+            'building_id' => 'nullable|integer|exists:buildings,id',
             'floor' => 'nullable|string|max:255',
             'is_bookable' => 'nullable|boolean',
             'requires_approval' => 'nullable|boolean',
             'min_capacity' => 'nullable|integer|min:1',
             'max_capacity' => 'nullable|integer|min:1',
-            'sort' => 'nullable|string|in:name,building,type,capacity,status,created_at',
+            'sort' => 'nullable|string|in:name,building_id,type,capacity,status,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
         $query = Room::query()
-            ->with('campus')
+            ->with(['campus', 'building'])
             ->forCampus(app('campus')->id);
 
         // Apply search filter
@@ -60,8 +60,11 @@ class RoomController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhere('building', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('building', function ($buildingQuery) use ($search) {
+                        $buildingQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -76,8 +79,8 @@ class RoomController extends Controller
         }
 
         // Apply building filter
-        if ($validated['building'] ?? null) {
-            $query->where('building', $validated['building']);
+        if ($validated['building_id'] ?? null) {
+            $query->where('building_id', $validated['building_id']);
         }
 
         // Apply floor filter
@@ -120,13 +123,19 @@ class RoomController extends Controller
         // Get statistics
         $statistics = $this->roomService->getRoomStatistics();
 
-        // Get unique buildings and floors for filters
-        $buildings = Room::forCampus(app('campus')->id)
-            ->distinct()
-            ->pluck('building')
-            ->filter()
-            ->sort()
-            ->values();
+        // Get buildings for filters
+        $buildings = \App\Models\Building::forCampus(app('campus')->id)
+            ->select('id', 'name', 'code')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($building) {
+                return [
+                    'id' => $building->id,
+                    'label' => $building->name . ' (' . $building->code . ')',
+                    'name' => $building->name,
+                    'code' => $building->code,
+                ];
+            });
 
         $floors = Room::forCampus(app('campus')->id)
             ->distinct()
@@ -141,7 +150,7 @@ class RoomController extends Controller
                 'search' => $validated['search'] ?? null,
                 'type' => $validated['type'] ?? null,
                 'status' => $validated['status'] ?? null,
-                'building' => $validated['building'] ?? null,
+                'building_id' => $validated['building_id'] ?? null,
                 'floor' => $validated['floor'] ?? null,
                 'is_bookable' => $validated['is_bookable'] ?? null,
                 'requires_approval' => $validated['requires_approval'] ?? null,
@@ -166,15 +175,21 @@ class RoomController extends Controller
      */
     public function create(): Response
     {
-        // Get unique buildings for dropdown
-        $buildings = Room::forCampus(app('campus')->id)
-            ->distinct()
-            ->pluck('building')
-            ->filter()
-            ->sort()
-            ->values();
+        // Get buildings for dropdown
+        $buildings = \App\Models\Building::forCampus(app('campus')->id)
+            ->select('id', 'name', 'code')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($building) {
+                return [
+                    'id' => $building->id,
+                    'label' => $building->name . ' (' . $building->code . ')',
+                    'name' => $building->name,
+                    'code' => $building->code,
+                ];
+            });
 
-        return Inertia::render('rooms/Create', [
+        return Inertia::render('rooms/CreateAutoForm', [
             'room_types' => $this->getRoomTypeOptions(),
             'room_statuses' => $this->getRoomStatusOptions(),
             'buildings' => $buildings,
@@ -232,18 +247,24 @@ class RoomController extends Controller
             abort(404);
         }
 
-        $room->load('campus');
+        $room->load(['campus', 'building']);
 
-        // Get unique buildings for dropdown
-        $buildings = Room::forCampus(app('campus')->id)
-            ->distinct()
-            ->pluck('building')
-            ->filter()
-            ->sort()
-            ->values();
+        // Get buildings for dropdown
+        $buildings = \App\Models\Building::forCampus(app('campus')->id)
+            ->select('id', 'name', 'code')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($building) {
+                return [
+                    'id' => $building->id,
+                    'label' => $building->name . ' (' . $building->code . ')',
+                    'name' => $building->name,
+                    'code' => $building->code,
+                ];
+            });
 
         return Inertia::render('rooms/Edit', [
-            'room' => new RoomResource($room),
+            'room' => $room,
             'room_types' => $this->getRoomTypeOptions(),
             'room_statuses' => $this->getRoomStatusOptions(),
             'buildings' => $buildings,

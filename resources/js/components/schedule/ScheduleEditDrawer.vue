@@ -126,6 +126,7 @@ const loadSessionDetails = async () => {
 
     // Populate form with current session data
     if (detailedSession.value?.schedule && detailedSession.value?.room) {
+      console.log('%c detailedSession', 'color: red', detailedSession.value.room);
       setFieldValue('session_date', detailedSession.value.schedule.date)
       setFieldValue('start_time', detailedSession.value.schedule.startTime)
       setFieldValue('end_time', detailedSession.value.schedule.endTime)
@@ -160,6 +161,7 @@ const onSubmit = handleSubmit(async (formValues) => {
     emit('update:open', false)
   } catch (error) {
     if (error instanceof Error) {
+        console.log('%c error', 'color: red', error);
       conflictError.value = error.message
     }
   } finally {

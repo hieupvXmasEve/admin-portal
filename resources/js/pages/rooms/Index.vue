@@ -2,22 +2,24 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import TableActions from '@/components/TableActions.vue';
+import Icon from '@/components/Icon.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useGlobalDeleteDialog } from '@/composables';
 import { getRoomStatusOptions, getRoomTypeOptions } from '@/schemas/room';
 import type { PaginatedResponse } from '@/types';
-import type { Room } from '@/types/models';
+import type { Building, Room } from '@/types/models';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
 import { Building2, Plus, Users, X } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, h, ref } from 'vue';
+import { toast } from 'vue-sonner';
 
 const props = defineProps<{
     rooms: PaginatedResponse<Room>;
@@ -25,7 +27,7 @@ const props = defineProps<{
         search?: string;
         type?: string;
         status?: string;
-        building?: string;
+        building_id?: string;
         floor?: string;
         is_bookable?: boolean;
         requires_approval?: boolean;
@@ -41,7 +43,7 @@ const props = defineProps<{
     };
     room_types?: Array<{ value: string; label: string }>;
     room_statuses?: Array<{ value: string; label: string }>;
-    buildings?: string[];
+    buildings?: Building[];
     floors?: string[];
     permissions?: {
         can_create: boolean;
@@ -49,6 +51,10 @@ const props = defineProps<{
         can_delete: boolean;
     };
 }>();
+
+// Delete dialog composable
+const deleteDialog = useGlobalDeleteDialog();
+
 // Reactive data
 const data = computed(() => props.rooms.data);
 
@@ -57,7 +63,7 @@ const filters = ref({
     search: props.filters?.search || '',
     type: props.filters?.type || '',
     status: props.filters?.status || '',
-    building: props.filters?.building || '',
+    building_id: props.filters?.building_id || '',
     floor: props.filters?.floor || '',
     is_bookable: props.filters?.is_bookable,
     requires_approval: props.filters?.requires_approval,
@@ -75,10 +81,10 @@ const roomStatusOptions = props.room_statuses || getRoomStatusOptions();
 // Get unique buildings and floors from props, fallback to data calculation
 const buildingOptions = computed(() => {
     if (props.buildings) {
-        return props.buildings.map((building) => ({
-            value: building,
-            label: building,
-        }));
+        return props?.buildings ? props.buildings.map((building) => ({
+            value: building.id,
+            label: building.name,
+        })) : [];
     }
 
     const buildings = new Set<string>();
@@ -120,7 +126,7 @@ const applyFilters = (newFilters: typeof filters.value) => {
     if (newFilters.search) params.set('search', newFilters.search);
     if (newFilters.type) params.set('type', newFilters.type);
     if (newFilters.status) params.set('status', newFilters.status);
-    if (newFilters.building) params.set('building', newFilters.building);
+    if (newFilters.building_id) params.set('building_id', newFilters.building_id);
     if (newFilters.floor) params.set('floor', newFilters.floor);
     if (newFilters.is_bookable !== undefined && newFilters.is_bookable !== null) params.set('is_bookable', newFilters.is_bookable.toString());
     if (newFilters.requires_approval !== undefined && newFilters.requires_approval !== null) params.set('requires_approval', newFilters.requires_approval.toString());
@@ -169,7 +175,7 @@ const updateStatusFilter = (value: any) => {
 
 const updateBuildingFilter = (value: any) => {
     const stringValue = String(value);
-    filters.value.building = stringValue === 'all' || value === null ? '' : stringValue;
+    filters.value.building_id = stringValue === 'all' || value === null ? '' : stringValue;
     applyFilters(filters.value);
 };
 
@@ -264,22 +270,29 @@ const getStatusBadgeVariant = (status: string): 'default' | 'secondary' | 'destr
 };
 
 // CRUD actions
-const editRoom = (room: Room) => {
-    router.visit(systemRoutes.rooms.edit(room.id));
+const editRoom = (roomId: number) => {
+    router.visit(systemRoutes.rooms.edit(roomId));
 };
 
-const viewRoom = (room: Room) => {
-    router.visit(systemRoutes.rooms.show(room.id));
+const viewRoom = (roomId: number) => {
+    router.visit(systemRoutes.rooms.show(roomId));
 };
 
 const deleteRoom = (room: Room) => {
-    if (confirm(`Are you sure you want to delete room "${room.name}"?`)) {
+    deleteDialog.deleteItem(room.name, 'room', () => {
         router.delete(systemRoutes.rooms.destroy(room.id), {
             preserveState: true,
             preserveScroll: true,
-            only: ['rooms', 'stats'],
+            only: ['rooms', 'statistics'],
+            onSuccess: () => {
+                toast.success("Room deleted successfully")
+                console.log('Room deleted successfully');
+            },
+            onError: () => {
+                toast.error("Room deleted errorfully");
+            }
         });
-    }
+    });
 };
 
 // Column definitions
@@ -373,7 +386,38 @@ const columns: ColumnDef<Room>[] = [
         header: 'Actions',
         enableHiding: false,
         enableSorting: false,
-        cell: 'actions',
+        cell: ({ row }) => {
+            const room = row.original;
+            return h('div', { class: 'flex items-center space-x-2' }, [
+                // h(
+                //     Button,
+                //     {
+                //         variant: 'ghost',
+                //         size: 'sm',
+                //         onClick: () => viewRoom(room.id),
+                //     },
+                //     () => [h(Icon, { name: 'eye', class: 'w-4 h-4 mr-1' })],
+                // ),
+                h(
+                    Button,
+                    {
+                        variant: 'ghost',
+                        size: 'sm',
+                        onClick: () => editRoom(room.id),
+                    },
+                    () => [h(Icon, { name: 'edit', class: 'w-4 h-4 mr-1' })],
+                ),
+                h(
+                    Button,
+                    {
+                        variant: 'ghost',
+                        size: 'sm',
+                        onClick: () => deleteRoom(room),
+                    },
+                    () => [h(Icon, { name: 'trash', class: 'w-4 h-4' })],
+                ),
+            ]);
+        },
     },
 ];
 
@@ -484,13 +528,13 @@ const handlePageSizeChange = (pageSize: number) => {
                 <!-- Building Filter -->
                 <div class="flex flex-col gap-1">
                     <Label class="text-muted-foreground text-xs">Building</Label>
-                    <Select :model-value="filters.building || 'all'" @update:model-value="updateBuildingFilter">
+                    <Select :model-value="filters.building_id || 'all'" @update:model-value="updateBuildingFilter">
                         <SelectTrigger class="w-48">
                             <SelectValue placeholder="All Buildings" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Buildings</SelectItem>
-                            <SelectItem v-for="option in buildingOptions" :key="option.value" :value="option.value">
+                            <SelectItem v-for="option in buildingOptions" :key="option.value" :value="option.value.toString()">
                                 {{ option.label }}
                             </SelectItem>
                         </SelectContent>
@@ -516,49 +560,29 @@ const handlePageSizeChange = (pageSize: number) => {
                 <!-- Capacity Range -->
                 <div class="flex flex-col gap-1">
                     <Label class="text-muted-foreground text-xs">Min Capacity</Label>
-                    <Input
-                        :model-value="filters.min_capacity"
-                        @update:model-value="updateMinCapacityFilter"
-                        placeholder="Min"
-                        type="number"
-                        class="w-24"
-                    />
+                    <Input :model-value="filters.min_capacity" @update:model-value="updateMinCapacityFilter" placeholder="Min" type="number" class="w-24" />
                 </div>
 
                 <div class="flex flex-col gap-1">
                     <Label class="text-muted-foreground text-xs">Max Capacity</Label>
-                    <Input
-                        :model-value="filters.max_capacity"
-                        @update:model-value="updateMaxCapacityFilter"
-                        placeholder="Max"
-                        type="number"
-                        class="w-24"
-                    />
+                    <Input :model-value="filters.max_capacity" @update:model-value="updateMaxCapacityFilter" placeholder="Max" type="number" class="w-24" />
                 </div>
             </div>
 
             <!-- Row 3: Boolean Filters -->
-            <div class="flex flex-wrap items-center gap-4">
-                <!-- Bookable Filter -->
-                <div class="flex items-center space-x-2">
-                    <Checkbox
-                        id="bookable"
-                        :checked="filters.is_bookable === true"
-                        @update:checked="(checked: unknown) => updateBookableFilter(checked as boolean)"
-                    />
-                    <Label for="bookable" class="text-sm font-medium">Bookable Only</Label>
-                </div>
+            <!--            <div class="flex flex-wrap items-center gap-4">-->
+            <!--                &lt;!&ndash; Bookable Filter &ndash;&gt;-->
+            <!--                <div class="flex items-center space-x-2">-->
+            <!--                    <Checkbox id="bookable" :checked="filters.is_bookable === true" @update:checked="(checked: unknown) => updateBookableFilter(checked as boolean)" />-->
+            <!--                    <Label for="bookable" class="text-sm font-medium">Bookable Only</Label>-->
+            <!--                </div>-->
 
-                <!-- Requires Approval Filter -->
-                <div class="flex items-center space-x-2">
-                    <Checkbox
-                        id="approval"
-                        :checked="filters.requires_approval === true"
-                        @update:checked="(checked: unknown) => updateApprovalFilter(checked as boolean)"
-                    />
-                    <Label for="approval" class="text-sm font-medium">Requires Approval</Label>
-                </div>
-            </div>
+            <!--                &lt;!&ndash; Requires Approval Filter &ndash;&gt;-->
+            <!--                <div class="flex items-center space-x-2">-->
+            <!--                    <Checkbox id="approval" :checked="filters.requires_approval === true" @update:checked="(checked: unknown) => updateApprovalFilter(checked as boolean)" />-->
+            <!--                    <Label for="approval" class="text-sm font-medium">Requires Approval</Label>-->
+            <!--                </div>-->
+            <!--            </div>-->
         </div>
     </details>
 
@@ -575,7 +599,7 @@ const handlePageSizeChange = (pageSize: number) => {
             <div class="flex flex-col">
                 <div class="flex items-center gap-1 font-medium">
                     <Building2 class="h-3 w-3" />
-                    {{ row.original.building }}
+                    {{ row.original.building.name }}
                 </div>
                 <div class="text-muted-foreground text-sm">Floor {{ row.original.floor }}</div>
             </div>
@@ -599,10 +623,6 @@ const handlePageSizeChange = (pageSize: number) => {
                 <Badge v-if="row.original.is_bookable" variant="default" class="text-xs"> Bookable </Badge>
                 <Badge v-if="row.original.requires_approval" variant="outline" class="text-xs"> Needs Approval </Badge>
             </div>
-        </template>
-
-        <template #cell-actions="{ row }">
-            <TableActions @view="viewRoom(row.original)" @edit="editRoom(row.original)" @delete="deleteRoom(row.original)" />
         </template>
     </DataTable>
 

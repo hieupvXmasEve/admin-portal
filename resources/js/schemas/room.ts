@@ -3,7 +3,7 @@ import { z } from 'zod';
 // Room types and statuses (should match backend)
 export const ROOM_TYPES = [
     'classroom',
-    'laboratory', 
+    'laboratory',
     'computer_lab',
     'auditorium',
     'meeting_room',
@@ -32,80 +32,119 @@ export const DAYS_OF_WEEK = [
     'Sunday',
 ] as const;
 
-// Time format regex (HH:MM:SS)
-const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/;
+// Time format regex (HH:MM)
+export const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 
+// Base schema for room form with comprehensive defaults
 export const roomFormSchema = z.object({
-    name: z.string()
-        .min(1, 'Room name is required')
-        .max(255, 'Room name must not exceed 255 characters'),
-    
-    code: z.string()
+    name: z.string({
+        required_error: "Room name is required.",
+    })
+        .min(2, 'Room name must be at least 2 characters')
+        .max(255, 'Room name must not exceed 255 characters')
+        .describe('Room Name'),
+
+    code: z.string({
+        required_error: "Room code is required.",
+    })
         .min(1, 'Room code is required')
         .max(50, 'Room code must not exceed 50 characters')
-        .regex(/^[A-Za-z0-9\-_]+$/, 'Room code can only contain letters, numbers, hyphens, and underscores'),
-    
-    building: z.string()
+        .regex(/^[A-Za-z0-9\-_]+$/, 'Room code can only contain letters, numbers, hyphens, and underscores')
+        .describe('Room Code'),
+
+    building_id: z.coerce.number({
+        required_error: "Building is required.",
+        invalid_type_error: "Building must be selected.",
+    })
+        .int('Building must be selected')
         .min(1, 'Building is required')
-        .max(255, 'Building name must not exceed 255 characters'),
-    
-    floor: z.string()
+        .default(1)
+        .describe('Building'),
+
+    floor: z.string({
+        required_error: "Floor is required.",
+    })
         .min(1, 'Floor is required')
-        .max(50, 'Floor must not exceed 50 characters'),
-    
+        .max(50, 'Floor must not exceed 50 characters')
+        .default('Ground')
+        .describe('Floor'),
+
     type: z.enum(ROOM_TYPES, {
         required_error: 'Room type is required',
         invalid_type_error: 'Please select a valid room type',
-    }),
-    
-    capacity: z.coerce.number()
+    })
+        .default('classroom')
+        .describe('Room Type'),
+
+    capacity: z.coerce.number({
+        required_error: "Capacity is required.",
+        invalid_type_error: "Capacity must be a number.",
+    })
         .int('Capacity must be a whole number')
         .min(1, 'Capacity must be at least 1')
-        .max(10000, 'Capacity must not exceed 10,000'),
-    
+        .max(10000, 'Capacity must not exceed 10,000')
+        .default(30)
+        .describe('Capacity'),
+
     status: z.enum(ROOM_STATUSES, {
         required_error: 'Room status is required',
         invalid_type_error: 'Please select a valid room status',
-    }),
-    
-    is_bookable: z.boolean().default(true),
-    
-    requires_approval: z.boolean().default(false),
-    
+    })
+        .default('available')
+        .describe('Status'),
+
+    is_bookable: z.boolean()
+        .default(true)
+        .describe('Is Bookable'),
+
+    requires_approval: z.boolean()
+        .default(false)
+        .describe('Requires Approval'),
+
     available_from: z.string()
         .optional()
         .refine((val) => !val || timeRegex.test(val), {
-            message: 'Available from time must be in HH:MM:SS format',
-        }),
-    
+            message: 'Available from time must be in HH:MM format',
+        })
+        .default('07:00')
+        .describe('Available From'),
+
     available_until: z.string()
         .optional()
         .refine((val) => !val || timeRegex.test(val), {
-            message: 'Available until time must be in HH:MM:SS format',
-        }),
-    
-    blocked_days: z.array(z.enum(DAYS_OF_WEEK)).optional().default([]),
-    
+            message: 'Available until time must be in HH:MM format',
+        })
+        .default('18:00')
+        .describe('Available Until'),
+
+    // blocked_days: z.array(z.enum(DAYS_OF_WEEK))
+    //     .optional()
+    //     .default([])
+    //     .describe('Blocked Days'),
+
     description: z.string()
         .max(1000, 'Description must not exceed 1000 characters')
-        .optional(),
-    
+        .optional()
+        .describe('Description'),
+
     usage_guidelines: z.string()
         .max(2000, 'Usage guidelines must not exceed 2000 characters')
-        .optional(),
-    
+        .optional()
+        .describe('Usage Guidelines'),
+
     booking_notes: z.string()
         .max(1000, 'Booking notes must not exceed 1000 characters')
-        .optional(),
+        .optional()
+        .describe('Booking Notes'),
 }).refine((data) => {
     // Validate that available_until is after available_from if both are provided
     if (data.available_from && data.available_until) {
         const fromTime = data.available_from.split(':').map(Number);
         const untilTime = data.available_until.split(':').map(Number);
-        
+
         const fromMinutes = fromTime[0] * 60 + fromTime[1];
         const untilMinutes = untilTime[0] * 60 + untilTime[1];
-        
+
         return untilMinutes > fromMinutes;
     }
     return true;
@@ -144,21 +183,21 @@ export const processRoomFormData = (data: any): RoomFormData => {
             data.blocked_days = [];
         }
     }
-    
+
     // Convert boolean strings to actual booleans
     if (typeof data.is_bookable === 'string') {
         data.is_bookable = data.is_bookable === 'true' || data.is_bookable === '1';
     }
-    
+
     if (typeof data.requires_approval === 'string') {
         data.requires_approval = data.requires_approval === 'true' || data.requires_approval === '1';
     }
-    
+
     // Convert capacity to number
     if (typeof data.capacity === 'string') {
         data.capacity = parseInt(data.capacity, 10);
     }
-    
+
     return roomFormSchema.parse(data);
 };
 
@@ -166,7 +205,7 @@ export const processRoomFormData = (data: any): RoomFormData => {
 export const getRoomTypeOptions = () => {
     return ROOM_TYPES.map(type => ({
         value: type,
-        label: type.split('_').map(word => 
+        label: type.split('_').map(word =>
             word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' '),
     }));
@@ -175,12 +214,12 @@ export const getRoomTypeOptions = () => {
 export const getRoomStatusOptions = () => {
     const statusLabels: Record<typeof ROOM_STATUSES[number], string> = {
         available: 'Available',
-        occupied: 'Occupied', 
+        occupied: 'Occupied',
         maintenance: 'Under Maintenance',
         out_of_service: 'Out of Service',
         reserved: 'Reserved',
     };
-    
+
     return ROOM_STATUSES.map(status => ({
         value: status,
         label: statusLabels[status],
