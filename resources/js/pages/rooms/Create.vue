@@ -87,7 +87,7 @@ const onSubmit = (values: any) => {
             console.error('Validation errors:', errors);
             const firstErrorKey = Object.keys(errors)[0];
             const firstError = errors[firstErrorKey];
-            
+
             if (firstError) {
                 toast.error(Array.isArray(firstError) ? firstError[0] : firstError);
             } else {
@@ -354,7 +354,7 @@ const goBack = () => {
         <!-- Form Actions -->
         <div class="flex items-center justify-end gap-4">
             <Button type="button" variant="outline" @click="goBack" :disabled="inertiaForm.processing">Cancel</Button>
-            <Button type="submit" :disabled="!meta.valid || inertiaForm.processing" class="min-w-[120px]">
+            <Button type="submit" :disabled="inertiaForm.processing" class="min-w-[120px]">
                 <span v-if="inertiaForm.processing">Creating...</span>
                 <span v-else>Create Room</span>
             </Button>

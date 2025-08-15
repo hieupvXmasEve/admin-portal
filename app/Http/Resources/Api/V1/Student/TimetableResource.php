@@ -54,7 +54,7 @@ class TimetableResource extends JsonResource
                         'room' => [
                             'code' => $session['room']['code'],
                             'name' => $session['room']['name'],
-                            'building' => $session['room']['building'],
+                            'building' => $session['room']['building'] ?? null, // This may be building data object or null
                             'full_location' => $this->formatRoomLocation($session['room']),
                         ],
                         'color' => $session['color'],
@@ -177,10 +177,19 @@ class TimetableResource extends JsonResource
      */
     protected function formatRoomLocation(array $room): string
     {
+        $buildingName = null;
+        if (isset($room['building'])) {
+            if (is_array($room['building'])) {
+                $buildingName = $room['building']['name'] ?? null;
+            } else {
+                $buildingName = $room['building'];
+            }
+        }
+
         $parts = array_filter([
             $room['code'],
             $room['name'],
-            $room['building'],
+            $buildingName,
         ]);
 
         return implode(' - ', $parts);

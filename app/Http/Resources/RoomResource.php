@@ -17,10 +17,10 @@ class RoomResource extends JsonResource
         return [
             'id' => $this->id,
             'campus_id' => $this->campus_id,
+            'building_id' => $this->building_id,
             'name' => $this->name,
             'code' => $this->code,
             'full_code' => $this->full_code,
-            'building' => $this->building,
             'floor' => $this->floor,
             'type' => $this->type,
             'capacity' => $this->capacity,
@@ -38,6 +38,14 @@ class RoomResource extends JsonResource
                     'id' => $this->campus->id,
                     'name' => $this->campus->name,
                     'code' => $this->campus->code,
+                ];
+            }),
+            'building' => $this->whenLoaded('building', function () {
+                return [
+                    'id' => $this->building->id,
+                    'name' => $this->building->name,
+                    'code' => $this->building->code,
+                    'description' => $this->building->description,
                 ];
             }),
             'created_at' => $this->created_at->toISOString(),

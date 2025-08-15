@@ -88,7 +88,7 @@ class ClassSessionDetailResource extends JsonResource
             'id' => $room['id'],
             'code' => $room['code'],
             'name' => $room['name'],
-            'building' => $room['building'],
+            'building' => $room['building'] ?? null, // May be building object or null
             'capacity' => $room['capacity'],
             'facilities' => $room['facilities'],
             'full_location' => $this->formatRoomLocation($room),
@@ -239,10 +239,19 @@ class ClassSessionDetailResource extends JsonResource
      */
     protected function formatRoomLocation(array $room): string
     {
+        $buildingName = null;
+        if (isset($room['building'])) {
+            if (is_array($room['building'])) {
+                $buildingName = $room['building']['name'] ?? null;
+            } else {
+                $buildingName = $room['building'];
+            }
+        }
+
         $parts = array_filter([
             $room['code'],
             $room['name'],
-            $room['building'],
+            $buildingName,
         ]);
 
         return implode(' - ', $parts);

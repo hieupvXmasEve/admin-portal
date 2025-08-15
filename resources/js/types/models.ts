@@ -745,6 +745,10 @@ export interface ClassSession {
     id: number;
     course_offering_id: number;
     room_id?: number;
+    room?: {
+        id: number;
+        name: string;
+    };
     room_booking_id?: number;
     instructor_id?: number;
     session_title?: string;

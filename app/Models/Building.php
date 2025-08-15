@@ -57,7 +57,6 @@ class Building extends AuditableModel
         return $this->belongsTo(Campus::class);
     }
 
-    // Note: Room model not yet implemented
     public function rooms(): HasMany
     {
         return $this->hasMany(Room::class);
@@ -83,8 +82,7 @@ class Building extends AuditableModel
     // Helper methods
     public function getTotalRooms(): int
     {
-        // return $this->rooms()->count();
-        return 0; // Placeholder until Room model is implemented
+        return $this->rooms()->count();
     }
 
     // ========== AUDIT LOGGING CONFIGURATION ==========

@@ -14,9 +14,9 @@ class Room extends AuditableModel
 
     protected $fillable = [
         'campus_id',
+        'building_id',
         'name',
         'code',
-        'building',
         'floor',
         'type',
         'capacity',
@@ -78,6 +78,14 @@ class Room extends AuditableModel
     public function campus(): BelongsTo
     {
         return $this->belongsTo(Campus::class);
+    }
+
+    /**
+     * Get the building that owns the room.
+     */
+    public function building(): BelongsTo
+    {
+        return $this->belongsTo(Building::class);
     }
 
     /**
@@ -154,11 +162,19 @@ class Room extends AuditableModel
     }
 
     /**
-     * Get the full room identifier (building + code).
+     * Scope to filter rooms by building.
+     */
+    public function scopeForBuilding($query, int $buildingId)
+    {
+        return $query->where('building_id', $buildingId);
+    }
+
+    /**
+     * Get the full room identifier (building code + room code).
      */
     public function getFullCodeAttribute(): string
     {
-        return $this->building ? "{$this->building}-{$this->code}" : $this->code;
+        return $this->building ? "{$this->building->code}-{$this->code}" : $this->code;
     }
 
     /**
@@ -194,9 +210,9 @@ class Room extends AuditableModel
     {
         return [
             'campus_id',
+            'building_id',
             'name',
             'code',
-            'building',
             'type',
             'capacity',
             'status',
@@ -220,6 +236,7 @@ class Room extends AuditableModel
             'room_type' => $this->type,
             'capacity' => $this->capacity,
             'campus_name' => $this->campus?->name,
+            'building_name' => $this->building?->name,
         ];
 
         // Track status changes

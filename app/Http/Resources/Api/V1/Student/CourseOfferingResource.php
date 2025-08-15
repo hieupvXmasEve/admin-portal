@@ -64,10 +64,17 @@ class CourseOfferingResource extends JsonResource
             // Handle room data (could be null, array, or object)
             $roomData = [];
             if ($room) {
+                $buildingInfo = null;
+                if (is_array($room)) {
+                    $buildingInfo = $room['building'] ?? null;
+                } else {
+                    $buildingInfo = $room->building ?? null;
+                }
+                
                 $roomData = [
                     'code' => is_array($room) ? ($room['code'] ?? null) : ($room->code ?? null),
                     'name' => is_array($room) ? ($room['name'] ?? null) : ($room->name ?? null),
-                    'building' => is_array($room) ? ($room['building'] ?? null) : ($room->building ?? null),
+                    'building' => $buildingInfo,
                 ];
                 $roomData['full_location'] = $this->formatRoomLocation($roomData);
             }
@@ -184,10 +191,19 @@ class CourseOfferingResource extends JsonResource
      */
     protected function formatRoomLocation(array $room): string
     {
+        $buildingName = null;
+        if (isset($room['building'])) {
+            if (is_array($room['building'])) {
+                $buildingName = $room['building']['name'] ?? null;
+            } else {
+                $buildingName = $room['building'];
+            }
+        }
+
         $parts = array_filter([
             $room['code'] ?? null,
             $room['name'] ?? null,
-            $room['building'] ?? null,
+            $buildingName,
         ]);
 
         return implode(' - ', $parts);

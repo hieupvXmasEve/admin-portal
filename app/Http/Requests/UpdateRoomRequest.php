@@ -35,7 +35,7 @@ class UpdateRoomRequest extends FormRequest
                     ->where('campus_id', app('campus')->id)
                     ->ignore($room->id),
             ],
-            'building' => ['required', 'string', 'max:255'],
+            'building_id' => ['required', 'integer', 'exists:buildings,id'],
             'floor' => ['required', 'string', 'max:50'],
             'type' => ['required', 'string', Rule::in(Room::getTypes())],
             'capacity' => ['required', 'integer', 'min:1', 'max:10000'],
@@ -60,7 +60,7 @@ class UpdateRoomRequest extends FormRequest
         return [
             'name' => 'room name',
             'code' => 'room code',
-            'building' => 'building',
+            'building_id' => 'building',
             'floor' => 'floor',
             'type' => 'room type',
             'capacity' => 'capacity',

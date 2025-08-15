@@ -87,7 +87,7 @@ require __DIR__.'/web/systems.php';
 require __DIR__.'/web/email-monitoring.php';
 
 // Admin Schedule API routes (using web auth for SPA)
-Route::middleware(['auth', 'verified'])->name('api.admin.')->group(function () {
+Route::middleware(['auth'])->name('api.admin.')->group(function () {
     Route::prefix('api/admin/schedules')->name('schedules.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\AdminScheduleController::class, 'index'])
             ->middleware('can:view_course_offering')
@@ -98,7 +98,7 @@ Route::middleware(['auth', 'verified'])->name('api.admin.')->group(function () {
         Route::get('/{session}', [\App\Http\Controllers\Api\AdminScheduleController::class, 'show'])
             ->middleware('can:view_course_offering')
             ->name('show');
-        Route::patch('/{session}', [\App\Http\Controllers\Api\AdminScheduleController::class, 'update'])
+        Route::put('/{session}', [\App\Http\Controllers\Api\AdminScheduleController::class, 'update'])
             ->middleware('can:edit_course_offering')
             ->name('update');
     });

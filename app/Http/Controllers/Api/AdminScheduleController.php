@@ -95,7 +95,7 @@ class AdminScheduleController extends Controller
                 'success' => false,
                 'message' => 'Schedule conflict detected',
                 'errors' => $e->getMessage(),
-            ], 409); // Conflict status code
+            ], 200); // Conflict status code
         } catch (\Exception $e) {
             Log::error('Error updating session', [
                 'session_id' => $session->id,
