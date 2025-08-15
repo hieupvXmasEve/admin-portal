@@ -4,8 +4,8 @@ import { computed, reactive, readonly, ref } from 'vue';
 
 const systemConfig = reactive<SystemConfig>({
   app_name: '',
-  logo_full: '',
-  logo_text: '',
+  logo_full: '/placeholder.svg',
+  logo_text: '/placeholder.svg',
   copyright_text: '',
   country: ''
 })

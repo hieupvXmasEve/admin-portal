@@ -282,13 +282,13 @@ const handleLogoTextUpload = (event: Event) => {
 
                     <!-- Logo Text Upload -->
                     <div class="space-y-2">
-                        <Label for="logo_text_file">Text Logo Upload</Label>
+                        <Label for="logo_text_file">Logo SVG Upload</Label>
                         <div class="flex items-center gap-4">
                             <div class="flex-1">
                                 <input
                                     id="logo_text_file"
                                     type="file"
-                                    accept="image/png,image/jpeg,image/jpg,image/gif,image/svg+xml"
+                                    accept="image/svg+xml"
                                     @change="handleLogoTextUpload"
                                     :disabled="isUploadingLogoText || isSaving"
                                     class="block w-full text-sm text-slate-500
@@ -324,7 +324,7 @@ const handleLogoTextUpload = (event: Event) => {
                             <span v-else class="text-sm text-muted-foreground">No logo set</span>
                         </div>
                         <p class="text-sm text-muted-foreground">
-                            Upload a new text logo image. Supported formats: PNG, JPG, GIF, SVG (max 2MB)
+                            Upload a new text logo image. Supported formats: SVG (max 2MB)
                         </p>
                     </div>
 
