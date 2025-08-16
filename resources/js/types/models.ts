@@ -172,7 +172,7 @@ export interface Room {
     campus_id: number;
     name: string;
     code: string;
-    building: string;
+    building: Building;
     floor: string;
     type: 'classroom' | 'laboratory' | 'computer_lab' | 'auditorium' | 'meeting_room' | 'library' | 'study_room' | 'workshop' | 'office' | 'other';
     capacity: number;

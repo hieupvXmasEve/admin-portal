@@ -58,6 +58,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:view_course_offering')
         ->name(CourseOfferingRoutes::API_STATISTICS);
 
+    // Change room for all class sessions of an offering
+    Route::post('api/course-offerings/{courseOffering}/change-room', [CourseOfferingController::class, 'changeRoom'])
+        ->middleware('can:edit_course_offering')
+        ->name(CourseOfferingRoutes::API_CHANGE_ROOM);
+
     // Instructor assignment routes
     Route::get('api/course-offerings/check-instructor-assignments', [CourseOfferingController::class, 'checkInstructorAssignments'])
         ->middleware('can:view_course_offering')

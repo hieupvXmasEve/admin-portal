@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -325,12 +326,12 @@ class CourseOfferingController extends Controller
         $availableRooms = Room::bookable()
             ->withStatus(Room::STATUS_AVAILABLE)
             ->forCampus(app('campus')->id)
+            ->with('building:id,name')
             ->when(! empty($conflictingRoomIds), function ($q) use ($conflictingRoomIds) {
                 $q->whereNotIn('id', $conflictingRoomIds);
             })
-            ->orderBy('building')
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'building', 'capacity', 'type']);
+            ->get(['id', 'name', 'code', 'capacity', 'type']);
 
         $canGenerateClassSessions = $courseOffering->canGenerateClassSessions();
         return Inertia::render('course-offerings/Show', [
@@ -435,6 +436,120 @@ class CourseOfferingController extends Controller
 
         return Redirect::back()
             ->with('success', "Course offering status updated to {$newStatus}.");
+    }
+
+    /**
+     * Change the room for all existing class sessions of this course offering.
+     * Validates that the selected room is available on the configured schedule days
+     * and within the time range (schedule_time_start to schedule_time_end).
+     */
+    public function changeRoom(Request $request, CourseOffering $courseOffering): RedirectResponse
+    {
+        $validated = $request->validate([
+            'room_id' => ['required', Rule::exists('rooms', 'id')],
+        ]);
+
+        $roomId = (int) $validated['room_id'];
+
+        // Ensure there are class sessions to update
+        if (! $courseOffering->classSessions()->exists()) {
+            return Redirect::back()->with('error', 'No class sessions exist for this course offering.');
+        }
+
+        // Ensure room belongs to current campus and is bookable/available
+        $room = Room::where('id', $roomId)
+            ->forCampus(app('campus')->id)
+            ->bookable()
+            ->withStatus(Room::STATUS_AVAILABLE)
+            ->first();
+
+        if (! $room) {
+            return Redirect::back()->with('error', 'Selected room is not available or not in the current campus.');
+        }
+
+        // Check schedule-based conflicts using offering schedule
+        $scheduleDays = $courseOffering->schedule_days ?? [];
+        $startTime = $courseOffering->schedule_time_start ? $courseOffering->schedule_time_start->format('H:i') : null;
+        $endTime = $courseOffering->schedule_time_end ? $courseOffering->schedule_time_end->format('H:i') : null;
+
+        $conflictExists = false;
+
+        if (! empty($scheduleDays) && $startTime && $endTime) {
+            // Map schedule days to MySQL WEEKDAY() indexes (Monday=0 ... Sunday=6)
+            $dayToIndex = [
+                'monday' => 0,
+                'tuesday' => 1,
+                'wednesday' => 2,
+                'thursday' => 3,
+                'friday' => 4,
+                'saturday' => 5,
+                'sunday' => 6,
+            ];
+            $weekdayIndexes = collect($scheduleDays)
+                ->map(fn ($d) => strtolower($d))
+                ->map(fn ($d) => $dayToIndex[$d] ?? null)
+                ->filter(static fn ($v) => $v !== null)
+                ->values()
+                ->all();
+
+            if (! empty($weekdayIndexes)) {
+                $conflictExists = ClassSession::where('room_id', $roomId)
+                    ->where('status', '!=', 'cancelled')
+                    ->whereIn(DB::raw('WEEKDAY(session_date)'), $weekdayIndexes)
+                    ->where(function ($q) use ($startTime, $endTime) {
+                        $q->where(function ($subQ) use ($startTime) {
+                            // Existing session overlaps new start
+                            $subQ->whereTime('start_time', '<=', $startTime)
+                                ->whereTime('end_time', '>', $startTime);
+                        })->orWhere(function ($subQ) use ($endTime) {
+                            // Existing session overlaps new end
+                            $subQ->whereTime('start_time', '<', $endTime)
+                                ->whereTime('end_time', '>=', $endTime);
+                        })->orWhere(function ($subQ) use ($startTime, $endTime) {
+                            // Existing session fully within the new window
+                            $subQ->whereTime('start_time', '>=', $startTime)
+                                ->whereTime('end_time', '<=', $endTime);
+                        });
+                    })
+                    ->exists();
+            }
+        } else {
+            // Fallback: check conflicts on exact dates of this offering's sessions using first session's time window
+            $firstSession = $courseOffering->classSessions()->orderBy('session_date')->first();
+            if ($firstSession) {
+                $dates = $courseOffering->classSessions()->pluck('session_date');
+                $start = $firstSession->start_time->format('H:i');
+                $end = $firstSession->end_time->format('H:i');
+
+                $conflictExists = ClassSession::where('room_id', $roomId)
+                    ->where('status', '!=', 'cancelled')
+                    ->whereIn('session_date', $dates)
+                    ->where(function ($q) use ($start, $end) {
+                        $q->where(function ($subQ) use ($start) {
+                            $subQ->whereTime('start_time', '<=', $start)
+                                ->whereTime('end_time', '>', $start);
+                        })->orWhere(function ($subQ) use ($end) {
+                            $subQ->whereTime('start_time', '<', $end)
+                                ->whereTime('end_time', '>=', $end);
+                        })->orWhere(function ($subQ) use ($start, $end) {
+                            $subQ->whereTime('start_time', '>=', $start)
+                                ->whereTime('end_time', '<=', $end);
+                        });
+                    })
+                    ->exists();
+            }
+        }
+
+        if ($conflictExists) {
+            return Redirect::back()->with('error', 'Selected room is not available for the course offering schedule.');
+        }
+
+        // Update all sessions to the new room
+        DB::transaction(function () use ($courseOffering, $roomId) {
+            $courseOffering->classSessions()->update(['room_id' => $roomId]);
+        });
+
+        return Redirect::back()->with('success', 'Room updated for all class sessions.');
     }
 
     /**
