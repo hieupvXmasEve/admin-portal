@@ -4,6 +4,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
@@ -11,7 +24,7 @@ import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/t
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface Props {
@@ -28,7 +41,6 @@ console.log('%c props', 'color: red', props.courseOffering.class_sessions);
 const api = useApi();
 // const showStatusModal = ref(false);
 const isGenerating = ref(false);
-const classSessions = ref<ClassSession[]>(props.courseOffering.class_sessions || []);
 
 const getStatusVariant = (status: string) => {
     switch (status) {
@@ -103,8 +115,6 @@ const generateClassSessions = async (roomId: number) => {
             room_id: roomId,
         });
         if (result.data?.value?.success) {
-
-            classSessions.value = result.data.value.data.sessions;
             toast.success(`${result.data.value.data.sessions_count} class sessions generated successfully`);
             router.reload({
                 only: ['courseOffering'],
@@ -125,7 +135,10 @@ const deleteClassSessions = async () => {
         const result = await api.delete(`/api/course-offerings/${props.courseOffering.id}/class-sessions`);
 
         if (result.data?.value?.success) {
-            classSessions.value = [];
+            // Reload Inertia props to reflect deletion without local state
+            router.reload({
+                only: ['courseOffering'],
+            });
             toast.success('Class sessions deleted successfully');
         } else {
             toast.error(result.data?.value?.message || 'Failed to delete class sessions');
@@ -161,6 +174,42 @@ const getSessionStatusVariant = (status: string) => {
 };
 const editCourseOffering = () => {
     router.visit(`/course-offerings/${props.courseOffering.id}/edit`);
+};
+
+// Change Room modal state
+const changeRoomOpen = ref(false);
+const selectedRoomId = ref<number | null>(null);
+const roomSearch = ref('');
+const filteredRooms = computed(() => {
+    const q = roomSearch.value.toLowerCase().trim();
+    if (!q) return props.availableRooms || [];
+    return (props.availableRooms || []).filter((r) =>
+        [r.name, r.code, (r.building as any)?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
+    );
+});
+
+const submitChangeRoom = () => {
+    if (!selectedRoomId.value) return;
+    router.post(
+        `/api/course-offerings/${props.courseOffering.id}/change-room`,
+        { room_id: selectedRoomId.value },
+        {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const flash: any = (page as any)?.props?.flash || {};
+                if (flash.success) toast.success(flash.success);
+                else if (flash.error) toast.error(flash.error);
+                else toast.success('Room updated for all class sessions');
+                changeRoomOpen.value = false;
+                router.reload({ only: ['courseOffering'] });
+            },
+            onError: (errors) => {
+                // Try to surface first validation error; otherwise generic
+                const messages = Object.values(errors || {}) as string[];
+                toast.error(messages[0] || 'Failed to update room. Please ensure the room is available.');
+            },
+        },
+    );
 };
 </script>
 
@@ -387,12 +436,12 @@ const editCourseOffering = () => {
             </CardHeader>
             <CollapsibleContent>
                 <CardContent>
-                    <div v-if="classSessions.length === 0" class="py-8 text-center">
+                    <div v-if="!courseOffering.class_sessions || courseOffering.class_sessions.length === 0" class="py-8 text-center">
                         <Calendar class="text-muted-foreground mx-auto h-12 w-12" />
                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No class sessions</h3>
                         <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class sessions based on the syllabus.</p>
                         <div class="mt-1 flex items-center justify-center gap-2">
-                            <Button v-if="classSessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
+                            <Button v-if="courseOffering.class_sessions && courseOffering.class_sessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
                                 <Trash2 class="mr-2 h-4 w-4" />
                                 Delete All
                             </Button>
@@ -403,7 +452,59 @@ const editCourseOffering = () => {
                             </div>
                         </div>
                     </div>
-                    <div v-else>
+                    <div v-else class="space-y-4">
+                        <!-- Change Room action -->
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm text-muted-foreground">
+                                {{ courseOffering.class_sessions.length }} session(s)
+                            </div>
+                            <Dialog v-model:open="changeRoomOpen">
+                                <DialogTrigger as-child>
+                                    <Button size="sm" variant="outline">Change Room</Button>
+                                </DialogTrigger>
+                                <DialogContent class="max-w-2xl">
+                                    <DialogHeader>
+                                        <DialogTitle>Select Room</DialogTitle>
+                                        <DialogDescription>
+                                            Choose an active room to apply to all class sessions. Availability will be validated against the schedule.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <Label class="text-xs">Search</Label>
+                                            <Input v-model="roomSearch" placeholder="Search by name, code, building" type="search" />
+                                        </div>
+                                        <div class="max-h-80 overflow-auto rounded border">
+                                            <RadioGroup v-model="selectedRoomId" class="flex flex-col divide-y">
+                                                <div
+                                                    v-for="room in filteredRooms"
+                                                    :key="room.id"
+                                                    class="hover:bg-accent/40 flex items-center justify-between gap-3 px-3 py-2"
+                                                >
+                                                    <div class="flex items-center gap-3">
+                                                        <RadioGroupItem :id="`room-${room.id}`" :value="room.id" />
+                                                        <Label :for="`room-${room.id}`" class="cursor-pointer">
+                                                            <div class="font-medium">{{ room.name }} <span class="text-muted-foreground">({{ room.code }})</span></div>
+                                                            <div class="text-xs text-muted-foreground">
+                                                                {{ room.building?.name || room.building }} • Capacity: {{ room.capacity }} • {{ room.type?.replace('_', ' ') }}
+                                                            </div>
+                                                        </Label>
+                                                    </div>
+                                                </div>
+                                                <div v-if="filteredRooms.length === 0" class="text-muted-foreground p-4 text-center text-sm">No rooms found</div>
+                                            </RadioGroup>
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <DialogClose as-child>
+                                            <Button variant="outline">Cancel</Button>
+                                        </DialogClose>
+                                        <Button :disabled="!selectedRoomId" @click="submitChangeRoom">Apply to All Sessions</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+
                         <Table class="h-20 overflow-y-auto">
                             <TableHeader>
                                 <TableRow>
@@ -418,7 +519,7 @@ const editCourseOffering = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody class="h-20 overflow-y-auto">
-                                <TableRow v-for="session in classSessions" :key="session.id">
+                                <TableRow v-for="session in (courseOffering.class_sessions || [])" :key="session.id">
                                     <TableCell>
                                         <div class="flex items-center gap-2">
                                             <component :is="getSessionTypeIcon(session.session_type)" class="h-4 w-4" />

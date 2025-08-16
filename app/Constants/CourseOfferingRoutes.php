@@ -43,6 +43,9 @@ class CourseOfferingRoutes
 
     public const API_BULK_UPDATE_STATUS = 'api.course-offerings.bulk-update-status';
 
+    // Class sessions / room management
+    public const API_CHANGE_ROOM = 'api.course-offerings.change-room';
+
     // Route Prefixes
     public const WEB_PREFIX = 'course-offerings.';
 

@@ -39,7 +39,7 @@ const filteredItems = computed(() => {
 });
 // virtual list
 const { list, containerProps, wrapperProps } = useVirtualList(filteredItems, {
-    itemHeight: 120, // height of one Card (px)
+    itemHeight: 90, // height of one Card (px)
 });
 
 // Reset selection when modal opens
@@ -101,13 +101,13 @@ const getRoomDisplayName = (room: Room) => {
                     <div v-for="{ data: room } in list" :key="room.id" class="">
                         <Label :for="`room-${room.id}`" class="cursor-pointer">
                             <Card
-                                class="hover:border-primary w-full border-2 transition-colors"
+                                class="hover:border-primary w-full border-2 transition-colors py-2 gap-0"
                                 :class="{
                                     'border-primary bg-primary/5': selectedRoomId === room.id,
                                     'border-border': selectedRoomId !== room.id,
                                 }"
                             >
-                                <CardHeader class="pb-3">
+                                <CardHeader>
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center space-x-3">
                                             <RadioGroupItem :id="`room-${room.id}`" :value="room.id" class="mt-0.5" />
