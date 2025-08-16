@@ -7,14 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { PaginatedResponse } from '@/types';
 import type { ClassSession } from '@/types/models';
 import { formatDate } from '@/utils/date';
 import { attendanceRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { Calendar, Clock, Edit, Eye, MapPin, MoreHorizontal, Plus, Trash2, Users, Video, X, UserPlus } from 'lucide-vue-next';
+import { Calendar, Clock, Edit, Eye, MapPin, MoreHorizontal, Plus, Trash2, Video, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -35,7 +34,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log('props', props);
+console.log('props', props.sessions);
 const filters = ref({
     search: props.filters.search || '',
     status: props.filters.status || 'all',
@@ -122,10 +121,7 @@ const columns: ColumnDef<ClassSession>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const session = row.original;
-            return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'font-medium text-sm' }, session.session_title),
-                h('div', { class: 'text-xs text-muted-foreground max-w-[200px] truncate' }, session.session_description || 'No description'),
-            ]);
+            return h('div', { class: 'space-y-1' }, [h('div', { class: 'font-medium text-sm' }, session.session_title), h('div', { class: 'text-xs text-muted-foreground max-w-[200px] truncate' }, session.session_description || 'No description')]);
         },
     },
     {
@@ -135,12 +131,8 @@ const columns: ColumnDef<ClassSession>[] = [
         cell: ({ row }) => {
             const session = row.original;
             return h('div', { class: 'space-y-1' }, [
-                h(
-                    'div',
-                    { class: 'font-medium text-sm' },
-                    `${session.course_offering?.curriculum_unit?.unit.code} - ${session.course_offering?.curriculum_unit?.unit.name}`,
-                ),
-                h('div', { class: 'text-xs text-muted-foreground' }, session.instructor?.name || 'No instructor assigned'),
+                h('div', { class: 'font-medium text-sm' }, `${session.course_offering?.curriculum_unit?.unit.code} - ${session.course_offering?.curriculum_unit?.unit.name}`),
+                h('div', { class: 'text-xs text-muted-foreground' }, session.lecture?.display_name || session.lecture?.full_name || 'No instructor assigned'),
             ]);
         },
     },
@@ -151,19 +143,18 @@ const columns: ColumnDef<ClassSession>[] = [
         cell: ({ row }) => {
             const session = row.original;
             return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'flex items-center gap-1 text-sm' }, [
-                    h(Calendar, { class: 'h-3 w-3' }),
-                    h('span', formatDate(session.session_date)),
-                ]),
-                h('div', { class: 'flex items-center gap-1 text-xs text-muted-foreground' }, [
-                    h(Clock, { class: 'h-3 w-3' }),
-                    h('span', session.start_time),
-                    h('span', ' - '),
-                    h('span', session.end_time),
-                ]),
+                h('div', { class: 'flex items-center gap-1 text-sm' }, [h(Calendar, { class: 'h-3 w-3' }), h('span', formatDate(session.session_date))]),
+                h('div', { class: 'flex items-center gap-1 text-xs text-muted-foreground' }, [h(Clock, { class: 'h-3 w-3' }), h('span', session.start_time), h('span', ' - '), h('span', session.end_time)]),
                 h('div', { class: 'text-xs text-muted-foreground' }, `${session.duration_minutes} minutes`),
             ]);
         },
+    },
+    {
+        header: 'Room',
+        id: 'room_id',
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => row.original.room?.name || 'N/A',
     },
     {
         header: 'Type & Mode',
@@ -180,10 +171,7 @@ const columns: ColumnDef<ClassSession>[] = [
                     },
                     () => session.session_type?.toUpperCase() || 'N/A',
                 ),
-                h('div', { class: 'flex items-center gap-1 text-xs' }, [
-                    h(session.delivery_mode === 'online' ? Video : MapPin, { class: 'h-3 w-3' }),
-                    h('span', { class: 'capitalize' }, session.delivery_mode?.replace('_', ' ')),
-                ]),
+                h('div', { class: 'flex items-center gap-1 text-xs' }, [h(session.delivery_mode === 'online' ? Video : MapPin, { class: 'h-3 w-3' }), h('span', { class: 'capitalize' }, session.delivery_mode?.replace('_', ' '))]),
             ]);
         },
     },
@@ -196,11 +184,7 @@ const columns: ColumnDef<ClassSession>[] = [
             const stats = session.attendance_stats;
             return h('div', { class: 'space-y-1' }, [
                 h('div', { class: 'text-sm font-medium' }, `${stats?.attendance_percentage || 0}%`),
-                h(
-                    'div',
-                    { class: 'text-xs text-muted-foreground' },
-                    `${stats!.present + stats!.late || 0}/${stats!.total || session.expected_attendees || 0} students`,
-                ),
+                h('div', { class: 'text-xs text-muted-foreground' }, `${stats!.present + stats!.late || 0}/${stats!.total || session.expected_attendees || 0} students`),
                 session.attendance_required &&
                     h(
                         Badge,
@@ -262,34 +246,6 @@ const deleteSession = (sessionId: number) => {
         },
         onError: () => {
             toast.error('Failed to delete class session');
-        },
-    });
-};
-
-// Navigate to attendance
-const viewAttendance = (sessionId: number) => {
-    router.visit(`/attendance?session_id=${sessionId}`);
-};
-
-// Generate attendance for a session
-const generateAttendance = (sessionId: number) => {
-    router.post(`/class-sessions/${sessionId}/generate-attendance`, {}, {
-        onSuccess: (page) => {
-            // Check if there's a success message in the flash data
-            if (page.props.flash?.success) {
-                toast.success(page.props.flash.success);
-            } else {
-                toast.success('Attendance records generated successfully');
-            }
-        },
-        onError: (errors) => {
-            console.error('Generate attendance errors:', errors);
-            // Check if there's an error message in the flash data
-            if (errors.flash?.error) {
-                toast.error(errors.flash.error);
-            } else {
-                toast.error('Failed to generate attendance records');
-            }
         },
     });
 };
@@ -402,19 +358,6 @@ const generateAttendance = (sessionId: number) => {
         <DataTable :data="data" :columns="columns">
             <template #cell-actions="{ row }">
                 <div class="flex items-center gap-2">
-                    <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                        <Tooltip>
-                            <TooltipTrigger as-child>
-                                <Button variant="ghost" size="sm" @click="viewAttendance(row.original.id)">
-                                    <Users class="h-4 w-4" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>View Attendance</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-
                     <DropdownMenu>
                         <DropdownMenuTrigger as-child>
                             <Button variant="ghost" size="sm">
@@ -434,10 +377,6 @@ const generateAttendance = (sessionId: number) => {
                                     Edit Session
                                 </DropdownMenuItem>
                             </Link>
-                            <DropdownMenuItem @click="generateAttendance(row.original.id)">
-                                <UserPlus class="mr-2 h-4 w-4" />
-                                Generate Attendance
-                            </DropdownMenuItem>
                             <DropdownMenuItem class="text-destructive" @click="deleteSession(row.original.id)">
                                 <Trash2 class="mr-2 h-4 w-4" />
                                 Delete Session

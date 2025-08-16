@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ClassSessionDeliveryMode, ClassSessionStatus, ClassSessionType, type ClassSession, type CourseOffering } from '@/types/models';
+import { ClassSessionDeliveryMode, ClassSessionStatus, ClassSessionType, type ClassSession, type CourseOffering, type Room } from '@/types/models';
 import { attendanceRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -19,6 +19,7 @@ import { z } from 'zod';
 interface Props {
     session: ClassSession;
     courseOfferings: CourseOffering[];
+    rooms: Room[];
 }
 
 const props = defineProps<Props>();
@@ -33,6 +34,7 @@ const formSchema = toTypedSchema(
             session_title: z.string().min(1, 'Session title is required').max(255, 'Title is too long'),
             session_description: z.string().optional(),
             session_date: z.string().min(1, 'Session date is required'),
+            room_id: z.string().optional().or(z.literal('')),
             start_time: z
                 .string()
                 .min(1, 'Start time is required')
@@ -94,6 +96,7 @@ const { handleSubmit, values } = useForm({
         session_title: props.session.session_title || '',
         session_description: props.session.session_description || '',
         session_date: props.session.session_date || '',
+        room_id: props.session.room_id?.toString() || '',
         start_time: props.session.start_time || '',
         end_time: props.session.end_time || '',
         session_type: props.session.session_type || 'lecture',
@@ -117,6 +120,7 @@ const onSubmit = handleSubmit((formValues) => {
     const data = {
         ...formValues,
         course_offering_id: parseInt(formValues.course_offering_id),
+        room_id: formValues.room_id && formValues.room_id !== 'none' ? parseInt(formValues.room_id) : null,
         learning_objectives: formValues.learning_objectives ? formValues.learning_objectives.split('\n').filter((line) => line.trim()) : [],
         required_materials: formValues.required_materials ? formValues.required_materials.split('\n').filter((line) => line.trim()) : [],
         topics_covered: formValues.topics_covered ? formValues.topics_covered.split('\n').filter((line) => line.trim()) : [],
@@ -350,6 +354,34 @@ const today = new Date().toISOString().split('T')[0];
                                             <SelectContent>
                                                 <SelectItem v-for="option in statusOptions" :key="option.value" :value="option.value">
                                                     {{ option.label }}
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                </FormField>
+                            </div>
+
+                            <!-- Room (for in-person/hybrid) -->
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                <FormField v-slot="{ componentField }" name="room_id">
+                                    <FormItem>
+                                        <FormLabel>Room</FormLabel>
+                                        <Select v-bind="componentField" :disabled="values.delivery_mode === 'online'">
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a room (current campus)" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="none">No Room</SelectItem>
+                                                <SelectItem
+                                                    v-for="room in (rooms || [])"
+                                                    :key="room.id"
+                                                    :value="room.id.toString()"
+                                                >
+                                                    {{ room.name }} ({{ room.code }})
+                                                    <span v-if="room.building?.name" class="text-muted-foreground"> • {{ room.building?.name }}</span>
                                                 </SelectItem>
                                             </SelectContent>
                                         </Select>
