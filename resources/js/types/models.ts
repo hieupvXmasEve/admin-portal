@@ -726,7 +726,6 @@ export enum ClassSessionStatus {
     IN_PROGRESS = 'in_progress',
     COMPLETED = 'completed',
     CANCELLED = 'cancelled',
-    POSTPONED = 'postponed',
 }
 export enum ClassSessionType {
     LECTURE = 'lecture',
@@ -745,12 +744,9 @@ export interface ClassSession {
     id: number;
     course_offering_id: number;
     room_id?: number;
-    room?: {
-        id: number;
-        name: string;
-    };
+    room?: Room;
     room_booking_id?: number;
-    instructor_id?: number;
+    lecture_id?: number;
     session_title?: string;
     session_description?: string;
     session_date: string;
@@ -787,11 +783,11 @@ export interface ClassSession {
     ended_at?: string;
     cancelled_at?: string;
     course_offering?: CourseOffering;
+    lecture?: Lecture;
     created_at: string;
     updated_at: string;
     // Additional properties
     attendances?: Attendance[];
-    instructor?: User;
     attendance_stats?: {
         total: number;
         present: number;
@@ -800,11 +796,12 @@ export interface ClassSession {
         excused: number;
         attendance_percentage: number;
     };
-    status_badge_color?: string;
+    status_badge_color?: BadgeVariants['variant'];
     // Computed properties
     formatted_date?: string;
     formatted_time?: string;
     duration_in_minutes?: number;
+    attendance_marked?: boolean;
 }
 
 export interface Attendance {

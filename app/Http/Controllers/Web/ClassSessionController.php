@@ -6,9 +6,11 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
+use App\Models\Room;
 use App\Services\ClassSessionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,7 +24,8 @@ class ClassSessionController extends Controller
     public function index(Request $request): Response
     {
         $filters = $request->only(['search', 'status', 'session_type', 'delivery_mode', 'date_from', 'date_to']);
-        $perPage = $request->get('per_page', 15);
+        $perPage = (int) ($request->input('per_page', 15));
+        $perPage = max(1, min($perPage, 100));
 
         $sessions = $this->classSessionService->getPaginatedSessions($filters, $perPage);
 
@@ -58,7 +61,7 @@ class ClassSessionController extends Controller
 
         return Inertia::render('class-sessions/Index', [
             'sessions' => $sessions,
-            'filters' => $request->only(['search', 'status', 'session_type', 'delivery_mode', 'date_from', 'date_to', 'per_page']),
+            'filters' => array_merge($filters, ['per_page' => $perPage]),
             'statusOptions' => $statusOptions,
             'sessionTypeOptions' => $sessionTypeOptions,
             'deliveryModeOptions' => $deliveryModeOptions,
@@ -121,7 +124,9 @@ class ClassSessionController extends Controller
     public function show(Request $request, ClassSession $classSession)
     {
         $filters = $request->only(['search', 'status', 'per_page']);
-        $perPage = $request->get('per_page', 15);
+        $perPage = (int) ($request->input('per_page', 15));
+        $perPage = max(1, min($perPage, 100));
+        $filters['per_page'] = $perPage;
 
         // Get session with relationships
         $session = $this->classSessionService->getSessionWithRelations($classSession->id);
@@ -196,10 +201,15 @@ class ClassSessionController extends Controller
     public function edit(ClassSession $classSession): Response
     {
         $courseOfferings = $this->classSessionService->getCourseOfferingsForSelect();
+        $rooms = Room::forCampus(app('campus')->id)
+            ->with('building:id,name,code')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'capacity', 'type', 'building_id']);
 
         return Inertia::render('class-sessions/Edit', [
             'session' => $classSession,
             'courseOfferings' => $courseOfferings,
+            'rooms' => $rooms,
         ]);
     }
 
@@ -225,6 +235,10 @@ class ClassSessionController extends Controller
             'topics_covered' => 'nullable|array',
             'online_meeting_url' => 'nullable|url',
             'instructor_notes' => 'nullable|string',
+            'room_id' => [
+                'nullable',
+                Rule::exists('rooms', 'id')->where('campus_id', app('campus')->id),
+            ],
         ]);
 
         $classSession = $this->classSessionService->updateClassSession($classSession, $validated);

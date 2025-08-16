@@ -348,6 +348,7 @@ class ClassSessionService
             'courseOffering.curriculumUnit.unit',
             'lecture',
             'attendances',
+            'room:id,name'
         ])->orderBy('session_date', 'desc')
             ->orderBy('start_time', 'desc');
 
