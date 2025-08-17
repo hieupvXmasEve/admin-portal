@@ -28,10 +28,10 @@ class Semester extends AuditableModel
     ];
 
     protected $casts = [
-        'start_date' => 'datetime',
-        'end_date' => 'datetime',
-        'enrollment_start_date' => 'datetime',
-        'enrollment_end_date' => 'datetime',
+        'start_date' => 'date:Y-m-d',
+        'end_date' => 'date:Y-m-d',
+        'enrollment_start_date' => 'date:Y-m-d',
+        'enrollment_end_date' => 'date:Y-m-d',
         'is_active' => 'boolean',
         'is_archived' => 'boolean',
     ];

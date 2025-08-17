@@ -11,6 +11,7 @@ use App\Models\CourseOffering;
 use App\Services\ClassSessionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Carbon\Carbon;
 
 class ClassSessionController extends Controller
 {
@@ -32,10 +33,12 @@ class ClassSessionController extends Controller
     public function generate(GenerateClassSessionsRequest $request, CourseOffering $courseOffering): JsonResponse
     {
         try {
-            $roomId = $request->validated()['room_id'];
+            $validated = $request->validated();
+            $roomId = $validated['room_id'];
+            $startDate = isset($validated['start_date']) ? Carbon::parse($validated['start_date']) : null;
 
             // Generate new sessions
-            $sessions = $this->classSessionService->generateClassSessions($courseOffering, $roomId);
+            $sessions = $this->classSessionService->generateClassSessions($courseOffering, $roomId, $startDate);
 
             return response()->json([
                 'success' => true,

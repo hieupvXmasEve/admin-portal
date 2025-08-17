@@ -108,11 +108,12 @@ const enrollmentPercentage = props.courseOffering.max_capacity > 0 ? Math.round(
 // };
 
 // Class sessions management functions
-const generateClassSessions = async (roomId: number) => {
+const generateClassSessions = async ({ roomId, startDate }: { roomId: number; startDate: string }) => {
     try {
         isGenerating.value = true;
         const result = await api.post(`/api/course-offerings/${props.courseOffering.id}/class-sessions/generate`, {
             room_id: roomId,
+            start_date: startDate,
         });
         if (result.data?.value?.success) {
             toast.success(`${result.data.value.data.sessions_count} class sessions generated successfully`);
@@ -445,7 +446,14 @@ const submitChangeRoom = () => {
                                 <Trash2 class="mr-2 h-4 w-4" />
                                 Delete All
                             </Button>
-                            <RoomSelectionModal v-if="canGenerateClassSessions" :available-rooms="availableRooms" :is-generating="isGenerating" @generate="generateClassSessions" />
+                            <RoomSelectionModal
+                                v-if="canGenerateClassSessions"
+                                :available-rooms="availableRooms"
+                                :is-generating="isGenerating"
+                                :semester-start="courseOffering.semester.start_date"
+                                :semester-end="courseOffering.semester.end_date"
+                                @generate="generateClassSessions"
+                            />
                             <div v-else>
                                 <!-- Notice for user need required fields: schedule day, schedule time start, schedule time end -->
                                 <p class="text-sm text-red-400">Please set the schedule days, start time, end time, and ensure the unit has a complete syllabus before generating class sessions.</p>

@@ -20,7 +20,7 @@ class ClassSessionService
     /**
      * Auto-generate class sessions based on syllabus data
      */
-    public function generateClassSessions(CourseOffering $courseOffering, int $roomId): Collection
+    public function generateClassSessions(CourseOffering $courseOffering, int $roomId, ?Carbon $startDateOverride = null): Collection
     {
         Log::info("Generating class sessions for course offering {$courseOffering->id}");
 
@@ -56,7 +56,7 @@ class ClassSessionService
             Log::info("Total sessions to generate: {$totalSessions}, Duration: {$sessionDuration} hours");
 
             // Get semester dates and schedule
-            $startDate = $this->getStartDate($courseOffering);
+            $startDate = $startDateOverride ?: $this->getStartDate($courseOffering);
             $scheduleDays = $courseOffering->schedule_days ?? ['Monday'];
             $startTime = $courseOffering->schedule_time_start ? $courseOffering->schedule_time_start->format('H:i') : '09:00';
             $endTime = $courseOffering->schedule_time_end ? $courseOffering->schedule_time_end->format('H:i') : '11:00';

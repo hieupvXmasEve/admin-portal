@@ -22,10 +22,13 @@ import { computed, ref, shallowRef, watch } from 'vue';
 interface Props {
     availableRooms?: Room[];
     isGenerating: boolean;
+    // Optional semester bounds for client-side limits
+    semesterStart?: string;
+    semesterEnd?: string;
 }
 
 interface Emits {
-    (e: 'generate', roomId: number): void;
+    (e: 'generate', payload: { roomId: number; startDate: string }): void;
 }
 
 const props = defineProps<Props>();
@@ -33,6 +36,7 @@ const emit = defineEmits<Emits>();
 const open = ref(false);
 const selectedRoomId = ref<number | null>(null);
 const search = shallowRef('');
+const startDate = ref<string>('');
 
 const filteredItems = computed(() => {
     return props?.availableRooms?.filter((i) => i.name.toLowerCase().includes(search.value.toLowerCase())) || [];
@@ -46,12 +50,17 @@ const { list, containerProps, wrapperProps } = useVirtualList(filteredItems, {
 watch(open, (newValue) => {
     if (newValue) {
         selectedRoomId.value = null;
+        // Default start date to semester start if provided
+        if (!startDate.value && props.semesterStart) {
+            startDate.value = props.semesterStart.split('T')[0] || props.semesterStart;
+            console.log('%c startDate.value','color: red',props.semesterStart)
+        }
     }
 });
 
 const handleGenerate = () => {
-    if (selectedRoomId.value) {
-        emit('generate', selectedRoomId.value);
+    if (selectedRoomId.value && startDate.value) {
+        emit('generate', { roomId: selectedRoomId.value, startDate: startDate.value });
         open.value = false;
     }
 };
@@ -92,6 +101,17 @@ const getRoomDisplayName = (room: Room) => {
                     Choose a room where the class sessions will be held. All generated sessions will be assigned to the selected room.
                 </DialogDescription>
             </DialogHeader>
+            <div class="grid grid-cols-1 gap-3">
+                <div>
+                    <Label class="text-xs">Start date (within semester)</Label>
+                    <Input
+                        v-model="startDate"
+                        type="date"
+                        :min="semesterStart ? (semesterStart.split('T')[0] || semesterStart) : undefined"
+                        :max="semesterEnd ? (semesterEnd.split('T')[0] || semesterEnd) : undefined"
+                    />
+                </div>
+            </div>
             <div class="mr-4 inline-block">
                 Filter list by size
                 <Input v-model="search" placeholder="e.g..." type="search" />
@@ -151,7 +171,7 @@ const getRoomDisplayName = (room: Room) => {
                 <DialogClose as-child>
                     <Button variant="outline">Cancel</Button>
                 </DialogClose>
-                <Button @click="handleGenerate" :disabled="!selectedRoomId || isGenerating">
+                <Button @click="handleGenerate" :disabled="!selectedRoomId || !startDate || isGenerating">
                     {{ isGenerating ? 'Generating...' : 'Generate Sessions' }}
                 </Button>
             </DialogFooter>
