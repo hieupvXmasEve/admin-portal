@@ -45,6 +45,8 @@ export interface Semester {
     id: number;
     name: string;
     code: string;
+    start_date: string;
+    end_date: string;
     created_at: string;
     updated_at: string;
 }
@@ -704,7 +706,7 @@ export interface CourseOffering {
     notes?: string;
     curriculum_unit: CurriculumUnit;
     lecture?: Lecture;
-    semester?: Semester;
+    semester: Semester;
     campus?: Campus;
     courseRegistrations?: CourseRegistration[];
     created_at: string;
