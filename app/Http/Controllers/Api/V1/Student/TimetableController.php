@@ -13,6 +13,7 @@ use App\Models\ClassSession;
 use App\Services\V1\Student\TimetableService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class TimetableController extends Controller
 {
@@ -34,9 +35,9 @@ class TimetableController extends Controller
             unset($filters['semester_id']);
 
             $timetable = $this->timetableService->getStudentTimetable($student, $semesterId, $filters);
-
             return ApiResponse::success(
                 new TimetableResource($timetable),
+                [],
                 'Timetable retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -61,6 +62,7 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 $weeklyTimetable,
+                [],
                 'Weekly timetable retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -81,6 +83,7 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 new ClassSessionDetailResource($sessionDetail),
+                [],
                 'Class session detail retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -102,6 +105,7 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 $filterOptions,
+                [],
                 'Filter options retrieved successfully'
             );
         } catch (\Exception $e) {

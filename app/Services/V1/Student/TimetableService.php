@@ -29,25 +29,41 @@ class TimetableService
             return $this->getEmptyTimetable();
         }
 
-        $cacheKey = "timetable:student:{$student->id}:semester:{$semester->id}:".md5(serialize($filters));
+        $cacheKey = "timetable:student:{$student->id}:semester:{$semester->id}:" . md5(serialize($filters));
 
-        return Cache::remember($cacheKey, 300, function () use ($student, $semester, $filters) {
-            $classSessions = $this->classSessionRepository->getStudentClassSessions($student, $semester, $filters);
+        $classSessions = $this->classSessionRepository->getStudentClassSessions($student, $semester, $filters);
 
-            return [
-                'semester' => [
-                    'id' => $semester->id,
-                    'name' => $semester->name,
-                    'code' => $semester->code,
-                    'start_date' => $semester->start_date->toDateString(),
-                    'end_date' => $semester->end_date->toDateString(),
-                ],
-                'weekly_schedule' => $this->generateWeeklySchedule($classSessions),
-                'schedule_summary' => $this->generateScheduleSummary($classSessions),
-                'time_blocks' => $this->generateTimeBlocks($classSessions),
-                'filters_applied' => $filters,
-            ];
-        });
+        return [
+            'semester' => [
+                'id' => $semester->id,
+                'name' => $semester->name,
+                'code' => $semester->code,
+                'start_date' => $semester->start_date->toDateString(),
+                'end_date' => $semester->end_date->toDateString(),
+            ],
+            'weekly_schedule' => $this->generateWeeklySchedule($classSessions),
+            'schedule_summary' => $this->generateScheduleSummary($classSessions),
+            'time_blocks' => $this->generateTimeBlocks($classSessions),
+            'filters_applied' => $filters,
+            'generated_at' => now()->toISOString(),
+        ];
+        // return Cache::remember($cacheKey, 300, function () use ($student, $semester, $filters) {
+        //     $classSessions = $this->classSessionRepository->getStudentClassSessions($student, $semester, $filters);
+
+        //     return [
+        //         'semester' => [
+        //             'id' => $semester->id,
+        //             'name' => $semester->name,
+        //             'code' => $semester->code,
+        //             'start_date' => $semester->start_date->toDateString(),
+        //             'end_date' => $semester->end_date->toDateString(),
+        //         ],
+        //         'weekly_schedule' => $this->generateWeeklySchedule($classSessions),
+        //         'schedule_summary' => $this->generateScheduleSummary($classSessions),
+        //         'time_blocks' => $this->generateTimeBlocks($classSessions),
+        //         'filters_applied' => $filters,
+        //     ];
+        // });
     }
 
     /**
@@ -76,14 +92,19 @@ class TimetableService
             throw new \Exception('Student is not enrolled in this class session');
         }
 
+        $sessionDateString = $classSession->session_date instanceof Carbon
+            ? $classSession->session_date->toDateString()
+            : (string) $classSession->session_date;
+
         return [
             'session' => [
                 'id' => $classSession->id,
-                'day_of_week' => $classSession->day_of_week,
+                'session_date' => $sessionDateString,
+                'day_of_week' => strtolower(Carbon::parse($sessionDateString)->format('l')),
                 'start_time' => $classSession->start_time,
                 'end_time' => $classSession->end_time,
                 'session_type' => $classSession->session_type,
-                'duration_minutes' => $this->calculateDuration($classSession->start_time, $classSession->end_time),
+                'duration_minutes' => $this->calculateDuration((string) $classSession->start_time, (string) $classSession->end_time),
             ],
             'course' => [
                 'code' => $classSession->courseOffering->curriculumUnit->unit->code,
@@ -140,16 +161,37 @@ class TimetableService
         $schedule = [];
 
         foreach ($daysOfWeek as $day) {
+            $dayMap = [
+                'sunday' => 0,
+                'monday' => 1,
+                'tuesday' => 2,
+                'wednesday' => 3,
+                'thursday' => 4,
+                'friday' => 5,
+                'saturday' => 6,
+            ];
+
             $schedule[$day] = [
                 'day_name' => ucfirst($day),
+                'day_abbreviation' => strtoupper(substr($day, 0, 3)),
                 'sessions' => $classSessions
-                    ->where('day_of_week', $day)
+                    ->filter(function ($session) use ($dayMap, $day) {
+                        return Carbon::parse($session->session_date)->dayOfWeek === $dayMap[$day];
+                    })
                     ->sortBy('start_time')
                     ->map(function ($session) {
                         return $this->formatSessionForSchedule($session);
                     })
                     ->values()
                     ->toArray(),
+            ];
+
+            // Add session count and total duration
+            $sessions = $schedule[$day]['sessions'];
+            $schedule[$day]['session_count'] = count($sessions);
+            $schedule[$day]['total_duration'] = [
+                'total_minutes' => collect($sessions)->sum('duration_minutes'),
+                'display' => $this->formatDuration(collect($sessions)->sum('duration_minutes'))
             ];
         }
 
@@ -163,22 +205,48 @@ class TimetableService
     {
         $totalSessions = $classSessions->count();
         $uniqueCourses = $classSessions->pluck('courseOffering.curriculumUnit.unit.code')->unique()->count();
-        $totalHours = $classSessions->sum(function ($session) {
-            return $this->calculateDuration($session->start_time, $session->end_time) / 60;
+        $totalMinutes = $classSessions->sum(function ($session) {
+            return $this->calculateDuration($session->start_time, $session->end_time);
         });
+        $totalHours = $totalMinutes / 60.0;
 
-        $dayDistribution = $classSessions->groupBy('day_of_week')->map->count();
-        $sessionTypeDistribution = $classSessions->groupBy('session_type')->map->count();
+        // Build distributions as plain arrays to satisfy static analysis
+        $byDay = $classSessions->reduce(function (array $acc, $session) {
+            $day = strtolower(Carbon::parse((string) $session->session_date)->format('l'));
+            $acc[$day] = ($acc[$day] ?? 0) + 1;
+            return $acc;
+        }, []);
+
+        $bySessionType = $classSessions->reduce(function (array $acc, $session) {
+            $type = (string) $session->session_type;
+            $acc[$type] = ($acc[$type] ?? 0) + 1;
+            return $acc;
+        }, []);
+
+        // Determine busiest day
+        $busiestDay = null;
+        if (! empty($byDay)) {
+            $busiestDay = array_keys($byDay, max($byDay))[0];
+        }
 
         return [
-            'total_sessions_per_week' => $totalSessions,
-            'unique_courses' => $uniqueCourses,
-            'total_hours_per_week' => round($totalHours, 1),
-            'busiest_day' => $dayDistribution->keys()->first(),
-            'day_distribution' => $dayDistribution->toArray(),
-            'session_type_distribution' => $sessionTypeDistribution->toArray(),
-            'earliest_start' => $classSessions->min('start_time'),
-            'latest_end' => $classSessions->max('end_time'),
+            'overview' => [
+                'total_sessions_per_week' => $totalSessions,
+                'unique_courses' => $uniqueCourses,
+                'total_hours_per_week' => round($totalHours, 1),
+                'average_hours_per_day' => $totalSessions > 0 ? (float) round($totalHours / 7, 1) : 0,
+            ],
+            'schedule_pattern' => [
+                'busiest_day' => $busiestDay,
+                'earliest_start' => $classSessions->min('start_time'),
+                'latest_end' => $classSessions->max('end_time'),
+                'earliest_start_display' => ($min = $classSessions->min('start_time')) ? Carbon::createFromTimeString((string) $min)->format('g:i A') : null,
+                'latest_end_display' => ($max = $classSessions->max('end_time')) ? Carbon::createFromTimeString((string) $max)->format('g:i A') : null,
+            ],
+            'distribution' => [
+                'by_day' => $byDay,
+                'by_session_type' => $bySessionType,
+            ],
         ];
     }
 
@@ -200,11 +268,22 @@ class TimetableService
             ];
 
             foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as $day) {
-                $sessionsInSlot = $classSessions->filter(function ($session) use ($day, $hour) {
-                    $startHour = Carbon::createFromTimeString($session->start_time)->hour;
-                    $endHour = Carbon::createFromTimeString($session->end_time)->hour;
+                $dayMap = [
+                    'sunday' => 0,
+                    'monday' => 1,
+                    'tuesday' => 2,
+                    'wednesday' => 3,
+                    'thursday' => 4,
+                    'friday' => 5,
+                    'saturday' => 6,
+                ];
 
-                    return $session->day_of_week === $day && $hour >= $startHour && $hour < $endHour;
+                $sessionsInSlot = $classSessions->filter(function ($session) use ($dayMap, $day, $hour) {
+                    $startHour = $session->start_time instanceof Carbon ? $session->start_time->hour : Carbon::createFromTimeString($session->start_time)->hour;
+                    $endHour = $session->end_time instanceof Carbon ? $session->end_time->hour : Carbon::createFromTimeString($session->end_time)->hour;
+                    $sessionDay = Carbon::parse($session->session_date)->dayOfWeek;
+
+                    return $sessionDay === $dayMap[$day] && $hour >= $startHour && $hour < $endHour;
                 });
 
                 $timeSlots[$timeSlot]['sessions'][$day] = $sessionsInSlot->map(function ($session) {
@@ -221,6 +300,15 @@ class TimetableService
      */
     protected function formatSessionForSchedule(ClassSession $session): array
     {
+        $roomBuilding = null;
+        if ($session->room && $session->room->building) {
+            if (is_object($session->room->building)) {
+                $roomBuilding = $session->room->building->name ?? null;
+            } else {
+                $roomBuilding = $session->room->building;
+            }
+        }
+
         return [
             'id' => $session->id,
             'course_code' => $session->courseOffering->curriculumUnit->unit->code,
@@ -228,12 +316,12 @@ class TimetableService
             'session_type' => $session->session_type,
             'start_time' => $session->start_time,
             'end_time' => $session->end_time,
-            'duration_minutes' => $this->calculateDuration($session->start_time, $session->end_time),
-            'lecturer' => $session->courseOffering->lecturer?->full_name,
+            'duration_minutes' => $this->calculateDuration((string) $session->start_time, (string) $session->end_time),
+            'lecturer' => $session->courseOffering->lecture?->full_name,
             'room' => [
                 'code' => $session->room?->code,
                 'name' => $session->room?->name,
-                'building' => $session->room?->building,
+                'building' => $roomBuilding,
             ],
             'color' => $this->generateSessionColor($session->courseOffering->curriculumUnit->unit->code),
         ];
@@ -258,12 +346,12 @@ class TimetableService
     /**
      * Calculate duration between two times in minutes
      */
-    protected function calculateDuration(string $startTime, string $endTime): int
+    protected function calculateDuration(string|Carbon $startTime, string|Carbon $endTime): int
     {
-        $start = Carbon::createFromTimeString($startTime);
-        $end = Carbon::createFromTimeString($endTime);
+        $start = $startTime instanceof Carbon ? $startTime : Carbon::createFromTimeString($startTime);
+        $end = $endTime instanceof Carbon ? $endTime : Carbon::createFromTimeString($endTime);
 
-        return $start->diffInMinutes($end);
+        return (int) $start->diffInMinutes($end);
     }
 
     /**
@@ -272,8 +360,16 @@ class TimetableService
     protected function generateSessionColor(string $courseCode): string
     {
         $colors = [
-            '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
-            '#06B6D4', '#F97316', '#84CC16', '#EC4899', '#6366F1',
+            '#3B82F6',
+            '#EF4444',
+            '#10B981',
+            '#F59E0B',
+            '#8B5CF6',
+            '#06B6D4',
+            '#F97316',
+            '#84CC16',
+            '#EC4899',
+            '#6366F1',
         ];
 
         $index = crc32($courseCode) % count($colors);
@@ -298,17 +394,69 @@ class TimetableService
      */
     protected function getEmptyTimetable(): array
     {
+        $emptyDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $emptySchedule = [];
+
+        foreach ($emptyDays as $day) {
+            $emptySchedule[$day] = [
+                'day_name' => ucfirst($day),
+                'day_abbreviation' => strtoupper(substr($day, 0, 3)),
+                'session_count' => 0,
+                'sessions' => [],
+                'total_duration' => [
+                    'total_minutes' => 0,
+                    'display' => '0m'
+                ],
+            ];
+        }
+
         return [
             'semester' => null,
-            'weekly_schedule' => [],
+            'weekly_schedule' => $emptySchedule,
             'schedule_summary' => [
-                'total_sessions_per_week' => 0,
-                'unique_courses' => 0,
-                'total_hours_per_week' => 0,
+                'overview' => [
+                    'total_sessions_per_week' => 0,
+                    'unique_courses' => 0,
+                    'total_hours_per_week' => 0,
+                    'average_hours_per_day' => 0,
+                ],
+                'schedule_pattern' => [
+                    'busiest_day' => null,
+                    'earliest_start' => null,
+                    'latest_end' => null,
+                    'earliest_start_display' => null,
+                    'latest_end_display' => null,
+                ],
+                'distribution' => [
+                    'by_day' => [],
+                    'by_session_type' => [],
+                ],
             ],
             'time_blocks' => [],
             'filters_applied' => [],
+            'generated_at' => now()->toISOString(),
         ];
+    }
+
+    /**
+     * Format duration in minutes to human readable format
+     */
+    protected function formatDuration(int $minutes): string
+    {
+        if ($minutes === 0) {
+            return '0m';
+        }
+
+        $hours = intval($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+
+        if ($hours > 0 && $remainingMinutes > 0) {
+            return "{$hours}h {$remainingMinutes}m";
+        } elseif ($hours > 0) {
+            return "{$hours}h";
+        } else {
+            return "{$remainingMinutes}m";
+        }
     }
 
     /**
@@ -316,7 +464,21 @@ class TimetableService
      */
     protected function getAvailableDays(Collection $classSessions): array
     {
-        return $classSessions->pluck('day_of_week')->unique()->sort()->values()->toArray();
+        $days = $classSessions->map(function ($session) {
+            $dayOfWeek = Carbon::parse($session->session_date)->dayOfWeek;
+            $dayMap = [
+                1 => 'sunday',
+                2 => 'monday',
+                3 => 'tuesday',
+                4 => 'wednesday',
+                5 => 'thursday',
+                6 => 'friday',
+                7 => 'saturday'
+            ];
+            return $dayMap[$dayOfWeek] ?? 'unknown';
+        })->unique()->sort()->values()->toArray();
+
+        return $days;
     }
 
     /**
@@ -347,6 +509,13 @@ class TimetableService
     {
         return $classSessions->pluck('room.building')
             ->filter()
+            ->map(function ($building) {
+                if (is_object($building)) {
+                    return $building->name ?? null;
+                }
+                return $building;
+            })
+            ->filter()
             ->unique()
             ->sort()
             ->values()
@@ -364,13 +533,15 @@ class TimetableService
             $timeSlots[] = [
                 'start' => $session->start_time,
                 'end' => $session->end_time,
-                'display' => Carbon::createFromTimeString($session->start_time)->format('g:i A').
-                           ' - '.
-                           Carbon::createFromTimeString($session->end_time)->format('g:i A'),
+                'display' => Carbon::createFromTimeString($session->start_time)->format('g:i A') .
+                    ' - ' .
+                    Carbon::createFromTimeString($session->end_time)->format('g:i A'),
             ];
         }
 
-        return collect($timeSlots)->unique('start')->sortBy('start')->values()->toArray();
+        return collect($timeSlots)->unique(function ($item) {
+            return $item['start'] . '-' . $item['end'];
+        })->sortBy('start')->values()->toArray();
     }
 
     /**
