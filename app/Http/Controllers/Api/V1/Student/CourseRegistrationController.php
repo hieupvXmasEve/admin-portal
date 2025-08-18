@@ -40,6 +40,7 @@ class CourseRegistrationController extends Controller
 
             return ApiResponse::success(
                 CourseOfferingResource::collection($availableCourses),
+                [],
                 'Available courses retrieved successfully'
             );
         } catch (BusinessLogicException $e) {
@@ -82,6 +83,7 @@ class CourseRegistrationController extends Controller
 
             return ApiResponse::success(
                 CourseRegistrationResource::collection($formattedRegistrations),
+                [],
                 'Course registration successful',
                 201
             );
@@ -106,6 +108,7 @@ class CourseRegistrationController extends Controller
 
             return ApiResponse::success(
                 null,
+                [],
                 'Course dropped successfully'
             );
         } catch (BusinessLogicException $e) {
@@ -128,6 +131,7 @@ class CourseRegistrationController extends Controller
 
             return ApiResponse::success(
                 CourseRegistrationResource::collection($registrations),
+                [],
                 'Student registrations retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -176,7 +180,7 @@ class CourseRegistrationController extends Controller
                 }
             }
 
-            return ApiResponse::success($validations, 'Registration validation completed');
+            return ApiResponse::success($validations, [], 'Registration validation completed');
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to validate registration');
         }
@@ -198,7 +202,7 @@ class CourseRegistrationController extends Controller
                 'has_conflicts' => ! $conflicts->isEmpty(),
                 'conflict_count' => $conflicts->count(),
                 'conflicts' => $conflicts->toArray(),
-            ], 'Schedule conflicts checked successfully');
+            ], [], 'Schedule conflicts checked successfully');
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to check schedule conflicts');
         }

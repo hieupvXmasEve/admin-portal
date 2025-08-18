@@ -23,10 +23,44 @@ import { toast } from 'vue-sonner';
 interface StudentApplication {
     id: number;
     full_name: string;
-    email: string;
+    gender: string;
+    ethnicity: string;
+    birth_day: number;
+    birth_month: number;
+    birth_year: number;
+    national_id: string;
     phone: string;
+    email: string;
+    address: string;
+    health_information: string;
+    parent_phone: string;
+    parent_email: string;
     campus_code: string;
+    intended_program: string;
+    intended_specialization: string;
+    intake: string;
+    exam_date: string;
+    english_test_type: string;
+    listening: number;
+    reading: number;
+    writing: number;
+    speaking: number;
+    overall: number;
+    submitted_photo: string | null;
+    submitted_cccd: string | null;
+    submitted_ccta: string | null;
+    submitted_tn_translate: string | null;
+    submitted_hb_translate: string | null;
+    submitted_other: string | null;
+    submitted_insurance_card: string | null;
+    submitted_exemption_gc: string | null;
+    study_link_status: string;
+    english_qualifications: string;
+    sut_id: string;
+    is_international_applicant: boolean;
+    exception_units: string;
     status: 'pending' | 'reviewed' | 'approved' | 'rejected';
+    student_id: number | null;
     created_at: string;
     updated_at: string;
     student?: {
@@ -82,7 +116,9 @@ const selectedApplications = ref<StudentApplication[]>([]);
 const showBatchConversionDialog = ref(false);
 const showStatusUpdateDialog = ref(false);
 const showBulkStatusUpdateDialog = ref(false);
+const showApplicationDetailsDialog = ref(false);
 const currentApplication = ref<StudentApplication | null>(null);
+const selectedApplicationForDetails = ref<StudentApplication | null>(null);
 const isLoading = ref(false);
 
 // Template refs
@@ -123,22 +159,65 @@ const getStatusBadge = (status: string) => {
     }
 };
 
+// Helper function to format birth date
+const formatBirthDate = (day: number, month: number, year: number) => {
+    if (!day || !month || !year) return 'N/A';
+    return `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+};
+
+// Helper function to format boolean as Yes/No
+const formatBoolean = (value: boolean) => {
+    return value ? 'Yes' : 'No';
+};
+
 // Table columns
 const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
+    {
+        accessorKey: 'id',
+        header: 'ID',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm font-mono' }, application.id.toString());
+        },
+    },
     {
         accessorKey: 'full_name',
         header: 'Full Name',
         cell: ({ row }) => {
             const application = row.original;
-            return h('div', { class: 'font-medium' }, application.full_name);
+            return h('div', { class: 'font-medium min-w-[150px]' }, application.full_name);
         },
     },
     {
-        accessorKey: 'email',
-        header: 'Email',
+        accessorKey: 'gender',
+        header: 'Gender',
         cell: ({ row }) => {
             const application = row.original;
-            return h('div', { class: 'text-sm text-muted-foreground' }, application.email);
+            return h('div', { class: 'text-sm' }, application.gender || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'ethnicity',
+        header: 'Ethnicity',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, application.ethnicity || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'birth_date',
+        header: 'Birth Date',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, formatBirthDate(application.birth_day, application.birth_month, application.birth_year));
+        },
+    },
+    {
+        accessorKey: 'national_id',
+        header: 'National ID',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm font-mono' }, application.national_id || 'N/A');
         },
     },
     {
@@ -146,7 +225,47 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
         header: 'Phone',
         cell: ({ row }) => {
             const application = row.original;
-            return h('div', { class: 'text-sm' }, application.phone);
+            return h('div', { class: 'text-sm' }, application.phone || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'email',
+        header: 'Email',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm text-muted-foreground min-w-[200px]' }, application.email || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'address',
+        header: 'Address',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm max-w-[200px] truncate', title: application.address }, application.address || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'health_information',
+        header: 'Health Info',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm max-w-[150px] truncate', title: application.health_information }, application.health_information || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'parent_phone',
+        header: 'Parent Phone',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, application.parent_phone || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'parent_email',
+        header: 'Parent Email',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm text-muted-foreground min-w-[200px]' }, application.parent_email || 'N/A');
         },
     },
     {
@@ -155,7 +274,265 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
         cell: ({ row }) => {
             const application = row.original;
             const campus = props.campuses.find((c) => c.code === application.campus_code);
-            return h('div', { class: 'text-sm' }, campus?.name || application.campus_code);
+            return h('div', { class: 'text-sm' }, campus?.name || application.campus_code || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'intended_program',
+        header: 'Intended Program',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm min-w-[150px]' }, application.intended_program || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'intended_specialization',
+        header: 'Specialization',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm min-w-[150px]' }, application.intended_specialization || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'intake',
+        header: 'Intake',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, application.intake || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'exam_date',
+        header: 'Exam Date',
+        cell: ({ row }) => {
+            const application = row.original;
+            if (!application.exam_date) return h('span', { class: 'text-sm text-muted-foreground' }, 'N/A');
+            return h('div', { class: 'text-sm' }, format(new Date(application.exam_date), 'MMM dd, yyyy'));
+        },
+    },
+    {
+        accessorKey: 'english_test_type',
+        header: 'English Test',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, application.english_test_type || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'listening',
+        header: 'Listening',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, application.listening ? application.listening.toString() : 'N/A');
+        },
+    },
+    {
+        accessorKey: 'reading',
+        header: 'Reading',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, application.reading ? application.reading.toString() : 'N/A');
+        },
+    },
+    {
+        accessorKey: 'writing',
+        header: 'Writing',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, application.writing ? application.writing.toString() : 'N/A');
+        },
+    },
+    {
+        accessorKey: 'speaking',
+        header: 'Speaking',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, application.speaking ? application.speaking.toString() : 'N/A');
+        },
+    },
+    {
+        accessorKey: 'overall',
+        header: 'Overall Score',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm font-medium' }, application.overall ? application.overall.toString() : 'N/A');
+        },
+    },
+    {
+        accessorKey: 'submitted_photo',
+        header: 'Photo',
+        cell: ({ row }) => {
+            const application = row.original;
+            const documentPath = application.submitted_photo;
+            if (documentPath) {
+                return h('a', {
+                    href: documentPath,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
+                }, 'View');
+            }
+            return h('span', { class: 'text-sm text-red-600' }, 'No');
+        },
+    },
+    {
+        accessorKey: 'submitted_cccd',
+        header: 'CCCD',
+        cell: ({ row }) => {
+            const application = row.original;
+            const documentPath = application.submitted_cccd;
+            if (documentPath) {
+                return h('a', {
+                    href: documentPath,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
+                }, 'View');
+            }
+            return h('span', { class: 'text-sm text-red-600' }, 'No');
+        },
+    },
+    {
+        accessorKey: 'submitted_ccta',
+        header: 'CCTA',
+        cell: ({ row }) => {
+            const application = row.original;
+            const documentPath = application.submitted_ccta;
+            if (documentPath) {
+                return h('a', {
+                    href: documentPath,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
+                }, 'View');
+            }
+            return h('span', { class: 'text-sm text-red-600' }, 'No');
+        },
+    },
+    {
+        accessorKey: 'submitted_tn_translate',
+        header: 'TN Translate',
+        cell: ({ row }) => {
+            const application = row.original;
+            const documentPath = application.submitted_tn_translate;
+            if (documentPath) {
+                return h('a', {
+                    href: documentPath,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
+                }, 'View');
+            }
+            return h('span', { class: 'text-sm text-red-600' }, 'No');
+        },
+    },
+    {
+        accessorKey: 'submitted_hb_translate',
+        header: 'HB Translate',
+        cell: ({ row }) => {
+            const application = row.original;
+            const documentPath = application.submitted_hb_translate;
+            if (documentPath) {
+                return h('a', {
+                    href: documentPath,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
+                }, 'View');
+            }
+            return h('span', { class: 'text-sm text-red-600' }, 'No');
+        },
+    },
+    {
+        accessorKey: 'submitted_other',
+        header: 'Other Docs',
+        cell: ({ row }) => {
+            const application = row.original;
+            const documentPath = application.submitted_other;
+            if (documentPath) {
+                return h('a', {
+                    href: documentPath,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
+                }, 'View');
+            }
+            return h('span', { class: 'text-sm text-red-600' }, 'No');
+        },
+    },
+    {
+        accessorKey: 'submitted_insurance_card',
+        header: 'Insurance',
+        cell: ({ row }) => {
+            const application = row.original;
+            const documentPath = application.submitted_insurance_card;
+            if (documentPath) {
+                return h('a', {
+                    href: documentPath,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
+                }, 'View');
+            }
+            return h('span', { class: 'text-sm text-red-600' }, 'No');
+        },
+    },
+    {
+        accessorKey: 'submitted_exemption_gc',
+        header: 'Exemption GC',
+        cell: ({ row }) => {
+            const application = row.original;
+            const documentPath = application.submitted_exemption_gc;
+            if (documentPath) {
+                return h('a', {
+                    href: documentPath,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
+                }, 'View');
+            }
+            return h('span', { class: 'text-sm text-red-600' }, 'No');
+        },
+    },
+    {
+        accessorKey: 'study_link_status',
+        header: 'StudyLink Status',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm' }, application.study_link_status || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'english_qualifications',
+        header: 'English Qualifications',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm max-w-[200px] truncate', title: application.english_qualifications }, application.english_qualifications || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'sut_id',
+        header: 'SUT ID',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm font-mono' }, application.sut_id || 'N/A');
+        },
+    },
+    {
+        accessorKey: 'is_international_applicant',
+        header: 'International',
+        cell: ({ row }) => {
+            const application = row.original;
+            const isInternational = application.is_international_applicant;
+            return h('div', { class: `text-sm ${isInternational ? 'text-blue-600' : 'text-gray-600'}` }, formatBoolean(isInternational));
+        },
+    },
+    {
+        accessorKey: 'exception_units',
+        header: 'Exception Units',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm max-w-[150px] truncate', title: application.exception_units }, application.exception_units || 'N/A');
         },
     },
     {
@@ -194,6 +571,14 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
         },
     },
     {
+        accessorKey: 'updated_at',
+        header: 'Updated',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'text-sm text-muted-foreground' }, format(new Date(application.updated_at), 'MMM dd, yyyy'));
+        },
+    },
+    {
         id: 'actions',
         header: 'Actions',
         cell: ({ row }) => {
@@ -209,7 +594,7 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
                             h(
                                 DropdownMenuItem,
                                 {
-                                    onClick: () => router.visit(`/student-applications/${application.id}`),
+                                    onClick: () => openApplicationDetailsDialog(application),
                                 },
                                 () => [h(Eye, { class: 'mr-2 h-4 w-4' }), 'View'],
                             ),
@@ -319,11 +704,18 @@ const openBulkStatusDialog = () => {
     showBulkStatusUpdateDialog.value = true;
 };
 
+const openApplicationDetailsDialog = (application: StudentApplication) => {
+    selectedApplicationForDetails.value = application;
+    showApplicationDetailsDialog.value = true;
+};
+
 const closeDialogs = () => {
     showStatusUpdateDialog.value = false;
     showBatchConversionDialog.value = false;
     showBulkStatusUpdateDialog.value = false;
+    showApplicationDetailsDialog.value = false;
     currentApplication.value = null;
+    selectedApplicationForDetails.value = null;
     conversionForm.value = {
         admission_date: format(new Date(), 'yyyy-MM-dd'),
     };
@@ -636,6 +1028,295 @@ const clearFilters = () => {
                     <RefreshCw v-if="isLoading" class="mr-2 h-4 w-4 animate-spin" />
                     Update Status
                 </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Application Details Dialog -->
+    <Dialog v-model:open="showApplicationDetailsDialog">
+        <DialogContent class="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+                <DialogTitle class="flex items-center gap-2">
+                    <Eye class="h-5 w-5" />
+                    Student Application Details
+                </DialogTitle>
+                <DialogDescription v-if="selectedApplicationForDetails">
+                    Viewing details for {{ selectedApplicationForDetails.full_name }}'s application
+                </DialogDescription>
+            </DialogHeader>
+
+            <div v-if="selectedApplicationForDetails" class="space-y-6">
+                <!-- Personal Information -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="text-lg">Personal Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Application ID</Label>
+                                <p class="font-mono">{{ selectedApplicationForDetails.id }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Full Name</Label>
+                                <p class="font-medium">{{ selectedApplicationForDetails.full_name || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Gender</Label>
+                                <p>{{ selectedApplicationForDetails.gender || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Ethnicity</Label>
+                                <p>{{ selectedApplicationForDetails.ethnicity || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Birth Date</Label>
+                                <p>{{ formatBirthDate(selectedApplicationForDetails.birth_day, selectedApplicationForDetails.birth_month, selectedApplicationForDetails.birth_year) }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">National ID</Label>
+                                <p class="font-mono">{{ selectedApplicationForDetails.national_id || 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- Contact Information -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="text-lg">Contact Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1  gap-4">
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Phone</Label>
+                                <p>{{ selectedApplicationForDetails.phone || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Email</Label>
+                                <p class="text-blue-600">{{ selectedApplicationForDetails.email || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Address</Label>
+                                <p class="break-words">{{ selectedApplicationForDetails.address || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Parent Phone</Label>
+                                <p>{{ selectedApplicationForDetails.parent_phone || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Parent Email</Label>
+                                <p class="text-blue-600">{{ selectedApplicationForDetails.parent_email || 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- Academic Information -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="text-lg">Academic Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Campus</Label>
+                                <p>{{ campuses.find(c => c.code === selectedApplicationForDetails.campus_code)?.name || selectedApplicationForDetails.campus_code || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Intended Program</Label>
+                                <p>{{ selectedApplicationForDetails.intended_program || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Specialization</Label>
+                                <p>{{ selectedApplicationForDetails.intended_specialization || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Intake</Label>
+                                <p>{{ selectedApplicationForDetails.intake || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Exam Date</Label>
+                                <p>{{ selectedApplicationForDetails.exam_date ? format(new Date(selectedApplicationForDetails.exam_date), 'MMM dd, yyyy') : 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">SUT ID</Label>
+                                <p class="font-mono">{{ selectedApplicationForDetails.sut_id || 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- English Test Scores -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="text-lg">English Test Scores</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Test Type</Label>
+                                <p>{{ selectedApplicationForDetails.english_test_type || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Listening</Label>
+                                <p class="font-medium">{{ selectedApplicationForDetails.listening || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Reading</Label>
+                                <p class="font-medium">{{ selectedApplicationForDetails.reading || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Writing</Label>
+                                <p class="font-medium">{{ selectedApplicationForDetails.writing || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Speaking</Label>
+                                <p class="font-medium">{{ selectedApplicationForDetails.speaking || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Overall Score</Label>
+                                <p class="font-semibold text-lg">{{ selectedApplicationForDetails.overall || 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- Document Submissions -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="text-lg">Document Submissions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Photo</Label>
+                                <p v-if="selectedApplicationForDetails.submitted_photo">
+                                    <a :href="selectedApplicationForDetails.submitted_photo" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
+                                </p>
+                                <p v-else class="text-red-600">Not Submitted</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">CCCD</Label>
+                                <p v-if="selectedApplicationForDetails.submitted_cccd">
+                                    <a :href="selectedApplicationForDetails.submitted_cccd" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
+                                </p>
+                                <p v-else class="text-red-600">Not Submitted</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">CCTA</Label>
+                                <p v-if="selectedApplicationForDetails.submitted_ccta">
+                                    <a :href="selectedApplicationForDetails.submitted_ccta" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
+                                </p>
+                                <p v-else class="text-red-600">Not Submitted</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">TN Translate</Label>
+                                <p v-if="selectedApplicationForDetails.submitted_tn_translate">
+                                    <a :href="selectedApplicationForDetails.submitted_tn_translate" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
+                                </p>
+                                <p v-else class="text-red-600">Not Submitted</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">HB Translate</Label>
+                                <p v-if="selectedApplicationForDetails.submitted_hb_translate">
+                                    <a :href="selectedApplicationForDetails.submitted_hb_translate" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
+                                </p>
+                                <p v-else class="text-red-600">Not Submitted</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Other Documents</Label>
+                                <p v-if="selectedApplicationForDetails.submitted_other">
+                                    <a :href="selectedApplicationForDetails.submitted_other" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
+                                </p>
+                                <p v-else class="text-red-600">Not Submitted</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Insurance Card</Label>
+                                <p v-if="selectedApplicationForDetails.submitted_insurance_card">
+                                    <a :href="selectedApplicationForDetails.submitted_insurance_card" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
+                                </p>
+                                <p v-else class="text-red-600">Not Submitted</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Exemption GC</Label>
+                                <p v-if="selectedApplicationForDetails.submitted_exemption_gc">
+                                    <a :href="selectedApplicationForDetails.submitted_exemption_gc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
+                                </p>
+                                <p v-else class="text-red-600">Not Submitted</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- Additional Information -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="text-lg">Additional Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Health Information</Label>
+                                <p class="break-words">{{ selectedApplicationForDetails.health_information || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">StudyLink Status</Label>
+                                <p>{{ selectedApplicationForDetails.study_link_status || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">English Qualifications</Label>
+                                <p class="break-words">{{ selectedApplicationForDetails.english_qualifications || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">International Applicant</Label>
+                                <p :class="selectedApplicationForDetails.is_international_applicant ? 'text-blue-600' : 'text-gray-600'">{{ formatBoolean(selectedApplicationForDetails.is_international_applicant) }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Exception Units</Label>
+                                <p class="break-words">{{ selectedApplicationForDetails.exception_units || 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Application Status</Label>
+                                <Badge :variant="getStatusBadge(selectedApplicationForDetails.status).variant" :class="getStatusBadge(selectedApplicationForDetails.status).class">
+                                    <component :is="getStatusBadge(selectedApplicationForDetails.status).icon" class="w-3 h-3 mr-1" />
+                                    {{ selectedApplicationForDetails.status.charAt(0).toUpperCase() + selectedApplicationForDetails.status.slice(1) }}
+                                </Badge>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <!-- Conversion Status -->
+                <Card>
+                    <CardHeader>
+                        <CardTitle class="text-lg">Conversion Status</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Student Conversion</Label>
+                                <div v-if="selectedApplicationForDetails.student">
+                                    <p class="font-medium text-green-600">{{ selectedApplicationForDetails.student.student_id }}</p>
+                                    <p class="text-xs text-muted-foreground">Converted to Student</p>
+                                </div>
+                                <p v-else class="text-muted-foreground">Not Converted</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Created Date</Label>
+                                <p>{{ format(new Date(selectedApplicationForDetails.created_at), 'MMM dd, yyyy HH:mm') }}</p>
+                            </div>
+                            <div>
+                                <Label class="text-sm font-medium text-muted-foreground">Last Updated</Label>
+                                <p>{{ format(new Date(selectedApplicationForDetails.updated_at), 'MMM dd, yyyy HH:mm') }}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="closeDialogs()">Close</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
