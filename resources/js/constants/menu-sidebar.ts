@@ -45,6 +45,7 @@ export const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: '/dashboard',
         icon: LayoutDashboard,
+        requiredPermissions: ['view_dashboard'],
     },
         {
             title: 'System Management',
@@ -457,7 +458,7 @@ export const mainNavItems: NavItem[] = [
                 title: 'System Configuration',
                 href: systemRoutes.config.index(),
                 icon: Settings2,
-                // requiredPermissions: ['view_system_config'], // Will be implemented later
+                requiredPermissions: ['view_system_config'], // Will be implemented later
             },
             {
                 title: 'Activity Logs',
@@ -482,19 +483,19 @@ export const mainNavItems: NavItem[] = [
                 title: 'Email Configuration',
                 href: systemRoutes.emailConfiguration.index(),
                 icon: Settings2,
-                // requiredPermissions: ['view_email_configuration'],
+                requiredPermissions: ['view_email_configuration'],
             },
             {
                 title: 'Email Templates',
                 href: systemRoutes.emailConfiguration.templates(),
                 icon: FileText,
-                // requiredPermissions: ['view_email_template'],
+                requiredPermissions: ['view_email_template'],
             },
             {
                 title: 'Bulk Email',
                 href: systemRoutes.emailConfiguration.bulkEmail(),
                 icon: MailPlus,
-                // requiredPermissions: ['view_email_template'],
+                requiredPermissions: ['view_email_template'],
             },
         ],
     },

@@ -1034,7 +1034,7 @@ const clearFilters = () => {
 
     <!-- Application Details Dialog -->
     <Dialog v-model:open="showApplicationDetailsDialog">
-        <DialogContent class="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
                 <DialogTitle class="flex items-center gap-2">
                     <Eye class="h-5 w-5" />
