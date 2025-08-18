@@ -6,6 +6,7 @@ import type { DetailedScheduleSession, ScheduleSession } from '@/types/schedule'
 import { Head } from '@inertiajs/vue3';
 import { Calendar } from 'lucide-vue-next';
 import { ref } from 'vue';
+import { addDays, format, startOfWeek } from 'date-fns';
 
 // Composable
 const scheduleApi = useAdminSchedule();
@@ -22,10 +23,23 @@ const handleSessionClick = (session: ScheduleSession) => {
     isEditDrawerOpen.value = true;
 };
 
-const handleSessionUpdated = (updatedSession: DetailedScheduleSession) => {
-    // Session has been updated, the composable will handle the state update
-    selectedSession.value = null;
+const handleSessionUpdated = async () => {
+    // Close drawer first
     isEditDrawerOpen.value = false;
+    selectedSession.value = null;
+
+    // Refresh the grid for the current week
+    const startDate = startOfWeek(selectedWeek.value, { weekStartsOn: 1 });
+    const endDate = addDays(startDate, 6);
+    await scheduleApi.fetchSessions(
+        {
+            date_range: {
+                start: format(startDate, 'yyyy-MM-dd'),
+                end: format(endDate, 'yyyy-MM-dd'),
+            },
+        },
+        { force: true },
+    );
 };
 
 const handleWeekChange = (date: Date) => {
@@ -74,22 +88,12 @@ const handleOverlappingSessionsClick = (sessions: ScheduleSession[], date: strin
 
         <!-- Schedule Grid -->
         <main class="lg:col-span-4">
-            <ScheduleGridView 
-                :selected-week="selectedWeek" 
-                @session-click="handleSessionClick" 
-                @week-change="handleWeekChange"
-                @overlapping-sessions-click="handleOverlappingSessionsClick"
-            />
+            <ScheduleGridView :selected-week="selectedWeek" @session-click="handleSessionClick" @week-change="handleWeekChange" @overlapping-sessions-click="handleOverlappingSessionsClick" />
         </main>
     </div>
 
     <!-- Edit Session Drawer -->
-    <ScheduleEditDrawer
-        v-model:open="isEditDrawerOpen"
-        :session="selectedSession"
-        @session-updated="handleSessionUpdated"
-        @update:open="handleEditDrawerClose"
-    />
+    <ScheduleEditDrawer v-model:open="isEditDrawerOpen" :session="selectedSession" @session-updated="handleSessionUpdated" @update:open="handleEditDrawerClose" />
 </template>
 
 <style scoped></style>

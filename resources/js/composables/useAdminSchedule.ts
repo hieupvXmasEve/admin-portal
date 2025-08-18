@@ -8,7 +8,8 @@ import type { ScheduleSession, DetailedScheduleSession, ScheduleFilters, FilterO
  * Provides a clean API interface for schedule management
  * with business logic, caching, and error handling without using Pinia
  */
-export function useAdminSchedule() {
+// Singleton store builder
+function createScheduleStore() {
   const api = useApi()
 
   // State management
@@ -264,19 +265,10 @@ export function useAdminSchedule() {
       const response = await api.put<ScheduleSession>(route('api.admin.schedules.update', { session: sessionId }), updateData)
 
       if (response.data?.value?.success) {
-        const updatedSession = response.data.value.data
-        
-        // Update the session in the local state
-        const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
-        if (sessionIndex !== -1) {
-          sessions.value[sessionIndex] = {
-            ...sessions.value[sessionIndex],
-            ...updatedSession,
-          }
-        }
-
-        selectedSession.value = updatedSession
-        return updatedSession
+        const updatedSession = (response.data.value as any).data
+        // Keep selected session for detail views; let caller decide to refetch list
+        selectedSession.value = updatedSession as any
+        return updatedSession as any
       } else {
         const errorMessage = response.data?.value?.message || response.data?.value?.error || 'Failed to update session'
         updateError.value = errorMessage
@@ -420,4 +412,14 @@ export function useAdminSchedule() {
     getSessionById,
     hasSessionConflicts,
   }
+}
+
+// Singleton instance holder
+let _scheduleStore: ReturnType<typeof createScheduleStore> | null = null
+
+export function useAdminSchedule() {
+  if (!_scheduleStore) {
+    _scheduleStore = createScheduleStore()
+  }
+  return _scheduleStore
 }

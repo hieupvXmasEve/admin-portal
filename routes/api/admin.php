@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AdminScheduleController;
 use App\Http\Controllers\Api\StudentApplicationController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
@@ -66,6 +67,14 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
         Route::post('/logs/{emailLog}/retry', [EmailController::class, 'retryEmail'])->name('emails.retry');
         Route::get('/user-roles', [EmailController::class, 'getUserRoles'])->name('emails.user-roles');
         Route::get('/campuses', [EmailController::class, 'getCampuses'])->name('emails.campuses');
+    });
+
+    // Schedule Management (Admin)
+    Route::prefix('schedules')->name('schedules.')->group(function () {
+        Route::get('/', [AdminScheduleController::class, 'index'])->name('index');
+        Route::get('/filter-options', [AdminScheduleController::class, 'filterOptions'])->name('filter-options');
+        Route::get('/{session}', [AdminScheduleController::class, 'show'])->name('show');
+        Route::put('/{session}', [AdminScheduleController::class, 'update'])->name('update');
     });
 });
 
