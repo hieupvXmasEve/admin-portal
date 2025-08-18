@@ -333,7 +333,7 @@ onMounted(async () => {
                         {{ session.title }}
                       </div>
 
-<!--                      &lt;!&ndash; Time &ndash;&gt;-->
+                      <!-- Time -->
 <!--                      <div class="flex items-center text-xs text-muted-foreground">-->
 <!--                        <Clock class="h-3 w-3 mr-1" />-->
 <!--                        {{ session.startTime }}-{{ session.endTime }}-->

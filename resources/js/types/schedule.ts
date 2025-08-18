@@ -113,7 +113,10 @@ export interface FilterOptions {
     id: number
     name: string
     code: string
-    building: string
+    building: {
+        id: number | null
+        name: string
+    }
     campus_id: number
     campus: {
       id: number

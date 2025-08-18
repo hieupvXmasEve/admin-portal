@@ -139,6 +139,7 @@ class AdminScheduleService
                     ];
                 }),
             'rooms' => Room::with(['campus:id,name', 'building:id,name,code'])
+                ->where('campus_id', app('campus')->id)
                 ->select('id', 'name', 'code', 'building_id', 'campus_id')
                 ->get()
                 ->sortBy(function ($room) {
