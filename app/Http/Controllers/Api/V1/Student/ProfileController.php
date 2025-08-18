@@ -14,6 +14,7 @@ use App\Http\Responses\ApiResponse;
 use App\Services\V1\Student\ProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
@@ -33,10 +34,16 @@ class ProfileController extends Controller
             $profile = $this->profileService->getProfile($student);
 
             return ApiResponse::success(
-                new ProfileResource($profile),
-                'Profile retrieved successfully'
+                data: new ProfileResource($profile),
+                message: 'Profile retrieved successfully'
             );
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::channel('api')->error('Profile show failed', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             return ApiResponse::serverError('Failed to retrieve profile');
         }
     }
@@ -55,13 +62,19 @@ class ProfileController extends Controller
 
             if ($success) {
                 return ApiResponse::success(
-                    null,
-                    'Profile updated successfully'
+                    data: null,
+                    message: 'Profile updated successfully'
                 );
             } else {
                 return ApiResponse::businessLogicError('Failed to update profile');
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::channel('api')->error('Profile update failed', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             return ApiResponse::serverError('Failed to update profile');
         }
     }
@@ -79,10 +92,16 @@ class ProfileController extends Controller
             $result = $this->profileService->uploadAvatar($student, $file);
 
             return ApiResponse::success(
-                $result,
-                'Avatar uploaded successfully'
+                data: $result,
+                message: 'Avatar uploaded successfully'
             );
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::channel('api')->error('Avatar upload failed', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             return ApiResponse::serverError('Failed to upload avatar');
         }
     }
@@ -99,10 +118,19 @@ class ProfileController extends Controller
             $studyPlan = $this->profileService->getStudyPlan($student);
 
             return ApiResponse::success(
-                new StudyPlanResource($studyPlan),
-                'Study plan retrieved successfully'
+                data: new StudyPlanResource($studyPlan),
+                message: 'Study plan retrieved successfully'
             );
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::info('error' , [
+                'message' => $e->getMessage(),
+            ]);
+            Log::channel('api')->error('Study plan retrieval failed', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             return ApiResponse::serverError('Failed to retrieve study plan');
         }
     }
@@ -119,10 +147,16 @@ class ProfileController extends Controller
             $academicHistory = $this->profileService->getAcademicHistory($student);
 
             return ApiResponse::success(
-                new AcademicHistoryResource($academicHistory),
-                'Academic history retrieved successfully'
+                data: new AcademicHistoryResource($academicHistory),
+                message: 'Academic history retrieved successfully'
             );
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::channel('api')->error('Academic history retrieval failed', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             return ApiResponse::serverError('Failed to retrieve academic history');
         }
     }

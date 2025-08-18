@@ -151,38 +151,36 @@ class AuthController extends Controller
 
         return ApiResponse::success(
             data: [
-                'student' => [
-                    'id' => $student->id,
-                    'student_id' => $student->student_id,
-                    'full_name' => $student->full_name,
-                    'email' => $student->email,
-                    'phone' => $student->phone,
-                    'status' => $student->status,
-                    'academic_status' => $student->academic_status,
-                    'campus' => [
-                        'id' => $student->campus?->id,
-                        'name' => $student->campus?->name,
-                        'code' => $student->campus?->code,
-                    ],
-                    'program' => [
-                        'id' => $student->program?->id,
-                        'name' => $student->program?->name,
-                        'code' => $student->program?->code,
-                    ],
-                    'specialization' => $student->specialization ? [
-                        'id' => $student->specialization->id,
-                        'name' => $student->specialization->name,
-                    ] : null,
-                    'curriculum_version' => [
-                        'id' => $student->curriculumVersion?->id,
-                        'name' => $student->curriculumVersion?->name,
-                        'version' => $student->curriculumVersion?->version,
-                    ],
-                    'avatar_url' => $student->avatar_url,
-                    'admission_date' => $student->admission_date?->toDateString(),
-                    'expected_graduation_date' => $student->expected_graduation_date?->toDateString(),
-                    'last_login_at' => $student->last_login_at?->toISOString(),
+                'id' => $student->id,
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'email' => $student->email,
+                'phone' => $student->phone,
+                'status' => $student->status,
+                'academic_status' => $student->academic_status,
+                'campus' => [
+                    'id' => $student->campus?->id,
+                    'name' => $student->campus?->name,
+                    'code' => $student->campus?->code,
                 ],
+                'program' => [
+                    'id' => $student->program?->id,
+                    'name' => $student->program?->name,
+                    'code' => $student->program?->code,
+                ],
+                'specialization' => $student->specialization ? [
+                    'id' => $student->specialization->id,
+                    'name' => $student->specialization->name,
+                ] : null,
+                'curriculum_version' => [
+                    'id' => $student->curriculumVersion?->id,
+                    'name' => $student->curriculumVersion?->name,
+                    'version' => $student->curriculumVersion?->version,
+                ],
+                'avatar_url' => $student->avatar_url,
+                'admission_date' => $student->admission_date?->toDateString(),
+                'expected_graduation_date' => $student->expected_graduation_date?->toDateString(),
+                'last_login_at' => $student->last_login_at?->toISOString(),
             ],
             message: 'Student profile retrieved successfully'
         );

@@ -59,36 +59,44 @@ class ProfileResource extends JsonResource
      */
     protected function formatAcademicInfo(array $academicInfo): array
     {
+        $program = $academicInfo['program'] ?? [];
+        $cv = $academicInfo['curriculum_version'] ?? [];
+        $campus = $academicInfo['campus'] ?? [];
+        $cvVersion = $cv['version'] ?? null;
+
+        $studyMode = (string) ($academicInfo['study_mode'] ?? '');
+        $status = (string) ($academicInfo['status'] ?? '');
+
         return [
             'program' => [
-                'id' => $academicInfo['program']['id'],
-                'name' => $academicInfo['program']['name'],
-                'code' => $academicInfo['program']['code'],
-                'degree_type' => $academicInfo['program']['degree_type'],
-                'duration_years' => $academicInfo['program']['duration_years'],
-                'display_name' => $academicInfo['program']['code'] . ' - ' . $academicInfo['program']['name'],
+                'id' => $program['id'] ?? null,
+                'name' => $program['name'] ?? null,
+                'code' => $program['code'] ?? null,
+                'degree_type' => $program['degree_type'] ?? null,
+                'duration_years' => $program['duration_years'] ?? null,
+                'display_name' => ($program['code'] ?? '') . ' - ' . ($program['name'] ?? ''),
             ],
             'curriculum_version' => [
-                'id' => $academicInfo['curriculum_version']['id'],
-                'version' => $academicInfo['curriculum_version']['version'],
-                'effective_date' => $academicInfo['curriculum_version']['effective_date'],
-                'display' => 'Version ' . $academicInfo['curriculum_version']['version'],
+                'id' => $cv['id'] ?? null,
+                'version' => $cvVersion,
+                'effective_date' => $cv['effective_date'] ?? null,
+                'display' => $cvVersion !== null && $cvVersion !== '' ? ('Version ' . $cvVersion) : null,
             ],
             'campus' => [
-                'id' => $academicInfo['campus']['id'],
-                'name' => $academicInfo['campus']['name'],
-                'code' => $academicInfo['campus']['code'],
-                'location' => $academicInfo['campus']['location'],
-                'display_name' => $academicInfo['campus']['name'] . ' (' . $academicInfo['campus']['code'] . ')',
+                'id' => $campus['id'] ?? null,
+                'name' => $campus['name'] ?? null,
+                'code' => $campus['code'] ?? null,
+                'location' => $campus['location'] ?? null,
+                'display_name' => ($campus['name'] ?? '') . (($campus['code'] ?? null) ? ' (' . $campus['code'] . ')' : ''),
             ],
             'enrollment' => [
-                'enrollment_date' => $academicInfo['enrollment_date'],
-                'expected_graduation_date' => $academicInfo['expected_graduation_date'],
-                'study_mode' => $academicInfo['study_mode'],
-                'study_mode_display' => $this->getStudyModeDisplay($academicInfo['study_mode']),
-                'status' => $academicInfo['status'],
-                'status_display' => $this->getStatusDisplay($academicInfo['status']),
-                'status_color' => $this->getStatusColor($academicInfo['status']),
+                'enrollment_date' => $academicInfo['enrollment_date'] ?? null,
+                'expected_graduation_date' => $academicInfo['expected_graduation_date'] ?? null,
+                'study_mode' => $studyMode,
+                'study_mode_display' => $this->getStudyModeDisplay($studyMode),
+                'status' => $status,
+                'status_display' => $this->getStatusDisplay($status),
+                'status_color' => $this->getStatusColor($status),
             ],
         ];
     }

@@ -20,14 +20,18 @@ class ClassSessionRepository
         $query = ClassSession::query()
             ->whereHas('courseOffering', function (Builder $query) use ($student, $semester) {
                 $query->where('semester_id', $semester->id)
-                    ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                        $regQuery->where('student_id', $student->id)
-                            ->where('registration_status', 'registered');
+                    ->whereHas('curriculumUnit', function (Builder $cuQuery) use ($student) {
+                        $cuQuery->whereHas('curriculumVersion', function (Builder $cvQuery) use ($student) {
+                            $cvQuery->whereHas('enrollments', function (Builder $enrollQuery) use ($student) {
+                                $enrollQuery->where('student_id', $student->id)
+                                    ->where('status', 'in_progress');
+                            });
+                        });
                     });
             })
             ->with([
                 'courseOffering.curriculumUnit.unit',
-                'courseOffering.lecturer',
+                'courseOffering.lecture',
                 'room',
             ]);
 
@@ -43,9 +47,11 @@ class ClassSessionRepository
     public function isStudentEnrolledInSession(Student $student, ClassSession $classSession): bool
     {
         return $classSession->courseOffering
-            ->courseRegistrations()
+            ->curriculumUnit
+            ->curriculumVersion
+            ->enrollments()
             ->where('student_id', $student->id)
-            ->where('registration_status', 'registered')
+            ->where('status', 'in_progress')
             ->exists();
     }
 
@@ -119,9 +125,13 @@ class ClassSessionRepository
         // First, try to find a session today that hasn't started yet
         $todaySession = ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
             $query->where('semester_id', $currentSemester->id)
-                ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
-                    $regQuery->where('student_id', $student->id)
-                        ->where('registration_status', 'registered');
+                ->whereHas('curriculumUnit', function (Builder $cuQuery) use ($student) {
+                    $cuQuery->whereHas('curriculumVersion', function (Builder $cvQuery) use ($student) {
+                        $cvQuery->whereHas('enrollments', function (Builder $enrollQuery) use ($student) {
+                            $enrollQuery->where('student_id', $student->id)
+                                ->where('status', 'in_progress');
+                        });
+                    });
                 });
         })
             ->where('day_of_week', $currentDay)
@@ -227,8 +237,36 @@ class ClassSessionRepository
      */
     protected function applyFilters(Builder $query, array $filters): void
     {
+        if (! empty($filters['week_start'])) {
+            $query->where('session_date', '>=', $filters['week_start']);
+        }
+
+        if (! empty($filters['week_end'])) {
+            $query->where('session_date', '<=', $filters['week_end']);
+        }
+
         if (! empty($filters['day_of_week'])) {
-            $query->where('day_of_week', $filters['day_of_week']);
+            // Convert day_of_week to actual dates within the week range
+            if (! empty($filters['week_start']) && ! empty($filters['week_end'])) {
+                $startDate = \Carbon\Carbon::parse($filters['week_start']);
+                $endDate = \Carbon\Carbon::parse($filters['week_end']);
+
+                $dayOfWeek = strtolower($filters['day_of_week']);
+                $dayMap = [
+                    'monday' => 1,
+                    'tuesday' => 2,
+                    'wednesday' => 3,
+                    'thursday' => 4,
+                    'friday' => 5,
+                    'saturday' => 6,
+                    'sunday' => 0
+                ];
+
+                if (isset($dayMap[$dayOfWeek])) {
+                    $targetDay = $dayMap[$dayOfWeek];
+                    $query->whereRaw('DAYOFWEEK(session_date) = ?', [$targetDay]);
+                }
+            }
         }
 
         if (! empty($filters['session_type'])) {
@@ -304,7 +342,19 @@ class ClassSessionRepository
             return $start->diffInMinutes($end) / 60;
         });
 
-        $dayDistribution = $sessions->groupBy('day_of_week')->map->count();
+        $dayDistribution = $sessions->groupBy(function ($session) {
+            $dayOfWeek = \Carbon\Carbon::parse($session->session_date)->dayOfWeek;
+            $dayMap = [
+                1 => 'sunday',
+                2 => 'monday',
+                3 => 'tuesday',
+                4 => 'wednesday',
+                5 => 'thursday',
+                6 => 'friday',
+                7 => 'saturday'
+            ];
+            return $dayMap[$dayOfWeek] ?? 'unknown';
+        })->map->count();
         $sessionTypeDistribution = $sessions->groupBy('session_type')->map->count();
         $buildingDistribution = $sessions->groupBy('room.building')->map->count();
 
@@ -312,13 +362,13 @@ class ClassSessionRepository
             'total_sessions_per_week' => $totalSessions,
             'unique_courses' => $uniqueCourses,
             'total_hours_per_week' => round($totalHours, 1),
-            'average_session_duration' => $totalSessions > 0 ? round(($totalHours * 60) / $totalSessions, 0) : 0,
-            'day_distribution' => $dayDistribution->toArray(),
-            'session_type_distribution' => $sessionTypeDistribution->toArray(),
-            'building_distribution' => $buildingDistribution->toArray(),
-            'busiest_day' => $dayDistribution->keys()->sortByDesc(function ($day) use ($dayDistribution) {
+            'average_session_duration' => $totalSessions > 0 ? (int) round(($totalHours * 60) / $totalSessions, 0) : 0,
+            'day_distribution' => $dayDistribution instanceof \Illuminate\Support\Collection ? $dayDistribution->toArray() : (array) $dayDistribution,
+            'session_type_distribution' => $sessionTypeDistribution instanceof \Illuminate\Support\Collection ? $sessionTypeDistribution->toArray() : (array) $sessionTypeDistribution,
+            'building_distribution' => $buildingDistribution instanceof \Illuminate\Support\Collection ? $buildingDistribution->toArray() : (array) $buildingDistribution,
+            'busiest_day' => $dayDistribution instanceof \Illuminate\Support\Collection ? $dayDistribution->keys()->sortByDesc(function ($day) use ($dayDistribution) {
                 return $dayDistribution[$day];
-            })->first(),
+            })->first() : null,
             'earliest_start' => $sessions->min('start_time'),
             'latest_end' => $sessions->max('end_time'),
         ];

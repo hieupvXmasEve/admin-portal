@@ -202,7 +202,7 @@ class CourseRegistrationController extends Controller
                 'has_conflicts' => ! $conflicts->isEmpty(),
                 'conflict_count' => $conflicts->count(),
                 'conflicts' => $conflicts->toArray(),
-            ], [], 'Schedule conflicts checked successfully');
+            ], 'Schedule conflicts checked successfully');
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to check schedule conflicts');
         }

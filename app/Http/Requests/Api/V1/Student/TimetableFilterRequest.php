@@ -26,6 +26,8 @@ class TimetableFilterRequest extends FormRequest
     {
         return [
             'semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
+            'week_start' => ['nullable', 'date', 'before_or_equal:week_end'],
+            'week_end' => ['nullable', 'date', 'after_or_equal:week_start'],
             'day_of_week' => ['nullable', 'string', 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday'],
             'session_type' => ['nullable', 'string', 'max:50'],
             'lecturer_name' => ['nullable', 'string', 'max:255'],

@@ -13,6 +13,7 @@ use App\Http\Responses\ApiResponse;
 use App\Services\V1\Student\CurriculumService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CurriculumController extends Controller
 {
@@ -30,9 +31,13 @@ class CurriculumController extends Controller
 
         try {
             $curriculumOverview = $this->curriculumService->getCurriculumOverview($student);
-
+            Log::info('$curriculumOverview', [
+                'student' => $student,
+                '$curriculumOverview' => $curriculumOverview,
+            ]);
             return ApiResponse::success(
                 new CurriculumOverviewResource($curriculumOverview),
+                [],
                 'Curriculum overview retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -53,6 +58,7 @@ class CurriculumController extends Controller
 
             return ApiResponse::success(
                 new PrerequisiteTreeResource($prerequisiteTree),
+                [],
                 'Prerequisite tree retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -73,6 +79,7 @@ class CurriculumController extends Controller
 
             return ApiResponse::success(
                 new ProgramRequirementsResource($programRequirements),
+                [],
                 'Program requirements retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -93,6 +100,7 @@ class CurriculumController extends Controller
 
             return ApiResponse::success(
                 new AcademicRoadmapResource($roadmap),
+                [],
                 'Academic roadmap retrieved successfully'
             );
         } catch (\Exception $e) {

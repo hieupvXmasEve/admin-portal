@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\V1\Student;
 
+use App\Models\Semester;
 use App\Models\Student;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -78,7 +79,7 @@ class ProfileService
         $cacheKey = "study_plan:student:{$student->id}";
 
         return Cache::remember($cacheKey, 1800, function () use ($student) {
-            $currentSemester = $student->getCurrentSemester();
+            $currentSemester = $this->resolveCurrentSemester();
             $completedUnits = $this->getCompletedUnits($student);
             $currentEnrollments = $this->getCurrentEnrollments($student);
             $remainingRequirements = $this->getRemainingRequirements($student);
@@ -146,27 +147,27 @@ class ProfileService
     {
         return [
             'program' => [
-                'id' => $student->program->id,
-                'name' => $student->program->name,
-                'code' => $student->program->code,
-                'degree_type' => $student->program->degree_type,
-                'duration_years' => $student->program->duration_years,
+                'id' => $student->program?->id,
+                'name' => $student->program?->name,
+                'code' => $student->program?->code,
+                'degree_type' => $student->program?->degree_type,
+                'duration_years' => $student->program?->duration_years,
             ],
             'curriculum_version' => [
-                'id' => $student->curriculumVersion->id,
-                'version' => $student->curriculumVersion->version,
-                'effective_date' => $student->curriculumVersion->effective_date->toDateString(),
+                'id' => $student->curriculumVersion?->id,
+                'version' => $student->curriculumVersion?->version,
+                'effective_date' => $student->curriculumVersion?->effective_date?->toDateString(),
             ],
             'campus' => [
-                'id' => $student->campus->id,
-                'name' => $student->campus->name,
-                'code' => $student->campus->code,
-                'location' => $student->campus->location,
+                'id' => $student->campus?->id,
+                'name' => $student->campus?->name,
+                'code' => $student->campus?->code,
+                'location' => $student->campus?->location,
             ],
             'enrollment_date' => $student->enrollment_date?->toDateString(),
             'expected_graduation_date' => $student->expected_graduation_date?->toDateString(),
-            'study_mode' => $student->study_mode,
-            'status' => $student->status,
+            'study_mode' => (string) ($student->study_mode ?? ''),
+            'status' => (string) ($student->status ?? ''),
         ];
     }
 
@@ -200,7 +201,7 @@ class ProfileService
             ->where('completion_status', 'completed')
             ->sum('credit_hours_earned');
 
-        $totalCreditsRequired = $student->curriculumVersion->total_credit_hours ?? 0;
+        $totalCreditsRequired = $student->curriculumVersion?->total_credit_hours ?? 0;
 
         return [
             'total_credits_earned' => $totalCreditsEarned,
@@ -305,11 +306,11 @@ class ProfileService
             ->get()
             ->map(function ($record) {
                 return [
-                    'unit_code' => $record->unit->code,
-                    'unit_name' => $record->unit->name,
+                    'unit_code' => $record->unit?->code,
+                    'unit_name' => $record->unit?->name,
                     'credit_hours' => $record->credit_hours,
                     'grade' => $record->final_letter_grade,
-                    'semester' => $record->semester->name,
+                    'semester' => $record->semester?->name,
                     'completion_date' => $record->completion_date?->toDateString(),
                 ];
             })
@@ -321,7 +322,7 @@ class ProfileService
      */
     protected function getCurrentEnrollments(Student $student): array
     {
-        $currentSemester = $student->getCurrentSemester();
+        $currentSemester = $this->resolveCurrentSemester();
 
         if (! $currentSemester) {
             return [];
@@ -334,9 +335,9 @@ class ProfileService
             ->get()
             ->map(function ($registration) {
                 return [
-                    'unit_code' => $registration->courseOffering->curriculumUnit->unit->code,
-                    'unit_name' => $registration->courseOffering->curriculumUnit->unit->name,
-                    'credit_hours' => $registration->courseOffering->curriculumUnit->credit_hours,
+                    'unit_code' => $registration->courseOffering?->curriculumUnit?->unit?->code,
+                    'unit_name' => $registration->courseOffering?->curriculumUnit?->unit?->name,
+                    'credit_hours' => $registration->courseOffering?->curriculumUnit?->credit_hours,
                     'registration_date' => $registration->registration_date?->toDateString(),
                 ];
             })
@@ -362,7 +363,7 @@ class ProfileService
      */
     protected function calculateGraduationTimeline(Student $student): array
     {
-        $totalCreditsRequired = $student->curriculumVersion->total_credit_hours ?? 0;
+        $totalCreditsRequired = $student->curriculumVersion?->total_credit_hours ?? 0;
         $creditsEarned = $student->academicRecords()
             ->where('completion_status', 'completed')
             ->sum('credit_hours_earned');
@@ -371,7 +372,7 @@ class ProfileService
         $averageCreditsPerSemester = 18; // Typical full-time load
 
         $semestersRemaining = $creditsRemaining > 0
-            ? ceil($creditsRemaining / $averageCreditsPerSemester)
+            ? (int) ceil($creditsRemaining / $averageCreditsPerSemester)
             : 0;
 
         return [
@@ -398,23 +399,23 @@ class ProfileService
     protected function formatAcademicRecords(Collection $records): array
     {
         return $records->groupBy('semester_id')->map(function ($semesterRecords, $semesterId) {
-            $semester = $semesterRecords->first()->semester;
+            $semester = $semesterRecords->first()->semester ?? null;
 
             return [
                 'semester' => [
-                    'id' => $semester->id,
-                    'name' => $semester->name,
-                    'code' => $semester->code,
+                    'id' => $semester?->id,
+                    'name' => $semester?->name,
+                    'code' => $semester?->code,
                 ],
                 'courses' => $semesterRecords->map(function ($record) {
                     return [
-                        'unit_code' => $record->unit->code,
-                        'unit_name' => $record->unit->name,
+                        'unit_code' => $record->unit?->code,
+                        'unit_name' => $record->unit?->name,
                         'credit_hours' => $record->credit_hours,
                         'grade' => $record->final_letter_grade,
                         'grade_points' => $record->grade_points,
                         'completion_status' => $record->completion_status,
-                        'lecturer' => $record->courseOffering->lecturer?->full_name,
+                        'lecturer' => $record->courseOffering?->lecturer?->full_name,
                     ];
                 })->toArray(),
             ];
@@ -427,7 +428,7 @@ class ProfileService
     protected function calculateSemesterSummary(Collection $records): array
     {
         return $records->groupBy('semester_id')->map(function ($semesterRecords) {
-            $semester = $semesterRecords->first()->semester;
+            $semester = $semesterRecords->first()->semester ?? null;
             $completedRecords = $semesterRecords->where('completion_status', 'completed');
 
             $totalCredits = $semesterRecords->sum('credit_hours');
@@ -435,7 +436,7 @@ class ProfileService
             $qualityPoints = $completedRecords->sum('quality_points');
 
             return [
-                'semester_name' => $semester->name,
+                'semester_name' => $semester?->name,
                 'total_courses' => $semesterRecords->count(),
                 'completed_courses' => $completedRecords->count(),
                 'total_credits' => $totalCredits,
@@ -457,7 +458,7 @@ class ProfileService
             ->get()
             ->map(function ($calculation) {
                 return [
-                    'semester' => $calculation->semester->name,
+                    'semester' => $calculation->semester?->name,
                     'gpa' => round($calculation->gpa, 2),
                     'credit_hours' => $calculation->credit_hours_earned,
                     'academic_standing' => $calculation->academic_standing,
@@ -481,12 +482,12 @@ class ProfileService
         $cumulativeCredits = 0;
 
         foreach ($records->groupBy('semester_id') as $semesterRecords) {
-            $semester = $semesterRecords->first()->semester;
+            $semester = $semesterRecords->first()->semester ?? null;
             $semesterCredits = $semesterRecords->sum('credit_hours_earned');
             $cumulativeCredits += $semesterCredits;
 
             $progression[] = [
-                'semester' => $semester->name,
+                'semester' => $semester?->name,
                 'semester_credits' => $semesterCredits,
                 'cumulative_credits' => $cumulativeCredits,
             ];
@@ -514,8 +515,8 @@ class ProfileService
                 'type' => 'deans_list',
                 'title' => 'Dean\'s List',
                 'description' => 'Achieved GPA of ' . round($achievement->gpa, 2),
-                'semester' => $achievement->semester->name,
-                'date' => $achievement->created_at->toDateString(),
+                'semester' => $achievement->semester?->name,
+                'date' => $achievement->created_at?->toDateString(),
             ];
         }
 
@@ -527,7 +528,7 @@ class ProfileService
      */
     protected function getCurrentSemesterCredits(Student $student): int
     {
-        $currentSemester = $student->getCurrentSemester();
+        $currentSemester = $this->resolveCurrentSemester();
 
         if (! $currentSemester) {
             return 0;
@@ -587,7 +588,7 @@ class ProfileService
         }
 
         // Assuming 2 semesters per year
-        $yearsRemaining = ceil($semestersRemaining / 2);
+        $yearsRemaining = (int) ceil($semestersRemaining / 2);
 
         return now()->addYears($yearsRemaining)->format('Y-m-d');
     }
@@ -603,7 +604,7 @@ class ProfileService
 
         $monthsRemaining = now()->diffInMonths($student->expected_graduation_date);
 
-        return ceil($monthsRemaining / 6); // Assuming 6 months per semester
+        return (int) ceil($monthsRemaining / 6); // Assuming 6 months per semester
     }
 
     /**
@@ -620,5 +621,24 @@ class ProfileService
         foreach ($patterns as $pattern) {
             Cache::forget($pattern);
         }
+    }
+
+    /**
+     * Resolve current semester from system state
+     */
+    protected function resolveCurrentSemester(): ?Semester
+    {
+        // Prefer explicitly active semester if set
+        $active = Semester::getActiveSemester();
+        if ($active) {
+            return $active;
+        }
+
+        // Fallback: pick semester that wraps current date
+        return Semester::query()
+            ->where('start_date', '<=', now())
+            ->where('end_date', '>=', now())
+            ->orderBy('start_date', 'desc')
+            ->first();
     }
 }

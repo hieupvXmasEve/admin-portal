@@ -34,9 +34,9 @@ class TimetableResource extends JsonResource
         foreach ($weeklySchedule as $day => $dayData) {
             $formatted[$day] = [
                 'day_name' => $dayData['day_name'],
-                'day_abbreviation' => substr($dayData['day_name'], 0, 3),
-                'session_count' => count($dayData['sessions']),
-                'sessions' => collect($dayData['sessions'])->map(function ($session) {
+                'day_abbreviation' => $dayData['day_abbreviation'],
+                'session_count' => $dayData['session_count'],
+                'sessions' => collect($dayData['sessions'])->map(function ($session) use ($day) {
                     return [
                         'id' => $session['id'],
                         'course_code' => $session['course_code'],
@@ -62,7 +62,7 @@ class TimetableResource extends JsonResource
                         'is_upcoming' => $this->isUpcomingSession($session, $day),
                     ];
                 })->toArray(),
-                'total_duration' => $this->calculateDayDuration($dayData['sessions']),
+                'total_duration' => $dayData['total_duration'],
             ];
         }
 
@@ -76,21 +76,21 @@ class TimetableResource extends JsonResource
     {
         return [
             'overview' => [
-                'total_sessions_per_week' => $summary['total_sessions_per_week'],
-                'unique_courses' => $summary['unique_courses'],
-                'total_hours_per_week' => $summary['total_hours_per_week'],
-                'average_hours_per_day' => round($summary['total_hours_per_week'] / 7, 1),
+                'total_sessions_per_week' => $summary['overview']['total_sessions_per_week'],
+                'unique_courses' => $summary['overview']['unique_courses'],
+                'total_hours_per_week' => $summary['overview']['total_hours_per_week'],
+                'average_hours_per_day' => $summary['overview']['average_hours_per_day'],
             ],
             'schedule_pattern' => [
-                'busiest_day' => $summary['busiest_day'],
-                'earliest_start' => $summary['earliest_start'],
-                'latest_end' => $summary['latest_end'],
-                'earliest_start_display' => $this->formatTime($summary['earliest_start']),
-                'latest_end_display' => $this->formatTime($summary['latest_end']),
+                'busiest_day' => $summary['schedule_pattern']['busiest_day'],
+                'earliest_start' => $summary['schedule_pattern']['earliest_start'],
+                'latest_end' => $summary['schedule_pattern']['latest_end'],
+                'earliest_start_display' => $summary['schedule_pattern']['earliest_start_display'],
+                'latest_end_display' => $summary['schedule_pattern']['latest_end_display'],
             ],
             'distribution' => [
-                'by_day' => $summary['day_distribution'],
-                'by_session_type' => $summary['session_type_distribution'],
+                'by_day' => $summary['distribution']['by_day'],
+                'by_session_type' => $summary['distribution']['by_session_type'],
             ],
         ];
     }
@@ -139,20 +139,25 @@ class TimetableResource extends JsonResource
     /**
      * Format time range for display
      */
-    protected function formatTimeRange(string $startTime, string $endTime): string
+    protected function formatTimeRange(string|\Carbon\Carbon $startTime, string|\Carbon\Carbon $endTime): string
     {
-        $start = \Carbon\Carbon::createFromTimeString($startTime);
-        $end = \Carbon\Carbon::createFromTimeString($endTime);
+        $start = $startTime instanceof \Carbon\Carbon ? $startTime : \Carbon\Carbon::createFromTimeString($startTime);
+        $end = $endTime instanceof \Carbon\Carbon ? $endTime : \Carbon\Carbon::createFromTimeString($endTime);
 
-        return $start->format('g:i A').' - '.$end->format('g:i A');
+        return $start->format('g:i A') . ' - ' . $end->format('g:i A');
     }
 
     /**
      * Format single time for display
      */
-    protected function formatTime(string $time): string
+    protected function formatTime(string|\Carbon\Carbon|null $time): ?string
     {
-        return \Carbon\Carbon::createFromTimeString($time)->format('g:i A');
+        if ($time === null) {
+            return null;
+        }
+
+        $carbonTime = $time instanceof \Carbon\Carbon ? $time : \Carbon\Carbon::createFromTimeString($time);
+        return $carbonTime->format('g:i A');
     }
 
     /**
@@ -202,10 +207,13 @@ class TimetableResource extends JsonResource
     {
         $currentDay = strtolower(now()->format('l'));
         $currentTime = now()->format('H:i');
+        
+        $startTime = $session['start_time'] instanceof \Carbon\Carbon ? $session['start_time']->format('H:i') : $session['start_time'];
+        $endTime = $session['end_time'] instanceof \Carbon\Carbon ? $session['end_time']->format('H:i') : $session['end_time'];
 
         return $day === $currentDay &&
-               $currentTime >= $session['start_time'] &&
-               $currentTime < $session['end_time'];
+            $currentTime >= $startTime &&
+            $currentTime < $endTime;
     }
 
     /**
@@ -215,8 +223,10 @@ class TimetableResource extends JsonResource
     {
         $currentDay = strtolower(now()->format('l'));
         $currentTime = now()->format('H:i');
+        
+        $startTime = $session['start_time'] instanceof \Carbon\Carbon ? $session['start_time']->format('H:i') : $session['start_time'];
 
-        return $day === $currentDay && $currentTime < $session['start_time'];
+        return $day === $currentDay && $currentTime < $startTime;
     }
 
     /**
