@@ -286,30 +286,33 @@ class SemesterEnrollmentController extends Controller
 
             foreach ($unitIds as $unitId) {
                 try {
-                    // Find curriculum unit for this unit
-                    $curriculumUnit = CurriculumUnit::where('unit_id', $unitId)->first();
-
-                    if (!$curriculumUnit) {
-                        $errors[] = "No curriculum unit found for unit ID {$unitId}";
-
-                        continue;
-                    }
-
-                    // Check if offering already exists
+                    // Check if any offering already exists for this unit (across all curriculum versions)
                     $existingOffering = CourseOffering::where('semester_id', $semester->id)
-                        ->where('curriculum_unit_id', $curriculumUnit->id)
+                        ->where('campus_id', app('campus')->id)
+                        ->whereHas('curriculumUnit', function($query) use ($unitId) {
+                            $query->where('unit_id', $unitId);
+                        })
                         ->first();
 
                     if ($existingOffering) {
                         $errors[] = "Course offering already exists for unit ID {$unitId}";
-
                         continue;
                     }
 
-                    CourseOffering::create([
+                    // Find any curriculum unit for this unit (we'll use the first one as representative)
+                    $representativeCurriculumUnit = CurriculumUnit::where('unit_id', $unitId)
+                        ->with('unit')
+                        ->first();
+
+                    if (!$representativeCurriculumUnit) {
+                        $errors[] = "No curriculum unit found for unit ID {$unitId}";
+                        continue;
+                    }
+
+                    $courseOffering = CourseOffering::create([
                         'campus_id' => app('campus')->id,
                         'semester_id' => $semester->id,
-                        'curriculum_unit_id' => $curriculumUnit->id,
+                        'curriculum_unit_id' => $representativeCurriculumUnit->id,
                         'max_capacity' => $defaultCapacity,
                         'current_enrollment' => 0,
                         'waitlist_capacity' => 10,
@@ -317,6 +320,7 @@ class SemesterEnrollmentController extends Controller
                         'delivery_mode' => $deliveryMode,
                         'is_active' => true,
                         'enrollment_status' => 'open',
+                        'notes' => 'Unified offering for all curriculum versions',
                     ]);
 
                     $offeringsCreated++;
@@ -326,6 +330,7 @@ class SemesterEnrollmentController extends Controller
                         'semester_id' => $semester->id,
                         'unit_id' => $unitId,
                         'error' => $e->getMessage(),
+                        'stack_trace' => $e->getTraceAsString(),
                     ]);
                 }
             }
@@ -546,6 +551,15 @@ class SemesterEnrollmentController extends Controller
             $forceRegistration = (bool)($validated['force_registration'] ?? false);
             $preferredInstructorIds = collect($validated['preferred_instructor_ids'] ?? []);
 
+            Log::info('Starting bulk student registration', [
+                'semester_id' => $semester->id,
+                'campus_id' => $currentCampusId,
+                'registration_method' => $registrationMethod,
+                'force_registration' => $forceRegistration,
+                'page' => $validated['page'] ?? 1,
+                'per_page' => $validated['per_page'] ?? 300,
+            ]);
+
             // 1) Enrollment window validation (semester-level) - Disabled for admin override
             // Admin can override enrollment window restrictions
             //            if (!$forceRegistration && method_exists($semester, 'isRegistrationOpen') && !$semester->isRegistrationOpen()) {
@@ -650,6 +664,7 @@ class SemesterEnrollmentController extends Controller
                             ];
                             Log::warning('Blocked registration due to active holds', [
                                 'student_id' => $student->id,
+                                'student_student_id' => $student->student_id,
                                 'holds' => $activeHolds->pluck('id')->all(),
                             ]);
                             continue;
@@ -661,6 +676,7 @@ class SemesterEnrollmentController extends Controller
                             ->where('semester_number', $enrollment->semester_number)
                             ->with('unit')
                             ->get();
+
 
                         if ($curriculumUnits->isEmpty()) {
                             $skipped++;
@@ -713,10 +729,7 @@ class SemesterEnrollmentController extends Controller
                                     'unit_code' => $unitCode,
                                     'reason' => 'Completed or credit already earned',
                                 ];
-                                Log::info('Skipped registration - credit already earned', [
-                                    'student_id' => $student->id,
-                                    'unit_id' => $curriculumUnit->unit_id,
-                                ]);
+
                                 continue;
                             }
 
@@ -789,11 +802,13 @@ class SemesterEnrollmentController extends Controller
                                 continue;
                             }
 
-                            // 7) Section selection with deterministic logic
+                            // 7) Section selection with deterministic logic - Search by unit_id since we now have unified offerings
                             $offerings = CourseOffering::query()
                                 ->where('semester_id', $semester->id)
-                                ->where('curriculum_unit_id', $curriculumUnit->id)
                                 ->where('campus_id', $currentCampusId)
+                                ->whereHas('curriculumUnit', function($query) use ($curriculumUnit) {
+                                    $query->where('unit_id', $curriculumUnit->unit_id);
+                                })
                                 ->active()
                                 ->where('enrollment_status', 'open')
                                 ->registrationOpen()
@@ -914,8 +929,11 @@ class SemesterEnrollmentController extends Controller
                                 // Unique constraint hit or other issue
                                 Log::warning('Registration insert conflict or error', [
                                     'student_id' => $student->id,
+                                    'student_student_id' => $student->student_id,
                                     'course_offering_id' => $offeringLocked->id,
+                                    'unit_code' => $unitCode,
                                     'error' => $ex->getMessage(),
+                                    'error_code' => $ex->getCode(),
                                 ]);
                                 $skipped++;
                                 $results['skipped'][] = [
@@ -954,8 +972,10 @@ class SemesterEnrollmentController extends Controller
                         ];
                         Log::error('Student enrollment processing failed', [
                             'student_id' => $student->id ?? null,
+                            'student_student_id' => $student->student_id ?? null,
                             'enrollment_id' => $enrollment->id ?? null,
                             'error' => $e->getMessage(),
+                            'stack_trace' => $e->getTraceAsString(),
                         ]);
                     }
                 }
