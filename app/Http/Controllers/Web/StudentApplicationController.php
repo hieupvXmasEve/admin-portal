@@ -22,7 +22,9 @@ class StudentApplicationController extends Controller
 {
     public function __construct(
         private StudentApplicationService $studentApplicationService
-    ) {}
+    )
+    {
+    }
 
     /**
      * Display a listing of student applications
@@ -33,7 +35,7 @@ class StudentApplicationController extends Controller
             'search' => $request->get('search'),
             'status' => $request->get('status'),
             'converted' => $request->get('converted'),
-            //            'campus_code' => $request->get('campus'),
+            'campus_code' => $request->get('campus'),
             'per_page' => $request->get('per_page', 15),
             'sort' => $request->get('sort', 'created_at'),
             'direction' => $request->get('direction', 'desc'),
@@ -69,13 +71,15 @@ class StudentApplicationController extends Controller
         }
 
         //        // Apply campus filter
-        //        if ($filters['campus_code']) {
-        //            $query->where('campus_code', $filters['campus_code']);
-        //        }
+        if ($filters['campus_code'] !== null && $filters['campus_code'] !== 'all') {
+            $query->where('campus_code', $filters['campus_code']);
+        }
 
         // Apply sorting
         $query->orderBy($filters['sort'], $filters['direction']);
-        $applications = $query->where('campus_code', app('campus')->code)->paginate($filters['per_page'])
+        $applications = $query
+//            ->where('campus_code', app('campus')->code)
+            ->paginate($filters['per_page'])
             ->withQueryString();
 
         // Get filter options
