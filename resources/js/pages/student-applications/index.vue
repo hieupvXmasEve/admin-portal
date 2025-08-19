@@ -663,6 +663,9 @@ const onSearch = (value: string) => {
 const onStatusFilter = (value: string) => {
     applyFilters({ status: value === 'all' ? '' : value });
 };
+const onCampusFilter = (value: string) => {
+    applyFilters({ campus: value === 'all' ? '' : value });
+};
 
 const onConversionFilter = (value: string) => {
     applyFilters({ converted: value === 'all' ? '' : value });
@@ -906,7 +909,19 @@ const clearFilters = () => {
                         </SelectContent>
                     </Select>
                 </div>
-
+                <div class="min-w-[150px]">
+                    <Select :model-value="filters.campus || 'all'" @update:model-value="onCampusFilter">
+                        <SelectTrigger>
+                            <SelectValue placeholder="All Campus" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Campus</SelectItem>
+                            <SelectItem v-for="option in campuses" :key="option.code" :value="option.code">
+                                {{ option.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
                 <!-- Conversion Filter -->
                 <div class="min-w-[180px]">
                     <Select :model-value="filters.converted || 'all'" @update:model-value="onConversionFilter">
