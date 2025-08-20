@@ -71,7 +71,7 @@ class InstitutionSetupSeeder extends Seeder
 
         foreach ($campuses as $campusData) {
             $campus = Campus::create($campusData);
-            $this->createBuildingsForCampus($campus);
+//            $this->createBuildingsForCampus($campus);
             $this->command->info("📍 Created campus: {$campus->name}");
         }
     }

@@ -13,7 +13,7 @@ class AssessmentComponent extends AuditableModel
     use HasFactory;
 
     protected $fillable = [
-        'syllabus_id',
+        'syllabus_template_id',
         'name',
         'weight',
         'type',
@@ -75,9 +75,9 @@ class AssessmentComponent extends AuditableModel
     /**
      * Get the syllabus that owns this assessment component.
      */
-    public function syllabus(): BelongsTo
+    public function syllabusTemplate(): BelongsTo
     {
-        return $this->belongsTo(Syllabus::class);
+        return $this->belongsTo(SyllabusTemplate::class, 'syllabus_template_id');
     }
 
     /**
@@ -195,7 +195,7 @@ class AssessmentComponent extends AuditableModel
         $errors = [];
 
         // Get all other components in the same syllabus
-        $otherComponents = self::where('syllabus_id', $this->syllabus_id)
+        $otherComponents = self::where('syllabus_template_id', $this->syllabus_template_id)
             ->where('id', '!=', $this->id)
             ->get();
 
@@ -252,7 +252,7 @@ class AssessmentComponent extends AuditableModel
     protected function getComprehensiveLogFields(): array
     {
         return [
-            'syllabus_id',
+            'syllabus_template_id',
             'name',
             'weight',
             'type',
@@ -274,10 +274,11 @@ class AssessmentComponent extends AuditableModel
      */
     protected function getIdentifierForLog(): string
     {
-        $syllabusUnit = $this->syllabus?->curriculumUnit?->unit;
-        $unitCode = $syllabusUnit?->code ?? 'N/A';
-        
-        return "{$this->name} ({$this->type}) - {$unitCode}";
+        $unit = $this->syllabusTemplate?->unit;
+        $unitCode = $unit?->code ?? 'N/A';
+        $version = $this->syllabusTemplate?->version;
+
+        return "{$this->name} ({$this->type}) - {$unitCode}" . ($version ? " v{$version}" : '');
     }
 
     /**
@@ -305,9 +306,9 @@ class AssessmentComponent extends AuditableModel
             'component_name' => $this->name,
             'component_type' => $this->type,
             'weight_percentage' => $this->weight,
-            'unit_code' => $this->syllabus?->curriculumUnit?->unit?->code,
-            'unit_name' => $this->syllabus?->curriculumUnit?->unit?->name,
-            'syllabus_version' => $this->syllabus?->version,
+            'unit_code' => $this->syllabusTemplate?->unit?->code,
+            'unit_name' => $this->syllabusTemplate?->unit?->name,
+            'syllabus_template_version' => $this->syllabusTemplate?->version,
             'total_detail_weight' => $this->getTotalDetailWeightAttribute(),
             'has_details' => $this->hasDetails(),
             'affects_final_exam' => $this->is_required_to_sit_final_exam,

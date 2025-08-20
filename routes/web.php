@@ -85,6 +85,7 @@ require __DIR__.'/web/class-schedule.php';
 require __DIR__.'/web/student-application.php';
 require __DIR__.'/web/systems.php';
 require __DIR__.'/web/email-monitoring.php';
+require __DIR__.'/web/syllabus-templates.php';
 
 // Admin Schedule API routes (using web auth for SPA)
 Route::middleware(['auth'])->name('api.admin.')->group(function () {

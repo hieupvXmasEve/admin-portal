@@ -30,6 +30,15 @@ export const CURRICULUM_ROUTE_NAMES = {
     UNIT_UPDATE: 'curriculum_unit.update',
     UNIT_DESTROY: 'curriculum_unit.destroy',
 
+    // Syllabus Template
+    SYLLABUS_TEMPLATE_INDEX: 'syllabus_templates.index',
+    SYLLABUS_TEMPLATE_CREATE: 'syllabus_templates.create',
+    SYLLABUS_TEMPLATE_STORE: 'syllabus_templates.store',
+    SYLLABUS_TEMPLATE_SHOW: 'syllabus_templates.show',
+    SYLLABUS_TEMPLATE_EDIT: 'syllabus_templates.edit',
+    SYLLABUS_TEMPLATE_UPDATE: 'syllabus_templates.update',
+    SYLLABUS_TEMPLATE_DESTROY: 'syllabus_templates.destroy',
+
     // API Version
     API_VERSION_STORE: 'api.curriculum_versions.store',
     API_VERSION_DESTROY: 'api.curriculum_versions.destroy',

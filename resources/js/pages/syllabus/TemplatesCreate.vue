@@ -3,6 +3,7 @@ import Badge from '@/components/ui/badge/Badge.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,9 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Head, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
-import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, ChevronsUpDown, Plus, Save, Trash2 } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
@@ -24,47 +25,23 @@ interface Unit {
     credit_points: number;
 }
 
-interface Semester {
-    id: number;
-    name: string;
-}
-
-interface CurriculumVersion {
-    id: number;
-    version: string;
-    specialization: {
-        id: number;
-        name: string;
-    };
-    program: {
-        id: number;
-        name: string;
-    };
-}
-
-interface CurriculumUnit {
-    id: number;
-    semester: Semester;
-    curriculum_version: CurriculumVersion;
-}
-
 const props = defineProps<{
-    unit: Unit;
-    curriculumUnits: CurriculumUnit[];
+    units: Unit[];
     assessmentTypes: Record<string, string>;
 }>();
-console.log('props', props.curriculumUnits);
 
 // Validation Schema
 const formSchema = toTypedSchema(
     z.object({
+        title: z.string().min(1, { message: 'Title is required' }),
         version: z.string().min(1, { message: 'Version is required' }),
-        description: z.string().min(1, { message: 'Description is required' }),
+        // description Can be empty
+        description: z.string().optional(),
         // Total hours can be 0
         total_hours: z.number().min(0, { message: 'Total hours must be a positive number' }),
         total_sessions: z.number().int({ message: 'Total sessions must be an integer' }).min(1, { message: 'Total sessions must be at least 1' }),
-        curriculum_unit_id: z.string({ message: 'Please select a curriculum unit' }),
-        is_active: z.boolean().default(false),
+        unit_id: z.string({ message: 'Please select a curriculum unit' }),
+        is_active: z.boolean().default(true),
         assessment_components: z
             .array(
                 z.object({
@@ -112,8 +89,8 @@ const form = useForm({
         description: '',
         total_hours: 0,
         total_sessions: 1,
-        curriculum_unit_id: '0',
-        is_active: false,
+        unit_id: '0',
+        is_active: true,
         // init 3 components
         assessment_components: [
             {
@@ -143,6 +120,8 @@ const form = useForm({
 
 // Form State
 const isSubmitting = ref(false);
+// Unit search states
+const addUnitSearch = ref('');
 
 // Assessment Component Management
 const addAssessmentComponent = () => {
@@ -235,13 +214,13 @@ const onSubmit = form.handleSubmit((formData) => {
     console.log('Form is valid, submitting:', formData);
     isSubmitting.value = true;
 
-    // Convert curriculum_unit_id to number if it's a string
+    // Convert unit_id to number if it's a string
     const submitData = {
         ...formData,
-        curriculum_unit_id: formData.curriculum_unit_id ? Number(formData.curriculum_unit_id) : null,
+        unit_id: formData.unit_id ? Number(formData.unit_id) : null,
     };
 
-    router.post(`/units/${props.unit.id}/syllabus`, submitData, {
+    router.post(`/syllabus-templates`, submitData, {
         onSuccess: () => {
             toast.success('Syllabus created successfully');
         },
@@ -254,18 +233,26 @@ const onSubmit = form.handleSubmit((formData) => {
         },
     });
 });
+// Filtered units for add modal with search
+const filteredAvailableUnits = computed(() => {
+    if (!addUnitSearch.value.trim()) {
+        return props.units;
+    }
+
+    const searchTerm = addUnitSearch.value.toLowerCase().trim();
+    return props.units.filter((unit) => unit.code.toLowerCase().includes(searchTerm) || unit.name.toLowerCase().includes(searchTerm));
+});
 </script>
 
 <template>
-    <Head :title="`Create Syllabus - ${unit.code}`" />
+    <Head :title="`Create Syllabus Template`" />
     <!-- Header -->
     <div class="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
         <div>
-            <h1 class="text-3xl font-bold">Create Syllabus</h1>
-            <p class="text-xl text-gray-700">{{ unit.code }} - {{ unit.name }}</p>
+            <h1 class="text-3xl font-bold">Create Syllabus Template</h1>
         </div>
         <div class="flex items-center gap-3">
-            <Button variant="outline" @click="router.visit(`/units/${unit.id}/syllabus`)">
+            <Button variant="outline" @click="router.visit(`/syllabus-templates`)">
                 <ArrowLeft class="mr-2 h-4 w-4" />
                 Cancel
             </Button>
@@ -285,6 +272,15 @@ const onSubmit = form.handleSubmit((formData) => {
             </CardHeader>
             <CardContent class="space-y-4">
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="title">
+                        <FormItem>
+                            <FormLabel for="title">Title *</FormLabel>
+                            <FormControl>
+                                <Input id="title" type="text" placeholder="Title" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
                     <FormField v-slot="{ componentField }" name="version">
                         <FormItem>
                             <FormLabel for="version">Version *</FormLabel>
@@ -295,20 +291,37 @@ const onSubmit = form.handleSubmit((formData) => {
                         </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="curriculum_unit_id">
+                    <FormField v-slot="{ componentField }" name="unit_id">
                         <FormItem>
-                            <FormLabel for="curriculum_unit_id">Curriculum Unit</FormLabel>
+                            <FormLabel>Unit *</FormLabel>
                             <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select curriculum unit" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="curriculumUnit in curriculumUnits" :key="curriculumUnit.id" :value="curriculumUnit.id.toString()">
-                                            {{ curriculumUnit.semester.name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Combobox v-bind="componentField">
+                                    <ComboboxAnchor>
+                                        <div class="relative w-full items-center">
+                                            <ComboboxInput
+                                                v-model="addUnitSearch"
+                                                placeholder="Search for a unit..."
+                                                :display-value="
+                                                    (value) => {
+                                                        const unit = units.find((u) => u.id.toString() === value?.toString());
+                                                        return unit ? `${unit.code} - ${unit.name}` : '';
+                                                    }
+                                                "
+                                            />
+                                            <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                                <ChevronsUpDown class="text-muted-foreground size-4" />
+                                            </ComboboxTrigger>
+                                        </div>
+                                    </ComboboxAnchor>
+                                    <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                        <ComboboxViewport>
+                                            <ComboboxEmpty v-if="filteredAvailableUnits.length === 0">
+                                                {{ units.length === 0 ? 'No available units to add' : 'No units found' }}
+                                            </ComboboxEmpty>
+                                            <ComboboxItem v-for="unit in filteredAvailableUnits" :key="unit.id" :value="unit.id.toString()" class="cursor-pointer"> {{ unit.code }} - {{ unit.name }} </ComboboxItem>
+                                        </ComboboxViewport>
+                                    </ComboboxList>
+                                </Combobox>
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -397,7 +410,7 @@ const onSubmit = form.handleSubmit((formData) => {
                             <Checkbox :model-value="value" @update:model-value="handleChange" />
                         </FormControl>
                         <div class="space-y-1 leading-none">
-                            <FormLabel>Set as active syllabus</FormLabel>
+                            <FormLabel>Active</FormLabel>
                         </div>
                     </FormItem>
                 </FormField>
