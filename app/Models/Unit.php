@@ -68,30 +68,21 @@ class Unit extends AuditableModel
     }
 
     /**
-     * Get all syllabus for this unit through curriculum units.
+     * Get all syllabus templates for this unit.
      */
-    public function syllabus()
+    public function syllabusTemplates(): HasMany
     {
-        return $this->hasManyThrough(
-            Syllabus::class,
-            CurriculumUnit::class,
-            'unit_id',
-            'curriculum_unit_id'
-        );
+        return $this->hasMany(SyllabusTemplate::class);
     }
 
     /**
-     * Get the active syllabus for this unit through curriculum units.
+     * Get the active syllabus templates for this unit.
      */
-    public function activeSyllabus()
+    public function activeSyllabusTemplates(): HasMany
     {
-        return $this->hasManyThrough(
-            Syllabus::class,
-            CurriculumUnit::class,
-            'unit_id',
-            'curriculum_unit_id'
-        )->where('syllabus.is_active', true);
+        return $this->hasMany(SyllabusTemplate::class)->where('is_active', true);
     }
+
 
     /**
      * Check if this unit can be used as an elective for a given specialization.
@@ -226,7 +217,7 @@ class Unit extends AuditableModel
             'curriculum_usage' => $this->getCurriculumUsageStats(),
             'prerequisite_info' => $this->getPrerequisiteInfo(),
             'equivalency_info' => $this->getEquivalencyInfo(),
-            'active_syllabus_count' => $this->activeSyllabus()->count(),
+            'active_syllabus_templates_count' => $this->activeSyllabusTemplates()->count(),
         ];
 
         // Track credit point changes (critical for graduation requirements)

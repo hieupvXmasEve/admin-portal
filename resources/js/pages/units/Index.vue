@@ -28,7 +28,7 @@ interface Unit {
     prerequisite_conditions_count: number;
     equivalent_units_count: number;
     curriculum_units_count: number;
-    syllabus_count: number;
+    syllabus_templates_count: number;
     created_at: string;
     updated_at: string;
 }
@@ -278,12 +278,12 @@ const columns: ColumnDef<Unit>[] = [
         },
     },
     {
-        header: 'Syllabus',
-        accessorKey: 'syllabus_count',
+        header: 'Syllabus Templates',
+        accessorKey: 'syllabus_templates_count',
         enableSorting: false,
         cell: ({ row }) => {
-            const count = row.original.syllabus_count;
-            return count > 0 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800' }, count) : h('span', { class: 'text-gray-400' }, 'None');
+            const count = row.original.syllabus_templates_count;
+            return count > 0 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800' }, count) : h('span', { class: 'text-gray-400' }, 'None');
         },
     },
     {
