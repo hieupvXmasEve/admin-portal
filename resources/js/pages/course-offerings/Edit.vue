@@ -16,15 +16,37 @@ import { z } from 'zod';
 interface Props {
     courseOffering: CourseOffering;
     lectures: Lecture[];
+    syllabusTemplates: Array<{
+        id: number;
+        unit_id: number;
+        title: string;
+        version: string;
+        description: string;
+        delivery_mode: string;
+        unit?: {
+            id: number;
+            code: string;
+            name: string;
+        };
+        applicable_campus?: {
+            id: number;
+            name: string;
+        };
+        applicable_program?: {
+            id: number;
+            name: string;
+        };
+    }>;
 }
 
 const props = defineProps<Props>();
-console.log('%c props', 'color: red', props.courseOffering);
+console.log('%c props', 'color: red', props);
 // Define validation schema following development standards
 const formSchema = toTypedSchema(
     z.object({
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
+        syllabus_template_id: z.string().optional(),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(1000, 'Max capacity cannot exceed 1000'),
         waitlist_capacity: z.number().int().min(0, 'Waitlist capacity must be 0 or greater').max(100, 'Waitlist capacity cannot exceed 100'),
         delivery_mode: z.enum(['in_person', 'online', 'hybrid', 'blended'], {
@@ -52,6 +74,7 @@ const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
         section_code: props.courseOffering.section_code || '',
+        syllabus_template_id: props.courseOffering.syllabus_template_id?.toString() || '',
         max_capacity: props.courseOffering.max_capacity,
         waitlist_capacity: props.courseOffering.waitlist_capacity || 0,
         delivery_mode: props.courseOffering.delivery_mode,
@@ -73,6 +96,7 @@ const onSubmit = handleSubmit((values) => {
         curriculum_unit_id: props.courseOffering.curriculum_unit_id,
         lecture_id: values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
+        syllabus_template_id: values.syllabus_template_id === '' ? null : values.syllabus_template_id,
         max_capacity: Number(values.max_capacity),
         waitlist_capacity: Number(values.waitlist_capacity) || 0,
         delivery_mode: values.delivery_mode,
@@ -195,6 +219,32 @@ const enrollmentStatusOptions = [
                             <FormLabel>Section Code</FormLabel>
                             <FormControl>
                                 <Input v-bind="componentField" placeholder="e.g., A, B1, 01" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="syllabus_template_id">
+                        <FormItem>
+                            <FormLabel>Syllabus Template</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select syllabus template (optional)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No syllabus template</SelectItem>
+                                        <SelectItem v-for="template in syllabusTemplates" :key="template.id" :value="template.id.toString()">
+                                            <div class="flex flex-col">
+                                                <span class="font-medium">{{ template.title }} v{{ template.version }}</span>
+                                                <div class="text-muted-foreground text-xs">
+                                                    <span v-if="template.unit">{{ template.unit.code }} - {{ template.unit.name }}</span>
+                                                    <span v-if="template.delivery_mode" class="ml-2">• {{ template.delivery_mode }}</span>
+                                                </div>
+                                            </div>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </FormControl>
                             <FormMessage />
                         </FormItem>

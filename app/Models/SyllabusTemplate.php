@@ -83,6 +83,14 @@ class SyllabusTemplate extends AuditableModel
         return $this->hasMany(AssessmentComponent::class);
     }
 
+    /**
+     * Get all course offerings using this syllabus template.
+     */
+    public function courseOfferings(): HasMany
+    {
+        return $this->hasMany(CourseOffering::class);
+    }
+
     // ========== AUDIT LOGGING CONFIGURATION ==========
 
     protected function getLoggingLevel(): string

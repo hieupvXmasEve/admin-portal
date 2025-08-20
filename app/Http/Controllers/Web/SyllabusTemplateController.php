@@ -99,7 +99,7 @@ class SyllabusTemplateController extends Controller
     {
         return Inertia::render('syllabus/TemplatesShow', [
             'unit' => $syllabusTemplate->unit,
-            'template' => $syllabusTemplate->load(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate']),
+            'template' => $syllabusTemplate->load(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate', 'assessmentComponents.details']),
         ]);
     }
 
@@ -181,7 +181,7 @@ class SyllabusTemplateController extends Controller
 
     public function show(Request $request, SyllabusTemplate $syllabusTemplate): JsonResponse|Response
     {
-        $syllabusTemplate->load(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate']);
+        $syllabusTemplate->load(['unit', 'applicableProgram', 'applicableCampus', 'creator', 'sourceTemplate', 'assessmentComponents.details']);
 
         if ($request->wantsJson()) {
             return response()->json(['data' => $syllabusTemplate]);

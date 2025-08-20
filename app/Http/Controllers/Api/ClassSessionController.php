@@ -36,9 +36,15 @@ class ClassSessionController extends Controller
             $validated = $request->validated();
             $roomId = $validated['room_id'];
             $startDate = isset($validated['start_date']) ? Carbon::parse($validated['start_date']) : null;
+            $weeklySchedule = $validated['weekly_schedule'];
 
             // Generate new sessions
-            $sessions = $this->classSessionService->generateClassSessions($courseOffering, $roomId, $startDate);
+            $sessions = $this->classSessionService->generateClassSessions(
+                $courseOffering, 
+                $roomId, 
+                $startDate,
+                $weeklySchedule
+            );
 
             return response()->json([
                 'success' => true,

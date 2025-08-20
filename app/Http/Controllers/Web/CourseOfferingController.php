@@ -223,6 +223,12 @@ class CourseOfferingController extends Controller
             ->orderByName()
             ->get(['id', 'first_name', 'last_name', 'email', 'academic_rank']);
 
+        // Get available syllabus templates
+        $syllabusTemplates = \App\Models\SyllabusTemplate::where('is_active', true)
+            ->with(['unit:id,code,name', 'applicableCampus:id,name', 'applicableProgram:id,name'])
+            ->orderBy('title')
+            ->get(['id', 'unit_id', 'title', 'version', 'description', 'applicable_campus_id', 'applicable_program_id', 'delivery_mode']);
+
         return Inertia::render('course-offerings/Create', [
             'activeSemester' => [
                 'id' => $activeSemester->id,
@@ -233,6 +239,7 @@ class CourseOfferingController extends Controller
             ],
             'units' => $curriculumUnits,
             'lectures' => $lectures,
+            'syllabusTemplates' => $syllabusTemplates,
             'error' => null,
         ]);
     }
@@ -260,6 +267,7 @@ class CourseOfferingController extends Controller
             'semester',
             'curriculumUnit.unit',
             'curriculumUnit.syllabus',
+            'syllabusTemplate:id,title,version,description',
             'lecture',
             'courseRegistrations' => function ($query) {
                 $query->with('student')
@@ -333,11 +341,11 @@ class CourseOfferingController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'capacity', 'type']);
 
-        $canGenerateClassSessions = $courseOffering->canGenerateClassSessions();
+        // $canGenerateClassSessions = $courseOffering->canGenerateClassSessions();
         return Inertia::render('course-offerings/Show', [
             'courseOffering' => $courseOffering,
             'availableRooms' => $availableRooms,
-            'canGenerateClassSessions' => $canGenerateClassSessions,
+            // 'canGenerateClassSessions' => $canGenerateClassSessions,
         ]);
     }
 
@@ -351,6 +359,7 @@ class CourseOfferingController extends Controller
             'semester:id,name,code,start_date,end_date',
             'curriculumUnit:id,unit_id,year_level,semester_number',
             'curriculumUnit.unit:id,code,name,credit_points',
+            'syllabusTemplate:id,title,version,description',
         ]);
 
         // Get available lectures
@@ -359,9 +368,16 @@ class CourseOfferingController extends Controller
             ->orderByName()
             ->get(['id', 'first_name', 'last_name', 'email', 'academic_rank']);
 
+        // Get available syllabus templates
+        $syllabusTemplates = \App\Models\SyllabusTemplate::where('is_active', true)
+            ->with(['unit:id,code,name', 'applicableCampus:id,name', 'applicableProgram:id,name'])
+            ->orderBy('title')
+            ->get(['id', 'unit_id', 'title', 'version', 'description', 'applicable_campus_id', 'applicable_program_id', 'delivery_mode']);
+
         return Inertia::render('course-offerings/Edit', [
             'courseOffering' => $courseOffering,
             'lectures' => $lectures,
+            'syllabusTemplates' => $syllabusTemplates,
         ]);
     }
 
@@ -486,9 +502,9 @@ class CourseOfferingController extends Controller
                 'sunday' => 6,
             ];
             $weekdayIndexes = collect($scheduleDays)
-                ->map(fn ($d) => strtolower($d))
-                ->map(fn ($d) => $dayToIndex[$d] ?? null)
-                ->filter(static fn ($v) => $v !== null)
+                ->map(fn($d) => strtolower($d))
+                ->map(fn($d) => $dayToIndex[$d] ?? null)
+                ->filter(static fn($v) => $v !== null)
                 ->values()
                 ->all();
 

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { CourseOfferingFormData, Lecture, Semester, Unit } from '@/types/models';
+import type { CourseOfferingFormData, Lecture } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Save } from 'lucide-vue-next';
@@ -37,6 +37,27 @@ interface Props {
         source: 'new_curriculum' | 'continuing_curriculum' | 'common_curriculum';
     }>;
     lectures: Lecture[];
+    syllabusTemplates: Array<{
+        id: number;
+        unit_id: number;
+        title: string;
+        version: string;
+        description: string;
+        delivery_mode: string;
+        unit?: {
+            id: number;
+            code: string;
+            name: string;
+        };
+        applicable_campus?: {
+            id: number;
+            name: string;
+        };
+        applicable_program?: {
+            id: number;
+            name: string;
+        };
+    }>;
     error: string | null;
 }
 
@@ -46,15 +67,11 @@ const submitError = ref<string | null>(null);
 const formSchema = toTypedSchema(
     z.object({
         curriculum_unit_id: z.string().min(1, 'Curriculum unit is required'),
+        syllabus_template_id: z.string().optional(),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(500, 'Max capacity cannot exceed 500'),
-        waitlist_capacity: z
-            .number()
-            .int()
-            .min(0, 'Waitlist capacity must be 0 or greater')
-            .max(100, 'Waitlist capacity cannot exceed 100')
-            .default(10),
+        waitlist_capacity: z.number().int().min(0, 'Waitlist capacity must be 0 or greater').max(100, 'Waitlist capacity cannot exceed 100').default(10),
         delivery_mode: z.enum(['in_person', 'online', 'hybrid', 'blended'], {
             errorMap: () => ({ message: 'Please select a delivery mode' }),
         }),
@@ -74,6 +91,7 @@ const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
         curriculum_unit_id: '',
+        syllabus_template_id: '',
         lecture_id: '',
         section_code: '',
         max_capacity: 30,
@@ -100,6 +118,7 @@ const onSubmit = handleSubmit((values) => {
     const formData = {
         semester_id: props.activeSemester?.id,
         curriculum_unit_id: values.curriculum_unit_id,
+        syllabus_template_id: values.syllabus_template_id === '' ? null : values.syllabus_template_id,
         lecture_id: values.lecture_id === 'none' || values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
         max_capacity: Number(values.max_capacity),
@@ -183,7 +202,11 @@ const dayOptions = [
         <div class="flex items-start">
             <div class="flex-shrink-0">
                 <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
+                    <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                        clip-rule="evenodd"
+                    />
                 </svg>
             </div>
             <div class="ml-3">
@@ -193,9 +216,7 @@ const dayOptions = [
                 </div>
                 <div class="mt-4">
                     <Link href="/semesters">
-                        <Button size="sm" variant="outline" class="border-red-300 text-red-700 hover:bg-red-100">
-                            Manage Semesters
-                        </Button>
+                        <Button size="sm" variant="outline" class="border-red-300 text-red-700 hover:bg-red-100"> Manage Semesters </Button>
                     </Link>
                 </div>
             </div>
@@ -203,38 +224,40 @@ const dayOptions = [
     </div>
 
     <!-- Active Semester Info -->
-    <div v-if="props.activeSemester" class="rounded-lg border border-blue-200 bg-blue-50 p-4 mb-6">
+    <div v-if="props.activeSemester" class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
         <div class="flex items-start">
             <div class="flex-shrink-0">
                 <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd" />
+                    <path
+                        fill-rule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
+                        clip-rule="evenodd"
+                    />
                 </svg>
             </div>
             <div class="ml-3 flex-1">
                 <h3 class="text-sm font-medium text-blue-800">Active Semester</h3>
                 <div class="mt-1 text-sm text-blue-700">
-                    <p><strong>{{ props.activeSemester.name }}</strong> ({{ props.activeSemester.code }})</p>
-                    <p class="text-xs mt-1">
-                        {{ new Date(props.activeSemester.start_date).toLocaleDateString() }} - 
+                    <p>
+                        <strong>{{ props.activeSemester.name }}</strong> ({{ props.activeSemester.code }})
+                    </p>
+                    <p class="mt-1 text-xs">
+                        {{ new Date(props.activeSemester.start_date).toLocaleDateString() }} -
                         {{ new Date(props.activeSemester.end_date).toLocaleDateString() }}
                     </p>
                 </div>
             </div>
             <div class="text-right text-xs text-blue-600">
-                <p><strong>{{ props.units.length }}</strong> units available</p>
+                <p>
+                    <strong>{{ props.units.length }}</strong> units available
+                </p>
                 <div class="mt-1 space-y-1">
                     <div>
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 mr-2">
-                            {{ props.units.filter(u => u.source === 'new_curriculum').length }} New
-                        </span>
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                            {{ props.units.filter(u => u.source === 'continuing_curriculum').length }} Continuing
-                        </span>
+                        <span class="mr-2 inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs text-green-800"> {{ props.units.filter((u) => u.source === 'new_curriculum').length }} New </span>
+                        <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800"> {{ props.units.filter((u) => u.source === 'continuing_curriculum').length }} Continuing </span>
                     </div>
                     <div>
-                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                            {{ props.units.filter(u => u.source === 'common_curriculum').length }} Common
-                        </span>
+                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-800"> {{ props.units.filter((u) => u.source === 'common_curriculum').length }} Common </span>
                     </div>
                 </div>
             </div>
@@ -258,31 +281,21 @@ const dayOptions = [
                                         <SelectValue placeholder="Select curriculum unit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem 
-                                            v-for="unit in props.units" 
-                                            :key="unit.curriculum_unit_id" 
-                                            :value="unit.curriculum_unit_id.toString()"
-                                        >
+                                        <SelectItem v-for="unit in props.units" :key="unit.curriculum_unit_id" :value="unit.curriculum_unit_id.toString()">
                                             <div class="flex flex-col">
                                                 <span class="font-medium">{{ unit.code }} - {{ unit.name }}</span>
-                                                <span class="text-xs text-muted-foreground">
-                                                    {{ unit.credit_points }} credits • 
-                                                    <template v-if="unit.semester_number !== null">
-                                                        Y{{ unit.year_level }}S{{ unit.semester_number }} • 
-                                                    </template>
-                                                    <template v-else>
-                                                        <span class="text-purple-600">Common Unit</span> • 
-                                                    </template>
-                                                    <span :class="{
-                                                        'text-green-600': unit.source === 'new_curriculum',
-                                                        'text-blue-600': unit.source === 'continuing_curriculum',
-                                                        'text-purple-600': unit.source === 'common_curriculum'
-                                                    }">
-                                                        {{ 
-                                                            unit.source === 'new_curriculum' ? 'New Curriculum' :
-                                                            unit.source === 'continuing_curriculum' ? 'Continuing Curriculum' :
-                                                            'Common Curriculum'
-                                                        }}
+                                                <span class="text-muted-foreground text-xs">
+                                                    {{ unit.credit_points }} credits •
+                                                    <template v-if="unit.semester_number !== null"> Y{{ unit.year_level }}S{{ unit.semester_number }} • </template>
+                                                    <template v-else> <span class="text-purple-600">Common Unit</span> • </template>
+                                                    <span
+                                                        :class="{
+                                                            'text-green-600': unit.source === 'new_curriculum',
+                                                            'text-blue-600': unit.source === 'continuing_curriculum',
+                                                            'text-purple-600': unit.source === 'common_curriculum',
+                                                        }"
+                                                    >
+                                                        {{ unit.source === 'new_curriculum' ? 'New Curriculum' : unit.source === 'continuing_curriculum' ? 'Continuing Curriculum' : 'Common Curriculum' }}
                                                     </span>
                                                     • Started: {{ unit.curriculum_start_semester }}
                                                 </span>
@@ -305,6 +318,33 @@ const dayOptions = [
                         </FormItem>
                     </FormField>
 
+                    <FormField v-slot="{ componentField }" name="syllabus_template_id">
+                        <FormItem>
+                            <FormLabel>Syllabus Template (Optional)</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select syllabus template (optional)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No syllabus template</SelectItem>
+                                        <SelectItem v-for="template in props.syllabusTemplates" :key="template.id" :value="template.id.toString()">
+                                            <div class="flex flex-col">
+                                                <span class="font-medium">{{ template.title }} (v{{ template.version }})</span>
+                                                <span class="text-muted-foreground text-xs">
+                                                    <template v-if="template.unit"> {{ template.unit.code }} - {{ template.unit.name }} • </template>
+                                                    {{ template.delivery_mode.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase()) }}
+                                                    <template v-if="template.description"> • {{ template.description.substring(0, 50) }}{{ template.description.length > 50 ? '...' : '' }} </template>
+                                                </span>
+                                            </div>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
                     <FormField v-slot="{ componentField }" name="lecture_id">
                         <FormItem>
                             <FormLabel>Lecture</FormLabel>
@@ -315,9 +355,7 @@ const dayOptions = [
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none">No lecture assigned</SelectItem>
-                                        <SelectItem v-for="lecture in props.lectures" :key="lecture.id" :value="lecture.id.toString()">
-                                            {{ lecture.first_name }} {{ lecture.last_name }} ({{ lecture.academic_rank }})
-                                        </SelectItem>
+                                        <SelectItem v-for="lecture in props.lectures" :key="lecture.id" :value="lecture.id.toString()"> {{ lecture.first_name }} {{ lecture.last_name }} ({{ lecture.academic_rank }}) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>

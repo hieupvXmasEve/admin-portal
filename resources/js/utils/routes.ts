@@ -191,8 +191,8 @@ export const curriculumRoutes = {
     syllabusTemplates: {
         index: () => route(CURRICULUM_ROUTE_NAMES.SYLLABUS_TEMPLATE_INDEX),
         create: () => route(CURRICULUM_ROUTE_NAMES.SYLLABUS_TEMPLATE_CREATE),
-        edit: (id: number) => route(CURRICULUM_ROUTE_NAMES.SYLLABUS_TEMPLATE_EDIT, { syllabus_template: id }),
-        show: (id: number) => route(CURRICULUM_ROUTE_NAMES.SYLLABUS_TEMPLATE_SHOW, { syllabus_template: id }),
+        edit: (id: number) => route(CURRICULUM_ROUTE_NAMES.SYLLABUS_TEMPLATE_EDIT, { syllabusTemplate: id }),
+        show: (id: number) => route(CURRICULUM_ROUTE_NAMES.SYLLABUS_TEMPLATE_SHOW, { syllabusTemplate: id }),
     },
     // Placeholder for future features
     equivalentCourses: () => '#', // Will be implemented later

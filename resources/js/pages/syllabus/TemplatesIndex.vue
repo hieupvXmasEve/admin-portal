@@ -9,7 +9,7 @@ import { useTableFilters } from '@/composables/useFilters';
 import type { PaginatedResponse } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Edit, Plus } from 'lucide-vue-next';
+import { Edit, Eye, Plus } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Unit {
@@ -137,6 +137,7 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
             </template>
             <template #cell-actions="{ row }">
                 <div class="flex items-center justify-center gap-2">
+                    <Button variant="ghost" size="sm" @click="router.visit(`/syllabus-templates/${row.original.id}`)"><Eye class="h-4 w-4" /></Button>
                     <Button variant="ghost" size="sm" @click="router.visit(`/syllabus-templates/${row.original.id}/edit`)"><Edit class="h-4 w-4" /></Button>
                 </div>
             </template>
