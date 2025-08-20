@@ -41,10 +41,12 @@ class CourseOfferingController extends Controller
     public function index(Request $request): Response
     {
         $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecture', 'unit'])
-            ->where('campus_id', app('campus')->id)
-            ->join('units', 'course_offerings.unit_id', '=', 'units.id')
-            ->orderBy('semester_id', 'desc')
-            ->orderBy('units.code', 'asc');
+            ->whereHas('unit', fn($q) => $q->whereNotNull('id'))
+            ->orderBy(
+                Unit::select('code')
+                    ->whereColumn('units.id', 'course_offerings.unit_id')
+                    ->limit(1)
+            );
 
         // Apply filters
         if ($request->filled('search')) {
