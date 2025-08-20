@@ -289,7 +289,7 @@ class SemesterEnrollmentController extends Controller
                     // Check if any offering already exists for this unit (across all curriculum versions)
                     $existingOffering = CourseOffering::where('semester_id', $semester->id)
                         ->where('campus_id', app('campus')->id)
-                        ->whereHas('curriculumUnit', function($query) use ($unitId) {
+                        ->whereHas('curriculumUnit', function ($query) use ($unitId) {
                             $query->where('unit_id', $unitId);
                         })
                         ->first();
@@ -313,6 +313,7 @@ class SemesterEnrollmentController extends Controller
                         'campus_id' => app('campus')->id,
                         'semester_id' => $semester->id,
                         'curriculum_unit_id' => $representativeCurriculumUnit->id,
+                        'unit_id' => $unitId,
                         'max_capacity' => $defaultCapacity,
                         'current_enrollment' => 0,
                         'waitlist_capacity' => 10,
@@ -806,7 +807,7 @@ class SemesterEnrollmentController extends Controller
                             $offerings = CourseOffering::query()
                                 ->where('semester_id', $semester->id)
                                 ->where('campus_id', $currentCampusId)
-                                ->whereHas('curriculumUnit', function($query) use ($curriculumUnit) {
+                                ->whereHas('curriculumUnit', function ($query) use ($curriculumUnit) {
                                     $query->where('unit_id', $curriculumUnit->unit_id);
                                 })
                                 ->active()

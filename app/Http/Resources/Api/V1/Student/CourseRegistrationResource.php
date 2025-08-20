@@ -23,7 +23,7 @@ class CourseRegistrationResource extends JsonResource
             'unit' => [
                 'code' => $this->resource['unit']['code'],
                 'name' => $this->resource['unit']['name'],
-                'credit_hours' => (float) $this->resource['unit']['credit_hours'],
+                'credit_points' => (float) $this->resource['unit']['credit_points'],
             ],
             'lecturer' => [
                 'name' => $this->resource['lecturer']['name'] ?? null,

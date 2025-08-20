@@ -275,7 +275,7 @@ class CourseRegistrationService
             'unit' => [
                 'code' => $registration->courseOffering->curriculumUnit->unit->code,
                 'name' => $registration->courseOffering->curriculumUnit->unit->name,
-                'credit_hours' => (float) $registration->credit_hours,
+                'credit_points' => (float) $registration->courseOffering->unit->credit_points,
             ],
             'lecturer' => [
                 'name' => $registration->courseOffering->lecture?->display_name ?? $registration->courseOffering->lecture?->full_name ?? null,

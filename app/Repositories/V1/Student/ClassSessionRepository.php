@@ -14,23 +14,24 @@ class ClassSessionRepository
 {
     /**
      * Get class sessions for a student in a specific semester
+     * Student can access course offerings if they have the same unit in their curriculum version
      */
     public function getStudentClassSessions(Student $student, Semester $semester, array $filters = []): Collection
     {
         $query = ClassSession::query()
             ->whereHas('courseOffering', function (Builder $query) use ($student, $semester) {
                 $query->where('semester_id', $semester->id)
-                    ->whereHas('curriculumUnit', function (Builder $cuQuery) use ($student) {
-                        $cuQuery->whereHas('curriculumVersion', function (Builder $cvQuery) use ($student) {
-                            $cvQuery->whereHas('enrollments', function (Builder $enrollQuery) use ($student) {
-                                $enrollQuery->where('student_id', $student->id)
-                                    ->where('status', 'in_progress');
-                            });
-                        });
+                    ->whereExists(function ($subQuery) use ($student) {
+                        // Check if the student has this unit in their curriculum version
+                        $subQuery->select('id')
+                            ->from('curriculum_units')
+                            ->whereColumn('curriculum_units.unit_id', 'course_offerings.unit_id')
+                            ->where('curriculum_units.curriculum_version_id', $student->curriculum_version_id);
                     });
             })
             ->with([
                 'courseOffering.curriculumUnit.unit',
+                'courseOffering.unit',
                 'courseOffering.lecture',
                 'room',
             ]);

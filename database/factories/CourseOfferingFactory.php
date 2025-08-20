@@ -24,9 +24,12 @@ class CourseOfferingFactory extends Factory
      */
     public function definition(): array
     {
+        $curriculumUnit = CurriculumUnit::factory()->create();
+        
         return [
             'semester_id' => Semester::factory(),
-            'curriculum_unit_id' => CurriculumUnit::factory(),
+            'curriculum_unit_id' => $curriculumUnit->id,
+            'unit_id' => $curriculumUnit->unit_id, // Auto-fill unit_id from curriculum_unit
             'lecture_id' => Lecture::factory(),
             'section_code' => $this->faker->optional()->bothify('SEC-?##'),
             'max_capacity' => $this->faker->numberBetween(20, 100),
