@@ -49,7 +49,7 @@ class UnitController extends Controller
                 $query->orderBy($sort, $direction);
             })
             ->orderBy('created_at', 'desc') // Sort by created_at in descending order by default
-            ->withCount(['equivalentUnits', 'curriculumUnits', 'prerequisiteConditions', 'syllabus'])
+            ->withCount(['equivalentUnits', 'curriculumUnits', 'prerequisiteConditions', 'syllabusTemplates'])
             ->paginate($validated['per_page'] ?? 15)
             ->withQueryString();
 
@@ -107,8 +107,7 @@ class UnitController extends Controller
             'curriculumUnits.curriculumVersion.specialization',
             'curriculumUnits.semester',
             'prerequisiteGroups.conditions.requiredUnit',
-            'syllabus.curriculumUnit.semester',
-            'syllabus.assessmentComponents.details',
+            'syllabusTemplates.assessmentComponents',
         ]);
 
         // Transform the data to match frontend expectations
@@ -116,10 +115,6 @@ class UnitController extends Controller
             return $this->transformPrerequisiteGroup($group);
         });
 
-        // Calculate assessment weight for each syllabus
-        $unit->syllabus->each(function ($syllabus) {
-            $syllabus->total_assessment_weight = $syllabus->assessmentComponents->sum('weight');
-        });
 
         // Get all equivalent units (both direct and transitive relationships)
         $allEquivalentUnits = $this->relationshipService->getAllEquivalentUnits($unit);
@@ -140,8 +135,8 @@ class UnitController extends Controller
                 'prerequisite_conditions_count' => $unit->prerequisiteConditions()->count(),
                 'equivalent_count' => $allEquivalentUnits->count(),
                 'curriculum_count' => $unit->curriculumUnits()->count(),
-                'syllabus_count' => $unit->syllabus()->count(),
-                'active_syllabus_count' => $unit->syllabus()->where('is_active', true)->count(),
+                'syllabus_templates_count' => $unit->syllabusTemplates()->count(),
+                'active_syllabus_templates_count' => $unit->syllabusTemplates()->where('is_active', true)->count(),
             ],
             //            'canEdit' => $this->validationService->canEditUnit($unit),
             'canEdit' => true,

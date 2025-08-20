@@ -266,8 +266,9 @@ class CourseOfferingController extends Controller
         $courseOffering->load([
             'semester',
             'curriculumUnit.unit',
-            'curriculumUnit.syllabus',
-            'syllabusTemplate:id,title,version,description',
+            'syllabusTemplate.unit:id,code,name',
+            'syllabusTemplate.applicableCampus:id,name',
+            'syllabusTemplate.applicableProgram:id,name',
             'lecture',
             'courseRegistrations' => function ($query) {
                 $query->with('student')

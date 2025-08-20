@@ -62,30 +62,29 @@ Route::get('/health', function () {
         'version' => '1.0.0',
     ]);
 });
-require __DIR__.'/web/settings.php';
-require __DIR__.'/web/auth.php';
-require __DIR__.'/web/user.php';
-require __DIR__.'/web/role.php';
-require __DIR__.'/web/semester.php';
-require __DIR__.'/web/units.php';
-require __DIR__.'/web/syllabus.php';
-require __DIR__.'/web/programs.php';
-require __DIR__.'/web/specializations.php';
-require __DIR__.'/web/curriculum.php';
-require __DIR__.'/web/course-offerings.php';
-require __DIR__.'/web/course-registrations.php';
-require __DIR__.'/web/campuses.php';
-require __DIR__.'/web/rooms.php';
-require __DIR__.'/web/lectures.php';
-require __DIR__.'/web/teaching-assignments.php';
-require __DIR__.'/web/student-management.php';
-require __DIR__.'/web/class-sessions.php';
-require __DIR__.'/web/attendance.php';
-require __DIR__.'/web/class-schedule.php';
-require __DIR__.'/web/student-application.php';
-require __DIR__.'/web/systems.php';
-require __DIR__.'/web/email-monitoring.php';
-require __DIR__.'/web/syllabus-templates.php';
+require __DIR__ . '/web/settings.php';
+require __DIR__ . '/web/auth.php';
+require __DIR__ . '/web/user.php';
+require __DIR__ . '/web/role.php';
+require __DIR__ . '/web/semester.php';
+require __DIR__ . '/web/units.php';
+require __DIR__ . '/web/programs.php';
+require __DIR__ . '/web/specializations.php';
+require __DIR__ . '/web/curriculum.php';
+require __DIR__ . '/web/course-offerings.php';
+require __DIR__ . '/web/course-registrations.php';
+require __DIR__ . '/web/campuses.php';
+require __DIR__ . '/web/rooms.php';
+require __DIR__ . '/web/lectures.php';
+require __DIR__ . '/web/teaching-assignments.php';
+require __DIR__ . '/web/student-management.php';
+require __DIR__ . '/web/class-sessions.php';
+require __DIR__ . '/web/attendance.php';
+require __DIR__ . '/web/class-schedule.php';
+require __DIR__ . '/web/student-application.php';
+require __DIR__ . '/web/systems.php';
+require __DIR__ . '/web/email-monitoring.php';
+require __DIR__ . '/web/syllabus-templates.php';
 
 // Admin Schedule API routes (using web auth for SPA)
 Route::middleware(['auth'])->name('api.admin.')->group(function () {

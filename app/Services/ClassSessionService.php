@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
-use App\Models\Syllabus;
 use App\Models\SyllabusTemplate;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,12 +20,11 @@ class ClassSessionService
      * Auto-generate class sessions based on syllabus data and weekly schedule
      */
     public function generateClassSessions(
-        CourseOffering $courseOffering, 
-        int $roomId, 
+        CourseOffering $courseOffering,
+        int $roomId,
         ?Carbon $startDateOverride = null,
         ?array $weeklySchedule = null
-    ): Collection
-    {
+    ): Collection {
         Log::info("Generating class sessions for course offering {$courseOffering->id}");
 
         try {
@@ -82,9 +79,9 @@ class ClassSessionService
                 $scheduleDays = $courseOffering->schedule_days ?? ['Monday'];
                 $startTime = $courseOffering->schedule_time_start ? $courseOffering->schedule_time_start->format('H:i') : '09:00';
                 $endTime = $courseOffering->schedule_time_end ? $courseOffering->schedule_time_end->format('H:i') : '11:00';
-                
+
                 Log::info("Using course offering schedule: Days: " . implode(',', $scheduleDays) . ", Time: {$startTime}-{$endTime}");
-                
+
                 $regularSessions = $this->generateRegularSessions(
                     $courseOffering,
                     $totalSessions,
@@ -222,72 +219,6 @@ class ClassSessionService
     }
 
     /**
-     * Generate assessment sessions based on syllabus assessment components
-     */
-    private function generateAssessmentSessions(
-        CourseOffering $courseOffering,
-        Syllabus $syllabus,
-        Carbon $startDate,
-        array $scheduleDays,
-        string $startTime,
-        string $endTime
-    ): Collection {
-        $sessions = collect();
-        $assessmentComponents = $syllabus->assessmentComponents;
-
-        if ($assessmentComponents->isEmpty()) {
-            return $sessions;
-        }
-
-        // Calculate assessment dates (spread throughout the semester)
-        $semesterWeeks = 16; // Typical semester length
-        $weekInterval = $semesterWeeks / ($assessmentComponents->count() + 1);
-
-        $assessmentComponents->each(function ($component, $index) use (
-            $courseOffering,
-            $startDate,
-            $scheduleDays,
-            $startTime,
-            $endTime,
-            &$sessions,
-            $weekInterval
-        ) {
-            $assessmentDate = $startDate->copy()->addWeeks(($index + 1) * $weekInterval);
-
-            // Find the next scheduled day
-            $dayNumbers = $this->convertDaysToNumbers($scheduleDays);
-            while (! in_array($assessmentDate->dayOfWeek, $dayNumbers)) {
-                $assessmentDate->addDay();
-            }
-
-            $sessionData = [
-                'course_offering_id' => $courseOffering->id,
-                'session_title' => $component->name . ' Assessment',
-                'session_description' => 'Assessment session for ' . $component->name,
-                'session_date' => $assessmentDate->toDateString(),
-                'start_time' => $assessmentDate->copy()->setTimeFromTimeString($startTime),
-                'end_time' => $assessmentDate->copy()->setTimeFromTimeString($endTime),
-                'duration_minutes' => 120, // Default 2 hours for assessments
-                'session_type' => 'assessment',
-                'delivery_mode' => $courseOffering->delivery_mode,
-                'status' => 'scheduled',
-                'attendance_required' => true,
-                'attendance_tracking_enabled' => true,
-                'is_assessment' => true,
-                'assessment_weight' => $component->weight,
-                'assessment_duration_minutes' => 120,
-                'is_recurring' => false,
-                'sequence_number' => 1000 + $index, // High numbers to distinguish from regular sessions
-            ];
-
-            $session = ClassSession::create($sessionData);
-            $sessions->push($session);
-        });
-
-        return $sessions;
-    }
-
-    /**
      * Convert day names to Carbon day numbers
      */
     private function convertDaysToNumbers(array $dayNames): array
@@ -315,7 +246,7 @@ class ClassSessionService
         $enabledDays = [];
         $dayMap = [
             'monday' => 'Monday',
-            'tuesday' => 'Tuesday', 
+            'tuesday' => 'Tuesday',
             'wednesday' => 'Wednesday',
             'thursday' => 'Thursday',
             'friday' => 'Friday',
@@ -338,11 +269,11 @@ class ClassSessionService
     private function getScheduleTimesForDay(array $weeklySchedule, string $dayName): array
     {
         $dayKey = strtolower($dayName);
-        
+
         if (!isset($weeklySchedule[$dayKey]) || !$weeklySchedule[$dayKey]['enabled']) {
             return [];
         }
-        
+
         return [
             'start_time' => $weeklySchedule[$dayKey]['startTime'] ?? '09:00',
             'end_time' => $weeklySchedule[$dayKey]['endTime'] ?? '11:00',
@@ -373,10 +304,10 @@ class ClassSessionService
             if (in_array($currentDate->dayOfWeek, $dayNumbers)) {
                 // Get the day name
                 $dayName = $currentDate->format('l'); // Full day name like 'Monday'
-                
+
                 // Get times for this specific day
                 $dayTimes = $this->getScheduleTimesForDay($weeklySchedule, $dayName);
-                
+
                 if (!empty($dayTimes)) {
                     $sessionData = [
                         'course_offering_id' => $courseOffering->id,
@@ -416,7 +347,7 @@ class ClassSessionService
     {
         $start = Carbon::createFromFormat('H:i', $startTime);
         $end = Carbon::createFromFormat('H:i', $endTime);
-        
+
         return (int) $start->diffInMinutes($end);
     }
 

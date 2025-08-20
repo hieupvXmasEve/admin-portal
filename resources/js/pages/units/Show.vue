@@ -5,24 +5,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { UnitData as Unit } from '@/types/Unit';
-import { curriculumRoutes, syllabusRoutes } from '@/utils/routes';
+import { curriculumRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, BookOpen, CheckCircle, Clock, Edit, FileText, GitBranch, GraduationCap, Network, Shield, Target } from 'lucide-vue-next';
 
-interface Syllabus {
+interface SyllabusTemplate {
     id: number;
+    title: string;
     version: string | null;
     description: string | null;
     total_hours: number | null;
-    hours_per_session: number | null;
+    total_sessions: number | null;
+    learning_outcomes: string[] | null;
+    grading_criteria: string[] | null;
+    required_materials: string[] | null;
+    assessment_policy: string | null;
+    delivery_mode: string | null;
+    is_default: boolean;
     is_active: boolean;
-    effective_from_semester: {
-        id: number;
-        term: string;
-        year: number;
-    } | null;
     assessment_components: AssessmentComponent[];
-    total_assessment_weight: number;
 }
 
 interface AssessmentComponent {
@@ -31,17 +32,10 @@ interface AssessmentComponent {
     weight: number;
     type: string;
     is_required_to_sit_final_exam: boolean;
-    details: AssessmentComponentDetail[];
-}
-
-interface AssessmentComponentDetail {
-    id: number;
-    name: string;
-    weight: number | null;
 }
 
 interface UnitData extends Unit {
-    syllabus: Syllabus[];
+    syllabus_templates: SyllabusTemplate[];
 }
 
 interface RelationshipStats {
@@ -51,7 +45,8 @@ interface RelationshipStats {
     prerequisite_conditions_count: number;
     equivalent_count: number;
     curriculum_count: number;
-    syllabus_count: number;
+    syllabus_templates_count: number;
+    active_syllabus_templates_count: number;
 }
 
 interface EquivalentUnitItem {
@@ -156,25 +151,6 @@ const getUnitTypeColor = (unitTypeCode: string) => {
     }
 };
 
-const getAssessmentTypeColor = (type: string) => {
-    switch (type) {
-        case 'quiz':
-            return 'bg-blue-100 text-blue-800';
-        case 'assignment':
-            return 'bg-green-100 text-green-800';
-        case 'project':
-            return 'bg-purple-100 text-purple-800';
-        case 'exam':
-            return 'bg-red-100 text-red-800';
-        case 'online_activity':
-            return 'bg-yellow-100 text-yellow-800';
-        case 'other':
-            return 'bg-gray-100 text-gray-800';
-        default:
-            return 'bg-gray-100 text-gray-800';
-    }
-};
-
 // Check if unit has any relationships
 const hasRelationships = () => {
     return (props.unit.prerequisite_groups && props.unit.prerequisite_groups.length > 0) || (props.equivalentUnits && props.equivalentUnits.length > 0) || (props.unit.curriculum_units && props.unit.curriculum_units.length > 0);
@@ -260,8 +236,8 @@ const hasRelationships = () => {
             <div class="flex items-center gap-2">
                 <FileText class="h-5 w-5 text-indigo-600" />
                 <div>
-                    <p class="text-sm text-gray-600">syllabus</p>
-                    <p class="text-2xl font-bold">{{ relationshipStats.syllabus_count || 0 }}</p>
+                    <p class="text-sm text-gray-600">Syllabus Templates</p>
+                    <p class="text-2xl font-bold">{{ relationshipStats.syllabus_templates_count || 0 }}</p>
                 </div>
             </div>
         </Card>
@@ -465,95 +441,101 @@ const hasRelationships = () => {
         </CardContent>
     </Card>
 
-    <!-- syllabus Section -->
+    <!-- Syllabus Templates Section -->
     <Card>
         <CardHeader>
             <div class="flex items-center justify-between">
                 <div>
                     <CardTitle class="flex items-center gap-2">
                         <FileText class="h-5 w-5" />
-                        syllabus
+                        Syllabus Templates
                     </CardTitle>
-                    <CardDescription>Course syllabus and assessment structures for {{ unit.code }} </CardDescription>
+                    <CardDescription>Syllabus templates available for {{ unit.code }}</CardDescription>
                 </div>
-                <Button v-if="canEdit" variant="outline" @click="router.visit(syllabusRoutes.management(unit.id))">
+                <Button v-if="canEdit" variant="outline" @click="router.visit(curriculumRoutes.syllabusTemplates.index())">
                     <FileText class="mr-2 h-4 w-4" />
-                    Manage syllabus
+                    Manage Templates
                 </Button>
             </div>
         </CardHeader>
-        <CardContent v-if="unit.syllabus && unit.syllabus.length > 0">
+        <CardContent v-if="unit.syllabus_templates && unit.syllabus_templates.length > 0">
             <div class="space-y-4">
-                <div v-for="syllabus in unit.syllabus" :key="syllabus.id" class="rounded-lg border p-4 transition-colors hover:bg-gray-50" :class="syllabus.is_active ? 'border-green-200 bg-green-50' : ''">
+                <div v-for="template in unit.syllabus_templates" :key="template.id" class="rounded-lg border p-4 transition-colors hover:bg-gray-50" :class="template.is_active ? 'border-green-200 bg-green-50' : ''">
                     <div class="mb-3 flex items-start justify-between">
                         <div class="flex-1">
                             <div class="mb-2 flex items-center gap-2">
                                 <span class="font-semibold">
-                                    {{ syllabus.version || 'No Version' }}
+                                    {{ template.title || 'Untitled Template' }}
                                 </span>
-                                <Badge v-if="syllabus.is_active" class="bg-green-100 text-green-800"> Active </Badge>
-                                <Badge v-else class="bg-gray-100 text-gray-800"> Inactive</Badge>
+                                <Badge v-if="template.version" class="bg-blue-100 text-blue-800">{{ template.version }}</Badge>
+                                <Badge v-if="template.is_active" class="bg-green-100 text-green-800">Active</Badge>
+                                <Badge v-else class="bg-gray-100 text-gray-800">Inactive</Badge>
+                                <Badge v-if="template.is_default" class="bg-purple-100 text-purple-800">Default</Badge>
                             </div>
                             <div class="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
-                                <div v-if="syllabus.effective_from_semester">
-                                    <span class="font-medium text-gray-500">Effective From:</span>
-                                    <span class="ml-1"> {{ syllabus.effective_from_semester.term }} {{ syllabus.effective_from_semester.year }} </span>
-                                </div>
-                                <div v-if="syllabus.total_hours">
+                                <div v-if="template.total_hours">
                                     <span class="font-medium text-gray-500">Total Hours:</span>
-                                    <span class="ml-1">{{ syllabus.total_hours }}</span>
+                                    <span class="ml-1">{{ template.total_hours }}</span>
                                 </div>
-                                <div v-if="syllabus.hours_per_session">
-                                    <span class="font-medium text-gray-500">Hours/Session:</span>
-                                    <span class="ml-1">{{ syllabus.hours_per_session }}</span>
+                                <div v-if="template.total_sessions">
+                                    <span class="font-medium text-gray-500">Sessions:</span>
+                                    <span class="ml-1">{{ template.total_sessions }}</span>
+                                </div>
+                                <div v-if="template.delivery_mode">
+                                    <span class="font-medium text-gray-500">Delivery:</span>
+                                    <span class="ml-1">{{ template.delivery_mode }}</span>
                                 </div>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
-                            <div v-if="syllabus.assessment_components && syllabus.assessment_components.length > 0" class="text-right">
+                            <div v-if="template.assessment_components && template.assessment_components.length > 0" class="text-right">
                                 <div class="text-sm font-medium">
-                                    {{ syllabus.assessment_components.length }}
+                                    {{ template.assessment_components.length }}
                                     Components
                                 </div>
-                                <div class="text-xs text-gray-500">{{ syllabus.total_assessment_weight || 0 }}% Total Weight</div>
-                                <div v-if="syllabus.total_assessment_weight !== 100" class="text-xs text-orange-600">⚠️ Incomplete</div>
+                                <div class="text-xs text-gray-500">{{ template.assessment_components.reduce((sum, comp) => sum + comp.weight, 0) }}% Total</div>
                             </div>
-                            <Button variant="ghost" size="sm" @click="router.visit(syllabusRoutes.show(unit.id, syllabus.id))"> View Details </Button>
-                        </div>
-                    </div>
-
-                    <!-- Assessment Components Preview -->
-                    <div v-if="syllabus.assessment_components && syllabus.assessment_components.length > 0" class="mt-3">
-                        <h4 class="mb-2 text-sm font-medium text-gray-700">Assessment Components</h4>
-                        <div class="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                            <div v-for="component in syllabus.assessment_components.slice(0, 6)" :key="component.id" class="rounded border bg-white p-2">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-sm font-medium">{{ component.name }}</span>
-                                    <div class="flex items-center gap-1">
-                                        <Badge class="text-xs" :class="getAssessmentTypeColor(component.type)">
-                                            {{ component.type.toUpperCase() }}
-                                        </Badge>
-                                        <span class="text-xs text-gray-500">{{ component.weight }}%</span>
-                                    </div>
-                                </div>
-                                <div v-if="component.details && component.details.length > 0" class="mt-1">
-                                    <div class="text-xs text-gray-500">
-                                        {{ component.details.length }}
-                                        sub-tasks
-                                    </div>
-                                </div>
-                            </div>
-                            <div v-if="syllabus.assessment_components.length > 6" class="flex items-center justify-center rounded border border-dashed p-2 text-sm text-gray-500">+{{ syllabus.assessment_components.length - 6 }} more</div>
+                            <Button variant="ghost" size="sm" @click="router.visit(curriculumRoutes.syllabusTemplates.show(template.id))"> View Details </Button>
                         </div>
                     </div>
 
                     <!-- Description Preview -->
-                    <div v-if="syllabus.description" class="mt-3">
+                    <div v-if="template.description" class="mt-3">
                         <h4 class="mb-1 text-sm font-medium text-gray-700">Description</h4>
-                        <p class="line-clamp-2 text-sm text-gray-600">{{ syllabus.description }}</p>
+                        <p class="line-clamp-2 text-sm text-gray-600">{{ template.description }}</p>
+                    </div>
+
+                    <!-- Learning Outcomes Preview -->
+                    <div v-if="template.learning_outcomes && template.learning_outcomes.length > 0" class="mt-3">
+                        <h4 class="mb-1 text-sm font-medium text-gray-700">Learning Outcomes</h4>
+                        <div class="text-sm text-gray-600">{{ template.learning_outcomes.length }} outcome(s) defined</div>
+                    </div>
+
+                    <!-- Assessment Components Preview -->
+                    <div v-if="template.assessment_components && template.assessment_components.length > 0" class="mt-3">
+                        <h4 class="mb-2 text-sm font-medium text-gray-700">Assessment Components</h4>
+                        <div class="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                            <div v-for="component in template.assessment_components.slice(0, 6)" :key="component.id" class="rounded border bg-white p-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium">{{ component.name }}</span>
+                                    <div class="flex items-center gap-1">
+                                        <span class="text-xs text-gray-500">{{ component.weight }}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="template.assessment_components.length > 6" class="flex items-center justify-center rounded border border-dashed p-2 text-sm text-gray-500">+{{ template.assessment_components.length - 6 }} more</div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </CardContent>
+        <CardContent v-else class="py-8 text-center">
+            <FileText class="mx-auto mb-3 h-12 w-12 text-gray-400" />
+            <p class="text-gray-500">No syllabus templates available for this unit</p>
+            <Button v-if="canEdit" class="mt-4" variant="outline" @click="router.visit(curriculumRoutes.syllabusTemplates.create())">
+                <FileText class="mr-2 h-4 w-4" />
+                Create Template
+            </Button>
         </CardContent>
     </Card>
 

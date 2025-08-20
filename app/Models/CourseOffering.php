@@ -149,11 +149,12 @@ class CourseOffering extends AuditableModel
         return $this->hasMany(ClassSession::class, 'course_offering_id');
     }
 
-    public function syllabus(): HasOne
-    {
-        return $this->hasOne(Syllabus::class, 'curriculum_unit_id', 'curriculum_unit_id')
-            ->where('syllabus.is_active', true);
-    }
+    // Deprecated: Syllabus relationship removed - use syllabusTemplate instead
+    // public function syllabus(): HasOne
+    // {
+    //     return $this->hasOne(Syllabus::class, 'curriculum_unit_id', 'curriculum_unit_id')
+    //         ->where('syllabus.is_active', true);
+    // }
 
     public function syllabusTemplate(): BelongsTo
     {
@@ -232,11 +233,12 @@ class CourseOffering extends AuditableModel
 
     public function canGenerateClassSessions(): bool
     {
-        $syllabus = $this->curriculumUnit->syllabus ?? null;
         return $this->schedule_days !== null
             && $this->schedule_time_start !== null
             && $this->schedule_time_end !== null
-            && $syllabus?->hasCompleteTotalHoursAndPerSessionHours();
+            && $this->syllabusTemplate !== null
+            && $this->syllabusTemplate->total_sessions !== null
+            && $this->syllabusTemplate->total_sessions > 0;
     }
 
     public function isRegistrationOpen(): bool
