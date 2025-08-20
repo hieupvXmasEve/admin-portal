@@ -11,6 +11,33 @@
 - config/, bootstrap/, storage/: Standard Laravel dirs.
 - docker/, scripts/: Local dev, CI, and deployment helpers.
 
+## Vue.js Conventions
+
+### Component Structure
+
+- Use `<script setup>` syntax for all new components
+- Order script blocks: imports, props, emits, composables, reactive data, computed, methods
+- Use PascalCase for component names and file names
+- Prefer composition API over options API
+
+### Template Guidelines
+
+- Use kebab-case for HTML attributes and event handlers
+- Prefer `v-show` for conditional rendering that toggles frequently
+- Use `v-if` for conditional rendering that rarely changes
+- Always use `:key` with `v-for` loops
+
+### Reka-UI Components
+
+- Verify component exists in `@/components/ui/` before use
+- Add TODO comment if component needs installation: `<!-- TODO: Run npx shadcn-vue add [component] -->`
+- Always import components explicitly
+- Use proper TypeScript props interface
+
+### Table Component
+- using `@/components/DataTable` for table
+- using `@/components/DataPagination` for pagination
+
 ## Build, Test, and Development Commands
 - composer dev: Run PHP server, queue worker, logs, and Vite concurrently.
 - composer dev:ssr: Start Laravel + Inertia SSR pipeline.

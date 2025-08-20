@@ -60,7 +60,7 @@ Ensure the following directories exist:
 - **Web Routes:**
   - Use the Web controller
   - Ensure proper namespace: `use App\Http\Controllers\Web\<ModuleName>Controller`
-  - Define routes using `Route::resource()` if applicable
+
 
 - **API Routes:**
   - Add them to `routes/api.php`

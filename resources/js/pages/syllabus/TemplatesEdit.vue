@@ -1,0 +1,554 @@
+<script setup lang="ts">
+import Badge from '@/components/ui/badge/Badge.vue';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NumberField, NumberFieldContent, NumberFieldInput } from '@/components/ui/number-field';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Head, router } from '@inertiajs/vue3';
+import { toTypedSchema } from '@vee-validate/zod';
+import { ArrowLeft, ChevronsUpDown, Plus, Save, Trash2 } from 'lucide-vue-next';
+import { useForm } from 'vee-validate';
+import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
+import { z } from 'zod';
+
+interface Unit {
+    id: number;
+    code: string;
+    name: string;
+    credit_points?: number;
+}
+
+interface AssessmentComponentDetail {
+    id?: number;
+    name: string;
+    weight: number | null;
+}
+
+interface AssessmentComponent {
+    id?: number;
+    name: string;
+    weight: number;
+    type: string;
+    is_required_to_sit_final_exam: boolean;
+    details: AssessmentComponentDetail[];
+}
+
+interface SyllabusTemplate {
+    id: number;
+    unit_id: number;
+    title: string;
+    version: string;
+    description: string | null;
+    total_hours: number;
+    total_sessions: number;
+    is_active: boolean;
+    assessment_components: AssessmentComponent[];
+}
+const props = defineProps<{
+    unit: { id: number; code: string; name: string };
+    syllabusTemplate: SyllabusTemplate;
+    units: Unit[];
+    assessmentTypes: Record<string, string>;
+}>();
+console.log('assessmentTypes', props.assessmentTypes);
+
+// Validation Schema (similar to create)
+const formSchema = toTypedSchema(
+    z.object({
+        title: z.string().min(1, { message: 'Title is required' }),
+        version: z.string().min(1, { message: 'Version is required' }),
+        description: z.string().optional(),
+        total_hours: z.number().min(0, { message: 'Total hours must be a positive number' }),
+        total_sessions: z.number().int({ message: 'Total sessions must be an integer' }).min(1, { message: 'Total sessions must be at least 1' }).optional(),
+        unit_id: z.string({ message: 'Please select a curriculum unit' }),
+        is_active: z.boolean().default(true).optional(),
+        assessment_components: z.array(z.any()).optional(),
+    }),
+);
+
+// Build initial values from template
+const initialValues = {
+    title: props.syllabusTemplate.title ?? '',
+    version: props.syllabusTemplate.version ?? '',
+    description: props.syllabusTemplate.description ?? '',
+    total_hours: Number(props.syllabusTemplate.total_hours ?? 0),
+    total_sessions: Number(props.syllabusTemplate.total_sessions ?? 1),
+    unit_id: (props.syllabusTemplate.unit_id ?? props.unit.id).toString(),
+    is_active: !!props.syllabusTemplate.is_active,
+    assessment_components:
+        props.syllabusTemplate.assessment_components.map((comp) => ({
+            ...comp,
+            weight: Number(comp.weight) || 0,
+            type: comp.type as 'quiz' | 'assignment' | 'project' | 'exam' | 'online_activity' | 'other',
+            details:
+                comp.details?.map((detail) => ({
+                    ...detail,
+                    weight: detail.weight !== null && detail.weight !== undefined ? Number(detail.weight) : null,
+                })) || [],
+        })) || [],
+};
+console.log('initialValues', initialValues);
+
+const form = useForm({
+    validationSchema: formSchema,
+    initialValues,
+});
+
+const isSubmitting = ref(false);
+const addUnitSearch = ref('');
+
+// Assessment Component helpers (UI only)
+const addAssessmentComponent = () => {
+    const currentComponents = (form.values.assessment_components as any[]) || [];
+    form.setFieldValue('assessment_components', [...currentComponents, { name: '', weight: 0, type: 'assignment', details: [] }]);
+};
+const removeAssessmentComponent = (index: number) => {
+    const current = (form.values.assessment_components as any[]) || [];
+    const next = [...current];
+    next.splice(index, 1);
+    form.setFieldValue('assessment_components', next);
+};
+const addComponentDetail = (componentIndex: number) => {
+    const current = (form.values.assessment_components as any[]) || [];
+    const next = [...current];
+    if (next[componentIndex]) {
+        next[componentIndex].details = next[componentIndex].details || [];
+        next[componentIndex].details.push({ name: '', weight: null });
+        form.setFieldValue('assessment_components', next);
+    }
+};
+const removeComponentDetail = (componentIndex: number, detailIndex: number) => {
+    const current = (form.values.assessment_components as any[]) || [];
+    const next = [...current];
+    if (next[componentIndex]?.details) {
+        next[componentIndex].details.splice(detailIndex, 1);
+        form.setFieldValue('assessment_components', next);
+    }
+};
+
+const getTotalWeight = () => {
+    const components = (form.values.assessment_components as any[]) || [];
+    const total = components.reduce((sum, c) => sum + (Number(c.weight) || 0), 0);
+    return Math.round(total * 100) / 100;
+};
+const getSubComponentTotalWeight = (componentIndex: number) => {
+    const components = (form.values.assessment_components as any[]) || [];
+    const comp = components[componentIndex];
+    if (!comp?.details?.length) return null;
+    const total = comp.details.reduce((sum: number, d: any) => sum + (Number(d.weight) || 0), 0);
+    return Math.round(total * 100) / 100;
+};
+
+const filteredAvailableUnits = computed(() => {
+    if (!addUnitSearch.value.trim()) return props.units;
+    const q = addUnitSearch.value.toLowerCase().trim();
+    return props.units.filter((u) => u.code.toLowerCase().includes(q) || u.name.toLowerCase().includes(q));
+});
+const getAssessmentTypeColor = (type: string) => {
+    switch (type) {
+        case 'quiz':
+            return 'bg-blue-100 text-blue-800';
+        case 'assignment':
+            return 'bg-green-100 text-green-800';
+        case 'project':
+            return 'bg-purple-100 text-purple-800';
+        case 'exam':
+            return 'bg-red-100 text-red-800';
+        case 'online_activity':
+            return 'bg-yellow-100 text-yellow-800';
+        case 'other':
+            return 'bg-gray-100 text-gray-800';
+        default:
+            return 'bg-gray-100 text-gray-800';
+    }
+};
+
+const onSubmit = form.handleSubmit((formData) => {
+    console.log('...formData,', formData);
+
+    isSubmitting.value = true;
+
+    const submitData = {
+        title: formData.title,
+        version: formData.version,
+        description: formData.description,
+        total_hours: formData.total_hours,
+        total_sessions: formData.total_sessions,
+        is_active: formData.is_active,
+        assessment_components: formData.assessment_components,
+        // unit_id intentionally omitted from update on backend (not supported),
+        // but kept in UI for consistency
+    } as Record<string, any>;
+
+    router.put(`/syllabus-templates/${props.syllabusTemplate.id}`, submitData, {
+        onSuccess: () => {
+            toast.success('Syllabus template updated');
+            router.visit('/syllabus-templates');
+        },
+        onError: (errors) => {
+            toast.error('Failed to update syllabus template');
+            console.error(errors);
+        },
+        onFinish: () => {
+            isSubmitting.value = false;
+        },
+    });
+});
+</script>
+
+<template>
+    <Head :title="`Edit Syllabus Template`" />
+
+    <div class="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
+        <div>
+            <h1 class="text-3xl font-bold">Edit Syllabus Template</h1>
+            <div class="text-muted-foreground">{{ unit.code }} — {{ unit.name }}</div>
+        </div>
+        <div class="flex items-center gap-3">
+            <Button variant="outline" @click="router.visit('/syllabus-templates')">
+                <ArrowLeft class="mr-2 h-4 w-4" />
+                Back
+            </Button>
+            <Button type="button" @click="onSubmit">
+                <Save class="mr-2 h-4 w-4" />
+                {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
+            </Button>
+        </div>
+    </div>
+
+    <form class="space-y-6" @submit="onSubmit">
+        <!-- Basic Information -->
+        <Card>
+            <CardHeader>
+                <CardTitle>Basic Information</CardTitle>
+                <CardDescription>General syllabus details and metadata</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="title">
+                        <FormItem>
+                            <FormLabel for="title">Title *</FormLabel>
+                            <FormControl>
+                                <Input id="title" type="text" placeholder="Title" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="version">
+                        <FormItem>
+                            <FormLabel for="version">Version *</FormLabel>
+                            <FormControl>
+                                <Input id="version" type="text" placeholder="e.g., v1.0, v2.1" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="unit_id">
+                        <FormItem>
+                            <FormLabel>Unit *</FormLabel>
+                            <FormControl>
+                                <Combobox v-bind="componentField" disabled>
+                                    <ComboboxAnchor>
+                                        <div class="relative w-full items-center">
+                                            <ComboboxInput
+                                                v-model="addUnitSearch"
+                                                placeholder="Search for a unit..."
+                                                :display-value="
+                                                    (value) => {
+                                                        const u = units.find((x) => x.id.toString() === value?.toString());
+                                                        return u ? `${u.code} - ${u.name}` : '';
+                                                    }
+                                                "
+                                            />
+                                            <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                                <ChevronsUpDown class="text-muted-foreground size-4" />
+                                            </ComboboxTrigger>
+                                        </div>
+                                    </ComboboxAnchor>
+                                    <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                        <ComboboxViewport>
+                                            <ComboboxEmpty>No units</ComboboxEmpty>
+                                            <ComboboxItem v-for="u in filteredAvailableUnits" :key="u.id" :value="u.id.toString()">{{ u.code }} - {{ u.name }}</ComboboxItem>
+                                        </ComboboxViewport>
+                                    </ComboboxList>
+                                </Combobox>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField
+                        v-slot="{ componentField }"
+                        name="total_hours"
+                        :transform="
+                            (value: any) => {
+                                if (value === '' || value === null || value === undefined) return 0;
+                                const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                                return isNaN(num) ? 0 : num;
+                            }
+                        "
+                    >
+                        <FormItem>
+                            <FormLabel for="total_hours">Total Hours *</FormLabel>
+                            <FormControl>
+                                <NumberField
+                                    :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || 0 : componentField.modelValue"
+                                    @update:model-value="componentField['onUpdate:modelValue']"
+                                    :step="0.5"
+                                    :format-options="{ minimumFractionDigits: 0, maximumFractionDigits: 2 }"
+                                >
+                                    <NumberFieldContent>
+                                        <NumberFieldInput />
+                                    </NumberFieldContent>
+                                </NumberField>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField
+                        v-slot="{ componentField }"
+                        name="total_sessions"
+                        :transform="
+                            (value: any) => {
+                                if (value === '' || value === null || value === undefined) return 1;
+                                const num = typeof value === 'string' ? parseInt(value, 10) : Number(value);
+                                return isNaN(num) ? 1 : Math.round(num);
+                            }
+                        "
+                    >
+                        <FormItem>
+                            <FormLabel for="total_sessions">Total Sessions *</FormLabel>
+                            <FormControl>
+                                <NumberField
+                                    :model-value="typeof componentField.modelValue === 'string' ? parseInt(componentField.modelValue, 10) || 1 : componentField.modelValue"
+                                    @update:model-value="componentField['onUpdate:modelValue']"
+                                    :step="1"
+                                    :format-options="{ minimumFractionDigits: 0, maximumFractionDigits: 0 }"
+                                >
+                                    <NumberFieldContent>
+                                        <NumberFieldInput />
+                                    </NumberFieldContent>
+                                </NumberField>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
+                <FormField v-slot="{ componentField }" name="description">
+                    <FormItem>
+                        <FormLabel for="description">Description</FormLabel>
+                        <FormControl>
+                            <Textarea id="description" rows="4" placeholder="Describe the course content, objectives, and structure..." v-bind="componentField" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ value, handleChange }" name="is_active">
+                    <FormItem class="flex flex-row items-start space-y-0 space-x-3">
+                        <FormControl>
+                            <Checkbox :model-value="value" @update:model-value="handleChange" />
+                        </FormControl>
+                        <div class="space-y-1 leading-none">
+                            <FormLabel>Set as active syllabus</FormLabel>
+                        </div>
+                    </FormItem>
+                </FormField>
+            </CardContent>
+        </Card>
+
+        <!-- Assessment Components (UI parity) -->
+        <Card>
+            <CardHeader class="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle class="flex items-center gap-2">
+                        Assessment Components
+                        <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'"> {{ getTotalWeight() }}% </Badge>
+                    </CardTitle>
+                    <CardDescription>Define the assessment structure and weightings for this syllabus.</CardDescription>
+                </div>
+                <Button type="button" variant="outline" @click="addAssessmentComponent">
+                    <Plus class="mr-2 h-4 w-4" />
+                    Add Component
+                </Button>
+            </CardHeader>
+            <CardContent class="space-y-6">
+                <div v-for="(component, componentIndex) in form.values.assessment_components || []" :key="componentIndex" class="rounded-lg border p-4">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-medium">Component {{ componentIndex + 1 }}</h4>
+                            <Badge v-if="component.type" :class="getAssessmentTypeColor(component.type)">
+                                {{ assessmentTypes[component.type] || component.type }}
+                            </Badge>
+                        </div>
+                        <Button v-if="(form.values.assessment_components || []).length > 1" type="button" variant="ghost" size="sm" @click="removeAssessmentComponent(componentIndex)">
+                            <Trash2 class="h-4 w-4" />
+                        </Button>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                        <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.name`">
+                            <FormItem>
+                                <FormLabel>Component Name</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="e.g., Assignment 1" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ value, setValue }" :name="`assessment_components.${componentIndex}.weight`">
+                            <FormItem>
+                                <FormLabel>Weight (%)</FormLabel>
+                                <FormControl>
+                                    <NumberField
+                                        :model-value="value"
+                                        @update:model-value="
+                                            (v) => {
+                                                if (v) {
+                                                    setValue(v);
+                                                } else {
+                                                    setValue(0);
+                                                }
+                                            }
+                                        "
+                                        :default-value="0"
+                                        :min="0"
+                                        :max="100"
+                                    >
+                                        <NumberFieldContent>
+                                            <NumberFieldInput />
+                                        </NumberFieldContent>
+                                    </NumberField>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.type`">
+                            <FormItem>
+                                <FormLabel>Type</FormLabel>
+                                <FormControl>
+                                    <Select v-bind="componentField">
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="(label, value) in assessmentTypes" :key="value" :value="value">
+                                                {{ label }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <div class="flex items-end">
+                            <Button type="button" variant="outline" size="sm" @click="addComponentDetail(componentIndex)">
+                                <Plus class="mr-1 h-3 w-3" />
+                                Add Detail
+                            </Button>
+                        </div>
+                    </div>
+
+                    <FormField v-slot="{ value, handleChange }" :name="`assessment_components.${componentIndex}.is_required_to_sit_final_exam`">
+                        <FormItem class="mt-4 flex items-center space-y-0 space-x-3">
+                            <FormControl>
+                                <Checkbox :checked="value" @update:checked="handleChange" />
+                            </FormControl>
+                            <FormLabel class="text-sm">Required to sit final exam</FormLabel>
+                        </FormItem>
+                    </FormField>
+
+                    <!-- Component Details -->
+                    <FormField v-if="component.details && component.details.length > 0" v-slot="{}" :name="`assessment_components.${componentIndex}.details`">
+                        <div class="mt-4 space-y-3">
+                            <div class="flex items-center gap-2">
+                                <Label class="text-sm font-medium">Subcomponents</Label>
+                                <Badge v-if="getSubComponentTotalWeight(componentIndex) !== null" :class="getSubComponentTotalWeight(componentIndex) === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
+                                    {{ getSubComponentTotalWeight(componentIndex) }}%
+                                </Badge>
+                            </div>
+                            <div class="rounded border bg-gray-50 p-3">
+                                <div v-for="(detail, detailIndex) in component.details" :key="detailIndex" class="mb-3 flex items-end gap-3 last:mb-0">
+                                    <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`">
+                                        <FormItem class="flex-1">
+                                            <FormLabel v-if="detailIndex === 0" class="text-xs">Detail Name</FormLabel>
+                                            <FormControl>
+                                                <Input v-bind="componentField" placeholder="e.g., Part A" class="text-sm" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    </FormField>
+
+                                    <FormField v-slot="{ value, setValue }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.weight`">
+                                        <FormItem class="w-24">
+                                            <FormLabel v-if="detailIndex === 0" class="text-xs">Weight (%)</FormLabel>
+                                            <FormControl>
+                                                <NumberField
+                                                    :model-value="value"
+                                                    @update:model-value="
+                                                        (v) => {
+                                                            if (v) {
+                                                                setValue(v);
+                                                            } else {
+                                                                setValue(0);
+                                                            }
+                                                        }
+                                                    "
+                                                    :default-value="0"
+                                                    :min="0"
+                                                    :max="100"
+                                                >
+                                                    <NumberFieldContent>
+                                                        <NumberFieldInput class="text-sm" />
+                                                    </NumberFieldContent>
+                                                </NumberField>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    </FormField>
+
+                                    <Button type="button" variant="ghost" size="sm" @click="removeComponentDetail(componentIndex, detailIndex)" class="mb-1">
+                                        <Trash2 class="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                            <FormItem>
+                                <FormMessage />
+                            </FormItem>
+                        </div>
+                    </FormField>
+                </div>
+
+                <!-- Total Weight Summary -->
+                <FormField v-slot="{}" name="assessment_components">
+                    <div class="rounded-lg bg-gray-50 p-4">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium">Total Assessment Weight:</span>
+                            <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'"> {{ getTotalWeight() }}% / 100% </Badge>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-600">All assessment components must total exactly 100% for a valid syllabus.</p>
+                        <FormItem class="mt-2">
+                            <FormMessage />
+                        </FormItem>
+                    </div>
+                </FormField>
+            </CardContent>
+        </Card>
+    </form>
+</template>

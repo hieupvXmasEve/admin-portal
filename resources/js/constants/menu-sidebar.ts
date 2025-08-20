@@ -47,37 +47,37 @@ export const mainNavItems: NavItem[] = [
         icon: LayoutDashboard,
         requiredPermissions: ['view_dashboard'],
     },
-        {
-            title: 'System Management',
-            href: '#',
-            icon: Settings,
-            children: [
-                {
-                    title: 'Users',
-                    href: systemRoutes.users.index(),
-                    icon: Users,
-                    requiredPermissions: ['view_user'],
-                },
-                {
-                    title: 'Roles & Permissions',
-                    href: systemRoutes.roles.index(),
-                    icon: ShieldCheck,
-                    requiredPermissions: ['view_role'],
-                },
-                {
-                    title: 'Campuses & Departments',
-                    href: systemRoutes.campuses.index(),
-                    icon: Building2,
-                    requiredPermissions: ['view_campus'], // Will be implemented later
-                },
-                {
-                    title: 'Room Management',
-                    href: systemRoutes.rooms.index(),
-                    icon: DoorOpen,
-                    requiredPermissions: ['view_room'],
-                },
-            ],
-        },
+    {
+        title: 'System Management',
+        href: '#',
+        icon: Settings,
+        children: [
+            {
+                title: 'Users',
+                href: systemRoutes.users.index(),
+                icon: Users,
+                requiredPermissions: ['view_user'],
+            },
+            {
+                title: 'Roles & Permissions',
+                href: systemRoutes.roles.index(),
+                icon: ShieldCheck,
+                requiredPermissions: ['view_role'],
+            },
+            {
+                title: 'Campuses & Departments',
+                href: systemRoutes.campuses.index(),
+                icon: Building2,
+                requiredPermissions: ['view_campus'], // Will be implemented later
+            },
+            {
+                title: 'Room Management',
+                href: systemRoutes.rooms.index(),
+                icon: DoorOpen,
+                requiredPermissions: ['view_room'],
+            },
+        ],
+    },
     {
         title: 'Curriculum & Courses',
         href: '#',
@@ -110,6 +110,12 @@ export const mainNavItems: NavItem[] = [
                 href: curriculumRoutes.units.index(),
                 icon: BookMarked,
                 requiredPermissions: ['view_unit'],
+            },
+            {
+                title: 'Syllabus Templates',
+                href: curriculumRoutes.syllabusTemplates.index(),
+                icon: FileText,
+                requiredPermissions: ['view_syllabus'],
             },
             // {
             //     title: 'Equivalent/Substitute Courses',

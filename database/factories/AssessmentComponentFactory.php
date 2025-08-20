@@ -3,7 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\AssessmentComponent;
-use App\Models\Syllabus;
+use App\Models\SyllabusTemplate;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -34,7 +34,7 @@ class AssessmentComponentFactory extends Factory
         $name = $this->faker->randomElement($names[$type]);
 
         return [
-            'syllabus_id' => Syllabus::factory(),
+            'syllabus_template_id' => SyllabusTemplate::factory(),
             'name' => $name,
             'weight' => $this->faker->numberBetween(10, 50),
             'type' => $type,
