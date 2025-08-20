@@ -4,16 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -23,8 +14,8 @@ import { useApi } from '@/composables/useApiRequest';
 import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
-import { ref, computed } from 'vue';
+import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, UserCheck, Users } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface Props {
@@ -33,11 +24,11 @@ interface Props {
         class_sessions?: ClassSession[];
     };
     availableRooms: Room[];
-    canGenerateClassSessions: boolean;
+    // canGenerateClassSessions: boolean;
 }
 
 const props = defineProps<Props>();
-console.log('%c props', 'color: red', props.courseOffering.class_sessions);
+console.log('%c props', 'color: red', props.courseOffering);
 const api = useApi();
 // const showStatusModal = ref(false);
 const isGenerating = ref(false);
@@ -88,12 +79,12 @@ const getDeliveryModeLabel = (mode: string) => {
 };
 
 const formatDate = (dateString: string | null | undefined): string => {
-    if (!dateString) return 'Not set';
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString();
 };
 
 const formatDateTime = (dateString: string | null | undefined): string => {
-    if (!dateString) return 'Not set';
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
 };
 
@@ -108,12 +99,13 @@ const enrollmentPercentage = props.courseOffering.max_capacity > 0 ? Math.round(
 // };
 
 // Class sessions management functions
-const generateClassSessions = async ({ roomId, startDate }: { roomId: number; startDate: string }) => {
+const generateClassSessions = async ({ roomId, startDate, weeklySchedule }: { roomId: number; startDate: string; weeklySchedule: any }) => {
     try {
         isGenerating.value = true;
         const result = await api.post(`/api/course-offerings/${props.courseOffering.id}/class-sessions/generate`, {
             room_id: roomId,
             start_date: startDate,
+            weekly_schedule: weeklySchedule,
         });
         if (result.data?.value?.success) {
             toast.success(`${result.data.value.data.sessions_count} class sessions generated successfully`);
@@ -131,24 +123,24 @@ const generateClassSessions = async ({ roomId, startDate }: { roomId: number; st
     }
 };
 
-const deleteClassSessions = async () => {
-    try {
-        const result = await api.delete(`/api/course-offerings/${props.courseOffering.id}/class-sessions`);
+// const deleteClassSessions = async () => {
+//     try {
+//         const result = await api.delete(`/api/course-offerings/${props.courseOffering.id}/class-sessions`);
 
-        if (result.data?.value?.success) {
-            // Reload Inertia props to reflect deletion without local state
-            router.reload({
-                only: ['courseOffering'],
-            });
-            toast.success('Class sessions deleted successfully');
-        } else {
-            toast.error(result.data?.value?.message || 'Failed to delete class sessions');
-        }
-    } catch (error) {
-        console.error('Error deleting class sessions:', error);
-        toast.error('Failed to delete class sessions');
-    }
-};
+//         if (result.data?.value?.success) {
+//             // Reload Inertia props to reflect deletion without local state
+//             router.reload({
+//                 only: ['courseOffering'],
+//             });
+//             toast.success('Class sessions deleted successfully');
+//         } else {
+//             toast.error(result.data?.value?.message || 'Failed to delete class sessions');
+//         }
+//     } catch (error) {
+//         console.error('Error deleting class sessions:', error);
+//         toast.error('Failed to delete class sessions');
+//     }
+// };
 
 const getSessionTypeIcon = (type: string) => {
     switch (type) {
@@ -184,9 +176,7 @@ const roomSearch = ref('');
 const filteredRooms = computed(() => {
     const q = roomSearch.value.toLowerCase().trim();
     if (!q) return props.availableRooms || [];
-    return (props.availableRooms || []).filter((r) =>
-        [r.name, r.code, (r.building as any)?.name].filter(Boolean).join(' ').toLowerCase().includes(q),
-    );
+    return (props.availableRooms || []).filter((r) => [r.name, r.code, (r.building as any)?.name].filter(Boolean).join(' ').toLowerCase().includes(q));
 });
 
 const submitChangeRoom = () => {
@@ -217,7 +207,7 @@ const submitChangeRoom = () => {
 <template>
     <Head title="Course Offering Details" />
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col items-center md:flex-row md:justify-between">
         <div class="flex items-center justify-between gap-4">
             <div>
                 <h1 class="text-3xl font-bold tracking-tight">{{ courseOffering.course_code }} - {{ courseOffering.course_title }}</h1>
@@ -274,10 +264,10 @@ const submitChangeRoom = () => {
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
-                    <div>
+                    <!-- <div>
                         <p class="text-muted-foreground text-sm font-medium">Credit Hours</p>
                         <p class="text-lg font-semibold">{{ courseOffering.credit_hours }}</p>
-                    </div>
+                    </div> -->
                     <div>
                         <p class="text-muted-foreground text-sm font-medium">Delivery Mode</p>
                         <p class="text-lg font-semibold">{{ getDeliveryModeLabel(courseOffering.delivery_mode) }}</p>
@@ -347,20 +337,20 @@ const submitChangeRoom = () => {
 
                     <div v-if="courseOffering.curriculum_unit">
                         <p class="text-muted-foreground text-sm font-medium">Unit</p>
-                        <Link :href="`/units/${courseOffering.curriculum_unit.unit.id}`" class="text-green-400 flex items-center gap-2 text-lg font-semibold">
-                            <span class="flex-1">{{ courseOffering.curriculum_unit.unit.code }} - {{ courseOffering.curriculum_unit.unit.name }}</span>
+                        <Link :href="`/units/${courseOffering.curriculum_unit.unit.id}`" class="flex items-center gap-2 text-lg font-semibold text-green-400">
+                            <span class="">{{ courseOffering.curriculum_unit.unit.code }} - {{ courseOffering.curriculum_unit.unit.name }}</span>
                             <ExternalLink class="h-4 w-4" />
                         </Link>
                     </div>
 
-                    <div v-if="courseOffering?.lecture">
-                        <p class="text-muted-foreground text-sm font-medium">Lecture</p>
-                        <p class="text-lg font-semibold">{{ courseOffering.lecture.display_name }}</p>
+                    <div>
+                        <p class="text-muted-foreground text-sm font-medium">Lecturer</p>
+                        <p class="text-muted-foreground text-lg font-semibold">{{ courseOffering.lecture?.display_name || 'Not set' }}</p>
                     </div>
                 </div>
                 <div class="space-y-4">
                     <!-- show syllabus link -->
-                    <div>
+                    <!-- <div>
                         <p class="text-muted-foreground text-sm font-medium">Syllabus</p>
                         <Link
                             v-if="courseOffering.curriculum_unit?.syllabus"
@@ -371,6 +361,37 @@ const submitChangeRoom = () => {
                             <ExternalLink class="h-4 w-4" />
                         </Link>
                         <p v-else class="font-semibold">No syllabus</p>
+                    </div> -->
+
+                    <div>
+                        <p class="text-muted-foreground text-sm font-medium">Syllabus</p>
+                        <div v-if="courseOffering.syllabus_template" class="space-y-2">
+                            <div class="flex items-start gap-2">
+                                <div class="flex-1">
+                                    <!-- <p class="text-lg font-semibold">{{ courseOffering.syllabus_template.title }} - {{ courseOffering.syllabus_template.version }}</p> -->
+                                    <Link v-if="courseOffering.syllabus_template" :href="curriculumRoutes.syllabusTemplates.show(courseOffering.syllabus_template.id)" class="flex items-center gap-2 text-lg font-semibold">
+                                        {{ courseOffering.syllabus_template.title }} - {{ courseOffering.syllabus_template.version }}
+                                        <ExternalLink class="h-4 w-4" />
+                                    </Link>
+                                    <p v-if="courseOffering.syllabus_template.description" class="text-muted-foreground mt-1 text-sm">
+                                        {{ courseOffering.syllabus_template.description }}
+                                    </p>
+                                    <div class="text-muted-foreground mt-2 flex items-center gap-4 text-xs">
+                                        <span v-if="courseOffering.syllabus_template.unit"> {{ courseOffering.syllabus_template.unit.code }} - {{ courseOffering.syllabus_template.unit.name }} </span>
+                                        <span v-if="courseOffering.syllabus_template.delivery_mode">
+                                            {{ getDeliveryModeLabel(courseOffering.syllabus_template.delivery_mode) }}
+                                        </span>
+                                        <span v-if="courseOffering.syllabus_template.applicable_campus">
+                                            {{ courseOffering.syllabus_template.applicable_campus.name }}
+                                        </span>
+                                        <span v-if="courseOffering.syllabus_template.applicable_program">
+                                            {{ courseOffering.syllabus_template.applicable_program.name }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <p v-else class="text-muted-foreground font-semibold">No Syllabus assigned</p>
                     </div>
                 </div>
             </CardContent>
@@ -408,7 +429,7 @@ const submitChangeRoom = () => {
                     <!-- schedule day -->
                     <div>
                         <p class="text-muted-foreground text-sm font-medium">Schedule Day</p>
-                        <p class="text-sm">{{ courseOffering.schedule_days?.join(', ') ?? 'Not set' }}</p>
+                        <p class="text-muted-foreground text-sm font-semibold">{{ courseOffering.schedule_days?.join(', ') ?? 'Not set' }}</p>
                     </div>
                     <div>
                         <p class="text-muted-foreground text-sm font-medium">Schedule Time</p>
@@ -437,35 +458,34 @@ const submitChangeRoom = () => {
             </CardHeader>
             <CollapsibleContent>
                 <CardContent>
-                    <div v-if="!courseOffering.class_sessions || courseOffering.class_sessions.length === 0" class="py-8 text-center">
+                    <div v-if="!courseOffering.class_sessions || courseOffering.class_sessions.length === 0" class="space-y-2 text-center">
                         <Calendar class="text-muted-foreground mx-auto h-12 w-12" />
                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No class sessions</h3>
                         <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class sessions based on the syllabus.</p>
                         <div class="mt-1 flex items-center justify-center gap-2">
-                            <Button v-if="courseOffering.class_sessions && courseOffering.class_sessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
+                            <!-- <Button v-if="courseOffering.class_sessions && courseOffering.class_sessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
                                 <Trash2 class="mr-2 h-4 w-4" />
                                 Delete All
-                            </Button>
+                            </Button> -->
                             <RoomSelectionModal
-                                v-if="canGenerateClassSessions"
+                                :disable-generate="!courseOffering.syllabus_template"
                                 :available-rooms="availableRooms"
                                 :is-generating="isGenerating"
                                 :semester-start="courseOffering.semester.start_date"
                                 :semester-end="courseOffering.semester.end_date"
+                                :syllabus-template="courseOffering.syllabus_template"
                                 @generate="generateClassSessions"
                             />
-                            <div v-else>
-                                <!-- Notice for user need required fields: schedule day, schedule time start, schedule time end -->
-                                <p class="text-sm text-red-400">Please set the schedule days, start time, end time, and ensure the unit has a complete syllabus before generating class sessions.</p>
-                            </div>
+                        </div>
+                        <div v-if="!courseOffering.syllabus_template || !courseOffering.syllabus_template.total_sessions">
+                            <!-- Notice for user about missing syllabus template -->
+                            <p class="text-sm text-yellow-600">Please ensure a syllabus template with total sessions is assigned to this course offering before generating class sessions.</p>
                         </div>
                     </div>
                     <div v-else class="space-y-4">
                         <!-- Change Room action -->
                         <div class="flex items-center justify-between">
-                            <div class="text-sm text-muted-foreground">
-                                {{ courseOffering.class_sessions.length }} session(s)
-                            </div>
+                            <div class="text-muted-foreground text-sm">{{ courseOffering.class_sessions.length }} session(s)</div>
                             <Dialog v-model:open="changeRoomOpen">
                                 <DialogTrigger as-child>
                                     <Button size="sm" variant="outline">Change Room</Button>
@@ -473,9 +493,7 @@ const submitChangeRoom = () => {
                                 <DialogContent class="max-w-2xl">
                                     <DialogHeader>
                                         <DialogTitle>Select Room</DialogTitle>
-                                        <DialogDescription>
-                                            Choose an active room to apply to all class sessions. Availability will be validated against the schedule.
-                                        </DialogDescription>
+                                        <DialogDescription> Choose an active room to apply to all class sessions. Availability will be validated against the schedule. </DialogDescription>
                                     </DialogHeader>
                                     <div class="space-y-3">
                                         <div>
@@ -484,18 +502,14 @@ const submitChangeRoom = () => {
                                         </div>
                                         <div class="max-h-80 overflow-auto rounded border">
                                             <RadioGroup v-model="selectedRoomId" class="flex flex-col divide-y">
-                                                <div
-                                                    v-for="room in filteredRooms"
-                                                    :key="room.id"
-                                                    class="hover:bg-accent/40 flex items-center justify-between gap-3 px-3 py-2"
-                                                >
+                                                <div v-for="room in filteredRooms" :key="room.id" class="hover:bg-accent/40 flex items-center justify-between gap-3 px-3 py-2">
                                                     <div class="flex items-center gap-3">
                                                         <RadioGroupItem :id="`room-${room.id}`" :value="room.id" />
                                                         <Label :for="`room-${room.id}`" class="cursor-pointer">
-                                                            <div class="font-medium">{{ room.name }} <span class="text-muted-foreground">({{ room.code }})</span></div>
-                                                            <div class="text-xs text-muted-foreground">
-                                                                {{ room.building?.name || room.building }} • Capacity: {{ room.capacity }} • {{ room.type?.replace('_', ' ') }}
+                                                            <div class="font-medium">
+                                                                {{ room.name }} <span class="text-muted-foreground">({{ room.code }})</span>
                                                             </div>
+                                                            <div class="text-muted-foreground text-xs">{{ room.building?.name || room.building }} • Capacity: {{ room.capacity }} • {{ room.type?.replace('_', ' ') }}</div>
                                                         </Label>
                                                     </div>
                                                 </div>
@@ -527,7 +541,7 @@ const submitChangeRoom = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody class="h-20 overflow-y-auto">
-                                <TableRow v-for="session in (courseOffering.class_sessions || [])" :key="session.id">
+                                <TableRow v-for="session in courseOffering.class_sessions || []" :key="session.id">
                                     <TableCell>
                                         <div class="flex items-center gap-2">
                                             <component :is="getSessionTypeIcon(session.session_type)" class="h-4 w-4" />
@@ -543,7 +557,7 @@ const submitChangeRoom = () => {
                                         {{ formatDate(session.session_date) }}
                                     </TableCell>
                                     <TableCell> {{ session.start_time }} - {{ session.end_time }}</TableCell>
-                                    <TableCell> {{ session?.room.name}}</TableCell>
+                                    <TableCell> {{ session?.room?.name }}</TableCell>
                                     <TableCell>
                                         <Badge :variant="session.is_assessment ? 'secondary' : 'outline'">
                                             {{ session.session_type.toUpperCase() }}

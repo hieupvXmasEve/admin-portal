@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\Syllabus;
+use App\Models\SyllabusTemplate;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -18,9 +19,14 @@ use Illuminate\Support\Facades\Log;
 class ClassSessionService
 {
     /**
-     * Auto-generate class sessions based on syllabus data
+     * Auto-generate class sessions based on syllabus data and weekly schedule
      */
-    public function generateClassSessions(CourseOffering $courseOffering, int $roomId, ?Carbon $startDateOverride = null): Collection
+    public function generateClassSessions(
+        CourseOffering $courseOffering, 
+        int $roomId, 
+        ?Carbon $startDateOverride = null,
+        ?array $weeklySchedule = null
+    ): Collection
     {
         Log::info("Generating class sessions for course offering {$courseOffering->id}");
 
@@ -32,53 +38,65 @@ class ClassSessionService
             }
             // Load required relationships with proper error checking
             $courseOffering->load([
-                'curriculumUnit.syllabus.assessmentComponents.details',
+                'syllabusTemplate.assessmentComponents.details',
                 'semester',
             ]);
 
-            // First check if curriculumUnit exists
-            if (! $courseOffering->curriculumUnit) {
-                throw new \Exception('No curriculum unit found for this course offering');
+            // Check if syllabus template exists
+            $syllabusTemplate = $courseOffering->syllabusTemplate;
+            if (! $syllabusTemplate) {
+                throw new \Exception('No syllabus template found for this course offering');
             }
 
-            // Then check if syllabus exists
-            $syllabus = $courseOffering->curriculumUnit->syllabus;
-            if (! $syllabus) {
-                throw new \Exception('No syllabus found for this course offering');
-            }
-
-            Log::info("Found syllabus: {$syllabus->id} for course offering {$courseOffering->id}");
+            Log::info("Found syllabus template: {$syllabusTemplate->id} for course offering {$courseOffering->id}");
 
             // Calculate session details
-            $totalSessions = $this->calculateTotalSessions($syllabus);
-            $sessionDuration = $syllabus->hours_per_session ?? 2; // Default 2 hours
+            $totalSessions = $this->calculateTotalSessions($syllabusTemplate);
+            $sessionDuration = $this->calculateSessionDuration($syllabusTemplate);
 
             Log::info("Total sessions to generate: {$totalSessions}, Duration: {$sessionDuration} hours");
 
             // Get semester dates and schedule
             $startDate = $startDateOverride ?: $this->getStartDate($courseOffering);
-            $scheduleDays = $courseOffering->schedule_days ?? ['Monday'];
-            $startTime = $courseOffering->schedule_time_start ? $courseOffering->schedule_time_start->format('H:i') : '09:00';
-            $endTime = $courseOffering->schedule_time_end ? $courseOffering->schedule_time_end->format('H:i') : '11:00';
             $lectureId = $courseOffering->lecture_id;
 
             Log::info("Lecture ID: {$lectureId}");
-            Log::info("Schedule: {$startDate}, Days: " . implode(',', $scheduleDays) . ", Time: {$startTime}-{$endTime}");
+            Log::info("Start date: {$startDate}");
 
             $sessions = collect();
 
-            // Generate regular sessions
-            $regularSessions = $this->generateRegularSessions(
-                $courseOffering,
-                $totalSessions,
-                $startDate,
-                $scheduleDays,
-                $startTime,
-                $endTime,
-                $sessionDuration,
-                $lectureId,
-                $roomId
-            );
+            // Generate regular sessions using weekly schedule if provided
+            if ($weeklySchedule) {
+                Log::info("Using provided weekly schedule for session generation");
+                $regularSessions = $this->generateSessionsWithWeeklySchedule(
+                    $courseOffering,
+                    $totalSessions,
+                    $startDate,
+                    $weeklySchedule,
+                    $sessionDuration,
+                    $lectureId,
+                    $roomId
+                );
+            } else {
+                // Fallback to course offering schedule
+                $scheduleDays = $courseOffering->schedule_days ?? ['Monday'];
+                $startTime = $courseOffering->schedule_time_start ? $courseOffering->schedule_time_start->format('H:i') : '09:00';
+                $endTime = $courseOffering->schedule_time_end ? $courseOffering->schedule_time_end->format('H:i') : '11:00';
+                
+                Log::info("Using course offering schedule: Days: " . implode(',', $scheduleDays) . ", Time: {$startTime}-{$endTime}");
+                
+                $regularSessions = $this->generateRegularSessions(
+                    $courseOffering,
+                    $totalSessions,
+                    $startDate,
+                    $scheduleDays,
+                    $startTime,
+                    $endTime,
+                    $sessionDuration,
+                    $lectureId,
+                    $roomId
+                );
+            }
 
             $sessions = $sessions->merge($regularSessions);
             Log::info("Generated {$regularSessions} regular sessions");
@@ -107,14 +125,34 @@ class ClassSessionService
     }
 
     /**
-     * Calculate total sessions needed based on syllabus
+     * Calculate total sessions needed based on syllabus template
      */
-    private function calculateTotalSessions(Syllabus $syllabus): int
+    private function calculateTotalSessions(SyllabusTemplate $syllabusTemplate): int
     {
-        $totalHours = $syllabus->total_hours ?? 40; // Default 40 hours
-        $hoursPerSession = $syllabus->hours_per_session ?? 2; // Default 2 hours
+        // If total_sessions is directly specified, use it
+        if ($syllabusTemplate->total_sessions) {
+            return $syllabusTemplate->total_sessions;
+        }
+
+        // Otherwise, calculate from total hours
+        $totalHours = $syllabusTemplate->total_hours ?? 40; // Default 40 hours
+        $hoursPerSession = 2; // Default 2 hours (could be made configurable)
 
         return (int) ceil($totalHours / $hoursPerSession);
+    }
+
+    /**
+     * Calculate session duration based on syllabus template
+     */
+    private function calculateSessionDuration(SyllabusTemplate $syllabusTemplate): int
+    {
+        // If we have total hours and total sessions, calculate duration per session
+        if ($syllabusTemplate->total_hours && $syllabusTemplate->total_sessions) {
+            return (int) ceil($syllabusTemplate->total_hours / $syllabusTemplate->total_sessions);
+        }
+
+        // Default to 2 hours per session
+        return 2;
     }
 
     /**
@@ -267,6 +305,119 @@ class ClassSessionService
         return array_map(function ($day) use ($dayMap) {
             return $dayMap[$day] ?? 1; // Default to Monday
         }, $dayNames);
+    }
+
+    /**
+     * Extract enabled days from weekly schedule
+     */
+    private function getEnabledDaysFromSchedule(array $weeklySchedule): array
+    {
+        $enabledDays = [];
+        $dayMap = [
+            'monday' => 'Monday',
+            'tuesday' => 'Tuesday', 
+            'wednesday' => 'Wednesday',
+            'thursday' => 'Thursday',
+            'friday' => 'Friday',
+            'saturday' => 'Saturday',
+            'sunday' => 'Sunday',
+        ];
+
+        foreach ($weeklySchedule as $day => $schedule) {
+            if (isset($schedule['enabled']) && $schedule['enabled'] === true) {
+                $enabledDays[] = $dayMap[$day] ?? ucfirst($day);
+            }
+        }
+
+        return $enabledDays;
+    }
+
+    /**
+     * Get schedule times for a specific day from weekly schedule
+     */
+    private function getScheduleTimesForDay(array $weeklySchedule, string $dayName): array
+    {
+        $dayKey = strtolower($dayName);
+        
+        if (!isset($weeklySchedule[$dayKey]) || !$weeklySchedule[$dayKey]['enabled']) {
+            return [];
+        }
+        
+        return [
+            'start_time' => $weeklySchedule[$dayKey]['startTime'] ?? '09:00',
+            'end_time' => $weeklySchedule[$dayKey]['endTime'] ?? '11:00',
+        ];
+    }
+
+    /**
+     * Generate sessions with different times for different days based on weekly schedule
+     */
+    private function generateSessionsWithWeeklySchedule(
+        CourseOffering $courseOffering,
+        int $totalSessions,
+        Carbon $startDate,
+        array $weeklySchedule,
+        int $sessionDuration,
+        ?int $lectureId,
+        int $roomId
+    ): Collection {
+        $sessions = collect();
+        $currentDate = $startDate->copy();
+        $sessionCount = 0;
+
+        // Get enabled days
+        $enabledDays = $this->getEnabledDaysFromSchedule($weeklySchedule);
+        $dayNumbers = $this->convertDaysToNumbers($enabledDays);
+
+        while ($sessionCount < $totalSessions) {
+            if (in_array($currentDate->dayOfWeek, $dayNumbers)) {
+                // Get the day name
+                $dayName = $currentDate->format('l'); // Full day name like 'Monday'
+                
+                // Get times for this specific day
+                $dayTimes = $this->getScheduleTimesForDay($weeklySchedule, $dayName);
+                
+                if (!empty($dayTimes)) {
+                    $sessionData = [
+                        'course_offering_id' => $courseOffering->id,
+                        'session_title' => 'Session ' . ($sessionCount + 1),
+                        'session_description' => 'Regular class session',
+                        'session_date' => $currentDate->toDateString(),
+                        'start_time' => $currentDate->copy()->setTimeFromTimeString($dayTimes['start_time']),
+                        'end_time' => $currentDate->copy()->setTimeFromTimeString($dayTimes['end_time']),
+                        'duration_minutes' => $this->calculateDurationMinutes($dayTimes['start_time'], $dayTimes['end_time']),
+                        'session_type' => 'lecture',
+                        'delivery_mode' => $courseOffering->delivery_mode,
+                        'status' => 'scheduled',
+                        'attendance_required' => true,
+                        'attendance_tracking_enabled' => true,
+                        'is_assessment' => false,
+                        'is_recurring' => false,
+                        'sequence_number' => $sessionCount + 1,
+                        'lecture_id' => $lectureId,
+                        'room_id' => $roomId,
+                    ];
+
+                    $session = ClassSession::create($sessionData);
+                    $sessions->push($session);
+                    $sessionCount++;
+                }
+            }
+            $currentDate->addDay();
+        }
+
+        return $sessions;
+    }
+
+    /**
+     * Calculate duration in minutes between two time strings
+     */
+    private function calculateDurationMinutes(string $startTime, string $endTime): int
+    {
+        $start = Carbon::createFromFormat('H:i', $startTime);
+        $end = Carbon::createFromFormat('H:i', $endTime);
+        
+        return (int) $start->diffInMinutes($end);
     }
 
     /**

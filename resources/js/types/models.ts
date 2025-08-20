@@ -683,6 +683,31 @@ export enum ScheduleDay {
     Friday = 'Friday',
     Saturday = 'Saturday',
 }
+export interface SyllabusTemplate {
+    id: number;
+    unit_id: number;
+    title: string;
+    version: string;
+    description: string;
+    total_hours: number;
+    total_sessions: number;
+    learning_outcomes?: any[];
+    grading_criteria?: any[];
+    required_materials?: any[];
+    assessment_policy?: string;
+    applicable_program_id?: number;
+    applicable_campus_id?: number;
+    delivery_mode: string;
+    is_default: boolean;
+    is_active: boolean;
+    source_template_id?: number;
+    created_by?: number;
+    unit?: Unit;
+    applicable_campus?: Campus;
+    applicable_program?: Program;
+    created_at?: string;
+    updated_at?: string;
+}
 export interface CourseOffering {
     id: number;
     semester_id: number;
@@ -709,6 +734,7 @@ export interface CourseOffering {
     semester: Semester;
     campus?: Campus;
     courseRegistrations?: CourseRegistration[];
+    syllabus_template?: SyllabusTemplate;
     created_at: string;
     updated_at: string;
     // Computed properties from model accessors

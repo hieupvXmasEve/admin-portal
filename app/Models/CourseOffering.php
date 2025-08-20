@@ -21,6 +21,7 @@ class CourseOffering extends AuditableModel
     protected $fillable = [
         'semester_id',
         'curriculum_unit_id',
+        'syllabus_template_id',
         'lecture_id',
         'campus_id',
         'section_code',
@@ -68,6 +69,7 @@ class CourseOffering extends AuditableModel
         return [
             'semester_id' => ['required', 'exists:semesters,id'],
             'curriculum_unit_id' => ['required', 'exists:curriculum_units,id'],
+            'syllabus_template_id' => ['nullable', 'exists:syllabus_templates,id'],
             'lecture_id' => ['nullable', 'exists:lectures,id'],
             'section_code' => ['nullable', 'string', 'max:10'],
             'max_capacity' => ['required', 'integer', 'min:1', 'max:1000'],
@@ -96,6 +98,7 @@ class CourseOffering extends AuditableModel
             'semester_id.exists' => 'Selected semester does not exist',
             'curriculum_unit_id.required' => 'Curriculum unit is required',
             'curriculum_unit_id.exists' => 'Selected curriculum unit does not exist',
+            'syllabus_template_id.exists' => 'Selected syllabus template does not exist',
             'lecture_id.exists' => 'Selected lecture does not exist',
             'section_code.max' => 'Section code cannot exceed 10 characters',
             'max_capacity.required' => 'Maximum capacity is required',
@@ -150,6 +153,11 @@ class CourseOffering extends AuditableModel
     {
         return $this->hasOne(Syllabus::class, 'curriculum_unit_id', 'curriculum_unit_id')
             ->where('syllabus.is_active', true);
+    }
+
+    public function syllabusTemplate(): BelongsTo
+    {
+        return $this->belongsTo(SyllabusTemplate::class);
     }
 
     // Campus

@@ -42,7 +42,32 @@ class GenerateClassSessionsRequest extends FormRequest
                 'required',
                 'date',
             ],
+            'weekly_schedule' => [
+                'required',
+                'array',
+            ],
+            'weekly_schedule.monday' => $this->getDayValidationRules(),
+            'weekly_schedule.tuesday' => $this->getDayValidationRules(),
+            'weekly_schedule.wednesday' => $this->getDayValidationRules(),
+            'weekly_schedule.thursday' => $this->getDayValidationRules(),
+            'weekly_schedule.friday' => $this->getDayValidationRules(),
+            'weekly_schedule.saturday' => $this->getDayValidationRules(),
+            'weekly_schedule.sunday' => $this->getDayValidationRules(),
         ];
+
+        // Add custom validation to ensure at least one day is enabled
+        $rules['weekly_schedule'][] = function ($attribute, $value, $fail) {
+            $hasEnabledDay = false;
+            foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as $day) {
+                if (isset($value[$day]['enabled']) && $value[$day]['enabled'] === true) {
+                    $hasEnabledDay = true;
+                    break;
+                }
+            }
+            if (!$hasEnabledDay) {
+                $fail('At least one day must be enabled in the weekly schedule.');
+            }
+        };
 
         // Enforce semester window if available
         if ($after) {
@@ -53,6 +78,41 @@ class GenerateClassSessionsRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * Get validation rules for individual day schedule
+     */
+    private function getDayValidationRules(): array
+    {
+        return [
+            'required',
+            'array',
+            function ($attribute, $value, $fail) {
+                if (!isset($value['enabled'])) {
+                    $fail("The {$attribute}.enabled field is required.");
+                }
+                if (!is_bool($value['enabled'])) {
+                    $fail("The {$attribute}.enabled field must be a boolean.");
+                }
+                if ($value['enabled']) {
+                    if (!isset($value['startTime']) || !isset($value['endTime'])) {
+                        $fail("The {$attribute} must have startTime and endTime when enabled.");
+                    }
+                    if (isset($value['startTime'], $value['endTime'])) {
+                        if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $value['startTime'])) {
+                            $fail("The {$attribute}.startTime must be in HH:MM format.");
+                        }
+                        if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $value['endTime'])) {
+                            $fail("The {$attribute}.endTime must be in HH:MM format.");
+                        }
+                        if (strtotime($value['startTime']) >= strtotime($value['endTime'])) {
+                            $fail("The {$attribute}.endTime must be after startTime.");
+                        }
+                    }
+                }
+            }
+        ];
     }
 
     /**
