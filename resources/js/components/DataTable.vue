@@ -96,9 +96,7 @@ defineExpose({
         <!-- Selection Info and Column Toggle -->
         <div class="flex items-center justify-between">
             <!-- Selection Info -->
-            <div v-if="enableRowSelection && selectedRowsCount > 0" class="text-muted-foreground flex-1 text-sm">
-                {{ selectedRowsCount }} of {{ totalRowsCount }} row(s) selected.
-            </div>
+            <div v-if="enableRowSelection && selectedRowsCount > 0" class="text-muted-foreground flex-1 text-sm">{{ selectedRowsCount }} of {{ totalRowsCount }} row(s) selected.</div>
 
             <!-- Column Toggle -->
             <div v-if="showColumnToggle" class="flex justify-end" :class="{ 'ml-auto': !enableRowSelection || selectedRowsCount === 0 }">
@@ -114,8 +112,10 @@ defineExpose({
                             v-for="column in table.getAllColumns().filter((column) => column.getCanHide())"
                             :key="column.id"
                             class="capitalize"
+                            :checked="column.getIsVisible()"
                             :model-value="column.getIsVisible()"
                             @update:model-value="(value) => column.toggleVisibility(!!value)"
+                            @select.prevent
                         >
                             {{ column.id }}
                         </DropdownMenuCheckboxItem>
@@ -133,12 +133,7 @@ defineExpose({
                             v-for="header in headerGroup.headers"
                             :key="header.id"
                             :data-pinned="header.column.getIsPinned()"
-                            :class="
-                                cn(
-                                    { 'bg-background/95 sticky': header.column.getIsPinned() },
-                                    header.column.getIsPinned() === 'left' ? 'left-0' : 'right-0',
-                                )
-                            "
+                            :class="cn({ 'bg-background/95 sticky': header.column.getIsPinned() }, header.column.getIsPinned() === 'left' ? 'left-0' : 'right-0')"
                         >
                             <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()" />
                         </TableHead>
@@ -152,12 +147,7 @@ defineExpose({
                                     v-for="cell in row.getVisibleCells()"
                                     :key="cell.id"
                                     :data-pinned="cell.column.getIsPinned()"
-                                    :class="
-                                        cn(
-                                            { 'bg-background/95 sticky': cell.column.getIsPinned() },
-                                            cell.column.getIsPinned() === 'left' ? 'left-0' : 'right-0',
-                                        )
-                                    "
+                                    :class="cn({ 'bg-background/95 sticky': cell.column.getIsPinned() }, cell.column.getIsPinned() === 'left' ? 'left-0' : 'right-0')"
                                 >
                                     <slot :name="`cell-${cell.column.id}`" :cell="cell" :row="row" :value="cell.getValue()">
                                         <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
