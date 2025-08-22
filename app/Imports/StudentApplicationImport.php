@@ -151,7 +151,34 @@ class StudentApplicationImport implements
                     ];
                 }
             } else {
-                $this->createNewApplication($validatedData, $rowNumber);
+                // For new records, campus_code is required
+                $campusCode = $validatedData['campus_code'] ?? null;
+                
+                Log::debug('Checking campus_code for new application', [
+                    'row' => $rowNumber,
+                    'campus_code_value' => $campusCode,
+                    'campus_code_type' => gettype($campusCode),
+                    'is_empty' => empty($campusCode),
+                    'is_null' => is_null($campusCode),
+                    'validated_data_keys' => array_keys($validatedData)
+                ]);
+                
+                if (empty($campusCode)) {
+                    $this->results['skipped']++;
+                    $this->results['errors'][] = [
+                        'row' => $rowNumber,
+                        'student_code' => $mappedData['student_code'],
+                        'errors' => ['Campus code is required for creating new student applications']
+                    ];
+                    
+                    Log::info('Skipped creating new application - missing campus code', [
+                        'row' => $rowNumber,
+                        'student_code' => $mappedData['student_code'],
+                        'email' => $mappedData['email']
+                    ]);
+                } else {
+                    $this->createNewApplication($validatedData, $rowNumber);
+                }
             }
         } catch (Throwable $e) {
             $this->results['skipped']++;
@@ -364,16 +391,32 @@ class StudentApplicationImport implements
 
     /**
      * Update existing student application
+     * Only update fields that are provided in the Excel file (non-null values)
+     * This preserves existing data like campus_code if not provided in import
      */
     protected function updateExistingApplication(StudentApplication $application, array $data, int $rowNumber): void
     {
         try {
-            $application->update($data);
+            // Filter out null values to preserve existing data
+            $updateData = array_filter($data, function($value) {
+                return $value !== null && $value !== '';
+            });
+
+            Log::debug('Updating existing application', [
+                'row' => $rowNumber,
+                'original_data' => $data,
+                'filtered_update_data' => $updateData,
+                'existing_campus_code' => $application->campus_code,
+                'will_preserve_campus_code' => !isset($updateData['campus_code'])
+            ]);
+
+            $application->update($updateData);
             $this->results['updated']++;
 
             Log::info('Updated student application from import', [
                 'student_code' => $data['student_code'],
-                'row' => $rowNumber
+                'row' => $rowNumber,
+                'updated_fields' => array_keys($updateData)
             ]);
         } catch (Throwable $e) {
             $this->results['skipped']++;

@@ -171,9 +171,14 @@ const startImport = async (): Promise<void> => {
                                         <li><strong>Email</strong> is required and used to identify existing records</li>
                                         <li><strong>Student Code</strong> is required</li>
                                         <li><strong>Full Name</strong> is required</li>
-                                        <li>If an email already exists in the database, the record will be updated</li>
-                                        <li>Records without email addresses will be skipped</li>
-                                        <li>Only matching columns will be imported</li>
+                                        <li><strong>Import Logic:</strong></li>
+                                        <ul class="list-disc space-y-1 pl-5 mt-1">
+                                            <li>If email exists in database → Update existing record with new data</li>
+                                            <li>If email doesn't exist → Create new record (requires Campus Code)</li>
+                                            <li>Records missing Campus Code will be skipped for new entries</li>
+                                            <li>Existing records preserve their Campus Code if not provided in Excel</li>
+                                        </ul>
+                                        <li>Only columns present in Excel will be updated</li>
                                         <li>Maximum file size: {{ maxFileSize }}</li>
                                         <li>Supported formats: {{ allowedExtensions.join(', ').toUpperCase() }}</li>
                                     </ul>

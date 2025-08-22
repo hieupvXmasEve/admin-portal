@@ -14,12 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
 import { Head, router } from '@inertiajs/vue3';
-import { route } from 'ziggy-js';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
 import { AlertCircle, CheckCircle2, ChevronDown, Clock, Download, Eye, FileSpreadsheet, Filter, RefreshCw, Trash2, Users, XCircle } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
 
 // Types
 interface StudentApplication {
@@ -114,7 +114,6 @@ interface Props {
 
 const props = defineProps<Props>();
 const filters = ref({ ...props.filters });
-console.log('props', props.campuses);
 
 // API
 const api = useApi();
@@ -158,6 +157,10 @@ const exportForm = ref({
     scope: 'filtered',
 });
 const isExporting = ref(false);
+
+// Batch error details state
+const showBatchErrorDialog = ref(false);
+const batchErrors = ref<Array<{ application_id: number; error: string; details: string[] }>>([]);
 
 // Computed
 const hasSelectedApplications = computed(() => selectedApplications.value.length > 0);
@@ -738,10 +741,8 @@ const applyFilters = (newFilters: Partial<typeof filters.value>) => {
 
     filters.value = { ...filters.value, ...newFilters };
     const queryParams = { ...props.filters, ...filters.value };
-    console.log('queryParams', queryParams);
 
     Object.entries(queryParams).forEach(([key, value]) => {
-        console.log('key', key, 'value', value);
         if (value !== '' && value != null) {
             params.set(key, value.toString());
         }
@@ -795,8 +796,6 @@ const toggleOverallSort = () => {
 };
 
 const onOverallFilterChange = (operator: 'all' | 'gt' | 'gte' | 'lt' | 'lte' | 'eq', value: number | undefined) => {
-    console.log('value', value);
-
     if (operator === 'all' || value === undefined || value === null) {
         applyFilters({ overall_operator: undefined, overall_value: undefined });
     } else {
@@ -839,8 +838,10 @@ const closeDialogs = () => {
     showBulkStatusUpdateDialog.value = false;
     showApplicationDetailsDialog.value = false;
     showExportDialog.value = false;
+    showBatchErrorDialog.value = false;
     currentApplication.value = null;
     selectedApplicationForDetails.value = null;
+    batchErrors.value = [];
     conversionForm.value = {
         admission_date: format(new Date(), 'yyyy-MM-dd'),
     };
@@ -850,6 +851,17 @@ const closeDialogs = () => {
         format: 'xlsx',
         scope: 'filtered',
     };
+};
+
+// Function to open batch error dialog
+const openBatchErrorDialog = () => {
+    showBatchErrorDialog.value = true;
+};
+
+// Function to get application name by ID
+const getApplicationNameById = (applicationId: number) => {
+    const application = props.applications.data.find((app) => app.id === applicationId);
+    return application ? application.full_name : `Application ID: ${applicationId}`;
 };
 
 // Action handlers
@@ -899,7 +911,6 @@ const batchConvert = () => {
 
                 // Check if there are any errors in the response
                 const flashMessages = page.props.flash as any;
-                console.log('flashMessages', flashMessages);
 
                 // Handle different types of responses
                 if (flashMessages?.error) {
@@ -908,21 +919,27 @@ const batchConvert = () => {
                 } else if (flashMessages?.warning) {
                     // Partial failure (some succeeded, some failed)
                     toast.warning(flashMessages.warning);
-                    
-                    // Show detailed error information if available
+
+                    // Store detailed error information if available
                     if (flashMessages?.batch_errors && Array.isArray(flashMessages.batch_errors)) {
-                        const errorList = flashMessages.batch_errors.map((error: any) => 
-                            `• ${error.error}${error.details && error.details.length > 0 ? ': ' + error.details.join(', ') : ''}`
-                        ).join('\n');
-                        
-                        // Show detailed errors in a separate toast or console for debugging
+                        batchErrors.value = flashMessages.batch_errors;
+
+                        // Show detailed errors in console for debugging
+                        const errorList = flashMessages.batch_errors.map((error: any) => `• ${error.error}${error.details && error.details.length > 0 ? ': ' + error.details.join(', ') : ''}`).join('\n');
                         console.error('Detailed conversion errors:', errorList);
-                        
-                        // Optionally show the first few errors in a toast
-                        const firstErrors = flashMessages.batch_errors.slice(0, 3).map((error: any) => error.error).join(', ');
-                        if (firstErrors) {
-                            toast.error(`Conversion errors: ${firstErrors}${flashMessages.batch_errors.length > 3 ? ` (and ${flashMessages.batch_errors.length - 3} more)` : ''}`);
-                        }
+
+                        // Show a toast with View Details button
+                        const conversionSummary = flashMessages.conversion_summary;
+                        const errorMessage = `Batch conversion completed: ${conversionSummary?.successful || 0} successful, ${conversionSummary?.failed || 0} failed.`;
+
+                        // Create a custom toast with action button
+                        toast.error(errorMessage, {
+                            action: {
+                                label: 'View Details',
+                                onClick: () => openBatchErrorDialog(),
+                            },
+                            duration: 10000, // Longer duration to allow user to click
+                        });
                     }
                 } else if (flashMessages?.success) {
                     // Complete success
@@ -1739,6 +1756,73 @@ const exportApplications = async () => {
                     <RefreshCw v-if="isExporting" class="mr-2 h-4 w-4 animate-spin" />
                     {{ isExporting ? 'Exporting...' : 'Export' }}
                 </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Batch Error Details Dialog -->
+    <Dialog v-model:open="showBatchErrorDialog">
+        <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            <DialogHeader>
+                <DialogTitle class="flex items-center gap-2">
+                    <AlertCircle class="h-5 w-5 text-red-600" />
+                    Batch Conversion Error Details
+                </DialogTitle>
+                <DialogDescription> Review the errors that occurred during the batch conversion process </DialogDescription>
+            </DialogHeader>
+
+            <div v-if="batchErrors.length > 0" class="space-y-4">
+                <div class="rounded-lg border border-red-200 bg-red-50 p-4">
+                    <div class="mb-2 flex items-center gap-2">
+                        <AlertCircle class="h-4 w-4 text-red-600" />
+                        <span class="text-sm font-medium text-red-800">{{ batchErrors.length }} Application{{ batchErrors.length > 1 ? 's' : '' }} Failed to Convert</span>
+                    </div>
+                    <p class="text-sm text-red-700">The following applications could not be converted due to validation errors:</p>
+                </div>
+
+                <div class="space-y-3">
+                    <div v-for="error in batchErrors" :key="error.application_id" class="rounded-lg border p-4">
+                        <div class="flex items-start gap-3">
+                            <XCircle class="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+                            <div class="flex-1">
+                                <div class="mb-1 flex items-center gap-2">
+                                    <span class="text-sm font-medium">{{ getApplicationNameById(error.application_id) }}</span>
+                                    <Badge variant="outline" class="text-xs"> ID: {{ error.application_id }} </Badge>
+                                </div>
+                                <p class="mb-2 text-sm text-red-600">{{ error.error }}</p>
+                                <div v-if="error.details && error.details.length > 0" class="space-y-1">
+                                    <p class="text-xs font-medium text-gray-700">Required fields:</p>
+                                    <ul class="ml-2 list-inside list-disc space-y-1 text-xs text-gray-600">
+                                        <li v-for="detail in error.details" :key="detail">{{ detail }}</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <div class="flex items-start gap-2">
+                        <AlertCircle class="mt-0.5 h-4 w-4 text-blue-600" />
+                        <div class="text-sm text-blue-800">
+                            <p class="mb-1 font-medium">Next Steps:</p>
+                            <ul class="list-inside list-disc space-y-1 text-xs">
+                                <li>Review and update the required fields for each failed application</li>
+                                <li>Ensure all mandatory information is complete and accurate</li>
+                                <li>Try the conversion process again for the corrected applications</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-else class="py-8 text-center">
+                <AlertCircle class="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                <p class="text-sm text-gray-500">No error details available</p>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="closeDialogs()">Close</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
