@@ -94,6 +94,7 @@ class StudentApplicationServiceTest extends TestCase
             'parent_email' => 'parent@example.com',
             'status' => 'pending',
             'student_id' => null,
+            'student_code' => 'SAI20250001',
         ]);
 
         $result = $this->service->convertSingleApplication($application->id, [
@@ -122,7 +123,7 @@ class StudentApplicationServiceTest extends TestCase
         $this->assertEquals($this->curriculumVersion->id, $student->curriculum_version_id);
         $this->assertEquals('0987654321', $student->emergency_contact_phone);
         $this->assertEquals('active', $student->status);
-        $this->assertStringContainsString($this->campus->code, $student->student_code);
+        $this->assertEquals('SAI20250001', $student->student_id);
 
         // Verify application was updated
         $application->refresh();
@@ -150,6 +151,7 @@ class StudentApplicationServiceTest extends TestCase
             'campus_code' => $this->campus->code,
             'student_id' => $existingStudent->id,
             'status' => 'approved',
+            'student_code' => 'SAI20250002',
         ]);
 
         $result = $this->service->convertSingleApplication($application->id, [
@@ -167,6 +169,7 @@ class StudentApplicationServiceTest extends TestCase
         $application = StudentApplication::factory()->create([
             'campus_code' => 'INVALID',
             'student_id' => null,
+            'student_code' => 'INV20250001',
         ]);
 
         $result = $this->service->convertSingleApplication($application->id, [
@@ -189,6 +192,7 @@ class StudentApplicationServiceTest extends TestCase
             'birth_year' => 1999,
             'campus_code' => $this->campus->code,
             'student_id' => null,
+            'student_code' => 'SAI20250003',
         ]);
 
         $result = $this->service->convertSingleApplication($application->id, [

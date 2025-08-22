@@ -898,9 +898,36 @@ const batchConvert = () => {
 
                 // Check if there are any errors in the response
                 const flashMessages = page.props.flash as any;
-                if (flashMessages?.warning) {
+                console.log('flashMessages', flashMessages);
+
+                // Handle different types of responses
+                if (flashMessages?.error) {
+                    // Complete failure
+                    toast.error(flashMessages.error);
+                } else if (flashMessages?.warning) {
+                    // Partial failure (some succeeded, some failed)
                     toast.warning(flashMessages.warning);
+                    
+                    // Show detailed error information if available
+                    if (flashMessages?.batch_errors && Array.isArray(flashMessages.batch_errors)) {
+                        const errorList = flashMessages.batch_errors.map((error: any) => 
+                            `• ${error.error}${error.details && error.details.length > 0 ? ': ' + error.details.join(', ') : ''}`
+                        ).join('\n');
+                        
+                        // Show detailed errors in a separate toast or console for debugging
+                        console.error('Detailed conversion errors:', errorList);
+                        
+                        // Optionally show the first few errors in a toast
+                        const firstErrors = flashMessages.batch_errors.slice(0, 3).map((error: any) => error.error).join(', ');
+                        if (firstErrors) {
+                            toast.error(`Conversion errors: ${firstErrors}${flashMessages.batch_errors.length > 3 ? ` (and ${flashMessages.batch_errors.length - 3} more)` : ''}`);
+                        }
+                    }
+                } else if (flashMessages?.success) {
+                    // Complete success
+                    toast.success(flashMessages.success);
                 } else {
+                    // Fallback success message
                     toast.success(`Successfully converted ${count} application(s) to students!`);
                 }
             },

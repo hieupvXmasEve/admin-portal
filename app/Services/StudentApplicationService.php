@@ -71,11 +71,19 @@ class StudentApplicationService
                     ];
                 }
 
+                // Check if student_code is available in application
+                if (empty($application->student_code)) {
+                    return [
+                        'success' => false,
+                        'error' => 'Student code is not available in the application',
+                    ];
+                }
+
                 // Map application data to student data
                 $studentData = $this->mapApplicationToStudentData($application, $conversionData);
 
-                // Generate student code
-                $studentData['student_id'] = $this->codeGenerationService->generateStudentCodeByCampusId($campus->id);
+                // Use student_code from application instead of auto-generating
+                $studentData['student_id'] = $application->student_code;
 
                 // Validate student data
                 $validator = Validator::make($studentData, Student::validationRules(), Student::validationMessages());

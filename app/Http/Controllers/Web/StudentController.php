@@ -272,6 +272,17 @@ class StudentController extends Controller
         }
     }
 
+    /**
+     * Show photo capture page for student
+     */
+    public function photoCapture(Student $student): Response
+    {
+        return Inertia::render('students/PhotoCapture', [
+            'studentId' => $student->id,
+            'returnUrl' => route(StudentRoutes::EDIT, $student),
+        ]);
+    }
+
     public function destroy(Student $student, Request $request): RedirectResponse|\Illuminate\Http\Response|JsonResponse
     {
         try {

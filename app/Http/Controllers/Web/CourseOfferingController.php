@@ -41,6 +41,7 @@ class CourseOfferingController extends Controller
     public function index(Request $request): Response
     {
         $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecture', 'unit'])
+            ->where('campus_id', app('campus')->id)
             ->whereHas('unit', fn($q) => $q->whereNotNull('id'))
             ->orderBy(
                 Unit::select('code')
@@ -266,6 +267,11 @@ class CourseOfferingController extends Controller
      */
     public function show(CourseOffering $courseOffering): Response
     {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
         $courseOffering->load([
             'semester',
             'curriculumUnit.unit',
@@ -358,6 +364,11 @@ class CourseOfferingController extends Controller
      */
     public function edit(CourseOffering $courseOffering): Response
     {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
         // Load the course offering with its related semester and curriculum unit data
         $courseOffering->load([
             'semester:id,name,code,start_date,end_date',
@@ -390,6 +401,11 @@ class CourseOfferingController extends Controller
      */
     public function update(UpdateCourseOfferingRequest $request, CourseOffering $courseOffering): RedirectResponse
     {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
         try {
 
             $courseOffering->update($request->validated());
@@ -409,6 +425,11 @@ class CourseOfferingController extends Controller
      */
     public function destroy(CourseOffering $courseOffering): RedirectResponse
     {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
         // Check if there are any registrations
         if ($courseOffering->courseRegistrations()->count() > 0) {
             return Redirect::back()
@@ -431,7 +452,9 @@ class CourseOfferingController extends Controller
             'ids.*' => 'exists:course_offerings,id',
         ]);
 
-        $courseOfferings = CourseOffering::whereIn('id', $request->ids)->get();
+        $courseOfferings = CourseOffering::whereIn('id', $request->ids)
+            ->where('campus_id', app('campus')->id)
+            ->get();
 
         foreach ($courseOfferings as $courseOffering) {
             if ($courseOffering->courseRegistrations()->count() > 0) {
@@ -440,7 +463,9 @@ class CourseOfferingController extends Controller
             }
         }
 
-        CourseOffering::whereIn('id', $request->ids)->delete();
+        CourseOffering::whereIn('id', $request->ids)
+            ->where('campus_id', app('campus')->id)
+            ->delete();
 
         return Redirect::route(CourseOfferingRoutes::INDEX)
             ->with('success', 'Selected course offerings deleted successfully.');
@@ -451,6 +476,11 @@ class CourseOfferingController extends Controller
      */
     public function toggleStatus(CourseOffering $courseOffering): RedirectResponse
     {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
         $newStatus = $courseOffering->enrollment_status === 'open' ? 'closed' : 'open';
         $courseOffering->update(['enrollment_status' => $newStatus]);
 
@@ -465,6 +495,11 @@ class CourseOfferingController extends Controller
      */
     public function changeRoom(Request $request, CourseOffering $courseOffering): RedirectResponse
     {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
         $validated = $request->validate([
             'room_id' => ['required', Rule::exists('rooms', 'id')],
         ]);
@@ -609,6 +644,11 @@ class CourseOfferingController extends Controller
      */
     public function showSplit(CourseOffering $courseOffering): Response|RedirectResponse
     {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
         // Check if this course offering can be split
         if ($courseOffering->section_code) {
             return Redirect::back()
@@ -659,6 +699,11 @@ class CourseOfferingController extends Controller
      */
     public function performSplit(Request $request, CourseOffering $courseOffering): RedirectResponse
     {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
         $request->validate([
             'number_of_sections' => 'required|integer|min:2|max:10',
             'assignment_mode' => 'required|in:equal,custom',
@@ -785,6 +830,7 @@ class CourseOfferingController extends Controller
 
         // Get all active course offerings without lectures
         $offeringsWithoutInstructors = CourseOffering::with(['curriculumUnit.unit', 'semester'])
+            ->where('campus_id', app('campus')->id)
             ->where('semester_id', $semesterId)
             ->where('is_active', true)
             ->whereNull('lecture_id')
@@ -835,7 +881,9 @@ class CourseOfferingController extends Controller
 
             $assignmentsCount = 0;
             foreach ($request->assignments as $assignment) {
-                $courseOffering = CourseOffering::find($assignment['course_offering_id']);
+                $courseOffering = CourseOffering::where('id', $assignment['course_offering_id'])
+                    ->where('campus_id', app('campus')->id)
+                    ->first();
                 if ($courseOffering && ! $courseOffering->lecture_id) {
                     $courseOffering->update(['lecture_id' => $assignment['lecture_id']]);
                     $assignmentsCount++;
@@ -859,6 +907,11 @@ class CourseOfferingController extends Controller
      */
     public function bulkUpdateRegistrationStatus(Request $request, CourseOffering $courseOffering)
     {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
         $request->validate([
             'from_status' => 'required|in:registered,confirmed,dropped,withdrawn,completed',
             'to_status' => 'required|in:registered,confirmed,dropped,withdrawn,completed',

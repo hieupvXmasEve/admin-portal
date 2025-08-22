@@ -29,17 +29,38 @@ class SemesterEnrollmentController extends Controller
      */
     public function show(Semester $semester): Response
     {
+        // Get current campus ID from session
+        $currentCampusId = session()->get('current_campus_id');
 
-        $semester->load(['enrollments.student.curriculumVersion', 'courseOfferings.curriculumUnit.unit']);
+        // Load semester data with campus-filtered enrollments
+        $semester->load([
+            'enrollments' => function ($query) use ($currentCampusId) {
+                if ($currentCampusId) {
+                    $query->whereHas('student', function ($q) use ($currentCampusId) {
+                        $q->where('campus_id', $currentCampusId);
+                    });
+                }
+            },
+            'enrollments.student.curriculumVersion',
+            'courseOfferings.curriculumUnit.unit'
+        ]);
+
+        // Campus-filtered enrollment statistics
+        $enrollmentQuery = $semester->enrollments();
+        if ($currentCampusId) {
+            $enrollmentQuery->whereHas('student', function ($query) use ($currentCampusId) {
+                $query->where('campus_id', $currentCampusId);
+            });
+        }
 
         $enrollmentStats = [
-            'total_enrolled' => $semester->enrollments()->count(),
-            'by_status' => $semester->enrollments()
+            'total_enrolled' => $enrollmentQuery->count(),
+            'by_status' => (clone $enrollmentQuery)
                 ->groupBy('status')
                 ->selectRaw('status, count(*) as count')
                 ->pluck('count', 'status')
                 ->toArray(),
-            'by_semester_number' => $semester->enrollments()
+            'by_semester_number' => (clone $enrollmentQuery)
                 ->groupBy('semester_number')
                 ->selectRaw('semester_number, count(*) as count')
                 ->orderBy('semester_number')
@@ -47,9 +68,60 @@ class SemesterEnrollmentController extends Controller
                 ->toArray(),
         ];
 
+        // Get campus-specific student statistics
+        $campusStats = [];
+        if ($currentCampusId) {
+            $campus = \App\Models\Campus::find($currentCampusId);
+
+            // Get total eligible students for this campus
+            $totalEligibleStudents = Student::query()
+                ->where('status', 'active')
+                ->where('academic_status', 'active')
+                ->where('campus_id', $currentCampusId)
+                ->whereNotNull('curriculum_version_id')
+                ->count();
+
+            // Get students already enrolled for this semester
+            $enrolledStudents = Student::query()
+                ->where('status', 'active')
+                ->where('academic_status', 'active')
+                ->where('campus_id', $currentCampusId)
+                ->whereNotNull('curriculum_version_id')
+                ->whereHas('enrollments', function ($query) use ($semester) {
+                    $query->where('semester_id', $semester->id);
+                })
+                ->count();
+
+            // Get students not yet enrolled for this semester
+            $notEnrolledStudents = Student::query()
+                ->where('status', 'active')
+                ->where('academic_status', 'active')
+                ->where('campus_id', $currentCampusId)
+                ->whereNotNull('curriculum_version_id')
+                ->whereDoesntHave('enrollments', function ($query) use ($semester) {
+                    $query->where('semester_id', $semester->id);
+                })
+                ->whereDoesntHave('academicHolds', function ($query) {
+                    $query->where('hold_category', 'registration')->where('status', 'active');
+                })
+                ->count();
+
+            $campusStats = [
+                'campus_name' => $campus->name ?? 'Unknown Campus',
+                'campus_code' => $campus->code ?? 'N/A',
+                'total_eligible_students' => $totalEligibleStudents,
+                'enrolled_students' => $enrolledStudents,
+                'not_enrolled_students' => $notEnrolledStudents,
+                'enrollment_rate' => $totalEligibleStudents > 0
+                    ? round(($enrolledStudents / $totalEligibleStudents) * 100, 1)
+                    : 0,
+            ];
+        }
+
         return Inertia::render('semesters/Enrollment', [
             'semester' => $semester,
             'enrollmentStats' => $enrollmentStats,
+            'campusStats' => $campusStats,
         ]);
     }
 
@@ -128,10 +200,21 @@ class SemesterEnrollmentController extends Controller
 
             DB::commit();
 
+            // Get updated campus statistics
+            $campus = \App\Models\Campus::find($currentCampusId);
+            $totalEligibleStudents = Student::query()
+                ->where('status', 'active')
+                ->where('academic_status', 'active')
+                ->where('campus_id', $currentCampusId)
+                ->whereNotNull('curriculum_version_id')
+                ->count();
+            $campusName = $campus->name ?? 'campus';
             return response()->json([
                 'success' => true,
-                'message' => "Successfully created {$enrollmentsCreated} enrollments",
+                'message' => "Successfully created {$enrollmentsCreated} enrollments for {$campusName}",
                 'enrollments_created' => $enrollmentsCreated,
+                'total_eligible_students' => $totalEligibleStudents,
+                'campus_name' => $campus->name ?? 'Unknown Campus',
                 'errors' => $errors,
             ]);
         } catch (\Exception $e) {
