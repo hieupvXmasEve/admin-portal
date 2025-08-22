@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
 import { Head, router } from '@inertiajs/vue3';
+import { route } from 'ziggy-js';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
 import { AlertCircle, CheckCircle2, ChevronDown, Clock, Download, Eye, FileSpreadsheet, Filter, RefreshCw, Trash2, Users, XCircle } from 'lucide-vue-next';
@@ -1118,6 +1119,11 @@ const exportApplications = async () => {
             <Button v-if="hasSelectedApplications && canConvertSelected" @click="openConversionDialog()" class="bg-green-600 hover:bg-green-700">
                 <Users class="mr-2 h-4 w-4" />
                 Convert {{ selectedApplications.length }} to Students
+            </Button>
+
+            <Button @click="() => router.visit(route('student-applications.import'))" variant="outline" class="border-purple-300 text-purple-600 hover:bg-purple-50">
+                <FileSpreadsheet class="mr-2 h-4 w-4" />
+                Import
             </Button>
 
             <Button @click="openExportDialog()" variant="outline" class="border-gray-300">

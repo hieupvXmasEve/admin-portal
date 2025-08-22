@@ -56,6 +56,7 @@ class StudentApplicationFactory extends Factory
             'exception_units' => fake()->optional()->sentence(),
             'status' => fake()->randomElement(['pending', 'approved', 'rejected']),
             'student_id' => null,
+            'student_code' => fake()->unique()->regexify('SWU[0-9]{6}'),
         ];
     }
 

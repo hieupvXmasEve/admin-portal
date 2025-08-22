@@ -120,6 +120,8 @@ return [
             'create_student_application' => 'create_student_application',
             'edit_student_application' => 'edit_student_application',
             'delete_student_application' => 'delete_student_application',
+            'import_student_application' => 'import_student_application',
+            'export_student_application' => 'export_student_application'
         ],
 
         // Attendance Management
