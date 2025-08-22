@@ -268,7 +268,7 @@ class StudentApplicationService
             'email' => $application->email,
             'phone' => $application->phone,
             'gender' => $application->gender,
-            'nationality' => $application->ethnicity, // Map ethnicity to nationality
+            'nationality' => $application->ethnicity ?: 'Vietnamese', // Map ethnicity to nationality, default to Vietnamese if null/empty
             'national_id' => $application->national_id,
             'address' => $application->address,
 
