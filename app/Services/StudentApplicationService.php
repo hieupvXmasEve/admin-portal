@@ -12,12 +12,14 @@ use App\Models\Student;
 use App\Models\StudentApplication;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class StudentApplicationService
 {
     public function __construct(
-        private StudentCodeGenerationService $codeGenerationService
+        private StudentCodeGenerationService $codeGenerationService,
+        private ProgramMappingService $programMappingService
     ) {}
 
     /**
@@ -128,53 +130,98 @@ class StudentApplicationService
      */
     public function convertBatchApplications(array $applicationIds, array $conversionData): array
     {
+        Log::info('Starting batch conversion', [
+            'application_ids' => $applicationIds,
+            'conversion_data' => $conversionData,
+            'total_applications' => count($applicationIds)
+        ]);
+
         $successful = [];
         $failed = [];
         $successCount = 0;
         $errorCount = 0;
 
         foreach ($applicationIds as $applicationId) {
+            Log::info("Processing application {$applicationId}");
+            
             // Clone base conversion data for this application
             $dataForThisApplication = $conversionData;
 
-            // Resolve curriculum version and program from application's intake if not provided
-            if (! isset($dataForThisApplication['program_id']) || ! isset($dataForThisApplication['curriculum_version_id'])) {
-                $application = StudentApplication::find($applicationId);
+            // Auto-resolve mapping data from application if not provided
+            $application = StudentApplication::find($applicationId);
 
-                if (! $application) {
+            if (! $application) {
+                Log::warning("Application {$applicationId} not found");
+                $failed[] = [
+                    'application_id' => $applicationId,
+                    'error' => 'Student application not found',
+                    'errors' => [],
+                ];
+                $errorCount++;
+                continue;
+            }
+
+            Log::info("Found application {$applicationId}: {$application->full_name}", [
+                'campus_code' => $application->campus_code,
+                'intended_program' => $application->intended_program,
+                'intake' => $application->intake,
+                'is_converted' => $application->isConverted()
+            ]);
+
+            // Check if application is ready for conversion
+            if (! $application->isReadyForConversion()) {
+                $errors = $application->getConversionValidationErrors();
+                Log::warning("Application {$applicationId} not ready for conversion", [
+                    'application_name' => $application->full_name,
+                    'validation_errors' => $errors
+                ]);
+                $failed[] = [
+                    'application_id' => $applicationId,
+                    'error' => 'Application not ready for conversion',
+                    'errors' => $errors,
+                ];
+                $errorCount++;
+                continue;
+            }
+
+            // Auto-resolve missing IDs using ProgramMappingService
+            if (! isset($dataForThisApplication['campus_id']) ||
+                ! isset($dataForThisApplication['program_id']) ||
+                ! isset($dataForThisApplication['curriculum_version_id'])) {
+                
+                Log::info("Auto-resolving mapping data for application {$applicationId}", [
+                    'campus_code' => $application->campus_code,
+                    'intended_program' => $application->intended_program,
+                    'intake' => $application->intake
+                ]);
+                
+                $mappingData = $application->getConversionMappingData();
+                
+                Log::info("Mapping resolution result for application {$applicationId}", [
+                    'resolved_data' => $mappingData
+                ]);
+                
+                // Merge resolved data with existing data (existing data takes precedence)
+                $dataForThisApplication = array_merge($mappingData, $dataForThisApplication);
+                
+                // Validate mapping completeness
+                $mappingValidation = $this->programMappingService->validateMappingData($mappingData);
+                if (! $mappingValidation['valid']) {
+                    Log::error("Mapping validation failed for application {$applicationId}", [
+                        'application_name' => $application->full_name,
+                        'mapping_data' => $mappingData,
+                        'validation_errors' => $mappingValidation['errors']
+                    ]);
                     $failed[] = [
                         'application_id' => $applicationId,
-                        'error' => 'Student application not found',
-                        'errors' => [],
+                        'error' => 'Failed to resolve mapping data',
+                        'errors' => $mappingValidation['errors'],
                     ];
                     $errorCount++;
                     continue;
                 }
-
-                if (! empty($application->intake)) {
-                    $curriculumVersion = CurriculumVersion::where('version_code', $application->intake)->first();
-
-                    if ($curriculumVersion) {
-                        $dataForThisApplication['curriculum_version_id'] = $curriculumVersion->id;
-                        $dataForThisApplication['program_id'] = $curriculumVersion->program_id;
-                    } else {
-                        $failed[] = [
-                            'application_id' => $applicationId,
-                            'error' => "Curriculum version not found for intake: {$application->intake}",
-                            'errors' => [],
-                        ];
-                        $errorCount++;
-                        continue;
-                    }
-                } else {
-                    $failed[] = [
-                        'application_id' => $applicationId,
-                        'error' => 'Intake is missing; cannot resolve curriculum version',
-                        'errors' => [],
-                    ];
-                    $errorCount++;
-                    continue;
-                }
+                
+                Log::info("Mapping validation successful for application {$applicationId}");
             }
 
             $result = $this->convertSingleApplication($applicationId, $dataForThisApplication);

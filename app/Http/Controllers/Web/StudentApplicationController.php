@@ -265,6 +265,7 @@ class StudentApplicationController extends Controller
 
     /**
      * Convert multiple student applications to students
+     * Now with automatic campus_id and curriculum_version_id resolution
      */
     public function batchConvert(Request $request)
     {
@@ -272,27 +273,70 @@ class StudentApplicationController extends Controller
             'application_ids' => 'required|array|min:1',
             'application_ids.*' => 'exists:student_applications,id',
             'admission_date' => 'required|date',
+            'expected_graduation_date' => 'nullable|date|after:admission_date',
         ]);
 
-        $result = $this->studentApplicationService->convertBatchApplications(
-            $request->application_ids,
-            $request->only([
-                'admission_date',
-            ])
-        );
+        try {
+            // The service will now automatically resolve campus_id, program_id, and curriculum_version_id
+            // from the application's campus_code, intended_program, and intake fields
+            $result = $this->studentApplicationService->convertBatchApplications(
+                $request->application_ids,
+                $request->only([
+                    'admission_date',
+                    'expected_graduation_date',
+                ])
+            );
 
-        $message = "Batch conversion completed: {$result['success_count']} successful, {$result['error_count']} failed.";
+            $message = "Batch conversion completed: {$result['success_count']} successful, {$result['error_count']} failed.";
 
-        if ($result['error_count'] > 0) {
+            // Detailed success message with mapping info
+            if ($result['success_count'] > 0) {
+                $successDetails = [];
+                foreach ($result['successful'] as $success) {
+                    $student = $success['student'];
+                    $application = $success['application'];
+                    $successDetails[] = "✓ {$application['full_name']} → Student ID: {$student['student_id']}";
+                }
+                
+                session()->flash('success_details', $successDetails);
+            }
+
+            // Detailed error information
+            if ($result['error_count'] > 0) {
+                $errorDetails = [];
+                foreach ($result['failed'] as $failed) {
+                    $errorDetails[] = [
+                        'application_id' => $failed['application_id'],
+                        'error' => $failed['error'],
+                        'details' => $failed['errors'],
+                    ];
+                }
+
+                return redirect()
+                    ->back()
+                    ->with('warning', $message)
+                    ->with('batch_errors', $errorDetails)
+                    ->with('conversion_summary', [
+                        'total' => count($request->application_ids),
+                        'successful' => $result['success_count'],
+                        'failed' => $result['error_count'],
+                    ]);
+            }
+
+            return redirect()
+                ->route('student-applications.index')
+                ->with('success', $message)
+                ->with('conversion_summary', [
+                    'total' => count($request->application_ids),
+                    'successful' => $result['success_count'],
+                    'failed' => $result['error_count'],
+                ]);
+        } catch (\Exception $e) {
             return redirect()
                 ->back()
-                ->with('warning', $message)
-                ->with('batch_errors', $result['failed']);
+                ->with('error', 'Batch conversion failed: ' . $e->getMessage())
+                ->withInput();
         }
-
-        return redirect()
-            ->route('student-applications.index')
-            ->with('success', $message);
     }
 
     /**
@@ -320,6 +364,57 @@ class StudentApplicationController extends Controller
         }
 
         return response()->json($data);
+    }
+
+    /**
+     * Check which applications are ready for batch conversion
+     */
+    public function checkConversionReadiness(Request $request): JsonResponse
+    {
+        $request->validate([
+            'application_ids' => 'required|array|min:1',
+            'application_ids.*' => 'exists:student_applications,id',
+        ]);
+
+        $applications = StudentApplication::whereIn('id', $request->application_ids)->get();
+        $ready = [];
+        $notReady = [];
+
+        foreach ($applications as $application) {
+            $status = [
+                'id' => $application->id,
+                'full_name' => $application->full_name,
+                'campus_code' => $application->campus_code,
+                'intended_program' => $application->intended_program,
+                'intake' => $application->intake,
+            ];
+
+            if ($application->isReadyForConversion()) {
+                $mappingData = $application->getConversionMappingData();
+                $status['mapping'] = [
+                    'campus_id' => $mappingData['campus_id'] ?? null,
+                    'program_id' => $mappingData['program_id'] ?? null,
+                    'curriculum_version_id' => $mappingData['curriculum_version_id'] ?? null,
+                ];
+                $ready[] = $status;
+            } else {
+                $status['errors'] = $application->getConversionValidationErrors();
+                $notReady[] = $status;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'ready' => $ready,
+                'not_ready' => $notReady,
+                'summary' => [
+                    'total' => count($applications),
+                    'ready_count' => count($ready),
+                    'not_ready_count' => count($notReady),
+                ],
+            ],
+        ]);
     }
 
     /**
