@@ -1284,6 +1284,18 @@ const exportApplications = async () => {
     <CardContent class="p-0">
         <DataTable ref="dataTableRef" :data="applications.data" :columns="suggestedCoursesColumns" :enable-row-selection="true" @selection-change="onSelectionChange" empty-message="No applications found" />
 
+        <!-- <VirtualDataTable
+            ref="dataTableRef"
+            :data="applications.data"
+            :columns="suggestedCoursesColumns"
+            :enable-row-selection="true"
+            @selection-change="onSelectionChange"
+            empty-message="No applications found"
+            height="70vh"
+            :estimated-row-height="53"
+            :overscan="10"
+            :enableColumnVisibility="true"
+        /> -->
         <DataPagination :pagination-data="applications" item-name="applications" @navigate="onNavigate" @page-size-change="onPageSizeChange" />
     </CardContent>
 
