@@ -10,12 +10,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
-import { AlertCircle, CheckCircle2, ChevronDown, Clock, Eye, RefreshCw, Trash2, Users, XCircle } from 'lucide-vue-next';
+import { AlertCircle, CheckCircle2, ChevronDown, Clock, Download, Eye, FileSpreadsheet, Filter, RefreshCw, Trash2, Users, XCircle } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -101,6 +102,8 @@ interface Props {
         per_page: number;
         sort: string;
         direction: 'asc' | 'desc';
+        overall_operator?: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+        overall_value?: number;
     };
     campuses: Campus[];
     statusOptions: FilterOption[];
@@ -108,6 +111,9 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const filters = ref({ ...props.filters });
+console.log('props', props);
+
 // API
 const api = useApi();
 
@@ -138,6 +144,18 @@ const bulkStatusForm = ref({
 });
 
 const loadingOptions = ref(false);
+
+// Overall score filter state
+const overallFilterOperator = ref(filters.value.overall_operator || 'all');
+const overallFilterValue = ref<number | undefined>(filters.value.overall_value);
+
+// Export state
+const showExportDialog = ref(false);
+const exportForm = ref({
+    format: 'xlsx',
+    scope: 'filtered',
+});
+const isExporting = ref(false);
 
 // Computed
 const hasSelectedApplications = computed(() => selectedApplications.value.length > 0);
@@ -352,7 +370,40 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
     },
     {
         accessorKey: 'overall',
-        header: 'Overall Score',
+        header: ({ column }) => {
+            return h('div', { class: 'flex items-center gap-2' }, [
+                h('span', 'Overall Score'),
+                h(
+                    Button,
+                    {
+                        variant: 'ghost',
+                        size: 'sm',
+                        onClick: () => toggleOverallSort(),
+                        class: 'h-7 w-7 p-0',
+                    },
+                    () =>
+                        h(
+                            'svg',
+                            {
+                                class: 'h-4 w-4',
+                                xmlns: 'http://www.w3.org/2000/svg',
+                                viewBox: '0 0 24 24',
+                                fill: 'none',
+                                stroke: 'currentColor',
+                                'stroke-width': '2',
+                                'stroke-linecap': 'round',
+                                'stroke-linejoin': 'round',
+                            },
+                            [
+                                h('path', {
+                                    d: filters.value.sort === 'overall' && filters.value.direction === 'asc' ? 'M8 9l4-4 4 4' : filters.value.sort === 'overall' && filters.value.direction === 'desc' ? 'M8 15l4 4 4-4' : 'M8 9l4-4 4 4M8 15l4 4 4-4',
+                                    class: filters.value.sort === 'overall' ? 'text-primary' : '',
+                                }),
+                            ],
+                        ),
+                ),
+            ]);
+        },
         cell: ({ row }) => {
             const application = row.original;
             return h('div', { class: 'text-sm font-medium' }, application.overall ? application.overall.toString() : 'N/A');
@@ -365,12 +416,16 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
             const application = row.original;
             const documentPath = application.submitted_photo;
             if (documentPath) {
-                return h('a', {
-                    href: documentPath,
-                    target: '_blank',
-                    rel: 'noopener noreferrer',
-                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
-                }, 'View');
+                return h(
+                    'a',
+                    {
+                        href: documentPath,
+                        target: '_blank',
+                        rel: 'noopener noreferrer',
+                        class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer',
+                    },
+                    'View',
+                );
             }
             return h('span', { class: 'text-sm text-red-600' }, 'No');
         },
@@ -382,12 +437,16 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
             const application = row.original;
             const documentPath = application.submitted_cccd;
             if (documentPath) {
-                return h('a', {
-                    href: documentPath,
-                    target: '_blank',
-                    rel: 'noopener noreferrer',
-                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
-                }, 'View');
+                return h(
+                    'a',
+                    {
+                        href: documentPath,
+                        target: '_blank',
+                        rel: 'noopener noreferrer',
+                        class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer',
+                    },
+                    'View',
+                );
             }
             return h('span', { class: 'text-sm text-red-600' }, 'No');
         },
@@ -399,12 +458,16 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
             const application = row.original;
             const documentPath = application.submitted_ccta;
             if (documentPath) {
-                return h('a', {
-                    href: documentPath,
-                    target: '_blank',
-                    rel: 'noopener noreferrer',
-                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
-                }, 'View');
+                return h(
+                    'a',
+                    {
+                        href: documentPath,
+                        target: '_blank',
+                        rel: 'noopener noreferrer',
+                        class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer',
+                    },
+                    'View',
+                );
             }
             return h('span', { class: 'text-sm text-red-600' }, 'No');
         },
@@ -416,12 +479,16 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
             const application = row.original;
             const documentPath = application.submitted_tn_translate;
             if (documentPath) {
-                return h('a', {
-                    href: documentPath,
-                    target: '_blank',
-                    rel: 'noopener noreferrer',
-                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
-                }, 'View');
+                return h(
+                    'a',
+                    {
+                        href: documentPath,
+                        target: '_blank',
+                        rel: 'noopener noreferrer',
+                        class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer',
+                    },
+                    'View',
+                );
             }
             return h('span', { class: 'text-sm text-red-600' }, 'No');
         },
@@ -433,12 +500,16 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
             const application = row.original;
             const documentPath = application.submitted_hb_translate;
             if (documentPath) {
-                return h('a', {
-                    href: documentPath,
-                    target: '_blank',
-                    rel: 'noopener noreferrer',
-                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
-                }, 'View');
+                return h(
+                    'a',
+                    {
+                        href: documentPath,
+                        target: '_blank',
+                        rel: 'noopener noreferrer',
+                        class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer',
+                    },
+                    'View',
+                );
             }
             return h('span', { class: 'text-sm text-red-600' }, 'No');
         },
@@ -450,12 +521,16 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
             const application = row.original;
             const documentPath = application.submitted_other;
             if (documentPath) {
-                return h('a', {
-                    href: documentPath,
-                    target: '_blank',
-                    rel: 'noopener noreferrer',
-                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
-                }, 'View');
+                return h(
+                    'a',
+                    {
+                        href: documentPath,
+                        target: '_blank',
+                        rel: 'noopener noreferrer',
+                        class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer',
+                    },
+                    'View',
+                );
             }
             return h('span', { class: 'text-sm text-red-600' }, 'No');
         },
@@ -467,12 +542,16 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
             const application = row.original;
             const documentPath = application.submitted_insurance_card;
             if (documentPath) {
-                return h('a', {
-                    href: documentPath,
-                    target: '_blank',
-                    rel: 'noopener noreferrer',
-                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
-                }, 'View');
+                return h(
+                    'a',
+                    {
+                        href: documentPath,
+                        target: '_blank',
+                        rel: 'noopener noreferrer',
+                        class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer',
+                    },
+                    'View',
+                );
             }
             return h('span', { class: 'text-sm text-red-600' }, 'No');
         },
@@ -484,12 +563,16 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
             const application = row.original;
             const documentPath = application.submitted_exemption_gc;
             if (documentPath) {
-                return h('a', {
-                    href: documentPath,
-                    target: '_blank',
-                    rel: 'noopener noreferrer',
-                    class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer'
-                }, 'View');
+                return h(
+                    'a',
+                    {
+                        href: documentPath,
+                        target: '_blank',
+                        rel: 'noopener noreferrer',
+                        class: 'text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer',
+                    },
+                    'View',
+                );
             }
             return h('span', { class: 'text-sm text-red-600' }, 'No');
         },
@@ -640,10 +723,13 @@ const suggestedCoursesColumns = createColumns(baseSuggestedCoursesColumns, {
     enableSelection: true,
 });
 // Filter functions
-const applyFilters = (newFilters: Partial<typeof props.filters>) => {
+const applyFilters = (newFilters: Partial<typeof filters.value>) => {
     const params = new URLSearchParams();
 
-    Object.entries({ ...props.filters, ...newFilters }).forEach(([key, value]) => {
+    filters.value = { ...filters.value, ...newFilters };
+    const queryParams = { ...props.filters, ...filters.value };
+
+    Object.entries(queryParams).forEach(([key, value]) => {
         if (value && value !== '') {
             params.set(key, value.toString());
         }
@@ -683,6 +769,27 @@ const onNavigate = (url: string) => {
     });
 };
 
+const toggleOverallSort = () => {
+    if (filters.value.sort === 'overall') {
+        // Toggle direction if already sorting by overall
+        applyFilters({ 
+            sort: 'overall',
+            direction: filters.value.direction === 'asc' ? 'desc' : 'asc' 
+        });
+    } else {
+        // Set to sort by overall descending by default
+        applyFilters({ sort: 'overall', direction: 'desc' });
+    }
+};
+
+const onOverallFilterChange = (operator: string, value: number | undefined) => {
+    if (operator === 'all' || value === undefined || value === null) {
+        applyFilters({ overall_operator: undefined, overall_value: undefined });
+    } else {
+        applyFilters({ overall_operator: operator, overall_value: value });
+    }
+};
+
 // Selection handlers
 const onSelectionChange = (selected: StudentApplication[]) => {
     selectedApplications.value = selected;
@@ -717,6 +824,7 @@ const closeDialogs = () => {
     showBatchConversionDialog.value = false;
     showBulkStatusUpdateDialog.value = false;
     showApplicationDetailsDialog.value = false;
+    showExportDialog.value = false;
     currentApplication.value = null;
     selectedApplicationForDetails.value = null;
     conversionForm.value = {
@@ -724,6 +832,10 @@ const closeDialogs = () => {
     };
     statusForm.value.status = '';
     bulkStatusForm.value.status = '';
+    exportForm.value = {
+        format: 'xlsx',
+        scope: 'filtered',
+    };
 };
 
 // Action handlers
@@ -852,11 +964,97 @@ const deleteApplication = (application: StudentApplication) => {
 };
 
 const clearFilters = () => {
+    overallFilterOperator.value = 'all';
+    overallFilterValue.value = undefined;
     router.visit('/student-applications', {
         preserveState: true,
         preserveScroll: true,
         only: ['applications', 'filters'],
     });
+};
+
+const openExportDialog = () => {
+    showExportDialog.value = true;
+};
+
+const exportApplications = async () => {
+    isExporting.value = true;
+
+    try {
+        const params = new URLSearchParams();
+        
+        // Add export parameters
+        params.set('format', exportForm.value.format);
+        params.set('scope', exportForm.value.scope);
+        
+        // Add current filters if exporting filtered results
+        if (exportForm.value.scope === 'filtered') {
+            if (filters.value.search) params.set('search', filters.value.search);
+            if (filters.value.status) params.set('status', filters.value.status);
+            if (filters.value.converted) params.set('converted', filters.value.converted);
+            if (filters.value.campus) params.set('campus', filters.value.campus);
+            if (filters.value.overall_operator) params.set('overall_operator', filters.value.overall_operator);
+            if (filters.value.overall_value !== undefined) params.set('overall_value', filters.value.overall_value.toString());
+            if (filters.value.sort) params.set('sort', filters.value.sort);
+            if (filters.value.direction) params.set('direction', filters.value.direction);
+        }
+
+        // Create download URL
+        const exportUrl = `/student-applications/export?${params.toString()}`;
+        
+        // Get CSRF token from meta tag or cookie
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
+                         document.cookie.split('; ').find(row => row.startsWith('XSRF-TOKEN='))?.split('=')[1];
+        
+        // Use fetch to download with authentication
+        const response = await fetch(exportUrl, {
+            method: 'GET',
+            credentials: 'include', // Changed from 'same-origin' to 'include'
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken ? decodeURIComponent(csrfToken) : '',
+                'Accept': exportForm.value.format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Export failed: ${response.statusText}`);
+        }
+
+        // Get the filename from the response headers
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = `student_applications.${exportForm.value.format}`;
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?(.+?)"?(?:;|$)/);
+            if (filenameMatch) {
+                filename = filenameMatch[1];
+            }
+        }
+
+        // Create a blob from the response
+        const blob = await response.blob();
+        
+        // Create a download link and trigger it
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Clean up
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        // Close dialog and show success message
+        closeDialogs();
+        toast.success(`Export completed! Your ${exportForm.value.format.toUpperCase()} file has been downloaded.`);
+    } catch (error) {
+        console.error('Export error:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to export applications. Please try again.');
+    } finally {
+        isExporting.value = false;
+    }
 };
 </script>
 
@@ -878,6 +1076,11 @@ const clearFilters = () => {
             <Button v-if="hasSelectedApplications && canConvertSelected" @click="openConversionDialog()" class="bg-green-600 hover:bg-green-700">
                 <Users class="mr-2 h-4 w-4" />
                 Convert {{ selectedApplications.length }} to Students
+            </Button>
+
+            <Button @click="openExportDialog()" variant="outline" class="border-gray-300">
+                <Download class="mr-2 h-4 w-4" />
+                Export
             </Button>
         </div>
     </div>
@@ -935,6 +1138,87 @@ const clearFilters = () => {
                             </SelectItem>
                         </SelectContent>
                     </Select>
+                </div>
+
+                <!-- Overall Score Filter -->
+                <div class="min-w-[200px]">
+                    <Popover>
+                        <PopoverTrigger as-child>
+                            <Button variant="outline" class="w-full justify-start">
+                                <Filter class="mr-2 h-4 w-4" />
+                                <span v-if="filters.overall_operator && filters.overall_value !== undefined">
+                                    Overall Score {{ 
+                                        filters.overall_operator === 'gt' ? '>' : 
+                                        filters.overall_operator === 'gte' ? '≥' : 
+                                        filters.overall_operator === 'lt' ? '<' : 
+                                        filters.overall_operator === 'lte' ? '≤' : 
+                                        '=' 
+                                    }} {{ filters.overall_value }}
+                                </span>
+                                <span v-else>Overall Score Filter</span>
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent class="w-80">
+                            <div class="space-y-4">
+                                <div>
+                                    <Label class="text-sm font-medium">Operator</Label>
+                                    <Select 
+                                        :model-value="overallFilterOperator" 
+                                        @update:model-value="(value) => {
+                                            overallFilterOperator = value;
+                                            if (value === 'all') {
+                                                overallFilterValue = undefined;
+                                                onOverallFilterChange('all', undefined);
+                                            }
+                                        }"
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select operator" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Scores</SelectItem>
+                                            <SelectItem value="gt">Greater than (>)</SelectItem>
+                                            <SelectItem value="gte">Greater than or equal (≥)</SelectItem>
+                                            <SelectItem value="lt">Less than (<)</SelectItem>
+                                            <SelectItem value="lte">Less than or equal (≤)</SelectItem>
+                                            <SelectItem value="eq">Equal to (=)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div v-if="overallFilterOperator !== 'all'">
+                                    <Label class="text-sm font-medium">Value</Label>
+                                    <Input 
+                                        v-model.number="overallFilterValue" 
+                                        type="number" 
+                                        placeholder="Enter score value"
+                                        min="0"
+                                        max="10"
+                                        step="0.1"
+                                    />
+                                </div>
+                                <div class="flex gap-2">
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        @click="() => {
+                                            overallFilterOperator = 'all';
+                                            overallFilterValue = undefined;
+                                            onOverallFilterChange('all', undefined);
+                                        }"
+                                    >
+                                        Clear
+                                    </Button>
+                                    <Button 
+                                        size="sm"
+                                        :disabled="overallFilterOperator === 'all' || overallFilterValue === undefined"
+                                        @click="onOverallFilterChange(overallFilterOperator, overallFilterValue)"
+                                    >
+                                        Apply Filter
+                                    </Button>
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                 </div>
 
                 <!-- Clear Filters -->
@@ -1049,15 +1333,13 @@ const clearFilters = () => {
 
     <!-- Application Details Dialog -->
     <Dialog v-model:open="showApplicationDetailsDialog">
-        <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
             <DialogHeader>
                 <DialogTitle class="flex items-center gap-2">
                     <Eye class="h-5 w-5" />
                     Student Application Details
                 </DialogTitle>
-                <DialogDescription v-if="selectedApplicationForDetails">
-                    Viewing details for {{ selectedApplicationForDetails.full_name }}'s application
-                </DialogDescription>
+                <DialogDescription v-if="selectedApplicationForDetails"> Viewing details for {{ selectedApplicationForDetails.full_name }}'s application </DialogDescription>
             </DialogHeader>
 
             <div v-if="selectedApplicationForDetails" class="space-y-6">
@@ -1067,29 +1349,29 @@ const clearFilters = () => {
                         <CardTitle class="text-lg">Personal Information</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Application ID</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Application ID</Label>
                                 <p class="font-mono">{{ selectedApplicationForDetails.id }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Full Name</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Full Name</Label>
                                 <p class="font-medium">{{ selectedApplicationForDetails.full_name || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Gender</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Gender</Label>
                                 <p>{{ selectedApplicationForDetails.gender || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Ethnicity</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Ethnicity</Label>
                                 <p>{{ selectedApplicationForDetails.ethnicity || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Birth Date</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Birth Date</Label>
                                 <p>{{ formatBirthDate(selectedApplicationForDetails.birth_day, selectedApplicationForDetails.birth_month, selectedApplicationForDetails.birth_year) }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">National ID</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">National ID</Label>
                                 <p class="font-mono">{{ selectedApplicationForDetails.national_id || 'N/A' }}</p>
                             </div>
                         </div>
@@ -1102,25 +1384,25 @@ const clearFilters = () => {
                         <CardTitle class="text-lg">Contact Information</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div class="grid grid-cols-1  gap-4">
+                        <div class="grid grid-cols-1 gap-4">
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Phone</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Phone</Label>
                                 <p>{{ selectedApplicationForDetails.phone || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Email</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Email</Label>
                                 <p class="text-blue-600">{{ selectedApplicationForDetails.email || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Address</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Address</Label>
                                 <p class="break-words">{{ selectedApplicationForDetails.address || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Parent Phone</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Parent Phone</Label>
                                 <p>{{ selectedApplicationForDetails.parent_phone || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Parent Email</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Parent Email</Label>
                                 <p class="text-blue-600">{{ selectedApplicationForDetails.parent_email || 'N/A' }}</p>
                             </div>
                         </div>
@@ -1133,29 +1415,29 @@ const clearFilters = () => {
                         <CardTitle class="text-lg">Academic Information</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Campus</Label>
-                                <p>{{ campuses.find(c => c.code === selectedApplicationForDetails.campus_code)?.name || selectedApplicationForDetails.campus_code || 'N/A' }}</p>
+                                <Label class="text-muted-foreground text-sm font-medium">Campus</Label>
+                                <p>{{ campuses.find((c) => c.code === selectedApplicationForDetails.campus_code)?.name || selectedApplicationForDetails.campus_code || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Intended Program</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Intended Program</Label>
                                 <p>{{ selectedApplicationForDetails.intended_program || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Specialization</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Specialization</Label>
                                 <p>{{ selectedApplicationForDetails.intended_specialization || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Intake</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Intake</Label>
                                 <p>{{ selectedApplicationForDetails.intake || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Exam Date</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Exam Date</Label>
                                 <p>{{ selectedApplicationForDetails.exam_date ? format(new Date(selectedApplicationForDetails.exam_date), 'MMM dd, yyyy') : 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">SUT ID</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">SUT ID</Label>
                                 <p class="font-mono">{{ selectedApplicationForDetails.sut_id || 'N/A' }}</p>
                             </div>
                         </div>
@@ -1168,30 +1450,30 @@ const clearFilters = () => {
                         <CardTitle class="text-lg">English Test Scores</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Test Type</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Test Type</Label>
                                 <p>{{ selectedApplicationForDetails.english_test_type || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Listening</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Listening</Label>
                                 <p class="font-medium">{{ selectedApplicationForDetails.listening || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Reading</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Reading</Label>
                                 <p class="font-medium">{{ selectedApplicationForDetails.reading || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Writing</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Writing</Label>
                                 <p class="font-medium">{{ selectedApplicationForDetails.writing || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Speaking</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Speaking</Label>
                                 <p class="font-medium">{{ selectedApplicationForDetails.speaking || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Overall Score</Label>
-                                <p class="font-semibold text-lg">{{ selectedApplicationForDetails.overall || 'N/A' }}</p>
+                                <Label class="text-muted-foreground text-sm font-medium">Overall Score</Label>
+                                <p class="text-lg font-semibold">{{ selectedApplicationForDetails.overall || 'N/A' }}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -1203,58 +1485,58 @@ const clearFilters = () => {
                         <CardTitle class="text-lg">Document Submissions</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Photo</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Photo</Label>
                                 <p v-if="selectedApplicationForDetails.submitted_photo">
                                     <a :href="selectedApplicationForDetails.submitted_photo" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">CCCD</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">CCCD</Label>
                                 <p v-if="selectedApplicationForDetails.submitted_cccd">
                                     <a :href="selectedApplicationForDetails.submitted_cccd" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">CCTA</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">CCTA</Label>
                                 <p v-if="selectedApplicationForDetails.submitted_ccta">
                                     <a :href="selectedApplicationForDetails.submitted_ccta" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">TN Translate</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">TN Translate</Label>
                                 <p v-if="selectedApplicationForDetails.submitted_tn_translate">
                                     <a :href="selectedApplicationForDetails.submitted_tn_translate" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">HB Translate</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">HB Translate</Label>
                                 <p v-if="selectedApplicationForDetails.submitted_hb_translate">
                                     <a :href="selectedApplicationForDetails.submitted_hb_translate" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Other Documents</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Other Documents</Label>
                                 <p v-if="selectedApplicationForDetails.submitted_other">
                                     <a :href="selectedApplicationForDetails.submitted_other" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Insurance Card</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Insurance Card</Label>
                                 <p v-if="selectedApplicationForDetails.submitted_insurance_card">
                                     <a :href="selectedApplicationForDetails.submitted_insurance_card" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Exemption GC</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Exemption GC</Label>
                                 <p v-if="selectedApplicationForDetails.submitted_exemption_gc">
                                     <a :href="selectedApplicationForDetails.submitted_exemption_gc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
@@ -1270,31 +1552,31 @@ const clearFilters = () => {
                         <CardTitle class="text-lg">Additional Information</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Health Information</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Health Information</Label>
                                 <p class="break-words">{{ selectedApplicationForDetails.health_information || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">StudyLink Status</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">StudyLink Status</Label>
                                 <p>{{ selectedApplicationForDetails.study_link_status || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">English Qualifications</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">English Qualifications</Label>
                                 <p class="break-words">{{ selectedApplicationForDetails.english_qualifications || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">International Applicant</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">International Applicant</Label>
                                 <p :class="selectedApplicationForDetails.is_international_applicant ? 'text-blue-600' : 'text-gray-600'">{{ formatBoolean(selectedApplicationForDetails.is_international_applicant) }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Exception Units</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Exception Units</Label>
                                 <p class="break-words">{{ selectedApplicationForDetails.exception_units || 'N/A' }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Application Status</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Application Status</Label>
                                 <Badge :variant="getStatusBadge(selectedApplicationForDetails.status).variant" :class="getStatusBadge(selectedApplicationForDetails.status).class">
-                                    <component :is="getStatusBadge(selectedApplicationForDetails.status).icon" class="w-3 h-3 mr-1" />
+                                    <component :is="getStatusBadge(selectedApplicationForDetails.status).icon" class="mr-1 h-3 w-3" />
                                     {{ selectedApplicationForDetails.status.charAt(0).toUpperCase() + selectedApplicationForDetails.status.slice(1) }}
                                 </Badge>
                             </div>
@@ -1308,21 +1590,21 @@ const clearFilters = () => {
                         <CardTitle class="text-lg">Conversion Status</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Student Conversion</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Student Conversion</Label>
                                 <div v-if="selectedApplicationForDetails.student">
                                     <p class="font-medium text-green-600">{{ selectedApplicationForDetails.student.student_id }}</p>
-                                    <p class="text-xs text-muted-foreground">Converted to Student</p>
+                                    <p class="text-muted-foreground text-xs">Converted to Student</p>
                                 </div>
                                 <p v-else class="text-muted-foreground">Not Converted</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Created Date</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Created Date</Label>
                                 <p>{{ format(new Date(selectedApplicationForDetails.created_at), 'MMM dd, yyyy HH:mm') }}</p>
                             </div>
                             <div>
-                                <Label class="text-sm font-medium text-muted-foreground">Last Updated</Label>
+                                <Label class="text-muted-foreground text-sm font-medium">Last Updated</Label>
                                 <p>{{ format(new Date(selectedApplicationForDetails.updated_at), 'MMM dd, yyyy HH:mm') }}</p>
                             </div>
                         </div>
@@ -1332,6 +1614,104 @@ const clearFilters = () => {
 
             <DialogFooter>
                 <Button variant="outline" @click="closeDialogs()">Close</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Export Dialog -->
+    <Dialog v-model:open="showExportDialog">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle class="flex items-center gap-2">
+                    <FileSpreadsheet class="h-5 w-5" />
+                    Export Applications
+                </DialogTitle>
+                <DialogDescription>
+                    Choose export format and scope for your data export
+                </DialogDescription>
+            </DialogHeader>
+
+            <div class="space-y-4">
+                <div>
+                    <Label class="text-sm font-medium">Export Format</Label>
+                    <Select v-model="exportForm.format">
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select format" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="xlsx">
+                                <div class="flex items-center">
+                                    <FileSpreadsheet class="mr-2 h-4 w-4 text-green-600" />
+                                    Excel (.xlsx)
+                                </div>
+                            </SelectItem>
+                            <SelectItem value="csv">
+                                <div class="flex items-center">
+                                    <FileSpreadsheet class="mr-2 h-4 w-4 text-blue-600" />
+                                    CSV (.csv)
+                                </div>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div>
+                    <Label class="text-sm font-medium">Export Scope</Label>
+                    <Select v-model="exportForm.scope">
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select scope" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="filtered">
+                                <div>
+                                    <div class="font-medium">Current Filtered Results</div>
+                                    <div class="text-xs text-muted-foreground">
+                                        Export only the applications matching current filters
+                                        <span v-if="applications.total">({{ applications.total }} records)</span>
+                                    </div>
+                                </div>
+                            </SelectItem>
+                            <SelectItem value="all">
+                                <div>
+                                    <div class="font-medium">All Applications</div>
+                                    <div class="text-xs text-muted-foreground">Export all applications without any filters</div>
+                                </div>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div class="rounded-lg bg-muted p-3">
+                    <div class="text-sm font-medium mb-2">Export Information</div>
+                    <ul class="text-xs text-muted-foreground space-y-1">
+                        <li v-if="exportForm.scope === 'filtered' && filters.search">• Search: "{{ filters.search }}"</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.status">• Status: {{ filters.status }}</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.converted">• Conversion: {{ filters.converted === 'yes' ? 'Converted' : 'Not Converted' }}</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.campus">• Campus: {{ filters.campus }}</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.overall_operator && filters.overall_value !== undefined">
+                            • Overall Score: {{ 
+                                filters.overall_operator === 'gt' ? '>' : 
+                                filters.overall_operator === 'gte' ? '≥' : 
+                                filters.overall_operator === 'lt' ? '<' : 
+                                filters.overall_operator === 'lte' ? '≤' : 
+                                '=' 
+                            }} {{ filters.overall_value }}
+                        </li>
+                        <li v-if="exportForm.scope === 'all'">• All applications will be exported</li>
+                        <li>• Format: {{ exportForm.format === 'xlsx' ? 'Excel (.xlsx)' : 'CSV (.csv)' }}</li>
+                    </ul>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="closeDialogs" :disabled="isExporting">
+                    Cancel
+                </Button>
+                <Button @click="exportApplications" :disabled="isExporting">
+                    <Download v-if="!isExporting" class="mr-2 h-4 w-4" />
+                    <RefreshCw v-if="isExporting" class="mr-2 h-4 w-4 animate-spin" />
+                    {{ isExporting ? 'Exporting...' : 'Export' }}
+                </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

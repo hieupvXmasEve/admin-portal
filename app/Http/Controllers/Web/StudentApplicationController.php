@@ -11,6 +11,8 @@ use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\StudentApplication;
 use App\Services\StudentApplicationService;
+use App\Exports\StudentApplicationExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,9 +24,7 @@ class StudentApplicationController extends Controller
 {
     public function __construct(
         private StudentApplicationService $studentApplicationService
-    )
-    {
-    }
+    ) {}
 
     /**
      * Display a listing of student applications
@@ -36,9 +36,11 @@ class StudentApplicationController extends Controller
             'status' => $request->get('status'),
             'converted' => $request->get('converted'),
             'campus_code' => $request->get('campus'),
-            'per_page' => $request->get('per_page', 15),
+            'per_page' => min((int) $request->get('per_page', 15), 200),
             'sort' => $request->get('sort', 'created_at'),
             'direction' => $request->get('direction', 'desc'),
+            'overall_operator' => $request->get('overall_operator'),
+            'overall_value' => $request->get('overall_value'),
         ];
 
         $query = StudentApplication::query()
@@ -75,10 +77,23 @@ class StudentApplicationController extends Controller
             $query->where('campus_code', $filters['campus_code']);
         }
 
+        // Apply overall score filter
+        if ($filters['overall_operator'] && $filters['overall_value'] !== null) {
+            $operator = match ($filters['overall_operator']) {
+                'gt' => '>',
+                'gte' => '>=',
+                'lt' => '<',
+                'lte' => '<=',
+                'eq' => '=',
+                default => '='
+            };
+            $query->where('overall', $operator, $filters['overall_value']);
+        }
+
         // Apply sorting
         $query->orderBy($filters['sort'], $filters['direction']);
         $applications = $query
-//            ->where('campus_code', app('campus')->code)
+            //            ->where('campus_code', app('campus')->code)
             ->paginate($filters['per_page'])
             ->withQueryString();
 
@@ -343,6 +358,98 @@ class StudentApplicationController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update application statuses: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Export student applications to Excel or CSV
+     */
+    public function export(Request $request)
+    {
+        try {
+            $request->validate([
+                'format' => 'required|in:xlsx,csv',
+                'scope' => 'required|in:filtered,all',
+            ]);
+
+            $filters = [
+                'search' => $request->get('search'),
+                'status' => $request->get('status'),
+                'converted' => $request->get('converted'),
+                'campus_code' => $request->get('campus'),
+                'overall_operator' => $request->get('overall_operator'),
+                'overall_value' => $request->get('overall_value'),
+            ];
+
+            $query = StudentApplication::query();
+
+            if ($request->scope === 'filtered') {
+                // Apply search filter
+                if ($filters['search']) {
+                    $query->where(function ($q) use ($filters) {
+                        $q->where('full_name', 'like', '%' . $filters['search'] . '%')
+                            ->orWhere('email', 'like', '%' . $filters['search'] . '%')
+                            ->orWhere('national_id', 'like', '%' . $filters['search'] . '%')
+                            ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
+                    });
+                }
+
+                // Apply status filter
+                if ($filters['status']) {
+                    $query->where('status', $filters['status']);
+                }
+
+                // Apply converted filter
+                if ($filters['converted'] !== null && $filters['converted'] !== '') {
+                    if ($filters['converted'] === 'yes') {
+                        $query->whereNotNull('student_id');
+                    } elseif ($filters['converted'] === 'no') {
+                        $query->whereNull('student_id');
+                    }
+                }
+
+                // Apply campus filter
+                if ($filters['campus_code'] !== null && $filters['campus_code'] !== 'all') {
+                    $query->where('campus_code', $filters['campus_code']);
+                }
+
+                // Apply overall score filter
+                if ($filters['overall_operator'] && $filters['overall_value'] !== null) {
+                    $operator = match($filters['overall_operator']) {
+                        'gt' => '>',
+                        'gte' => '>=',
+                        'lt' => '<',
+                        'lte' => '<=',
+                        'eq' => '=',
+                        default => '='
+                    };
+                    $query->where('overall', $operator, $filters['overall_value']);
+                }
+            }
+
+            // Apply sorting
+            $sort = $request->get('sort', 'created_at');
+            $direction = $request->get('direction', 'desc');
+            $query->orderBy($sort, $direction);
+
+            $export = new StudentApplicationExport($query, $filters);
+            $timestamp = now()->format('Y-m-d_H-i-s');
+            $filename = "student_applications_{$timestamp}";
+
+            if ($request->format === 'csv') {
+                return Excel::download($export, "{$filename}.csv", \Maatwebsite\Excel\Excel::CSV);
+            }
+
+            return Excel::download($export, "{$filename}.xlsx");
+        } catch (\Exception $e) {
+            Log::error('Export failed: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'error' => 'Export failed: ' . $e->getMessage()
             ], 500);
         }
     }
