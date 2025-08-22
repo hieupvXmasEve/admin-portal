@@ -49,6 +49,7 @@ class StudentApplication extends AuditableModel
         'exception_units',
         'status',
         'student_id',
+        'student_code',
     ];
 
     protected $casts = [
@@ -115,7 +116,7 @@ class StudentApplication extends AuditableModel
             'campus_code', 'intended_program', 'intended_specialization', 'intake',
             'exam_date', 'english_test_type', 'overall',
             'study_link_status', 'is_international_applicant',
-            'status', 'student_id',
+            'status', 'student_id', 'student_code',
         ];
     }
 

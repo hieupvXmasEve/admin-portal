@@ -53,6 +53,7 @@ class StudentApplicationController extends Controller
             $query->where(function ($q) use ($filters) {
                 $q->where('full_name', 'like', '%' . $filters['search'] . '%')
                     ->orWhere('email', 'like', '%' . $filters['search'] . '%')
+                    ->orWhere('student_code', 'like', '%' . $filters['search'] . '%')
                     ->orWhere('national_id', 'like', '%' . $filters['search'] . '%')
                     ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
             });

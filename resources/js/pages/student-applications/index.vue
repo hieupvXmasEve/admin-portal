@@ -24,6 +24,7 @@ import { toast } from 'vue-sonner';
 interface StudentApplication {
     id: number;
     full_name: string;
+    student_code: string;
     gender: string;
     ethnicity: string;
     birth_day: number;
@@ -196,6 +197,14 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
         cell: ({ row }) => {
             const application = row.original;
             return h('div', { class: 'text-sm font-mono' }, application.id.toString());
+        },
+    },
+    {
+        accessorKey: 'student_code',
+        header: 'Student Code',
+        cell: ({ row }) => {
+            const application = row.original;
+            return h('div', { class: 'font-medium min-w-[150px]' }, application.student_code);
         },
     },
     {

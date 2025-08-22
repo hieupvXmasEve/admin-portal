@@ -83,6 +83,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     // Student Applications
     Route::get('/student-applications', [StudentApplicationController::class, 'index']);
     Route::get('/student-applications/{studentApplication}', [StudentApplicationController::class, 'show']);
+    Route::put('/student-applications/{studentApplication}', [StudentApplicationController::class, 'update']);
     Route::patch('/student-applications/{studentApplication}/status', [StudentApplicationController::class, 'updateStatus']);
     Route::post('/student-applications', [StudentApplicationController::class, 'store']);
 
