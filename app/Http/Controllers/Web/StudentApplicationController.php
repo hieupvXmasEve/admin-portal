@@ -35,7 +35,7 @@ class StudentApplicationController extends Controller
             'search' => $request->get('search'),
             'status' => $request->get('status'),
             'converted' => $request->get('converted'),
-            'campus_code' => $request->get('campus'),
+            'campus_code' => $request->get('campus_code'),
             'per_page' => min((int) $request->get('per_page', 15), 200),
             'sort' => $request->get('sort', 'created_at'),
             'direction' => $request->get('direction', 'desc'),
@@ -87,7 +87,10 @@ class StudentApplicationController extends Controller
                 'eq' => '=',
                 default => '='
             };
-            $query->where('overall', $operator, $filters['overall_value']);
+            // $query->where('overall', $operator, $filters['overall_value']);
+            $query->whereRaw('COALESCE(overall, 0) ' . $operator . ' ?', [
+                $filters['overall_value']
+            ]);
         }
 
         // Apply sorting
@@ -377,7 +380,7 @@ class StudentApplicationController extends Controller
                 'search' => $request->get('search'),
                 'status' => $request->get('status'),
                 'converted' => $request->get('converted'),
-                'campus_code' => $request->get('campus'),
+                'campus_code' => $request->get('campus_code'),
                 'overall_operator' => $request->get('overall_operator'),
                 'overall_value' => $request->get('overall_value'),
             ];
@@ -416,7 +419,7 @@ class StudentApplicationController extends Controller
 
                 // Apply overall score filter
                 if ($filters['overall_operator'] && $filters['overall_value'] !== null) {
-                    $operator = match($filters['overall_operator']) {
+                    $operator = match ($filters['overall_operator']) {
                         'gt' => '>',
                         'gte' => '>=',
                         'lt' => '<',
@@ -447,7 +450,7 @@ class StudentApplicationController extends Controller
                 'exception' => $e,
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return response()->json([
                 'error' => 'Export failed: ' . $e->getMessage()
             ], 500);
