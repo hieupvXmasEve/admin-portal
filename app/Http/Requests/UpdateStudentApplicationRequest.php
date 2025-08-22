@@ -29,10 +29,10 @@ class UpdateStudentApplicationRequest extends FormRequest
             'ethnicity' => ['nullable', 'string', 'max:100'],
             'birth_day' => ['nullable', 'integer', 'min:1', 'max:31'],
             'birth_month' => ['nullable', 'integer', 'min:1', 'max:12'],
-            'birth_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
-            'national_id' => ['nullable', 'string', 'max:20', 'unique:student_applications,national_id,'.$applicationId],
+            'birth_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
+            'national_id' => ['nullable', 'string', 'max:20', 'unique:student_applications,national_id,' . $applicationId],
             'phone' => ['required', 'string', 'max:20'],
-            'email' => ['required', 'email', 'max:255', 'unique:student_applications,email,'.$applicationId],
+            'email' => ['required', 'email', 'max:255', 'unique:student_applications,email,' . $applicationId],
             'address' => ['nullable', 'string'],
             'health_information' => ['nullable', 'string'],
             'parent_phone' => ['nullable', 'string', 'max:20'],
@@ -62,6 +62,7 @@ class UpdateStudentApplicationRequest extends FormRequest
             'is_international_applicant' => ['nullable', 'boolean'],
             'exception_units' => ['nullable', 'string'],
             'status' => ['required', 'in:pending,reviewed,approved,rejected'],
+            'student_code' => ['required', 'string', 'max:20'],
         ];
     }
 

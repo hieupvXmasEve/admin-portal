@@ -28,7 +28,7 @@ class StoreStudentApplicationRequest extends FormRequest
             'students.*.ethnicity' => 'nullable|string|max:100',
             'students.*.birth_day' => 'nullable|integer|min:1|max:31',
             'students.*.birth_month' => 'nullable|integer|min:1|max:12',
-            'students.*.birth_year' => 'nullable|integer|min:1900|max:'.date('Y'),
+            'students.*.birth_year' => 'nullable|integer|min:1900|max:' . date('Y'),
             'students.*.national_id' => 'nullable|string|max:20',
             'students.*.phone' => 'nullable|string|max:20',
             'students.*.email' => 'required|email|max:255',
@@ -61,6 +61,7 @@ class StoreStudentApplicationRequest extends FormRequest
             'students.*.is_international_applicant' => 'nullable|boolean',
             'students.*.exception_units' => 'nullable|string',
             'students.*.status' => 'nullable|in:pending,reviewed,approved,rejected',
+            'students.*.student_code' => 'required|string|max:20',
         ];
     }
 }
