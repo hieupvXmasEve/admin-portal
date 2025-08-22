@@ -5,6 +5,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import StudentAvatar from '@/components/ui/avatar/StudentAvatar.vue';
 import type { Campus, CurriculumVersion, Program, Specialization, Student } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
 import { studentRoutes } from '@/utils/routes';
@@ -196,6 +197,15 @@ const onSubmit = handleSubmit((formData) => {
 const handleCancel = () => {
     router.visit(studentRoutes.show(props.student.id));
 };
+
+// Photo handling
+const selectedPhoto = ref<File | null>(null);
+const photoPreviewUrl = ref<string | null>(null);
+
+const handlePhotoSelected = (file: File, dataUrl: string) => {
+    selectedPhoto.value = file;
+    photoPreviewUrl.value = dataUrl;
+};
 </script>
 
 <template>
@@ -223,6 +233,16 @@ const handleCancel = () => {
                 </CardTitle>
             </CardHeader>
             <CardContent class="space-y-4">
+                <!-- Avatar Section -->
+                <div class="mb-6">
+                    <StudentAvatar
+                        :student-id="student.id"
+                        :current-avatar="photoPreviewUrl || student.avatar_url"
+                        size="xl"
+                        @photo-selected="handlePhotoSelected"
+                    />
+                </div>
+
                 <div class="grid grid-cols-1">
                     <FormField v-slot="{ componentField }" name="full_name">
                         <FormItem>

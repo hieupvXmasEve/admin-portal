@@ -71,6 +71,11 @@ class HandleInertiaRequests extends Middleware
                 return [
                     'success' => session('success'),
                     'error' => session('error'),
+                    'warning' => session('warning'),
+                    'info' => session('info'),
+                    'batch_errors' => session('batch_errors'),
+                    'conversion_summary' => session('conversion_summary'),
+                    'success_details' => session('success_details'),
                 ];
             },
         ];

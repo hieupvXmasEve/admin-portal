@@ -91,6 +91,15 @@ interface RegistrationStats {
     }>;
 }
 
+interface CampusStats {
+    campus_name: string;
+    campus_code: string;
+    total_eligible_students: number;
+    enrolled_students: number;
+    not_enrolled_students: number;
+    enrollment_rate: number;
+}
+
 interface Props {
     semester: Semester & {
         enrollments?: Enrollment[];
@@ -101,6 +110,7 @@ interface Props {
         by_status: Record<string, number>;
         by_semester_number: Record<string, number>;
     };
+    campusStats?: CampusStats;
 }
 
 const props = defineProps<Props>();
@@ -150,7 +160,7 @@ const generateEnrollments = async () => {
         if (data.value?.success) {
             toast.success(data.value.message);
             // Refresh page data
-            router.reload({ only: ['semester', 'enrollmentStats'] });
+            router.reload({ only: ['semester', 'enrollmentStats', 'campusStats'] });
         } else {
             toast.error(data.value?.message || 'Failed to generate enrollments');
         }
@@ -423,6 +433,39 @@ onMounted(() => {
         <Heading :title="`${semester.name} - Enrollment Management`" />
     </div>
 
+    <!-- Campus Overview -->
+    <Card v-if="campusStats" class="mb-6 border-blue-200 bg-blue-50">
+        <CardHeader>
+            <CardTitle class="flex items-center gap-2 text-blue-800">
+                <Users class="h-5 w-5" />
+                {{ campusStats.campus_name }} - Student Enrollment Overview
+            </CardTitle>
+            <CardDescription class="text-blue-700">
+                Campus: {{ campusStats.campus_code }} | Enrollment management for {{ semester.name }}
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-800">{{ campusStats.total_eligible_students }}</div>
+                    <div class="text-sm text-blue-600">Total Eligible Students</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-800">{{ campusStats.enrolled_students }}</div>
+                    <div class="text-sm text-green-600">Already Enrolled</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-amber-800">{{ campusStats.not_enrolled_students }}</div>
+                    <div class="text-sm text-amber-600">Not Enrolled Yet</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-indigo-800">{{ campusStats.enrollment_rate }}%</div>
+                    <div class="text-sm text-indigo-600">Enrollment Rate</div>
+                </div>
+            </div>
+        </CardContent>
+    </Card>
+
     <!-- Overview Cards -->
     <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
@@ -432,6 +475,9 @@ onMounted(() => {
             </CardHeader>
             <CardContent>
                 <div class="text-2xl font-bold">{{ enrollmentStats.total_enrolled }}</div>
+                <div class="text-xs text-muted-foreground mt-1" v-if="campusStats">
+                    {{ campusStats.campus_name }}
+                </div>
             </CardContent>
         </Card>
         <Card>
@@ -454,11 +500,11 @@ onMounted(() => {
         </Card>
         <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle class="text-sm font-medium">Enrollment Rate</CardTitle>
+                <CardTitle class="text-sm font-medium">Campus Enrollment Rate</CardTitle>
                 <BarChart3 class="text-muted-foreground h-4 w-4" />
             </CardHeader>
             <CardContent>
-                <div class="text-2xl font-bold">{{ registrationStats?.enrollment_summary.enrollment_rate || 0 }}%</div>
+                <div class="text-2xl font-bold">{{ campusStats?.enrollment_rate || 0 }}%</div>
             </CardContent>
         </Card>
     </div>
@@ -476,18 +522,32 @@ onMounted(() => {
             <Card>
                 <CardHeader>
                     <CardTitle>Generate Student Enrollments</CardTitle>
-                    <CardDescription> Create enrollments for all active students based on their curriculum progress. </CardDescription>
+                    <CardDescription>
+                        Create enrollments for all active students in {{ campusStats?.campus_name || 'current campus' }} based on their curriculum progress.
+                        <span v-if="campusStats && campusStats.not_enrolled_students > 0" class="block mt-2 text-amber-600 font-medium">
+                            {{ campusStats.not_enrolled_students }} students are eligible for enrollment.
+                        </span>
+                    </CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
                     <div class="space-y-4">
                         <div class="flex items-center justify-between">
-                            <div>
+                            <div class="flex-1">
                                 <p class="text-muted-foreground text-sm">This will create enrollment records for students who don't already have one for this semester.</p>
+                                <div v-if="campusStats" class="mt-2 text-sm">
+                                    <span class="text-blue-600 font-medium">{{ campusStats.campus_name }}</span>:
+                                    <span class="text-green-600 ml-2">{{ campusStats.enrolled_students }} enrolled</span> |
+                                    <span class="text-amber-600 ml-2">{{ campusStats.not_enrolled_students }} pending</span> |
+                                    <span class="text-gray-600 ml-2">{{ campusStats.total_eligible_students }} total eligible</span>
+                                </div>
                             </div>
                             <div class="flex gap-2">
                                 <Button @click="generateEnrollments" :disabled="loading.generate">
                                     <Loader2 v-if="loading.generate" class="mr-2 h-4 w-4 animate-spin" />
                                     Generate Enrollments
+                                    <span v-if="campusStats && campusStats.not_enrolled_students > 0" class="ml-1">
+                                        ({{ campusStats.not_enrolled_students }})
+                                    </span>
                                 </Button>
                                 <Button @click="bulkRegisterStudents" :disabled="loading.bulkRegister || enrollmentStats.total_enrolled === 0" variant="outline">
                                     <Loader2 v-if="loading.bulkRegister" class="mr-2 h-4 w-4 animate-spin" />

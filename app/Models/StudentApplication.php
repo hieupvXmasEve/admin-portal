@@ -261,8 +261,8 @@ class StudentApplication extends AuditableModel
             return false;
         }
 
-        // Required basic data
-        if (empty($this->full_name) || empty($this->email) || empty($this->campus_code)) {
+        // Required basic data including student_code
+        if (empty($this->full_name) || empty($this->email) || empty($this->campus_code) || empty($this->student_code)) {
             return false;
         }
 
@@ -296,6 +296,10 @@ class StudentApplication extends AuditableModel
 
         if (empty($this->campus_code)) {
             $errors[] = 'Campus code is required';
+        }
+
+        if (empty($this->student_code)) {
+            $errors[] = 'Student code is required';
         }
 
         if (empty($this->intended_program)) {
