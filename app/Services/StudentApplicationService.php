@@ -151,7 +151,7 @@ class StudentApplicationService
 
         foreach ($applicationIds as $applicationId) {
             Log::info("Processing application {$applicationId}");
-            
+
             // Clone base conversion data for this application
             $dataForThisApplication = $conversionData;
 
@@ -193,25 +193,27 @@ class StudentApplicationService
             }
 
             // Auto-resolve missing IDs using ProgramMappingService
-            if (! isset($dataForThisApplication['campus_id']) ||
+            if (
+                ! isset($dataForThisApplication['campus_id']) ||
                 ! isset($dataForThisApplication['program_id']) ||
-                ! isset($dataForThisApplication['curriculum_version_id'])) {
-                
+                ! isset($dataForThisApplication['curriculum_version_id'])
+            ) {
+
                 Log::info("Auto-resolving mapping data for application {$applicationId}", [
                     'campus_code' => $application->campus_code,
                     'intended_program' => $application->intended_program,
                     'intake' => $application->intake
                 ]);
-                
+
                 $mappingData = $application->getConversionMappingData();
-                
+
                 Log::info("Mapping resolution result for application {$applicationId}", [
                     'resolved_data' => $mappingData
                 ]);
-                
+
                 // Merge resolved data with existing data (existing data takes precedence)
                 $dataForThisApplication = array_merge($mappingData, $dataForThisApplication);
-                
+
                 // Validate mapping completeness
                 $mappingValidation = $this->programMappingService->validateMappingData($mappingData);
                 if (! $mappingValidation['valid']) {
@@ -228,7 +230,7 @@ class StudentApplicationService
                     $errorCount++;
                     continue;
                 }
-                
+
                 Log::info("Mapping validation successful for application {$applicationId}");
             }
 
@@ -290,7 +292,7 @@ class StudentApplicationService
             // Additional fields with defaults
             'high_school_name' => null,
             'high_school_graduation_year' => null,
-            'entrance_exam_score' => $application->overall, // Use overall English score if available
+            // 'entrance_exam_score' => $application->overall, // Use overall English score if available
             'admission_notes' => $this->generateAdmissionNotes($application),
         ];
 
