@@ -164,7 +164,7 @@ const batchErrors = ref<Array<{ application_id: number; error: string; details: 
 
 // Computed
 const hasSelectedApplications = computed(() => selectedApplications.value.length > 0);
-const canConvertSelected = computed(() => selectedApplications.value.every((app) => app.status === 'approved' && !app.student));
+const canConvertSelected = computed(() => selectedApplications.value.every((app) => app.status === 'approved'));
 
 // Status badge configuration
 const getStatusBadge = (status: string) => {
