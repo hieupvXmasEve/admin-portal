@@ -189,6 +189,8 @@ class StudentApplicationImportService
 
     /**
      * Generate Excel template for student applications
+     * Note: Email is now used as the primary identifier for duplicate detection.
+     * If an email already exists in the database, the record will be updated.
      */
     public function generateTemplate(): string
     {
@@ -455,6 +457,10 @@ class StudentApplicationImportService
             $rowWarnings = [];
 
             // Check required fields
+            if (empty($row['data']['email'])) {
+                $errors[] = 'Email is required for import';
+            }
+            
             if (empty($row['data']['student_code'])) {
                 $errors[] = 'Student code is required';
             }
@@ -463,11 +469,11 @@ class StudentApplicationImportService
                 $errors[] = 'Full name is required';
             }
 
-            // Check for potential duplicates
-            if (!empty($row['data']['student_code'])) {
-                $existing = StudentApplication::where('student_code', $row['data']['student_code'])->first();
+            // Check for potential duplicates by email
+            if (!empty($row['data']['email'])) {
+                $existing = StudentApplication::where('email', $row['data']['email'])->first();
                 if ($existing) {
-                    $rowWarnings[] = 'Student code already exists - will be updated';
+                    $rowWarnings[] = 'Email already exists - record will be updated';
                 }
             }
 
