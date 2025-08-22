@@ -184,4 +184,141 @@ class StudentApplication extends AuditableModel
             'is_international' => $this->is_international_applicant,
         ];
     }
+
+    /**
+     * Get campus relationship from campus_code
+     */
+    public function campus(): BelongsTo
+    {
+        return $this->belongsTo(Campus::class, 'campus_code', 'code');
+    }
+
+    /**
+     * Resolve campus ID from campus code
+     */
+    public function resolveCampusId(): ?int
+    {
+        if (empty($this->campus_code)) {
+            return null;
+        }
+
+        $campus = Campus::where('code', $this->campus_code)->first();
+        return $campus?->id;
+    }
+
+    /**
+     * Resolve program ID from intended program using mapping
+     */
+    public function resolveProgramId(): ?int
+    {
+        if (empty($this->intended_program)) {
+            return null;
+        }
+
+        $mappingService = app(\App\Services\ProgramMappingService::class);
+        return $mappingService->getProgramIdFromIntendedCode($this->intended_program);
+    }
+
+    /**
+     * Resolve curriculum version ID from intake and program
+     */
+    public function resolveCurriculumVersionId(): ?int
+    {
+        if (empty($this->intake)) {
+            return null;
+        }
+
+        $programId = $this->resolveProgramId();
+        if (!$programId) {
+            return null;
+        }
+
+        $mappingService = app(\App\Services\ProgramMappingService::class);
+        return $mappingService->getCurriculumVersionId($this->intake, $programId);
+    }
+
+    /**
+     * Get complete mapping data for student conversion
+     */
+    public function getConversionMappingData(): array
+    {
+        $mappingService = app(\App\Services\ProgramMappingService::class);
+        
+        return $mappingService->resolveApplicationMappingData([
+            'campus_code' => $this->campus_code,
+            'intended_program' => $this->intended_program,
+            'intake' => $this->intake,
+        ]);
+    }
+
+    /**
+     * Check if application data is complete for conversion
+     */
+    public function isReadyForConversion(): bool
+    {
+        // Already converted
+        if ($this->isConverted()) {
+            return false;
+        }
+
+        // Required basic data
+        if (empty($this->full_name) || empty($this->email) || empty($this->campus_code)) {
+            return false;
+        }
+
+        // Check if mapping data can be resolved
+        $mappingData = $this->getConversionMappingData();
+        
+        return !empty($mappingData['campus_id']) && 
+               !empty($mappingData['program_id']) && 
+               !empty($mappingData['curriculum_version_id']);
+    }
+
+    /**
+     * Get validation errors for conversion readiness
+     */
+    public function getConversionValidationErrors(): array
+    {
+        $errors = [];
+
+        if ($this->isConverted()) {
+            $errors[] = 'Application has already been converted';
+            return $errors;
+        }
+
+        if (empty($this->full_name)) {
+            $errors[] = 'Full name is required';
+        }
+
+        if (empty($this->email)) {
+            $errors[] = 'Email is required';
+        }
+
+        if (empty($this->campus_code)) {
+            $errors[] = 'Campus code is required';
+        }
+
+        if (empty($this->intended_program)) {
+            $errors[] = 'Intended program is required';
+        }
+
+        if (empty($this->intake)) {
+            $errors[] = 'Intake is required';
+        }
+
+        // Check mapping resolution
+        if (!empty($this->campus_code) && !$this->resolveCampusId()) {
+            $errors[] = "Campus not found for code: {$this->campus_code}";
+        }
+
+        if (!empty($this->intended_program) && !$this->resolveProgramId()) {
+            $errors[] = "Program not found for intended program: {$this->intended_program}";
+        }
+
+        if (!empty($this->intake) && !empty($this->intended_program) && !$this->resolveCurriculumVersionId()) {
+            $errors[] = "Curriculum version not found for intake: {$this->intake}";
+        }
+
+        return $errors;
+    }
 }
