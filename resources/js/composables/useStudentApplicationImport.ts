@@ -89,7 +89,7 @@ export function useStudentApplicationImport() {
 
     // Computed
     const canStartImport = computed(() => {
-        return selectedFile.value && Object.keys(columnMapping.value).length > 0 && Object.values(columnMapping.value).includes('student_code') && Object.values(columnMapping.value).includes('full_name');
+        return selectedFile.value && Object.keys(columnMapping.value).length > 0 && Object.values(columnMapping.value).includes('email') && Object.values(columnMapping.value).includes('student_code') && Object.values(columnMapping.value).includes('full_name');
     });
 
     const hasValidData = computed(() => {
@@ -192,6 +192,7 @@ export function useStudentApplicationImport() {
             const missingItems = [];
             if (!selectedFile.value) missingItems.push('file');
             if (!Object.keys(columnMapping.value).length) missingItems.push('column mapping');
+            if (!Object.values(columnMapping.value).includes('email')) missingItems.push('email mapping');
             if (!Object.values(columnMapping.value).includes('student_code')) missingItems.push('student_code mapping');
             if (!Object.values(columnMapping.value).includes('full_name')) missingItems.push('full_name mapping');
 

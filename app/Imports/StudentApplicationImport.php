@@ -18,6 +18,16 @@ use Maatwebsite\Excel\Concerns\WithCalculatedFormulas;
 use Maatwebsite\Excel\Validators\Failure;
 use Throwable;
 
+/**
+ * Import student applications from Excel files.
+ * 
+ * This class handles the import of student applications with the following logic:
+ * - Email is used as the primary identifier for duplicate detection
+ * - If an email already exists in the database, the record will be updated
+ * - If an email doesn't exist, a new record will be created
+ * - Both email and student_code are required fields
+ * - Records without email will be skipped
+ */
 class StudentApplicationImport implements
     ToCollection,
     WithHeadingRow,
@@ -99,7 +109,17 @@ class StudentApplicationImport implements
                 'student_code_value' => $mappedData['student_code'] ?? null,
             ]);
 
-            // Validate required student_code
+            // Validate required fields
+            if (empty($mappedData['email'])) {
+                $this->results['skipped']++;
+                $this->results['errors'][] = [
+                    'row' => $rowNumber,
+                    'student_code' => $mappedData['student_code'] ?? '',
+                    'errors' => ['Email is required for import']
+                ];
+                return;
+            }
+            
             if (empty($mappedData['student_code'])) {
                 $this->results['skipped']++;
                 $this->results['errors'][] = [
@@ -116,8 +136,8 @@ class StudentApplicationImport implements
                 return; // Skip this row due to validation errors
             }
 
-            // Check if student application exists by student_code
-            $existingApplication = StudentApplication::where('student_code', $mappedData['student_code'])->first();
+            // Check if student application exists by email
+            $existingApplication = StudentApplication::where('email', $mappedData['email'])->first();
 
             if ($existingApplication) {
                 if ($this->options['update_existing']) {
@@ -263,6 +283,7 @@ class StudentApplicationImport implements
             'student_code.max' => 'Student code must not exceed 50 characters',
             'full_name.required' => 'Full name is required',
             'full_name.string' => 'Full name must be text/string format',
+            'email.required' => 'Email is required for import',
             'email.email' => 'Email must be a valid email address',
             'gender.in' => 'Gender must be one of: male, female, other',
             'birth_day.integer' => 'Birth day must be a number',
@@ -378,7 +399,7 @@ class StudentApplicationImport implements
         return [
             'full_name' => ['required', 'string', 'max:100'],
             'student_code' => ['required', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
             'gender' => ['nullable', 'in:male,female,other'],
             'ethnicity' => ['nullable', 'string', 'max:100'],
             'birth_day' => ['nullable', 'integer', 'min:1', 'max:31'],
