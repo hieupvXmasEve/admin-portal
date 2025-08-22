@@ -9,8 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
 import { Head, router } from '@inertiajs/vue3';
@@ -98,7 +98,7 @@ interface Props {
         search: string;
         status: string;
         converted: string;
-        campus: string;
+        campus_code: string;
         per_page: number;
         sort: string;
         direction: 'asc' | 'desc';
@@ -112,7 +112,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const filters = ref({ ...props.filters });
-console.log('props', props);
+console.log('props', props.campuses);
 
 // API
 const api = useApi();
@@ -128,7 +128,7 @@ const selectedApplicationForDetails = ref<StudentApplication | null>(null);
 const isLoading = ref(false);
 
 // Template refs
-const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null);
+const dataTableRef = ref<any>(null);
 
 // Form state for conversions
 const conversionForm = ref({
@@ -146,7 +146,7 @@ const bulkStatusForm = ref({
 const loadingOptions = ref(false);
 
 // Overall score filter state
-const overallFilterOperator = ref(filters.value.overall_operator || 'all');
+const overallFilterOperator = ref<'all' | 'gt' | 'gte' | 'lt' | 'lte' | 'eq'>(filters.value.overall_operator || 'all');
 const overallFilterValue = ref<number | undefined>(filters.value.overall_value);
 
 // Export state
@@ -370,7 +370,7 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
     },
     {
         accessorKey: 'overall',
-        header: ({ column }) => {
+        header: () => {
             return h('div', { class: 'flex items-center gap-2' }, [
                 h('span', 'Overall Score'),
                 h(
@@ -728,9 +728,11 @@ const applyFilters = (newFilters: Partial<typeof filters.value>) => {
 
     filters.value = { ...filters.value, ...newFilters };
     const queryParams = { ...props.filters, ...filters.value };
+    console.log('queryParams', queryParams);
 
     Object.entries(queryParams).forEach(([key, value]) => {
-        if (value && value !== '') {
+        console.log('key', key, 'value', value);
+        if (value !== '' && value != null) {
             params.set(key, value.toString());
         }
     });
@@ -742,15 +744,15 @@ const applyFilters = (newFilters: Partial<typeof filters.value>) => {
     });
 };
 
-const onSearch = (value: string) => {
-    applyFilters({ search: value });
+const onSearch = (value: string | number) => {
+    applyFilters({ search: value.toString() });
 };
 
 const onStatusFilter = (value: string) => {
     applyFilters({ status: value === 'all' ? '' : value });
 };
 const onCampusFilter = (value: string) => {
-    applyFilters({ campus: value === 'all' ? '' : value });
+    applyFilters({ campus_code: value === 'all' ? '' : value });
 };
 
 const onConversionFilter = (value: string) => {
@@ -772,9 +774,9 @@ const onNavigate = (url: string) => {
 const toggleOverallSort = () => {
     if (filters.value.sort === 'overall') {
         // Toggle direction if already sorting by overall
-        applyFilters({ 
+        applyFilters({
             sort: 'overall',
-            direction: filters.value.direction === 'asc' ? 'desc' : 'asc' 
+            direction: filters.value.direction === 'asc' ? 'desc' : 'asc',
         });
     } else {
         // Set to sort by overall descending by default
@@ -782,7 +784,9 @@ const toggleOverallSort = () => {
     }
 };
 
-const onOverallFilterChange = (operator: string, value: number | undefined) => {
+const onOverallFilterChange = (operator: 'all' | 'gt' | 'gte' | 'lt' | 'lte' | 'eq', value: number | undefined) => {
+    console.log('value', value);
+
     if (operator === 'all' || value === undefined || value === null) {
         applyFilters({ overall_operator: undefined, overall_value: undefined });
     } else {
@@ -924,8 +928,6 @@ const updateBulkStatus = async () => {
 
             // Refresh the page data
             router.reload({
-                preserveState: true,
-                preserveScroll: true,
                 only: ['applications'],
             });
 
@@ -982,17 +984,17 @@ const exportApplications = async () => {
 
     try {
         const params = new URLSearchParams();
-        
+
         // Add export parameters
         params.set('format', exportForm.value.format);
         params.set('scope', exportForm.value.scope);
-        
+
         // Add current filters if exporting filtered results
         if (exportForm.value.scope === 'filtered') {
             if (filters.value.search) params.set('search', filters.value.search);
             if (filters.value.status) params.set('status', filters.value.status);
             if (filters.value.converted) params.set('converted', filters.value.converted);
-            if (filters.value.campus) params.set('campus', filters.value.campus);
+            if (filters.value.campus_code) params.set('campus_code', filters.value.campus_code);
             if (filters.value.overall_operator) params.set('overall_operator', filters.value.overall_operator);
             if (filters.value.overall_value !== undefined) params.set('overall_value', filters.value.overall_value.toString());
             if (filters.value.sort) params.set('sort', filters.value.sort);
@@ -1001,11 +1003,15 @@ const exportApplications = async () => {
 
         // Create download URL
         const exportUrl = `/student-applications/export?${params.toString()}`;
-        
+
         // Get CSRF token from meta tag or cookie
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || 
-                         document.cookie.split('; ').find(row => row.startsWith('XSRF-TOKEN='))?.split('=')[1];
-        
+        const csrfToken =
+            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+            document.cookie
+                .split('; ')
+                .find((row) => row.startsWith('XSRF-TOKEN='))
+                ?.split('=')[1];
+
         // Use fetch to download with authentication
         const response = await fetch(exportUrl, {
             method: 'GET',
@@ -1013,7 +1019,7 @@ const exportApplications = async () => {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRF-TOKEN': csrfToken ? decodeURIComponent(csrfToken) : '',
-                'Accept': exportForm.value.format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                Accept: exportForm.value.format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             },
         });
 
@@ -1033,7 +1039,7 @@ const exportApplications = async () => {
 
         // Create a blob from the response
         const blob = await response.blob();
-        
+
         // Create a download link and trigger it
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1041,11 +1047,11 @@ const exportApplications = async () => {
         link.download = filename;
         document.body.appendChild(link);
         link.click();
-        
+
         // Clean up
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        
+
         // Close dialog and show success message
         closeDialogs();
         toast.success(`Export completed! Your ${exportForm.value.format.toUpperCase()} file has been downloaded.`);
@@ -1100,7 +1106,7 @@ const exportApplications = async () => {
 
                 <!-- Status Filter -->
                 <div class="min-w-[150px]">
-                    <Select :model-value="filters.status || 'all'" @update:model-value="onStatusFilter">
+                    <Select :model-value="filters.status || 'all'" @update:model-value="(value) => onStatusFilter(value as string)">
                         <SelectTrigger>
                             <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
@@ -1113,7 +1119,7 @@ const exportApplications = async () => {
                     </Select>
                 </div>
                 <div class="min-w-[150px]">
-                    <Select :model-value="filters.campus || 'all'" @update:model-value="onCampusFilter">
+                    <Select :model-value="filters.campus_code || 'all'" @update:model-value="(value) => onCampusFilter(value as string)">
                         <SelectTrigger>
                             <SelectValue placeholder="All Campus" />
                         </SelectTrigger>
@@ -1127,7 +1133,7 @@ const exportApplications = async () => {
                 </div>
                 <!-- Conversion Filter -->
                 <div class="min-w-[180px]">
-                    <Select :model-value="filters.converted || 'all'" @update:model-value="onConversionFilter">
+                    <Select :model-value="filters.converted || 'all'" @update:model-value="(value) => onConversionFilter(value as string)">
                         <SelectTrigger>
                             <SelectValue placeholder="All Applications" />
                         </SelectTrigger>
@@ -1147,13 +1153,8 @@ const exportApplications = async () => {
                             <Button variant="outline" class="w-full justify-start">
                                 <Filter class="mr-2 h-4 w-4" />
                                 <span v-if="filters.overall_operator && filters.overall_value !== undefined">
-                                    Overall Score {{ 
-                                        filters.overall_operator === 'gt' ? '>' : 
-                                        filters.overall_operator === 'gte' ? '≥' : 
-                                        filters.overall_operator === 'lt' ? '<' : 
-                                        filters.overall_operator === 'lte' ? '≤' : 
-                                        '=' 
-                                    }} {{ filters.overall_value }}
+                                    Overall Score {{ filters.overall_operator === 'gt' ? '>' : filters.overall_operator === 'gte' ? '≥' : filters.overall_operator === 'lt' ? '<' : filters.overall_operator === 'lte' ? '≤' : '=' }}
+                                    {{ filters.overall_value }}
                                 </span>
                                 <span v-else>Overall Score Filter</span>
                             </Button>
@@ -1162,24 +1163,28 @@ const exportApplications = async () => {
                             <div class="space-y-4">
                                 <div>
                                     <Label class="text-sm font-medium">Operator</Label>
-                                    <Select 
-                                        :model-value="overallFilterOperator" 
-                                        @update:model-value="(value) => {
-                                            overallFilterOperator = value;
-                                            if (value === 'all') {
-                                                overallFilterValue = undefined;
-                                                onOverallFilterChange('all', undefined);
+                                    <Select
+                                        :model-value="overallFilterOperator"
+                                        @update:model-value="
+                                            (value) => {
+                                                if (value && typeof value === 'string') {
+                                                    overallFilterOperator = value as 'all' | 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+                                                    if (value === 'all') {
+                                                        overallFilterValue = undefined;
+                                                        onOverallFilterChange('all', undefined);
+                                                    }
+                                                }
                                             }
-                                        }"
+                                        "
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select operator" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">All Scores</SelectItem>
-                                            <SelectItem value="gt">Greater than (>)</SelectItem>
+                                            <SelectItem value="gt">Greater than (&gt;)</SelectItem>
                                             <SelectItem value="gte">Greater than or equal (≥)</SelectItem>
-                                            <SelectItem value="lt">Less than (<)</SelectItem>
+                                            <SelectItem value="lt">Less than (&lt;)</SelectItem>
                                             <SelectItem value="lte">Less than or equal (≤)</SelectItem>
                                             <SelectItem value="eq">Equal to (=)</SelectItem>
                                         </SelectContent>
@@ -1187,34 +1192,23 @@ const exportApplications = async () => {
                                 </div>
                                 <div v-if="overallFilterOperator !== 'all'">
                                     <Label class="text-sm font-medium">Value</Label>
-                                    <Input 
-                                        v-model.number="overallFilterValue" 
-                                        type="number" 
-                                        placeholder="Enter score value"
-                                        min="0"
-                                        max="10"
-                                        step="0.1"
-                                    />
+                                    <Input v-model.number="overallFilterValue" type="number" placeholder="Enter score value" min="0" max="10" step="0.1" />
                                 </div>
                                 <div class="flex gap-2">
-                                    <Button 
-                                        variant="outline" 
+                                    <Button
+                                        variant="outline"
                                         size="sm"
-                                        @click="() => {
-                                            overallFilterOperator = 'all';
-                                            overallFilterValue = undefined;
-                                            onOverallFilterChange('all', undefined);
-                                        }"
+                                        @click="
+                                            () => {
+                                                overallFilterOperator = 'all';
+                                                overallFilterValue = undefined;
+                                                onOverallFilterChange('all', undefined);
+                                            }
+                                        "
                                     >
                                         Clear
                                     </Button>
-                                    <Button 
-                                        size="sm"
-                                        :disabled="overallFilterOperator === 'all' || overallFilterValue === undefined"
-                                        @click="onOverallFilterChange(overallFilterOperator, overallFilterValue)"
-                                    >
-                                        Apply Filter
-                                    </Button>
+                                    <Button size="sm" :disabled="overallFilterOperator === 'all' || overallFilterValue === undefined" @click="onOverallFilterChange(overallFilterOperator, overallFilterValue)"> Apply Filter </Button>
                                 </div>
                             </div>
                         </PopoverContent>
@@ -1418,27 +1412,27 @@ const exportApplications = async () => {
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Campus</Label>
-                                <p>{{ campuses.find((c) => c.code === selectedApplicationForDetails.campus_code)?.name || selectedApplicationForDetails.campus_code || 'N/A' }}</p>
+                                <p>{{ selectedApplicationForDetails?.campus_code ? campuses.find((c) => c.code === selectedApplicationForDetails.campus_code)?.name || selectedApplicationForDetails.campus_code : 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Intended Program</Label>
-                                <p>{{ selectedApplicationForDetails.intended_program || 'N/A' }}</p>
+                                <p>{{ selectedApplicationForDetails?.intended_program || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Specialization</Label>
-                                <p>{{ selectedApplicationForDetails.intended_specialization || 'N/A' }}</p>
+                                <p>{{ selectedApplicationForDetails?.intended_specialization || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Intake</Label>
-                                <p>{{ selectedApplicationForDetails.intake || 'N/A' }}</p>
+                                <p>{{ selectedApplicationForDetails?.intake || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Exam Date</Label>
-                                <p>{{ selectedApplicationForDetails.exam_date ? format(new Date(selectedApplicationForDetails.exam_date), 'MMM dd, yyyy') : 'N/A' }}</p>
+                                <p>{{ selectedApplicationForDetails?.exam_date ? format(new Date(selectedApplicationForDetails.exam_date), 'MMM dd, yyyy') : 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">SUT ID</Label>
-                                <p class="font-mono">{{ selectedApplicationForDetails.sut_id || 'N/A' }}</p>
+                                <p class="font-mono">{{ selectedApplicationForDetails?.sut_id || 'N/A' }}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -1453,27 +1447,27 @@ const exportApplications = async () => {
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Test Type</Label>
-                                <p>{{ selectedApplicationForDetails.english_test_type || 'N/A' }}</p>
+                                <p>{{ selectedApplicationForDetails?.english_test_type || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Listening</Label>
-                                <p class="font-medium">{{ selectedApplicationForDetails.listening || 'N/A' }}</p>
+                                <p class="font-medium">{{ selectedApplicationForDetails?.listening || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Reading</Label>
-                                <p class="font-medium">{{ selectedApplicationForDetails.reading || 'N/A' }}</p>
+                                <p class="font-medium">{{ selectedApplicationForDetails?.reading || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Writing</Label>
-                                <p class="font-medium">{{ selectedApplicationForDetails.writing || 'N/A' }}</p>
+                                <p class="font-medium">{{ selectedApplicationForDetails?.writing || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Speaking</Label>
-                                <p class="font-medium">{{ selectedApplicationForDetails.speaking || 'N/A' }}</p>
+                                <p class="font-medium">{{ selectedApplicationForDetails?.speaking || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Overall Score</Label>
-                                <p class="text-lg font-semibold">{{ selectedApplicationForDetails.overall || 'N/A' }}</p>
+                                <p class="text-lg font-semibold">{{ selectedApplicationForDetails?.overall || 'N/A' }}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -1488,56 +1482,56 @@ const exportApplications = async () => {
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Photo</Label>
-                                <p v-if="selectedApplicationForDetails.submitted_photo">
+                                <p v-if="selectedApplicationForDetails?.submitted_photo">
                                     <a :href="selectedApplicationForDetails.submitted_photo" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">CCCD</Label>
-                                <p v-if="selectedApplicationForDetails.submitted_cccd">
+                                <p v-if="selectedApplicationForDetails?.submitted_cccd">
                                     <a :href="selectedApplicationForDetails.submitted_cccd" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">CCTA</Label>
-                                <p v-if="selectedApplicationForDetails.submitted_ccta">
+                                <p v-if="selectedApplicationForDetails?.submitted_ccta">
                                     <a :href="selectedApplicationForDetails.submitted_ccta" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">TN Translate</Label>
-                                <p v-if="selectedApplicationForDetails.submitted_tn_translate">
+                                <p v-if="selectedApplicationForDetails?.submitted_tn_translate">
                                     <a :href="selectedApplicationForDetails.submitted_tn_translate" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">HB Translate</Label>
-                                <p v-if="selectedApplicationForDetails.submitted_hb_translate">
+                                <p v-if="selectedApplicationForDetails?.submitted_hb_translate">
                                     <a :href="selectedApplicationForDetails.submitted_hb_translate" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Other Documents</Label>
-                                <p v-if="selectedApplicationForDetails.submitted_other">
+                                <p v-if="selectedApplicationForDetails?.submitted_other">
                                     <a :href="selectedApplicationForDetails.submitted_other" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Insurance Card</Label>
-                                <p v-if="selectedApplicationForDetails.submitted_insurance_card">
+                                <p v-if="selectedApplicationForDetails?.submitted_insurance_card">
                                     <a :href="selectedApplicationForDetails.submitted_insurance_card" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Exemption GC</Label>
-                                <p v-if="selectedApplicationForDetails.submitted_exemption_gc">
+                                <p v-if="selectedApplicationForDetails?.submitted_exemption_gc">
                                     <a :href="selectedApplicationForDetails.submitted_exemption_gc" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">View Document</a>
                                 </p>
                                 <p v-else class="text-red-600">Not Submitted</p>
@@ -1555,29 +1549,29 @@ const exportApplications = async () => {
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Health Information</Label>
-                                <p class="break-words">{{ selectedApplicationForDetails.health_information || 'N/A' }}</p>
+                                <p class="break-words">{{ selectedApplicationForDetails?.health_information || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">StudyLink Status</Label>
-                                <p>{{ selectedApplicationForDetails.study_link_status || 'N/A' }}</p>
+                                <p>{{ selectedApplicationForDetails?.study_link_status || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">English Qualifications</Label>
-                                <p class="break-words">{{ selectedApplicationForDetails.english_qualifications || 'N/A' }}</p>
+                                <p class="break-words">{{ selectedApplicationForDetails?.english_qualifications || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">International Applicant</Label>
-                                <p :class="selectedApplicationForDetails.is_international_applicant ? 'text-blue-600' : 'text-gray-600'">{{ formatBoolean(selectedApplicationForDetails.is_international_applicant) }}</p>
+                                <p :class="selectedApplicationForDetails?.is_international_applicant ? 'text-blue-600' : 'text-gray-600'">{{ formatBoolean(selectedApplicationForDetails?.is_international_applicant || false) }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Exception Units</Label>
-                                <p class="break-words">{{ selectedApplicationForDetails.exception_units || 'N/A' }}</p>
+                                <p class="break-words">{{ selectedApplicationForDetails?.exception_units || 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Application Status</Label>
-                                <Badge :variant="getStatusBadge(selectedApplicationForDetails.status).variant" :class="getStatusBadge(selectedApplicationForDetails.status).class">
-                                    <component :is="getStatusBadge(selectedApplicationForDetails.status).icon" class="mr-1 h-3 w-3" />
-                                    {{ selectedApplicationForDetails.status.charAt(0).toUpperCase() + selectedApplicationForDetails.status.slice(1) }}
+                                <Badge :variant="getStatusBadge(selectedApplicationForDetails?.status || 'pending').variant as any" :class="getStatusBadge(selectedApplicationForDetails?.status || 'pending').class">
+                                    <component :is="getStatusBadge(selectedApplicationForDetails?.status || 'pending').icon" class="mr-1 h-3 w-3" />
+                                    {{ (selectedApplicationForDetails?.status || 'pending').charAt(0).toUpperCase() + (selectedApplicationForDetails?.status || 'pending').slice(1) }}
                                 </Badge>
                             </div>
                         </div>
@@ -1593,7 +1587,7 @@ const exportApplications = async () => {
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Student Conversion</Label>
-                                <div v-if="selectedApplicationForDetails.student">
+                                <div v-if="selectedApplicationForDetails?.student">
                                     <p class="font-medium text-green-600">{{ selectedApplicationForDetails.student.student_id }}</p>
                                     <p class="text-muted-foreground text-xs">Converted to Student</p>
                                 </div>
@@ -1601,11 +1595,11 @@ const exportApplications = async () => {
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Created Date</Label>
-                                <p>{{ format(new Date(selectedApplicationForDetails.created_at), 'MMM dd, yyyy HH:mm') }}</p>
+                                <p>{{ selectedApplicationForDetails?.created_at ? format(new Date(selectedApplicationForDetails.created_at), 'MMM dd, yyyy HH:mm') : 'N/A' }}</p>
                             </div>
                             <div>
                                 <Label class="text-muted-foreground text-sm font-medium">Last Updated</Label>
-                                <p>{{ format(new Date(selectedApplicationForDetails.updated_at), 'MMM dd, yyyy HH:mm') }}</p>
+                                <p>{{ selectedApplicationForDetails?.updated_at ? format(new Date(selectedApplicationForDetails.updated_at), 'MMM dd, yyyy HH:mm') : 'N/A' }}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -1626,9 +1620,7 @@ const exportApplications = async () => {
                     <FileSpreadsheet class="h-5 w-5" />
                     Export Applications
                 </DialogTitle>
-                <DialogDescription>
-                    Choose export format and scope for your data export
-                </DialogDescription>
+                <DialogDescription> Choose export format and scope for your data export </DialogDescription>
             </DialogHeader>
 
             <div class="space-y-4">
@@ -1665,8 +1657,8 @@ const exportApplications = async () => {
                             <SelectItem value="filtered">
                                 <div>
                                     <div class="font-medium">Current Filtered Results</div>
-                                    <div class="text-xs text-muted-foreground">
-                                        Export only the applications matching current filters
+                                    <div class="text-muted-foreground text-xs">
+                                        <!-- Export only the applications matching current filters -->
                                         <span v-if="applications.total">({{ applications.total }} records)</span>
                                     </div>
                                 </div>
@@ -1674,28 +1666,23 @@ const exportApplications = async () => {
                             <SelectItem value="all">
                                 <div>
                                     <div class="font-medium">All Applications</div>
-                                    <div class="text-xs text-muted-foreground">Export all applications without any filters</div>
+                                    <div class="text-muted-foreground text-xs">Export all applications without any filters</div>
                                 </div>
                             </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                <div class="rounded-lg bg-muted p-3">
-                    <div class="text-sm font-medium mb-2">Export Information</div>
-                    <ul class="text-xs text-muted-foreground space-y-1">
+                <div class="bg-muted rounded-lg p-3">
+                    <div class="mb-2 text-sm font-medium">Export Information</div>
+                    <ul class="text-muted-foreground space-y-1 text-xs">
                         <li v-if="exportForm.scope === 'filtered' && filters.search">• Search: "{{ filters.search }}"</li>
                         <li v-if="exportForm.scope === 'filtered' && filters.status">• Status: {{ filters.status }}</li>
                         <li v-if="exportForm.scope === 'filtered' && filters.converted">• Conversion: {{ filters.converted === 'yes' ? 'Converted' : 'Not Converted' }}</li>
-                        <li v-if="exportForm.scope === 'filtered' && filters.campus">• Campus: {{ filters.campus }}</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.campus_code">• Campus: {{ filters.campus_code }}</li>
                         <li v-if="exportForm.scope === 'filtered' && filters.overall_operator && filters.overall_value !== undefined">
-                            • Overall Score: {{ 
-                                filters.overall_operator === 'gt' ? '>' : 
-                                filters.overall_operator === 'gte' ? '≥' : 
-                                filters.overall_operator === 'lt' ? '<' : 
-                                filters.overall_operator === 'lte' ? '≤' : 
-                                '=' 
-                            }} {{ filters.overall_value }}
+                            • Overall Score: {{ filters.overall_operator === 'gt' ? '>' : filters.overall_operator === 'gte' ? '≥' : filters.overall_operator === 'lt' ? '<' : filters.overall_operator === 'lte' ? '≤' : '=' }}
+                            {{ filters.overall_value }}
                         </li>
                         <li v-if="exportForm.scope === 'all'">• All applications will be exported</li>
                         <li>• Format: {{ exportForm.format === 'xlsx' ? 'Excel (.xlsx)' : 'CSV (.csv)' }}</li>
@@ -1704,9 +1691,7 @@ const exportApplications = async () => {
             </div>
 
             <DialogFooter>
-                <Button variant="outline" @click="closeDialogs" :disabled="isExporting">
-                    Cancel
-                </Button>
+                <Button variant="outline" @click="closeDialogs" :disabled="isExporting"> Cancel </Button>
                 <Button @click="exportApplications" :disabled="isExporting">
                     <Download v-if="!isExporting" class="mr-2 h-4 w-4" />
                     <RefreshCw v-if="isExporting" class="mr-2 h-4 w-4 animate-spin" />
