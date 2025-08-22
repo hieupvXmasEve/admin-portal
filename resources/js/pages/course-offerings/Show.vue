@@ -14,9 +14,10 @@ import { useApi } from '@/composables/useApiRequest';
 import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, UserCheck, Users } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { useGlobalDeleteDialog } from '@/composables/useGlobalDeleteDialog';
 
 interface Props {
     courseOffering: CourseOffering & {
@@ -30,6 +31,7 @@ interface Props {
 const props = defineProps<Props>();
 console.log('%c props', 'color: red', props.courseOffering);
 const api = useApi();
+const { confirmDelete } = useGlobalDeleteDialog();
 // const showStatusModal = ref(false);
 const isGenerating = ref(false);
 
@@ -123,24 +125,35 @@ const generateClassSessions = async ({ roomId, startDate, weeklySchedule }: { ro
     }
 };
 
-// const deleteClassSessions = async () => {
-//     try {
-//         const result = await api.delete(`/api/course-offerings/${props.courseOffering.id}/class-sessions`);
+const deleteClassSessions = async () => {
+    confirmDelete(
+        {
+            title: 'Delete All Class Sessions',
+            message: 'Are you sure you want to delete all class sessions for this course offering? This action cannot be undone.',
+            confirmText: 'Delete All',
+        },
+        {
+            onConfirm: async () => {
+                try {
+                    const result = await api.delete(`/api/course-offerings/${props.courseOffering.id}/class-sessions`);
 
-//         if (result.data?.value?.success) {
-//             // Reload Inertia props to reflect deletion without local state
-//             router.reload({
-//                 only: ['courseOffering'],
-//             });
-//             toast.success('Class sessions deleted successfully');
-//         } else {
-//             toast.error(result.data?.value?.message || 'Failed to delete class sessions');
-//         }
-//     } catch (error) {
-//         console.error('Error deleting class sessions:', error);
-//         toast.error('Failed to delete class sessions');
-//     }
-// };
+                    if (result.data?.value?.success) {
+                        router.reload({
+                            only: ['courseOffering'],
+                        });
+                        toast.success('Class sessions deleted successfully');
+                    } else {
+                        toast.error(result.data?.value?.message || 'Failed to delete class sessions');
+                    }
+                } catch (error) {
+                    console.error('Error deleting class sessions:', error);
+                    toast.error('Failed to delete class sessions');
+                    throw error; // keep dialog open on error per store behavior
+                }
+            },
+        },
+    );
+};
 
 const getSessionTypeIcon = (type: string) => {
     switch (type) {
@@ -463,10 +476,6 @@ const submitChangeRoom = () => {
                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No class sessions</h3>
                         <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class sessions based on the syllabus.</p>
                         <div class="mt-1 flex items-center justify-center gap-2">
-                            <!-- <Button v-if="courseOffering.class_sessions && courseOffering.class_sessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
-                                <Trash2 class="mr-2 h-4 w-4" />
-                                Delete All
-                            </Button> -->
                             <RoomSelectionModal
                                 :disable-generate="!courseOffering.syllabus_template"
                                 :available-rooms="availableRooms"
@@ -486,45 +495,51 @@ const submitChangeRoom = () => {
                         <!-- Change Room action -->
                         <div class="flex items-center justify-between">
                             <div class="text-muted-foreground text-sm">{{ courseOffering.class_sessions.length }} session(s)</div>
-                            <Dialog v-model:open="changeRoomOpen">
-                                <DialogTrigger as-child>
-                                    <Button size="sm" variant="outline">Change Room</Button>
-                                </DialogTrigger>
-                                <DialogContent class="max-w-2xl">
-                                    <DialogHeader>
-                                        <DialogTitle>Select Room</DialogTitle>
-                                        <DialogDescription> Choose an active room to apply to all class sessions. Availability will be validated against the schedule. </DialogDescription>
-                                    </DialogHeader>
-                                    <div class="space-y-3">
-                                        <div>
-                                            <Label class="text-xs">Search</Label>
-                                            <Input v-model="roomSearch" placeholder="Search by name, code, building" type="search" />
-                                        </div>
-                                        <div class="max-h-80 overflow-auto rounded border">
-                                            <RadioGroup v-model="selectedRoomId" class="flex flex-col divide-y">
-                                                <div v-for="room in filteredRooms" :key="room.id" class="hover:bg-accent/40 flex items-center justify-between gap-3 px-3 py-2">
-                                                    <div class="flex items-center gap-3">
-                                                        <RadioGroupItem :id="`room-${room.id}`" :value="room.id" />
-                                                        <Label :for="`room-${room.id}`" class="cursor-pointer">
-                                                            <div class="font-medium">
-                                                                {{ room.name }} <span class="text-muted-foreground">({{ room.code }})</span>
-                                                            </div>
-                                                            <div class="text-muted-foreground text-xs">{{ room.building?.name || room.building }} • Capacity: {{ room.capacity }} • {{ room.type?.replace('_', ' ') }}</div>
-                                                        </Label>
+                            <div class="flex items-center gap-2">
+                                <Button v-if="courseOffering.class_sessions && courseOffering.class_sessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
+                                    <Trash2 class="mr-2 h-4 w-4" />
+                                    Delete All
+                                </Button>
+                                <Dialog v-model:open="changeRoomOpen">
+                                    <DialogTrigger as-child>
+                                        <Button size="sm" variant="outline">Change Room</Button>
+                                    </DialogTrigger>
+                                    <DialogContent class="max-w-2xl">
+                                        <DialogHeader>
+                                            <DialogTitle>Select Room</DialogTitle>
+                                            <DialogDescription> Choose an active room to apply to all class sessions. Availability will be validated against the schedule. </DialogDescription>
+                                        </DialogHeader>
+                                        <div class="space-y-3">
+                                            <div>
+                                                <Label class="text-xs">Search</Label>
+                                                <Input v-model="roomSearch" placeholder="Search by name, code, building" type="search" />
+                                            </div>
+                                            <div class="max-h-80 overflow-auto rounded border">
+                                                <RadioGroup v-model="selectedRoomId" class="flex flex-col divide-y">
+                                                    <div v-for="room in filteredRooms" :key="room.id" class="hover:bg-accent/40 flex items-center justify-between gap-3 px-3 py-2">
+                                                        <div class="flex items-center gap-3">
+                                                            <RadioGroupItem :id="`room-${room.id}`" :value="room.id" />
+                                                            <Label :for="`room-${room.id}`" class="cursor-pointer">
+                                                                <div class="font-medium">
+                                                                    {{ room.name }} <span class="text-muted-foreground">({{ room.code }})</span>
+                                                                </div>
+                                                                <div class="text-muted-foreground text-xs">{{ room.building?.name || room.building }} • Capacity: {{ room.capacity }} • {{ room.type?.replace('_', ' ') }}</div>
+                                                            </Label>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div v-if="filteredRooms.length === 0" class="text-muted-foreground p-4 text-center text-sm">No rooms found</div>
-                                            </RadioGroup>
+                                                    <div v-if="filteredRooms.length === 0" class="text-muted-foreground p-4 text-center text-sm">No rooms found</div>
+                                                </RadioGroup>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <DialogClose as-child>
-                                            <Button variant="outline">Cancel</Button>
-                                        </DialogClose>
-                                        <Button :disabled="!selectedRoomId" @click="submitChangeRoom">Apply to All Sessions</Button>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
+                                        <DialogFooter>
+                                            <DialogClose as-child>
+                                                <Button variant="outline">Cancel</Button>
+                                            </DialogClose>
+                                            <Button :disabled="!selectedRoomId" @click="submitChangeRoom">Apply to All Sessions</Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                         </div>
 
                         <Table class="h-20 overflow-y-auto">
