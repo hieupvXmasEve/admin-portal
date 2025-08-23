@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useGlobalDeleteDialog } from '@/composables';
+import { useGlobalConfirmDialog } from '@/composables';
 import type { Program, Student } from '@/types/models';
 import { studentRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -58,8 +58,8 @@ interface Props {
 const props = defineProps<Props>();
 console.log(props.students);
 
-// Global delete dialog composable
-const deleteDialog = useGlobalDeleteDialog();
+// Global confirm dialog composable
+const confirmDialog = useGlobalConfirmDialog();
 
 // Reactive data
 const data = computed(() => props.students.data);
@@ -204,7 +204,7 @@ const editStudent = (student: Student) => {
 const deleteStudent = (student: Student) => {
     const deleteRoute = route('students.destroy', student.id);
 
-    deleteDialog.deleteItem(student.full_name, 'student', () => {
+    confirmDialog.confirmDelete(student.full_name, 'student', () => {
         router.delete(deleteRoute, {
             onSuccess: () => {
                 console.log('Student deleted successfully');

@@ -6,8 +6,8 @@ export { useAdminSchedule } from './useAdminSchedule';
 export { useScheduleManagement } from './useScheduleManagement';
 
 // Global dialog composables
-export { useGlobalDeleteDialog } from './useGlobalDeleteDialog';
-export type { DeleteDialogCallbacks, DeleteDialogOptions } from './useGlobalDeleteDialog';
+export { useGlobalConfirmDialog } from './useGlobalConfirmDialog';
+export type { ConfirmDialogCallbacks, ConfirmDialogOptions } from './useGlobalConfirmDialog';
 
 // Permission composables
 export { usePermissions } from './usePermissions';

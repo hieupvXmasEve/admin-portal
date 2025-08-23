@@ -15,7 +15,7 @@ import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useDeleteDialogStore } from '@/stores/deleteDialog';
+import { useConfirmDialogStore } from '@/stores/confirmDialog';
 
 interface Props {
     campus: Campus & { buildings_count?: number };
@@ -26,7 +26,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const deleteDialog = useDeleteDialogStore();
+const confirmDialog = useConfirmDialogStore();
 
 // Tab state management with URL parameters
 const validTabs = ['overview', 'buildings'] as const;
@@ -211,7 +211,7 @@ const editBuilding = (building: Building) => {
 };
 
 const confirmDeleteBuilding = (building: Building) => {
-    deleteDialog.showDialog(
+    confirmDialog.showDialog(
         {
             title: 'Delete Building',
             message: `Are you sure you want to delete "${building.name}"? This action cannot be undone.`,
@@ -226,7 +226,7 @@ const deleteBuilding = (buildingId: number) => {
     router.delete(route('campuses.buildings.destroy', [props.campus.id, buildingId]), {
         preserveScroll: true,
         onSuccess: () => {
-            deleteDialog.hideDialog();
+            confirmDialog.hideDialog();
             toast.success('Building deleted successfully!');
         },
         onError: () => {
@@ -335,12 +335,7 @@ const deleteBuilding = (buildingId: number) => {
                 <!-- Building Filters -->
                 <div class="flex items-center gap-4 rounded-lg border p-4">
                     <div class="flex-1">
-                        <DebouncedInput
-                            v-model="filters.search"
-                            @debounced="handleBuildingSearch"
-                            placeholder="Search buildings by name, code, or description..."
-                            class="min-w-[300px]"
-                        />
+                        <DebouncedInput v-model="filters.search" @debounced="handleBuildingSearch" placeholder="Search buildings by name, code, or description..." class="min-w-[300px]" />
                     </div>
                     <div class="flex items-center gap-2">
                         <Button variant="outline" size="sm" @click="resetFilters" :disabled="!hasActiveFilters">

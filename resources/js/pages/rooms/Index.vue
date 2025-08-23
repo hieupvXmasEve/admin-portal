@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useGlobalDeleteDialog } from '@/composables';
+import { useGlobalConfirmDialog } from '@/composables';
 import { getRoomStatusOptions, getRoomTypeOptions } from '@/schemas/room';
 import type { PaginatedResponse } from '@/types';
 import type { Building, Room } from '@/types/models';
@@ -52,8 +52,8 @@ const props = defineProps<{
     };
 }>();
 
-// Delete dialog composable
-const deleteDialog = useGlobalDeleteDialog();
+// Confirm dialog composable
+const confirmDialog = useGlobalConfirmDialog();
 
 // Reactive data
 const data = computed(() => props.rooms.data);
@@ -279,7 +279,7 @@ const viewRoom = (roomId: number) => {
 };
 
 const deleteRoom = (room: Room) => {
-    deleteDialog.deleteItem(room.name, 'room', () => {
+    confirmDialog.confirmDelete(room.name, 'room', () => {
         router.delete(systemRoutes.rooms.destroy(room.id), {
             preserveState: true,
             preserveScroll: true,

@@ -49,6 +49,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:edit_course_offering')
         ->name(CourseOfferingRoutes::SPLIT_PERFORM);
 
+    Route::post('course-offerings/{courseOffering}/duplicate', [CourseOfferingController::class, 'duplicate'])
+        ->middleware('can:create_course_offering')
+        ->name(CourseOfferingRoutes::DUPLICATE);
+
     // API routes for bulk operations and statistics
     Route::delete('api/course-offerings/bulk-delete', [CourseOfferingController::class, 'bulkDelete'])
         ->middleware('can:delete_course_offering')
@@ -76,6 +80,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('api/course-offerings/{courseOffering}/bulk-update-status', [CourseOfferingController::class, 'bulkUpdateRegistrationStatus'])
         ->middleware('can:edit_course_offering')
         ->name(CourseOfferingRoutes::API_BULK_UPDATE_STATUS);
+
+    // Student search and bulk registration
+    Route::post('api/course-offerings/{courseOffering}/search-students', [CourseOfferingController::class, 'searchStudents'])
+        ->middleware('can:edit_course_offering')
+        ->name(CourseOfferingRoutes::API_SEARCH_STUDENTS);
+    
+    Route::post('api/course-offerings/{courseOffering}/bulk-register-students', [CourseOfferingController::class, 'bulkRegisterStudents'])
+        ->middleware('can:edit_course_offering')
+        ->name(CourseOfferingRoutes::API_BULK_REGISTER_STUDENTS);
+        
+    // Delete individual student registration
+    Route::post('course-offerings/{courseOffering}/delete-student-registration', [CourseOfferingController::class, 'deleteStudentRegistration'])
+        ->middleware('can:edit_course_offering')
+        ->name('course-offerings.delete-student-registration');
 
     // Class Session Management
     Route::prefix('api/course-offerings/{courseOffering}/class-sessions')->group(function () {

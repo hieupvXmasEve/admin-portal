@@ -712,6 +712,8 @@ export interface CourseOffering {
     id: number;
     semester_id: number;
     curriculum_unit_id: number;
+    unit_id: number;
+    unit: Unit;
     lecture_id?: number;
     section_code?: string;
     max_capacity: number;
@@ -796,6 +798,56 @@ export interface ClassSession {
     actual_attendees?: number;
     attendance_percentage?: number;
     is_assessment: boolean;
+}
+
+// Student search and eligibility interfaces
+export interface StudentEligibilityInfo {
+    student_id: string;
+    exists: boolean;
+    student_data?: {
+        id: number;
+        student_id: string;
+        full_name: string;
+        email: string;
+        program?: {
+            code: string;
+            name: string;
+        };
+        specialization?: {
+            code: string;
+            name: string;
+        };
+    };
+    is_eligible: boolean;
+    is_already_registered: boolean;
+    eligibility_reasons: string[];
+    major_code?: string;
+}
+
+export interface StudentSearchResponse {
+    success: boolean;
+    data: {
+        students: StudentEligibilityInfo[];
+    };
+    message?: string;
+}
+
+export interface BulkRegistrationRequest {
+    student_ids: string[];
+}
+
+export interface BulkRegistrationResponse {
+    success: boolean;
+    data: {
+        successful_registrations: number;
+        failed_registrations: number;
+        results: Array<{
+            student_id: string;
+            success: boolean;
+            message?: string;
+        }>;
+    };
+    message: string;
     assessment_weight?: number;
     assessment_duration_minutes?: number;
     assessment_materials_allowed?: string[];

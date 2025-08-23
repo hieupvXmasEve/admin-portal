@@ -32,6 +32,8 @@ class CourseOfferingRoutes
 
     public const SPLIT_PERFORM = 'course-offerings.split.perform';
 
+    public const DUPLICATE = 'course-offerings.duplicate';
+
     // Course Offering API Routes
     public const API_BULK_DELETE = 'api.course-offerings.bulk-delete';
 
@@ -42,6 +44,11 @@ class CourseOfferingRoutes
     public const API_BULK_ASSIGN_LECTURES = 'api.course-offerings.bulk-assign-lectures';
 
     public const API_BULK_UPDATE_STATUS = 'api.course-offerings.bulk-update-status';
+
+    // Student search and registration
+    public const API_SEARCH_STUDENTS = 'api.course-offerings.search-students';
+
+    public const API_BULK_REGISTER_STUDENTS = 'api.course-offerings.bulk-register-students';
 
     // Class sessions / room management
     public const API_CHANGE_ROOM = 'api.course-offerings.change-room';
