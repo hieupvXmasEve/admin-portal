@@ -4,7 +4,7 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { createPinia } from 'pinia';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
-import GlobalDeleteDialog from './components/GlobalDeleteDialog.vue';
+import GlobalConfirmDialog from './components/GlobalConfirmDialog.vue';
 import { initializeTheme } from './composables/useAppearance';
 import { vCan, vCanAny } from './directives/permission';
 import AppLayout from './layouts/AppLayout.vue';
@@ -36,7 +36,7 @@ createInertiaApp({
     },
     setup({ el, App, props, plugin }) {
         const app = createApp({
-            render: () => h('div', [h(App, props), h(GlobalDeleteDialog)]),
+            render: () => h('div', [h(App, props), h(GlobalConfirmDialog)]),
         });
         const pinia = createPinia();
 

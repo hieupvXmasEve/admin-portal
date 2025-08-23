@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import RoomSelectionModal from '@/components/RoomSelectionModal.vue';
+import StudentSearchModal from '@/components/StudentSearchModal.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,13 +12,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
-import { useGlobalDeleteDialog } from '@/composables/useGlobalDeleteDialog';
 
 interface Props {
     courseOffering: CourseOffering & {
@@ -31,7 +32,7 @@ interface Props {
 const props = defineProps<Props>();
 console.log('%c props', 'color: red', props.courseOffering);
 const api = useApi();
-const { confirmDelete } = useGlobalDeleteDialog();
+const { showConfirmDialog } = useGlobalConfirmDialog();
 // const showStatusModal = ref(false);
 const isGenerating = ref(false);
 
@@ -126,7 +127,7 @@ const generateClassSessions = async ({ roomId, startDate, weeklySchedule }: { ro
 };
 
 const deleteClassSessions = async () => {
-    confirmDelete(
+    showConfirmDialog(
         {
             title: 'Delete All Class Sessions',
             message: 'Are you sure you want to delete all class sessions for this course offering? This action cannot be undone.',
@@ -211,6 +212,45 @@ const submitChangeRoom = () => {
                 // Try to surface first validation error; otherwise generic
                 const messages = Object.values(errors || {}) as string[];
                 toast.error(messages[0] || 'Failed to update room. Please ensure the room is available.');
+            },
+        },
+    );
+};
+
+// Student addition success handler
+const handleStudentAddSuccess = () => {
+    router.reload({ only: ['courseOffering'] });
+};
+
+// Delete student registration
+const deleteStudentRegistration = (registration: CourseRegistration) => {
+    const studentName = registration.student?.full_name || 'Unknown Student';
+    const studentId = registration.student?.student_id || 'Unknown ID';
+    
+    showConfirmDialog(
+        {
+            title: 'Remove Student from Course',
+            message: `Are you sure you want to remove ${studentName} (${studentId}) from this course? This action cannot be undone.`,
+            confirmText: 'Remove Student',
+        },
+        {
+            onConfirm: async () => {
+                try {
+                    const result = await api.post(`/course-offerings/${props.courseOffering.id}/delete-student-registration`, {
+                        registration_id: registration.id,
+                    });
+                    
+                    if (result.data?.value?.success) {
+                        toast.success(result.data.value.message || `Successfully removed ${studentName} from the course`);
+                        router.reload({ only: ['courseOffering'] });
+                    } else {
+                        toast.error(result.data?.value?.message || 'Failed to remove student from course');
+                    }
+                } catch (error) {
+                    console.error('Error removing student:', error);
+                    toast.error('Failed to remove student from course');
+                    throw error; // Keep dialog open on error
+                }
             },
         },
     );
@@ -614,6 +654,7 @@ const submitChangeRoom = () => {
                             </div>
                         </Button>
                     </CollapsibleTrigger>
+
                     <!-- <Button
                         v-if="courseOffering.course_registrations && courseOffering.course_registrations.length > 0"
                         @click="showStatusModal = true"
@@ -626,6 +667,7 @@ const submitChangeRoom = () => {
             </CardHeader>
             <CollapsibleContent>
                 <CardContent>
+                    <StudentSearchModal :course-offering-id="courseOffering.id" :on-success="handleStudentAddSuccess" />
                     <div v-if="!courseOffering.course_registrations || courseOffering.course_registrations?.length === 0" class="py-8 text-center">
                         <Users class="text-muted-foreground mx-auto h-12 w-12" />
                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No registrations</h3>
@@ -642,6 +684,7 @@ const submitChangeRoom = () => {
                                     <TableHead>Status</TableHead>
                                     <TableHead>Registration Date</TableHead>
                                     <TableHead>Method</TableHead>
+                                    <TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -669,6 +712,16 @@ const submitChangeRoom = () => {
                                     </TableCell>
                                     <TableCell class="text-muted-foreground">
                                         {{ registration.registration_method }}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            @click="deleteStudentRegistration(registration)"
+                                            class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        >
+                                            <Trash2 class="h-4 w-4" />
+                                        </Button>
                                     </TableCell>
                                 </TableRow>
                             </TableBody>

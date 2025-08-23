@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent } from '@/components/ui/tooltip';
 import TooltipProvider from '@/components/ui/tooltip/TooltipProvider.vue';
 import TooltipTrigger from '@/components/ui/tooltip/TooltipTrigger.vue';
-import { useGlobalDeleteDialog } from '@/composables';
+import { useGlobalConfirmDialog } from '@/composables';
 import { ROLE_ROUTE_NAMES } from '@/constants';
 import type { PaginatedResponse } from '@/types';
 import type { Role } from '@/types/Role';
@@ -17,7 +17,7 @@ import { computed } from 'vue';
 const props = defineProps<{
     roles: PaginatedResponse<Role>;
 }>();
-const deleteDialog = useGlobalDeleteDialog();
+const confirmDialog = useGlobalConfirmDialog();
 
 // Reactive data
 const data = computed(() => props.roles.data);
@@ -79,7 +79,7 @@ const handlePageSizeChange = (pageSize: number) => {
 
 // Delete role function
 const deleteRole = (role: Role) => {
-    deleteDialog.deleteItem(role.name, 'role', () => {
+    confirmDialog.confirmDelete(role.name, 'role', () => {
         router.delete(route(ROLE_ROUTE_NAMES.DESTROY, role.id), {
             onSuccess: () => {
                 console.log('Role deleted successfully');

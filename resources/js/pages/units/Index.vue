@@ -5,8 +5,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTableFilters } from '@/composables/useFilters';
 import { useModuleNavigation } from '@/composables/useModuleNavigation';
@@ -67,12 +65,12 @@ const data = computed(() => props.units.data);
 const { filters, hasActiveFilters, debouncedApplyFilters, clearFilters, handlePaginationNavigate, handlePageSizeChange, appendCurrentQueryTo, updateFieldDebounced } = useTableFilters<UnitsFilters>(
     curriculumRoutes.units.index(),
     props.filters || {},
-    ['units', 'filters'] // Use correct keys that match backend response
+    ['units', 'filters'], // Use correct keys that match backend response
 );
 
 // Module navigation với return param
 const { getLinkUrlWithReturn } = useModuleNavigation({
-    moduleIndexRoute: 'units.index'
+    moduleIndexRoute: 'units.index',
 });
 // Selected rows for bulk actions
 const selectedRows = ref<number[]>([]);
@@ -93,8 +91,6 @@ const editUnit = (unit: Unit) => {
 // View unit function
 const viewUnit = (unit: Unit) => {
     const showUrl = getLinkUrlWithReturn('units.show', { unit: unit.id });
-    console.log('Current URL:', window.location.href);
-    console.log('Generated show URL:', showUrl);
     router.visit(showUrl, { preserveScroll: true, preserveState: true });
 };
 
@@ -127,10 +123,6 @@ const confirmDelete = () => {
 const updateSearchFilter = (value: string | number) => {
     updateFieldDebounced('search', String(value));
 };
-
-// provided by composable
-
-// provided by composable
 
 // Bulk delete functionality
 const isBulkDeleting = ref(false);
@@ -355,16 +347,11 @@ const columns: ColumnDef<Unit>[] = [
     </div>
 
     <!-- Filters Section -->
-    <div class="flex flex-wrap items-center gap-4 rounded-lg p-4 bg-muted/20 border">
+    <div class="bg-muted/20 flex flex-wrap items-center gap-4 rounded-lg border p-4">
         <div class="min-w-[200px] flex-1">
             <div class="relative">
                 <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input 
-                    placeholder="Search units..." 
-                    :model-value="filters.search" 
-                    @update:model-value="updateSearchFilter" 
-                    class="pl-9" 
-                />
+                <Input placeholder="Search units..." :model-value="filters.search" @update:model-value="updateSearchFilter" class="pl-9" />
             </div>
         </div>
 

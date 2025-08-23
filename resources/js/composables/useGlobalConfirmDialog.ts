@@ -1,42 +1,42 @@
-import { useDeleteDialogStore, type DeleteDialogOptions, type DeleteDialogCallbacks } from '@/stores/deleteDialog'
+import { useConfirmDialogStore, type ConfirmDialogOptions, type ConfirmDialogCallbacks } from '@/stores/confirmDialog'
 
-export function useGlobalDeleteDialog() {
-  const deleteDialogStore = useDeleteDialogStore()
+export function useGlobalConfirmDialog() {
+  const confirmDialogStore = useConfirmDialogStore()
 
   /**
-   * Show a delete confirmation dialog
+   * Show a confirmation dialog
    * @param options Dialog configuration options
    * @param callbacks Confirmation and cancellation callbacks
    */
-  const confirmDelete = (options: DeleteDialogOptions, callbacks: DeleteDialogCallbacks) => {
-    deleteDialogStore.showDialog(options, callbacks)
+  const showConfirmDialog = (options: ConfirmDialogOptions, callbacks: ConfirmDialogCallbacks) => {
+    confirmDialogStore.showDialog(options, callbacks)
   }
 
   /**
-   * Quick delete confirmation with minimal configuration
+   * Quick confirmation dialog with minimal configuration
    * @param message The confirmation message
    * @param onConfirm The confirmation callback
    * @param onCancel Optional cancellation callback
    */
-  const quickDelete = (
+  const quickConfirm = (
     message: string,
     onConfirm: () => void | Promise<void>,
     onCancel?: () => void
   ) => {
-    deleteDialogStore.showDialog(
+    confirmDialogStore.showDialog(
       { message },
       { onConfirm, onCancel }
     )
   }
 
   /**
-   * Delete item with contextual message
+   * Delete item with contextual message (backward compatibility)
    * @param itemName Name of the item being deleted
    * @param itemType Type of item (e.g., 'user', 'project', 'student')
    * @param onConfirm The confirmation callback
    * @param onCancel Optional cancellation callback
    */
-  const deleteItem = (
+  const confirmDelete = (
     itemName: string,
     itemType: string,
     onConfirm: () => void | Promise<void>,
@@ -51,29 +51,29 @@ export function useGlobalDeleteDialog() {
     };
     const callbacks = { onConfirm, onCancel };
 
-    deleteDialogStore.showDialog(options, callbacks)
+    confirmDialogStore.showDialog(options, callbacks)
   }
 
   /**
-   * Close the delete dialog
+   * Close the confirmation dialog
    */
   const closeDialog = () => {
-    deleteDialogStore.hideDialog()
+    confirmDialogStore.hideDialog()
   }
 
   return {
     // Main methods
-    confirmDelete,
-    quickDelete,
-    deleteItem,
+    showConfirmDialog,
+    quickConfirm,
+    confirmDelete, // Keep for backward compatibility with delete operations
     closeDialog,
 
     // Store state (read-only)
-    isOpen: deleteDialogStore.isOpen,
-    isLoading: deleteDialogStore.isLoading,
-    options: deleteDialogStore.options,
+    isOpen: confirmDialogStore.isOpen,
+    isLoading: confirmDialogStore.isLoading,
+    options: confirmDialogStore.options,
   }
 }
 
 // Export types for convenience
-export type { DeleteDialogOptions, DeleteDialogCallbacks } from '@/stores/deleteDialog'
+export type { ConfirmDialogOptions, ConfirmDialogCallbacks } from '@/stores/confirmDialog'

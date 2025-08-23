@@ -11,11 +11,12 @@ import Tooltip from '@/components/ui/tooltip/Tooltip.vue';
 import TooltipContent from '@/components/ui/tooltip/TooltipContent.vue';
 import TooltipProvider from '@/components/ui/tooltip/TooltipProvider.vue';
 import TooltipTrigger from '@/components/ui/tooltip/TooltipTrigger.vue';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import type { PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, Edit, Eye, MoreHorizontal, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
+import { BarChart3, Copy, Edit, Eye, MoreHorizontal, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
 import { h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -30,6 +31,12 @@ interface Props {
     semesters: Semester[];
     enrollmentStatusOptions: { value: string; label: string }[];
     deliveryModeOptions: { value: string; label: string }[];
+    flash?: {
+        success?: string;
+        error?: string;
+        warning?: string;
+        info?: string;
+    };
 }
 const props = defineProps<Props>();
 console.log(props.courseOfferings);
@@ -43,6 +50,9 @@ const filters = ref({
 const selectedItems = ref<number[]>([]);
 const isLoading = ref(false);
 const statistics = ref<any>(null);
+
+// Initialize the confirm dialog composable
+const confirmDialog = useGlobalConfirmDialog();
 
 // Load statistics
 const loadStatistics = async () => {
@@ -151,54 +161,86 @@ const toggleStatus = (courseOffering: CourseOffering) => {
 };
 
 const deleteCourseOffering = (courseOffering: CourseOffering) => {
-    if (confirm('Are you sure you want to delete this course offering?')) {
-        router.delete(`/course-offerings/${courseOffering.id}`, {
-            onSuccess: () => {
-                toast({
-                    title: 'Success',
-                    description: 'Course offering deleted successfully',
-                });
-            },
-            onError: () => {
-                toast({
-                    title: 'Error',
-                    description: 'Failed to delete course offering',
-                    variant: 'destructive',
-                });
-            },
+    const unitName = courseOffering.unit?.name || 'Unknown Unit';
+    const unitCode = courseOffering.unit?.code || '';
+    const itemName = unitCode ? `${unitCode} - ${unitName}` : unitName;
+
+    confirmDialog.confirmDelete(itemName, 'course offering', () => {
+        return new Promise((resolve, reject) => {
+            router.delete(`/course-offerings/${courseOffering.id}`, {
+                onSuccess: () => {
+                    toast.success('Course offering deleted successfully');
+                    resolve();
+                },
+                onError: (errors) => {
+                    console.error('Failed to delete course offering:', errors);
+                    reject(new Error('Failed to delete course offering'));
+                },
+            });
         });
-    }
+    });
+};
+
+const duplicateCourseOffering = (courseOffering: CourseOffering) => {
+    confirmDialog.showConfirmDialog(
+        {
+            title: 'Confirm Course Offering Duplication',
+            message: 'Are you sure you want to duplicate this course offering? Note: Lecturers will not be duplicated.',
+            confirmText: 'Duplicate',
+        },
+        {
+            onConfirm: () => {
+                return new Promise((resolve, reject) => {
+                    router.post(
+                        `/course-offerings/${courseOffering.id}/duplicate`,
+                        {},
+                        {
+                            onSuccess: () => {
+                                toast.success('Course offering duplicated successfully');
+                                resolve();
+                            },
+                            onError: () => {
+                                toast.error('Failed to duplicate course offering');
+                                reject(new Error('Failed to duplicate course offering'));
+                            },
+                        },
+                    );
+                });
+            },
+        },
+    );
 };
 
 const bulkDelete = () => {
     if (selectedItems.value.length === 0) {
-        toast({
-            title: 'Warning',
-            description: 'Please select items to delete',
-            variant: 'destructive',
-        });
+        toast.error('Please select items to delete');
         return;
     }
 
-    if (confirm(`Are you sure you want to delete ${selectedItems.value.length} course offering(s)?`)) {
-        router.delete('/api/course-offerings/bulk-delete', {
-            data: { ids: selectedItems.value },
-            onSuccess: () => {
-                selectedItems.value = [];
-                toast({
-                    title: 'Success',
-                    description: 'Course offerings deleted successfully',
+    confirmDialog.showConfirmDialog(
+        {
+            title: 'Delete Course Offerings',
+            message: `Are you sure you want to delete ${selectedItems.value.length} course offering(s)? This will also remove all associated student registrations and cannot be undone.`,
+            confirmText: `Delete ${selectedItems.value.length} Offering(s)`,
+        },
+        {
+            onConfirm: () => {
+                return new Promise((resolve, reject) => {
+                    router.delete('/api/course-offerings/bulk-delete', {
+                        data: { ids: selectedItems.value },
+                        onSuccess: () => {
+                            selectedItems.value = [];
+                            resolve();
+                        },
+                        onError: (errors) => {
+                            console.error('Failed to delete course offerings:', errors);
+                            reject(new Error('Failed to delete course offerings'));
+                        },
+                    });
                 });
             },
-            onError: () => {
-                toast({
-                    title: 'Error',
-                    description: 'Failed to delete course offerings',
-                    variant: 'destructive',
-                });
-            },
-        });
-    }
+        },
+    );
 };
 
 const getStatusBadgeVariant = (status: string) => {
@@ -242,26 +284,22 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
-        accessorKey: 'curriculum_unit.unit.code',
+        accessorKey: 'unit.code',
         header: 'Unit',
         cell: ({ row }) => {
             const course = row.original;
-            return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'font-medium' }, course.curriculum_unit.unit.code || 'N/A'),
-                course.section_code && h('div', { class: 'text-sm text-muted-foreground' }, `Section: ${course.section_code}`),
-            ]);
+            const unitCode = course.unit?.code || 'N/A';
+            return h('div', { class: 'space-y-1' }, [h('div', { class: 'font-medium' }, unitCode), course.section_code && h('div', { class: 'text-sm text-muted-foreground' }, `Section: ${course.section_code}`)]);
         },
     },
     {
-        accessorKey: 'curriculum_unit.unit.name',
+        accessorKey: 'unit.name',
         header: 'Unit Name',
         cell: ({ row }) => {
             const course = row.original;
-            return h('div', { class: 'max-w-xs' }, [
-                h('div', { class: 'font-medium truncate' }, course.curriculum_unit.unit.name || 'N/A'),
-                course.curriculum_unit.unit.credit_points &&
-                    h('div', { class: 'text-sm text-muted-foreground' }, `${course.curriculum_unit.unit.credit_points} credits`),
-            ]);
+            const unitName = course.unit?.name || 'N/A';
+            const creditPoints = course.unit?.credit_points;
+            return h('div', { class: 'max-w-xs' }, [h('div', { class: 'font-medium truncate' }, unitName), creditPoints && h('div', { class: 'text-sm text-muted-foreground' }, `${creditPoints} credits`)]);
         },
     },
     {
@@ -269,12 +307,7 @@ const columns: ColumnDef<CourseOffering>[] = [
         header: 'Semester',
         cell: ({ row }) => {
             const semester = row.original.semester;
-            return semester
-                ? h('div', {}, [
-                      h('div', { class: 'font-medium' }, semester.name),
-                      h('div', { class: 'text-sm text-muted-foreground' }, semester.code),
-                  ])
-                : 'N/A';
+            return semester ? h('div', {}, [h('div', { class: 'font-medium' }, semester.name), h('div', { class: 'text-sm text-muted-foreground' }, semester.code)]) : 'N/A';
         },
     },
     {
@@ -283,10 +316,7 @@ const columns: ColumnDef<CourseOffering>[] = [
         cell: ({ row }) => {
             const course = row.original;
             const percentage = course.max_capacity > 0 ? Math.round((course.current_enrollment / course.max_capacity) * 100) : 0;
-            return h('div', { class: 'text-center' }, [
-                h('div', { class: 'font-medium' }, `${course.current_enrollment}/${course.max_capacity}`),
-                h('div', { class: 'text-sm text-muted-foreground' }, `${percentage}%`),
-            ]);
+            return h('div', { class: 'text-center' }, [h('div', { class: 'font-medium' }, `${course.current_enrollment}/${course.max_capacity}`), h('div', { class: 'text-sm text-muted-foreground' }, `${percentage}%`)]);
         },
     },
     {
@@ -325,9 +355,7 @@ const columns: ColumnDef<CourseOffering>[] = [
                 {},
                 {
                     default: () => [
-                        h(DropdownMenuTrigger, { asChild: true }, () =>
-                            h(Button, { variant: 'ghost', class: 'h-8 w-8 p-0' }, () => h(MoreHorizontal, { class: 'h-4 w-4' })),
-                        ),
+                        h(DropdownMenuTrigger, { asChild: true }, () => h(Button, { variant: 'ghost', class: 'h-8 w-8 p-0' }, () => h(MoreHorizontal, { class: 'h-4 w-4' }))),
                         h(DropdownMenuContent, { align: 'end' }, () => [
                             h(
                                 DropdownMenuItem,
@@ -348,12 +376,14 @@ const columns: ColumnDef<CourseOffering>[] = [
                                 {
                                     onClick: () => toggleStatus(course),
                                 },
-                                () => [
-                                    course.enrollment_status === 'open'
-                                        ? h(ToggleLeft, { class: 'mr-2 h-4 w-4' })
-                                        : h(ToggleRight, { class: 'mr-2 h-4 w-4' }),
-                                    course.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration',
-                                ],
+                                () => [course.enrollment_status === 'open' ? h(ToggleLeft, { class: 'mr-2 h-4 w-4' }) : h(ToggleRight, { class: 'mr-2 h-4 w-4' }), course.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration'],
+                            ),
+                            h(
+                                DropdownMenuItem,
+                                {
+                                    onClick: () => duplicateCourseOffering(course),
+                                },
+                                () => [h(Copy, { class: 'mr-2 h-4 w-4' }), 'Duplicate'],
                             ),
                             h(
                                 DropdownMenuItem,
@@ -510,12 +540,7 @@ const columns: ColumnDef<CourseOffering>[] = [
                         <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                             <Tooltip>
                                 <TooltipTrigger as-child>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        @click="router.visit(`/course-offerings/${row.original.id}`)"
-                                        title="View course offering"
-                                    >
+                                    <Button variant="ghost" size="sm" @click="router.visit(`/course-offerings/${row.original.id}`)" title="View course offering">
                                         <Eye class="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
@@ -528,12 +553,7 @@ const columns: ColumnDef<CourseOffering>[] = [
                         <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                             <Tooltip>
                                 <TooltipTrigger as-child>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        @click="router.visit(`/course-offerings/${row.original.id}/edit`)"
-                                        title="Edit course offering"
-                                    >
+                                    <Button variant="ghost" size="sm" @click="router.visit(`/course-offerings/${row.original.id}/edit`)" title="Edit course offering">
                                         <Edit class="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
@@ -551,6 +571,19 @@ const columns: ColumnDef<CourseOffering>[] = [
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p>{{ row.original.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration' }}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+
+                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                            <Tooltip>
+                                <TooltipTrigger as-child>
+                                    <Button variant="ghost" size="sm" @click="duplicateCourseOffering(row.original)" title="Duplicate course offering">
+                                        <Copy class="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Duplicate course offering</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
