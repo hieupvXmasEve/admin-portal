@@ -58,29 +58,67 @@ const handleRetake = async () => {
     await startCamera();
 };
 
-const handleSave = () => {
+const handleSave = async () => {
     if (!capturedPhoto.value) return;
 
     isSaving.value = true;
 
-    // Create a temporary URL for the photo to pass back
-    const photoData = {
-        file: capturedPhoto.value.file,
-        dataUrl: capturedPhoto.value.dataUrl,
-    };
+    try {
+        // Create FormData for the upload
+        const formData = new FormData();
+        formData.append('file', capturedPhoto.value.file);
 
-    // Store photo data in session storage temporarily
-    sessionStorage.setItem(
-        'captured_photo',
-        JSON.stringify({
-            dataUrl: capturedPhoto.value.dataUrl,
-            fileName: capturedPhoto.value.file.name,
-        }),
-    );
+        // Use fetch for API endpoints instead of Inertia router
+        const response = await fetch(`/api/uploads/student-avatar/${props.studentId}`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
 
-    // Navigate back to edit page
-    const returnUrl = props.returnUrl || route('students.edit', props.studentId);
-    router.visit(returnUrl);
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            // Store successful upload data in session storage
+            sessionStorage.setItem(
+                'uploaded_avatar',
+                JSON.stringify({
+                    id: result.data.id,
+                    url: result.data.url,
+                    filename: result.data.filename,
+                    uploadedAt: new Date().toISOString(),
+                }),
+            );
+
+            // Navigate back to edit page
+            const returnUrl = props.returnUrl || route('students.edit', props.studentId);
+            router.visit(returnUrl);
+        } else {
+            // Handle API errors
+            let errorMessage = 'Upload failed. Please try again.';
+            
+            if (result.errors && typeof result.errors === 'object') {
+                // Handle validation errors
+                const firstError = Object.values(result.errors)[0];
+                errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+            } else if (result.message) {
+                errorMessage = result.message;
+            }
+            
+            error.value = `Upload failed: ${errorMessage}`;
+        }
+
+    } catch (uploadError) {
+        console.error('Avatar upload failed:', uploadError);
+        
+        // Set error state but don't navigate away
+        // Allow user to retry with the same captured image
+        error.value = `Upload failed: ${uploadError.message}. Please try again.`;
+    } finally {
+        isSaving.value = false;
+    }
 };
 
 const handleCancel = () => {
@@ -224,7 +262,7 @@ const handleCancel = () => {
                     </Button>
                     <Button size="lg" @click="handleSave" :disabled="isSaving">
                         <Save class="mr-2 h-5 w-5" />
-                        {{ isSaving ? 'Saving...' : 'Use Photo' }}
+                        {{ isSaving ? 'Uploading to server...' : 'Use Photo' }}
                     </Button>
                 </template>
             </div>

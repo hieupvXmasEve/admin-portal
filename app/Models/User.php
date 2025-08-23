@@ -243,6 +243,14 @@ class User extends UserAuditableModel
     }
 
     /**
+     * Upload records relationship
+     */
+    public function uploadRecords()
+    {
+        return $this->hasMany(UploadRecord::class);
+    }
+
+    /**
      * Available user status constants
      */
     public const STATUS_ACTIVE = 'active';

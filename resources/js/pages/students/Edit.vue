@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import StudentAvatar from '@/components/ui/avatar/StudentAvatar.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import StudentAvatar from '@/components/ui/avatar/StudentAvatar.vue';
 import type { Campus, CurriculumVersion, Program, Specialization, Student } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
 import { studentRoutes } from '@/utils/routes';
@@ -14,6 +14,7 @@ import { toTypedSchema } from '@vee-validate/zod';
 import { Building, GraduationCap, Mail, Phone, Save, User, X } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { computed, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
 interface Props {
@@ -29,12 +30,10 @@ console.log('Props', props.student);
 // Form validation schema
 const formSchema = toTypedSchema(
     z.object({
-        full_name: z
-            .string()
-            .min(ValidationRules.student.firstName.minLength, 'First name is required')
-            .max(ValidationRules.student.firstName.maxLength, 'First name is too long'),
+        full_name: z.string().min(ValidationRules.student.firstName.minLength, 'First name is required').max(ValidationRules.student.firstName.maxLength, 'First name is too long'),
         email: z.string().email('Invalid email format').max(ValidationRules.student.email.maxLength, 'Email is too long'),
         phone: z.string().max(ValidationRules.student.phone.maxLength, 'Phone number is too long').optional(),
+        avatar_url: z.string().url('Invalid URL format').optional().or(z.literal('')),
         date_of_birth: z.string().optional(),
         gender: z.enum(['male', 'female', 'other']).optional(),
         nationality: z.string().max(ValidationRules.student.nationality.maxLength, 'Nationality is too long').optional(),
@@ -46,14 +45,8 @@ const formSchema = toTypedSchema(
         curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
         admission_date: z.string().min(1, 'Admission date is required'),
         expected_graduation_date: z.string().optional(),
-        emergency_contact_name: z
-            .string()
-            .max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long')
-            .optional(),
-        emergency_contact_phone: z
-            .string()
-            .max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long')
-            .optional(),
+        emergency_contact_name: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
+        emergency_contact_phone: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
         emergency_contact_relationship: z.string().max(100, 'Emergency contact relationship is too long').optional(),
         high_school_name: z.string().max(ValidationRules.student.highSchoolName.maxLength, 'High school name is too long').optional(),
         high_school_graduation_year: z.string().optional(),
@@ -69,6 +62,7 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         full_name: props.student.full_name,
         email: props.student.email,
         phone: props.student.phone || '',
+        avatar_url: props.student.avatar_url || '',
         date_of_birth: props.student.date_of_birth || '',
         gender: props.student.gender,
         nationality: props.student.nationality || '',
@@ -171,6 +165,7 @@ const onSubmit = handleSubmit((formData) => {
         entrance_exam_score: formData.entrance_exam_score ? parseFloat(formData.entrance_exam_score) : null,
         // Remove empty strings
         phone: formData.phone || null,
+        avatar_url: formData.avatar_url || null, // Use the form field value directly
         date_of_birth: formData.date_of_birth || null,
         gender: formData.gender || null,
         nationality: formData.nationality || null,
@@ -186,7 +181,7 @@ const onSubmit = handleSubmit((formData) => {
 
     router.put(route('students.update', props.student.id), submitData, {
         onSuccess: () => {
-            router.visit(studentRoutes.show(props.student.id));
+            toast.success('Student updated successfully');
         },
         onError: (errors) => {
             console.error('Validation errors:', errors);
@@ -195,16 +190,36 @@ const onSubmit = handleSubmit((formData) => {
 });
 
 const handleCancel = () => {
-    router.visit(studentRoutes.show(props.student.id));
+    router.visit(studentRoutes.studentAcademicSummary(props.student.id));
 };
 
-// Photo handling
+// Photo/Avatar handling
 const selectedPhoto = ref<File | null>(null);
 const photoPreviewUrl = ref<string | null>(null);
+const uploadedAvatarUrl = ref<string | null>(null);
+const showSuccessMessage = ref(false);
 
 const handlePhotoSelected = (file: File, dataUrl: string) => {
     selectedPhoto.value = file;
     photoPreviewUrl.value = dataUrl;
+    console.log('dataUrl', dataUrl);
+};
+
+const handleAvatarUploaded = (avatarData: any) => {
+    console.log('Avatar uploaded:', avatarData);
+
+    // Update the form field with the new avatar URL
+    setFieldValue('avatar_url', avatarData.url);
+
+    // Update preview URL for display
+    uploadedAvatarUrl.value = avatarData.url;
+    photoPreviewUrl.value = avatarData.url;
+
+    // Show success message
+    showSuccessMessage.value = true;
+    setTimeout(() => {
+        showSuccessMessage.value = false;
+    }, 5000); // Hide after 5 seconds
 };
 </script>
 
@@ -223,6 +238,21 @@ const handlePhotoSelected = (file: File, dataUrl: string) => {
         </div>
     </div>
 
+    <!-- Success Message for Avatar Upload -->
+    <div v-if="showSuccessMessage" class="mb-6">
+        <Card class="border-green-200 bg-green-50">
+            <CardContent class="pt-4">
+                <div class="flex items-center gap-2 text-green-800">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="font-medium">Avatar uploaded successfully!</span>
+                    <span class="text-green-600">Click "Update Student" to save the new avatar to the student record.</span>
+                </div>
+            </CardContent>
+        </Card>
+    </div>
+
     <form @submit="onSubmit" class="space-y-6">
         <!-- Personal Information -->
         <Card>
@@ -235,12 +265,7 @@ const handlePhotoSelected = (file: File, dataUrl: string) => {
             <CardContent class="space-y-4">
                 <!-- Avatar Section -->
                 <div class="mb-6">
-                    <StudentAvatar
-                        :student-id="student.id"
-                        :current-avatar="photoPreviewUrl || student.avatar_url"
-                        size="xl"
-                        @photo-selected="handlePhotoSelected"
-                    />
+                    <StudentAvatar :student-id="student.id" :current-avatar="photoPreviewUrl || student.avatar_url" size="xl" @photo-selected="handlePhotoSelected" @avatar-uploaded="handleAvatarUploaded" />
                 </div>
 
                 <div class="grid grid-cols-1">
@@ -431,11 +456,7 @@ const handlePhotoSelected = (file: File, dataUrl: string) => {
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    <SelectItem
-                                        v-for="specialization in filteredSpecializations"
-                                        :key="specialization.id"
-                                        :value="specialization.id.toString()"
-                                    >
+                                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">
                                         {{ specialization.name }}
                                     </SelectItem>
                                 </SelectContent>
@@ -555,13 +576,7 @@ const handlePhotoSelected = (file: File, dataUrl: string) => {
                         <FormItem>
                             <FormLabel>Graduation Year</FormLabel>
                             <FormControl>
-                                <Input
-                                    v-bind="componentField"
-                                    type="number"
-                                    placeholder="Enter graduation year"
-                                    min="1900"
-                                    :max="new Date().getFullYear() + 1"
-                                />
+                                <Input v-bind="componentField" type="number" placeholder="Enter graduation year" min="1900" :max="new Date().getFullYear() + 1" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

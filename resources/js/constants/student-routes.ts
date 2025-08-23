@@ -8,7 +8,7 @@ export const STUDENT_ROUTE_NAMES = {
     INDEX: 'students.index',
     CREATE: 'students.create',
     STORE: 'students.store',
-    SHOW: 'students.show',
+    // SHOW: 'students.show',
     EDIT: 'students.edit',
     UPDATE: 'students.update',
     DESTROY: 'students.destroy',
@@ -16,13 +16,6 @@ export const STUDENT_ROUTE_NAMES = {
     // Actions
     ASSIGN_PROGRAM: 'students.assign-program',
     UPDATE_STATUS: 'students.update-status',
-
-    // AJAX
-    AJAX_SEARCH: 'ajax.students.search',
-    AJAX_SHOW: 'ajax.students.show',
-    AJAX_SPECIALIZATIONS: 'ajax.students.specializations',
-    AJAX_CURRICULUM_VERSIONS: 'ajax.students.curriculum-versions',
-    AJAX_BY_IDS: 'ajax.students.by-ids',
 } as const;
 
 // Route Paths - for frontend routing and navigation

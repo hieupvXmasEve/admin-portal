@@ -449,7 +449,7 @@ const executeCompleteOnboarding = () => {
                     <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
-                                <Button variant="ghost" size="sm" @click="router.visit(studentRoutes.show(row.original.id))" title="View student">
+                                <Button variant="ghost" size="sm" @click="router.visit(studentRoutes.studentAcademicSummary(row.original.id))" title="View student">
                                     <Eye class="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>

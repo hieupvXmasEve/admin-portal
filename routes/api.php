@@ -31,6 +31,11 @@ Route::get('/health', function () {
     ]);
 })->name('api.health');
 
+// Upload routes
+Route::prefix('uploads')->group(function () {
+    require __DIR__.'/api/uploads.php';
+});
+
 // require __DIR__.'/api/public.php';
 require __DIR__.'/api/admin.php';
 

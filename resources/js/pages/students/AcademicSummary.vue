@@ -21,7 +21,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log(props.academicSummary.scores);
 
 // Tab state management with URL parameters
 const validTabs = ['overview', 'registrations', 'scores', 'attendance', 'gpa', 'graduation'] as const;

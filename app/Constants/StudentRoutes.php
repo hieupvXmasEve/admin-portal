@@ -17,7 +17,7 @@ class StudentRoutes
 
     public const STORE = 'students.store';
 
-    public const SHOW = 'students.show';
+    // public const SHOW = 'students.show';
 
     public const EDIT = 'students.edit';
 

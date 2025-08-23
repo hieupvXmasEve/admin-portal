@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -112,8 +113,14 @@ const hasAcademicConcerns = computed(() => {
         <div v-else>
             <!-- Student Header -->
             <div class="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-                <div class="bg-primary/10 flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full">
-                    <User class="text-primary h-8 w-8" />
+                <!-- <StudentAvatar :student-id="overview.student_info.id" :current-avatar="overview.student_info.avatar_url" size="xl" /> -->
+                <!-- Show avatar -->
+                <div class="bg-primary/10 flex size-20 flex-shrink-0 items-center justify-center rounded-full">
+                    <!-- <img :src="overview.student_info.avatar_url" alt="Student Avatar" class="h-full w-full rounded-full object-cover" /> -->
+                    <Avatar class="size-20">
+                        <AvatarImage :src="overview.student_info.avatar_url || '/placeholder.svg'" alt="Student Avatar" />
+                        <AvatarFallback>Asia</AvatarFallback>
+                    </Avatar>
                 </div>
                 <div class="flex-1">
                     <h2 class="text-2xl font-bold">{{ overview.student_info.full_name }}</h2>
