@@ -10,6 +10,7 @@ use App\Models\Program;
 use App\Models\Semester;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class ProgramMappingService
 {
@@ -116,25 +117,56 @@ class ProgramMappingService
      */
     public function resolveApplicationMappingData(array $applicationData): array
     {
+        Log::info('ProgramMappingService: Starting mapping resolution', [
+            'input_data' => $applicationData
+        ]);
+        
         $resolvedData = [];
 
         // Resolve campus_id
         if (!empty($applicationData['campus_code'])) {
-            $resolvedData['campus_id'] = $this->getCampusIdFromCode($applicationData['campus_code']);
+            Log::info("Resolving campus ID for code: {$applicationData['campus_code']}");
+            $campusId = $this->getCampusIdFromCode($applicationData['campus_code']);
+            $resolvedData['campus_id'] = $campusId;
+            Log::info("Campus ID resolved: " . ($campusId ? $campusId : 'NULL'));
+        } else {
+            Log::warning('Campus code is empty, cannot resolve campus_id');
         }
 
         // Resolve program_id
         if (!empty($applicationData['intended_program'])) {
-            $resolvedData['program_id'] = $this->getProgramIdFromIntendedCode($applicationData['intended_program']);
+            Log::info("Resolving program ID for intended program: {$applicationData['intended_program']}");
+            $mappedCode = $this->mapIntendedProgramToCode($applicationData['intended_program']);
+            Log::info("Mapped program code: " . ($mappedCode ? $mappedCode : 'NULL'));
+            
+            $programId = $this->getProgramIdFromIntendedCode($applicationData['intended_program']);
+            $resolvedData['program_id'] = $programId;
+            Log::info("Program ID resolved: " . ($programId ? $programId : 'NULL'));
+        } else {
+            Log::warning('Intended program is empty, cannot resolve program_id');
         }
 
         // Resolve curriculum_version_id
         if (!empty($applicationData['intake']) && !empty($resolvedData['program_id'])) {
-            $resolvedData['curriculum_version_id'] = $this->getCurriculumVersionId(
+            Log::info("Resolving curriculum version ID for intake: {$applicationData['intake']}, program_id: {$resolvedData['program_id']}");
+            $curriculumVersionId = $this->getCurriculumVersionId(
                 $applicationData['intake'],
                 $resolvedData['program_id']
             );
+            $resolvedData['curriculum_version_id'] = $curriculumVersionId;
+            Log::info("Curriculum version ID resolved: " . ($curriculumVersionId ? $curriculumVersionId : 'NULL'));
+        } else {
+            if (empty($applicationData['intake'])) {
+                Log::warning('Intake is empty, cannot resolve curriculum_version_id');
+            }
+            if (empty($resolvedData['program_id'])) {
+                Log::warning('Program ID not resolved, cannot resolve curriculum_version_id');
+            }
         }
+
+        Log::info('ProgramMappingService: Mapping resolution complete', [
+            'resolved_data' => $resolvedData
+        ]);
 
         return $resolvedData;
     }

@@ -62,7 +62,7 @@ class UpdateStudentApplicationRequest extends FormRequest
             'is_international_applicant' => ['nullable', 'boolean'],
             'exception_units' => ['nullable', 'string'],
             'status' => ['required', 'in:pending,reviewed,approved,rejected'],
-            'student_code' => ['required', 'string', 'max:20'],
+            'student_code' => ['required', 'string', 'max:20', 'unique:student_applications,student_code,' . $applicationId],
         ];
     }
 
@@ -108,6 +108,8 @@ class UpdateStudentApplicationRequest extends FormRequest
             'overall.numeric' => 'Overall score must be a number.',
             'overall.min' => 'Overall score must be at least 0.',
             'overall.max' => 'Overall score cannot exceed 10.',
+            'student_code.required' => 'The student code field is required.',
+            'student_code.unique' => 'This student code is already in use.',
         ];
     }
 }

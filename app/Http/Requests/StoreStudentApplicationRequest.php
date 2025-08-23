@@ -61,7 +61,7 @@ class StoreStudentApplicationRequest extends FormRequest
             'students.*.is_international_applicant' => 'nullable|boolean',
             'students.*.exception_units' => 'nullable|string',
             'students.*.status' => 'nullable|in:pending,reviewed,approved,rejected',
-            'students.*.student_code' => 'required|string|max:20',
+            'students.*.student_code' => 'required|string|max:20|unique:student_applications,student_code',
         ];
     }
 }
