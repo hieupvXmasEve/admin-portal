@@ -88,12 +88,12 @@ const overlayDimensions = computed(() => {
         </div>
 
         <!-- Instructions -->
-        <div v-if="showInstructions" class="absolute bottom-4 left-1/2 -translate-x-1/2 transform">
-            <div class="bg-opacity-30 rounded-lg bg-black px-4 py-2 text-center text-sm text-white">
-                <p class="font-medium">3×4 ID Photo Frame</p>
-                <!-- <p class="text-xs opacity-80">Position your face within the guidelines</p> -->
-            </div>
-        </div>
+        <!-- <div v-if="showInstructions" class="absolute bottom-4 left-1/2 -translate-x-1/2 transform"> -->
+        <!-- <div class="bg-opacity-30 rounded-lg bg-black px-4 py-2 text-center text-sm text-white"> -->
+        <!-- <p class="font-medium">3×4 ID Photo Frame</p> -->
+        <!-- <p class="text-xs opacity-80">Position your face within the guidelines</p> -->
+        <!-- </div> -->
+        <!-- </div> -->
 
         <!-- Photo dimensions indicator -->
         <div class="bg-opacity-60 absolute top-4 right-4 rounded bg-black px-3 py-1 text-xs text-white">3×4" ({{ ID_PHOTO_DIMENSIONS.width }}×{{ ID_PHOTO_DIMENSIONS.height }}px)</div>

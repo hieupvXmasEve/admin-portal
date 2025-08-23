@@ -251,7 +251,7 @@ class StudentController extends Controller
 
             // Return redirect for web requests
             return redirect()
-                ->route(StudentRoutes::SHOW, $updatedStudent)
+                ->route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $updatedStudent)
                 ->with('success', 'Student updated successfully');
         } catch (\Exception $e) {
             Log::error('Failed to update student', [

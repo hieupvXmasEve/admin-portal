@@ -46,10 +46,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:create_student')
         ->name(StudentRoutes::STORE);
 
-    Route::get('students/{student}', [StudentController::class, 'show'])
-        ->middleware('can:view_student')
-        ->name(StudentRoutes::SHOW);
-
     Route::get('students/{student}/edit', [StudentController::class, 'edit'])
         ->middleware('can:edit_student')
         ->name(StudentRoutes::EDIT);

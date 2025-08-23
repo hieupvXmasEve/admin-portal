@@ -213,6 +213,7 @@ export interface Student {
     full_name: string;
     email: string;
     phone: string;
+    avatar_url: string | null;
     status: 'admitted' | 'active' | 'inactive' | 'graduated' | 'dropped_out';
     admission_date: string;
     admission_notes?: string;
@@ -308,6 +309,7 @@ export interface StudentOverview {
         expected_graduation_date?: string;
         status_change_date?: string;
         status_reason?: string;
+        avatar_url?: string;
     };
     program_info: {
         campus?: {

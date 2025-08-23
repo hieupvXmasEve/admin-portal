@@ -5,6 +5,7 @@ import { usePhotoCapture } from '@/composables/usePhotoCapture';
 import { router } from '@inertiajs/vue3';
 import { Camera, Upload, User } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Props {
     studentId: number;
@@ -20,6 +21,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
     photoSelected: [file: File, dataUrl: string];
+    avatarUploaded: [avatarData: any];
 }>();
 
 const { handleFileUpload } = usePhotoCapture();
@@ -28,7 +30,7 @@ const currentPhotoUrl = ref<string | null>(props.currentAvatar || null);
 
 const sizeClasses = {
     sm: 'h-8 w-8',
-    md: 'h-12 w-12', 
+    md: 'h-12 w-12',
     lg: 'h-16 w-16',
     xl: 'h-24 w-24'
 };
@@ -41,13 +43,30 @@ const iconSizeClasses = {
 };
 
 onMounted(() => {
-    // Check if there's a captured photo in session storage
+    // Check if there's an uploaded avatar from photo capture
+    const uploadedAvatar = sessionStorage.getItem('uploaded_avatar');
+    if (uploadedAvatar) {
+        try {
+            const avatarData = JSON.parse(uploadedAvatar);
+            currentPhotoUrl.value = avatarData.url;
+
+            // Emit the uploaded avatar data
+            emit('avatarUploaded', avatarData);
+
+            // Clear session storage
+            sessionStorage.removeItem('uploaded_avatar');
+        } catch (error) {
+            console.error('Error processing uploaded avatar:', error);
+        }
+    }
+
+    // Fallback: Check if there's a captured photo in session storage (legacy)
     const capturedPhoto = sessionStorage.getItem('captured_photo');
     if (capturedPhoto) {
         try {
             const photoData = JSON.parse(capturedPhoto);
             currentPhotoUrl.value = photoData.dataUrl;
-            
+
             // Convert dataUrl back to file for emission
             fetch(photoData.dataUrl)
                 .then(res => res.blob())
@@ -55,7 +74,7 @@ onMounted(() => {
                     const file = new File([blob], photoData.fileName, { type: 'image/jpeg' });
                     emit('photoSelected', file, photoData.dataUrl);
                 });
-            
+
             // Clear session storage
             sessionStorage.removeItem('captured_photo');
         } catch (error) {
@@ -75,7 +94,7 @@ const handleTakePhotoClick = () => {
 const handleFileChange = async (event: Event) => {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
-    
+    console.log('file', file)
     if (file) {
         try {
             const photo = await handleFileUpload(file);
@@ -92,24 +111,28 @@ const handleFileChange = async (event: Event) => {
     <div class="flex items-center gap-4">
         <div class="relative">
             <!-- Avatar Display -->
-            <div 
+            <div
                 :class="[
-                    'bg-primary/10 flex items-center justify-center rounded-full overflow-hidden border-2 border-border',
+                    'bg-primary/10 flex items-center justify-center rounded-full overflow-hidden border-1 border-border',
                     sizeClasses[size],
                     editable && 'cursor-pointer hover:opacity-80 transition-opacity'
                 ]"
                 @click="editable && handleUploadClick()"
             >
-                <img
+                <!-- <img
                     v-if="currentPhotoUrl"
                     :src="currentPhotoUrl"
                     alt="Student avatar"
                     class="h-full w-full object-cover"
                 />
-                <User 
+                <User
                     v-else
                     :class="['text-primary', iconSizeClasses[size]]"
-                />
+                /> -->
+                <Avatar class="size-full">
+                        <AvatarImage :src="currentPhotoUrl || '/placeholder.svg'" alt="Student Avatar" />
+                        <AvatarFallback>Asia</AvatarFallback>
+                </Avatar>
             </div>
 
             <!-- Dropdown Menu for Options (only when editable) -->
@@ -144,7 +167,7 @@ const handleFileChange = async (event: Event) => {
             class="hidden"
             @change="handleFileChange"
         />
-        
+
         <div v-if="editable" class="text-sm text-muted-foreground">
             <p class="font-medium">Student Photo</p>
             <p class="text-xs">Click the camera icon to upload or take a photo</p>

@@ -12,6 +12,10 @@ export type { ConfirmDialogCallbacks, ConfirmDialogOptions } from './useGlobalCo
 // Permission composables
 export { usePermissions } from './usePermissions';
 
+// Image upload composables
+export { useImageUpload } from './useImageUpload';
+export { useUploadConfig } from './useUploadConfig';
+
 // Add other composables here as they are created
 // export { useAuth } from './useAuth';
 // export { useNotifications } from './useNotifications';

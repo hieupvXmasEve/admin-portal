@@ -74,6 +74,7 @@ class Student extends StudentAuditableModel
             'full_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:students'],
             'phone' => ['nullable', 'string', 'max:20'],
+            'avatar_url' => ['nullable', 'string', 'url', 'max:255'],
             'date_of_birth' => ['nullable', 'date'],
             'gender' => ['nullable', 'in:male,female,other'],
             'nationality' => ['nullable', 'string', 'max:100'],
