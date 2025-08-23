@@ -436,15 +436,15 @@ class CourseOfferingController extends Controller
 
             // Get registration count for notification
             $registrationCount = $courseOffering->courseRegistrations()->count();
-            
+
             // Delete all associated course registrations first
             $courseOffering->courseRegistrations()->delete();
-            
+
             // Delete the course offering
             $courseOffering->delete();
-            
+
             DB::commit();
-            
+
             $message = 'Course offering deleted successfully.';
             if ($registrationCount > 0) {
                 $message .= " {$registrationCount} associated registration(s) were also removed.";
@@ -452,11 +452,10 @@ class CourseOfferingController extends Controller
 
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', $message);
-                
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to delete course offering: ' . $e->getMessage());
-            
+
             return Redirect::back()
                 ->with('error', 'Failed to delete course offering: ' . $e->getMessage());
         }
@@ -474,29 +473,29 @@ class CourseOfferingController extends Controller
 
         try {
             DB::beginTransaction();
-            
+
             $courseOfferings = CourseOffering::whereIn('id', $request->ids)
                 ->where('campus_id', app('campus')->id)
                 ->get();
-            
+
             $totalRegistrations = 0;
-            
+
             foreach ($courseOfferings as $courseOffering) {
                 // Count registrations for notification
                 $registrationCount = $courseOffering->courseRegistrations()->count();
                 $totalRegistrations += $registrationCount;
-                
+
                 // Delete associated course registrations first
                 $courseOffering->courseRegistrations()->delete();
             }
-            
+
             // Delete the course offerings
             CourseOffering::whereIn('id', $request->ids)
                 ->where('campus_id', app('campus')->id)
                 ->delete();
-            
+
             DB::commit();
-            
+
             $message = 'Selected course offerings deleted successfully.';
             if ($totalRegistrations > 0) {
                 $message .= " {$totalRegistrations} associated registration(s) were also removed.";
@@ -504,11 +503,10 @@ class CourseOfferingController extends Controller
 
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', $message);
-                
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to bulk delete course offerings: ' . $e->getMessage());
-            
+
             return Redirect::back()
                 ->with('error', 'Failed to delete course offerings: ' . $e->getMessage());
         }
@@ -728,45 +726,45 @@ class CourseOfferingController extends Controller
                     if ($existingUnitRegistration) {
                         $eligibilityInfo['is_already_registered'] = true;
                         $sectionCode = $existingUnitRegistration->courseOffering->section_code;
-                        $conflictMessage = $sectionCode 
+                        $conflictMessage = $sectionCode
                             ? "Already registered for {$courseOffering->course_code} (Section: {$sectionCode}) in this semester"
                             : "Already registered for {$courseOffering->course_code} in this semester";
                         $eligibilityInfo['eligibility_reasons'][] = $conflictMessage;
                     } else {
                         // Check eligibility criteria only if not already registered for the unit
-                    $isEligible = true;
-                    $reasons = [];
+                        $isEligible = true;
+                        $reasons = [];
 
-                    // Check if student is active
-                    if ($student->status !== 'active') {
-                        $isEligible = false;
-                        $reasons[] = "Student status is '{$student->status}' (must be 'active')";
-                    }
+                        // Check if student is active
+                        if ($student->status !== 'active') {
+                            $isEligible = false;
+                            $reasons[] = "Student status is '{$student->status}' (must be 'active')";
+                        }
 
-                    // Check for academic holds (if method exists)
-                    if (method_exists($student, 'hasActiveHolds') && $student->hasActiveHolds()) {
-                        $isEligible = false;
-                        $reasons[] = 'Student has active academic holds';
-                    }
+                        // Check for academic holds (if method exists)
+                        if (method_exists($student, 'hasActiveHolds') && $student->hasActiveHolds()) {
+                            $isEligible = false;
+                            $reasons[] = 'Student has active academic holds';
+                        }
 
-                    // Check course offering capacity
-                    if ($courseOffering->isFull()) {
-                        $isEligible = false;
-                        $reasons[] = 'Course offering is at full capacity';
-                    }
+                        // Check course offering capacity
+                        if ($courseOffering->isFull()) {
+                            $isEligible = false;
+                            $reasons[] = 'Course offering is at full capacity';
+                        }
 
-                    // Check if registration is open
-                    if (!$courseOffering->isRegistrationOpen()) {
-                        $isEligible = false;
-                        $reasons[] = 'Registration period is not currently open';
-                    }
+                        // Check if registration is open
+                        if (!$courseOffering->isRegistrationOpen()) {
+                            $isEligible = false;
+                            $reasons[] = 'Registration period is not currently open';
+                        }
 
-                    if ($isEligible) {
-                        $reasons[] = 'Eligible for registration';
-                    }
+                        if ($isEligible) {
+                            $reasons[] = 'Eligible for registration';
+                        }
 
-                    $eligibilityInfo['is_eligible'] = $isEligible;
-                    $eligibilityInfo['eligibility_reasons'] = $reasons;
+                        $eligibilityInfo['is_eligible'] = $isEligible;
+                        $eligibilityInfo['eligibility_reasons'] = $reasons;
                     }
                 }
             } else {
@@ -854,7 +852,7 @@ class CourseOfferingController extends Controller
 
                     if ($existingUnitRegistration) {
                         $sectionCode = $existingUnitRegistration->courseOffering->section_code;
-                        $conflictMessage = $sectionCode 
+                        $conflictMessage = $sectionCode
                             ? "Already registered for {$courseOffering->course_code} (Section: {$sectionCode}) in this semester"
                             : "Already registered for {$courseOffering->course_code} in this semester";
                         $result['message'] = $conflictMessage;
@@ -889,7 +887,7 @@ class CourseOfferingController extends Controller
                         'student_id' => $student->id,
                         'course_offering_id' => $courseOffering->id,
                         'semester_id' => $courseOffering->semester_id,
-                        'registration_status' => 'registered',
+                        'registration_status' => 'confirmed',
                         'registration_date' => now(),
                         'registration_method' => 'admin_override',
                         'credit_hours' => $courseOffering->curriculumUnit->unit->credit_points ?? 3,
@@ -983,7 +981,7 @@ class CourseOfferingController extends Controller
         try {
             // Get all attributes except the ones we want to exclude or modify
             $attributes = $courseOffering->getAttributes();
-            
+
             // Remove attributes that should not be duplicated
             unset(
                 $attributes['id'],
@@ -998,12 +996,12 @@ class CourseOfferingController extends Controller
             // Reset enrollment counters
             $attributes['current_enrollment'] = 0;
             $attributes['current_waitlist'] = 0;
-            
+
             // Modify section code if it exists to avoid duplicates
             if ($courseOffering->section_code) {
                 $baseSectionCode = $courseOffering->section_code;
                 $counter = 1;
-                
+
                 // Find a unique section code
                 do {
                     $newSectionCode = $baseSectionCode . '_copy' . ($counter > 1 ? $counter : '');
@@ -1014,7 +1012,7 @@ class CourseOfferingController extends Controller
                         ->exists();
                     $counter++;
                 } while ($exists && $counter <= 100); // Prevent infinite loop
-                
+
                 $attributes['section_code'] = $newSectionCode;
             }
 
@@ -1023,7 +1021,6 @@ class CourseOfferingController extends Controller
 
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering duplicated successfully. Please assign an instructor.');
-                
         } catch (\Exception $e) {
             Log::error('Failed to duplicate course offering: ' . $e->getMessage());
 
