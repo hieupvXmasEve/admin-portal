@@ -8,6 +8,7 @@ export const CAMPUS_ROUTE_NAMES = {
     // Campus Selection Routes
     SELECT_CAMPUS_INDEX: 'select-campus.index',
     SELECT_CAMPUS_SET_CURRENT: 'select-campus.set-current',
+    SELECT_CAMPUS_CHANGE: 'select-campus.change',
 
     // Main Campus Routes
     INDEX: 'campuses.index',

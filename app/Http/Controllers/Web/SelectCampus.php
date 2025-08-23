@@ -52,4 +52,22 @@ class SelectCampus extends Controller
             return back()->withErrors(['error' => 'Failed to set campus']);
         }
     }
+
+    public function changeCampus()
+    {
+        try {
+            // Clear campus-related session data
+            Session::forget(['current_campus_id', 'permissions']);
+            Session::save();
+
+            return redirect()->route('select-campus.index');
+        } catch (\Exception $e) {
+            Log::error('Error in changeCampus:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTrace(),
+            ]);
+
+            return back()->withErrors(['error' => 'Failed to change campus']);
+        }
+    }
 }

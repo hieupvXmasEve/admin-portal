@@ -17,6 +17,7 @@ Route::get('dashboard', function () {
 Route::middleware(['auth'])->group(callback: function () {
     Route::get('select-campus', [SelectCampus::class, 'index'])->name('select-campus.index');
     Route::post('select-campus/set-current', [SelectCampus::class, 'setCurrentCampus'])->name('select-campus.set-current');
+    Route::post('select-campus/change', [SelectCampus::class, 'changeCampus'])->name('select-campus.change');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
