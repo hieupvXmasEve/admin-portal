@@ -112,11 +112,23 @@ class StudentApplication extends AuditableModel
     protected function getStandardLogFields(): array
     {
         return [
-            'full_name', 'gender', 'ethnicity', 'phone', 'email',
-            'campus_code', 'intended_program', 'intended_specialization', 'intake',
-            'exam_date', 'english_test_type', 'overall',
-            'study_link_status', 'is_international_applicant',
-            'status', 'student_id', 'student_code',
+            'full_name',
+            'gender',
+            'ethnicity',
+            'phone',
+            'email',
+            'campus_code',
+            'intended_program',
+            'intended_specialization',
+            'intake',
+            'exam_date',
+            'english_test_type',
+            'overall',
+            'study_link_status',
+            'is_international_applicant',
+            'status',
+            'student_id',
+            'student_code',
         ];
     }
 
@@ -128,7 +140,8 @@ class StudentApplication extends AuditableModel
         return [
             'national_id', // Sensitive personal information
             'address', // Personal address
-            'parent_phone', 'parent_email', // Parent contact info
+            'parent_phone',
+            'parent_email', // Parent contact info
             'health_information', // Medical information
         ];
     }
@@ -141,7 +154,7 @@ class StudentApplication extends AuditableModel
         if (! empty($this->full_name)) {
             $campus = $this->campus_code ? " ({$this->campus_code})" : '';
 
-            return $this->full_name.$campus;
+            return $this->full_name . $campus;
         }
 
         if (! empty($this->email)) {
@@ -243,7 +256,7 @@ class StudentApplication extends AuditableModel
     public function getConversionMappingData(): array
     {
         $mappingService = app(\App\Services\ProgramMappingService::class);
-        
+
         return $mappingService->resolveApplicationMappingData([
             'campus_code' => $this->campus_code,
             'intended_program' => $this->intended_program,
@@ -256,22 +269,55 @@ class StudentApplication extends AuditableModel
      */
     public function isReadyForConversion(): bool
     {
-        // Already converted
+        \Log::info("Checking conversion readiness for application {$this->id}", [
+            'application_id' => $this->id,
+            'full_name' => $this->full_name,
+            'email' => $this->email,
+            'campus_code' => $this->campus_code,
+            'student_code' => $this->student_code,
+            'intended_program' => $this->intended_program,
+            'intake' => $this->intake,
+        ]);
+
+        // Allow already converted applications for updates
         if ($this->isConverted()) {
-            return false;
+            \Log::info("Application {$this->id} already converted (student_id: {$this->student_id}) - allowing for updates");
+            // Continue checking other requirements instead of returning false
         }
 
         // Required basic data including student_code
-        if (empty($this->full_name) || empty($this->email) || empty($this->campus_code) || empty($this->student_code)) {
-            return false;
+        $requiredFields = [
+            'full_name' => $this->full_name,
+            'email' => $this->email,
+            'campus_code' => $this->campus_code,
+            'student_code' => $this->student_code,
+        ];
+
+        foreach ($requiredFields as $field => $value) {
+            if (empty($value)) {
+                \Log::warning("Application {$this->id} missing required field: {$field}");
+                return false;
+            }
         }
 
         // Check if mapping data can be resolved
+        \Log::info("Getting conversion mapping data for application {$this->id}");
         $mappingData = $this->getConversionMappingData();
         
-        return !empty($mappingData['campus_id']) && 
-               !empty($mappingData['program_id']) && 
-               !empty($mappingData['curriculum_version_id']);
+        \Log::info("Mapping data resolved for application {$this->id}", [
+            'mapping_data' => $mappingData,
+            'campus_id_resolved' => !empty($mappingData['campus_id']),
+            'program_id_resolved' => !empty($mappingData['program_id']),
+            'curriculum_version_id_resolved' => !empty($mappingData['curriculum_version_id']),
+        ]);
+
+        $isReady = !empty($mappingData['campus_id']) &&
+            !empty($mappingData['program_id']) &&
+            !empty($mappingData['curriculum_version_id']);
+
+        \Log::info("Application {$this->id} readiness result: " . ($isReady ? 'READY' : 'NOT READY'));
+        
+        return $isReady;
     }
 
     /**
@@ -281,10 +327,10 @@ class StudentApplication extends AuditableModel
     {
         $errors = [];
 
-        if ($this->isConverted()) {
-            $errors[] = 'Application has already been converted';
-            return $errors;
-        }
+        // if ($this->isConverted()) {
+        //     $errors[] = 'Application has already been converted';
+        //     return $errors;
+        // }
 
         if (empty($this->full_name)) {
             $errors[] = 'Full name is required';
