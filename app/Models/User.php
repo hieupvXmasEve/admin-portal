@@ -61,7 +61,7 @@ class User extends UserAuditableModel
     {
         return Str::of($this->name)
             ->split('/[\s,]+/')
-            ->map(fn ($word) => Str::substr($word, 0, 1))
+            ->map(fn($word) => Str::substr($word, 0, 1))
             ->slice(0, 2)
             ->join('');
     }

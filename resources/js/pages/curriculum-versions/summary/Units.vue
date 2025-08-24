@@ -10,13 +10,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useApi } from '@/composables';
+import { useApi, usePermissions } from '@/composables';
 import CurriculumVersionSummaryLayout from '@/layouts/CurriculumVersionSummaryLayout.vue';
 import { createColumns } from '@/lib/table-utils';
 import type { CurriculumUnit, Unit } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
 import { curriculumRoutes } from '@/utils/routes';
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
 import { Book, ChevronsUpDown, Edit, GraduationCap, Plus, Target, Trash2 } from 'lucide-vue-next';
@@ -69,7 +69,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const page = usePage();
 const api = useApi();
 
 // Filters state for the tab
@@ -88,12 +87,7 @@ const showDeleteDialog = ref(false);
 const unitToDelete = ref<CurriculumUnit | null>(null);
 const isDeleting = ref(false);
 
-// Permission check function
-const can = (permission: string) => {
-    const permissions = (page.props as any).permissions || [];
-    return permissions.includes(permission);
-};
-
+const permission = usePermissions();
 // Form schemas
 interface AddUnitFormData {
     unit_id: string;
@@ -240,7 +234,7 @@ const baseColumns: ColumnDef<CurriculumUnit>[] = [
                 'div',
                 { class: 'flex items-center gap-1' },
                 [
-                    can('edit_curriculum_unit')
+                    permission.can('edit_curriculum_unit')
                         ? h(
                               Button,
                               {
@@ -251,7 +245,7 @@ const baseColumns: ColumnDef<CurriculumUnit>[] = [
                               () => h(Edit, { class: 'h-4 w-4' }),
                           )
                         : null,
-                    can('delete_curriculum_unit')
+                    permission.can('delete_curriculum_unit')
                         ? h(
                               Button,
                               {
@@ -494,7 +488,7 @@ const organizedUnits = computed(() => {
                             Structure
                         </CardTitle>
 
-                        <div v-if="can('create_curriculum_unit')" class="flex items-center gap-2">
+                        <div v-if="permission.can('create_curriculum_unit')" class="flex items-center gap-2">
                             <Button variant="outline" size="sm" :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
                                 <Plus class="mr-2 h-4 w-4" />
                                 Add Unit
@@ -529,7 +523,7 @@ const organizedUnits = computed(() => {
                                             </div>
                                             <div class="flex items-center justify-between text-xs">
                                                 <span class="text-gray-500">{{ unit.unit?.credit_points }} CP</span>
-                                                <Button v-if="can('edit_curriculum_unit')" variant="ghost" size="sm" @click="editCurriculumUnit(unit)">
+                                                <Button v-if="permission.can('edit_curriculum_unit')" variant="ghost" size="sm" @click="editCurriculumUnit(unit)">
                                                     <Edit class="h-3 w-3" />
                                                 </Button>
                                             </div>
@@ -550,7 +544,6 @@ const organizedUnits = computed(() => {
                             Curriculum Units
                             <Badge variant="secondary" class="ml-2"> {{ data.units.length }} </Badge>
                         </CardTitle>
-
                     </div>
 
                     <!-- Filters -->
@@ -599,7 +592,7 @@ const organizedUnits = computed(() => {
                         <p class="text-muted-foreground mt-2 text-sm">
                             {{ Object.values(filters).some((f) => f && f !== 'all') ? 'Try adjusting your search filters.' : "This curriculum version doesn't have any units yet." }}
                         </p>
-                        <div class="mt-6" v-if="can('create_curriculum_unit')">
+                        <div v-if="permission.can('create_curriculum_unit')" class="mt-6">
                             <Button :disabled="availableUnits.length === 0" @click="handleAddUnitClick">
                                 <Plus class="mr-2 h-4 w-4" />
                                 Add First Unit

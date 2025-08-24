@@ -1,24 +1,16 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { usePermissions } from '@/composables';
 import type { PaginatedResponse } from '@/types';
-import { Head, router, usePage } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
 import { Book, BookOpen, Calendar, Edit, Eye, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
@@ -95,7 +87,7 @@ const props = defineProps<{
     yearLevels: number[];
 }>();
 
-const page = usePage();
+const permission = usePermissions();
 
 // Reactive data
 const data = computed(() => props.curriculumUnits.data);
@@ -127,12 +119,6 @@ const curriculumUnitToDelete = ref<CurriculumUnit | null>(null);
 
 // Bulk delete dialog state
 const bulkDeleteDialogOpen = ref(false);
-
-// Permission check function
-const can = (permission: string) => {
-    const permissions = (page.props as any).permissions || [];
-    return permissions.includes(permission);
-};
 
 // Action functions
 const editCurriculumUnit = (curriculumUnit: CurriculumUnit) => {
@@ -252,9 +238,7 @@ const clearFilters = () => {
 };
 
 const hasActiveFilters = computed(() => {
-    return (
-        filters.value.search || filters.value.curriculum_version_id || filters.value.semester_id || filters.value.year_level || filters.value.is_core
-    );
+    return filters.value.search || filters.value.curriculum_version_id || filters.value.semester_id || filters.value.year_level || filters.value.is_core;
 });
 
 // Bulk delete functionality
@@ -356,10 +340,7 @@ const columns: ColumnDef<CurriculumUnit>[] = [
                     ),
                 ]),
                 h('div', { class: 'font-medium text-sm' }, unit.name),
-                h('div', { class: 'text-xs text-gray-500 flex items-center gap-1' }, [
-                    h(BookOpen, { class: 'h-3 w-3' }),
-                    `${unit.credit_points} credits`,
-                ]),
+                h('div', { class: 'text-xs text-gray-500 flex items-center gap-1' }, [h(BookOpen, { class: 'h-3 w-3' }), `${unit.credit_points} credits`]),
             ]);
         },
     },
@@ -375,16 +356,8 @@ const columns: ColumnDef<CurriculumUnit>[] = [
                 'div',
                 { class: 'space-y-2' },
                 [
-                    h('div', { class: 'space-y-1' }, [
-                        h('div', { class: 'font-medium text-sm' }, cv.name),
-                        h('div', { class: 'text-xs text-gray-500' }, `Version ${cv.version}`),
-                    ]),
-                    cv.program
-                        ? h('div', { class: 'text-xs' }, [
-                              h('span', { class: 'font-medium' }, cv.program.name),
-                              cv.specialization ? h('span', { class: 'text-blue-600 ml-2' }, `(${cv.specialization.code})`) : null,
-                          ])
-                        : null,
+                    h('div', { class: 'space-y-1' }, [h('div', { class: 'font-medium text-sm' }, cv.name), h('div', { class: 'text-xs text-gray-500' }, `Version ${cv.version}`)]),
+                    cv.program ? h('div', { class: 'text-xs' }, [h('span', { class: 'font-medium' }, cv.program.name), cv.specialization ? h('span', { class: 'text-blue-600 ml-2' }, `(${cv.specialization.code})`) : null]) : null,
                 ].filter(Boolean),
             );
         },
@@ -396,13 +369,8 @@ const columns: ColumnDef<CurriculumUnit>[] = [
         cell: ({ row }) => {
             const cu = row.original;
             return h('div', { class: 'space-y-2' }, [
-                h('div', { class: 'flex items-center gap-2' }, [
-                    h(Calendar, { class: 'h-3 w-3 text-gray-400' }),
-                    h('span', { class: 'text-sm font-medium' }, `Year ${cu.year_level}`),
-                ]),
-                cu.semester
-                    ? h('div', { class: 'text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded' }, cu.semester.name)
-                    : h('span', { class: 'text-xs text-gray-400' }, 'No semester'),
+                h('div', { class: 'flex items-center gap-2' }, [h(Calendar, { class: 'h-3 w-3 text-gray-400' }), h('span', { class: 'text-sm font-medium' }, `Year ${cu.year_level}`)]),
+                cu.semester ? h('div', { class: 'text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded' }, cu.semester.name) : h('span', { class: 'text-xs text-gray-400' }, 'No semester'),
             ]);
         },
     },
@@ -413,10 +381,7 @@ const columns: ColumnDef<CurriculumUnit>[] = [
         cell: ({ row }) => {
             const count = row.original.prerequisites_count;
             return count > 0
-                ? h('div', { class: 'flex items-center gap-1' }, [
-                      h(Book, { class: 'h-3 w-3 text-orange-500' }),
-                      h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800' }, count),
-                  ])
+                ? h('div', { class: 'flex items-center gap-1' }, [h(Book, { class: 'h-3 w-3 text-orange-500' }), h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800' }, count)])
                 : h('span', { class: 'text-gray-400 text-xs' }, 'None');
         },
     },
@@ -498,7 +463,7 @@ const handlePageSizeChange = (pageSize: number) => {
                 Import Excel
             </Button>
 
-            <Button v-if="can('create_curriculum_unit')" size="sm" @click="router.visit('/curriculum-units/create')">
+            <Button v-if="permission.can('create_curriculum_unit')" size="sm" @click="router.visit('/curriculum-units/create')">
                 <Plus class="mr-2 h-4 w-4" />
                 Add Curriculum Unit
             </Button>
@@ -521,9 +486,7 @@ const handlePageSizeChange = (pageSize: number) => {
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="all">All curricula</SelectItem>
-                    <SelectItem v-for="curriculum in curriculumVersions" :key="curriculum.id" :value="curriculum.id.toString()">
-                        {{ curriculum.name }} ({{ curriculum.version }})
-                    </SelectItem>
+                    <SelectItem v-for="curriculum in curriculumVersions" :key="curriculum.id" :value="curriculum.id.toString()"> {{ curriculum.name }} ({{ curriculum.version }}) </SelectItem>
                 </SelectContent>
             </Select>
         </div>
@@ -535,9 +498,7 @@ const handlePageSizeChange = (pageSize: number) => {
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="all">All semesters</SelectItem>
-                    <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
-                        {{ semester.name }} ({{ semester.number }})
-                    </SelectItem>
+                    <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()"> {{ semester.name }} ({{ semester.number }}) </SelectItem>
                 </SelectContent>
             </Select>
         </div>
@@ -593,7 +554,7 @@ const handlePageSizeChange = (pageSize: number) => {
                         </Tooltip>
                     </TooltipProvider>
 
-                    <TooltipProvider v-if="can('edit_curriculum_unit')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <TooltipProvider v-if="permission.can('edit_curriculum_unit')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
                                 <Button variant="ghost" size="sm" @click="editCurriculumUnit(row.original)" title="Edit curriculum unit">
@@ -606,7 +567,7 @@ const handlePageSizeChange = (pageSize: number) => {
                         </Tooltip>
                     </TooltipProvider>
 
-                    <TooltipProvider v-if="can('manage_curriculum_unit')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <TooltipProvider v-if="permission.can('manage_curriculum_unit')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
                                 <Button
@@ -627,7 +588,7 @@ const handlePageSizeChange = (pageSize: number) => {
                         </Tooltip>
                     </TooltipProvider>
 
-                    <TooltipProvider v-if="can('delete_curriculum_unit')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <TooltipProvider v-if="permission.can('delete_curriculum_unit')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
                                 <Button variant="ghost" size="sm" @click="deleteCurriculumUnit(row.original)" title="Delete curriculum unit">
@@ -652,10 +613,7 @@ const handlePageSizeChange = (pageSize: number) => {
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Curriculum Unit</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Are you sure you want to delete this curriculum unit assignment? This action cannot be undone and will remove the unit from the
-                    curriculum version.
-                </AlertDialogDescription>
+                <AlertDialogDescription> Are you sure you want to delete this curriculum unit assignment? This action cannot be undone and will remove the unit from the curriculum version. </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel @click="deleteDialogOpen = false">Cancel</AlertDialogCancel>
@@ -670,8 +628,7 @@ const handlePageSizeChange = (pageSize: number) => {
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Multiple Curriculum Units</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected curriculum units? This action cannot be undone
-                    and will remove all selected units from their curriculum versions.
+                    Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected curriculum units? This action cannot be undone and will remove all selected units from their curriculum versions.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

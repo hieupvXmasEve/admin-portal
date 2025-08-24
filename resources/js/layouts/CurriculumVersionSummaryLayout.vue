@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { usePermissions } from '@/composables';
+import { SharedData } from '@/types';
 import { curriculumRoutes } from '@/utils/routes';
 import { Link, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, Download } from 'lucide-vue-next';
@@ -30,10 +32,10 @@ interface Props {
     };
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
-const page = usePage();
-
+const page = usePage<SharedData>();
+const permission = usePermissions();
 // Get current route name to determine active tab
 const currentRouteName = computed(() => (page.props as any).ziggy?.route);
 
@@ -67,12 +69,6 @@ const activeTab = computed(() => {
     const tab = tabs.find((t) => t.route === routeName);
     return tab?.key || 'overview';
 });
-
-// Permission check function
-const can = (permission: string) => {
-    const permissions = (page.props as any).permissions || [];
-    return permissions.includes(permission);
-};
 
 // Helper functions
 const formatDate = (dateString: string): string => {
@@ -127,7 +123,7 @@ const handleExport = () => {
                         </Button>
                     </Link>
 
-                    <Button v-if="can('export_curriculum_version')" variant="outline" @click="handleExport">
+                    <Button v-if="permission.can('export_curriculum_version')" variant="outline" @click="handleExport">
                         <Download class="mr-2 h-4 w-4" />
                         Export
                     </Button>
@@ -147,7 +143,7 @@ const handleExport = () => {
                             :prefetch="true"
                             class="tab-button"
                             :class="{
-                                'tab-button--active': activeTab === tab.key
+                                'tab-button--active': activeTab === tab.key,
                             }"
                             :data-state="activeTab === tab.key ? 'active' : 'inactive'"
                             data-slot="tabs-trigger"
@@ -200,15 +196,17 @@ const handleExport = () => {
 
 /* Active state styling */
 .tab-button--active,
-.tab-button[data-state="active"] {
+.tab-button[data-state='active'] {
     background-color: white;
     color: hsl(var(--foreground));
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    box-shadow:
+        0 1px 3px 0 rgb(0 0 0 / 0.1),
+        0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
 /* Add a bottom border for active state */
 .tab-button--active::after,
-.tab-button[data-state="active"]::after {
+.tab-button[data-state='active']::after {
     content: '';
     position: absolute;
     bottom: -1px;
@@ -221,7 +219,7 @@ const handleExport = () => {
 
 /* Hover state for inactive tabs */
 .tab-button:not(.tab-button--active):hover,
-.tab-button[data-state="inactive"]:hover {
+.tab-button[data-state='inactive']:hover {
     background-color: hsl(var(--muted));
     color: hsl(var(--foreground));
 }
