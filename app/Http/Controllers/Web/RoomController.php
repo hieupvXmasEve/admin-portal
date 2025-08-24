@@ -346,6 +346,69 @@ class RoomController extends Controller
     }
 
     /**
+     * API endpoint for getting rooms (for dropdowns, quick edits, etc.)
+     */
+    public function apiIndex(Request $request)
+    {
+        $validated = $request->validate([
+            'campus_id' => 'nullable|exists:campuses,id',
+            'status' => 'nullable|string|in:available,occupied,maintenance,reserved',
+            'is_bookable' => 'nullable|string|in:true,false,1,0',
+            'type' => 'nullable|string|in:'.implode(',', Room::getTypes()),
+            'search' => 'nullable|string|max:255',
+            'limit' => 'nullable|integer|min:1|max:100',
+        ]);
+        
+        // Convert string boolean values to actual booleans
+        $isBookable = isset($validated['is_bookable']) ? filter_var($validated['is_bookable'], FILTER_VALIDATE_BOOLEAN) : null;
+
+        $query = Room::query()
+            ->with(['campus', 'building'])
+            ->forCampus($validated['campus_id'] ?? app('campus')->id);
+
+        // Apply filters
+        if (isset($validated['status'])) {
+            $query->withStatus($validated['status']);
+        }
+
+        if ($isBookable !== null) {
+            $query->where('is_bookable', $isBookable);
+        }
+        
+        if (isset($validated['type'])) {
+            $query->ofType($validated['type']);
+        }
+
+        if (isset($validated['search'])) {
+            $search = $validated['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('building', function ($buildingQuery) use ($search) {
+                        $buildingQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Default to available rooms if status not specified
+        if (!isset($validated['status'])) {
+            $query->withStatus('available');
+        }
+
+        $rooms = $query->orderBy('name')
+            ->limit($request->input('limit', 50))
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $rooms,
+            'message' => 'Rooms retrieved successfully',
+        ]);
+    }
+
+    /**
      * Get room status options for dropdowns.
      */
     private function getRoomStatusOptions(): array

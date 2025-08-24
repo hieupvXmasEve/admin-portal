@@ -227,6 +227,72 @@ class LectureController extends Controller
     }
 
     /**
+     * API endpoint for getting lectures (for dropdowns, quick edits, etc.)
+     */
+    public function apiIndex(Request $request)
+    {
+        $validated = $request->validate([
+            'campus_id' => 'nullable|exists:campuses,id',
+            'is_active' => 'nullable|string|in:true,false,1,0',
+            'is_available_for_assignment' => 'nullable|string|in:true,false,1,0',
+            'employment_status' => 'nullable|string|in:active,on_leave,sabbatical,retired,terminated,suspended',
+            'employment_type' => 'nullable|string|in:full_time,part_time,contract,visiting,emeritus',
+            'search' => 'nullable|string|max:255',
+            'limit' => 'nullable|integer|min:1|max:100',
+        ]);
+        
+        // Convert string boolean values to actual booleans
+        $isActive = isset($validated['is_active']) ? filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN) : null;
+        $isAvailableForAssignment = isset($validated['is_available_for_assignment']) ? filter_var($validated['is_available_for_assignment'], FILTER_VALIDATE_BOOLEAN) : null;
+
+        $query = Lecture::with(['campus'])
+            ->where('campus_id', $validated['campus_id'] ?? session('current_campus_id'));
+
+        // Apply filters using converted boolean values
+        if ($isActive !== null) {
+            $query->where('is_active', $isActive);
+        }
+
+        if ($isAvailableForAssignment !== null) {
+            $query->where('is_available_for_assignment', $isAvailableForAssignment);
+        }
+
+        if (isset($validated['employment_status'])) {
+            $query->where('employment_status', $validated['employment_status']);
+        }
+
+        if (isset($validated['employment_type'])) {
+            $query->where('employment_type', $validated['employment_type']);
+        }
+
+        if (isset($validated['search'])) {
+            $search = $validated['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('employee_id', 'like', "%{$search}%")
+                    ->orWhere('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('department', 'like', "%{$search}%");
+            });
+        }
+
+        // Default to active lecturers if not specified
+        if ($isActive === null) {
+            $query->where('is_active', true);
+        }
+
+        $lectures = $query->orderByName()
+            ->limit($request->input('limit', 50))
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $lectures,
+            'message' => 'Lecturers retrieved successfully',
+        ]);
+    }
+
+    /**
      * Get lecture statistics
      */
     public function statistics(Request $request)

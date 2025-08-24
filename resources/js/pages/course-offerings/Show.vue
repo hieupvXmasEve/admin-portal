@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import QuickEditClassSessionModal from '@/components/QuickEditClassSessionModal.vue';
 import RoomSelectionModal from '@/components/RoomSelectionModal.vue';
 import StudentSearchModal from '@/components/StudentSearchModal.vue';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,7 @@ import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Trash2, UserCheck, Users } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Settings, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -30,7 +31,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log('%c props', 'color: red', props.courseOffering);
 const api = useApi();
 const { showConfirmDialog } = useGlobalConfirmDialog();
 // const showStatusModal = ref(false);
@@ -187,6 +187,10 @@ const editCourseOffering = () => {
 const changeRoomOpen = ref(false);
 const selectedRoomId = ref<number | null>(null);
 const roomSearch = ref('');
+
+// Quick edit modal state
+const quickEditOpen = ref(false);
+const selectedSession = ref<ClassSession | null>(null);
 const filteredRooms = computed(() => {
     const q = roomSearch.value.toLowerCase().trim();
     if (!q) return props.availableRooms || [];
@@ -226,7 +230,7 @@ const handleStudentAddSuccess = () => {
 const deleteStudentRegistration = (registration: CourseRegistration) => {
     const studentName = registration.student?.full_name || 'Unknown Student';
     const studentId = registration.student?.student_id || 'Unknown ID';
-    
+
     showConfirmDialog(
         {
             title: 'Remove Student from Course',
@@ -239,7 +243,7 @@ const deleteStudentRegistration = (registration: CourseRegistration) => {
                     const result = await api.post(`/course-offerings/${props.courseOffering.id}/delete-student-registration`, {
                         registration_id: registration.id,
                     });
-                    
+
                     if (result.data?.value?.success) {
                         toast.success(result.data.value.message || `Successfully removed ${studentName} from the course`);
                         router.reload({ only: ['courseOffering'] });
@@ -254,6 +258,18 @@ const deleteStudentRegistration = (registration: CourseRegistration) => {
             },
         },
     );
+};
+
+// Quick edit session functions
+const openQuickEdit = (session: ClassSession) => {
+    selectedSession.value = session;
+    quickEditOpen.value = true;
+};
+
+const handleSessionUpdated = () => {
+    // Refresh the page to show updated data
+    router.reload({ only: ['courseOffering'] });
+    toast.success('Class session updated successfully');
 };
 </script>
 
@@ -589,10 +605,9 @@ const deleteStudentRegistration = (registration: CourseRegistration) => {
                                     <TableHead>Date</TableHead>
                                     <TableHead>Time</TableHead>
                                     <TableHead>Room</TableHead>
-                                    <TableHead>Type</TableHead>
+                                    <TableHead>Lecturer</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead>Duration</TableHead>
-                                    <TableHead>Actions</TableHead>
+                                    <TableHead class="w-32">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody class="h-20 overflow-y-auto">
@@ -614,22 +629,24 @@ const deleteStudentRegistration = (registration: CourseRegistration) => {
                                     <TableCell> {{ session.start_time }} - {{ session.end_time }}</TableCell>
                                     <TableCell> {{ session?.room?.name }}</TableCell>
                                     <TableCell>
-                                        <Badge :variant="session.is_assessment ? 'secondary' : 'outline'">
-                                            {{ session.session_type.toUpperCase() }}
-                                        </Badge>
+                                        {{ session.lecture?.display_name.toUpperCase() }}
                                     </TableCell>
                                     <TableCell>
                                         <Badge :variant="getSessionStatusVariant(session.status)">
                                             {{ session.status.toUpperCase() }}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell class="text-muted-foreground"> {{ session.duration_minutes }} min </TableCell>
                                     <TableCell>
-                                        <Link :href="classSessionRoutes.show(session.id)">
-                                            <Button variant="ghost" size="sm">
-                                                <Eye class="h-4 w-4" />
+                                        <div class="flex items-center gap-2">
+                                            <Button variant="ghost" size="sm" @click="openQuickEdit(session)" title="Quick Edit">
+                                                <Settings class="h-4 w-4" />
                                             </Button>
-                                        </Link>
+                                            <Link :href="classSessionRoutes.show(session.id)">
+                                                <Button variant="ghost" size="sm" title="View Details">
+                                                    <Eye class="h-4 w-4" />
+                                                </Button>
+                                            </Link>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
@@ -714,12 +731,7 @@ const deleteStudentRegistration = (registration: CourseRegistration) => {
                                         {{ registration.registration_method }}
                                     </TableCell>
                                     <TableCell>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            @click="deleteStudentRegistration(registration)"
-                                            class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        >
+                                        <Button variant="ghost" size="sm" @click="deleteStudentRegistration(registration)" class="text-destructive hover:text-destructive hover:bg-destructive/10">
                                             <Trash2 class="h-4 w-4" />
                                         </Button>
                                     </TableCell>
@@ -731,6 +743,9 @@ const deleteStudentRegistration = (registration: CourseRegistration) => {
             </CollapsibleContent>
         </Card>
     </Collapsible>
+
+    <!-- Quick Edit Class Session Modal -->
+    <QuickEditClassSessionModal :open="quickEditOpen" :session="selectedSession" @update:open="quickEditOpen = $event" @session-updated="handleSessionUpdated" :campus_id="courseOffering.campus_id" />
 
     <!-- Registration Status Management Modal -->
     <!--    <RegistrationStatusModal-->

@@ -714,6 +714,7 @@ export interface CourseOffering {
     id: number;
     semester_id: number;
     curriculum_unit_id: number;
+    campus_id: number;
     unit_id: number;
     unit: Unit;
     lecture_id?: number;
@@ -779,6 +780,7 @@ export interface ClassSession {
     room?: Room;
     room_booking_id?: number;
     lecture_id?: number;
+    lecture?: Lecture;
     session_title?: string;
     session_description?: string;
     session_date: string;
@@ -800,6 +802,7 @@ export interface ClassSession {
     actual_attendees?: number;
     attendance_percentage?: number;
     is_assessment: boolean;
+    instructor_notes?: string;
 }
 
 // Student search and eligibility interfaces

@@ -115,7 +115,21 @@ export function useApi() {
      * @returns Promise with standardized API response
      */
     const get = async <T = any>(url: string, params?: Record<string, any>, options?: { signal?: AbortSignal }) => {
-        const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
+        let queryString = '';
+        if (params) {
+            // Handle nested params object (e.g. { params: { key: 'value' } })
+            const actualParams = params.params || params;
+            
+            // Convert parameters to query string, handling different data types
+            const searchParams = new URLSearchParams();
+            for (const [key, value] of Object.entries(actualParams)) {
+                if (value !== null && value !== undefined) {
+                    searchParams.append(key, String(value));
+                }
+            }
+            queryString = searchParams.toString() ? '?' + searchParams.toString() : '';
+        }
+        
         return useApiRequest(url + queryString, {
             method: 'GET',
             signal: options?.signal,

@@ -14,7 +14,7 @@ class SocialController extends Controller
 {
     public function redirect(Request $request)
     {
-        return Socialite::driver('google')->redirect();
+        return Socialite::driver('google')->with(['hd' => 'fpt.edu.vn'])->redirect();
     }
 
     public function callback(Request $request)
