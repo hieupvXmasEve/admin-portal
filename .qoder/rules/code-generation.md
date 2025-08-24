@@ -1,7 +1,7 @@
 ---
-inclusion: true
+trigger: always_on
+alwaysApply: true
 ---
-
 # Code Generation Standards
 
 Strict rules for all AI-generated code in this Vue 3 + Inertia + Laravel project.
@@ -91,10 +91,10 @@ Add TODO comments for:
 - Missing component installations
 - Needed permission definitions
 - Required test cases
-
+<!--
 ## Testing Requirements
 
 - Include unit test placeholders for new services
 - Add integration test comments for new API endpoints
 - Consider edge cases in validation logic
-- Test permission-based access controls
+- Test permission-based access controls -->

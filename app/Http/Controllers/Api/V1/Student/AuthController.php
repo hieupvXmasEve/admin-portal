@@ -226,7 +226,7 @@ class AuthController extends Controller
                         'email' => $googleUserData['email'],
                         'oauth_provider' => 'google',
                         'oauth_provider_id' => $googleUserData['id'],
-                        'avatar_url' => $googleUserData['picture'] ?? null,
+                        // 'avatar_url' => $googleUserData['picture'] ?? null,
                         'status' => 'inactive', // Requires admin activation
                         'email_verified_at' => now(),
                     ]);
@@ -253,7 +253,7 @@ class AuthController extends Controller
                 $student->update([
                     'oauth_provider' => 'google',
                     'oauth_provider_id' => $googleUserData['id'],
-                    'avatar_url' => $student->avatar_url ?: ($googleUserData['picture'] ?? null),
+                    // 'avatar_url' => $student->avatar_url ?: ($googleUserData['picture'] ?? null),
                     'email_verified_at' => $student->email_verified_at ?: now(),
                 ]);
             }
