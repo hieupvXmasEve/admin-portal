@@ -6,7 +6,7 @@ import { ROOM_STATUSES, ROOM_TYPES, timeRegex } from '@/schemas/room';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft, Building2 } from 'lucide-vue-next';
-import { computed, h } from 'vue';
+import { computed, h, markRaw } from 'vue';
 import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
@@ -251,13 +251,9 @@ const fieldConfig = computed(() => ({
 
 // Form submission - simplified approach following your example pattern
 function onSubmit(values: Record<string, any>) {
-    // Show submitted values like in your example (for debugging)
-    toast({
-        title: 'Submitting room data:',
-        description: h('pre', { class: 'mt-2 w-[340px] rounded-md bg-slate-950 p-4' }, h('code', { class: 'text-white' }, JSON.stringify(values, null, 2))),
-    });
+    // Show submitted values (for debugging)
+    console.log('%c Submitting room data:', 'color: blue; font-weight: bold');
     console.log('%c value', 'color: red', values);
-    return;
     // Process and submit the form data
     const formData = {
         name: values.name,

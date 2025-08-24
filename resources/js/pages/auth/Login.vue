@@ -3,8 +3,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { AUTH_ROUTE_NAMES } from '@/constants/auth-routes';
 import { useSystemConfig } from '@/composables/useSystemConfig';
+import { AUTH_ROUTE_NAMES } from '@/constants/auth-routes';
 import { Head } from '@inertiajs/vue3';
 import { AlertTriangle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -21,7 +21,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 // System configuration
-const { get, getLogoFull } = useSystemConfig()
+const { get, getLogoFull } = useSystemConfig();
 
 const isLoading = ref(false);
 
@@ -42,7 +42,6 @@ const handleGoogleSignIn = async () => {
         isLoading.value = false;
     }
 };
-
 </script>
 <template>
     <Head title="Login" />
@@ -96,7 +95,7 @@ const handleGoogleSignIn = async () => {
                                     <span>{{ isLoading ? 'Signing in...' : 'Sign in with Google' }}</span>
                                 </div>
                             </Button>
-<!--                            <p class="text-muted-foreground text-center text-xs">Use your @asia.edu.vn or authorized institutional account</p>-->
+                            <!--                            <p class="text-muted-foreground text-center text-xs">Use your @asia.edu.vn or authorized institutional account</p>-->
                         </div>
                     </form>
 
