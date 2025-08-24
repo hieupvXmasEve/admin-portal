@@ -2,17 +2,20 @@
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail } from '@/components/ui/sidebar';
-import { mainNavItems } from '@/constants/menu-sidebar';
 import { usePermissions } from '@/composables/usePermissions';
-import { Link } from '@inertiajs/vue3';
+import { useSystemConfig } from '@/composables/useSystemConfig';
+import { mainNavItems } from '@/constants/menu-sidebar';
+import { SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import NavUser from './NavUser.vue';
-import { useSystemConfig } from '@/composables/useSystemConfig';
 
 const { filterMenuItems } = usePermissions();
-const {get} = useSystemConfig()
+const { get } = useSystemConfig();
 // Filter menu items based on user permissions
 const filteredMenuItems = computed(() => filterMenuItems(mainNavItems));
+const page = usePage<SharedData>();
+const campus = page.props.auth.current_campus;
 </script>
 
 <template>
@@ -27,7 +30,7 @@ const filteredMenuItems = computed(() => filterMenuItems(mainNavItems));
                             </div>
                             <div class="grid flex-1 text-left text-sm leading-tight">
                                 <span class="truncate font-semibold">{{ get('app_name') }}</span>
-<!--                                <span class="truncate text-xs">Admin Panel</span>-->
+                                <span class="truncate text-xs">Campus: {{ campus.name }}</span>
                             </div>
                         </Link>
                     </SidebarMenuButton>

@@ -58,6 +58,7 @@ class HandleInertiaRequests extends Middleware
                     'user' => $user->only('id', 'name', 'email'),
                     'permissions' => $permissionService->getUserPermissions($user, $currentCampusId),
                     'current_campus_id' => $currentCampusId,
+                    'current_campus' => $currentCampusId ? app('campus') : null,
                 ];
             },
             'ziggy' => [
@@ -66,7 +67,6 @@ class HandleInertiaRequests extends Middleware
                 'route' => $request->route()->getName(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-            'permissions' => fn () => $user ? app(PermissionService::class)->getUserPermissions($user, $currentCampusId) : [],
             'flash' => function () {
                 return [
                     'success' => session('success'),

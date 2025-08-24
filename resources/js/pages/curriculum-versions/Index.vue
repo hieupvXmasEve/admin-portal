@@ -12,13 +12,14 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { usePermissions } from '@/composables';
 import type { PaginatedResponse } from '@/types';
 import { ValidationRules } from '@/types/validation';
-import { Head, router, usePage } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
 import { useDebounceFn } from '@vueuse/core';
-import { Book, Edit, Eye, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
+import { Book, Edit, Eye, Plus, Search, Trash2, X } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { computed, h, nextTick, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
@@ -74,8 +75,6 @@ const props = defineProps<{
     specializations: Array<{ id: number; name: string; code: string; program_id: number }>;
     semesters?: Array<{ id: number; name: string; code: string }>;
 }>();
-
-const page = usePage();
 
 // Reactive data
 const data = computed(() => props.curriculumVersions.data);
@@ -216,11 +215,7 @@ const editFilteredSpecializations = computed(() => {
     return props.specializations.filter((spec) => spec.program_id === curriculumVersionToEdit.value!.program_id);
 });
 
-// Permission check function
-const can = (permission: string) => {
-    const permissions = (page.props as any).permissions || [];
-    return permissions.includes(permission);
-};
+const permission = usePermissions();
 
 // Action functions
 const editCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
@@ -363,34 +358,34 @@ const clearFilters = () => {
 };
 
 // Export functionality
-const isExporting = ref(false);
+// const isExporting = ref(false);
 
-const exportToExcel = async () => {
-    if (isExporting.value) return;
+// const exportToExcel = async () => {
+//     if (isExporting.value) return;
 
-    isExporting.value = true;
+//     isExporting.value = true;
 
-    try {
-        const params = new URLSearchParams();
+//     try {
+//         const params = new URLSearchParams();
 
-        if (filtersState.value.search) params.set('search', filtersState.value.search);
-        if (filtersState.value.program_id) params.set('program_id', filtersState.value.program_id);
-        if (filtersState.value.specialization_id) params.set('specialization_id', filtersState.value.specialization_id);
+//         if (filtersState.value.search) params.set('search', filtersState.value.search);
+//         if (filtersState.value.program_id) params.set('program_id', filtersState.value.program_id);
+//         if (filtersState.value.specialization_id) params.set('specialization_id', filtersState.value.specialization_id);
 
-        const exportUrl = `/curriculum-versions/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
+//         const exportUrl = `/curriculum-versions/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
 
-        window.location.href = exportUrl;
+//         window.location.href = exportUrl;
 
-        setTimeout(() => {
-            toast.success('Export started successfully');
-        }, 500);
-    } catch (error) {
-        console.error('Export failed:', error);
-        toast.error('Failed to export curriculum versions');
-    } finally {
-        isExporting.value = false;
-    }
-};
+//         setTimeout(() => {
+//             toast.success('Export started successfully');
+//         }, 500);
+//     } catch (error) {
+//         console.error('Export failed:', error);
+//         toast.error('Failed to export curriculum versions');
+//     } finally {
+//         isExporting.value = false;
+//     }
+// };
 
 // Column definitions - Fixed Badge warning by using function slots
 const columns: ColumnDef<CurriculumVersion>[] = [
@@ -543,16 +538,16 @@ const navigateToCreate = () => {
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-semibold">Curriculum Versions</h1>
         <div class="flex items-center gap-2">
-<!--            <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">-->
-<!--                <FileSpreadsheet class="h-4 w-4" />-->
-<!--                {{ isExporting ? 'Exporting...' : 'Export Excel' }}-->
-<!--            </Button>-->
-<!--            <Button @click="router.visit('/curriculum-versions/import')" variant="outline" class="flex items-center gap-2">-->
-<!--                <Upload class="h-4 w-4" />-->
-<!--                Import Excel-->
-<!--            </Button>-->
+            <!--            <Button @click="exportToExcel" variant="outline" :disabled="isExporting" class="flex items-center gap-2">-->
+            <!--                <FileSpreadsheet class="h-4 w-4" />-->
+            <!--                {{ isExporting ? 'Exporting...' : 'Export Excel' }}-->
+            <!--            </Button>-->
+            <!--            <Button @click="router.visit('/curriculum-versions/import')" variant="outline" class="flex items-center gap-2">-->
+            <!--                <Upload class="h-4 w-4" />-->
+            <!--                Import Excel-->
+            <!--            </Button>-->
 
-            <Button v-if="can('create_curriculum_version')" size="sm" @click="navigateToCreate">
+            <Button v-if="permission.can('create_curriculum_version')" size="sm" @click="navigateToCreate">
                 <Plus class="mr-2 h-4 w-4" />
                 Add Curriculum Version
             </Button>
@@ -633,7 +628,7 @@ const navigateToCreate = () => {
                         </Tooltip>
                     </TooltipProvider>
 
-                    <TooltipProvider v-if="can('edit_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <TooltipProvider v-if="permission.can('edit_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
                                 <Button variant="ghost" size="sm" @click="editCurriculumVersion(row.original)" title="Edit curriculum version">
@@ -646,7 +641,7 @@ const navigateToCreate = () => {
                         </Tooltip>
                     </TooltipProvider>
 
-                    <TooltipProvider v-if="can('delete_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                    <TooltipProvider v-if="permission.can('delete_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
                                 <Button variant="ghost" size="sm" @click="deleteCurriculumVersion(row.original)" title="Delete curriculum version">

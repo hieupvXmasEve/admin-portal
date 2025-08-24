@@ -1,23 +1,15 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { usePermissions } from '@/composables';
 import type { PaginatedResponse } from '@/types';
-import { Head, router, usePage } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
 import { Edit, Eye, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
@@ -60,8 +52,6 @@ const props = defineProps<{
     programs: Array<{ id: number; name: string }>;
 }>();
 
-const page = usePage();
-
 // Reactive data
 const data = computed(() => props.specializations.data);
 
@@ -84,11 +74,7 @@ const specializationToDelete = ref<Specialization | null>(null);
 // Bulk delete dialog state
 const bulkDeleteDialogOpen = ref(false);
 
-// Permission check function
-const can = (permission: string) => {
-    const permissions = (page.props as any).permissions || [];
-    return permissions.includes(permission);
-};
+const permission = usePermissions();
 
 // Action functions
 const editSpecialization = (specialization: Specialization) => {
@@ -297,9 +283,7 @@ const columns: ColumnDef<Specialization>[] = [
         enableSorting: false,
         cell: ({ row }) => {
             const count = row.original.curriculum_versions_count;
-            return count > 0
-                ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800' }, count)
-                : h('span', { class: 'text-gray-400' }, 'None');
+            return count > 0 ? h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800' }, count) : h('span', { class: 'text-gray-400' }, 'None');
         },
     },
     {
@@ -390,7 +374,7 @@ const handlePageSizeChange = (pageSize: number) => {
                 Import Excel
             </Button>
 
-            <Button v-if="can('create_specialization')" size="sm" @click="navigateToCreate">
+            <Button v-if="permission.can('create_specialization')" size="sm" @click="navigateToCreate">
                 <Plus class="mr-2 h-4 w-4" />
                 Add Specialization
             </Button>
@@ -443,7 +427,7 @@ const handlePageSizeChange = (pageSize: number) => {
                     </Tooltip>
                 </TooltipProvider>
 
-                <TooltipProvider v-if="can('edit_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                <TooltipProvider v-if="permission.can('edit_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                     <Tooltip>
                         <TooltipTrigger as-child>
                             <Button variant="ghost" size="sm" @click="editSpecialization(row.original)" title="Edit specialization">
@@ -456,7 +440,7 @@ const handlePageSizeChange = (pageSize: number) => {
                     </Tooltip>
                 </TooltipProvider>
 
-                <TooltipProvider v-if="can('delete_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                <TooltipProvider v-if="permission.can('delete_specialization')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                     <Tooltip>
                         <TooltipTrigger as-child>
                             <Button variant="ghost" size="sm" @click="deleteSpecialization(row.original)" title="Delete specialization">
@@ -498,8 +482,7 @@ const handlePageSizeChange = (pageSize: number) => {
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Multiple Specializations</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected specializations? This action cannot be undone
-                    and will permanently remove all selected specializations from the system.
+                    Are you sure you want to delete <strong>{{ selectedRows.length }}</strong> selected specializations? This action cannot be undone and will permanently remove all selected specializations from the system.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

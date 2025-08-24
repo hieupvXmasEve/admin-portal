@@ -6,6 +6,7 @@ export interface Auth {
     user: User;
     permissions: string[];
     current_campus_id: number;
+    current_campus: Campus;
 }
 
 export interface BreadcrumbItem {
