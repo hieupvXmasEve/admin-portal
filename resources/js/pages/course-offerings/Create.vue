@@ -11,7 +11,8 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
 interface Props {
@@ -87,7 +88,7 @@ const formSchema = toTypedSchema(
     }),
 );
 
-const { handleSubmit, isSubmitting } = useForm({
+const { handleSubmit, isSubmitting, values, setFieldValue } = useForm({
     validationSchema: formSchema,
     initialValues: {
         curriculum_unit_id: '',
@@ -109,17 +110,38 @@ const { handleSubmit, isSubmitting } = useForm({
     } satisfies Omit<CourseOfferingFormData, 'semester_id'>,
 });
 
+// Get the selected unit based on curriculum_unit_id
+const selectedUnit = computed(() => {
+    if (!values.curriculum_unit_id) return null;
+    return props.units.find((unit) => unit.curriculum_unit_id.toString() === values.curriculum_unit_id);
+});
+
+// Filter syllabus templates based on selected unit
+const filteredSyllabusTemplates = computed(() => {
+    if (!selectedUnit.value) return [];
+    return props.syllabusTemplates.filter((template) => template.unit_id === selectedUnit.value!.unit_id);
+});
+
+// Watch for curriculum unit changes and clear syllabus template selection
+watch(
+    () => values.curriculum_unit_id,
+    (newUnitId, oldUnitId) => {
+        // Clear syllabus template selection when unit changes
+        if (newUnitId !== oldUnitId && values.syllabus_template_id) {
+            setFieldValue('syllabus_template_id', '');
+        }
+    },
+);
+
 const onSubmit = handleSubmit((values) => {
     submitError.value = null;
-
-    console.log('Form values before transformation:', values);
 
     // Transform form data to match backend expectations
     const formData = {
         semester_id: props.activeSemester?.id,
         curriculum_unit_id: values.curriculum_unit_id,
-        syllabus_template_id: values.syllabus_template_id === '' ? null : values.syllabus_template_id,
-        lecture_id: values.lecture_id === 'none' || values.lecture_id === '' ? null : values.lecture_id,
+        syllabus_template_id: !values.syllabus_template_id || values.syllabus_template_id === 'none' || values.syllabus_template_id === '' ? null : values.syllabus_template_id,
+        lecture_id: !values.lecture_id || values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
         max_capacity: Number(values.max_capacity),
         waitlist_capacity: Number(values.waitlist_capacity) || 10,
@@ -139,7 +161,7 @@ const onSubmit = handleSubmit((values) => {
 
     router.post('/course-offerings', formData, {
         onSuccess: () => {
-            console.log('Course offering created successfully');
+            toast.success('Course offering created successfully');
         },
         onError: (errors) => {
             console.error('Validation errors:', errors);
@@ -149,9 +171,6 @@ const onSubmit = handleSubmit((values) => {
             Object.entries(errors).forEach(([field, messages]) => {
                 console.error(`Field "${field}":`, messages);
             });
-        },
-        onFinish: () => {
-            console.log('Request finished');
         },
     });
 });
@@ -281,26 +300,7 @@ const dayOptions = [
                                         <SelectValue placeholder="Select curriculum unit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="unit in props.units" :key="unit.curriculum_unit_id" :value="unit.curriculum_unit_id.toString()">
-                                            <div class="flex flex-col">
-                                                <span class="font-medium">{{ unit.code }} - {{ unit.name }}</span>
-                                                <span class="text-muted-foreground text-xs">
-                                                    {{ unit.credit_points }} credits •
-                                                    <template v-if="unit.semester_number !== null"> Y{{ unit.year_level }}S{{ unit.semester_number }} • </template>
-                                                    <template v-else> <span class="text-purple-600">Common Unit</span> • </template>
-                                                    <span
-                                                        :class="{
-                                                            'text-green-600': unit.source === 'new_curriculum',
-                                                            'text-blue-600': unit.source === 'continuing_curriculum',
-                                                            'text-purple-600': unit.source === 'common_curriculum',
-                                                        }"
-                                                    >
-                                                        {{ unit.source === 'new_curriculum' ? 'New Curriculum' : unit.source === 'continuing_curriculum' ? 'Continuing Curriculum' : 'Common Curriculum' }}
-                                                    </span>
-                                                    • Started: {{ unit.curriculum_start_semester }}
-                                                </span>
-                                            </div>
-                                        </SelectItem>
+                                        <SelectItem v-for="unit in props.units" :key="unit.curriculum_unit_id" :value="unit.curriculum_unit_id.toString()"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} credits) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -322,26 +322,18 @@ const dayOptions = [
                         <FormItem>
                             <FormLabel>Syllabus Template (Optional)</FormLabel>
                             <FormControl>
-                                <Select v-bind="componentField">
+                                <Select v-bind="componentField" :disabled="!selectedUnit">
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select syllabus template (optional)" />
+                                        <SelectValue :placeholder="!selectedUnit ? 'Select a curriculum unit first' : filteredSyllabusTemplates.length === 0 ? 'No syllabus templates available for this unit' : 'Select syllabus template (optional)'" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none">No syllabus template</SelectItem>
-                                        <SelectItem v-for="template in props.syllabusTemplates" :key="template.id" :value="template.id.toString()">
-                                            <div class="flex flex-col">
-                                                <span class="font-medium">{{ template.title }} (v{{ template.version }})</span>
-                                                <span class="text-muted-foreground text-xs">
-                                                    <template v-if="template.unit"> {{ template.unit.code }} - {{ template.unit.name }} • </template>
-                                                    {{ template.delivery_mode.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase()) }}
-                                                    <template v-if="template.description"> • {{ template.description.substring(0, 50) }}{{ template.description.length > 50 ? '...' : '' }} </template>
-                                                </span>
-                                            </div>
-                                        </SelectItem>
+                                        <SelectItem v-for="template in filteredSyllabusTemplates" :key="template.id" :value="template.id.toString()"> {{ template.title }} (v{{ template.version }}) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
                             <FormMessage />
+                            <p v-if="selectedUnit && filteredSyllabusTemplates.length === 0" class="text-muted-foreground mt-1 text-sm">No syllabus templates found for {{ selectedUnit.code }}. You can create course offering without a template.</p>
                         </FormItem>
                     </FormField>
 
@@ -448,9 +440,9 @@ const dayOptions = [
                                                     const target = e.target as HTMLInputElement;
                                                     const currentValue = componentField.modelValue || [];
                                                     if (target.checked) {
-                                                        componentField['onUpdate:modelValue']([...currentValue, day.value]);
+                                                        componentField['onUpdate:modelValue']?.([...currentValue, day.value]);
                                                     } else {
-                                                        componentField['onUpdate:modelValue'](currentValue.filter((d) => d !== day.value));
+                                                        componentField['onUpdate:modelValue']?.(currentValue.filter((d: string) => d !== day.value));
                                                     }
                                                 }
                                             "

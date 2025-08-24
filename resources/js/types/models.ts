@@ -942,6 +942,7 @@ export interface EnrollmentFormData {
 export interface CourseOfferingFormData {
     semester_id: string;
     curriculum_unit_id: string;
+    syllabus_template_id?: string;
     lecture_id?: string;
     section_code?: string;
     max_capacity: number;

@@ -16,7 +16,7 @@ import { z } from 'zod';
 interface Props {
     courseOffering: CourseOffering;
     lectures: Lecture[];
-    syllabusTemplates: Array<{
+    syllabusTemplates?: Array<{
         id: number;
         unit_id: number;
         title: string;
@@ -40,7 +40,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log('%c props', 'color: red', props);
 // Define validation schema following development standards
 const formSchema = toTypedSchema(
     z.object({
@@ -74,7 +73,7 @@ const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
         section_code: props.courseOffering.section_code || '',
-        syllabus_template_id: props.courseOffering.syllabus_template_id?.toString() || '',
+        syllabus_template_id: props.courseOffering.syllabus_template?.id.toString() || '',
         max_capacity: props.courseOffering.max_capacity,
         waitlist_capacity: props.courseOffering.waitlist_capacity || 0,
         delivery_mode: props.courseOffering.delivery_mode,
@@ -96,7 +95,7 @@ const onSubmit = handleSubmit((values) => {
         curriculum_unit_id: props.courseOffering.curriculum_unit_id,
         lecture_id: values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
-        syllabus_template_id: values.syllabus_template_id === '' ? null : values.syllabus_template_id,
+        syllabus_template_id: values.syllabus_template_id === 'none' || values.syllabus_template_id === '' ? null : values.syllabus_template_id,
         max_capacity: Number(values.max_capacity),
         waitlist_capacity: Number(values.waitlist_capacity) || 0,
         delivery_mode: values.delivery_mode,
@@ -110,7 +109,6 @@ const onSubmit = handleSubmit((values) => {
         special_requirements: values.special_requirements || null,
         notes: values.notes || null,
     };
-    console.log('%c formData', 'color: red', formData);
 
     router.put(`/course-offerings/${props.courseOffering.id}`, formData, {
         onSuccess: () => {
@@ -234,15 +232,17 @@ const enrollmentStatusOptions = [
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none">No syllabus template</SelectItem>
-                                        <SelectItem v-for="template in syllabusTemplates" :key="template.id" :value="template.id.toString()">
-                                            <div class="flex flex-col">
-                                                <span class="font-medium">{{ template.title }} v{{ template.version }}</span>
-                                                <div class="text-muted-foreground text-xs">
-                                                    <span v-if="template.unit">{{ template.unit.code }} - {{ template.unit.name }}</span>
-                                                    <span v-if="template.delivery_mode" class="ml-2">• {{ template.delivery_mode }}</span>
+                                        <template v-if="syllabusTemplates">
+                                            <SelectItem v-for="template in syllabusTemplates" :key="template.id" :value="template.id.toString()">
+                                                <div class="flex flex-col">
+                                                    <span class="font-medium">{{ template.title }} v{{ template.version }}</span>
+                                                    <div class="text-muted-foreground text-xs">
+                                                        <span v-if="template.unit">{{ template.unit.code }} - {{ template.unit.name }}</span>
+                                                        <span v-if="template.delivery_mode" class="ml-2">• {{ template.delivery_mode }}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </SelectItem>
+                                            </SelectItem>
+                                        </template>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
@@ -335,9 +335,9 @@ const enrollmentStatusOptions = [
                                                     const target = e.target as HTMLInputElement;
                                                     const currentValue = componentField.modelValue || [];
                                                     if (target.checked) {
-                                                        componentField['onUpdate:modelValue']([...currentValue, day]);
+                                                        componentField['onUpdate:modelValue']?.([...currentValue, day]);
                                                     } else {
-                                                        componentField['onUpdate:modelValue'](currentValue.filter((d) => d !== day));
+                                                        componentField['onUpdate:modelValue']?.(currentValue.filter((d: string) => d !== day));
                                                     }
                                                 }
                                             "

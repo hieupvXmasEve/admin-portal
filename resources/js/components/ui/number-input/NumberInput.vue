@@ -105,21 +105,16 @@ const parseNumber = (value: string): number | null => {
 // Watch for external model value changes
 watch(() => props.modelValue, (newValue) => {
     if (!isFocused.value) {
-        internalValue.value = '';
+        internalValue.value = formatNumber(newValue);
     }
 }, { immediate: true });
 
 // Computed display value
-const displayValue = computed({
-    get: () => {
-        if (isFocused.value && internalValue.value !== '') {
-            return internalValue.value;
-        }
-        return formatNumber(props.modelValue);
-    },
-    set: (value: string) => {
-        internalValue.value = value;
+const displayValue = computed(() => {
+    if (isFocused.value && internalValue.value !== '') {
+        return internalValue.value;
     }
+    return formatNumber(props.modelValue);
 });
 
 // Handle input events
@@ -134,11 +129,13 @@ const handleBlur = (event: FocusEvent) => {
     const target = event.target as HTMLInputElement;
     const parsedValue = parseNumber(target.value);
 
-    // Update the model value
-    emit('update:modelValue', parsedValue);
+    // Update the model value only if it's different
+    if (parsedValue !== props.modelValue) {
+        emit('update:modelValue', parsedValue);
+    }
 
-    // Clear internal value to show formatted value
-    internalValue.value = '';
+    // Reset internal value to show formatted value
+    internalValue.value = formatNumber(parsedValue);
 
     emit('blur', event);
 };

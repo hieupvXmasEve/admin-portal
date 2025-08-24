@@ -228,7 +228,7 @@ class CourseOfferingController extends Controller
             ->orderByName()
             ->get(['id', 'first_name', 'last_name', 'email', 'academic_rank']);
 
-        // Get available syllabus templates
+        // Get available syllabus templates (now loaded dynamically when unit is selected)
         $syllabusTemplates = \App\Models\SyllabusTemplate::where('is_active', true)
             ->with(['unit:id,code,name', 'applicableCampus:id,name', 'applicableProgram:id,name'])
             ->orderBy('title')
@@ -256,6 +256,14 @@ class CourseOfferingController extends Controller
     {
         $validatedData = $request->validated();
         $validatedData['campus_id'] = app('campus')->id;
+
+        // Get the unit_id from the selected curriculum_unit_id
+        if (isset($validatedData['curriculum_unit_id'])) {
+            $curriculumUnit = \App\Models\CurriculumUnit::with('unit')->find($validatedData['curriculum_unit_id']);
+            if ($curriculumUnit && $curriculumUnit->unit) {
+                $validatedData['unit_id'] = $curriculumUnit->unit->id;
+            }
+        }
 
         CourseOffering::create($validatedData);
 
@@ -384,8 +392,9 @@ class CourseOfferingController extends Controller
             ->orderByName()
             ->get(['id', 'first_name', 'last_name', 'email', 'academic_rank']);
 
-        // Get available syllabus templates
+        // Get available syllabus templates of unit
         $syllabusTemplates = \App\Models\SyllabusTemplate::where('is_active', true)
+            ->where('unit_id', $courseOffering->unit_id)
             ->with(['unit:id,code,name', 'applicableCampus:id,name', 'applicableProgram:id,name'])
             ->orderBy('title')
             ->get(['id', 'unit_id', 'title', 'version', 'description', 'applicable_campus_id', 'applicable_program_id', 'delivery_mode']);
