@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
+use Illuminate\Support\Str;
 
 class SocialController extends Controller
 {
@@ -21,6 +22,14 @@ class SocialController extends Controller
         try {
             $user_social = Socialite::driver('google')->user();
             $user = User::where('email', $user_social->getEmail())->first();
+            // Check if user is from fp.edu.vn
+            $domain = Str::after($user_social->getEmail(), '@');
+            if ($domain !== 'fpt.edu.vn') {
+                return redirect()->route('login', [
+                    'error' => 'Email is not from @fpt.edu.vn',
+                    'email' => $user_social->email,
+                ]);
+            }
             if ($user) {
                 Auth::login($user);
                 $request->session()->put('email', $user->email);
@@ -37,7 +46,7 @@ class SocialController extends Controller
             return redirect()->route('login')->with('error', 'Authentication failed. Please try again.');
         } catch (\Exception $e) {
             // Handle other exceptions
-            return redirect()->route('login')->with('error', 'Authentication error: '.$e->getMessage());
+            return redirect()->route('login')->with('error', 'Authentication error: ' . $e->getMessage());
         }
     }
 }

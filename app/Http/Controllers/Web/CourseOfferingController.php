@@ -285,7 +285,7 @@ class CourseOfferingController extends Controller
                     ->orderBy('registration_date', 'desc');
             },
             'classSessions' => function ($query) {
-                $query->with('room:id,name')->orderBy('session_date')
+                $query->with('room:id,name', 'lecture:id,first_name,last_name')->orderBy('session_date')
                     ->orderBy('start_time');
             },
         ]);
