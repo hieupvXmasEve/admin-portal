@@ -30,8 +30,7 @@ class StudentService
 
             // Get campus to generate student ID
             $campus = Campus::findOrFail($data['campus_id']);
-            $year = date('Y');
-            $studentId = $this->generateStudentId($campus->code, $year);
+            $studentId = $this->generateStudentId($campus->code);
 
             // Create student with admitted status by default
             $student = Student::create([
@@ -110,7 +109,7 @@ class StudentService
 
             // Generate unique student ID
             $campus = Campus::findOrFail($campusId);
-            $studentId = $this->generateStudentId($campus->code, date('Y'));
+            $studentId = $this->generateStudentId($campus->code);
 
             // Create student with active status by default
             $student = Student::create([
@@ -265,23 +264,13 @@ class StudentService
     /**
      * Generate unique student ID for campus
      */
-    private function generateStudentId(string $campusCode, string $year): string
+    private function generateStudentId(string $campusCode): string
     {
-        $prefix = strtoupper($campusCode) . $year;
+        // Sinh mã student_id dựa trên campusCode và 6 số ngẫu nhiên từ thời gian hiện tại
+        $prefix = strtoupper($campusCode);
+        $randomSix = substr(strval(mt_rand(100000, 999999) . time()), 0, 6);
 
-        // Find the last student ID with this prefix
-        $lastStudent = Student::where('student_id', 'like', $prefix . '%')
-            ->orderBy('student_id', 'desc')
-            ->first();
-
-        if ($lastStudent) {
-            $lastNumber = (int) substr($lastStudent->student_id, -4);
-            $newNumber = $lastNumber + 1;
-        } else {
-            $newNumber = 1;
-        }
-
-        return $prefix . str_pad((string) $newNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix . $randomSix;
     }
 
     /**

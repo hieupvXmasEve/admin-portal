@@ -22,6 +22,22 @@ export default defineConfig({
             },
         }),
     ],
+    server: {
+        host: '0.0.0.0',
+        port: 5173,
+        hmr: {
+            host: 'localhost',
+        },
+        cors: {
+            origin: [
+                'http://localhost:8000',
+                'http://127.0.0.1:8000',
+                /^http:\/\/192\.168\.[0-9]+\.[0-9]+:8000$/,
+                /^http:\/\/10\.[0-9]+\.[0-9]+\.[0-9]+:8000$/,
+            ],
+            credentials: true,
+        },
+    },
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './resources/js'),

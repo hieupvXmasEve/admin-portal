@@ -160,7 +160,7 @@ class StudentController extends Controller
 
             // Return redirect for web requests
             return redirect()
-                ->route(StudentRoutes::SHOW, $student)
+                ->route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $student)
                 ->with('success', 'Student created and admitted successfully');
         } catch (\Exception $e) {
             Log::error('Failed to create student', [
