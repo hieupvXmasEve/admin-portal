@@ -11,6 +11,7 @@ use App\Models\GpaCalculation;
 use App\Models\Semester;
 use App\Models\Student;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class DashboardService
 {
@@ -44,7 +45,7 @@ class DashboardService
      */
     public function getCurrentSemesterData(Student $student): array
     {
-        $currentSemester = Semester::where('is_active', true)->first();
+        $currentSemester = Semester::where('is_active', 1)->first();
 
         if (! $currentSemester) {
             return [
@@ -54,17 +55,15 @@ class DashboardService
                 'total_credits' => 0,
             ];
         }
-
-        $enrollment = $student->enrollments()
-            ->where('semester_id', $currentSemester->id)
-            ->first();
+        // $enrollment = $student->enrollments()
+        //     ->where('semester_id', $currentSemester->id)
+        //     ->first();
 
         $registrations = $student->courseRegistrations()
             ->where('semester_id', $currentSemester->id)
-            ->where('registration_status', 'registered')
-            ->with(['courseOffering.curriculumUnit.unit'])
+            ->whereIn('registration_status', ['registered', 'confirmed'])
+            ->with(['courseOffering.unit'])
             ->get();
-
         return [
             'semester' => [
                 'id' => $currentSemester->id,
@@ -74,18 +73,18 @@ class DashboardService
                 'end_date' => $currentSemester->end_date->toDateString(),
                 'is_registration_open' => $currentSemester->isRegistrationOpen(),
             ],
-            'enrollment' => $enrollment ? [
-                'id' => $enrollment->id,
-                'status' => $enrollment->status,
-                'semester_number' => $enrollment->semester_number,
-            ] : null,
+            // 'enrollment' => $enrollment ? [
+            //     'id' => $enrollment->id,
+            //     'status' => $enrollment->status,
+            //     'semester_number' => $enrollment->semester_number,
+            // ] : null,
             'registered_courses' => $registrations->count(),
             'total_credits' => $registrations->sum('credit_hours'),
             'courses' => $registrations->map(function ($registration) {
                 return [
                     'id' => $registration->id,
-                    'course_code' => $registration->courseOffering->curriculumUnit->unit->code,
-                    'course_name' => $registration->courseOffering->curriculumUnit->unit->name,
+                    'course_code' => $registration->courseOffering->unit->code,
+                    'course_name' => $registration->courseOffering->unit->name,
                     'credits' => $registration->credit_hours,
                     'status' => $registration->registration_status,
                 ];

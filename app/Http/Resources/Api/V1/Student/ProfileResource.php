@@ -18,7 +18,7 @@ class ProfileResource extends JsonResource
             'personal_info' => $this->formatPersonalInfo($this->resource['personal_info']),
             'academic_info' => $this->formatAcademicInfo($this->resource['academic_info']),
             'contact_info' => $this->formatContactInfo($this->resource['contact_info']),
-            'enrollment_info' => $this->formatEnrollmentInfo($this->resource['enrollment_info']),
+            // 'enrollment_info' => $this->formatEnrollmentInfo($this->resource['enrollment_info']),
             'preferences' => $this->formatPreferences($this->resource['preferences']),
             'profile_completion' => $this->formatProfileCompletion($this->resource['profile_completion']),
             'generated_at' => now()->toISOString(),
