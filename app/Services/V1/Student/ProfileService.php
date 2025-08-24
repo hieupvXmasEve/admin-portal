@@ -26,7 +26,7 @@ class ProfileService
                 'personal_info' => $this->getPersonalInfo($student),
                 'academic_info' => $this->getAcademicInfo($student),
                 'contact_info' => $this->getContactInfo($student),
-                'enrollment_info' => $this->getEnrollmentInfo($student),
+                // 'enrollment_info' => $this->getEnrollmentInfo($student),
                 'preferences' => $this->getPreferences($student),
                 'profile_completion' => $this->calculateProfileCompletion($student),
             ];

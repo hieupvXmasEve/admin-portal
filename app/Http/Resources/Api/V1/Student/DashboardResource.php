@@ -33,7 +33,7 @@ class DashboardResource extends JsonResource
     {
         return [
             'semester' => $semesterData['semester'],
-            'enrollment' => $semesterData['enrollment'],
+            // 'enrollment' => $semesterData['enrollment'],
             'course_summary' => [
                 'registered_courses' => $semesterData['registered_courses'],
                 'total_credits' => $semesterData['total_credits'],

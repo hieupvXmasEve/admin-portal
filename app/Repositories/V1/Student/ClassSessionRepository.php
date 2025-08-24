@@ -14,19 +14,17 @@ class ClassSessionRepository
 {
     /**
      * Get class sessions for a student in a specific semester
-     * Student can access course offerings if they have the same unit in their curriculum version
+     * Student can only see class sessions for course offerings they are registered for
      */
     public function getStudentClassSessions(Student $student, Semester $semester, array $filters = []): Collection
     {
         $query = ClassSession::query()
             ->whereHas('courseOffering', function (Builder $query) use ($student, $semester) {
                 $query->where('semester_id', $semester->id)
-                    ->whereExists(function ($subQuery) use ($student) {
-                        // Check if the student has this unit in their curriculum version
-                        $subQuery->select('id')
-                            ->from('curriculum_units')
-                            ->whereColumn('curriculum_units.unit_id', 'course_offerings.unit_id')
-                            ->where('curriculum_units.curriculum_version_id', $student->curriculum_version_id);
+                    ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
+                        // Check if the student is registered for this specific course offering
+                        $regQuery->where('student_id', $student->id)
+                            ->whereIn('registration_status', ['pending', 'registered', 'confirmed']);
                     });
             })
             ->with([
@@ -48,11 +46,9 @@ class ClassSessionRepository
     public function isStudentEnrolledInSession(Student $student, ClassSession $classSession): bool
     {
         return $classSession->courseOffering
-            ->curriculumUnit
-            ->curriculumVersion
-            ->enrollments()
+            ->courseRegistrations()
             ->where('student_id', $student->id)
-            ->where('status', 'in_progress')
+            ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
             ->exists();
     }
 
@@ -126,13 +122,9 @@ class ClassSessionRepository
         // First, try to find a session today that hasn't started yet
         $todaySession = ClassSession::whereHas('courseOffering', function (Builder $query) use ($student, $currentSemester) {
             $query->where('semester_id', $currentSemester->id)
-                ->whereHas('curriculumUnit', function (Builder $cuQuery) use ($student) {
-                    $cuQuery->whereHas('curriculumVersion', function (Builder $cvQuery) use ($student) {
-                        $cvQuery->whereHas('enrollments', function (Builder $enrollQuery) use ($student) {
-                            $enrollQuery->where('student_id', $student->id)
-                                ->where('status', 'in_progress');
-                        });
-                    });
+                ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
+                    $regQuery->where('student_id', $student->id)
+                        ->whereIn('registration_status', ['pending', 'registered', 'confirmed']);
                 });
         })
             ->where('day_of_week', $currentDay)
@@ -156,7 +148,7 @@ class ClassSessionRepository
                 $query->where('semester_id', $currentSemester->id)
                     ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
                         $regQuery->where('student_id', $student->id)
-                            ->where('registration_status', 'registered');
+                            ->whereIn('registration_status', ['pending', 'registered', 'confirmed']);
                     });
             })
                 ->where('day_of_week', $nextDay)
@@ -189,7 +181,7 @@ class ClassSessionRepository
             $query->where('semester_id', $currentSemester->id)
                 ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
                     $regQuery->where('student_id', $student->id)
-                        ->where('registration_status', 'registered');
+                        ->whereIn('registration_status', ['pending', 'registered', 'confirmed']);
                 });
         })
             ->where('day_of_week', $currentDay)
@@ -220,7 +212,7 @@ class ClassSessionRepository
             $query->where('semester_id', $currentSemester->id)
                 ->whereHas('courseRegistrations', function (Builder $regQuery) use ($student) {
                     $regQuery->where('student_id', $student->id)
-                        ->where('registration_status', 'registered');
+                        ->whereIn('registration_status', ['pending', 'registered', 'confirmed']);
                 });
         })
             ->where('day_of_week', $currentDay)
