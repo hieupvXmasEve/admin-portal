@@ -102,6 +102,7 @@ class ClassSessionController extends Controller
             'topics_covered' => 'nullable|array',
             'online_meeting_url' => 'nullable|url',
             'instructor_notes' => 'nullable|string',
+            'lecture_id' => 'nullable|exists:lectures,id',
         ]);
 
         $classSession = $this->classSessionService->createClassSession($validated);
@@ -235,6 +236,7 @@ class ClassSessionController extends Controller
             'topics_covered' => 'nullable|array',
             'online_meeting_url' => 'nullable|url',
             'instructor_notes' => 'nullable|string',
+            'lecture_id' => 'nullable|exists:lectures,id',
             'room_id' => [
                 'nullable',
                 Rule::exists('rooms', 'id')->where('campus_id', app('campus')->id),
