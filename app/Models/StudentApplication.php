@@ -67,6 +67,14 @@ class StudentApplication extends AuditableModel
     ];
 
     /**
+     * The model's default values for attributes.
+     */
+    protected $attributes = [
+        'is_international_applicant' => false,
+        'status' => 'approved',
+    ];
+
+    /**
      * Get the student that was created from this application
      */
     public function student(): BelongsTo

@@ -18,11 +18,11 @@ class ProgramMappingService
      * Mapping between intended_program codes and actual program codes
      */
     private const PROGRAM_CODE_MAPPING = [
-        'CS' => 'SEMI',           // Computer Science → Software Engineering and Mobile Intelligence
+        'Công nghệ bán dẫn' => 'SEMI',           // Computer Science → Software Engineering and Mobile Intelligence
         'Trí tuệ nhân tạo' => 'AI',  // AI Vietnamese name → AI code
         'AI' => 'AI',             // AI → AI (direct match)
-        'TC' => 'FIN',            // TC → Finance
-        'IT' => 'BA',             // IT → Business Analytics
+        'Tài chính' => 'FIN',            // TC → Finance
+        'Quản trị kinh doanh' => 'BA',             // IT → Business Analytics
     ];
 
     /**
@@ -120,7 +120,7 @@ class ProgramMappingService
         Log::info('ProgramMappingService: Starting mapping resolution', [
             'input_data' => $applicationData
         ]);
-        
+
         $resolvedData = [];
 
         // Resolve campus_id
@@ -138,7 +138,7 @@ class ProgramMappingService
             Log::info("Resolving program ID for intended program: {$applicationData['intended_program']}");
             $mappedCode = $this->mapIntendedProgramToCode($applicationData['intended_program']);
             Log::info("Mapped program code: " . ($mappedCode ? $mappedCode : 'NULL'));
-            
+
             $programId = $this->getProgramIdFromIntendedCode($applicationData['intended_program']);
             $resolvedData['program_id'] = $programId;
             Log::info("Program ID resolved: " . ($programId ? $programId : 'NULL'));
