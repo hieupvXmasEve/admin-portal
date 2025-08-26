@@ -322,11 +322,21 @@ class StudentApplicationImportService
 
     /**
      * Analyze Excel file structure
+     * Only reads from the first sheet
      */
     protected function analyzeFile(string $filePath): array
     {
         $spreadsheet = IOFactory::load($filePath);
-        $worksheet = $spreadsheet->getActiveSheet();
+        
+        // Always use the first sheet (index 0)
+        $worksheet = $spreadsheet->getSheet(0);
+        
+        Log::debug('Analyzing Excel file structure', [
+            'file_path' => $filePath,
+            'total_sheets' => $spreadsheet->getSheetCount(),
+            'first_sheet_name' => $worksheet->getTitle(),
+            'using_sheet_index' => 0
+        ]);
 
         $headers = [];
         $totalRows = 0;
@@ -345,6 +355,8 @@ class StudentApplicationImportService
         return [
             'headers' => $headers,
             'total_rows' => max(0, $totalRows),
+            'sheet_name' => $worksheet->getTitle(),
+            'total_sheets' => $spreadsheet->getSheetCount(),
         ];
     }
 
@@ -389,11 +401,21 @@ class StudentApplicationImportService
 
     /**
      * Get preview data from file
+     * Only reads from the first sheet
      */
     protected function getPreviewData(string $filePath, array $columnMapping, int $previewRows = 10): array
     {
         $spreadsheet = IOFactory::load($filePath);
-        $worksheet = $spreadsheet->getActiveSheet();
+        
+        // Always use the first sheet (index 0)
+        $worksheet = $spreadsheet->getSheet(0);
+        
+        Log::debug('Getting preview data from first sheet', [
+            'file_path' => $filePath,
+            'sheet_name' => $worksheet->getTitle(),
+            'sheet_index' => 0,
+            'preview_rows' => $previewRows
+        ]);
 
         // Get the headers from the first row to find column positions
         $headerRow = $worksheet->rangeToArray('A1:' . $worksheet->getHighestColumn() . '1')[0];
@@ -456,24 +478,31 @@ class StudentApplicationImportService
             $errors = [];
             $rowWarnings = [];
 
-            // Check required fields
+            // Check required fields - Both email and student_code are mandatory
             if (empty($row['data']['email'])) {
                 $errors[] = 'Email is required for import';
             }
             
             if (empty($row['data']['student_code'])) {
-                $errors[] = 'Student code is required';
+                $errors[] = 'Student code is required for import';
             }
 
             if (empty($row['data']['full_name'])) {
                 $errors[] = 'Full name is required';
             }
 
-            // Check for potential duplicates by email
+            // Check for potential duplicates by email and determine action
             if (!empty($row['data']['email'])) {
                 $existing = StudentApplication::where('email', $row['data']['email'])->first();
                 if ($existing) {
-                    $rowWarnings[] = 'Email already exists - record will be updated';
+                    $rowWarnings[] = 'Email already exists - record will be updated with non-empty import data only';
+                } else {
+                    // For new records, campus_code is required
+                    if (empty($row['data']['campus_code'])) {
+                        $errors[] = 'Campus code is required for creating new student applications';
+                    } else {
+                        $rowWarnings[] = 'New record will be created (email + student_code + campus_code provided)';
+                    }
                 }
             }
 

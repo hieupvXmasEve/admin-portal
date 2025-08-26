@@ -84,10 +84,11 @@ class StudentApplicationService
                 // Use student_code from application instead of auto-generating
                 $studentData['student_id'] = $application->student_code;
 
-                // Check if student with this email already exists OR if application already linked to student
+                // Check if student exists for update (application already linked to student OR email match)
                 $existingStudent = null;
-                
+
                 // First priority: If application already has student_id, use that student
+                // This ensures we update the correct student record that was previously converted
                 if ($application->isConverted() && $application->student_id) {
                     $existingStudent = Student::find($application->student_id);
                     Log::info("Using student linked to application", [
@@ -95,8 +96,9 @@ class StudentApplicationService
                         'found_student' => $existingStudent ? true : false
                     ]);
                 }
-                
+
                 // Second priority: If no linked student found, try by email
+                // This handles cases where student exists but not yet linked to this application
                 if (!$existingStudent) {
                     $existingStudent = Student::where('email', $studentData['email'])->first();
                     if ($existingStudent) {
@@ -106,23 +108,39 @@ class StudentApplicationService
                         ]);
                     }
                 }
-                
+
                 if ($existingStudent) {
-                    Log::info("Found existing student with email {$studentData['email']}, updating instead of creating new", [
+                    Log::info("Found existing student, updating with new data from application", [
                         'existing_student_id' => $existingStudent->id,
                         'existing_student_code' => $existingStudent->student_id,
                         'application_student_code' => $studentData['student_id'],
+                        'will_preserve_student_code' => true,
+                        'will_update_email' => true,
                     ]);
                     
-                    // Update existing student with new data (excluding email to avoid conflicts)
+                    // Update existing student with new data (excluding student_id/student_code to preserve it)
                     $updateData = $studentData;
-                    unset($updateData['email']); // Don't update email to avoid constraint issues
+                    unset($updateData['student_id']); // Don't update student_id to preserve existing student code
                     
-                    // Validate update data without email unique constraint
+                    // Validate update data with email unique constraint (excluding current student)
                     $rules = Student::validationRules();
-                    unset($rules['email']); // Remove email validation entirely for updates
+                    // Allow email updates but exclude current student from unique check
+                    if (isset($rules['email'])) {
+                        $rules['email'] = array_map(function($rule) use ($existingStudent) {
+                            if (str_contains($rule, 'unique:students')) {
+                                return 'unique:students,email,' . $existingStudent->id;
+                            }
+                            return $rule;
+                        }, $rules['email']);
+                    }
+                    // Handle national_id unique constraint for updates
                     if (isset($rules['national_id'])) {
-                        $rules['national_id'] = array_filter($rules['national_id'], fn($rule) => ! str_contains($rule, 'unique:students') || str_contains($rule, 'unique:students,national_id,' . $existingStudent->id));
+                        $rules['national_id'] = array_map(function($rule) use ($existingStudent) {
+                            if (str_contains($rule, 'unique:students')) {
+                                return 'unique:students,national_id,' . $existingStudent->id;
+                            }
+                            return $rule;
+                        }, $rules['national_id']);
                     }
                     
                     $validator = Validator::make($updateData, $rules, Student::validationMessages());
@@ -134,19 +152,20 @@ class StudentApplicationService
                         ];
                     }
                     
-                    // Update the existing student
+                    // Update the existing student (preserving original student_id/student_code)
                     $existingStudent->update($updateData);
                     $student = $existingStudent;
                     
                     Log::info("Successfully updated existing student", [
                         'student_id' => $student->id,
-                        'student_code' => $student->student_id,
+                        'preserved_student_code' => $student->student_id,
+                        'updated_email' => $student->email,
+                        'updated_fields' => array_keys($updateData)
                     ]);
-                    
                 } else {
                     // No existing student found, need to create new one
                     Log::info("No existing student found, preparing to create new student");
-                    
+
                     // Check if student_code already exists in students table
                     $existingStudentByCode = Student::where('student_id', $studentData['student_id'])->first();
                     if ($existingStudentByCode) {
@@ -155,7 +174,7 @@ class StudentApplicationService
                             'existing_student_email' => $existingStudentByCode->email,
                             'application_email' => $studentData['email'],
                         ]);
-                        
+
                         return [
                             'success' => false,
                             'error' => "Student code '{$studentData['student_id']}' already exists. Please use a different student code.",
@@ -166,9 +185,9 @@ class StudentApplicationService
                             ]
                         ];
                     }
-                    
+
                     Log::info("Student code {$studentData['student_id']} is available, proceeding with creation");
-                    
+
                     // Validate student data for new creation
                     $validator = Validator::make($studentData, Student::validationRules(), Student::validationMessages());
 
@@ -192,7 +211,7 @@ class StudentApplicationService
 
                     // Create the student
                     $student = Student::create($studentData);
-                    
+
                     Log::info("Successfully created new student", [
                         'student_id' => $student->id,
                         'student_code' => $student->student_id,
@@ -269,7 +288,7 @@ class StudentApplicationService
             // Check if application is ready for conversion
             Log::info("Checking if application {$applicationId} is ready for conversion");
             $isReady = $application->isReadyForConversion();
-            
+
             if (! $isReady) {
                 $errors = $application->getConversionValidationErrors();
                 Log::error("Application {$applicationId} not ready for conversion - DETAILED ANALYSIS", [

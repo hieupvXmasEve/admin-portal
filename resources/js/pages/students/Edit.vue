@@ -232,7 +232,7 @@ const handleAvatarUploaded = (avatarData: any) => {
                 <User class="text-primary h-8 w-8" />
             </div>
             <div>
-                <h1 class="text-3xl font-bold">Edit Student</h1>
+                <h1 class="text-3xl font-bold">Edit Student - {{ student.student_id }}</h1>
                 <p class="text-muted-foreground text-lg">{{ student.full_name }}</p>
             </div>
         </div>

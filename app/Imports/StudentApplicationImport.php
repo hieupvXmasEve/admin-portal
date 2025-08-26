@@ -15,24 +15,27 @@ use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\SkipsOnError;
 use Maatwebsite\Excel\Concerns\SkipsOnFailure;
 use Maatwebsite\Excel\Concerns\WithCalculatedFormulas;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Validators\Failure;
 use Throwable;
 
 /**
  * Import student applications from Excel files.
- * 
+ *
  * This class handles the import of student applications with the following logic:
- * - Email is used as the primary identifier for duplicate detection
- * - If an email already exists in the database, the record will be updated
- * - If an email doesn't exist, a new record will be created
+ * - Only reads from the first sheet of the Excel file
+ * - Student code is used as the primary identifier for duplicate detection
+ * - If a student_code already exists in the database, the record will be updated
+ * - If a student_code doesn't exist, a new record will be created
  * - Both email and student_code are required fields
- * - Records without email will be skipped
+ * - Records without student_code will be skipped
  */
 class StudentApplicationImport implements
     ToCollection,
     WithHeadingRow,
     WithChunkReading,
     WithBatchInserts,
+    WithMultipleSheets,
     SkipsOnError,
     SkipsOnFailure,
     WithCalculatedFormulas
@@ -58,7 +61,18 @@ class StudentApplicationImport implements
     }
 
     /**
+     * Specify which sheets to import - only the first sheet (index 0)
+     */
+    public function sheets(): array
+    {
+        return [
+            0 => $this, // Only import the first sheet
+        ];
+    }
+
+    /**
      * Process the collection of rows from Excel
+     * This will only process data from the first sheet
      */
     public function collection(Collection $rows): void
     {
@@ -109,7 +123,7 @@ class StudentApplicationImport implements
                 'student_code_value' => $mappedData['student_code'] ?? null,
             ]);
 
-            // Validate required fields
+            // Validate required fields - Both email and student_code are required for any operation
             if (empty($mappedData['email'])) {
                 $this->results['skipped']++;
                 $this->results['errors'][] = [
@@ -119,13 +133,13 @@ class StudentApplicationImport implements
                 ];
                 return;
             }
-            
+
             if (empty($mappedData['student_code'])) {
                 $this->results['skipped']++;
                 $this->results['errors'][] = [
                     'row' => $rowNumber,
                     'student_code' => '',
-                    'errors' => ['Student code is required']
+                    'errors' => ['Student code is required for import']
                 ];
                 return;
             }
@@ -136,33 +150,38 @@ class StudentApplicationImport implements
                 return; // Skip this row due to validation errors
             }
 
-            // Check if student application exists by email
-            $existingApplication = StudentApplication::where('email', $mappedData['email'])->first();
+            // Check if student application exists by student_code
+            $existingApplication = StudentApplication::where('student_code', $mappedData['student_code'])->first();
 
             if ($existingApplication) {
                 if ($this->options['update_existing']) {
-                    $this->updateExistingApplication($existingApplication, $validatedData, $rowNumber);
+                    // For updates, only update columns that have data in the import file
+                    $updateData = $this->filterNonEmptyColumns($validatedData, $mappedData);
+                    $this->updateExistingApplication($existingApplication, $updateData, $rowNumber);
                 } else {
                     $this->results['skipped']++;
                     $this->results['errors'][] = [
                         'row' => $rowNumber,
                         'student_code' => $mappedData['student_code'],
-                        'errors' => ['Student application already exists and update is disabled']
+                        'errors' => ['Student application with this student code already exists and update is disabled']
                     ];
                 }
             } else {
-                // For new records, campus_code is required
+                // For new records, both email and student_code are already validated above
+                // Also check campus_code is required for new records
                 $campusCode = $validatedData['campus_code'] ?? null;
-                
-                Log::debug('Checking campus_code for new application', [
+
+                Log::debug('Checking requirements for new application', [
                     'row' => $rowNumber,
+                    'email' => $mappedData['email'],
+                    'student_code' => $mappedData['student_code'],
                     'campus_code_value' => $campusCode,
                     'campus_code_type' => gettype($campusCode),
                     'is_empty' => empty($campusCode),
                     'is_null' => is_null($campusCode),
                     'validated_data_keys' => array_keys($validatedData)
                 ]);
-                
+
                 if (empty($campusCode)) {
                     $this->results['skipped']++;
                     $this->results['errors'][] = [
@@ -170,13 +189,20 @@ class StudentApplicationImport implements
                         'student_code' => $mappedData['student_code'],
                         'errors' => ['Campus code is required for creating new student applications']
                     ];
-                    
+
                     Log::info('Skipped creating new application - missing campus code', [
                         'row' => $rowNumber,
                         'student_code' => $mappedData['student_code'],
                         'email' => $mappedData['email']
                     ]);
                 } else {
+                    // All requirements met: email + student_code + campus_code
+                    Log::info('Creating new application with all required fields', [
+                        'row' => $rowNumber,
+                        'student_code' => $mappedData['student_code'],
+                        'email' => $mappedData['email'],
+                        'campus_code' => $campusCode
+                    ]);
                     $this->createNewApplication($validatedData, $rowNumber);
                 }
             }
@@ -212,13 +238,13 @@ class StudentApplicationImport implements
             // Maatwebsite Excel normalizes headers to lowercase snake_case
             // So "Full Name" becomes "full_name", "Student Code" becomes "student_code"
             $normalizedExcelColumn = strtolower(str_replace(' ', '_', $excelColumn));
-            
+
             // Special handling for "International" field which becomes "international"
             // but should map to "is_international_applicant"
             if ($excelColumn === 'International') {
                 $normalizedExcelColumn = 'international';
             }
-            
+
             $rawValue = $row[$normalizedExcelColumn] ?? $row[$excelColumn] ?? null;
 
             Log::debug('Processing column mapping', [
@@ -366,7 +392,17 @@ class StudentApplicationImport implements
     protected function createNewApplication(array $data, int $rowNumber): void
     {
         try {
-            StudentApplication::create($data);
+            // Filter out null values to let database use default values
+            $filteredData = $this->prepareDataForCreation($data);
+            
+            Log::debug('Creating new application with filtered data', [
+                'row' => $rowNumber,
+                'original_data_keys' => array_keys($data),
+                'filtered_data_keys' => array_keys($filteredData),
+                'student_code' => $data['student_code']
+            ]);
+            
+            StudentApplication::create($filteredData);
             $this->results['created']++;
 
             Log::info('Created student application from import', [
@@ -384,52 +420,99 @@ class StudentApplicationImport implements
             Log::error('Failed to create student application from import', [
                 'student_code' => $data['student_code'],
                 'row' => $rowNumber,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'data_attempted' => $data
             ]);
         }
     }
 
     /**
+     * Filter out columns that are null/empty in the original mapped data
+     * This ensures we only update columns that actually have data in the import file
+     */
+    protected function filterNonEmptyColumns(array $validatedData, array $originalMappedData): array
+    {
+        $updateData = [];
+
+        foreach ($validatedData as $field => $validatedValue) {
+            // Check if the original mapped data for this field was not null/empty
+            $originalValue = $originalMappedData[$field] ?? null;
+
+            // Only include the field if it had actual data in the import file
+            // This preserves existing data for fields not present in the import
+            if ($originalValue !== null && $originalValue !== '') {
+                $updateData[$field] = $validatedValue;
+            }
+        }
+
+        Log::debug('Filtered update data for existing application', [
+            'validated_data' => $validatedData,
+            'original_mapped_data' => $originalMappedData,
+            'filtered_update_data' => $updateData,
+            'filtered_fields' => array_keys($updateData)
+        ]);
+
+        return $updateData;
+    }
+
+    /**
      * Update existing student application
-     * Only update fields that are provided in the Excel file (non-null values)
+     * Only update fields that are provided in the Excel file (non-null/non-empty values)
      * This preserves existing data like campus_code if not provided in import
      */
     protected function updateExistingApplication(StudentApplication $application, array $data, int $rowNumber): void
     {
         try {
-            // Filter out null values to preserve existing data
-            $updateData = array_filter($data, function($value) {
-                return $value !== null && $value !== '';
-            });
-
+            // Data is already filtered by filterNonEmptyColumns method
             Log::debug('Updating existing application', [
                 'row' => $rowNumber,
-                'original_data' => $data,
-                'filtered_update_data' => $updateData,
+                'application_id' => $application->id,
+                'existing_email' => $application->email,
+                'existing_student_code' => $application->student_code,
                 'existing_campus_code' => $application->campus_code,
-                'will_preserve_campus_code' => !isset($updateData['campus_code'])
+                'update_data' => $data,
+                'fields_to_update' => array_keys($data),
+                'will_preserve_existing_data' => 'Only updating fields with data in import file'
             ]);
 
-            $application->update($updateData);
+            if (empty($data)) {
+                Log::warning('No data to update for existing application', [
+                    'row' => $rowNumber,
+                    'application_id' => $application->id,
+                    'email' => $application->email
+                ]);
+                $this->results['skipped']++;
+                $this->results['errors'][] = [
+                    'row' => $rowNumber,
+                    'student_code' => $application->student_code,
+                    'errors' => ['No data to update - all import columns are empty']
+                ];
+                return;
+            }
+
+            $application->update($data);
             $this->results['updated']++;
 
             Log::info('Updated student application from import', [
-                'student_code' => $data['student_code'],
+                'application_id' => $application->id,
+                'student_code' => $application->student_code,
                 'row' => $rowNumber,
-                'updated_fields' => array_keys($updateData)
+                'updated_fields' => array_keys($data)
             ]);
         } catch (Throwable $e) {
             $this->results['skipped']++;
             $this->results['errors'][] = [
                 'row' => $rowNumber,
-                'student_code' => $data['student_code'],
+                'student_code' => $data['student_code'] ?? 'unknown',
                 'errors' => ['Failed to update: ' . $e->getMessage()]
             ];
 
             Log::error('Failed to update student application from import', [
-                'student_code' => $data['student_code'],
+                'application_id' => $application->id ?? 'unknown',
+                'student_code' => $data['student_code'] ?? 'unknown',
                 'row' => $rowNumber,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
         }
     }
@@ -522,7 +605,7 @@ class StudentApplicationImport implements
                 'errors' => $failure->errors(),
                 'values' => $failure->values(),
             ]);
-            
+
             $this->results['skipped']++;
             $this->results['errors'][] = [
                 'row' => $failure->row(),
@@ -538,6 +621,33 @@ class StudentApplicationImport implements
     public function getResults(): array
     {
         return $this->results;
+    }
+
+    /**
+     * Prepare data for creation by removing null values to allow database defaults
+     */
+    protected function prepareDataForCreation(array $data): array
+    {
+        // Remove null values to let database use default values
+        $filteredData = array_filter($data, function($value) {
+            return $value !== null;
+        });
+        
+        // However, keep required fields even if they're null (validation will catch them)
+        $requiredFields = ['full_name', 'student_code', 'email'];
+        foreach ($requiredFields as $field) {
+            if (isset($data[$field])) {
+                $filteredData[$field] = $data[$field];
+            }
+        }
+        
+        Log::debug('Prepared data for creation', [
+            'original_data' => $data,
+            'filtered_data' => $filteredData,
+            'removed_null_fields' => array_diff_key($data, $filteredData)
+        ]);
+        
+        return $filteredData;
     }
 
     /**
