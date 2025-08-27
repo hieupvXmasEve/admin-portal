@@ -30,7 +30,7 @@ class LecturerCourseService
                     $q->where('registration_status', 'confirmed');
                 },
                 'classSessions' => function ($q) {
-                    $q->orderBy('session_date', 'desc')->limit(5);
+                    $q->orderBy('session_date', 'desc');
                 },
             ])
             ->where('is_active', true);
@@ -319,7 +319,7 @@ class LecturerCourseService
                 'id' => $courseOffering->curriculumUnit->id,
                 'unit_code' => $courseOffering->curriculumUnit->unit->code,
                 'unit_name' => $courseOffering->curriculumUnit->unit->name,
-                'credit_hours' => $courseOffering->curriculumUnit->unit->credit_points,
+                'credit_points' => $courseOffering->curriculumUnit->unit->credit_points,
                 'description' => $courseOffering->curriculumUnit->note,
             ],
             'semester' => [
