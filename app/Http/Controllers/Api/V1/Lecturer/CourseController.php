@@ -62,6 +62,7 @@ class CourseController extends Controller
 
             return ApiResponse::success(
                 new CourseDetailResource($courseDetails),
+                [],
                 'Course details retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -82,6 +83,7 @@ class CourseController extends Controller
 
             return ApiResponse::success(
                 $unit,
+                [],
                 'Unit information retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -102,6 +104,7 @@ class CourseController extends Controller
 
             return ApiResponse::success(
                 $statistics,
+                [],
                 'Course statistics retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -127,6 +130,7 @@ class CourseController extends Controller
 
             return ApiResponse::success(
                 CourseStudentResource::collection($students),
+                [],
                 'Course students retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -185,6 +189,7 @@ class CourseController extends Controller
 
             return ApiResponse::success(
                 $sessions,
+                [],
                 'Course sessions retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -205,6 +210,7 @@ class CourseController extends Controller
 
             return ApiResponse::success(
                 $filterOptions,
+                [],
                 'Filter options retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -243,6 +249,7 @@ class CourseController extends Controller
 
             return ApiResponse::success(
                 $summary,
+                [],
                 'Course summary retrieved successfully'
             );
         } catch (\Exception $e) {

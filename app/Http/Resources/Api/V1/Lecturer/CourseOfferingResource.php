@@ -52,7 +52,7 @@ class CourseOfferingResource extends JsonResource
             // Enrollment Statistics
             'enrollment_stats' => [
                 'enrolled_count' => $this->whenLoaded('courseRegistrations', function () {
-                    return $this->courseRegistrations->where('registration_status', 'enrolled')->count();
+                    return $this->courseRegistrations->where('registration_status', 'confirmed')->count();
                 }),
                 'capacity_utilization' => $this->max_capacity > 0
                     ? round(($this->current_enrollment / $this->max_capacity) * 100, 1)
