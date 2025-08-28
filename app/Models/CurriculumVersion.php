@@ -20,11 +20,9 @@ class CurriculumVersion extends AuditableModel
         'version_code',
         'semester_id',
         'notes',
-        'is_active',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -180,11 +178,11 @@ class CurriculumVersion extends AuditableModel
     }
 
     /**
-     * Scope for active curriculum versions.
+     * Scope for active curriculum versions based on having curriculum units.
      */
     public function scopeActive(Builder $query): void
     {
-        $query->where('is_active', true);
+        $query->whereHas('curriculumUnits');
     }
 
     /**
@@ -216,7 +214,6 @@ class CurriculumVersion extends AuditableModel
             'version_code',
             'semester_id',
             'notes',
-            'is_active',
         ];
     }
 
@@ -260,7 +257,6 @@ class CurriculumVersion extends AuditableModel
             'specialization_name' => $this->specialization?->name ?? 'General Program',
             'version_code' => $this->version_code,
             'effective_from_semester' => $this->effectiveFromSemester?->code,
-            'is_active' => $this->is_active,
             'total_units' => $this->curriculumUnits()->count(),
             'required_units' => $this->requiredUnits()->count(),
             'elective_units' => $this->electiveUnits()->count(),
@@ -268,15 +264,6 @@ class CurriculumVersion extends AuditableModel
             'active_enrollments_count' => $this->enrollments()->where('status', 'in_progress')->count(),
         ];
 
-        // Track activation/deactivation
-        if ($this->isDirty('is_active') && $this->exists) {
-            $properties['activation_change'] = [
-                'from' => $this->getOriginal('is_active') ? 'active' : 'inactive',
-                'to' => $this->is_active ? 'active' : 'inactive',
-                'changed_at' => now()->toDateTimeString(),
-                'affected_students' => $this->students()->pluck('student_id')->toArray(),
-            ];
-        }
 
         // Track version changes
         if ($this->isDirty('version_code') && $this->exists) {

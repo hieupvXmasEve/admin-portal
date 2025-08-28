@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Constants\CurriculumRoutes;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\DuplicateCurriculumVersionRequest;
 use App\Http\Requests\StoreCurriculumVersionRequest;
 use App\Http\Requests\UpdateCurriculumVersionRequest;
 use App\Models\CurriculumVersion;
@@ -532,6 +533,56 @@ class CurriculumVersionController extends Controller
 
         return redirect()->route(CurriculumRoutes::VERSION_INDEX)
             ->with('success', 'Curriculum version deleted successfully');
+    }
+
+    /**
+     * Duplicate the specified curriculum version with a new version code.
+     */
+    public function duplicate(DuplicateCurriculumVersionRequest $request, CurriculumVersion $curriculumVersion): RedirectResponse
+    {
+        try {
+            DB::beginTransaction();
+
+            // Create the duplicate curriculum version
+            $duplicateData = [
+                'program_id' => $curriculumVersion->program_id,
+                'specialization_id' => $curriculumVersion->specialization_id,
+                'version_code' => $request->validated()['version_code'],
+                'semester_id' => $curriculumVersion->semester_id,
+                'notes' => $request->validated()['notes'] ?? $curriculumVersion->notes,
+            ];
+
+            $duplicatedVersion = CurriculumVersion::create($duplicateData);
+
+            // If requested, duplicate curriculum units
+            if ($request->validated()['include_curriculum_units']) {
+                $curriculumUnits = $curriculumVersion->curriculumUnits()->get();
+                
+                foreach ($curriculumUnits as $unit) {
+                    $duplicatedVersion->curriculumUnits()->create([
+                        'unit_id' => $unit->unit_id,
+                        'year_level' => $unit->year_level,
+                        'semester_number' => $unit->semester_number,
+                        'unit_scope' => $unit->unit_scope,
+                        'is_compulsory' => $unit->is_compulsory,
+                        'is_prerequisite_flexible' => $unit->is_prerequisite_flexible,
+                        'note' => $unit->note,
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return redirect()->route(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW, $duplicatedVersion)
+                ->with('success', "Curriculum version duplicated successfully as '{$duplicatedVersion->version_code}'");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Curriculum version duplication failed: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->with('error', 'Failed to duplicate curriculum version. Please try again.');
+        }
     }
 
     /**

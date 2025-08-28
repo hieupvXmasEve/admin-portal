@@ -6,6 +6,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,7 @@ import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
 import { useDebounceFn } from '@vueuse/core';
-import { Book, Edit, Eye, Plus, Search, Trash2, X } from 'lucide-vue-next';
+import { Book, Copy, Edit, Eye, Plus, Search, Trash2, X } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { computed, h, nextTick, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
@@ -193,6 +194,10 @@ const curriculumVersionToDelete = ref<CurriculumVersion | null>(null);
 const showEditModal = ref(false);
 const curriculumVersionToEdit = ref<CurriculumVersion | null>(null);
 
+// Duplicate modal state
+const showDuplicateModal = ref(false);
+const curriculumVersionToDuplicate = ref<CurriculumVersion | null>(null);
+
 // Define validation schema for edit form
 const editFormSchema = toTypedSchema(
     z.object({
@@ -201,6 +206,15 @@ const editFormSchema = toTypedSchema(
         version_code: z.string().min(ValidationRules.curriculumVersion.versionCode.minLength, 'Version code is required').max(ValidationRules.curriculumVersion.versionCode.maxLength, 'Version code cannot exceed 50 characters'),
         semester_id: z.string().min(1, 'Semester is required'),
         notes: z.string().max(ValidationRules.curriculumVersion.notes.maxLength, 'Notes cannot exceed 1000 characters').optional(),
+    }),
+);
+
+// Define validation schema for duplicate form
+const duplicateFormSchema = toTypedSchema(
+    z.object({
+        version_code: z.string().min(1, 'Version code is required').max(20, 'Version code cannot exceed 20 characters'),
+        notes: z.string().max(ValidationRules.curriculumVersion.notes.maxLength, 'Notes cannot exceed 1000 characters').optional(),
+        include_curriculum_units: z.boolean(),
     }),
 );
 
@@ -230,6 +244,11 @@ const viewCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
 const deleteCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
     curriculumVersionToDelete.value = curriculumVersion;
     deleteDialogOpen.value = true;
+};
+
+const duplicateCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
+    curriculumVersionToDuplicate.value = curriculumVersion;
+    showDuplicateModal.value = true;
 };
 
 const confirmDelete = () => {
@@ -273,6 +292,39 @@ const onEditSubmit = (values: any) => {
             toast.error('Failed to update curriculum version');
         },
     });
+};
+
+// Duplicate modal functions
+const closeDuplicateModal = () => {
+    showDuplicateModal.value = false;
+    curriculumVersionToDuplicate.value = null;
+};
+
+const onDuplicateSubmit = (values: any) => {
+    if (!curriculumVersionToDuplicate.value) return;
+
+    const submitData = {
+        version_code: values.version_code,
+        notes: values.notes || null,
+        include_curriculum_units: values.include_curriculum_units,
+    };
+
+    router.post(`/curriculum-versions/${curriculumVersionToDuplicate.value.id}/duplicate`, submitData, {
+        onSuccess: () => {
+            toast.success(`Curriculum version duplicated successfully as '${values.version_code}'`);
+            closeDuplicateModal();
+        },
+        onError: () => {
+            toast.error('Failed to duplicate curriculum version');
+        },
+    });
+};
+
+// Generate suggested version code for duplicate
+const generateSuggestedVersionCode = (originalVersionCode: string): string => {
+    const year = new Date().getFullYear();
+    const timestamp = Date.now().toString().slice(-4);
+    return `${originalVersionCode}-Copy-${timestamp}`;
 };
 
 // Server-side filtering functions
@@ -641,6 +693,19 @@ const navigateToCreate = () => {
                         </Tooltip>
                     </TooltipProvider>
 
+                    <TooltipProvider v-if="permission.can('create_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="sm" @click="duplicateCurriculumVersion(row.original)" title="Duplicate curriculum version">
+                                    <Copy class="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Duplicate curriculum version</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
                     <TooltipProvider v-if="permission.can('delete_curriculum_version')" :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
                         <Tooltip>
                             <TooltipTrigger as-child>
@@ -779,6 +844,83 @@ const navigateToCreate = () => {
                     <Button type="button" variant="outline" @click="closeEditModal">Cancel</Button>
                     <Button type="submit" :disabled="isSubmitting">
                         {{ isSubmitting ? 'Updating...' : 'Update Version' }}
+                    </Button>
+                </DialogFooter>
+            </Form>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Duplicate Modal -->
+    <Dialog v-model:open="showDuplicateModal">
+        <DialogContent class="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Duplicate Curriculum Version</DialogTitle>
+                <DialogDescription>
+                    Create a copy of curriculum version <strong>{{ curriculumVersionToDuplicate?.version_code }}</strong> with a new version code.
+                </DialogDescription>
+            </DialogHeader>
+
+            <Form
+                v-if="curriculumVersionToDuplicate"
+                :validation-schema="duplicateFormSchema"
+                :initial-values="{
+                    version_code: generateSuggestedVersionCode(curriculumVersionToDuplicate.version_code),
+                    notes: curriculumVersionToDuplicate.notes || '',
+                    include_curriculum_units: true,
+                }"
+                @submit="onDuplicateSubmit"
+            >
+                <div class="grid grid-cols-1 gap-4">
+                    <FormField v-slot="{ componentField }" name="version_code">
+                        <FormItem>
+                            <FormLabel>New Version Code *</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="Enter new version code" :maxlength="20" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="notes">
+                        <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                                <Textarea v-bind="componentField" placeholder="Enter any additional notes for the duplicate..." rows="4" :maxlength="ValidationRules.curriculumVersion.notes.maxLength" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="include_curriculum_units">
+                        <FormItem class="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                                <Checkbox v-bind="componentField" />
+                            </FormControl>
+                            <div class="space-y-1 leading-none">
+                                <FormLabel>Include Curriculum Units</FormLabel>
+                                <p class="text-[0.8rem] text-muted-foreground">
+                                    Copy all {{ curriculumVersionToDuplicate.curriculum_units_count }} curriculum units from the original version to the duplicate.
+                                </p>
+                            </div>
+                        </FormItem>
+                    </FormField>
+
+                    <!-- Original Version Summary -->
+                    <div class="rounded-lg border bg-muted/50 p-4">
+                        <h4 class="font-medium mb-2">Original Version Details</h4>
+                        <div class="space-y-1 text-sm text-muted-foreground">
+                            <div><strong>Program:</strong> {{ curriculumVersionToDuplicate.program?.name }} ({{ curriculumVersionToDuplicate.program?.code }})</div>
+                            <div v-if="curriculumVersionToDuplicate.specialization"><strong>Specialization:</strong> {{ curriculumVersionToDuplicate.specialization.name }} ({{ curriculumVersionToDuplicate.specialization.code }})</div>
+                            <div><strong>Effective From:</strong> {{ curriculumVersionToDuplicate.effective_from_semester?.name }}</div>
+                            <div><strong>Curriculum Units:</strong> {{ curriculumVersionToDuplicate.curriculum_units_count }} units</div>
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter class="mt-4">
+                    <Button type="button" variant="outline" @click="closeDuplicateModal">Cancel</Button>
+                    <Button type="submit" :disabled="isSubmitting">
+                        {{ isSubmitting ? 'Duplicating...' : 'Duplicate Version' }}
                     </Button>
                 </DialogFooter>
             </Form>

@@ -45,6 +45,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{curriculum_version}', [CurriculumVersionController::class, 'destroy'])
             ->middleware('can:delete_curriculum_version')
             ->name(CurriculumRoutes::VERSION_DESTROY);
+        Route::post('/{curriculum_version}/duplicate', [CurriculumVersionController::class, 'duplicate'])
+            ->middleware('can:create_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_DUPLICATE);
     });
 
     // Global management routes for curriculum versions
