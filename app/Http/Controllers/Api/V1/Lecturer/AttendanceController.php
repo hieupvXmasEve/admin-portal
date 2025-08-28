@@ -59,6 +59,7 @@ class AttendanceController extends Controller
 
             return ApiResponse::success(
                 AttendanceSessionResource::collection($sessions->items()),
+                [],
                 'Sessions requiring attention retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -83,6 +84,7 @@ class AttendanceController extends Controller
 
             return ApiResponse::success(
                 new SessionAttendanceResource($attendanceData),
+                [],
                 'Session attendance retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -111,12 +113,14 @@ class AttendanceController extends Controller
             if ($result['total_errors'] > 0) {
                 return ApiResponse::success(
                     $result,
+                    [],
                     "Attendance marked with {$result['total_errors']} errors"
                 );
             }
 
             return ApiResponse::success(
                 $result,
+                [],
                 'Attendance marked successfully'
             );
         } catch (\Exception $e) {
@@ -175,7 +179,7 @@ class AttendanceController extends Controller
                 'total_attendance_marked' => $totalProcessed,
                 'total_errors' => $totalErrors,
                 'results' => $results,
-            ], 'Bulk attendance marking completed');
+            ], [], 'Bulk attendance marking completed');
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to process bulk attendance marking');
         }
@@ -200,6 +204,7 @@ class AttendanceController extends Controller
 
             return ApiResponse::success(
                 $analytics,
+                [],
                 'Course attendance analytics retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -226,6 +231,7 @@ class AttendanceController extends Controller
 
             return ApiResponse::success(
                 $alerts,
+                [],
                 'Attendance alerts retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -259,6 +265,7 @@ class AttendanceController extends Controller
 
             return ApiResponse::success(
                 $exportData,
+                [],
                 'Attendance data prepared for export'
             );
         } catch (\Exception $e) {
@@ -273,16 +280,17 @@ class AttendanceController extends Controller
     /**
      * Generate attendance records for a session (new endpoint)
      */
-    public function generateAttendance(Request $request, int $sessionId): JsonResponse
+    public function generateAttendance(Request $request, int $session): JsonResponse
     {
         /** @var \App\Models\Lecture $lecturer */
         $lecturer = $request->user();
 
         try {
-            $result = $this->attendanceService->generateAttendanceRecords($lecturer, $sessionId);
+            $result = $this->attendanceService->generateAttendanceRecords($lecturer, $session);
 
             return ApiResponse::success(
                 $result,
+                [],
                 $result['message']
             );
         } catch (\Exception $e) {
@@ -335,6 +343,7 @@ class AttendanceController extends Controller
 
             return ApiResponse::success(
                 $summary,
+                [],
                 'Attendance summary retrieved successfully'
             );
         } catch (\Exception $e) {

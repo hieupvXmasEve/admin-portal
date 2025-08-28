@@ -234,7 +234,7 @@ class ClassSession extends AuditableModel
     {
         $unitCode = $this->courseOffering?->unit?->code ?? 'N/A';
         $sessionDate = $this->session_date?->format('Y-m-d') ?? 'N/A';
-        
+
         return "{$unitCode} - Session on {$sessionDate}";
     }
 
