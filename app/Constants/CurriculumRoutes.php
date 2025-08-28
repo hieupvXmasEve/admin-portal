@@ -25,6 +25,8 @@ class CurriculumRoutes
 
     public const VERSION_DESTROY = 'curriculum_versions.destroy';
 
+    public const VERSION_DUPLICATE = 'curriculum_versions.duplicate';
+
     public const VERSION_EXPORT_FILTERED = 'curriculum_versions.export.filtered';
 
     // Curriculum Version Summary Tab Routes
