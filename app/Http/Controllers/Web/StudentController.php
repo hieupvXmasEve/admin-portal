@@ -287,13 +287,7 @@ class StudentController extends Controller
     {
         try {
             DB::transaction(function () use ($student) {
-                // Check if student has active registrations
-                $activeRegistrations = $student->courseRegistrations()->active()->count();
-                if ($activeRegistrations > 0) {
-                    throw new \Exception('Cannot delete student with active course registrations');
-                }
-
-                // Use service to delete the student
+                // Use service to soft delete the student and all related data
                 $this->studentService->deleteStudent($student);
             });
 
@@ -305,7 +299,7 @@ class StudentController extends Controller
             // Return redirect for web requests
             return redirect()
                 ->route(StudentRoutes::INDEX)
-                ->with('success', 'Student deleted successfully');
+                ->with('success', 'Student and all related data have been deleted successfully');
         } catch (\Exception $e) {
             Log::error('Failed to delete student', [
                 'student_id' => $student->id,
