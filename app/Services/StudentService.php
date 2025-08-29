@@ -451,20 +451,137 @@ class StudentService
     }
 
     /**
-     * Delete a student
+     * Delete a student and cascade soft delete to all related data
      */
     public function deleteStudent(Student $student): void
     {
         DB::transaction(function () use ($student) {
-            // Check if student has active registrations
-            $activeRegistrations = $student->courseRegistrations()->active()->count();
-            if ($activeRegistrations > 0) {
-                throw new Exception('Cannot delete student with active course registrations');
+            $deletedCounts = [
+                'course_registrations' => 0,
+                'enrollments' => 0,
+                'academic_records' => 0,
+                'academic_standings' => 0,
+                'academic_holds' => 0,
+                'gpa_calculations' => 0,
+                'program_change_requests' => 0,
+                'attendances' => 0,
+            ];
+
+            // Soft delete course registrations
+            $courseRegistrations = $student->courseRegistrations()->get();
+            foreach ($courseRegistrations as $registration) {
+                $registration->delete();
+                $deletedCounts['course_registrations']++;
             }
 
-            // Soft delete the student
+            // Soft delete enrollments
+            $enrollments = $student->enrollments()->get();
+            foreach ($enrollments as $enrollment) {
+                $enrollment->delete();
+                $deletedCounts['enrollments']++;
+            }
+
+            // Soft delete academic records (if they exist and support soft deletes)
+            if (method_exists($student, 'academicRecords')) {
+                try {
+                    $academicRecords = $student->academicRecords()->get();
+                    foreach ($academicRecords as $record) {
+                        if (in_array('Illuminate\\Database\\Eloquent\\SoftDeletes', class_uses_recursive($record))) {
+                            $record->delete();
+                            $deletedCounts['academic_records']++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Could not soft delete academic records: {$e->getMessage()}");
+                }
+            }
+
+            // Soft delete academic standings (if they exist and support soft deletes)
+            if (method_exists($student, 'academicStandings')) {
+                try {
+                    $academicStandings = $student->academicStandings()->get();
+                    foreach ($academicStandings as $standing) {
+                        if (in_array('Illuminate\\Database\\Eloquent\\SoftDeletes', class_uses_recursive($standing))) {
+                            $standing->delete();
+                            $deletedCounts['academic_standings']++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Could not soft delete academic standings: {$e->getMessage()}");
+                }
+            }
+
+            // Soft delete academic holds (if they exist and support soft deletes)
+            if (method_exists($student, 'academicHolds')) {
+                try {
+                    $academicHolds = $student->academicHolds()->get();
+                    foreach ($academicHolds as $hold) {
+                        if (in_array('Illuminate\\Database\\Eloquent\\SoftDeletes', class_uses_recursive($hold))) {
+                            $hold->delete();
+                            $deletedCounts['academic_holds']++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Could not soft delete academic holds: {$e->getMessage()}");
+                }
+            }
+
+            // Soft delete GPA calculations (if they exist and support soft deletes)
+            if (method_exists($student, 'gpaCalculations')) {
+                try {
+                    $gpaCalculations = $student->gpaCalculations()->get();
+                    foreach ($gpaCalculations as $gpa) {
+                        if (in_array('Illuminate\\Database\\Eloquent\\SoftDeletes', class_uses_recursive($gpa))) {
+                            $gpa->delete();
+                            $deletedCounts['gpa_calculations']++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Could not soft delete GPA calculations: {$e->getMessage()}");
+                }
+            }
+
+            // Soft delete program change requests (if they exist and support soft deletes)
+            if (method_exists($student, 'programChangeRequests')) {
+                try {
+                    $programChangeRequests = $student->programChangeRequests()->get();
+                    foreach ($programChangeRequests as $request) {
+                        if (in_array('Illuminate\\Database\\Eloquent\\SoftDeletes', class_uses_recursive($request))) {
+                            $request->delete();
+                            $deletedCounts['program_change_requests']++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Could not soft delete program change requests: {$e->getMessage()}");
+                }
+            }
+
+            // Soft delete attendances (if they exist and support soft deletes)
+            if (method_exists($student, 'attendances')) {
+                try {
+                    $attendances = $student->attendances()->get();
+                    foreach ($attendances as $attendance) {
+                        if (in_array('Illuminate\\Database\\Eloquent\\SoftDeletes', class_uses_recursive($attendance))) {
+                            $attendance->delete();
+                            $deletedCounts['attendances']++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Could not soft delete attendances: {$e->getMessage()}");
+                }
+            }
+
+            // Finally, soft delete the student
             $student->delete();
-            Log::warning("Soft deleted student {$student->id}");
+
+            Log::info("Soft deleted student {$student->id} ({$student->full_name}) and related data", [
+                'student_id' => $student->id,
+                'student_name' => $student->full_name,
+                'student_email' => $student->email,
+                'campus_id' => $student->campus_id,
+                'deleted_counts' => $deletedCounts,
+                'total_related_records' => array_sum($deletedCounts),
+            ]);
         });
     }
 
