@@ -240,7 +240,7 @@ class EmailLog extends AuditableModel
     /**
      * Get email statistics
      */
-    public static function getStatistics(Carbon $startDate = null, Carbon $endDate = null): array
+    public static function getStatistics(?Carbon $startDate = null, ?Carbon $endDate = null): array
     {
         $query = static::query();
 

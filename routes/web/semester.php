@@ -47,7 +47,7 @@ Route::middleware('auth')->group(function () {
         ->name(SemesterRoutes::ACTIVATION_STATUSES);
 
     // Admin enrollment management routes
-    Route::get('api/semesters/{semester}/enrollment', [SemesterEnrollmentController::class, 'show'])
+    Route::get('semesters/{semester}/enrollment', [SemesterEnrollmentController::class, 'show'])
         ->middleware('can:edit_semester')
         ->name(SemesterRoutes::ENROLLMENT_SHOW);
 

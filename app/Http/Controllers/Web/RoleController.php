@@ -9,11 +9,15 @@ use App\Http\Requests\Role\UpdateRoleRequest;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Services\RoleService;
+use App\Services\RoleAssignmentService;
 use Inertia\Inertia;
 
 class RoleController extends Controller
 {
-    public function __construct(protected RoleService $roleService) {}
+    public function __construct(
+        protected RoleService $roleService,
+        protected RoleAssignmentService $roleAssignmentService
+    ) {}
 
     public function index()
     {

@@ -13,7 +13,7 @@ return [
      |
      */
 
-    'enabled' => env('DEBUGBAR_ENABLED', false),
+    'enabled' => env('DEBUGBAR_ENABLED', true),
     'except' => [
         'telescope*',
         'horizon*',
@@ -32,7 +32,7 @@ return [
      |
      */
     'storage' => [
-        'enabled' => false,
+        'enabled' => true,
         'driver' => 'file', // redis, file, pdo, socket, custom
         'path' => storage_path('debugbar'), // For file driver
         'connection' => null,   // Leave null for default connection (Redis/PDO)
@@ -88,7 +88,7 @@ return [
      | jQuery is set to not conflict with existing jQuery scripts.
      |
      */
-    'include_vendors' => false,
+    'include_vendors' => true,
 
     /*
      |--------------------------------------------------------------------------
@@ -139,28 +139,28 @@ return [
      */
 
     'collectors' => [
-        'phpinfo' => false,
-        'messages' => false,
-        'time' => false,
-        'memory' => false,
-        'exceptions' => false,
-        'log' => false,
-        'db' => false,
-        'views' => false,
-        'route' => false,
-        'auth' => false,
-        'gate' => false,
-        'session' => false,
-        'symfony_request' => false,
-        'mail' => false,
-        'laravel' => false,
-        'events' => false,
-        'default_request' => false,
-        'logs' => false,
-        'files' => false,
-        'config' => false,
-        'cache' => false,
-        'models' => false,
+        'phpinfo' => true,
+        'messages' => true,
+        'time' => true,
+        'memory' => true,
+        'exceptions' => true,
+        'log' => true,
+        'db' => true,
+        'views' => true,
+        'route' => true,
+        'auth' => true,
+        'gate' => true,
+        'session' => true,
+        'symfony_request' => true,
+        'mail' => true,
+        'laravel' => true,
+        'events' => true,
+        'default_request' => true,
+        'logs' => true,
+        'files' => true,
+        'config' => true,
+        'cache' => true,
+        'models' => true,
         'livewire' => false,
     ],
 
@@ -220,7 +220,7 @@ return [
      |
      */
 
-    'inject' => false,
+    'inject' => true,
 
     /*
      |--------------------------------------------------------------------------

@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\Log;
 
 class UserService
 {
+    protected RoleAssignmentService $roleAssignmentService;
+
+    public function __construct(RoleAssignmentService $roleAssignmentService)
+    {
+        $this->roleAssignmentService = $roleAssignmentService;
+    }
     /**
      * Create a new user.
      *
@@ -58,7 +64,7 @@ class UserService
     }
 
     /**
-     * Sync roles for a user on the current campus.
+     * Sync roles for a user on the current campus using RoleAssignmentService.
      */
     public function syncCampusRoles(User $user, array $roleIds): void
     {
@@ -67,12 +73,6 @@ class UserService
             return;
         }
 
-        // Get current roles for this campus
-        $existingRoleIds = $user->campusRoles()
-            ->where('campus_id', $currentCampusId)
-            ->pluck('role_id')
-            ->toArray();
-
         // Validate that all role IDs exist in the roles table
         $validRoleIds = [];
         if (! empty($roleIds)) {
@@ -80,37 +80,13 @@ class UserService
 
             if (empty($validRoleIds)) {
                 Log::warning("No valid role IDs found for user {$user->id}", ['provided_roles' => $roleIds]);
-                // If no valid roles found, treat as empty array (remove all roles)
                 $validRoleIds = [];
             }
         }
 
-        // Find roles to remove and roles to add
-        $rolesToRemove = array_diff($existingRoleIds, $validRoleIds);
-        $rolesToAdd = array_diff($validRoleIds, $existingRoleIds);
-
-        // Remove roles that are no longer selected
-        if (! empty($rolesToRemove)) {
-            \App\Models\CampusUserRole::where('user_id', $user->id)
-                ->where('campus_id', $currentCampusId)
-                ->whereIn('role_id', $rolesToRemove)
-                ->delete();
-        }
-
-        // Add new roles
-        if (! empty($rolesToAdd)) {
-            $rolesToSync = [];
-            foreach ($rolesToAdd as $roleId) {
-                $rolesToSync[] = [
-                    'user_id' => $user->id,
-                    'campus_id' => $currentCampusId,
-                    'role_id' => $roleId,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-            \App\Models\CampusUserRole::insert($rolesToSync);
-        }
+        // ✅ Sử dụng RoleAssignmentService để sync roles và auto clear cache
+        $this->roleAssignmentService->assignMultipleRolesToUser($user, $validRoleIds, $currentCampusId);
+        
         Log::info("Synced roles for user {$user->id} on campus {$currentCampusId}");
     }
 
@@ -124,10 +100,8 @@ class UserService
         $currentCampusId = session('current_campus_id');
 
         if ($currentCampusId) {
-            // Remove user's roles for this campus only
-            \App\Models\CampusUserRole::where('user_id', $user->id)
-                ->where('campus_id', $currentCampusId)
-                ->delete();
+            // ✅ Sử dụng RoleAssignmentService để xóa tất cả roles và auto clear cache
+            $this->roleAssignmentService->assignMultipleRolesToUser($user, [], $currentCampusId);
         }
 
         // If user has no roles in any campus, delete the user
