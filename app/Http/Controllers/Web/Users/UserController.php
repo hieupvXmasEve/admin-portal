@@ -8,12 +8,16 @@ use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\User;
 use App\Services\UserService;
+use App\Services\RoleAssignmentService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class UserController extends Controller
 {
-    public function __construct(protected UserService $userService) {}
+    public function __construct(
+        protected UserService $userService,
+        protected RoleAssignmentService $roleAssignmentService
+    ) {}
 
     public function index(Request $request, User $user)
     {
@@ -64,7 +68,10 @@ class UserController extends Controller
 
     public function create()
     {
-        $roleController = new \App\Http\Controllers\Web\RoleController(new \App\Services\RoleService);
+        $roleController = new \App\Http\Controllers\Web\RoleController(
+            new \App\Services\RoleService($this->roleAssignmentService),
+            $this->roleAssignmentService
+        );
         $roles = $roleController->getRolesWithPermissions();
 
         return Inertia::render('users/Create', [
@@ -81,7 +88,10 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        $roleController = new \App\Http\Controllers\Web\RoleController(new \App\Services\RoleService);
+        $roleController = new \App\Http\Controllers\Web\RoleController(
+            new \App\Services\RoleService($this->roleAssignmentService),
+            $this->roleAssignmentService
+        );
         $roles = $roleController->getRolesWithPermissions();
 
         // Get current campus ID

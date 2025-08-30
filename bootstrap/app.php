@@ -2,7 +2,6 @@
 
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CheckCampusSelected;
-use App\Http\Middleware\CheckPermissions;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetCampus;
@@ -32,7 +31,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Register route middleware aliases
         $middleware->alias([
-            'permissions' => CheckPermissions::class,
             'admin' => AdminMiddleware::class,
             'student' => StudentMiddleware::class,
             'campus.selected' => CheckCampusSelected::class,

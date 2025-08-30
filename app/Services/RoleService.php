@@ -7,6 +7,12 @@ use Illuminate\Support\Facades\Log;
 
 class RoleService
 {
+    protected RoleAssignmentService $roleAssignmentService;
+
+    public function __construct(RoleAssignmentService $roleAssignmentService)
+    {
+        $this->roleAssignmentService = $roleAssignmentService;
+    }
     /**
      * Create a new role.
      *
@@ -21,7 +27,8 @@ class RoleService
         $role = Role::create($data);
 
         if (! empty($permissions)) {
-            $role->permissions()->sync($permissions);
+            // ✅ Sử dụng RoleAssignmentService để auto clear cache
+            $this->roleAssignmentService->syncPermissionsToRole($role, $permissions);
         }
 
         return $role;
@@ -41,7 +48,8 @@ class RoleService
         Log::info("Updating role {$role->id}", $data);
         $role->update($data);
 
-        $role->permissions()->sync($permissions);
+        // ✅ Sử dụng RoleAssignmentService để auto clear cache cho tất cả users có role này
+        $this->roleAssignmentService->syncPermissionsToRole($role, $permissions);
 
         return $role;
     }
