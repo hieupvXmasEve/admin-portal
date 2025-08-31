@@ -12,6 +12,7 @@ use App\Models\Program;
 use App\Services\ProgramService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -30,18 +31,28 @@ class ProgramController extends Controller
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
-        $programs = Program::query()
-            ->when($validated['search'] ?? null, function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%");
-            })
-            ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
-                $direction = $validated['direction'] ?? 'asc';
-                $query->orderBy($sort, $direction);
-            })
-            ->orderBy('created_at', 'desc')
-            ->withCount(['specializations', 'curriculumVersions'])
-            ->paginate($validated['per_page'] ?? 15)
-            ->withQueryString();
+        $page = (int) $request->query('page', 1);
+
+        $cacheKey = 'programs:index:'.md5(json_encode([
+            'page' => $page,
+            'per_page' => $validated['per_page'] ?? 15,
+            'search' => $validated['search'] ?? null,
+            'sort' => $validated['sort'] ?? null,
+            'direction' => $validated['direction'] ?? 'asc',
+        ]));
+        $programs = Cache::tags(['programs', 'programs.index'])->rememberForever($cacheKey, function () use ($validated, $page) {
+            return Program::query()
+                ->when($validated['search'] ?? null, function ($query, $search) {
+                    $query->where('name', 'like', "%{$search}%");
+                })
+                ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
+                    $direction = $validated['direction'] ?? 'asc';
+                    $query->orderBy($sort, $direction);
+                })
+                ->orderBy('created_at', 'desc')
+                ->withCount(['specializations', 'curriculumVersions'])
+                ->paginate($validated['per_page'] ?? 15, ['*'], 'page', $page);
+        })->withQueryString();
 
         return Inertia::render('programs/Index', [
             'programs' => $programs,
@@ -59,6 +70,9 @@ class ProgramController extends Controller
         try {
             $this->programService->createProgram($request->validated());
 
+            // Invalidate program caches after mutation
+            Cache::tags(['programs'])->flush();
+
             return redirect()
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program created successfully.');
@@ -73,27 +87,31 @@ class ProgramController extends Controller
 
     public function show(Program $program): Response
     {
-        $program->load([
-            'specializations' => function ($query) {
-                $query->withCount('curriculumVersions')
-                    ->orderBy('name');
-            },
-            'curriculumVersions' => function ($query) {
-                $query->with(['specialization', 'effectiveFromSemester'])
-                    ->withCount('curriculumUnits')
-                    ->orderBy('created_at', 'desc');
-            },
-        ]);
+        [$cachedProgram, $stats] = Cache::tags(['programs', 'programs.show'])
+            ->rememberForever("programs:show:{$program->id}", function () use ($program) {
+                $prog = $program->fresh()->load([
+                    'specializations' => function ($query) {
+                        $query->withCount('curriculumVersions')
+                            ->orderBy('name');
+                    },
+                    'curriculumVersions' => function ($query) {
+                        $query->with(['specialization', 'effectiveFromSemester'])
+                            ->withCount('curriculumUnits')
+                            ->orderBy('created_at', 'desc');
+                    },
+                ]);
 
-        // Get program statistics
-        $stats = [
-            'totalSpecializations' => $program->specializations()->count(),
-            'activeSpecializations' => $program->activeSpecializations()->count(),
-            'totalCurriculumVersions' => $program->curriculumVersions()->count(),
-        ];
+                $statsLocal = [
+                    'totalSpecializations' => $prog->specializations()->count(),
+                    'activeSpecializations' => $prog->activeSpecializations()->count(),
+                    'totalCurriculumVersions' => $prog->curriculumVersions()->count(),
+                ];
+
+                return [$prog, $statsLocal];
+            });
 
         return Inertia::render('programs/Show', [
-            'program' => $program,
+            'program' => $cachedProgram,
             'stats' => $stats,
         ]);
     }
@@ -102,6 +120,9 @@ class ProgramController extends Controller
     {
         try {
             $this->programService->updateProgram($program, $request->validated());
+
+            // Invalidate program caches after mutation
+            Cache::tags(['programs'])->flush();
 
             return redirect()
                 ->route(ProgramRoutes::INDEX)
@@ -120,6 +141,9 @@ class ProgramController extends Controller
         try {
             $this->programService->deleteProgram($program);
 
+            // Invalidate program caches after deletion
+            Cache::tags(['programs'])->flush();
+
             return redirect()
                 ->route(ProgramRoutes::INDEX)
                 ->with('success', 'Program deleted successfully.');
@@ -127,61 +151,6 @@ class ProgramController extends Controller
             Log::error('Program deletion failed: ' . $e->getMessage());
 
             return back()->withErrors(['error' => $e->getMessage()]);
-        }
-    }
-
-    public function search(Request $request)
-    {
-        $validated = $request->validate([
-            'q' => 'required|string|min:1|max:255',
-            'limit' => 'nullable|integer|min:1|max:50',
-        ]);
-
-        $programs = Program::query()
-            ->where('name', 'like', "%{$validated['q']}%")
-            ->limit($validated['limit'] ?? 10)
-            ->get(['id', 'name']);
-
-        return response()->json($programs);
-    }
-
-    public function bulkDelete(Request $request)
-    {
-        $validated = $request->validate([
-            'program_ids' => 'required|array|min:1|max:100',
-            'program_ids.*' => 'integer|exists:programs,id',
-        ]);
-
-        try {
-            DB::transaction(function () use ($validated) {
-                $programs = Program::whereIn('id', $validated['program_ids'])->get();
-                $deleted = [];
-                $failed = [];
-
-                foreach ($programs as $program) {
-                    if ($program->specializations()->count() > 0 || $program->curriculumVersions()->count() > 0) {
-                        $failed[] = [
-                            'name' => $program->name,
-                            'reason' => 'Has existing specializations or curriculum versions',
-                        ];
-                    } else {
-                        $program->delete();
-                        $deleted[] = $program->name;
-                    }
-                }
-
-                return response()->json([
-                    'success' => true,
-                    'deleted' => $deleted,
-                    'failed' => $failed,
-                    'message' => count($deleted) . ' programs deleted successfully.',
-                ]);
-            });
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Bulk delete failed: ' . $e->getMessage(),
-            ], 500);
         }
     }
 }

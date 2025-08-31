@@ -15,7 +15,7 @@ import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { fromDate } from '@internationalized/date';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Edit, Plus, Trash2, X } from 'lucide-vue-next';
+import { Edit, Plus, X } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -98,26 +98,26 @@ const editFormProcessing = ref(false);
 const deleteForm = useForm({});
 
 // Apply filters with debounce
-const applyFilters = () => {
-    const filters: Record<string, any> = {};
-
-    if (search.value) filters.search = search.value;
-    if (nameFilter.value) filters['filter[name]'] = nameFilter.value;
-    if (yearFilter.value) filters['filter[year]'] = yearFilter.value;
-    if (isActiveFilter.value !== null) filters['filter[is_active]'] = isActiveFilter.value;
-    if (isArchivedFilter.value !== null) filters['filter[is_archived]'] = isArchivedFilter.value;
-    router.get(systemRoutes.semesters.index(), filters, {
-        preserveState: true,
-        replace: true,
-    });
-};
+// const applyFilters = () => {
+//     const filters: Record<string, any> = {};
+//
+//     if (search.value) filters.search = search.value;
+//     if (nameFilter.value) filters['filter[name]'] = nameFilter.value;
+//     if (yearFilter.value) filters['filter[year]'] = yearFilter.value;
+//     if (isActiveFilter.value !== null) filters['filter[is_active]'] = isActiveFilter.value;
+//     if (isArchivedFilter.value !== null) filters['filter[is_archived]'] = isArchivedFilter.value;
+//     router.get(systemRoutes.semesters.index(), filters, {
+//         preserveState: true,
+//         replace: true,
+//     });
+// };
 
 // Watch filters for changes
-let filterTimeout: ReturnType<typeof setTimeout>;
-watch([search, nameFilter, yearFilter, isActiveFilter, isArchivedFilter], () => {
-    clearTimeout(filterTimeout);
-    filterTimeout = setTimeout(applyFilters, 500);
-});
+// let filterTimeout: ReturnType<typeof setTimeout>;
+// watch([search, nameFilter, yearFilter, isActiveFilter, isArchivedFilter], () => {
+//     clearTimeout(filterTimeout);
+//     filterTimeout = setTimeout(applyFilters, 500);
+// });
 
 // Extract year from semester name
 const extractYear = (semester: Semester): string => {
@@ -282,10 +282,10 @@ const openEditModal = (semester: Semester) => {
     showEditModal.value = true;
 };
 
-const openDeleteModal = (semester: Semester) => {
-    selectedSemester.value = semester;
-    showDeleteModal.value = true;
-};
+// const openDeleteModal = (semester: Semester) => {
+//     selectedSemester.value = semester;
+//     showDeleteModal.value = true;
+// };
 
 const closeModals = () => {
     showCreateModal.value = false;
@@ -434,53 +434,53 @@ const handlePageSizeChange = (pageSize: number) => {
     </div>
 
     <!-- Filters -->
-    <div class="flex flex-wrap items-center gap-4">
-        <div class="flex flex-col gap-1">
-            <Label for="search">Search</Label>
-            <Input id="search" v-model="search" placeholder="Search semesters..." />
-        </div>
-        <div class="flex flex-col gap-1">
-            <Label for="name-filter">Name</Label>
-            <Input id="name-filter" v-model="nameFilter" placeholder="Filter by name..." />
-        </div>
-        <div class="flex flex-col gap-1">
-            <Label for="year-filter">Year</Label>
-            <Input id="year-filter" v-model="yearFilter" placeholder="e.g., 2025" />
-        </div>
-        <div class="flex flex-col gap-1">
-            <Label for="active-filter">Active Status</Label>
-            <Select v-model="isActiveFilterString">
-                <SelectTrigger class="w-full">
-                    <SelectValue placeholder="Select active status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="null">All</SelectItem>
-                    <SelectItem value="true">Active</SelectItem>
-                    <SelectItem value="false">Inactive</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-        <div class="flex flex-col gap-1">
-            <Label for="archived-filter">Archived Status</Label>
-            <Select v-model="isArchivedFilterString">
-                <SelectTrigger class="w-full">
-                    <SelectValue placeholder="Select archived status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="null">All</SelectItem>
-                    <SelectItem value="true">Archived</SelectItem>
-                    <SelectItem value="false">Not Archived</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-        <div class="flex flex-col gap-1">
-            <Label class="text-xs text-transparent">Clear</Label>
-            <Button variant="outline" @click="clearFilters" :disabled="!hasActiveFilters">
-                <X class="h-4 w-4" />
-                Clear
-            </Button>
-        </div>
-    </div>
+<!--    <div class="flex flex-wrap items-center gap-4">-->
+<!--        <div class="flex flex-col gap-1">-->
+<!--            <Label for="search">Search</Label>-->
+<!--            <Input id="search" v-model="search" placeholder="Search semesters..." />-->
+<!--        </div>-->
+<!--        <div class="flex flex-col gap-1">-->
+<!--            <Label for="name-filter">Name</Label>-->
+<!--            <Input id="name-filter" v-model="nameFilter" placeholder="Filter by name..." />-->
+<!--        </div>-->
+<!--        <div class="flex flex-col gap-1">-->
+<!--            <Label for="year-filter">Year</Label>-->
+<!--            <Input id="year-filter" v-model="yearFilter" placeholder="e.g., 2025" />-->
+<!--        </div>-->
+<!--        <div class="flex flex-col gap-1">-->
+<!--            <Label for="active-filter">Active Status</Label>-->
+<!--            <Select v-model="isActiveFilterString">-->
+<!--                <SelectTrigger class="w-full">-->
+<!--                    <SelectValue placeholder="Select active status" />-->
+<!--                </SelectTrigger>-->
+<!--                <SelectContent>-->
+<!--                    <SelectItem value="null">All</SelectItem>-->
+<!--                    <SelectItem value="true">Active</SelectItem>-->
+<!--                    <SelectItem value="false">Inactive</SelectItem>-->
+<!--                </SelectContent>-->
+<!--            </Select>-->
+<!--        </div>-->
+<!--        <div class="flex flex-col gap-1">-->
+<!--            <Label for="archived-filter">Archived Status</Label>-->
+<!--            <Select v-model="isArchivedFilterString">-->
+<!--                <SelectTrigger class="w-full">-->
+<!--                    <SelectValue placeholder="Select archived status" />-->
+<!--                </SelectTrigger>-->
+<!--                <SelectContent>-->
+<!--                    <SelectItem value="null">All</SelectItem>-->
+<!--                    <SelectItem value="true">Archived</SelectItem>-->
+<!--                    <SelectItem value="false">Not Archived</SelectItem>-->
+<!--                </SelectContent>-->
+<!--            </Select>-->
+<!--        </div>-->
+<!--        <div class="flex flex-col gap-1">-->
+<!--            <Label class="text-xs text-transparent">Clear</Label>-->
+<!--            <Button variant="outline" @click="clearFilters" :disabled="!hasActiveFilters">-->
+<!--                <X class="h-4 w-4" />-->
+<!--                Clear-->
+<!--            </Button>-->
+<!--        </div>-->
+<!--    </div>-->
 
     <!-- Table -->
     <DataTable :data="semesters.data" :columns="columns" :empty-message="'No semesters found.'" />

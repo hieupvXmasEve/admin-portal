@@ -333,7 +333,7 @@ class AttendanceController extends Controller
                 'recent_sessions' => $sessions->take(5)->map(function ($session) {
                     return [
                         'id' => $session->id,
-                        'course' => $session->courseOffering->curriculumUnit->unit_code,
+                        'course' => $session->courseOffering->unit_code,
                         'date' => $session->session_date->format('Y-m-d'),
                         'attendance_marked' => $session->attendance_marked,
                         'attendance_percentage' => $session->attendance_percentage,

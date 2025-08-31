@@ -12,6 +12,7 @@ use App\Services\SemesterManagementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -96,7 +97,18 @@ class SemesterController extends Controller
             }
         }
 
-        $semesters = $query->paginate($per_page, ['*'], 'page', $page)
+        // Cache the paginated list per unique query (short TTL)
+        $cacheKey = 'semesters:index:'.md5(json_encode([
+            'page' => $page,
+            'per_page' => $per_page,
+            'search' => $validated['search'] ?? null,
+            'filter' => $validated['filter'] ?? [],
+        ]));
+
+        $semesters = Cache::tags(['semesters', 'semesters.index'])
+            ->rememberForever($cacheKey, function () use ($query, $per_page, $page) {
+                return $query->paginate($per_page, ['*'], 'page', $page);
+            })
             ->withQueryString();
 
         return Inertia::render('semesters/Index', [
@@ -109,11 +121,6 @@ class SemesterController extends Controller
                 'is_archived' => $validated['filter']['is_archived'] ?? null,
             ],
         ]);
-    }
-
-    public function create(): Response
-    {
-        return Inertia::render('semesters/Add');
     }
 
     public function store(Request $request): RedirectResponse
@@ -158,26 +165,15 @@ class SemesterController extends Controller
                 $message = 'Semester created successfully!';
             }
 
+            // Invalidate cached semester data after mutation
+            Cache::tags(['semesters'])->flush();
+
             return redirect()->route(SemesterRoutes::INDEX)->with('success', $message);
         } catch (\Exception $e) {
             Log::error('Error creating semester: '.$e->getMessage());
 
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
         }
-    }
-
-    public function show(Semester $semester): Response
-    {
-        return Inertia::render('semesters/Show', [
-            'semester' => $semester,
-        ]);
-    }
-
-    public function edit(Semester $semester): Response
-    {
-        return Inertia::render('semesters/Edit', [
-            'semester' => $semester,
-        ]);
     }
 
     public function update(Request $request, Semester $semester): RedirectResponse
@@ -243,6 +239,9 @@ class SemesterController extends Controller
                 $message = 'Semester updated successfully!';
             }
 
+            // Invalidate cached semester data after mutation
+            Cache::tags(['semesters'])->flush();
+
             return redirect()->route(SemesterRoutes::INDEX)->with('success', $message);
         } catch (\Exception $e) {
             Log::error('Error updating semester: '.$e->getMessage());
@@ -265,6 +264,9 @@ class SemesterController extends Controller
 
         $semester->delete();
 
+        // Invalidate cached semester data after deletion
+        Cache::tags(['semesters'])->flush();
+
         return redirect()->route(SemesterRoutes::INDEX)->with('success', 'Semester deleted successfully!');
     }
 
@@ -274,6 +276,11 @@ class SemesterController extends Controller
     public function activate(Semester $semester, SemesterManagementService $service): JsonResponse
     {
         $result = $service->activateSemester($semester);
+
+        if ($result['success'] ?? false) {
+            // Clear caches so lists/statuses reflect the change
+            Cache::tags(['semesters'])->flush();
+        }
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
@@ -285,6 +292,11 @@ class SemesterController extends Controller
     {
         $result = $service->deactivateSemester($semester);
 
+        if ($result['success'] ?? false) {
+            // Clear caches so lists/statuses reflect the change
+            Cache::tags(['semesters'])->flush();
+        }
+
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -293,7 +305,11 @@ class SemesterController extends Controller
      */
     public function activationStatuses(SemesterManagementService $service): JsonResponse
     {
-        $statuses = $service->getSemesterActivationStatuses();
+        // Cache activation statuses briefly (time-sensitive, keep TTL short)
+        $statuses = Cache::tags(['semesters', 'semesters.status'])
+            ->remember('semesters:activation_statuses', now()->addMinutes(1), function () use ($service) {
+                return $service->getSemesterActivationStatuses();
+            });
 
         return response()->json([
             'success' => true,
@@ -369,6 +385,9 @@ class SemesterController extends Controller
             } else {
                 $message = 'Semester updated successfully!';
             }
+
+            // Clear caches so lists/statuses reflect the change
+            Cache::tags(['semesters'])->flush();
 
             return response()->json([
                 'success' => true,

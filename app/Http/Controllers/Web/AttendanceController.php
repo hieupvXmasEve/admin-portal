@@ -106,14 +106,14 @@ class AttendanceController extends Controller
             'mobile_app' => 'Mobile App',
         ];
 
-        $classSessions = ClassSession::with('courseOffering.curriculumUnit.unit')
+        $classSessions = ClassSession::with('courseOffering.unit')
             ->orderBy('session_date', 'desc')
             ->get()
             ->map(function ($session) {
                 return [
                     'id' => $session->id,
                     'title' => $session->session_title,
-                    'course' => $session->courseOffering->curriculumUnit->unit->code,
+                    'course' => $session->courseOffering?->unit->code,
                     'date' => $session->session_date->format('M d, Y'),
                 ];
             });
