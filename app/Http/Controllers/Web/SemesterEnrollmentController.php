@@ -310,6 +310,7 @@ class SemesterEnrollmentController extends Controller
 
             // Get existing course offerings for this semester
             $existingOfferings = CourseOffering::where('course_offerings.semester_id', $semester->id)
+                ->where('campus_id', $currentCampusId)
                 ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
                 ->groupBy('curriculum_units.unit_id')
                 ->selectRaw('curriculum_units.unit_id, count(*) as offering_count')

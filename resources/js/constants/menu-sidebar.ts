@@ -45,7 +45,7 @@ export const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: '/dashboard',
         icon: LayoutDashboard,
-        requiredPermissions: ['view_dashboard'],
+        // requiredPermissions: ['view_dashboard'],
     },
     {
         title: 'System Management',
@@ -94,11 +94,11 @@ export const mainNavItems: NavItem[] = [
                 href: curriculumRoutes.programs.index(),
                 requiredPermissions: ['view_program'],
             },
-            {
-                title: 'Specializations',
-                href: curriculumRoutes.specializations.index(),
-                requiredPermissions: ['view_specialization'],
-            },
+            // {
+            //     title: 'Specializations',
+            //     href: curriculumRoutes.specializations.index(),
+            //     requiredPermissions: ['view_specialization'],
+            // },
             {
                 title: 'Curriculum Versions',
                 href: curriculumRoutes.curriculumVersions.index(),

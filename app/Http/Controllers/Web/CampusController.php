@@ -12,6 +12,7 @@ use App\Models\Campus;
 use App\Services\CampusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -37,22 +38,32 @@ class CampusController extends Controller
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
-        $campuses = Campus::query()
-            ->withCount(['buildings', 'users'])
-            ->when($validated['search'] ?? null, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%")
-                        ->orWhere('address', 'like', "%{$search}%");
-                });
-            })
-            ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
-                $direction = $validated['direction'] ?? 'asc';
-                $query->orderBy($sort, $direction);
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate($validated['per_page'] ?? 15)
-            ->withQueryString();
+        $page = (int) $request->query('page', 1);
+        $cacheKey = 'campuses:index:'.md5(json_encode([
+            'page' => $page,
+            'per_page' => $validated['per_page'] ?? 15,
+            'search' => $validated['search'] ?? null,
+            'sort' => $validated['sort'] ?? null,
+            'direction' => $validated['direction'] ?? 'asc',
+        ]));
+
+        $campuses = Cache::tags(['campuses', 'campuses.index'])->rememberForever($cacheKey, function () use ($validated, $page) {
+            return Campus::query()
+                ->withCount(['buildings', 'users'])
+                ->when($validated['search'] ?? null, function ($query, $search) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%")
+                            ->orWhere('address', 'like', "%{$search}%");
+                    });
+                })
+                ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
+                    $direction = $validated['direction'] ?? 'asc';
+                    $query->orderBy($sort, $direction);
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate($validated['per_page'] ?? 15, ['*'], 'page', $page);
+        })->withQueryString();
 
         return Inertia::render('campuses/Index', [
             'campuses' => $campuses,
@@ -74,6 +85,9 @@ class CampusController extends Controller
     {
         $this->campusService->createCampus($request->validated());
 
+        // Invalidate campus caches after creation
+        Cache::tags(['campuses'])->flush();
+
         return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus created successfully.');
     }
 
@@ -90,30 +104,43 @@ class CampusController extends Controller
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
-        // Load campus with counts
-        $campus->loadCount(['buildings', 'users']);
+        $page = (int) $request->query('page', 1);
+        $cacheKey = 'campuses:show:'.md5(json_encode([
+            'campus_id' => $campus->id,
+            'page' => $page,
+            'per_page' => $validated['per_page'] ?? 15,
+            'search' => $validated['search'] ?? null,
+            'sort' => $validated['sort'] ?? null,
+            'direction' => $validated['direction'] ?? 'asc',
+        ]));
 
-        // Get paginated buildings for this campus
-        $buildings = $campus->buildings()
-            ->when($validated['search'] ?? null, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%")
-                        ->orWhere('address', 'like', "%{$search}%");
-                });
-            })
-            ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
-                $direction = $validated['direction'] ?? 'asc';
-                $query->orderBy($sort, $direction);
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate($validated['per_page'] ?? 15)
-            ->withQueryString();
+        [$cachedCampus, $buildings] = Cache::tags(['campuses', 'campuses.show'])->rememberForever($cacheKey, function () use ($campus, $validated, $page) {
+            // Load campus with counts
+            $camp = $campus->fresh()->loadCount(['buildings', 'users']);
+
+            // Get paginated buildings for this campus
+            $builds = $camp->buildings()
+                ->when($validated['search'] ?? null, function ($query, $search) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%")
+                            ->orWhere('description', 'like', "%{$search}%")
+                            ->orWhere('address', 'like', "%{$search}%");
+                    });
+                })
+                ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
+                    $direction = $validated['direction'] ?? 'asc';
+                    $query->orderBy($sort, $direction);
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate($validated['per_page'] ?? 15, ['*'], 'page', $page);
+
+            return [$camp, $builds];
+        });
 
         return Inertia::render('campuses/Show', [
-            'campus' => $campus,
-            'buildings' => $buildings,
+            'campus' => $cachedCampus,
+            'buildings' => $buildings->withQueryString(),
             'filters' => $request->only(['search', 'sort', 'direction', 'per_page']),
         ]);
     }
@@ -135,6 +162,9 @@ class CampusController extends Controller
     {
         $this->campusService->updateCampus($campus, $request->validated());
 
+        // Invalidate campus caches after update
+        Cache::tags(['campuses'])->flush();
+
         return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus updated successfully.');
     }
 
@@ -145,6 +175,9 @@ class CampusController extends Controller
     {
         $this->campusService->deleteCampus($campus);
 
+        // Invalidate campus caches after deletion
+        Cache::tags(['campuses'])->flush();
+
         return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus deleted successfully.');
     }
 
@@ -153,14 +186,24 @@ class CampusController extends Controller
      */
     public function api(Request $request)
     {
-        $campuses = Campus::select('id', 'name', 'code')
-            ->when($request->search, function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
-            })
-            ->orderBy('name')
-            ->limit(50)
-            ->get();
+        $search = (string) ($request->search ?? '');
+        $cacheKey = 'campuses:api:'.md5(json_encode([
+            'search' => $search,
+            'limit' => 50,
+        ]));
+
+        $campuses = Cache::tags(['campuses', 'campuses.api'])->rememberForever($cacheKey, function () use ($search) {
+            return Campus::select('id', 'name', 'code')
+                ->when($search !== '', function ($query) use ($search) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
+                })
+                ->orderBy('name')
+                ->limit(50)
+                ->get();
+        });
 
         return response()->json([
             'success' => true,

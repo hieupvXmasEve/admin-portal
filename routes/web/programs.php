@@ -28,14 +28,3 @@ Route::middleware(['auth', 'web'])->group(function () {
         ->middleware('can:delete_program')
         ->name(ProgramRoutes::DESTROY);
 });
-
-// API routes for AJAX calls
-Route::middleware(['auth'])->group(function () {
-
-    // Programs API routes
-    Route::get('api/programs/search', [ProgramController::class, 'search'])
-        ->name(ProgramRoutes::API_SEARCH);
-
-    Route::delete('api/programs/bulk-delete', [ProgramController::class, 'bulkDelete'])
-        ->name(ProgramRoutes::API_BULK_DELETE);
-});

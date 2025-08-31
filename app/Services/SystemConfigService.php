@@ -10,14 +10,13 @@ class SystemConfigService
 {
     private const CONFIG_FILE = 'system_config.json';
     private const CACHE_KEY = 'system_config';
-    private const CACHE_TTL = 3600; // 1 hour
 
     /**
      * Get system configuration
      */
     public function getConfig(): array
     {
-        return Cache::remember(self::CACHE_KEY, self::CACHE_TTL, function () {
+        return Cache::rememberForever(self::CACHE_KEY, function () {
             return $this->loadConfigFromFile();
         });
     }
@@ -42,7 +41,7 @@ class SystemConfigService
         $success = Storage::put(self::CONFIG_FILE, json_encode($updatedConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         
         if ($success) {
-            $this->clearCache();
+            $this->refreshCache();
         }
 
         return $success;
@@ -108,6 +107,15 @@ class SystemConfigService
     public function clearCache(): void
     {
         Cache::forget(self::CACHE_KEY);
+    }
+
+    /**
+     * Refresh configuration cache
+     */
+    public function refreshCache(): void
+    {
+        Cache::forget(self::CACHE_KEY);
+        $this->getConfig(); // Reload and cache the configuration
     }
 
     /**

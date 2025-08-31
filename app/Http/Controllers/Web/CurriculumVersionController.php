@@ -178,6 +178,7 @@ class CurriculumVersionController extends Controller
     {
         // Get student counts by academic status
         $statusCounts = DB::table('students')
+            ->where('campus_id', app('campus')->id)
             ->where('curriculum_version_id', $curriculumVersion->id)
             ->whereNull('deleted_at') // Exclude soft deleted students
             ->groupBy('academic_status')
@@ -199,6 +200,7 @@ class CurriculumVersionController extends Controller
 
         // Get enrollment trends (last 6 months)
         $enrollmentTrends = DB::table('students')
+            ->where('campus_id', app('campus')->id)
             ->where('curriculum_version_id', $curriculumVersion->id)
             ->whereNull('deleted_at')
             ->where('admission_date', '>=', now()->subMonths(6))
@@ -557,7 +559,7 @@ class CurriculumVersionController extends Controller
             // If requested, duplicate curriculum units
             if ($request->validated()['include_curriculum_units']) {
                 $curriculumUnits = $curriculumVersion->curriculumUnits()->get();
-                
+
                 foreach ($curriculumUnits as $unit) {
                     $duplicatedVersion->curriculumUnits()->create([
                         'unit_id' => $unit->unit_id,
