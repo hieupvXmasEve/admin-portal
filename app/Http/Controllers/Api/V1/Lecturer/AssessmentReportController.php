@@ -27,8 +27,7 @@ class AssessmentReportController extends Controller
      */
     public function overview(CourseOffering $courseOffering): JsonResponse
     {
-        // Check if user can access this course offering's assessments
-        Gate::authorize('viewAssessments', $courseOffering);
+        \Log::info("okokok");
 
         try {
             $statistics = $this->assessmentReportService->generateOverviewStatistics($courseOffering);
@@ -68,16 +67,14 @@ class AssessmentReportController extends Controller
      */
     public function gradeMatrix(CourseOffering $courseOffering, Request $request): JsonResponse
     {
-        // Check if user can access this course offering's assessments
-        Gate::authorize('viewAssessments', $courseOffering);
 
         try {
             // Get filters from request
             $filters = [
                 'include_excluded' => $request->boolean('include_excluded', false),
-                'score_status' => $request->input('score_status', 'final'),
-                'student_ids' => $request->input('student_ids', []),
-                'component_ids' => $request->input('component_ids', []),
+//                'score_status' => $request->input('score_status', 'final'),
+//                'student_ids' => $request->input('student_ids', []),
+//                'component_ids' => $request->input('component_ids', []),
             ];
 
             $gradeMatrix = $this->assessmentReportService->generateGradeMatrix($courseOffering, $filters);
@@ -109,8 +106,6 @@ class AssessmentReportController extends Controller
      */
     public function statistics(CourseOffering $courseOffering, Request $request): JsonResponse
     {
-        // Check if user can access this course offering's assessments
-        Gate::authorize('viewAssessments', $courseOffering);
 
         try {
             $statisticsType = $request->input('type', 'all');
@@ -170,8 +165,6 @@ class AssessmentReportController extends Controller
      */
     public function exportExcel(CourseOffering $courseOffering, ExportAssessmentRequest $request): BinaryFileResponse
     {
-        // Check if user can access this course offering's assessments
-        Gate::authorize('viewAssessments', $courseOffering);
 
         try {
             // Get validated filters from request
@@ -207,8 +200,6 @@ class AssessmentReportController extends Controller
      */
     public function exportPdf(CourseOffering $courseOffering, ExportAssessmentRequest $request): BinaryFileResponse
     {
-        // Check if user can access this course offering's assessments
-        Gate::authorize('viewAssessments', $courseOffering);
 
         try {
             // Get validated options from request

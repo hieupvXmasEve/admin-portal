@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class CourseOffering extends AuditableModel
 {
     /** @use HasFactory<\Database\Factories\CourseOfferingFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
         'semester_id',

@@ -6,8 +6,9 @@ namespace App\Services\V1\Lecturer;
 
 use App\Models\Lecture;
 use App\Models\Semester;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
-
+use Illuminate\Support\Facades\Log;
 class LecturerDashboardService
 {
     /**
@@ -18,7 +19,7 @@ class LecturerDashboardService
         $semester = $semesterId ? Semester::find($semesterId) : Semester::getActiveSemester();
         $cacheKey = "lecturer-dashboard:{$lecturer->id}:{$semester?->id}";
 
-        return Cache::remember($cacheKey, 300, function () use ($lecturer, $semester) {
+//        return Cache::remember($cacheKey, 0, function () use ($lecturer, $semester) {
             return [
                 'semester' => $semester ? [
                     'id' => $semester->id,
@@ -33,7 +34,7 @@ class LecturerDashboardService
                 'upcoming_sessions' => $this->getUpcomingSessions($lecturer, 5),
                 'recent_activities' => $this->getRecentActivities($lecturer, 10),
             ];
-        });
+//        });
     }
 
     /**
@@ -41,14 +42,18 @@ class LecturerDashboardService
      */
     public function getTeachingSummary(Lecture $lecturer, ?Semester $semester): array
     {
-        $query = $lecturer->courseOfferings()->where('is_active', true);
+        $query = $lecturer->courseOfferings()
+            ->where('campus_id', $lecturer->campus_id)
+            ->where('is_active', true);
 
         if ($semester) {
             $query->where('semester_id', $semester->id);
         }
 
-        $courseOfferings = $query->with(['curriculumUnit', 'courseRegistrations'])->get();
-
+        $courseOfferings = $query->with(['unit', 'courseRegistrations'])->get();
+        Log::info('$courseOfferings', [
+            'courseOfferings' => $courseOfferings,
+        ]);
         $totalCourses = $courseOfferings->count();
         $totalStudents = $courseOfferings->sum('current_enrollment');
         $totalSessions = $courseOfferings->sum(function ($offering) {
@@ -68,8 +73,8 @@ class LecturerDashboardService
             'courses' => $courseOfferings->map(function ($offering) {
                 return [
                     'id' => $offering->id,
-                    'unit_code' => $offering->curriculumUnit->unit_code,
-                    'unit_name' => $offering->curriculumUnit->unit_name,
+                    'unit_code' => $offering?->unit?->code,
+                    'unit_name' => $offering?->unit?->name,
                     'section_code' => $offering->section_code,
                     'enrollment' => $offering->current_enrollment,
                     'capacity' => $offering->max_capacity,
@@ -85,7 +90,7 @@ class LecturerDashboardService
     public function getAttendanceOverview(Lecture $lecturer, ?Semester $semester): array
     {
         $sessionsQuery = $lecturer->classSessions()
-            ->with(['courseOffering.curriculumUnit', 'attendances']);
+            ->with(['courseOffering.unit', 'attendances']);
 
         if ($semester) {
             $sessionsQuery->whereHas('courseOffering', function ($query) use ($semester) {
@@ -99,10 +104,21 @@ class LecturerDashboardService
             ->get();
 
         $totalSessions = $sessions->count();
+        Log::info('getAttendanceOverview ', [
+            '$totalSessions' => $totalSessions
+        ]);
         $sessionsWithAttendance = $sessions->where('attendance_marked', true)->count();
-        $pendingAttendance = $sessions->where('attendance_marked', false)
-            ->where('session_date', '<', now()->subHours(2))
-            ->count();
+        $pendingAttendance = $sessions->filter(function ($session) {
+            Log::info('$sessions', [
+                'start_time' => $session->start_time,
+                'session date' => $session->session_date,
+            ]);
+            // Combine session date with start time for proper comparison
+            $sessionDateTime = Carbon::parse($session->session_date)
+                ->setTimeFromTimeString($session->start_time->format('H:i:s'));
+            return !$session->attendance_marked && $sessionDateTime->lt(now()->subMinute(10));
+        })->count();
+
 
         $averageAttendance = $sessions->where('attendance_marked', true)
             ->avg('attendance_percentage') ?? 0;
@@ -140,14 +156,20 @@ class LecturerDashboardService
     }
 
     /**
-     * Get upcoming sessions for lecturer
+     * Get upcoming sessions for lecturer (including all of today's sessions)
      */
     public function getUpcomingSessions(Lecture $lecturer, int $limit = 5): array
     {
+        $now = now();
+        $today = $now->toDateString();
+
         $sessions = $lecturer->classSessions()
-            ->with(['courseOffering.curriculumUnit', 'room'])
-            ->where('session_date', '>=', now())
-            ->where('status', 'scheduled')
+            ->with(['courseOffering.unit', 'room'])
+            ->where(function ($query) use ($today) {
+                $query->where('session_date', '>', $today) // Future dates
+                    ->orWhere('session_date', '=', $today); // All of today's sessions
+            })
+            ->whereIn('status', ['scheduled', 'in_progress', 'completed'])
             ->orderBy('session_date')
             ->orderBy('start_time')
             ->limit($limit)
@@ -158,9 +180,9 @@ class LecturerDashboardService
                 'id' => $session->id,
                 'title' => $session->session_title,
                 'course' => [
-                    'unit_code' => $session->courseOffering->curriculumUnit->unit_code,
-                    'unit_name' => $session->courseOffering->curriculumUnit->unit_name,
-                    'section_code' => $session->courseOffering->section_code,
+                    'unit_code' => $session->courseOffering?->unit?->code,
+                    'unit_name' => $session->courseOffering?->unit?->name,
+                    'section_code' => $session->courseOffering?->section_code,
                 ],
                 'date' => $session->session_date->format('Y-m-d'),
                 'start_time' => $session->start_time->format('H:i'),
@@ -172,6 +194,7 @@ class LecturerDashboardService
                     'capacity' => $session->room->capacity,
                 ] : null,
                 'expected_attendees' => $session->expected_attendees,
+                'status'=> $session->status,
             ];
         })->toArray();
     }
@@ -184,7 +207,7 @@ class LecturerDashboardService
         // This would typically come from an activity log table
         // For now, we'll use recent sessions and attendance marking
         $recentSessions = $lecturer->classSessions()
-            ->with(['courseOffering.curriculumUnit'])
+            ->with(['courseOffering.unit'])
             ->where('session_date', '>=', now()->subDays(7))
             ->where('status', 'completed')
             ->orderBy('session_date', 'desc')
@@ -195,7 +218,7 @@ class LecturerDashboardService
             return [
                 'type' => 'session_completed',
                 'description' => "Completed session: {$session->session_title}",
-                'course' => $session->courseOffering->curriculumUnit->unit_code,
+                'course' => $session->courseOffering?->unit?->code,
                 'date' => $session->session_date->format('Y-m-d'),
                 'time' => $session->start_time->format('H:i'),
                 'attendance_marked' => $session->attendance_marked,
@@ -209,7 +232,7 @@ class LecturerDashboardService
     protected function getSessionsRequiringAttention(Lecture $lecturer, ?Semester $semester): array
     {
         $query = $lecturer->classSessions()
-            ->with(['courseOffering.curriculumUnit'])
+            ->with(['courseOffering.unit'])
             ->whereDoesntHave('attendances')
             ->where('session_date', '<', now()->subHours(2))
             ->where('status', 'completed');
@@ -227,7 +250,7 @@ class LecturerDashboardService
                 return [
                     'id' => $session->id,
                     'title' => $session->session_title,
-                    'course' => $session->courseOffering->curriculumUnit->unit_code,
+                    'course' => $session->courseOffering?->unit?->code,
                     'date' => $session->session_date->format('Y-m-d'),
                     'time' => $session->start_time->format('H:i'),
                     'days_overdue' => now()->diffInDays($session->session_date),

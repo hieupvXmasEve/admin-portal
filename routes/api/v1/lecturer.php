@@ -141,18 +141,17 @@ Route::middleware([
 
     // Assessment management endpoints
     Route::prefix('courses/{courseOffering}/assessments')->name('assessments.')->group(function () {
-        Route::get('/', [AssessmentController::class, 'index'])
+        Route::get('/', [AssessmentController::class, 'index']) ->name('index');
             //            ->middleware(['lecturer.api.rate:lecturer-assessment-management'])
-            ->name('index');
 
-        Route::post('/', [AssessmentController::class, 'store'])->name('store');
-        Route::put('/{assessmentComponent}', [AssessmentController::class, 'update'])->name('update');
-        Route::delete('/{assessmentComponent}', [AssessmentController::class, 'destroy'])->name('destroy');
+//        Route::post('/', [AssessmentController::class, 'store'])->name('store');
+//        Route::put('/{assessmentComponent}', [AssessmentController::class, 'update'])->name('update');
+//        Route::delete('/{assessmentComponent}', [AssessmentController::class, 'destroy'])->name('destroy');
 
         // Assessment detail management endpoints
-        Route::post('/{assessmentComponent}/details', [AssessmentController::class, 'storeDetail'])->name('store-detail');
-        Route::put('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'updateDetail'])->name('update-detail');
-        Route::delete('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'destroyDetail'])->name('destroy-detail');
+//        Route::post('/{assessmentComponent}/details', [AssessmentController::class, 'storeDetail'])->name('store-detail');
+//        Route::put('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'updateDetail'])->name('update-detail');
+//        Route::delete('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'destroyDetail'])->name('destroy-detail');
 
         // Grading endpoints
         Route::get('/grade/student/{student}', [AssessmentController::class, 'gradeByStudent'])->name('grade-by-student');
@@ -175,5 +174,11 @@ Route::middleware([
         // Excel grade management endpoints
         Route::get('/details/{assessmentComponentDetail}/export-template', [AssessmentController::class, 'exportGradeTemplate'])->name('export-grade-template');
         Route::post('/details/{assessmentComponentDetail}/import-grades', [AssessmentController::class, 'importGrades'])->name('import-grades');
+
+        // New grade management endpoints
+        Route::get('/details/{assessmentComponentDetail}/grades', [AssessmentController::class, 'getGradeTable'])->name('grade-table');
+        Route::get('/details/{assessmentComponentDetail}/statistics', [AssessmentController::class, 'getGradeStatistics'])->name('grade-statistics');
+        Route::post('/details/{assessmentComponentDetail}/bulk-grades', [AssessmentController::class, 'bulkUpsertGrades'])->name('bulk-upsert-grades');
+        Route::get('/details/{assessmentComponentDetail}/export', [AssessmentController::class, 'exportGrades'])->name('export-grades');
     });
 });

@@ -236,6 +236,30 @@ class AssessmentComponent extends AuditableModel
             ->get();
     }
 
+    /**
+     * Create a default assessment component detail for this component.
+     * This is called automatically when a component is created without details.
+     */
+    public function createDefaultDetail(): AssessmentComponentDetail
+    {
+        return AssessmentComponentDetail::create([
+            'assessment_component_id' => $this->id,
+            'name' => $this->name,
+            'weight' => 100.00,
+        ]);
+    }
+
+    /**
+     * Ensure this component has at least one detail.
+     * If it doesn't have any details, create a default one.
+     */
+    public function ensureHasDetails(): void
+    {
+        if ($this->details()->count() === 0) {
+            $this->createDefaultDetail();
+        }
+    }
+
     // ========== AUDIT LOGGING CONFIGURATION ==========
 
     /**

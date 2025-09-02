@@ -161,8 +161,17 @@ class SyllabusTemplateController extends Controller
                                 'assessment_component_id' => $component->getKey(),
                                 'name' => $d['name'] ?? '',
                                 'weight' => $d['weight'] ?? null,
+                                'max_points' => 100.00
                             ]);
                         }
+                    } else {
+                        // Create default detail if no details provided
+                        AssessmentComponentDetail::create([
+                            'assessment_component_id' => $component->getKey(),
+                            'name' => $component->name,
+                            'weight' => 100.00,
+                            'max_points' => 100.00
+                        ]);
                     }
                 }
             }
@@ -248,7 +257,7 @@ class SyllabusTemplateController extends Controller
                         ->keyBy('id');
                     $keepDetailIds = [];
 
-                    if (is_array($incomingDetails)) {
+                    if (is_array($incomingDetails) && !empty($incomingDetails)) {
                         foreach ($incomingDetails as $d) {
                             if (!is_array($d)) continue;
                             $detailId = $d['id'] ?? null;
@@ -269,6 +278,19 @@ class SyllabusTemplateController extends Controller
                             }
                             $keepDetailIds[] = $detail->getKey();
                         }
+                    } else {
+                        // If this is a new component (no componentId) and no details provided,
+                        // create a default detail
+                        if (!$componentId) {
+                            $detail = new \App\Models\AssessmentComponentDetail([
+                                'assessment_component_id' => $component->getKey(),
+                                'name' => $component->name,
+                                'weight' => 100.00,
+                                'max_points' => 100.00
+                            ]);
+                            $detail->save();
+                            $keepDetailIds[] = $detail->getKey();
+                        }
                     }
 
                     // Delete details not present
@@ -277,8 +299,16 @@ class SyllabusTemplateController extends Controller
                             ->whereNotIn('id', $keepDetailIds)
                             ->delete();
                     } else {
-                        // If no details in payload, remove all
+                        // If no details in payload, remove all existing details and create default
                         \App\Models\AssessmentComponentDetail::where('assessment_component_id', $component->getKey())->delete();
+
+                        // Create default detail
+                        \App\Models\AssessmentComponentDetail::create([
+                            'assessment_component_id' => $component->getKey(),
+                            'name' => $component->name,
+                            'weight' => 100.00,
+                            'max_points' => 100.00
+                        ]);
                     }
                 }
 

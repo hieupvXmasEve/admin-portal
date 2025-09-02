@@ -61,6 +61,11 @@ class LecturerApiAuthorization
      */
     protected function isLecturerActive(Lecture $lecturer): bool
     {
+        // Check if lecturer is soft deleted first
+        if ($lecturer->trashed()) {
+            return false;
+        }
+        
         return $lecturer->is_active &&
             in_array($lecturer->employment_status, ['active', 'employed', 'contract_active']);
     }

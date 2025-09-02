@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClassSession extends AuditableModel
 {
@@ -118,6 +119,17 @@ class ClassSession extends AuditableModel
     public function scopeInPerson($query)
     {
         return $query->where('is_online', false);
+    }
+
+    public function scopeForStatusUpdate($query)
+    {
+        $now = now();
+
+        return $query->whereBetween('session_date', [
+            $now->copy()->subDay()->toDateString(),
+            $now->copy()->addDay()->toDateString()
+        ])
+        ->whereNotIn('status', ['cancelled', 'postponed', 'moved']);
     }
 
     // Accessors & Mutators
@@ -318,5 +330,73 @@ class ClassSession extends AuditableModel
             'cancelled' => 'destructive',
             default => 'secondary',
         };
+    }
+
+    /**
+     * Determine what status this session should have based on current time
+     */
+    public function getExpectedStatus(): string
+    {
+        // Don't change cancelled or postponed sessions
+        if (in_array($this->status, ['cancelled', 'postponed', 'moved'])) {
+            return $this->status;
+        }
+
+        $now = now();
+        $sessionDateTime = $this->session_date->copy()->setTimeFromTimeString($this->start_time->format('H:i:s'));
+        $sessionEndDateTime = $this->session_date->copy()->setTimeFromTimeString($this->end_time->format('H:i:s'));
+
+        // If current time is before session start time
+        if ($now->lt($sessionDateTime)) {
+            return 'scheduled';
+        }
+
+        // If current time is between start and end time
+        if ($now->gte($sessionDateTime) && $now->lt($sessionEndDateTime)) {
+            return 'in_progress';
+        }
+
+        // If current time is after session end time
+        if ($now->gte($sessionEndDateTime)) {
+            return 'completed';
+        }
+
+        return 'scheduled'; // fallback
+    }
+
+    /**
+     * Check if this session needs status update
+     */
+    public function needsStatusUpdate(): bool
+    {
+        return $this->status !== $this->getExpectedStatus();
+    }
+
+    /**
+     * Update status to match expected status based on current time
+     */
+    public function updateStatusIfNeeded(): bool
+    {
+        $expectedStatus = $this->getExpectedStatus();
+
+        if ($this->status !== $expectedStatus) {
+            $oldStatus = $this->status;
+            $this->status = $expectedStatus;
+
+            // Set appropriate timestamps
+            if ($expectedStatus === 'in_progress' && !$this->started_at) {
+                $this->started_at = now();
+            }
+
+            if ($expectedStatus === 'completed' && !$this->ended_at) {
+                $this->ended_at = now();
+            }
+
+            $this->save();
+
+            return true;
+        }
+
+        return false;
     }
 }

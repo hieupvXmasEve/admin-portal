@@ -93,7 +93,7 @@ const onSubmit = handleSubmit((values) => {
     const formData = {
         semester_id: props.courseOffering.semester_id,
         curriculum_unit_id: props.courseOffering.curriculum_unit_id,
-        lecture_id: values.lecture_id === '' ? null : values.lecture_id,
+        lecture_id: values.lecture_id === '' || values.lecture_id === 'none' ? null : values.lecture_id,
         section_code: values.section_code || null,
         syllabus_template_id: values.syllabus_template_id === 'none' || values.syllabus_template_id === '' ? null : values.syllabus_template_id,
         max_capacity: Number(values.max_capacity),

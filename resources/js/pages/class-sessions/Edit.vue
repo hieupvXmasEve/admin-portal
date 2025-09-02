@@ -271,7 +271,7 @@ const today = new Date().toISOString().split('T')[0];
                                     <FormItem>
                                         <FormLabel>Session Date *</FormLabel>
                                         <FormControl>
-                                            <Input v-bind="componentField" type="date" :min="today" />
+                                            <Input v-bind="componentField" type="date" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

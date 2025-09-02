@@ -19,7 +19,7 @@ class AssessmentManagementService
     public function getAssessmentStructure(CourseOffering $courseOffering): array
     {
         // Get the syllabus for this course offering
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return [
@@ -36,7 +36,7 @@ class AssessmentManagementService
         }
 
         // Get assessment components with their details and scores
-        $components = AssessmentComponent::where('syllabus_id', $syllabus->id)
+        $components = AssessmentComponent::where('syllabus_template_id', $syllabus->id)
             ->with([
                 'details.scores' => function ($query) use ($courseOffering) {
                     $query->where('course_offering_id', $courseOffering->id);
@@ -188,9 +188,9 @@ class AssessmentManagementService
     {
         $scores = $detail->scores()
             ->where('course_offering_id', $courseOffering->id)
-            ->where('score_excluded', false)
-            ->where('score_status', 'final')
-            ->whereNotNull('percentage_score')
+//            ->where('score_excluded', false)
+//            ->where('score_status', 'final')
+            ->whereNotNull('points_earned')
             ->get();
 
         if ($scores->isEmpty()) {
@@ -202,7 +202,7 @@ class AssessmentManagementService
             ];
         }
 
-        $percentageScores = $scores->pluck('percentage_score');
+        $percentageScores = $scores->pluck('points_earned');
 
         return [
             'average_score' => round($percentageScores->average(), 2),
@@ -459,7 +459,7 @@ class AssessmentManagementService
             throw new \Exception('Student is not enrolled in this course offering');
         }
 
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
         if (! $syllabus) {
             return [
                 'student' => $this->formatStudentData($student),
@@ -583,7 +583,7 @@ class AssessmentManagementService
     public function getGradingDataByComponent(CourseOffering $courseOffering, AssessmentComponent $assessmentComponent): array
     {
         // Verify the assessment component belongs to this course offering
-        if ($assessmentComponent->syllabus_id !== $courseOffering->syllabus?->id) {
+        if ($assessmentComponent->syllabus_template_id !== $courseOffering->syllabusTemplate?->id) {
             throw new \Exception('Assessment component does not belong to this course offering');
         }
 
@@ -592,7 +592,7 @@ class AssessmentManagementService
             ->with('student')
             ->get()
             ->pluck('student')
-            ->sortBy('display_name');
+            ->sortBy('full_name');
 
         // Get assessment component details with all scores
         $assessmentDetails = $assessmentComponent->details()
@@ -705,9 +705,7 @@ class AssessmentManagementService
         return [
             'id' => $student->id,
             'student_id' => $student->student_id,
-            'name' => $student->display_name,
-            'first_name' => $student->first_name,
-            'last_name' => $student->last_name,
+            'full_name' => $student->full_name,
             'email' => $student->email,
         ];
     }
@@ -1084,6 +1082,669 @@ class AssessmentManagementService
     }
 
     /**
+     * Get student grades table data with sorting and filtering.
+     */
+    public function getGradeTableData(
+        AssessmentComponentDetail $assessmentDetail,
+        CourseOffering $courseOffering,
+        array $filters = []
+    ): array {
+        // Get enrolled students
+        $enrolledStudents = $courseOffering->courseRegistrations()
+            ->with('student')
+            ->get()
+            ->pluck('student');
+
+        // Build query for scores
+        $query = AssessmentComponentDetailScore::where('assessment_component_detail_id', $assessmentDetail->id)
+            ->where('course_offering_id', $courseOffering->id)
+            ->with(['student', 'gradedBy', 'lastModifiedBy']);
+
+        // Apply filters
+        $this->applyGradeFilters($query, $filters);
+
+        // Apply sorting
+        $sortBy = $filters['sort_by'] ?? 'student_name';
+        $sortOrder = $filters['sort_order'] ?? 'asc';
+
+        if ($sortBy === 'student_name') {
+            $query->join('students', 'assessment_component_detail_scores.student_id', '=', 'students.id')
+                ->orderBy('students.full_name', $sortOrder)
+                ->select('assessment_component_detail_scores.*');
+        } elseif ($sortBy === 'student_id') {
+            $query->join('students', 'assessment_component_detail_scores.student_id', '=', 'students.id')
+                ->orderBy('students.student_id', $sortOrder)
+                ->select('assessment_component_detail_scores.*');
+        } else {
+            $query->orderBy($sortBy, $sortOrder);
+        }
+
+        // Paginate results
+        $perPage = $filters['per_page'] ?? 20;
+        $page = $filters['page'] ?? 1;
+
+        $scores = $query->paginate($perPage, ['*'], 'page', $page);
+
+        // Format the response
+        $formattedScores = [];
+        foreach ($scores->items() as $score) {
+            $student = $score->student;
+            $formattedScores[] = [
+                'score_id' => $score->id,
+                'student' => $this->formatStudentData($student),
+                'score_data' => $this->formatScoreData($score),
+                'submission_info' => [
+                    'submitted_at' => $score->submitted_at?->toISOString(),
+                    'submission_attempt' => $score->submission_attempt,
+                    'is_late' => $score->is_late,
+                    'minutes_late' => $score->minutes_late,
+                    'late_penalty_applied' => $score->late_penalty_applied,
+                ],
+                'grading_info' => [
+                    'graded_by' => $score->gradedBy ? [
+                        'id' => $score->gradedBy->id,
+                        'name' => $score->gradedBy->name,
+                    ] : null,
+                    'graded_at' => $score->graded_at?->toISOString(),
+                    'last_modified_by' => $score->lastModifiedBy ? [
+                        'id' => $score->lastModifiedBy->id,
+                        'name' => $score->lastModifiedBy->name,
+                    ] : null,
+                    'last_modified_at' => $score->last_modified_at?->toISOString(),
+                ],
+                'flags' => [
+                    'plagiarism_suspected' => $score->plagiarism_suspected,
+                    'score_excluded' => $score->score_excluded,
+                    'appeal_requested' => $score->appeal_requested,
+                    'is_extra_credit' => $score->is_extra_credit,
+                    'is_makeup' => $score->is_makeup,
+                ],
+            ];
+        }
+
+        // Add students without scores
+        $studentsWithScores = $scores->pluck('student_id')->toArray();
+        $studentsWithoutScores = $enrolledStudents->whereNotIn('id', $studentsWithScores);
+
+        foreach ($studentsWithoutScores as $student) {
+            $formattedScores[] = [
+                'score_id' => null,
+                'student' => $this->formatStudentData($student),
+                'score_data' => null,
+                'submission_info' => null,
+                'grading_info' => null,
+                'flags' => null,
+            ];
+        }
+
+        return [
+            'data' => $formattedScores,
+            'pagination' => [
+                'total' => $scores->total() + $studentsWithoutScores->count(),
+                'per_page' => $scores->perPage(),
+                'current_page' => $scores->currentPage(),
+                'last_page' => $scores->lastPage(),
+                'from' => $scores->firstItem(),
+                'to' => $scores->lastItem(),
+            ],
+            'assessment_detail' => [
+                'id' => $assessmentDetail->id,
+                'name' => $assessmentDetail->name,
+                'max_points' => $assessmentDetail->max_points,
+                'weight' => $assessmentDetail->weight,
+                'due_date' => $assessmentDetail->due_date?->toISOString(),
+            ],
+        ];
+    }
+
+    /**
+     * Apply filters to grade query.
+     */
+    private function applyGradeFilters($query, array $filters): void
+    {
+        // Status filters
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['score_status'])) {
+            $query->where('score_status', $filters['score_status']);
+        }
+
+        // Score range filters
+        if (isset($filters['min_score'])) {
+            $query->where('percentage_score', '>=', $filters['min_score']);
+        }
+
+        if (isset($filters['max_score'])) {
+            $query->where('percentage_score', '<=', $filters['max_score']);
+        }
+
+        // Letter grade filter
+        if (!empty($filters['letter_grade'])) {
+            $query->where('letter_grade', $filters['letter_grade']);
+        }
+
+        // Boolean filters
+        if (isset($filters['is_late'])) {
+            $query->where('is_late', $filters['is_late']);
+        }
+
+        if (isset($filters['plagiarism_suspected'])) {
+            $query->where('plagiarism_suspected', $filters['plagiarism_suspected']);
+        }
+
+        if (isset($filters['score_excluded'])) {
+            $query->where('score_excluded', $filters['score_excluded']);
+        }
+
+        if (isset($filters['appeal_requested'])) {
+            $query->where('appeal_requested', $filters['appeal_requested']);
+        }
+
+        // Date filters
+        if (!empty($filters['submitted_after'])) {
+            $query->where('submitted_at', '>=', $filters['submitted_after']);
+        }
+
+        if (!empty($filters['submitted_before'])) {
+            $query->where('submitted_at', '<=', $filters['submitted_before']);
+        }
+
+        if (!empty($filters['graded_after'])) {
+            $query->where('graded_at', '>=', $filters['graded_after']);
+        }
+
+        if (!empty($filters['graded_before'])) {
+            $query->where('graded_at', '<=', $filters['graded_before']);
+        }
+
+        // Group filter
+        if (!empty($filters['group_id'])) {
+            $query->where('student_group_id', $filters['group_id']);
+        }
+
+        // Search filter (student name or ID)
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->whereHas('student', function ($q) use ($search) {
+                $q->where('student_id', 'like', "%{$search}%")
+                    ->orWhere('full_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+    }
+
+    /**
+     * Calculate grade statistics and distribution for an assessment detail.
+     */
+    public function calculateGradeStatistics(
+        AssessmentComponentDetail $assessmentDetail,
+        CourseOffering $courseOffering
+    ): array {
+        $scores = AssessmentComponentDetailScore::where('assessment_component_detail_id', $assessmentDetail->id)
+            ->where('course_offering_id', $courseOffering->id)
+            ->where('score_excluded', false)
+            ->whereNotNull('percentage_score')
+            ->get();
+
+        if ($scores->isEmpty()) {
+            return $this->getEmptyStatistics();
+        }
+
+        $percentageScores = $scores->pluck('percentage_score')->sort()->values();
+        $count = $percentageScores->count();
+
+        // Basic statistics
+        $mean = $percentageScores->average();
+        $median = $this->calculateMedian($percentageScores);
+        $mode = $this->calculateMode($percentageScores);
+        $standardDeviation = $this->calculateStandardDeviation($percentageScores, $mean);
+
+        // Quartiles
+        $quartiles = $this->calculateQuartiles($percentageScores);
+
+        // Grade distribution
+        $gradeDistribution = $this->calculateGradeDistribution($scores);
+
+        // Score ranges
+        $scoreRanges = $this->calculateScoreRanges($percentageScores);
+
+        // Performance metrics
+        $performanceMetrics = $this->calculatePerformanceMetrics($scores, $courseOffering);
+
+        return [
+            'summary' => [
+                'total_students' => $courseOffering->courseRegistrations()->count(),
+                'graded_count' => $count,
+                'pending_count' => $courseOffering->courseRegistrations()->count() - $count,
+                'mean' => round($mean, 2),
+                'median' => round($median, 2),
+                'mode' => $mode ? round($mode, 2) : null,
+                'standard_deviation' => round($standardDeviation, 2),
+                'min_score' => $percentageScores->min(),
+                'max_score' => $percentageScores->max(),
+                'range' => $percentageScores->max() - $percentageScores->min(),
+            ],
+            'quartiles' => $quartiles,
+            'grade_distribution' => $gradeDistribution,
+            'score_ranges' => $scoreRanges,
+            'performance_metrics' => $performanceMetrics,
+            'visualization_data' => [
+                'histogram' => $this->generateHistogramData($percentageScores),
+                'box_plot' => $this->generateBoxPlotData($percentageScores, $quartiles),
+                'cumulative_frequency' => $this->generateCumulativeFrequency($percentageScores),
+            ],
+        ];
+    }
+
+    /**
+     * Calculate median from a collection of values.
+     */
+    private function calculateMedian($values)
+    {
+        $count = $values->count();
+        if ($count === 0) {
+            return 0;
+        }
+
+        if ($count % 2 === 0) {
+            return ($values[$count / 2 - 1] + $values[$count / 2]) / 2;
+        }
+
+        return $values[floor($count / 2)];
+    }
+
+    /**
+     * Calculate mode from a collection of values.
+     */
+    private function calculateMode($values)
+    {
+        $frequency = $values->countBy()->sortDesc();
+        $maxFrequency = $frequency->first();
+
+        if ($maxFrequency === 1) {
+            return null; // No mode if all values appear once
+        }
+
+        return (float) $frequency->filter(fn ($count) => $count === $maxFrequency)->keys()->first();
+    }
+
+    /**
+     * Calculate standard deviation.
+     */
+    private function calculateStandardDeviation($values, $mean)
+    {
+        $count = $values->count();
+        if ($count <= 1) {
+            return 0;
+        }
+
+        $variance = $values->map(fn ($value) => pow($value - $mean, 2))->sum() / ($count - 1);
+        return sqrt($variance);
+    }
+
+    /**
+     * Calculate quartiles.
+     */
+    private function calculateQuartiles($values)
+    {
+        $count = $values->count();
+        if ($count === 0) {
+            return ['q1' => 0, 'q2' => 0, 'q3' => 0];
+        }
+
+        return [
+            'q1' => $this->calculatePercentile($values, 25),
+            'q2' => $this->calculatePercentile($values, 50), // Median
+            'q3' => $this->calculatePercentile($values, 75),
+        ];
+    }
+
+    /**
+     * Calculate percentile.
+     */
+    private function calculatePercentile($values, $percentile)
+    {
+        $count = $values->count();
+        $index = ($percentile / 100) * ($count - 1);
+        $lower = floor($index);
+        $upper = ceil($index);
+        $weight = $index - $lower;
+
+        if ($lower === $upper) {
+            return $values[$lower];
+        }
+
+        return $values[$lower] * (1 - $weight) + $values[$upper] * $weight;
+    }
+
+    /**
+     * Calculate grade distribution.
+     */
+    private function calculateGradeDistribution($scores)
+    {
+        $grades = ['A+' => 0, 'A' => 0, 'A-' => 0, 'B+' => 0, 'B' => 0, 'B-' => 0,
+                   'C+' => 0, 'C' => 0, 'C-' => 0, 'D+' => 0, 'D' => 0, 'F' => 0];
+
+        foreach ($scores as $score) {
+            $letterGrade = $score->letter_grade ?? $this->calculateLetterGrade($score->percentage_score);
+            if (isset($grades[$letterGrade])) {
+                $grades[$letterGrade]++;
+            }
+        }
+
+        $total = array_sum($grades);
+        $distribution = [];
+
+        foreach ($grades as $grade => $count) {
+            $distribution[] = [
+                'grade' => $grade,
+                'count' => $count,
+                'percentage' => $total > 0 ? round(($count / $total) * 100, 2) : 0,
+            ];
+        }
+
+        return $distribution;
+    }
+
+    /**
+     * Calculate letter grade from percentage.
+     */
+    private function calculateLetterGrade($percentage)
+    {
+        if ($percentage >= 97) return 'A+';
+        if ($percentage >= 93) return 'A';
+        if ($percentage >= 90) return 'A-';
+        if ($percentage >= 87) return 'B+';
+        if ($percentage >= 83) return 'B';
+        if ($percentage >= 80) return 'B-';
+        if ($percentage >= 77) return 'C+';
+        if ($percentage >= 73) return 'C';
+        if ($percentage >= 70) return 'C-';
+        if ($percentage >= 67) return 'D+';
+        if ($percentage >= 60) return 'D';
+        return 'F';
+    }
+
+    /**
+     * Calculate score ranges distribution.
+     */
+    private function calculateScoreRanges($scores)
+    {
+        $ranges = [
+            '90-100' => 0,
+            '80-89' => 0,
+            '70-79' => 0,
+            '60-69' => 0,
+            '50-59' => 0,
+            '40-49' => 0,
+            '30-39' => 0,
+            '20-29' => 0,
+            '10-19' => 0,
+            '0-9' => 0,
+        ];
+
+        foreach ($scores as $score) {
+            $range = $this->getScoreRange($score);
+            if (isset($ranges[$range])) {
+                $ranges[$range]++;
+            }
+        }
+
+        $total = $scores->count();
+        $distribution = [];
+
+        foreach ($ranges as $range => $count) {
+            $distribution[] = [
+                'range' => $range,
+                'count' => $count,
+                'percentage' => $total > 0 ? round(($count / $total) * 100, 2) : 0,
+            ];
+        }
+
+        return array_reverse($distribution); // Show highest scores first
+    }
+
+    /**
+     * Get score range for a given score.
+     */
+    private function getScoreRange($score)
+    {
+        $value = floor($score / 10) * 10;
+        if ($value === 100) {
+            return '90-100';
+        }
+        return $value . '-' . ($value + 9);
+    }
+
+    /**
+     * Calculate performance metrics.
+     */
+    private function calculatePerformanceMetrics($scores, CourseOffering $courseOffering)
+    {
+        $totalEnrolled = $courseOffering->courseRegistrations()->count();
+        $submitted = $scores->where('status', '!=', 'not_submitted')->count();
+        $graded = $scores->where('score_status', 'final')->count();
+        $passed = $scores->where('percentage_score', '>=', 60)->count();
+        $failed = $scores->where('percentage_score', '<', 60)->count();
+        $late = $scores->where('is_late', true)->count();
+
+        return [
+            'submission_rate' => $totalEnrolled > 0 ? round(($submitted / $totalEnrolled) * 100, 2) : 0,
+            'completion_rate' => $totalEnrolled > 0 ? round(($graded / $totalEnrolled) * 100, 2) : 0,
+            'pass_rate' => $graded > 0 ? round(($passed / $graded) * 100, 2) : 0,
+            'fail_rate' => $graded > 0 ? round(($failed / $graded) * 100, 2) : 0,
+            'late_submission_rate' => $submitted > 0 ? round(($late / $submitted) * 100, 2) : 0,
+            'average_late_penalty' => $scores->where('late_penalty_applied', '>', 0)->avg('late_penalty_applied') ?? 0,
+        ];
+    }
+
+    /**
+     * Generate histogram data for visualization.
+     */
+    private function generateHistogramData($scores)
+    {
+        $bins = [];
+        for ($i = 0; $i <= 100; $i += 5) {
+            $bins[] = [
+                'range' => "{$i}-" . ($i + 4),
+                'min' => $i,
+                'max' => $i + 4,
+                'count' => $scores->filter(fn ($score) => $score >= $i && $score < $i + 5)->count(),
+            ];
+        }
+        return $bins;
+    }
+
+    /**
+     * Generate box plot data.
+     */
+    private function generateBoxPlotData($scores, $quartiles)
+    {
+        $outliers = $this->calculateOutliers($scores, $quartiles);
+
+        return [
+            'min' => $scores->min(),
+            'q1' => $quartiles['q1'],
+            'median' => $quartiles['q2'],
+            'q3' => $quartiles['q3'],
+            'max' => $scores->max(),
+            'outliers' => $outliers,
+        ];
+    }
+
+    /**
+     * Calculate outliers using IQR method.
+     */
+    private function calculateOutliers($scores, $quartiles)
+    {
+        $iqr = $quartiles['q3'] - $quartiles['q1'];
+        $lowerBound = $quartiles['q1'] - (1.5 * $iqr);
+        $upperBound = $quartiles['q3'] + (1.5 * $iqr);
+
+        return $scores->filter(fn ($score) => $score < $lowerBound || $score > $upperBound)->values()->toArray();
+    }
+
+    /**
+     * Generate cumulative frequency data.
+     */
+    private function generateCumulativeFrequency($scores)
+    {
+        $cumulative = [];
+        $total = $scores->count();
+        $runningCount = 0;
+
+        for ($i = 0; $i <= 100; $i += 5) {
+            $runningCount += $scores->filter(fn ($score) => $score >= $i && $score < $i + 5)->count();
+            $cumulative[] = [
+                'score' => $i + 4,
+                'cumulative_count' => $runningCount,
+                'cumulative_percentage' => $total > 0 ? round(($runningCount / $total) * 100, 2) : 0,
+            ];
+        }
+
+        return $cumulative;
+    }
+
+    /**
+     * Get empty statistics structure.
+     */
+    private function getEmptyStatistics(): array
+    {
+        return [
+            'summary' => [
+                'total_students' => 0,
+                'graded_count' => 0,
+                'pending_count' => 0,
+                'mean' => 0,
+                'median' => 0,
+                'mode' => null,
+                'standard_deviation' => 0,
+                'min_score' => 0,
+                'max_score' => 0,
+                'range' => 0,
+            ],
+            'quartiles' => ['q1' => 0, 'q2' => 0, 'q3' => 0],
+            'grade_distribution' => [],
+            'score_ranges' => [],
+            'performance_metrics' => [
+                'submission_rate' => 0,
+                'completion_rate' => 0,
+                'pass_rate' => 0,
+                'fail_rate' => 0,
+                'late_submission_rate' => 0,
+                'average_late_penalty' => 0,
+            ],
+            'visualization_data' => [
+                'histogram' => [],
+                'box_plot' => [],
+                'cumulative_frequency' => [],
+            ],
+        ];
+    }
+
+    /**
+     * Bulk create or update grades.
+     */
+    public function bulkUpsertGrades(
+        AssessmentComponentDetail $assessmentDetail,
+        CourseOffering $courseOffering,
+        array $gradesData,
+        int $lecturerId
+    ): array {
+        $results = [
+            'created' => [],
+            'updated' => [],
+            'errors' => [],
+        ];
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($gradesData as $gradeData) {
+                try {
+                    $studentId = $gradeData['student_id'] ?? null;
+
+                    if (!$studentId) {
+                        $results['errors'][] = [
+                            'data' => $gradeData,
+                            'error' => 'Student ID is required',
+                        ];
+                        continue;
+                    }
+
+                    // Verify student is enrolled
+                    $isEnrolled = $courseOffering->courseRegistrations()
+                        ->where('student_id', $studentId)
+                        ->exists();
+
+                    if (!$isEnrolled) {
+                        $results['errors'][] = [
+                            'student_id' => $studentId,
+                            'error' => 'Student is not enrolled in this course',
+                        ];
+                        continue;
+                    }
+
+                    // Find or create score record
+                    $score = AssessmentComponentDetailScore::firstOrNew([
+                        'assessment_component_detail_id' => $assessmentDetail->id,
+                        'student_id' => $studentId,
+                        'course_offering_id' => $courseOffering->id,
+                    ]);
+
+                    $isNew = !$score->exists;
+
+                    // Update score data
+                    $score->fill(array_merge($gradeData, [
+                        'graded_by_lecture_id' => $lecturerId,
+                        'graded_at' => now(),
+                        'last_modified_by_lecture_id' => $lecturerId,
+                        'last_modified_at' => now(),
+                    ]));
+
+                    // Calculate percentage if points provided
+                    if (isset($gradeData['points_earned']) && $assessmentDetail->max_points > 0) {
+                        $score->percentage_score = ($gradeData['points_earned'] / $assessmentDetail->max_points) * 100;
+                    }
+
+                    // Set letter grade if percentage provided
+                    if (isset($score->percentage_score) && !isset($gradeData['letter_grade'])) {
+                        $score->letter_grade = $this->calculateLetterGrade($score->percentage_score);
+                    }
+
+                    $score->save();
+
+                    if ($isNew) {
+                        $results['created'][] = [
+                            'student_id' => $studentId,
+                            'score_id' => $score->id,
+                        ];
+                    } else {
+                        $results['updated'][] = [
+                            'student_id' => $studentId,
+                            'score_id' => $score->id,
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    $results['errors'][] = [
+                        'data' => $gradeData,
+                        'error' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+
+        return $results;
+    }
+
+    /**
      * Get academic integrity statistics for a course offering.
      */
     public function getAcademicIntegrityStatistics(CourseOffering $courseOffering): array
@@ -1092,7 +1753,7 @@ class AssessmentManagementService
             ->selectRaw('
                 COUNT(*) as total_submissions,
                 SUM(CASE WHEN plagiarism_suspected = 1 THEN 1 ELSE 0 END) as flagged_submissions,
-                SUM(CASE WHEN integrity_status = "violation_confirmed" THEN 1 ELSE 0 END) as confirmed_violations,
+                SUM(CASE WHEN integrity_status = "violation_confirmed" THEN 1 ELSE 0 END) as confirm
                 SUM(CASE WHEN integrity_status = "under_review" THEN 1 ELSE 0 END) as under_review,
                 SUM(CASE WHEN integrity_status = "pending_hearing" THEN 1 ELSE 0 END) as pending_hearing,
                 AVG(CASE WHEN plagiarism_score IS NOT NULL THEN plagiarism_score ELSE NULL END) as avg_plagiarism_score
@@ -1544,7 +2205,7 @@ class AssessmentManagementService
      */
     public function calculateWeightedScores(CourseOffering $courseOffering, bool $includeExcluded = false): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
         if (! $syllabus) {
             return [
                 'students' => [],
@@ -1571,7 +2232,7 @@ class AssessmentManagementService
             ->with('student')
             ->get()
             ->pluck('student')
-            ->sortBy('display_name');
+            ->sortBy('full_name');
 
         $studentScores = [];
         $componentWeights = [];
@@ -1761,7 +2422,7 @@ class AssessmentManagementService
             'generate_audit_trail' => true,
         ], $options);
 
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
         if (! $syllabus) {
             return [
                 'students' => [],
@@ -1794,7 +2455,7 @@ class AssessmentManagementService
             ->with('student')
             ->get()
             ->pluck('student')
-            ->sortBy('display_name');
+            ->sortBy('full_name');
 
         $studentGrades = [];
         $calculationSummary = [

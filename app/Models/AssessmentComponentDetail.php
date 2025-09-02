@@ -16,10 +16,12 @@ class AssessmentComponentDetail extends AuditableModel
         'assessment_component_id',
         'name',
         'weight',
+        'max_points'
     ];
 
     protected $casts = [
         'weight' => 'decimal:2',
+        'max_points' => 'decimal:2'
     ];
 
     /**
