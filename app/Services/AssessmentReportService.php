@@ -18,7 +18,7 @@ class AssessmentReportService
      */
     public function generateOverviewStatistics(CourseOffering $courseOffering): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyOverviewStatistics();
@@ -30,7 +30,7 @@ class AssessmentReportService
             ->count();
 
         // Get assessment components
-        $assessmentComponents = AssessmentComponent::where('syllabus_id', $syllabus->id)
+        $assessmentComponents = AssessmentComponent::where('syllabus_template_id', $syllabus->id)
             ->with(['details'])
             ->get();
 
@@ -71,7 +71,7 @@ class AssessmentReportService
      */
     public function calculateScoreDistribution(CourseOffering $courseOffering): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyScoreDistribution();
@@ -79,7 +79,7 @@ class AssessmentReportService
 
         // Get all final scores for this course offering
         $scores = AssessmentComponentDetailScore::whereHas('assessmentComponentDetail.assessmentComponent', function ($query) use ($syllabus) {
-            $query->where('syllabus_id', $syllabus->id);
+            $query->where('syllabus_template_id', $syllabus->id);
         })
             ->where('course_offering_id', $courseOffering->id)
             ->where('score_status', 'final')
@@ -156,7 +156,7 @@ class AssessmentReportService
      */
     public function getCompletionStatistics(CourseOffering $courseOffering): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyCompletionStatistics();
@@ -166,7 +166,7 @@ class AssessmentReportService
             ->whereIn('registration_status', ['registered', 'confirmed'])
             ->count();
 
-        $assessmentComponents = AssessmentComponent::where('syllabus_id', $syllabus->id)
+        $assessmentComponents = AssessmentComponent::where('syllabus_template_id', $syllabus->id)
             ->with(['details'])
             ->get();
 
@@ -180,7 +180,7 @@ class AssessmentReportService
         $submissionStats = DB::table('assessment_component_detail_scores as scores')
             ->join('assessment_component_details as details', 'scores.assessment_component_detail_id', '=', 'details.id')
             ->join('assessment_components as components', 'details.assessment_component_id', '=', 'components.id')
-            ->where('components.syllabus_id', $syllabus->id)
+            ->where('components.syllabus_template_id', $syllabus->id)
             ->where('scores.course_offering_id', $courseOffering->id)
             ->whereNull('scores.deleted_at')
             ->selectRaw('
@@ -999,7 +999,7 @@ class AssessmentReportService
      */
     public function generateGradeMatrix(CourseOffering $courseOffering, array $filters = []): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyGradeMatrix();
@@ -1011,12 +1011,13 @@ class AssessmentReportService
             ->with('student')
             ->get()
             ->pluck('student')
-            ->sortBy('display_name');
+            ->sortBy('full_name');
 
         // Apply student filter if provided
         if (! empty($filters['student_ids'])) {
             $students = $students->whereIn('id', $filters['student_ids']);
         }
+
 
         // Get assessment components
         $assessmentComponents = $syllabus->assessmentComponents()
@@ -1049,16 +1050,13 @@ class AssessmentReportService
             ];
         }
 
-        // Get all scores with optimized query to avoid N+1 problem
+        // Get all scores with optimized query - only fetch points_earned since other fields are not used yet
         $allScores = DB::table('assessment_component_detail_scores as acds')
             ->join('assessment_component_details as acd', 'acds.assessment_component_detail_id', '=', 'acd.id')
             ->join('assessment_components as ac', 'acd.assessment_component_id', '=', 'ac.id')
-            ->where('ac.syllabus_id', $syllabus->id)
+            ->where('ac.syllabus_template_id', $syllabus->id)
             ->where('acds.course_offering_id', $courseOffering->id)
-            ->where('acds.score_status', $filters['score_status'] ?? 'final')
-            ->when(! ($filters['include_excluded'] ?? false), function ($query) {
-                return $query->where('acds.score_excluded', false);
-            })
+            ->whereNotNull('acds.points_earned')
             ->whereNull('acds.deleted_at')
             ->when(! empty($filters['student_ids']), function ($query) use ($filters) {
                 return $query->whereIn('acds.student_id', $filters['student_ids']);
@@ -1072,19 +1070,6 @@ class AssessmentReportService
                 'acd.id as detail_id',
                 'ac.id as component_id',
                 'acds.points_earned',
-                'acds.percentage_score',
-                'acds.letter_grade',
-                'acds.status',
-                'acds.score_status',
-                'acds.is_late',
-                'acds.late_penalty_applied',
-                'acds.late_excuse_approved',
-                'acds.bonus_points',
-                'acds.score_excluded',
-                'acds.exclusion_reason',
-                'acds.plagiarism_suspected',
-                'acds.appeal_requested',
-                'acds.graded_at',
                 'acd.weight as detail_weight',
                 'ac.weight as component_weight',
             ])
@@ -1096,13 +1081,12 @@ class AssessmentReportService
             $scoresIndex[$score->student_id][$score->detail_id] = $score;
         }
 
-        // Build grade matrix with enhanced statistics
+        // Build grade matrix with simplified statistics
         $gradeMatrix = [];
         $classStatistics = [
             'total_weighted_scores' => [],
             'component_averages' => [],
             'missing_scores_count' => 0,
-            'excluded_scores_count' => 0,
         ];
 
         foreach ($students as $student) {
@@ -1110,9 +1094,7 @@ class AssessmentReportService
                 'student' => [
                     'id' => $student->id,
                     'student_id' => $student->student_id,
-                    'name' => $student->display_name,
-                    'first_name' => $student->first_name,
-                    'last_name' => $student->last_name,
+                    'full_name' => $student->full_name,
                     'email' => $student->email,
                 ],
                 'component_scores' => [],
@@ -1120,21 +1102,11 @@ class AssessmentReportService
                 'final_percentage' => 0,
                 'letter_grade' => null,
                 'missing_assessments' => 0,
-                'excluded_assessments' => 0,
-                'late_submissions' => 0,
-                'bonus_points_total' => 0,
-                'has_integrity_concerns' => false,
-                'has_appeals' => false,
             ];
 
             $totalWeightedScore = 0;
             $totalWeight = 0;
             $studentMissingCount = 0;
-            $studentExcludedCount = 0;
-            $studentLateCount = 0;
-            $studentBonusTotal = 0;
-            $hasIntegrityConcerns = false;
-            $hasAppeals = false;
 
             foreach ($assessmentComponents as $component) {
                 $componentScores = [];
@@ -1149,72 +1121,26 @@ class AssessmentReportService
                     if ($score) {
                         $componentHasScores = true;
 
-                        // Calculate final score with all adjustments
-                        $finalScore = $this->calculateDetailFinalScore($score);
-
                         $scoreData = [
                             'id' => $score->score_id,
                             'points_earned' => $score->points_earned,
-                            'percentage_score' => $score->percentage_score,
-                            'final_score' => $finalScore,
-                            'letter_grade' => $score->letter_grade,
-                            'status' => $score->status,
-                            'score_status' => $score->score_status,
-                            'is_late' => (bool) $score->is_late,
-                            'late_penalty_applied' => $score->late_penalty_applied,
-                            'late_excuse_approved' => (bool) $score->late_excuse_approved,
-                            'bonus_points' => $score->bonus_points,
-                            'score_excluded' => (bool) $score->score_excluded,
-                            'exclusion_reason' => $score->exclusion_reason,
-                            'plagiarism_suspected' => (bool) $score->plagiarism_suspected,
-                            'appeal_requested' => (bool) $score->appeal_requested,
-                            'graded_at' => $score->graded_at,
-                            'has_adjustments' => $this->scoreHasAdjustments($score),
+                            'status' => 'graded',
                         ];
 
-                        // Track student-level statistics
-                        if ($score->is_late) {
-                            $studentLateCount++;
-                        }
-                        if ($score->score_excluded) {
-                            $studentExcludedCount++;
-                        }
-                        if ($score->bonus_points > 0) {
-                            $studentBonusTotal += $score->bonus_points;
-                        }
-                        if ($score->plagiarism_suspected) {
-                            $hasIntegrityConcerns = true;
-                        }
-                        if ($score->appeal_requested) {
-                            $hasAppeals = true;
-                        }
+                        // Use points_earned directly for calculations
+                        // Assuming points_earned is already a percentage or can be used as is
+                        $scoreValue = $score->points_earned;
 
-                        // Calculate weighted score for this detail (only if not excluded)
-                        if ($finalScore !== null && ! $score->score_excluded) {
-                            $componentWeightedScore += ($finalScore * $detail->weight);
-                            $componentTotalWeight += $detail->weight;
-                        }
+                        // Calculate weighted score for this detail
+                        $componentWeightedScore += ($scoreValue * $detail->weight);
+                        $componentTotalWeight += $detail->weight;
                     } else {
                         // Missing score
                         $studentMissingCount++;
                         $scoreData = [
                             'id' => null,
                             'points_earned' => null,
-                            'percentage_score' => null,
-                            'final_score' => null,
-                            'letter_grade' => null,
                             'status' => 'missing',
-                            'score_status' => null,
-                            'is_late' => false,
-                            'late_penalty_applied' => 0,
-                            'late_excuse_approved' => false,
-                            'bonus_points' => 0,
-                            'score_excluded' => false,
-                            'exclusion_reason' => null,
-                            'plagiarism_suspected' => false,
-                            'appeal_requested' => false,
-                            'graded_at' => null,
-                            'has_adjustments' => false,
                         ];
                     }
 
@@ -1260,18 +1186,12 @@ class AssessmentReportService
             $studentRow['final_percentage'] = $finalPercentage;
             $studentRow['letter_grade'] = $this->calculateLetterGrade($finalPercentage);
             $studentRow['missing_assessments'] = $studentMissingCount;
-            $studentRow['excluded_assessments'] = $studentExcludedCount;
-            $studentRow['late_submissions'] = $studentLateCount;
-            $studentRow['bonus_points_total'] = $studentBonusTotal;
-            $studentRow['has_integrity_concerns'] = $hasIntegrityConcerns;
-            $studentRow['has_appeals'] = $hasAppeals;
 
             // Track for class statistics
             if ($finalPercentage > 0) {
                 $classStatistics['total_weighted_scores'][] = $finalPercentage;
             }
             $classStatistics['missing_scores_count'] += $studentMissingCount;
-            $classStatistics['excluded_scores_count'] += $studentExcludedCount;
 
             $gradeMatrix[] = $studentRow;
         }
@@ -1460,15 +1380,13 @@ class AssessmentReportService
             }
         }
 
-        // Calculate performance metrics
+        // Calculate simplified performance metrics
         $performanceMetrics = [
             'students_above_90' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 90)),
             'students_above_80' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 80)),
             'students_above_70' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] >= 70)),
             'students_below_60' => count(array_filter($gradeMatrix, fn($row) => $row['final_percentage'] < 60)),
             'students_with_missing' => count(array_filter($gradeMatrix, fn($row) => $row['missing_assessments'] > 0)),
-            'students_with_late' => count(array_filter($gradeMatrix, fn($row) => $row['late_submissions'] > 0)),
-            'students_with_bonus' => count(array_filter($gradeMatrix, fn($row) => $row['bonus_points_total'] > 0)),
         ];
 
         return [
@@ -1482,7 +1400,6 @@ class AssessmentReportService
             'performance_metrics' => $performanceMetrics,
             'submission_statistics' => [
                 'total_missing_scores' => $classStatistics['missing_scores_count'],
-                'total_excluded_scores' => $classStatistics['excluded_scores_count'],
             ],
         ];
     }
@@ -1519,7 +1436,7 @@ class AssessmentReportService
      */
     public function identifyAtRiskStudents(CourseOffering $courseOffering, array $criteria = []): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyAtRiskStudents();
@@ -1683,7 +1600,7 @@ class AssessmentReportService
      */
     public function identifyExceptionalStudents(CourseOffering $courseOffering, array $criteria = []): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyExceptionalStudents();
@@ -1824,7 +1741,7 @@ class AssessmentReportService
      */
     public function monitorAcademicIntegrityIssues(CourseOffering $courseOffering): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyIntegrityMonitoring();
@@ -1983,7 +1900,7 @@ class AssessmentReportService
      */
     public function generatePerformanceAnalytics(CourseOffering $courseOffering, array $options = []): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyPerformanceAnalytics();
@@ -2033,7 +1950,7 @@ class AssessmentReportService
      */
     public function generateGradeDistributionData(CourseOffering $courseOffering, int $bins = 10): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyGradeDistribution();
@@ -2148,7 +2065,7 @@ class AssessmentReportService
      */
     public function generateComponentComparisonData(CourseOffering $courseOffering): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyComponentComparison();
@@ -2275,7 +2192,7 @@ class AssessmentReportService
      */
     public function generatePerformanceTrendsData(CourseOffering $courseOffering, int $periodDays = 30): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptyPerformanceTrends();
@@ -2400,7 +2317,7 @@ class AssessmentReportService
      */
     public function generateSubmissionPatternsData(CourseOffering $courseOffering): array
     {
-        $syllabus = $courseOffering->syllabus;
+        $syllabus = $courseOffering->syllabusTemplate;
 
         if (! $syllabus) {
             return $this->getEmptySubmissionPatterns();

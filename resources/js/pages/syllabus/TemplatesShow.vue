@@ -134,7 +134,7 @@ const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
 };
 
-const totalAssessmentWeight = props.template.assessment_components?.reduce((sum, component) => sum + component.weight, 0) || 0;
+const totalAssessmentWeight = props.template.assessment_components?.reduce((sum, component) => sum + Number(component.weight), 0) || 0;
 </script>
 
 <template>
@@ -283,7 +283,7 @@ const totalAssessmentWeight = props.template.assessment_components?.reduce((sum,
                                 <div class="text-sm text-gray-600">Version {{ template.source_template.version }}</div>
                             </div>
                             <Button
-                                variant="ghost" 
+                                variant="ghost"
                                 size="sm"
                                 @click="router.visit(`/syllabus-templates/${template.source_template.id}`)"
                             >

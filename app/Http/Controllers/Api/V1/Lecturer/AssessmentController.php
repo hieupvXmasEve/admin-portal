@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Lecturer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BulkUpdateGradesRequest;
+use App\Http\Requests\GradeTableRequest;
 use App\Http\Requests\ImportGradesRequest;
 use App\Http\Requests\StoreAssessmentDetailRequest;
 use App\Http\Requests\StoreAssessmentRequest;
@@ -26,6 +27,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AssessmentController extends Controller
@@ -40,11 +42,10 @@ class AssessmentController extends Controller
 
         try {
             // Check if lecturer is authorized to access this course offering
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -64,7 +65,7 @@ class AssessmentController extends Controller
                     'course_title' => $courseOffering->course_title,
                     'section_code' => $courseOffering->section_code,
                 ],
-            ], 'Assessment structure retrieved successfully');
+            ], [], 'Assessment structure retrieved successfully', 200);
         } catch (\Exception $e) {
             Log::error('Failed to retrieve assessment structure', [
                 'course_offering_id' => $courseOffering->id,
@@ -76,7 +77,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to retrieve assessment structure',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -92,21 +92,19 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
 
             $syllabus = $courseOffering->syllabus;
-            if (! $syllabus) {
+            if (!$syllabus) {
                 return ApiResponse::error(
                     'No syllabus found for this course offering',
                     [],
-                    'SYLLABUS_NOT_FOUND',
                     404
                 );
             }
@@ -164,12 +162,11 @@ class AssessmentController extends Controller
                     ];
                 }),
                 'total_detail_weight' => $assessmentComponent->total_detail_weight,
-            ], 'Assessment component created successfully', 201);
+            ], [], 'Assessment component created successfully', 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
-                'VALIDATION_ERROR',
                 422
             );
         } catch (\Exception $e) {
@@ -183,7 +180,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to create assessment component',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -199,11 +195,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -213,7 +208,6 @@ class AssessmentController extends Controller
                 return ApiResponse::error(
                     'Assessment component does not belong to this course offering',
                     [],
-                    'INVALID_ASSESSMENT',
                     404
                 );
             }
@@ -270,12 +264,11 @@ class AssessmentController extends Controller
                     ];
                 }),
                 'total_detail_weight' => $assessmentComponent->total_detail_weight,
-            ], 'Assessment component updated successfully');
+            ], [], 'Assessment component updated successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
-                'VALIDATION_ERROR',
                 422
             );
         } catch (\Exception $e) {
@@ -290,7 +283,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to update assessment component',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -306,11 +298,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -320,7 +311,6 @@ class AssessmentController extends Controller
                 return ApiResponse::error(
                     'Assessment component does not belong to this course offering',
                     [],
-                    'INVALID_ASSESSMENT',
                     404
                 );
             }
@@ -328,11 +318,10 @@ class AssessmentController extends Controller
             // Enhanced dependency checking
             $dependencyChecks = $this->checkAssessmentDependencies($assessmentComponent, $courseOffering);
 
-            if (! $dependencyChecks['can_delete']) {
+            if (!$dependencyChecks['can_delete']) {
                 return ApiResponse::error(
                     'Cannot delete assessment component due to existing dependencies',
                     ['dependencies' => $dependencyChecks['dependencies']],
-                    'HAS_DEPENDENCIES',
                     422
                 );
             }
@@ -348,6 +337,7 @@ class AssessmentController extends Controller
 
             return ApiResponse::success(
                 null,
+                [],
                 'Assessment component deleted successfully'
             );
         } catch (\Exception $e) {
@@ -362,7 +352,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to delete assessment component',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -378,11 +367,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -392,7 +380,6 @@ class AssessmentController extends Controller
                 return ApiResponse::error(
                     'Assessment component does not belong to this course offering',
                     [],
-                    'INVALID_ASSESSMENT',
                     404
                 );
             }
@@ -415,12 +402,11 @@ class AssessmentController extends Controller
                 'weight' => $assessmentDetail->weight,
                 'created_at' => $assessmentDetail->created_at->toISOString(),
                 'updated_at' => $assessmentDetail->updated_at->toISOString(),
-            ], 'Assessment detail created successfully', 201);
+            ], [], 'Assessment detail created successfully', 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
-                'VALIDATION_ERROR',
                 422
             );
         } catch (\Exception $e) {
@@ -435,7 +421,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to create assessment detail',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -451,11 +436,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -465,7 +449,6 @@ class AssessmentController extends Controller
                 return ApiResponse::error(
                     'Assessment component does not belong to this course offering',
                     [],
-                    'INVALID_ASSESSMENT',
                     404
                 );
             }
@@ -475,7 +458,6 @@ class AssessmentController extends Controller
                 return ApiResponse::error(
                     'Assessment detail does not belong to this assessment component',
                     [],
-                    'INVALID_ASSESSMENT_DETAIL',
                     404
                 );
             }
@@ -497,12 +479,11 @@ class AssessmentController extends Controller
                 'weight' => $assessmentDetail->weight,
                 'created_at' => $assessmentDetail->created_at->toISOString(),
                 'updated_at' => $assessmentDetail->updated_at->toISOString(),
-            ], 'Assessment detail updated successfully');
+            ], [], 'Assessment detail updated successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
-                'VALIDATION_ERROR',
                 422
             );
         } catch (\Exception $e) {
@@ -518,7 +499,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to update assessment detail',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -534,11 +514,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -548,7 +527,6 @@ class AssessmentController extends Controller
                 return ApiResponse::error(
                     'Assessment component does not belong to this course offering',
                     [],
-                    'INVALID_ASSESSMENT',
                     404
                 );
             }
@@ -558,7 +536,6 @@ class AssessmentController extends Controller
                 return ApiResponse::error(
                     'Assessment detail does not belong to this assessment component',
                     [],
-                    'INVALID_ASSESSMENT_DETAIL',
                     404
                 );
             }
@@ -572,7 +549,6 @@ class AssessmentController extends Controller
                 return ApiResponse::error(
                     'Cannot delete assessment detail with existing student scores',
                     [],
-                    'HAS_EXISTING_SCORES',
                     422
                 );
             }
@@ -584,6 +560,7 @@ class AssessmentController extends Controller
 
             return ApiResponse::success(
                 null,
+                [],
                 'Assessment detail deleted successfully'
             );
         } catch (\Exception $e) {
@@ -599,7 +576,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to delete assessment detail',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -615,11 +591,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -630,6 +605,7 @@ class AssessmentController extends Controller
 
             return ApiResponse::success(
                 $gradingData,
+                [],
                 'Student grading data retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -644,7 +620,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to retrieve student grading data',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -660,11 +635,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -675,6 +649,7 @@ class AssessmentController extends Controller
 
             return ApiResponse::success(
                 $gradingData,
+                [],
                 'Assessment component grading data retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -689,7 +664,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to retrieve assessment component grading data',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -705,11 +679,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -719,7 +692,6 @@ class AssessmentController extends Controller
                 return ApiResponse::error(
                     'Score does not belong to this course offering',
                     [],
-                    'INVALID_SCORE',
                     404
                 );
             }
@@ -745,13 +717,13 @@ class AssessmentController extends Controller
 
             return ApiResponse::success(
                 $formattedScore,
+                [],
                 'Grade updated successfully'
             );
         } catch (\Illuminate\Validation\ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
-                'VALIDATION_ERROR',
                 422
             );
         } catch (\Exception $e) {
@@ -766,7 +738,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to update grade',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -782,11 +753,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -826,7 +796,7 @@ class AssessmentController extends Controller
                 }
             });
 
-            if (! empty($errors)) {
+            if (!empty($errors)) {
                 return ApiResponse::error(
                     'Some grades could not be updated',
                     [
@@ -834,7 +804,6 @@ class AssessmentController extends Controller
                         'successfully_updated' => count($updatedScores),
                         'failed_updates' => count($errors),
                     ],
-                    'PARTIAL_FAILURE',
                     422
                 );
             }
@@ -843,12 +812,12 @@ class AssessmentController extends Controller
                 'updated_scores' => $updatedScores,
                 'total_updated' => count($updatedScores),
                 'operation_completed_at' => now()->toISOString(),
-            ], 'All grades updated successfully');
+
+            ], [], 'All grades updated successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return ApiResponse::error(
                 'Validation failed',
                 $e->errors(),
-                'VALIDATION_ERROR',
                 422
             );
         } catch (\Exception $e) {
@@ -862,7 +831,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to bulk update grades',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -878,11 +846,10 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
@@ -893,6 +860,7 @@ class AssessmentController extends Controller
 
             return ApiResponse::success(
                 new WeightValidationResource($validationResult),
+                [],
                 'Assessment weights validation completed successfully'
             );
         } catch (\Exception $e) {
@@ -906,7 +874,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to validate assessment weights',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -922,21 +889,19 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
 
             // Verify the assessment component detail belongs to this course offering
-            if (! $this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
                 return ApiResponse::error(
                     'Assessment component detail does not belong to this course offering',
                     [],
-                    'INVALID_ASSESSMENT',
                     400
                 );
             }
@@ -961,7 +926,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to export grade template',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -977,21 +941,19 @@ class AssessmentController extends Controller
 
         try {
             // Check authorization
-            if (! $this->canAccessCourseOffering($lecturer, $courseOffering)) {
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
                 return ApiResponse::error(
                     'Unauthorized access to course offering',
                     [],
-                    'UNAUTHORIZED',
                     403
                 );
             }
 
             // Verify the assessment component detail belongs to this course offering
-            if (! $this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
                 return ApiResponse::error(
                     'Assessment component detail does not belong to this course offering',
                     [],
-                    'INVALID_ASSESSMENT',
                     400
                 );
             }
@@ -1011,14 +973,13 @@ class AssessmentController extends Controller
             );
 
             // Determine response based on results
-            $hasErrors = ! empty($importResults['errors']);
-            $hasWarnings = ! empty($importResults['warnings']);
+            $hasErrors = !empty($importResults['errors']);
+            $hasWarnings = !empty($importResults['warnings']);
 
             if ($hasErrors && $importResults['successful_updates'] === 0 && $importResults['successful_creates'] === 0) {
                 return ApiResponse::error(
                     'Grade import failed',
                     $importResults,
-                    'IMPORT_FAILED',
                     422
                 );
             }
@@ -1026,12 +987,14 @@ class AssessmentController extends Controller
             if ($hasErrors || $hasWarnings) {
                 return ApiResponse::success(
                     $importResults,
+                    [],
                     'Grade import completed with some issues'
                 );
             }
 
             return ApiResponse::success(
                 $importResults,
+                [],
                 'Grade import completed successfully'
             );
         } catch (\Exception $e) {
@@ -1046,7 +1009,6 @@ class AssessmentController extends Controller
             return ApiResponse::error(
                 'Failed to import grades',
                 [],
-                'SERVER_ERROR',
                 500
             );
         }
@@ -1066,8 +1028,338 @@ class AssessmentController extends Controller
     private function assessmentBelongsToCourse(AssessmentComponentDetail $assessmentComponentDetail, CourseOffering $courseOffering): bool
     {
         return $assessmentComponentDetail->assessmentComponent
-            && $assessmentComponentDetail->assessmentComponent->syllabus
-            && $assessmentComponentDetail->assessmentComponent->syllabus->curriculum_unit_id === $courseOffering->curriculum_unit_id;
+            && $assessmentComponentDetail->assessmentComponent->syllabusTemplate
+            && $assessmentComponentDetail->assessmentComponent->syllabusTemplate->unit_id === $courseOffering->unit_id;
+    }
+
+    /**
+     * Get student grades table with sorting and filtering for an assessment detail.
+     */
+    public function getGradeTable(GradeTableRequest $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
+    {
+        /** @var \App\Models\Lecture $lecturer */
+        $lecturer = $request->user();
+
+        try {
+            // Check authorization
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+                return ApiResponse::error(
+                    'Unauthorized access to course offering',
+                    [],
+                    403
+                );
+            }
+
+            // Verify the assessment component detail belongs to this course offering
+            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+                return ApiResponse::error(
+                    'Assessment component detail does not belong to this course offering',
+                    [],
+                    400
+                );
+            }
+
+            // Get validated filters with defaults
+            $filters = $request->validatedWithDefaults();
+
+            // Use service to get grade table data
+            $assessmentService = app(AssessmentManagementService::class);
+            $gradeTableData = $assessmentService->getGradeTableData(
+                $assessmentComponentDetail,
+                $courseOffering,
+                $filters
+            );
+
+            return ApiResponse::success(
+                $gradeTableData,
+                [],
+                'Grade table data retrieved successfully'
+            );
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve grade table data', [
+                'course_offering_id' => $courseOffering->id,
+                'assessment_component_detail_id' => $assessmentComponentDetail->id,
+                'lecturer_id' => $lecturer->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return ApiResponse::error(
+                'Failed to retrieve grade table data',
+                [],
+                500
+            );
+        }
+    }
+
+    /**
+     * Get grade statistics and distribution for an assessment detail.
+     */
+    public function getGradeStatistics(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
+    {
+        /** @var \App\Models\Lecture $lecturer */
+        $lecturer = $request->user();
+
+        try {
+            // Check authorization
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+                return ApiResponse::error(
+                    'Unauthorized access to course offering',
+                    [],
+                    403
+                );
+            }
+
+            // Verify the assessment component detail belongs to this course offering
+            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+                return ApiResponse::error(
+                    'Assessment component detail does not belong to this course offering',
+                    [],
+                    400
+                );
+            }
+
+            // Use service to calculate statistics
+            $assessmentService = app(AssessmentManagementService::class);
+            $statistics = $assessmentService->calculateGradeStatistics(
+                $assessmentComponentDetail,
+                $courseOffering
+            );
+
+            return ApiResponse::success(
+                $statistics,
+                [],
+                'Grade statistics calculated successfully'
+            );
+        } catch (\Exception $e) {
+            Log::error('Failed to calculate grade statistics', [
+                'course_offering_id' => $courseOffering->id,
+                'assessment_component_detail_id' => $assessmentComponentDetail->id,
+                'lecturer_id' => $lecturer->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return ApiResponse::error(
+                'Failed to calculate grade statistics',
+                [],
+                500
+            );
+        }
+    }
+
+    /**
+     * Bulk create or update grades for an assessment detail.
+     */
+    public function bulkUpsertGrades(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): JsonResponse
+    {
+        /** @var \App\Models\Lecture $lecturer */
+        $lecturer = $request->user();
+
+        try {
+            // Check authorization
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+                return ApiResponse::error(
+                    'Unauthorized access to course offering',
+                    [],
+                    403
+                );
+            }
+
+            // Verify the assessment component detail belongs to this course offering
+            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+                return ApiResponse::error(
+                    'Assessment component detail does not belong to this course offering',
+                    [],
+                    400
+                );
+            }
+
+            // Validate request data
+            $validated = $request->validate([
+                'grades' => ['required', 'array', 'min:1'],
+                'grades.*.student_id' => ['required', 'integer', 'exists:students,id'],
+                'grades.*.points_earned' => ['sometimes', 'numeric', 'min:0'],
+                'grades.*.percentage_score' => ['sometimes', 'numeric', 'min:0', 'max:100'],
+                'grades.*.letter_grade' => ['sometimes', 'string', 'max:5'],
+                'grades.*.status' => ['sometimes', 'string', Rule::in(['not_submitted', 'submitted', 'grading', 'graded', 'returned'])],
+                'grades.*.score_status' => ['sometimes', 'string', Rule::in(['draft', 'provisional', 'final'])],
+                'grades.*.instructor_feedback' => ['sometimes', 'string', 'max:1000'],
+                'grades.*.private_notes' => ['sometimes', 'string', 'max:1000'],
+            ]);
+
+            // Use service to bulk upsert grades
+            $assessmentService = app(AssessmentManagementService::class);
+            $results = $assessmentService->bulkUpsertGrades(
+                $assessmentComponentDetail,
+                $courseOffering,
+                $validated['grades'],
+                $lecturer->id
+            );
+
+            // Check if there were any errors
+            if (!empty($results['errors'])) {
+                return ApiResponse::success(
+                    $results,
+                    [],
+                    'Bulk grade operation completed with some errors'
+                );
+            }
+
+            return ApiResponse::success(
+                $results,
+                [],
+                'Bulk grade operation completed successfully'
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return ApiResponse::error(
+                'Validation failed',
+                $e->errors(),
+                422
+            );
+        } catch (\Exception $e) {
+            Log::error('Failed to bulk upsert grades', [
+                'course_offering_id' => $courseOffering->id,
+                'assessment_component_detail_id' => $assessmentComponentDetail->id,
+                'lecturer_id' => $lecturer->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return ApiResponse::error(
+                'Failed to bulk upsert grades',
+                [],
+                500
+            );
+        }
+    }
+
+    /**
+     * Export grades for an assessment detail.
+     */
+    public function exportGrades(Request $request, CourseOffering $courseOffering, AssessmentComponentDetail $assessmentComponentDetail): BinaryFileResponse|JsonResponse
+    {
+        /** @var \App\Models\Lecture $lecturer */
+        $lecturer = $request->user();
+
+        try {
+            // Check authorization
+            if (!$this->canAccessCourseOffering($lecturer, $courseOffering)) {
+                return ApiResponse::error(
+                    'Unauthorized access to course offering',
+                    [],
+                    403
+                );
+            }
+
+            // Verify the assessment component detail belongs to this course offering
+            if (!$this->assessmentBelongsToCourse($assessmentComponentDetail, $courseOffering)) {
+                return ApiResponse::error(
+                    'Assessment component detail does not belong to this course offering',
+                    [],
+                    400
+                );
+            }
+
+            // Get format from request
+            $format = $request->query('format', 'excel');
+
+            if ($format === 'excel') {
+                // Use existing Excel service for export
+                $excelService = app(AssessmentGradeExcelService::class);
+                $filePath = $excelService->exportGrades($assessmentComponentDetail, $courseOffering);
+
+                return response()->download($filePath, basename($filePath), [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ])->deleteFileAfterSend(true);
+            } elseif ($format === 'csv') {
+                // Export as CSV
+                $assessmentService = app(AssessmentManagementService::class);
+                $gradeData = $assessmentService->getGradeTableData(
+                    $assessmentComponentDetail,
+                    $courseOffering,
+                    ['per_page' => 10000] // Get all records
+                );
+
+                // Convert to CSV format
+                $csv = $this->convertGradesToCsv($gradeData['data']);
+                $filename = "grades_{$assessmentComponentDetail->id}_" . now()->format('Y-m-d_His') . '.csv';
+
+                return response($csv, 200, [
+                    'Content-Type' => 'text/csv',
+                    'Content-Disposition' => "attachment; filename={$filename}",
+                ]);
+            } else {
+                return ApiResponse::error(
+                    'Invalid export format. Supported formats: excel, csv',
+                    [],
+                    400
+                );
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to export grades', [
+                'course_offering_id' => $courseOffering->id,
+                'assessment_component_detail_id' => $assessmentComponentDetail->id,
+                'lecturer_id' => $lecturer->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return ApiResponse::error(
+                'Failed to export grades',
+                [],
+                500
+            );
+        }
+    }
+
+    /**
+     * Convert grade data to CSV format.
+     */
+    private function convertGradesToCsv(array $gradeData): string
+    {
+        $csv = "Student ID,Student Name,Email,Points Earned,Percentage Score,Letter Grade,Status,Score Status,Submitted At,Graded At,Is Late,Minutes Late,Late Penalty,Plagiarism Suspected,Score Excluded,Appeal Requested\n";
+
+        foreach ($gradeData as $record) {
+            if ($record['score_data']) {
+                $score = $record['score_data'];
+                $student = $record['student'];
+                $submission = $record['submission_info'];
+                $grading = $record['grading_info'];
+                $flags = $record['flags'];
+
+                $csv .= sprintf(
+                    '"%s","%s","%s",%s,%s,"%s","%s","%s","%s","%s",%s,%s,%s,%s,%s,%s' . "\n",
+                    $student['student_id'],
+                    $student['name'],
+                    $student['email'],
+                    $score['points_earned'] ?? '',
+                    $score['percentage_score'] ?? '',
+                    $score['letter_grade'] ?? '',
+                    $score['status'] ?? '',
+                    $score['score_status'] ?? '',
+                    $submission['submitted_at'] ?? '',
+                    $grading['graded_at'] ?? '',
+                    $submission['is_late'] ? 'Yes' : 'No',
+                    $submission['minutes_late'] ?? '0',
+                    $submission['late_penalty_applied'] ?? '0',
+                    $flags['plagiarism_suspected'] ? 'Yes' : 'No',
+                    $flags['score_excluded'] ? 'Yes' : 'No',
+                    $flags['appeal_requested'] ? 'Yes' : 'No'
+                );
+            } else {
+                // Student without score
+                $student = $record['student'];
+                $csv .= sprintf(
+                    '"%s","%s","%s",,,,"not_submitted",,,,,,,,,,' . "\n",
+                    $student['student_id'],
+                    $student['name'],
+                    $student['email']
+                );
+            }
+        }
+
+        return $csv;
     }
 
     /**

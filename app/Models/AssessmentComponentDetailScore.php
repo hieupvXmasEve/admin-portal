@@ -61,6 +61,30 @@ class AssessmentComponentDetailScore extends AuditableModel
         'appeal_status',
     ];
 
+    protected $casts = [
+        'points_earned' => 'integer',
+        'percentage_score' => 'decimal:2',
+        'gpa_points' => 'decimal:2',
+        'submitted_at' => 'datetime',
+        'graded_at' => 'datetime',
+        'submission_files' => 'array',
+        'is_late' => 'boolean',
+        'late_penalty_applied' => 'decimal:2',
+        'late_excuse_approved' => 'boolean',
+        'rubric_scores' => 'array',
+        'bonus_points' => 'decimal:2',
+        'individual_score_override' => 'boolean',
+        'plagiarism_suspected' => 'boolean',
+        'plagiarism_score' => 'decimal:2',
+        'score_history' => 'array',
+        'last_modified_at' => 'datetime',
+        'is_extra_credit' => 'boolean',
+        'is_makeup' => 'boolean',
+        'score_excluded' => 'boolean',
+        'appeal_requested' => 'boolean',
+        'appeal_requested_at' => 'datetime',
+    ];
+
     /**
      * Configure activity logging for assessment scores
      */
@@ -120,29 +144,7 @@ class AssessmentComponentDetailScore extends AuditableModel
         ];
     }
 
-    protected $casts = [
-        'points_earned' => 'decimal:2',
-        'percentage_score' => 'decimal:2',
-        'gpa_points' => 'decimal:2',
-        'submitted_at' => 'datetime',
-        'graded_at' => 'datetime',
-        'submission_files' => 'array',
-        'is_late' => 'boolean',
-        'late_penalty_applied' => 'decimal:2',
-        'late_excuse_approved' => 'boolean',
-        'rubric_scores' => 'array',
-        'bonus_points' => 'decimal:2',
-        'individual_score_override' => 'boolean',
-        'plagiarism_suspected' => 'boolean',
-        'plagiarism_score' => 'decimal:2',
-        'score_history' => 'array',
-        'last_modified_at' => 'datetime',
-        'is_extra_credit' => 'boolean',
-        'is_makeup' => 'boolean',
-        'score_excluded' => 'boolean',
-        'appeal_requested' => 'boolean',
-        'appeal_requested_at' => 'datetime',
-    ];
+
 
     // Relationships
     public function assessmentComponentDetail(): BelongsTo

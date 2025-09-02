@@ -21,3 +21,4 @@ Schedule::command('sessions:update-statuses')
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();
+
