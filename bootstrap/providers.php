@@ -5,6 +5,6 @@ return [
     App\Providers\AuthServiceProvider::class,
     App\Providers\EventServiceProvider::class,
     App\Providers\PermissionServiceProvider::class,
-    App\Providers\TelescopeServiceProvider::class,
-    Barryvdh\Debugbar\ServiceProvider::class,
+    // App\Providers\TelescopeServiceProvider::class,
+    // Barryvdh\Debugbar\ServiceProvider::class,
 ];
