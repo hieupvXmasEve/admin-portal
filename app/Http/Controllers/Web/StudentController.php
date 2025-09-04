@@ -299,7 +299,7 @@ class StudentController extends Controller
             // Return redirect for web requests
             return redirect()
                 ->route(StudentRoutes::INDEX)
-                ->with('success', 'Student and all related data have been deleted successfully');
+                ->with('success', 'Student and all related data have been permanently deleted from database');
         } catch (\Exception $e) {
             Log::error('Failed to delete student', [
                 'student_id' => $student->id,
@@ -315,6 +315,7 @@ class StudentController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
+
 
     /**
      * Get students by IDs (API endpoint)
