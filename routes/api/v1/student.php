@@ -21,7 +21,7 @@ Route::prefix('auth')->name('auth.')->group(function () {
         ->name('login');
 
     Route::post('/login/google', [AuthController::class, 'loginWithGoogle'])
-        ->middleware(['student.api.rate:student-auth'])
+//        ->middleware(['student.api.rate:student-auth'])
         ->name('login.google');
 
     Route::post('/refresh', [AuthController::class, 'refresh'])
