@@ -22,7 +22,9 @@ class ProgramMappingService
         'Trí tuệ nhân tạo' => 'AI',  // AI Vietnamese name → AI code
         'AI' => 'AI',             // AI → AI (direct match)
         'Tài chính' => 'FIN',            // TC → Finance
-        'Quản trị kinh doanh' => 'BA',             // IT → Business Analytics
+        'Quản trị kinh doanh' => 'BA',             // IT → Business Analytics,
+        'Hệ thống IoT Thông minh' => 'IOT',
+        'Công nghệ phần mềm' => 'SWT'
     ];
 
     /**

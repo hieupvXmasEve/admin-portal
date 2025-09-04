@@ -55,19 +55,24 @@ class ProfileService
     public function uploadAvatar(Student $student, UploadedFile $file): array
     {
         // Delete old avatar if exists
-        if ($student->avatar_path) {
-            Storage::disk('public')->delete($student->avatar_path);
+        if ($student->avatar_url) {
+            // Extract path from URL if it's stored as URL
+            $oldPath = str_replace(Storage::disk('public')->url(''), '', $student->avatar_url);
+            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
         }
 
         // Store new avatar
         $path = $file->store('avatars', 'public');
+        $avatarUrl = Storage::disk('public')->url($path);
 
-        $student->update(['avatar_path' => $path]);
+        $student->update(['avatar_url' => $avatarUrl]);
         $this->clearProfileCache($student);
 
         return [
             'avatar_path' => $path,
-            'avatar_url' => Storage::disk('public')->url($path),
+            'avatar_url' => $avatarUrl,
         ];
     }
 
@@ -127,16 +132,22 @@ class ProfileService
      */
     protected function getPersonalInfo(Student $student): array
     {
+        // Parse first and last name from full_name if they don't exist as separate fields
+        $nameParts = $student->full_name ? explode(' ', $student->full_name, 2) : ['', ''];
+        $firstName = $nameParts[0] ?? '';
+        $lastName = $nameParts[1] ?? '';
+        
         return [
             'student_id' => $student->student_id,
-            'first_name' => $student->first_name,
-            'last_name' => $student->last_name,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
             'full_name' => $student->full_name,
             'preferred_name' => $student->preferred_name,
             'date_of_birth' => $student->date_of_birth?->toDateString(),
             'gender' => $student->gender,
             'nationality' => $student->nationality,
-            'avatar_url' => $student->avatar_path ? Storage::disk('public')->url($student->avatar_path) : null,
+            'avatar_url' => $student->avatar_url,
+            'national_id' => $student->national_id,
         ];
     }
 
@@ -164,7 +175,7 @@ class ProfileService
                 'code' => $student->campus?->code,
                 'location' => $student->campus?->location,
             ],
-            'enrollment_date' => $student->enrollment_date?->toDateString(),
+            'enrollment_date' => $student->admission_date?->toDateString(),
             'expected_graduation_date' => $student->expected_graduation_date?->toDateString(),
             'study_mode' => (string) ($student->study_mode ?? ''),
             'status' => (string) ($student->status ?? ''),
@@ -176,19 +187,23 @@ class ProfileService
      */
     protected function getContactInfo(Student $student): array
     {
+        // Parse address if it's a single string field or provide empty structure
+        $addressData = [
+            'street' => null,
+            'city' => null,
+            'state' => null,
+            'postal_code' => null,
+            'country' => null,
+        ];
+        
         return [
             'email' => $student->email,
             'phone' => $student->phone,
             'emergency_contact_name' => $student->emergency_contact_name,
             'emergency_contact_phone' => $student->emergency_contact_phone,
             'emergency_contact_relationship' => $student->emergency_contact_relationship,
-            'address' => [
-                'street' => $student->address_street,
-                'city' => $student->address_city,
-                'state' => $student->address_state,
-                'postal_code' => $student->address_postal_code,
-                'country' => $student->address_country,
-            ],
+            'address' => $addressData,
+            'high_school_name' => $student->high_school_name,
         ];
     }
 
@@ -239,17 +254,22 @@ class ProfileService
      */
     protected function calculateProfileCompletion(Student $student): array
     {
+        // Parse first and last name from full_name for completion check
+        $nameParts = $student->full_name ? explode(' ', $student->full_name, 2) : ['', ''];
+        $firstName = $nameParts[0] ?? '';
+        $lastName = $nameParts[1] ?? '';
+        
         $fields = [
-            'first_name' => ! empty($student->first_name),
-            'last_name' => ! empty($student->last_name),
+            'full_name' => ! empty($student->full_name),
             'email' => ! empty($student->email),
             'phone' => ! empty($student->phone),
             'date_of_birth' => ! empty($student->date_of_birth),
-            'address_street' => ! empty($student->address_street),
-            'address_city' => ! empty($student->address_city),
+            'address' => ! empty($student->address),
             'emergency_contact_name' => ! empty($student->emergency_contact_name),
             'emergency_contact_phone' => ! empty($student->emergency_contact_phone),
-            'avatar_path' => ! empty($student->avatar_path),
+            'avatar_url' => ! empty($student->avatar_url),
+            'gender' => ! empty($student->gender),
+            'nationality' => ! empty($student->nationality),
         ];
 
         $completedFields = array_filter($fields);
@@ -272,24 +292,12 @@ class ProfileService
     protected function filterUpdateableFields(array $data): array
     {
         $allowedFields = [
-            'preferred_name',
+            'full_name',
             'phone',
-            'emergency_contact_name',
-            'emergency_contact_phone',
-            'emergency_contact_relationship',
-            'address_street',
-            'address_city',
-            'address_state',
-            'address_postal_code',
-            'address_country',
-            'preferred_language',
-            'timezone',
-            'date_format',
-            'time_format',
-            'theme_preference',
-            'email_notifications',
-            'push_notifications',
-            'sms_notifications',
+            'date_of_birth',
+            'address',
+            'high_school_name',
+            'gender',
         ];
 
         return array_intersect_key($data, array_flip($allowedFields));

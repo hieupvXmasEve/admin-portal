@@ -46,6 +46,7 @@ class ProfileResource extends JsonResource
                     : null,
                 'gender' => $personalInfo['gender'],
                 'nationality' => $personalInfo['nationality'],
+                'national_id' => $personalInfo['national_id'],
             ],
             'avatar' => [
                 'url' => $personalInfo['avatar_url'],
@@ -128,6 +129,7 @@ class ProfileResource extends JsonResource
                 'formatted_address' => $this->formatAddress($contactInfo['address']),
                 'is_complete' => $this->isAddressComplete($contactInfo['address']),
             ],
+            'high_school_name' => $contactInfo['high_school_name'],
         ];
     }
 
