@@ -157,12 +157,11 @@ class TimetableService
      */
     protected function generateWeeklySchedule(Collection $classSessions): array
     {
-        $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         $schedule = [];
 
         foreach ($daysOfWeek as $day) {
             $dayMap = [
-                'sunday' => 0,
                 'monday' => 1,
                 'tuesday' => 2,
                 'wednesday' => 3,
