@@ -14,7 +14,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Student extends StudentAuditableModel
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $guard = 'student';
 

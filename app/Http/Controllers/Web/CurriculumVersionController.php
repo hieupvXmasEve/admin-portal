@@ -838,16 +838,16 @@ class CurriculumVersionController extends Controller
     {
         $validated = $request->validate([
             'program_id' => 'required|exists:programs,id',
-            'specialization_id' => 'nullable|exists:specializations,id',
+//            'specialization_id' => 'nullable|exists:specializations,id',
         ]);
 
         $query = CurriculumVersion::where('program_id', $validated['program_id']);
 
-        if ($validated['specialization_id']) {
-            $query->where('specialization_id', $validated['specialization_id']);
-        } else {
-            $query->whereNull('specialization_id');
-        }
+//        if ($validated['specialization_id']) {
+//            $query->where('specialization_id', $validated['specialization_id']);
+//        } else {
+//            $query->whereNull('specialization_id');
+//        }
 
         $versions = $query->orderBy('created_at', 'desc')
             ->get(['id', 'version_code'])

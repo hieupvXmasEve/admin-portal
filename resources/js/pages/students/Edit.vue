@@ -13,7 +13,7 @@ import { Head, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { Building, GraduationCap, Mail, Phone, Save, User, X } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
@@ -25,7 +25,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log('Props', props.student);
 
 // Form validation schema
 const formSchema = toTypedSchema(
@@ -41,7 +40,7 @@ const formSchema = toTypedSchema(
         address: z.string().optional(),
         campus_id: z.string().min(1, 'Campus is required'),
         program_id: z.string().min(1, 'Program is required'),
-        specialization_id: z.string().optional(),
+        // specialization_id: z.string().optional(),
         curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
         admission_date: z.string().min(1, 'Admission date is required'),
         expected_graduation_date: z.string().optional(),
@@ -70,7 +69,7 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         address: props.student.address || '',
         campus_id: props.student.campus_id.toString(),
         program_id: props.student.program_id.toString(),
-        specialization_id: props.student.specialization_id?.toString() || '',
+        // specialization_id: props.student.specialization_id?.toString() || '',
         curriculum_version_id: props.student.curriculum_version_id.toString(),
         admission_date: props.student.admission_date || '',
         emergency_contact_name: props.student.emergency_contact_name || '',
@@ -89,15 +88,16 @@ const availableCurriculumVersions = ref<CurriculumVersion[]>([]);
 const loadingCurriculumVersions = ref(false);
 
 // Computed specializations filtered by selected program (same as Create.vue)
-const filteredSpecializations = computed(() => {
-    if (!values.program_id) return [];
-    const selectedProgram = props.programs.find((p) => p.id.toString() === values.program_id);
-    return selectedProgram?.specializations || [];
-});
+// const filteredSpecializations = computed(() => {
+//     if (!values.program_id) return [];
+//     const selectedProgram = props.programs.find((p) => p.id.toString() === values.program_id);
+//     return selectedProgram?.specializations || [];
+// });
 
 // Fetch curriculum versions based on program and specialization (same as Create.vue)
 const fetchCurriculumVersions = async () => {
-    if (!values.program_id || !values.specialization_id) {
+    // if (!values.program_id || !values.specialization_id) {
+    if (!values.program_id) {
         availableCurriculumVersions.value = [];
         return;
     }
@@ -107,7 +107,6 @@ const fetchCurriculumVersions = async () => {
     try {
         const params = new URLSearchParams({
             program_id: values.program_id,
-            specialization_id: values.specialization_id,
         });
 
         const response = await fetch(`/api/curriculum-versions/by-program-specialization?${params}`);
@@ -130,26 +129,27 @@ watch(
     () => values.program_id,
     (newProgramId, oldProgramId) => {
         if (newProgramId !== oldProgramId) {
-            setFieldValue('specialization_id', '');
+            // setFieldValue('specialization_id', '');
             setFieldValue('curriculum_version_id', '');
             availableCurriculumVersions.value = [];
-        }
-    },
-);
-
-// Watch for specialization changes to fetch curriculum versions (same as Create.vue)
-watch(
-    () => values.specialization_id,
-    (newSpecializationId, oldSpecializationId) => {
-        if (newSpecializationId !== oldSpecializationId) {
-            setFieldValue('curriculum_version_id', '');
             fetchCurriculumVersions();
         }
     },
 );
 
+// Watch for specialization changes to fetch curriculum versions (same as Create.vue)
+// watch(
+//     () => values.specialization_id,
+//     (newSpecializationId, oldSpecializationId) => {
+//         if (newSpecializationId !== oldSpecializationId) {
+//             setFieldValue('curriculum_version_id', '');
+//             fetchCurriculumVersions();
+//         }
+//     },
+// );
+
 // Initialize curriculum versions on mount if student has program and specialization
-if (props.student.program_id && props.student.specialization_id) {
+if (props.student.program_id) {
     fetchCurriculumVersions();
 }
 
@@ -159,7 +159,7 @@ const onSubmit = handleSubmit((formData) => {
         ...formData,
         campus_id: parseInt(formData.campus_id),
         program_id: parseInt(formData.program_id),
-        specialization_id: formData.specialization_id ? parseInt(formData.specialization_id) : null,
+        // specialization_id: formData.specialization_id ? parseInt(formData.specialization_id) : null,
         curriculum_version_id: parseInt(formData.curriculum_version_id),
         high_school_graduation_year: formData.high_school_graduation_year ? parseInt(formData.high_school_graduation_year) : null,
         entrance_exam_score: formData.entrance_exam_score ? parseFloat(formData.entrance_exam_score) : null,
@@ -202,12 +202,9 @@ const showSuccessMessage = ref(false);
 const handlePhotoSelected = (file: File, dataUrl: string) => {
     selectedPhoto.value = file;
     photoPreviewUrl.value = dataUrl;
-    console.log('dataUrl', dataUrl);
 };
 
 const handleAvatarUploaded = (avatarData: any) => {
-    console.log('Avatar uploaded:', avatarData);
-
     // Update the form field with the new avatar URL
     setFieldValue('avatar_url', avatarData.url);
 
@@ -446,24 +443,24 @@ const handleAvatarUploaded = (avatarData: any) => {
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField v-slot="{ componentField }" name="specialization_id">
-                        <FormItem>
-                            <FormLabel>Specialization</FormLabel>
-                            <Select v-bind="componentField" :disabled="!filteredSpecializations.length">
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select specialization" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">
-                                        {{ specialization.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+<!--                    <FormField v-slot="{ componentField }" name="specialization_id">-->
+<!--                        <FormItem>-->
+<!--                            <FormLabel>Specialization</FormLabel>-->
+<!--                            <Select v-bind="componentField" :disabled="!filteredSpecializations.length">-->
+<!--                                <FormControl>-->
+<!--                                    <SelectTrigger>-->
+<!--                                        <SelectValue placeholder="Select specialization" />-->
+<!--                                    </SelectTrigger>-->
+<!--                                </FormControl>-->
+<!--                                <SelectContent>-->
+<!--                                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">-->
+<!--                                        {{ specialization.name }}-->
+<!--                                    </SelectItem>-->
+<!--                                </SelectContent>-->
+<!--                            </Select>-->
+<!--                            <FormMessage />-->
+<!--                        </FormItem>-->
+<!--                    </FormField>-->
 
                     <FormField v-slot="{ componentField }" name="curriculum_version_id">
                         <FormItem>
