@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AddClassSessionModal from '@/components/AddClassSessionModal.vue';
 import QuickEditClassSessionModal from '@/components/QuickEditClassSessionModal.vue';
 import RoomSelectionModal from '@/components/RoomSelectionModal.vue';
 import StudentSearchModal from '@/components/StudentSearchModal.vue';
@@ -191,6 +192,9 @@ const roomSearch = ref('');
 // Quick edit modal state
 const quickEditOpen = ref(false);
 const selectedSession = ref<ClassSession | null>(null);
+
+// Add class session modal state
+const addSessionOpen = ref(false);
 const filteredRooms = computed(() => {
     const q = roomSearch.value.toLowerCase().trim();
     if (!q) return props.availableRooms || [];
@@ -271,6 +275,81 @@ const handleSessionUpdated = () => {
     router.reload({ only: ['courseOffering'] });
     toast.success('Class session updated successfully');
 };
+
+// Delete single class session
+const deleteClassSession = (session: ClassSession) => {
+    const sessionTitle = session.session_title || 'Unnamed Session';
+    const sessionDate = new Date(session.session_date).toLocaleDateString();
+
+    showConfirmDialog(
+        {
+            title: 'Delete Class Session',
+            message: `Are you sure you want to delete "${sessionTitle}" scheduled on ${sessionDate}? This action cannot be undone.`,
+            confirmText: 'Delete Session',
+        },
+        {
+            onConfirm: async () => {
+                try {
+                    const result = await api.delete(`/api/class-sessions/${session.id}`);
+
+                    if (result.data?.value?.success) {
+                        router.reload({
+                            only: ['courseOffering'],
+                        });
+                        toast.success('Class session deleted successfully');
+                    } else {
+                        toast.error(result.data?.value?.message || 'Failed to delete class session');
+                    }
+                } catch (error) {
+                    console.error('Error deleting class session:', error);
+                    toast.error('Failed to delete class session');
+                    throw error; // Keep dialog open on error
+                }
+            },
+        },
+    );
+};
+
+// Add class session functions
+const canAddSession = computed(() => {
+    // Check if we have a syllabus template with total_sessions limit
+    if (!props.courseOffering.syllabus_template?.total_sessions) {
+        return true; // No limit, can always add
+    }
+
+    const currentSessionCount = props.courseOffering.class_sessions?.length || 0;
+    return currentSessionCount < props.courseOffering.syllabus_template.total_sessions;
+});
+
+const openAddSessionModal = () => {
+    if (!canAddSession.value) {
+        const maxSessions = props.courseOffering.syllabus_template?.total_sessions || 0;
+        toast.error(`Cannot add more sessions. Maximum of ${maxSessions} sessions allowed by syllabus template.`);
+        return;
+    }
+    addSessionOpen.value = true;
+};
+
+const handleSessionCreated = () => {
+    // Refresh the page to show updated data
+    router.reload({ only: ['courseOffering'] });
+    toast.success('Class session created successfully');
+};
+
+const getAddSessionButtonText = computed(() => {
+    if (!props.courseOffering.syllabus_template?.total_sessions) {
+        return 'Add Class Session';
+    }
+
+    const currentCount = props.courseOffering.class_sessions?.length || 0;
+    const maxSessions = props.courseOffering.syllabus_template.total_sessions;
+    
+    if (canAddSession.value) {
+        return `Add Class Session (${currentCount}/${maxSessions})`;
+    }
+    
+    return `Session Limit Reached (${currentCount}/${maxSessions})`;
+});
 </script>
 
 <template>
@@ -646,11 +725,32 @@ const handleSessionUpdated = () => {
                                                     <Eye class="h-4 w-4" />
                                                 </Button>
                                             </Link>
+                                            <Button v-if="session.status !== 'completed'" variant="ghost" size="sm" @click="deleteClassSession(session)" title="Delete Session" class="text-destructive hover:text-destructive hover:bg-destructive/10">
+                                                <Trash2 class="h-4 w-4" />
+                                            </Button>
                                         </div>
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
+                        <!-- Add Class Session Button -->
+                        <div class="flex items-center justify-center gap-2">
+                            <Button 
+                                @click="openAddSessionModal" 
+                                :disabled="!canAddSession"
+                                :variant="canAddSession ? 'default' : 'outline'"
+                            >
+                                <Calendar class="mr-2 h-4 w-4" />
+                                {{ getAddSessionButtonText }}
+                            </Button>
+                        </div>
+                        
+                        <!-- Session limit warning -->
+                        <div v-if="!canAddSession && courseOffering.syllabus_template?.total_sessions" class="text-center">
+                            <p class="text-sm text-orange-600">
+                                Session limit reached. Maximum of {{ courseOffering.syllabus_template.total_sessions }} sessions allowed by syllabus template.
+                            </p>
+                        </div>
                     </div>
                 </CardContent>
             </CollapsibleContent>
@@ -746,6 +846,9 @@ const handleSessionUpdated = () => {
 
     <!-- Quick Edit Class Session Modal -->
     <QuickEditClassSessionModal :open="quickEditOpen" :session="selectedSession" @update:open="quickEditOpen = $event" @session-updated="handleSessionUpdated" :campus_id="courseOffering.campus_id" />
+
+    <!-- Add Class Session Modal -->
+    <AddClassSessionModal :open="addSessionOpen" :course-offering-id="courseOffering.id" :campus_id="courseOffering.campus_id" @update:open="addSessionOpen = $event" @session-created="handleSessionCreated" />
 
     <!-- Registration Status Management Modal -->
     <!--    <RegistrationStatusModal-->

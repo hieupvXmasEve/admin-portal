@@ -104,4 +104,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/', [\App\Http\Controllers\Api\ClassSessionController::class, 'destroy'])
             ->middleware('can:edit_course_offering');
     });
+
+    // Individual Class Session Management
+    Route::post('api/class-sessions', [\App\Http\Controllers\Api\ClassSessionController::class, 'store'])
+        ->middleware('can:edit_course_offering')
+        ->name('api.class-sessions.store');
+        
+    Route::delete('api/class-sessions/{classSession}', [\App\Http\Controllers\Api\ClassSessionController::class, 'destroySingle'])
+        ->middleware('can:edit_course_offering')
+        ->name('api.class-sessions.destroy');
 });

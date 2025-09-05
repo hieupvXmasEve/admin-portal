@@ -102,4 +102,77 @@ class ClassSessionController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Create a new class session
+     */
+    public function store(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'course_offering_id' => 'required|exists:course_offerings,id',
+            'session_title' => 'required|string|max:255',
+            'session_description' => 'nullable|string',
+            'session_date' => 'required|date',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'session_type' => 'required|in:lecture,tutorial,practical,workshop,seminar,exam',
+            'delivery_mode' => 'required|in:in_person,online,hybrid',
+            'status' => 'required|in:scheduled,in_progress,completed,cancelled',
+            'attendance_required' => 'boolean',
+            'attendance_tracking_enabled' => 'boolean',
+            'online_meeting_url' => 'nullable|url',
+            'instructor_notes' => 'nullable|string',
+            'lecture_id' => 'nullable|exists:lectures,id',
+            'room_id' => 'nullable|exists:rooms,id',
+        ]);
+
+        try {
+            // Check syllabus template total_sessions limit
+            $courseOffering = CourseOffering::with('syllabusTemplate')->find($validated['course_offering_id']);
+            
+            if ($courseOffering && $courseOffering->syllabusTemplate && $courseOffering->syllabusTemplate->total_sessions) {
+                $currentSessionsCount = \App\Models\ClassSession::where('course_offering_id', $courseOffering->id)->count();
+                
+                if ($currentSessionsCount >= $courseOffering->syllabusTemplate->total_sessions) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Cannot create session. Course offering has reached the maximum of {$courseOffering->syllabusTemplate->total_sessions} sessions allowed by the syllabus template.",
+                    ], 400);
+                }
+            }
+
+            $classSession = $this->classSessionService->createClassSession($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Class session created successfully',
+                'data' => $classSession,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create class session: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a single class session
+     */
+    public function destroySingle(\App\Models\ClassSession $classSession): JsonResponse
+    {
+        try {
+            $deleted = $this->classSessionService->deleteClassSession($classSession);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Class session deleted successfully',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete class session: '.$e->getMessage(),
+            ], 500);
+        }
+    }
 }
