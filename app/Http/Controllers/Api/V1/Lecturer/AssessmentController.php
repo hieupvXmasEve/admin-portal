@@ -1016,10 +1016,13 @@ class AssessmentController extends Controller
 
     /**
      * Check if lecturer can access the course offering
+     * Uses class session based authorization - lecturer must have at least one class session assigned
      */
     private function canAccessCourseOffering($lecturer, CourseOffering $courseOffering): bool
     {
-        return $courseOffering->lecture_id === $lecturer->id;
+        return $courseOffering->classSessions()
+            ->where('lecture_id', $lecturer->id)
+            ->exists();
     }
 
     /**

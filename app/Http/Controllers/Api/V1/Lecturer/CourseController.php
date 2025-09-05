@@ -151,11 +151,15 @@ class CourseController extends Controller
         $lecturer = $request->user();
 
         try {
-            // Verify lecturer has access to this course
-            $courseOffering = $lecturer->courseOfferings()
+            // Verify lecturer has access to this course through class sessions assignment
+            $courseOffering = \App\Models\CourseOffering::query()
+                ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
+                    $sessionQuery->where('lecture_id', $lecturer->id);
+                })
                 ->with([
-                    'classSessions' => function ($q) {
-                        $q->orderBy('session_date', 'asc');
+                    'classSessions' => function ($q) use ($lecturer) {
+                        $q->where('lecture_id', $lecturer->id)
+                          ->orderBy('session_date', 'asc');
                     },
                 ])
                 ->where('id', $courseOfferingId)
