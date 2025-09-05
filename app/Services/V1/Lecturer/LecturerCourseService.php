@@ -16,21 +16,28 @@ class LecturerCourseService
 {
     /**
      * Get lecturer's course offerings with filtering and pagination
+     * Only returns course offerings where the lecturer is assigned to at least one class session
      */
     public function getCourseOfferings(
         Lecture $lecturer,
         array $filters = [],
         int $perPage = 15
     ): LengthAwarePaginator {
-        $query = $lecturer->courseOfferings()
+        // Changed from lecturer->courseOfferings() to CourseOffering model query
+        // Filter by course offerings that have at least one class session assigned to this lecturer
+        $query = CourseOffering::query()
+            ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
+                $sessionQuery->where('lecture_id', $lecturer->id);
+            })
             ->with([
                 'curriculumUnit',
                 'semester',
                 'courseRegistrations' => function ($q) {
                     $q->where('registration_status', 'confirmed');
                 },
-                'classSessions' => function ($q) {
-                    $q->orderBy('session_date', 'desc');
+                'classSessions' => function ($q) use ($lecturer) {
+                    $q->where('lecture_id', $lecturer->id)
+                      ->orderBy('session_date', 'desc');
                 },
             ])
             ->where('is_active', true);
@@ -51,13 +58,18 @@ class LecturerCourseService
         $cacheKey = "lecturer-course-details:{$lecturer->id}:{$courseOfferingId}";
 
         return Cache::remember($cacheKey, 600, function () use ($lecturer, $courseOfferingId) {
-            $courseOffering = $lecturer->courseOfferings()
+            // Only get course offering if lecturer is assigned to at least one class session
+            $courseOffering = CourseOffering::query()
+                ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
+                    $sessionQuery->where('lecture_id', $lecturer->id);
+                })
                 ->with([
                     'curriculumUnit',
                     'semester',
                     'courseRegistrations.student',
-                    'classSessions' => function ($q) {
-                        $q->orderBy('session_date', 'asc');
+                    'classSessions' => function ($q) use ($lecturer) {
+                        $q->where('lecture_id', $lecturer->id)
+                          ->orderBy('session_date', 'asc');
                     },
                 ])
                 ->where('id', $courseOfferingId)
@@ -83,7 +95,11 @@ class LecturerCourseService
      */
     public function getUnitByCourseOfferingId(Lecture $lecturer, int $courseOfferingId): ?Unit
     {
-        $courseOffering = $lecturer->courseOfferings()
+        // Only get course offering if lecturer is assigned to at least one class session
+        $courseOffering = CourseOffering::query()
+            ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
+                $sessionQuery->where('lecture_id', $lecturer->id);
+            })
             ->where('id', $courseOfferingId)
             ->where('is_active', true)
             ->first();
@@ -100,8 +116,18 @@ class LecturerCourseService
      */
     public function getCourseStatistics(Lecture $lecturer, int $courseOfferingId): array
     {
-        $courseOffering = $lecturer->courseOfferings()
-            ->with(['courseRegistrations', 'classSessions.attendances'])
+        // Only get course offering if lecturer is assigned to at least one class session
+        $courseOffering = CourseOffering::query()
+            ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
+                $sessionQuery->where('lecture_id', $lecturer->id);
+            })
+            ->with([
+                'courseRegistrations', 
+                'classSessions' => function ($q) use ($lecturer) {
+                    $q->where('lecture_id', $lecturer->id)
+                      ->with('attendances');
+                }
+            ])
             ->where('id', $courseOfferingId)
             ->where('is_active', true)
             ->first();
@@ -127,7 +153,11 @@ class LecturerCourseService
         int $courseOfferingId,
         array $filters = []
     ): array {
-        $courseOffering = $lecturer->courseOfferings()
+        // Only get course offering if lecturer is assigned to at least one class session
+        $courseOffering = CourseOffering::query()
+            ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
+                $sessionQuery->where('lecture_id', $lecturer->id);
+            })
             ->where('id', $courseOfferingId)
             ->where('is_active', true)
             ->first();
@@ -203,18 +233,24 @@ class LecturerCourseService
      */
     public function getFilterOptions(Lecture $lecturer): array
     {
-        $semesters = $lecturer->courseOfferings()
+        // Get semesters from course offerings where lecturer has class sessions
+        $courseOfferings = CourseOffering::query()
+            ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
+                $sessionQuery->where('lecture_id', $lecturer->id);
+            })
             ->with('semester')
-            ->get()
+            ->get();
+
+        $semesters = $courseOfferings
             ->pluck('semester')
             ->unique('id')
             ->sortByDesc('start_date')
             ->values();
 
-        $deliveryModes = $lecturer->courseOfferings()
-            ->distinct()
+        $deliveryModes = $courseOfferings
             ->pluck('delivery_mode')
             ->filter()
+            ->unique()
             ->sort()
             ->values();
 
