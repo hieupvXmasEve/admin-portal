@@ -42,7 +42,11 @@ class LecturerDashboardService
      */
     public function getTeachingSummary(Lecture $lecturer, ?Semester $semester): array
     {
-        $query = $lecturer->courseOfferings()
+        // Use class session based logic instead of direct course offering relationship
+        $query = \App\Models\CourseOffering::query()
+            ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
+                $sessionQuery->where('lecture_id', $lecturer->id);
+            })
             ->where('campus_id', $lecturer->campus_id)
             ->where('is_active', true);
 
@@ -50,17 +54,24 @@ class LecturerDashboardService
             $query->where('semester_id', $semester->id);
         }
 
-        $courseOfferings = $query->with(['unit', 'courseRegistrations'])->get();
+        $courseOfferings = $query->with([
+            'unit', 
+            'courseRegistrations',
+            'classSessions' => function ($q) use ($lecturer) {
+                $q->where('lecture_id', $lecturer->id);
+            }
+        ])->get();
         Log::info('$courseOfferings', [
             'courseOfferings' => $courseOfferings,
         ]);
         $totalCourses = $courseOfferings->count();
         $totalStudents = $courseOfferings->sum('current_enrollment');
+        // Use eager-loaded relationships instead of additional queries
         $totalSessions = $courseOfferings->sum(function ($offering) {
-            return $offering->classSessions()->count();
+            return $offering->classSessions->count(); // Already filtered by lecturer in with()
         });
         $completedSessions = $courseOfferings->sum(function ($offering) {
-            return $offering->classSessions()->where('status', 'completed')->count();
+            return $offering->classSessions->where('status', 'completed')->count();
         });
 
         return [
