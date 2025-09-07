@@ -21,7 +21,7 @@ Route::prefix('auth')->name('auth.')->group(function () {
         ->name('login');
 
     Route::post('/login/google', [AuthController::class, 'loginWithGoogle'])
-//        ->middleware(['student.api.rate:student-auth'])
+        ->middleware(['student.api.rate:student-auth'])
         ->name('login.google');
 
     Route::post('/refresh', [AuthController::class, 'refresh'])
@@ -103,8 +103,8 @@ Route::middleware([
     // Attendance endpoints
     Route::prefix('attendance')->name('attendance.')->group(function () {
         Route::get('/', [AttendanceController::class, 'index'])->name('index');
-        Route::get('/summary', [AttendanceController::class, 'summary'])->name('summary');
-        Route::get('/alerts', [AttendanceController::class, 'alerts'])->name('alerts');
+//        Route::get('/summary', [AttendanceController::class, 'summary'])->name('summary');
+//        Route::get('/alerts', [AttendanceController::class, 'alerts'])->name('alerts');
         Route::get('/course/{courseOfferingId}', [AttendanceController::class, 'courseAttendance'])
             ->name('course-attendance');
     });

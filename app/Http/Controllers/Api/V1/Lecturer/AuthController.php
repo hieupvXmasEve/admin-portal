@@ -220,7 +220,7 @@ class AuthController extends Controller
                     'lecturer' => new LecturerResource($lecturer),
                     'token' => $token,
                     'token_type' => 'Bearer',
-                    'expires_in' => config('sanctum.expiration', 525600), // minutes
+                    'expires_in' => config('sanctum.expiration', 1440), // minutes
                 ],
                 message: 'Google login successful'
             );
