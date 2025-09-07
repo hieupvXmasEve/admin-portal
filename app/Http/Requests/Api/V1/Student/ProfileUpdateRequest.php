@@ -29,6 +29,8 @@ class ProfileUpdateRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:20', 'regex:/^[\+]?[0-9\s\-\(\)]+$/'],
             'date_of_birth' => ['nullable', 'date', 'before:today'],
             'address' => ['nullable', 'string', 'max:500'],
+            'cccd_address' => ['nullable', 'string', 'max:500'],
+            'national_id' => ['nullable', 'string', 'max:20'],
             'high_school_name' => ['nullable', 'string', 'max:255'],
             'gender' => ['nullable', 'in:male,female,other'],
         ];
@@ -46,6 +48,8 @@ class ProfileUpdateRequest extends FormRequest
             'date_of_birth.date' => 'Date of birth must be a valid date',
             'date_of_birth.before' => 'Date of birth must be before today',
             'address.max' => 'Address cannot exceed 500 characters',
+            'cccd_address.max' => 'CCCD address cannot exceed 500 characters',
+            'national_id.max' => 'National ID cannot exceed 20 characters',
             'high_school_name.max' => 'High school name cannot exceed 255 characters',
             'gender.in' => 'Gender must be one of: male, female, other',
         ];
