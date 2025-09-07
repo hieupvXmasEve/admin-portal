@@ -47,6 +47,8 @@ class ProfileResource extends JsonResource
                 'gender' => $personalInfo['gender'],
                 'nationality' => $personalInfo['nationality'],
                 'national_id' => $personalInfo['national_id'],
+                'address' => $personalInfo['address'],
+                'cccd_address' => $personalInfo['cccd_address'],
             ],
             'avatar' => [
                 'url' => $personalInfo['avatar_url'],

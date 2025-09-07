@@ -21,7 +21,7 @@ class ProfileService
     {
         $cacheKey = "profile:student:{$student->id}";
 
-        return Cache::remember($cacheKey, 600, function () use ($student) {
+        return Cache::remember($cacheKey, 1, function () use ($student) {
             return [
                 'personal_info' => $this->getPersonalInfo($student),
                 'academic_info' => $this->getAcademicInfo($student),
@@ -136,7 +136,7 @@ class ProfileService
         $nameParts = $student->full_name ? explode(' ', $student->full_name, 2) : ['', ''];
         $firstName = $nameParts[0] ?? '';
         $lastName = $nameParts[1] ?? '';
-        
+
         return [
             'student_id' => $student->student_id,
             'first_name' => $firstName,
@@ -148,6 +148,8 @@ class ProfileService
             'nationality' => $student->nationality,
             'avatar_url' => $student->avatar_url,
             'national_id' => $student->national_id,
+            'cccd_address' => $student->cccd_address,
+            'address' => $student->address,
         ];
     }
 
@@ -195,7 +197,7 @@ class ProfileService
             'postal_code' => null,
             'country' => null,
         ];
-        
+
         return [
             'email' => $student->email,
             'phone' => $student->phone,
@@ -258,13 +260,15 @@ class ProfileService
         $nameParts = $student->full_name ? explode(' ', $student->full_name, 2) : ['', ''];
         $firstName = $nameParts[0] ?? '';
         $lastName = $nameParts[1] ?? '';
-        
+
         $fields = [
             'full_name' => ! empty($student->full_name),
             'email' => ! empty($student->email),
             'phone' => ! empty($student->phone),
             'date_of_birth' => ! empty($student->date_of_birth),
             'address' => ! empty($student->address),
+            'cccd_address' => ! empty($student->cccd_address),
+            'national_id' => ! empty($student->national_id),
             'emergency_contact_name' => ! empty($student->emergency_contact_name),
             'emergency_contact_phone' => ! empty($student->emergency_contact_phone),
             'avatar_url' => ! empty($student->avatar_url),
@@ -296,6 +300,8 @@ class ProfileService
             'phone',
             'date_of_birth',
             'address',
+            'cccd_address',
+            'national_id',
             'high_school_name',
             'gender',
         ];
