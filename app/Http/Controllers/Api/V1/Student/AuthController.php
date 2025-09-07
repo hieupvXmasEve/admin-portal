@@ -218,36 +218,6 @@ class AuthController extends Controller
             // Check for student account
             $student = Student::where('email', $googleUserData['email'])->first();
 
-            if (! $student) {
-                // Handle student registration if allowed
-                if (config('app.allow_student_registration', false)) {
-                    $student = Student::create([
-                        'full_name' => $googleUserData['name'] ?? $googleUserData['email'],
-                        'email' => $googleUserData['email'],
-                        'oauth_provider' => 'google',
-                        'oauth_provider_id' => $googleUserData['id'],
-                        // 'avatar_url' => $googleUserData['picture'] ?? null,
-                        'status' => 'inactive', // Requires admin activation
-                        'email_verified_at' => now(),
-                    ]);
-
-                    return ApiResponse::success(
-                        data: [
-                            'student' => [
-                                'id' => $student->id,
-                                'full_name' => $student->full_name,
-                                'email' => $student->email,
-                                'status' => $student->status,
-                            ],
-                        ],
-                        message: 'Student account created successfully. Please wait for admin approval.',
-                        status: 201
-                    );
-                }
-
-                return ApiResponse::notFound('No student account found with this email. Please contact your administrator.');
-            }
-
             // Update OAuth provider data if not set
             if (! $student->oauth_provider_id) {
                 $student->update([

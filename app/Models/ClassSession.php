@@ -13,6 +13,38 @@ class ClassSession extends AuditableModel
 {
     use HasFactory;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::updating(function ($classSession) {
+            // Check if status is being updated to 'in_progress'
+            if ($classSession->isDirty('status') && $classSession->status === 'in_progress') {
+                $oldStatus = $classSession->getOriginal('status');
+                
+                // Only create attendance if it wasn't already in_progress
+                if ($oldStatus !== 'in_progress') {
+                    // Set started_at timestamp if not already set
+                    if (!$classSession->started_at) {
+                        $classSession->started_at = now();
+                    }
+                }
+            }
+        });
+
+        static::updated(function ($classSession) {
+            // After the model is saved, create attendance if status changed to in_progress
+            if ($classSession->wasChanged('status') && $classSession->status === 'in_progress') {
+                $oldStatus = $classSession->getOriginal('status');
+                
+                // Only create attendance if it wasn't already in_progress
+                if ($oldStatus !== 'in_progress') {
+                    $classSession->createDefaultAttendance();
+                }
+            }
+        });
+    }
+
     protected $fillable = [
         'course_offering_id',
         'room_id',
@@ -394,9 +426,43 @@ class ClassSession extends AuditableModel
 
             $this->save();
 
+            // Automatically create attendance when status changes to in_progress
+            if ($expectedStatus === 'in_progress' && $oldStatus !== 'in_progress') {
+                $this->createDefaultAttendance();
+            }
+
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * Get all enrolled students for this class session
+     */
+    public function getEnrolledStudents()
+    {
+        return Student::whereHas('courseRegistrations', function ($query) {
+            $query->where('course_offering_id', $this->course_offering_id)
+                ->whereIn('registration_status', ['registered', 'confirmed'])
+                ->where('semester_id', $this->courseOffering->semester_id);
+        })
+        ->where('status', 'active')
+        ->select(['id', 'student_id', 'full_name', 'email'])
+        ->get();
+    }
+
+    /**
+     * Create default attendance records for all enrolled students
+     */
+    public function createDefaultAttendance(): void
+    {
+        // Use the AttendanceService
+        $attendanceService = app(\App\Services\AttendanceService::class);
+        $result = $attendanceService->createAttendanceForSession($this);
+        
+        if (!$result['success']) {
+            \Illuminate\Support\Facades\Log::warning("Failed to auto-create attendance for session {$this->id}: {$result['message']}");
+        }
     }
 }
