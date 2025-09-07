@@ -21,7 +21,7 @@ class ProfileService
     {
         $cacheKey = "profile:student:{$student->id}";
 
-        return Cache::remember($cacheKey, 1, function () use ($student) {
+        return Cache::remember($cacheKey, 600, function () use ($student) {
             return [
                 'personal_info' => $this->getPersonalInfo($student),
                 'academic_info' => $this->getAcademicInfo($student),
