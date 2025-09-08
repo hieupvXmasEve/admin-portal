@@ -7,6 +7,7 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { CheckCircle2, LogOut, MapPin } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
 import { route } from 'ziggy-js';
+import { useSystemConfig } from '@/composables/useSystemConfig';
 
 interface Campus {
     id: number;
@@ -22,6 +23,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { systemConfig } = useSystemConfig();
 const selectedCampus = ref<Campus | null>(null);
 
 const form = useForm({
@@ -71,7 +73,7 @@ const handleLogout = () => {
             <!-- Header -->
             <div class="mb-8 text-center">
                 <h1 class="mb-2 text-3xl font-bold text-gray-900 md:text-4xl">Select Your Campus</h1>
-                <p class="mx-auto max-w-2xl text-lg text-gray-600">Choose your Swinburne campus to continue with your university experience</p>
+                <p class="mx-auto max-w-2xl text-lg text-gray-600">Choose your {{systemConfig.app_name}} campus to continue with your university experience</p>
             </div>
 
             <!-- Campus Grid -->
