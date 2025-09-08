@@ -16,7 +16,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
 });
-
+console.log('%c props', 'color: red', props.overview.student_info);
 // Status badge styling
 const getStatusBadgeVariant = (status: string) => {
     const variants: Record<string, string> = {
@@ -280,12 +280,22 @@ const hasAcademicConcerns = computed(() => {
                                 </div>
                             </div>
 
+                            <div class="pt-4">
+                                <Separator class="mb-4" />
+                                <div class="flex items-start gap-3">
+                                    <MapPin class="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0" />
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-muted-foreground text-sm">Address of Permanent Residence:</p>
+                                        <p class="font-medium">{{ overview.student_info.cccd_address || 'N/A' }}</p>
+                                    </div>
+                                </div>
+                            </div>
                             <div v-if="overview.student_info.address" class="pt-4">
                                 <Separator class="mb-4" />
                                 <div class="flex items-start gap-3">
                                     <MapPin class="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0" />
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-muted-foreground text-sm">Address</p>
+                                        <p class="text-muted-foreground text-sm">Current Address</p>
                                         <p class="font-medium">{{ overview.student_info.address }}</p>
                                     </div>
                                 </div>

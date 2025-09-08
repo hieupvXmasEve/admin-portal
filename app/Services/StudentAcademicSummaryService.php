@@ -134,6 +134,7 @@ class StudentAcademicSummaryService
                 'nationality' => $student->nationality,
                 'national_id' => $student->national_id,
                 'address' => $student->address,
+                'cccd_address' => $student->cccd_address,
                 'status' => $student->status,
                 'academic_status' => $student->academic_status,
                 'admission_date' => $student->admission_date,
