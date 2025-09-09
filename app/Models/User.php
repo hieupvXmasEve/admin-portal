@@ -234,6 +234,11 @@ class User extends UserAuditableModel
         return $this->hasMany(UserEmailPreference::class);
     }
 
+    public function children()
+    {
+        return $this->hasMany(Student::class, 'parent_user_id');
+    }
+
     /**
      * Email logs relationship
      */

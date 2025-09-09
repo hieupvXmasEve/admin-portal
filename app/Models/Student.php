@@ -52,6 +52,7 @@ class Student extends StudentAuditableModel
         'status_changed_by',
         'last_login_at',
         'email_verified_at',
+        'parent_user_id',
     ];
 
     protected $hidden = [
@@ -121,6 +122,11 @@ class Student extends StudentAuditableModel
     public function campus(): BelongsTo
     {
         return $this->belongsTo(Campus::class);
+    }
+
+    public function parentUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'parent_user_id');
     }
 
     public function program(): BelongsTo

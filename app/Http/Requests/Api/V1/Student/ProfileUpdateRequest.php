@@ -33,6 +33,9 @@ class ProfileUpdateRequest extends FormRequest
             'national_id' => ['nullable', 'string', 'max:20'],
             'high_school_name' => ['nullable', 'string', 'max:255'],
             'gender' => ['nullable', 'in:male,female,other'],
+            'emergency_contact_phone' => ['required', 'string', 'max:20', 'regex:/^[\+]?[0-9\s\-\(\)]+$/'],
+            'emergency_contact_name' => ['required', 'string', 'max:100'],
+            'emergency_contact_relationship' => ['required', 'string', 'max:50'],
         ];
     }
 
@@ -52,6 +55,10 @@ class ProfileUpdateRequest extends FormRequest
             'national_id.max' => 'National ID cannot exceed 20 characters',
             'high_school_name.max' => 'High school name cannot exceed 255 characters',
             'gender.in' => 'Gender must be one of: male, female, other',
+            'emergency_contact_phone.regex' => 'Phone number format is invalid',
+            'emergency_contact_name.max' => 'Name cannot exceed 100 characters',
+            'emergency_contact_name.required' => 'Name cannot be empty',
+            'emergency_contact_relationship.required' => 'Relationship cannot be empty',
         ];
     }
 
