@@ -1,0 +1,151 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Middleware;
+
+use App\Http\Responses\ApiResponse;
+use App\Models\Student;
+use App\Models\User;
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class ParentStudentAccess
+{
+    /**
+     * Handle an incoming request.
+     * 
+     * This middleware allows parents to access student APIs by:
+     * 1. If user is Student → pass through normally
+     * 2. If user is User (parent) → require student_id, verify relationship, inject Student
+     */
+    public function handle(Request $request, Closure $next): Response
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return ApiResponse::authenticationError('Authentication required');
+        }
+
+        // If already a Student, pass through normally
+        if ($user instanceof Student) {
+            return $next($request);
+        }
+
+        // If User (parent), check for student access
+        if ($user instanceof User) {
+            return $this->handleParentAccess($request, $next, $user);
+        }
+
+        return ApiResponse::authorizationError('Invalid user type');
+    }
+
+    /**
+     * Handle parent access to student APIs
+     */
+    protected function handleParentAccess(Request $request, Closure $next, User $parent): Response
+    {
+        // Get student_id from multiple possible sources
+        $studentId = $request->input('student_id') 
+                  ?? $request->header('X-Student-ID')
+                  ?? $request->route('student_id');
+
+        if (!$studentId) {
+            return ApiResponse::validationError([
+                'student_id' => ['Parent must specify student_id to access student data']
+            ]);
+        }
+
+        // Find the student and verify parent relationship
+        $student = Student::where('id', $studentId)
+                         ->orWhere('student_id', $studentId)
+                         ->first();
+
+        if (!$student) {
+            return ApiResponse::notFoundError('Student not found');
+        }
+
+        // Verify parent has access to this student
+        if (!$this->canParentAccessStudent($parent, $student)) {
+            return ApiResponse::authorizationError('You do not have permission to access this student\'s data');
+        }
+
+        // Check student account status
+        if (!$this->isStudentAccessible($student)) {
+            return ApiResponse::authorizationError('Student account is not accessible');
+        }
+
+        // Override the user resolver to return the Student instead of User
+        $request->setUserResolver(function () use ($student) {
+            return $student;
+        });
+
+        // Add parent context for logging/auditing
+        $request->attributes->set('accessing_parent', $parent);
+        $request->attributes->set('student_access_method', 'parent_proxy');
+
+        return $next($request);
+    }
+
+    /**
+     * Check if parent can access this student's data
+     */
+    protected function canParentAccessStudent(User $parent, Student $student): bool
+    {
+        // Direct parent relationship
+        if ($student->parent_user_id === $parent->id) {
+            return true;
+        }
+
+        // Could add additional parent-child relationships here if needed
+        // e.g., guardian relationships, secondary parents, etc.
+
+        return false;
+    }
+
+    /**
+     * Check if student account is in a state that allows access
+     */
+    protected function isStudentAccessible(Student $student): bool
+    {
+        // Check if student account is active
+        if (!in_array($student->status, ['active', 'enrolled'])) {
+            return false;
+        }
+
+        // Check for blocking academic holds (optional)
+        $hasBlockingHolds = $student->academicHolds()
+            ->where('status', 'active')
+            ->where('hold_category', 'all')
+            ->exists();
+
+        // Allow access even with holds for parent monitoring
+        // You might want to restrict this based on business rules
+        
+        return true;
+    }
+
+    /**
+     * Extract student ID from various route patterns
+     */
+    protected function getStudentIdFromRoute(Request $request): ?string
+    {
+        $route = $request->route();
+        
+        if (!$route) {
+            return null;
+        }
+
+        // Common route parameter names for student ID
+        $possibleParams = ['student', 'student_id', 'studentId'];
+        
+        foreach ($possibleParams as $param) {
+            if ($route->hasParameter($param)) {
+                return $route->parameter($param);
+            }
+        }
+
+        return null;
+    }
+}

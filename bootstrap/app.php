@@ -38,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'student.api.rate' => \App\Http\Middleware\StudentApiRateLimiter::class,
             'lecturer.api.auth' => \App\Http\Middleware\LecturerApiAuthorization::class,
             'lecturer.api.rate' => \App\Http\Middleware\LecturerApiRateLimiter::class,
+            'parent.student.access' => \App\Http\Middleware\ParentStudentAccess::class,
             'api.logging' => \App\Http\Middleware\ApiLogging::class,
         ]);
     })

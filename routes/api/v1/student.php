@@ -32,8 +32,9 @@ Route::prefix('auth')->name('auth.')->group(function () {
 // Protected student API routes
 Route::middleware([
     'auth:sanctum',
+    'parent.student.access',
     'student.api.auth',
-    'student.api.rate:student-api',
+//    'student.api.rate:student-api',
     'api.logging',
 ])->group(function () {
 

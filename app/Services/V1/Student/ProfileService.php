@@ -168,7 +168,7 @@ class ProfileService
             ],
             'curriculum_version' => [
                 'id' => $student->curriculumVersion?->id,
-                'version' => $student->curriculumVersion?->version,
+                'version' => $student->curriculumVersion?->version_code,
                 'effective_date' => $student->curriculumVersion?->effective_date?->toDateString(),
             ],
             'campus' => [
@@ -304,6 +304,9 @@ class ProfileService
             'national_id',
             'high_school_name',
             'gender',
+            'emergency_contact_name',
+            'emergency_contact_phone',
+            'emergency_contact_relationship',
         ];
 
         return array_intersect_key($data, array_flip($allowedFields));

@@ -69,6 +69,7 @@ class RoleAndPermissionSeeder extends Seeder
             ['id' => 2, 'name' => 'Giám Đốc Đào Tạo', 'code' => 'giam_doc_dao_tao'],
             ['id' => 3, 'name' => 'Trưởng Phòng', 'code' => 'truong_phong'],
             ['id' => 4, 'name' => 'Cán Bộ', 'code' => 'can_bo'],
+            ['id' => 5, 'name' => 'Phụ huynh', 'code' => 'parent'],
         ];
 
         foreach ($roles as $role) {
