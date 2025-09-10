@@ -264,7 +264,7 @@ const handlePageSizeChange = (pageSize: number) => {
                                 <SelectValue placeholder="All Semesters" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All Semesters</SelectItem>
+                                <SelectItem value="all">All Semesters</SelectItem>
                                 <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
                                     {{ semester.name }}
                                 </SelectItem>
@@ -279,7 +279,7 @@ const handlePageSizeChange = (pageSize: number) => {
                                 <SelectValue placeholder="All Statuses" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All Statuses</SelectItem>
+                                <SelectItem value="all">All Statuses</SelectItem>
                                 <SelectItem value="completed">Completed</SelectItem>
                                 <SelectItem value="in_progress">In Progress</SelectItem>
                                 <SelectItem value="withdrawn">Withdrawn</SelectItem>

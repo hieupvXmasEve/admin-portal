@@ -290,13 +290,30 @@ const hasAcademicConcerns = computed(() => {
                                     </div>
                                 </div>
                             </div>
-                            <div v-if="overview.student_info.address" class="pt-4">
+                            <div class="pt-4">
                                 <Separator class="mb-4" />
                                 <div class="flex items-start gap-3">
                                     <MapPin class="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0" />
                                     <div class="min-w-0 flex-1">
                                         <p class="text-muted-foreground text-sm">Current Address</p>
-                                        <p class="font-medium">{{ overview.student_info.address }}</p>
+                                        <p class="font-medium">{{ overview.student_info.address || 'N/A' }}</p>
+                                    </div>
+                                </div>
+                            </div> <div class="pt-4">
+                                <Separator class="mb-4" />
+                                <div class="flex items-start gap-3">
+                                    <User class="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0" />
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-muted-foreground text-sm">Emergency Name</p>
+                                        <p class="font-medium">{{ overview.student_info.emergency_contact_name || 'N/A' }}</p>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-muted-foreground text-sm">Emergency Phone</p>
+                                        <p class="font-medium">{{ overview.student_info.emergency_contact_phone || 'N/A' }}</p>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-muted-foreground text-sm">Emergency Relationship</p>
+                                        <Badge class="uppercase">{{ overview.student_info.emergency_contact_relationship || 'N/A' }}</Badge>
                                     </div>
                                 </div>
                             </div>

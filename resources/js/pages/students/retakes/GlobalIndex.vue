@@ -185,7 +185,7 @@ const handlePageSizeChange = (pageSize: number) => {
                                 <SelectValue placeholder="All Statuses" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All Statuses</SelectItem>
+                                <SelectItem value="all">All Statuses</SelectItem>
                                 <SelectItem value="registered">Registered</SelectItem>
                                 <SelectItem value="completed">Completed</SelectItem>
                                 <SelectItem value="dropped">Dropped</SelectItem>
