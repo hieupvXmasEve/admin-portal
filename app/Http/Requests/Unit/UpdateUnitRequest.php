@@ -38,7 +38,7 @@ class UpdateUnitRequest extends FormRequest
             'credit_points' => [
                 'required',
                 'numeric',
-                'min:0.25',
+                'min:0',
                 'max:999.99',
                 'decimal:0,2',
             ],

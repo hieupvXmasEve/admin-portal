@@ -312,7 +312,7 @@ const indexWithCurrentQuery = (): string => {
                         @input="validateCreditPoints($event.target.value)"
                         type="number"
                         step="1"
-                        min="1"
+                        min="0"
                         max="20"
                         placeholder="3.00"
                         :class="{ 'border-red-500': form.errors.credit_points }"
@@ -321,7 +321,7 @@ const indexWithCurrentQuery = (): string => {
                     <p v-if="form.errors.credit_points" class="text-sm text-red-600">
                         {{ form.errors.credit_points }}
                     </p>
-                    <p class="text-sm text-gray-500">Credit points must be between 0.25 and 999.99 (e.g., 3.00, 6.00).</p>
+                    <p class="text-sm text-gray-500">Credit points must be between 0 and 999 (e.g., 3.00, 6.00).</p>
                 </div>
             </CardContent>
         </Card>
