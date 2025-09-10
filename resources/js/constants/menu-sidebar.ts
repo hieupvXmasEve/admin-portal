@@ -503,6 +503,13 @@ export const mainNavItems: NavItem[] = [
                 icon: MailPlus,
                 requiredPermissions: ['view_email_template'],
             },
+            //     Email history
+            {
+                title: 'Email History',
+                href: systemRoutes.emailConfiguration.emailHistory(),
+                icon: Clock,
+                requiredPermissions: ['view_email_log'],
+            },
         ],
     },
 ];
