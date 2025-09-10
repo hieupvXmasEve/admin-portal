@@ -77,18 +77,17 @@ class EmailService
         );
 
         try {
-            // Render template content if template is provided
+            // Use the provided content directly and perform variable substitution if needed
             $htmlContent = $content;
             $textContent = null;
             $finalSubject = $subject;
 
-            if ($template) {
-                $rendered = $this->renderTemplate($template, $templateVariables);
-                $htmlContent = $rendered['html'] ?? $content;
-                $textContent = $rendered['text'] ?? null;
-                $finalSubject = $rendered['subject'] ?? $subject;
+            // If template variables are provided, substitute them in the provided content
+            if (!empty($templateVariables)) {
+                $finalSubject = $this->substituteVariables($subject, $templateVariables);
+                $htmlContent = $this->substituteVariables($content, $templateVariables);
                 
-                // Update email log with rendered subject
+                // Update email log with final subject
                 $emailLog->update(['subject' => $finalSubject]);
             }
 
@@ -349,17 +348,16 @@ class EmailService
         ];
 
         try {
-            // Render template content if provided
+            // Use the provided content directly and perform variable substitution if needed
             $htmlContent = $content;
             $textContent = null;
             $finalSubject = $subject;
 
-            if ($template) {
-                $rendered = $this->renderTemplate($template, $templateVariables);
-                $htmlContent = $rendered['html'] ?? $content;
-                $textContent = $rendered['text'] ?? null;
-                $finalSubject = $rendered['subject'] ?? $subject;
-            }
+            // IMPORTANT: Do NOT substitute global variables here for bulk.
+            // We will pass global variables to the job so that, per recipient,
+            // we can merge per-recipient variables over these fallbacks and
+            // substitute once. This avoids "first student" values being baked
+            // into all emails.
 
             // Validate rendered content
             $this->validateRenderedContent($htmlContent, $textContent);
@@ -378,7 +376,9 @@ class EmailService
                     $attachments,
                     $sender?->id,
                     $batchId,
-                    $chunkIndex
+                    $chunkIndex,
+                    $options['template_variables_per_recipient'] ?? null,
+                    $templateVariables // global fallbacks
                 );
             }
 
@@ -735,6 +735,17 @@ class EmailService
         }
 
         return $template->render($variables);
+    }
+
+    /**
+     * Substitute variables in content using {{ variable }} syntax
+     */
+    public function substituteVariables(string $content, array $variables): string
+    {
+        return preg_replace_callback('/\{\{\s*([^}]+)\s*\}\}/', function ($matches) use ($variables) {
+            $key = trim($matches[1]);
+            return $variables[$key] ?? $matches[0]; // Return original if variable not found
+        }, $content);
     }
 
     /**

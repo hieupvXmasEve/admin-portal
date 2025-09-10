@@ -1,20 +1,42 @@
 <script setup lang="ts">
 import { useBulkEmail } from '@/composables/useBulkEmail';
-import { ClockIcon, EyeIcon, PaperclipIcon, SendIcon, UploadIcon, XIcon } from 'lucide-vue-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useApi } from '@/composables/useApiRequest';
+import { debounce } from 'lodash-es';
+import { ClockIcon, EyeIcon, PaperclipIcon, SendIcon, UploadIcon, UserPlus, Users, XIcon } from 'lucide-vue-next';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import BulkEmailProgressModal from './components/BulkEmailProgressModal.vue';
 import EmailHistoryModal from './components/EmailHistoryModal.vue';
 import EmailPreviewModal from './components/EmailPreviewModal.vue';
+import EditorContent from '@/components/EditorContent.vue';
 
 const { emailTemplates, userRoles, campuses, isSubmitting, loadEmailTemplates, loadUserGroups, sendBulkEmail } = useBulkEmail();
 
-const recipientMode = ref<'manual' | 'groups' | 'upload'>('manual');
+const recipientMode = ref<'manual' | 'groups' | 'upload' | 'students'>('students');
 const showProgressModal = ref(false);
 const showPreviewModal = ref(false);
 const showHistoryModal = ref(false);
+const showStudentModal = ref(false);
 const currentBatchId = ref<string | null>(null);
 const uploadedFile = ref<File | null>(null);
 const uploadedRecipients = ref<string[]>([]);
+
+// Student selection functionality
+const api = useApi();
+const studentIds = ref('');
+const selectedStudents = ref<Array<{
+    id: number;
+    student_id: string;
+    fullname: string;
+    email: string;
+    curriculum_version_code?: string;
+}>>([]);
+const isSearchingStudents = ref(false);
 
 const form = reactive({
     manualRecipients: '',
@@ -24,6 +46,7 @@ const form = reactive({
     subject: '',
     content: '',
     templateVariables: {} as Record<string, string>,
+    templateVariablesPerRecipient: {} as Record<string, Record<string, string>>, // keyed by email
     attachments: [] as File[],
     chunkSize: 100,
     sendTest: false,
@@ -39,12 +62,12 @@ const selectedTemplate = computed(() => {
 
 const requiredTemplateVariables = computed(() => {
     if (!selectedTemplate.value) return [];
-    
+
     const content = selectedTemplate.value.subject + ' ' + selectedTemplate.value.html_content;
     const matches = content.match(/\{\{([^}]+)\}\}/g);
-    
+
     if (!matches) return [];
-    
+
     return [...new Set(matches.map(match => match.replace(/[{}]/g, '')))];
 });
 
@@ -61,6 +84,8 @@ const getTotalRecipients = () => {
             return getSelectedGroupsCount();
         case 'upload':
             return uploadedRecipients.value.length;
+        case 'students':
+            return selectedStudents.value.length;
         default:
             return 0;
     }
@@ -121,24 +146,123 @@ const removeAttachment = (index: number) => {
     form.attachments.splice(index, 1);
 };
 
+const buildPerRecipientVariables = () => {
+    // Build per-recipient variables from selected students
+    const vars: Record<string, Record<string, string>> = {}
+    selectedStudents.value.forEach((s) => {
+        // Create a comprehensive mapping of student data to template variables
+        const studentVars: Record<string, string> = {
+            name: s.fullname || '',
+            email: s.email || '',
+            student_name: s.fullname || '', // Common template variable
+            student_id: s.student_id || '',
+            program: s.program_name || '',
+            campus: s.campus_name || '',
+            specialization: s.specialization_name || '',
+            curriculum_version: s.curriculum_version_code || '',
+            status: s.status || '',
+        }
+        
+        // Add any additional fields that may be available
+        if (s.template_variables) {
+            Object.assign(studentVars, s.template_variables)
+        }
+        
+        vars[s.email] = studentVars
+    })
+    form.templateVariablesPerRecipient = vars
+}
+
 const onTemplateChange = () => {
     if (form.templateId) {
         const template = emailTemplates.value.find((t) => t.id === parseInt(form.templateId));
         if (template) {
             form.subject = template.subject;
             form.content = template.html_content;
-            
-            // Reset template variables and initialize with required ones
+
+            // Reset template variables and initialize with required ones (fallbacks)
             form.templateVariables = {};
             requiredTemplateVariables.value.forEach(variable => {
                 form.templateVariables[variable] = '';
             });
+
+            // When using students, derive per-recipient vars and populate global fallbacks
+            if (recipientMode.value === 'students' && selectedStudents.value.length > 0) {
+                buildPerRecipientVariables();
+                
+                // Also populate global template variables with fallback values
+                // This ensures the form validation passes and provides defaults
+                const firstStudent = selectedStudents.value[0];
+                if (firstStudent) {
+                    requiredTemplateVariables.value.forEach(variable => {
+                        switch(variable) {
+                            case 'name':
+                            case 'student_name':
+                                form.templateVariables[variable] = firstStudent.fullname || '';
+                                break;
+                            case 'email':
+                                form.templateVariables[variable] = firstStudent.email || '';
+                                break;
+                            case 'student_id':
+                                form.templateVariables[variable] = firstStudent.student_id || '';
+                                break;
+                            case 'program':
+                                form.templateVariables[variable] = firstStudent.program_name || '';
+                                break;
+                            case 'campus':
+                                form.templateVariables[variable] = firstStudent.campus_name || '';
+                                break;
+                            case 'specialization':
+                                form.templateVariables[variable] = firstStudent.specialization_name || '';
+                                break;
+                            case 'curriculum_version':
+                                form.templateVariables[variable] = firstStudent.curriculum_version_code || '';
+                                break;
+                            case 'status':
+                                form.templateVariables[variable] = firstStudent.status || '';
+                                break;
+                            default:
+                                // Try to get from template_variables if available
+                                if (firstStudent.template_variables && firstStudent.template_variables[variable]) {
+                                    form.templateVariables[variable] = firstStudent.template_variables[variable];
+                                }
+                                break;
+                        }
+                    });
+                }
+            }
         }
     } else {
         // Clear template variables when no template is selected
         form.templateVariables = {};
+        form.templateVariablesPerRecipient = {};
     }
 };
+
+const interpolate = (tpl: string, vars: Record<string, string>) => {
+    return tpl.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, key) => vars[key.trim()] ?? '')
+}
+
+const getPreviewSamples = () => {
+    if (!form.templateId || recipientMode.value !== 'students' || selectedStudents.value.length === 0) return []
+    const samples = selectedStudents.value.slice(0, 3).map((s) => {
+        const vars = form.templateVariablesPerRecipient[s.email] || {
+            name: s.fullname || '',
+            email: s.email || '',
+            student_name: s.fullname || '',
+            student_id: s.student_id || '',
+            program: s.program_name || '',
+            campus: s.campus_name || '',
+        }
+        return {
+            email: s.email,
+            name: s.fullname,
+            subject: interpolate(form.subject, vars),
+            content: interpolate(form.content, vars),
+        }
+    })
+    return samples
+}
 
 const previewEmail = () => {
     showPreviewModal.value = true;
@@ -159,8 +283,9 @@ const handleSubmit = async () => {
             recipients,
             subject: form.subject,
             content: form.content,
-            template_id: form.templateId || undefined,
+            template_id: form.templateId ? parseInt(form.templateId) : undefined,
             template_variables: form.templateVariables,
+            template_variables_per_recipient: form.templateVariablesPerRecipient,
             attachments: form.attachments,
             chunk_size: form.chunkSize,
         });
@@ -185,10 +310,14 @@ const getRecipients = (): string[] => {
             return [];
         case 'upload':
             return uploadedRecipients.value;
+        case 'students':
+            return selectedStudents.value.map(student => student.email);
         default:
             return [];
     }
-};const onSendingComplete = () => {
+};
+
+const onSendingComplete = () => {
     showProgressModal.value = false;
     currentBatchId.value = null;
 
@@ -208,7 +337,72 @@ const getRecipients = (): string[] => {
 
     uploadedFile.value = null;
     uploadedRecipients.value = [];
+    selectedStudents.value = [];
 };
+
+// Student search functionality
+const searchStudents = async () => {
+    if (!studentIds.value.trim()) {
+        toast.error('Please enter at least one student ID');
+        return;
+    }
+
+    isSearchingStudents.value = true;
+
+    try {
+        const studentIdArray = studentIds.value.trim().split(/\s+/).filter(id => id);
+
+        const response = await api.post('/api/students/by-ids', {
+            student_ids: studentIdArray,
+        });
+
+        if (response.data?.value?.success) {
+            const foundStudents = response.data.value.data.students;
+            const foundStudentIds = foundStudents.map((s: any) => s.student_id);
+            const notFoundIds = studentIdArray.filter(id => !foundStudentIds.includes(id));
+
+            if (notFoundIds.length > 0) {
+                toast.warning(`Some student IDs were not found: ${notFoundIds.join(', ')}`);
+            }
+
+            if (foundStudents.length > 0) {
+                // Add found students to selected list (avoiding duplicates)
+                const existingIds = new Set(selectedStudents.value.map(s => s.student_id));
+                const newStudents = foundStudents.filter((s: any) => !existingIds.has(s.student_id));
+
+                selectedStudents.value.push(...newStudents);
+                console.log(newStudents);
+                toast.success(`Added ${newStudents.length} student(s)`);
+            }
+
+            // Clear the input
+            studentIds.value = '';
+            showStudentModal.value = false;
+        } else {
+            toast.error('Failed to search students');
+        }
+    } catch (error) {
+        console.error('Error searching students:', error);
+        toast.error('Failed to search students');
+    } finally {
+        isSearchingStudents.value = false;
+    }
+};
+
+const removeStudent = (index: number) => {
+    const removed = selectedStudents.value.splice(index, 1);
+    if (removed.length && form.templateId) {
+        // Rebuild both per-recipient and global variables if template selected
+        onTemplateChange();
+    }
+};
+
+watch([selectedStudents, () => form.templateId, recipientMode], () => {
+    if (recipientMode.value === 'students' && form.templateId) {
+        // Trigger the full template change logic to rebuild both per-recipient and global variables
+        onTemplateChange();
+    }
+});
 </script>
 
 <template>
@@ -243,6 +437,13 @@ const getRecipients = (): string[] => {
                             <nav class="-mb-px flex space-x-8">
                                 <button
                                     type="button"
+                                    @click="recipientMode = 'students'"
+                                    :class="['border-b-2 px-1 py-2 text-sm font-medium', recipientMode === 'students' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
+                                >
+                                    Students
+                                </button>
+                                <button
+                                    type="button"
                                     @click="recipientMode = 'manual'"
                                     :class="['border-b-2 px-1 py-2 text-sm font-medium', recipientMode === 'manual' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700']"
                                 >
@@ -262,6 +463,7 @@ const getRecipients = (): string[] => {
                                 >
                                     Upload CSV
                                 </button>
+
                             </nav>
                         </div>
 
@@ -335,6 +537,93 @@ const getRecipients = (): string[] => {
                                     <div v-if="uploadedFile" class="mt-2 text-sm text-green-600">✓ {{ uploadedFile.name }} ({{ uploadedRecipients.length }} recipients)</div>
                                 </div>
                             </div>
+
+                            <!-- Students -->
+                            <div v-show="recipientMode === 'students'" class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <Label for="selected-students" class="block text-sm font-medium text-gray-700">Selected Students</Label>
+                                    <Dialog v-model:open="showStudentModal">
+                                        <DialogTrigger as-child>
+                                            <Button variant="outline" size="sm">
+                                                <UserPlus class="mr-2 h-4 w-4" />
+                                                Add Students
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent class="max-w-md">
+                                            <DialogHeader>
+                                                <DialogTitle class="flex items-center gap-2">
+                                                    <Users class="h-5 w-5" />
+                                                    Add Students
+                                                </DialogTitle>
+                                                <DialogDescription>
+                                                    Enter student IDs separated by whitespace to add them to the recipients.
+                                                </DialogDescription>
+                                            </DialogHeader>
+
+                                            <div class="space-y-4">
+                                                <div class="space-y-2">
+                                                    <Label for="student-ids">Student IDs</Label>
+                                                    <Input
+                                                        id="student-ids"
+                                                        v-model="studentIds"
+                                                        placeholder="Enter student IDs separated by spaces (e.g., ST001 ST002 ST003)"
+                                                        :disabled="isSearchingStudents"
+                                                    />
+                                                    <p class="text-muted-foreground text-sm">Students will be added to the email recipients list</p>
+                                                </div>
+                                            </div>
+
+                                            <DialogFooter>
+                                                <DialogClose as-child>
+                                                    <Button variant="outline" :disabled="isSearchingStudents">
+                                                        Cancel
+                                                    </Button>
+                                                </DialogClose>
+                                                <Button @click="searchStudents" :disabled="isSearchingStudents || !studentIds.trim()">
+                                                    {{ isSearchingStudents ? 'Searching...' : 'Add Students' }}
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+
+                                <div class="min-h-[100px]">
+                                    <div v-if="selectedStudents.length > 0" class="flex flex-wrap gap-2 rounded-md border border-input bg-background p-3">
+                                        <div
+                                            v-for="(student, index) in selectedStudents"
+                                            :key="student.id"
+                                            class="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm"
+                                        >
+                                            <div class="flex flex-col">
+                                                <span class="font-medium">{{ student.student_id }}</span>
+                                                <div class="text-xs text-gray-600">
+                                                    <span>{{ student.fullname }}</span>
+                                                    <span v-if="student.curriculum_version_code" class="ml-1">({{ student.curriculum_version_code }})</span>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                @click="removeStudent(index)"
+                                                variant="outline"
+                                                class="flex size-5 items-center justify-center rounded-sm text-gray-500 hover:text-red-600 cursor-pointer hover:border-red-500"
+                                            >
+                                                <XIcon class="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div v-else class="flex h-24 items-center justify-center rounded-md border-2 border-dashed border-gray-300 text-gray-500">
+                                        <div class="text-center">
+                                            <Users class="mx-auto h-8 w-8 mb-2" />
+                                            <p class="text-sm">No students selected</p>
+                                            <p class="text-xs">Click "Add Students" to select recipients</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div v-if="selectedStudents.length > 0" class="rounded-lg bg-blue-50 p-3">
+                                    <p class="text-sm text-blue-700">Selected {{ selectedStudents.length }} student(s) as email recipients</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -369,15 +658,10 @@ const getRecipients = (): string[] => {
 
                             <!-- Content -->
                             <div>
-                                <label for="content" class="block text-sm font-medium text-gray-700"> Email Content * </label>
-                                <textarea
-                                    id="content"
+                                <label class="block text-sm font-medium text-gray-700 mb-2"> Email Content * </label>
+                                <EditorContent
                                     v-model="form.content"
-                                    rows="12"
-                                    required
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                    :class="{ 'border-red-300': errors.content }"
-                                    placeholder="Enter your email content here..."
+                                    min-height="200px"
                                 />
                                 <p v-if="errors.content" class="mt-1 text-sm text-red-600">{{ errors.content[0] }}</p>
                             </div>
@@ -386,16 +670,43 @@ const getRecipients = (): string[] => {
                             <div v-if="requiredTemplateVariables.length > 0">
                                 <label class="mb-2 block text-sm font-medium text-gray-700"> Template Variables * </label>
                                 <div class="space-y-3 rounded-lg border border-gray-200 p-4">
-                                    <p class="text-sm text-gray-600">Fill in the required variables for the selected template:</p>
-                                    <div v-for="variable in requiredTemplateVariables" :key="variable" class="space-y-1">
-                                        <label :for="`var-${variable}`" class="block text-sm font-medium text-gray-700">{{ variable.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) }}</label>
-                                        <input
-                                            :id="`var-${variable}`"
-                                            v-model="form.templateVariables[variable]"
-                                            type="text"
-                                            class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                            :placeholder="`Enter ${variable.replace('_', ' ')}`"
-                                        />
+                                    <!-- Student mode: auto-derived -->
+                                    <div v-if="recipientMode === 'students' && selectedStudents.length > 0">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <div class="h-2 w-2 bg-green-500 rounded-full"></div>
+                                            <p class="text-sm text-green-700">Variables are automatically derived from selected students' data</p>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4 text-sm">
+                                            <div v-for="variable in requiredTemplateVariables" :key="variable" class="bg-gray-50 p-2 rounded">
+                                                <div class="font-medium text-gray-700">{{ variable.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) }}</div>
+                                                <div class="text-gray-500 text-xs mt-1">
+                                                    <template v-if="variable === 'name' || variable === 'student_name'">From student's fullname</template>
+                                                    <template v-else-if="variable === 'email'">From student's email</template>
+                                                    <template v-else-if="variable === 'student_id'">From student's ID</template>
+                                                    <template v-else-if="variable === 'program'">From student's program</template>
+                                                    <template v-else-if="variable === 'campus'">From student's campus</template>
+                                                    <template v-else-if="variable === 'specialization'">From student's specialization</template>
+                                                    <template v-else-if="variable === 'curriculum_version'">From student's curriculum version</template>
+                                                    <template v-else-if="variable === 'status'">From student's status</template>
+                                                    <template v-else>Per-student value</template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Manual/other modes: user input required -->
+                                    <div v-else>
+                                        <p class="text-sm text-gray-600">Fill in the fallback variables for the selected template:</p>
+                                        <div v-for="variable in requiredTemplateVariables" :key="variable" class="space-y-1">
+                                            <label :for="`var-${variable}`" class="block text-sm font-medium text-gray-700">{{ variable.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) }}</label>
+                                            <input
+                                                :id="`var-${variable}`"
+                                                v-model="form.templateVariables[variable]"
+                                                type="text"
+                                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                                :placeholder="`Enter ${variable.replace('_', ' ')}`"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -487,7 +798,7 @@ const getRecipients = (): string[] => {
         <BulkEmailProgressModal v-model:open="showProgressModal" :batch-id="currentBatchId" @complete="onSendingComplete" />
 
         <!-- Preview Modal -->
-        <EmailPreviewModal v-model:open="showPreviewModal" :subject="form.subject" :content="form.content" />
+        <EmailPreviewModal v-model:open="showPreviewModal" :subject="form.subject" :content="form.content" :samples="getPreviewSamples()" />
 
         <!-- History Modal -->
         <EmailHistoryModal v-model:open="showHistoryModal" />

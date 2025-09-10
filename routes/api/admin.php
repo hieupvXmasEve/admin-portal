@@ -24,6 +24,7 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     Route::get('/students', [StudentController::class, 'index'])->name('students.index');
     Route::get('/students/stats', [StudentController::class, 'stats'])->name('students.stats');
     Route::get('students/search', [WebStudentController::class, 'apiSearch'])->name('students.apiSearch');
+    Route::post('students/by-ids', [WebStudentController::class, 'getByStudentIds'])->name('students.getByStudentIds');
     Route::get('students/{student}', [WebStudentController::class, 'apiShow'])->name('students.apiShow');
 
     // Student Applications
@@ -76,11 +77,11 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
         Route::get('/{session}', [AdminScheduleController::class, 'show'])->name('show');
         Route::put('/{session}', [AdminScheduleController::class, 'update'])->name('update');
     });
-    
+
     // Rooms API - for dropdowns and quick edits
     Route::get('/rooms', [\App\Http\Controllers\Web\RoomController::class, 'apiIndex'])->name('rooms.api-index');
-    
-    // Lectures API - for dropdowns and quick edits  
+
+    // Lectures API - for dropdowns and quick edits
     Route::get('/lectures', [\App\Http\Controllers\Web\LectureController::class, 'apiIndex'])->name('lectures.api-index');
 });
 

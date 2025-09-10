@@ -1,4 +1,5 @@
 import '../css/app.css';
+import '../css/tiptap.css';
 
 import { createInertiaApp } from '@inertiajs/vue3';
 import { createPinia } from 'pinia';

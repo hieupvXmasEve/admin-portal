@@ -68,9 +68,12 @@ class EmailTemplateController extends Controller
                 'data' => $template,
             ], 201);
         } catch (ValidationException $e) {
+            // Get the first error message for a more user-friendly response
+            $firstError = collect($e->errors())->flatten()->first();
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Validation failed',
+                'message' => $firstError ?? 'Validation failed',
                 'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {

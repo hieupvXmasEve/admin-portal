@@ -6,6 +6,41 @@ Modern web application built with Laravel 12 + Vue.js 3 + Inertia.js for compreh
 
 ### Docker Development (Recommended)
 ```bash
+mkdir -p storage/app/private/email-attachments
+php -v
+php -m | grep -E 'pdo|mbstring|openssl|curl|zip|imagick'
+cp .env.example .env  # nếu chưa có
+php artisan key:generate --ansi
+chmod -R ug+rw storage bootstrap/cache
+php artisan storage:link
+
+composer install --no-dev --prefer-dist --optimize-autoloader
+npm ci
+npm run build
+# Nếu dùng SSR:
+# npm run build:ssr
+
+php artisan migrate --force
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan event:cache
+php artisan optimize
+
+#•  Production nên dùng Supervisor/systemd. Ví dụ Supervisor (/etc/supervisor/conf.d/laravel-worker.conf):
+[program:laravel-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/your-app/artisan queue:work --queue=emails,bulk-emails,notifications --sleep=1 --tries=5 --timeout=120
+autostart=true
+autorestart=true
+numprocs=3
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/laravel-worker.log
+stopwaitsecs=3600
+
+php artisan migrate:status
+php artisan about
+php artisan queue:retry all   # nếu cần retry
 # Development environment
 ./dev.sh start
 

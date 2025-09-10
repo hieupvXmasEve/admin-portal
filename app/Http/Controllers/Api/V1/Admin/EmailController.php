@@ -10,15 +10,17 @@ use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
 class EmailController extends Controller
 {
     public function __construct(
-        protected EmailService $emailService,
+        protected EmailService        $emailService,
         protected NotificationService $notificationService
-    ) {
+    )
+    {
     }
 
     /**
@@ -44,9 +46,13 @@ class EmailController extends Controller
 
             $attachmentPaths = [];
             if ($request->hasFile('attachments')) {
+                // Ensure the target directory exists on the configured 'local' disk
+                Storage::disk('local')->makeDirectory('email-attachments');
+
                 foreach ($request->file('attachments') as $file) {
                     $path = $file->store('email-attachments', 'local');
-                    $attachmentPaths[] = storage_path('app/' . $path);
+                    // Resolve the absolute path according to the disk's root
+                    $attachmentPaths[] = Storage::disk('local')->path($path);
                 }
             }
 
@@ -96,6 +102,7 @@ class EmailController extends Controller
                 'content' => 'required|string',
                 'template_id' => 'nullable|exists:email_templates,id',
                 'template_variables' => 'nullable|array',
+                'template_variables_per_recipient' => 'nullable|array',
                 'attachments' => 'nullable|array',
                 'attachments.*' => 'file|max:10240',
                 'chunk_size' => 'nullable|integer|min:10|max:500',
@@ -108,9 +115,13 @@ class EmailController extends Controller
 
             $attachmentPaths = [];
             if ($request->hasFile('attachments')) {
+                // Ensure the target directory exists on the configured 'local' disk
+                Storage::disk('local')->makeDirectory('email-attachments');
+
                 foreach ($request->file('attachments') as $file) {
                     $path = $file->store('email-attachments', 'local');
-                    $attachmentPaths[] = storage_path('app/' . $path);
+                    // Resolve the absolute path according to the disk's root
+                    $attachmentPaths[] = Storage::disk('local')->path($path);
                 }
             }
 
@@ -121,8 +132,11 @@ class EmailController extends Controller
                 $template,
                 $attachmentPaths,
                 Auth::user(),
-                $validated['template_variables'] ?? [], // templateVariables
-                $validated['chunk_size'] ?? 100 // chunkSize
+                $validated['template_variables'] ?? [], // templateVariables (global)
+                $validated['chunk_size'] ?? 100, // chunkSize
+                [
+                    'template_variables_per_recipient' => $validated['template_variables_per_recipient'] ?? null,
+                ]
             );
 
             return response()->json([

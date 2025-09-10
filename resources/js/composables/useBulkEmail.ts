@@ -49,6 +49,7 @@ interface BulkEmailData {
     content: string;
     template_id?: number;
     template_variables?: Record<string, string>;
+    template_variables_per_recipient?: Record<string, Record<string, string>>;
     attachments?: File[];
     chunk_size?: number;
 }
@@ -142,10 +143,19 @@ export function useBulkEmail() {
                 formData.append('chunk_size', data.chunk_size.toString());
             }
 
-            // Add template variables
+            // Add template variables (global)
             if (data.template_variables) {
                 Object.entries(data.template_variables).forEach(([key, value]) => {
                     formData.append(`template_variables[${key}]`, value);
+                });
+            }
+
+            // Add per-recipient template variables
+            if (data.template_variables_per_recipient) {
+                Object.entries(data.template_variables_per_recipient).forEach(([email, vars]) => {
+                    Object.entries(vars).forEach(([key, value]) => {
+                        formData.append(`template_variables_per_recipient[${email}][${key}]`, value);
+                    });
                 });
             }
 

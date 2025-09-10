@@ -14,10 +14,18 @@ import {
     InfoIcon
 } from 'lucide-vue-next'
 
+interface PreviewSample {
+    email: string
+    name?: string
+    subject: string
+    content: string
+}
+
 interface Props {
     open: boolean
     subject: string
     content: string
+    samples?: PreviewSample[]
 }
 
 interface Emits {
@@ -33,6 +41,10 @@ const isOpen = computed({
 })
 
 const activeTab = ref('rendered')
+const currentSampleIndex = ref(0)
+const hasSamples = computed(() => Array.isArray(props.samples) && (props.samples?.length || 0) > 0)
+const visibleSamples = computed(() => (props.samples || []).slice(0, 3))
+const setSample = (idx: number) => { if (idx >=0 && idx < visibleSamples.value.length) currentSampleIndex.value = idx }
 
 const isHtmlContent = computed(() => {
     return props.content.includes('<') && props.content.includes('>')
@@ -82,6 +94,26 @@ const closeModal = () => {
                                     </div>
                                 </div>
 
+                                <!-- Per-student selector (if provided) -->
+                                <div v-if="hasSamples" class="mb-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm text-gray-600">Showing preview for {{ visibleSamples.length }} sample recipient(s)</span>
+                                    </div>
+                                    <div class="flex gap-2 overflow-x-auto pb-2">
+                                        <button
+                                            v-for="(s, idx) in visibleSamples"
+                                            :key="s.email"
+                                            type="button"
+                                            @click="setSample(idx)"
+                                            :class="['px-3 py-2 rounded-md text-sm border', idx === currentSampleIndex ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50']"
+                                            title="Switch sample"
+                                        >
+                                            <div class="font-medium truncate max-w-[180px]">{{ s.name || s.email }}</div>
+                                            <div class="text-xs text-gray-500 truncate max-w-[180px]">{{ s.email }}</div>
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <!-- Content Tabs -->
                                 <div>
                                     <div class="border-b border-gray-200">
@@ -109,9 +141,23 @@ const closeModal = () => {
                                         <!-- Rendered View -->
                                         <div v-show="activeTab === 'rendered'"
                                             class="bg-white border rounded-lg p-6 max-h-96 overflow-y-auto">
-                                            <div v-if="isHtmlContent" v-html="content"></div>
-                                            <div v-else class="whitespace-pre-wrap font-mono text-sm">{{ content }}
-                                            </div>
+                                            <template v-if="hasSamples">
+                                                <div class="mb-4 text-sm text-gray-600 flex items-center gap-2">
+                                                    <span class="font-medium">To:</span>
+                                                    <span>{{ visibleSamples[currentSampleIndex].name || visibleSamples[currentSampleIndex].email }}</span>
+                                                    <span class="text-gray-400">&lt;{{ visibleSamples[currentSampleIndex].email }}&gt;</span>
+                                                </div>
+                                                <div class="mb-3 text-sm">
+                                                    <span class="font-medium text-gray-700">Subject:</span>
+                                                    <span class="text-gray-900">{{ visibleSamples[currentSampleIndex].subject || subject }}</span>
+                                                </div>
+                                                <div v-if="(visibleSamples[currentSampleIndex].content || content).includes('<') && (visibleSamples[currentSampleIndex].content || content).includes('>')" v-html="visibleSamples[currentSampleIndex].content || content"></div>
+                                                <div v-else class="whitespace-pre-wrap font-mono text-sm">{{ visibleSamples[currentSampleIndex].content || content }}</div>
+                                            </template>
+                                            <template v-else>
+                                                <div v-if="isHtmlContent" v-html="content"></div>
+                                                <div v-else class="whitespace-pre-wrap font-mono text-sm">{{ content }}</div>
+                                            </template>
                                         </div>
 
                                         <!-- Source Code -->

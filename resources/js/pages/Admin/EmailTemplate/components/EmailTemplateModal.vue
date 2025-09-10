@@ -1,493 +1,376 @@
-
 <script setup lang="ts">
-import { ref, computed, watch, reactive } from 'vue'
-import {
-  DialogRoot,
-  DialogPortal,
-  DialogOverlay,
-  DialogContent,
-  DialogTitle,
-  DialogClose
-} from 'reka-ui'
-import {
-  XIcon,
-  EyeIcon
-} from 'lucide-vue-next'
-import { useEmailTemplate } from '@/composables/useEmailTemplate'
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { useEmailTemplate } from '@/composables/useEmailTemplate';
+import { toTypedSchema } from '@vee-validate/zod';
+import { EyeIcon } from 'lucide-vue-next';
+import { useForm } from 'vee-validate';
+import { computed, ref, watch } from 'vue';
+import * as z from 'zod';
 
 interface Props {
-  open: boolean
-  template?: any
-  templateTypes: Record<string, string>
+    open: boolean;
+    template?: any;
+    templateTypes: Record<string, string>;
 }
 
 interface Emits {
-  (e: 'update:open', value: boolean): void
-  (e: 'saved'): void
+    (e: 'update:open', value: boolean): void;
+    (e: 'saved'): void;
 }
 
-const props = defineProps<Props>()
-const emit = defineEmits<Emits>()
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
 
-const { createTemplate, updateTemplate, previewTemplate } = useEmailTemplate()
+const { createTemplate, updateTemplate, previewTemplate } = useEmailTemplate();
 
 const isOpen = computed({
-  get: () => props.open,
-  set: (value) => emit('update:open', value)
-})
+    get: () => props.open,
+    set: (value) => emit('update:open', value),
+});
 
-const isEditing = computed(() => !!props.template && props.template.id > 0)
+const isEditing = computed(() => !!props.template && props.template.id > 0);
 
-const form = reactive({
-  name: '',
-  type: '',
-  subject: '',
-  html_content: '',
-  text_content: '',
-  description: '',
-  is_active: true
-})
+// Zod validation schema
+const formSchema = toTypedSchema(
+    z.object({
+        name: z.string().min(1, 'Template name is required'),
+        type: z.string().min(1, 'Template type is required'),
+        subject: z.string().min(1, 'Subject line is required'),
+        html_content: z.string().min(1, 'HTML content is required'),
+        text_content: z.string().optional(),
+        description: z.string().optional(),
+        is_active: z.boolean(),
+    }),
+);
 
-const errors = ref<Record<string, string[]>>({})
-const isSubmitting = ref(false)
-const isGeneratingPreview = ref(false)
-const activeTab = ref('html')
-const previewData = ref<any>(null)
-const sampleVariables = ref<Record<string, string>>({})
+// Form setup with vee-validate
+const { handleSubmit, setValues, values, resetForm } = useForm({
+    validationSchema: formSchema,
+});
+const isSubmitting = ref(false);
+const isGeneratingPreview = ref(false);
+const activeTab = ref('html');
+const previewData = ref<any>(null);
+const sampleVariables = ref<Record<string, string>>({});
 
 const commonVariables = [
-  { name: 'user_name', description: 'User full name' },
-  { name: 'user_email', description: 'User email address' },
-  { name: 'student_name', description: 'Student name' },
-  { name: 'student_id', description: 'Student ID' },
-  { name: 'course_name', description: 'Course name' },
-  { name: 'course_code', description: 'Course code' },
-  { name: 'semester', description: 'Current semester' },
-  { name: 'grade', description: 'Grade/Score' },
-  { name: 'deadline', description: 'Deadline date' },
-  { name: 'system_name', description: 'System name' }
-]
+    { name: 'user_name', description: 'User full name' },
+    { name: 'user_email', description: 'User email address' },
+    { name: 'student_name', description: 'Student name' },
+    { name: 'student_id', description: 'Student ID' },
+    { name: 'course_name', description: 'Course name' },
+    { name: 'course_code', description: 'Course code' },
+    { name: 'semester', description: 'Current semester' },
+    { name: 'grade', description: 'Grade/Score' },
+    { name: 'deadline', description: 'Deadline date' },
+    { name: 'system_name', description: 'System name' },
+];
 
 const extractedVariables = computed(() => {
-  const content = form.subject + ' ' + form.html_content + ' ' + (form.text_content || '')
-  const matches = content.match(/\{\{([^}]+)\}\}/g)
-  if (!matches) return []
+    const content = (values.subject || '') + ' ' + (values.html_content || '') + ' ' + (values.text_content || '');
+    const matches = content.match(/\{\{([^}]+)\}\}/g);
+    if (!matches) return [];
 
-  return [...new Set(matches.map(match => match.slice(2, -2).trim()))]
-})
+    return [...new Set(matches.map((match) => match.slice(2, -2).trim()))];
+});
 
 // Watch for template changes
-watch(() => props.template, (template) => {
-  if (template) {
-    Object.assign(form, {
-      name: template.name || '',
-      type: template.type || '',
-      subject: template.subject || '',
-      html_content: template.html_content || '',
-      text_content: template.text_content || '',
-      description: template.description || '',
-      is_active: template.is_active ?? true
-    })
+watch(
+    () => [props.open, props.template],
+    ([isOpen, template]) => {
+        if (isOpen) {
+            previewData.value = null;
+            activeTab.value = 'html';
 
-    // Initialize sample variables
-    if (template.variables) {
-      const samples: Record<string, string> = {}
-      template.variables.forEach((variable: string) => {
-        samples[variable] = `[${variable}]`
-      })
-      sampleVariables.value = samples
-    }
-  } else {
-    // Reset form for new template
-    Object.assign(form, {
-      name: '',
-      type: '',
-      subject: '',
-      html_content: '',
-      text_content: '',
-      description: '',
-      is_active: true
-    })
-    sampleVariables.value = {}
-  }
-  errors.value = {}
-  previewData.value = null
-  activeTab.value = 'html'
-}, { immediate: true })
+            if (template) {
+                setValues({
+                    name: template.name || '',
+                    type: template.type || '',
+                    subject: template.subject || '',
+                    html_content: template.html_content || '',
+                    text_content: template.text_content || '',
+                    description: template.description || '',
+                    is_active: template.is_active ?? true,
+                });
+
+                // Initialize sample variables
+                if (template.variables) {
+                    const samples: Record<string, string> = {};
+                    template.variables.forEach((variable: string) => {
+                        samples[variable] = `[${variable}]`;
+                    });
+                    sampleVariables.value = samples;
+                }
+            } else {
+                // Reset form for new template
+                setValues({
+                    name: '',
+                    type: '',
+                    subject: '',
+                    html_content: '',
+                    text_content: '',
+                    description: '',
+                    is_active: true,
+                });
+                sampleVariables.value = {};
+            }
+        }
+    },
+    { immediate: true },
+);
 
 // Watch for variable changes to update sample variables
 watch(extractedVariables, (newVariables) => {
-  const samples: Record<string, string> = {}
-  newVariables.forEach(variable => {
-    samples[variable] = sampleVariables.value[variable] || `[${variable}]`
-  })
-  sampleVariables.value = samples
-})
+    const samples: Record<string, string> = {};
+    newVariables.forEach((variable) => {
+        samples[variable] = sampleVariables.value[variable] || `[${variable}]`;
+    });
+    sampleVariables.value = samples;
+});
 
 const generatePreview = async () => {
-  if (!form.html_content) return
+    if (!values.html_content) return;
 
-  isGeneratingPreview.value = true
-  try {
-    // Create a temporary template object for preview
-    const tempTemplate = {
-      subject: form.subject,
-      html_content: form.html_content,
-      text_content: form.text_content
+    isGeneratingPreview.value = true;
+    try {
+        // Create a temporary template object for preview
+        const tempTemplate = {
+            subject: values.subject || '',
+            html_content: values.html_content || '',
+            text_content: values.text_content || '',
+        };
+
+        // Use sample variables for preview
+        const variables = { ...sampleVariables.value };
+
+        // Simple client-side preview generation
+        let subject = tempTemplate.subject;
+        let html = tempTemplate.html_content;
+        let text = tempTemplate.text_content || '';
+
+        Object.entries(variables).forEach(([key, value]) => {
+            const placeholder = `{{${key}}}`;
+            subject = subject.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
+            html = html.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
+            text = text.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
+        });
+
+        previewData.value = {
+            subject,
+            html,
+            text: text || null,
+        };
+    } catch (error) {
+        console.error('Failed to generate preview:', error);
+    } finally {
+        isGeneratingPreview.value = false;
     }
+};
 
-    // Use sample variables for preview
-    const variables = { ...sampleVariables.value }
+const onSubmit = handleSubmit(async (formValues) => {
+    isSubmitting.value = true;
 
-    // Simple client-side preview generation
-    let subject = tempTemplate.subject
-    let html = tempTemplate.html_content
-    let text = tempTemplate.text_content || ''
+    try {
+        if (isEditing.value) {
+            await updateTemplate(props.template.id, formValues);
+        } else {
+            await createTemplate(formValues);
+        }
 
-    Object.entries(variables).forEach(([key, value]) => {
-      const placeholder = `{{${key}}}`
-      subject = subject.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value)
-      html = html.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value)
-      text = text.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value)
-    })
-
-    previewData.value = {
-      subject,
-      html,
-      text: text || null
+        emit('saved');
+    } catch (error: any) {
+        console.error('Failed to save template:', error);
+    } finally {
+        isSubmitting.value = false;
     }
-  } catch (error) {
-    console.error('Failed to generate preview:', error)
-  } finally {
-    isGeneratingPreview.value = false
-  }
-}
-
-const handleSubmit = async () => {
-  isSubmitting.value = true
-  errors.value = {}
-
-  try {
-    if (isEditing.value) {
-      await updateTemplate(props.template.id, form)
-    } else {
-      await createTemplate(form)
-    }
-
-    emit('saved')
-  } catch (error: any) {
-    if (error.response?.data?.errors) {
-      errors.value = error.response.data.errors
-    } else {
-      console.error('Failed to save template:', error)
-    }
-  } finally {
-    isSubmitting.value = false
-  }
-}
+});
 
 const closeModal = () => {
-  isOpen.value = false
-}
+    isOpen.value = false;
+};
 </script>
 
 <template>
-  <DialogRoot v-model:open="isOpen">
-    <DialogPortal>
-      <DialogOverlay class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity z-50" />
-      <DialogContent class="fixed inset-0 z-50 overflow-y-auto">
-        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-          <div class="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:p-6">
-          <div>
-            <div class="flex items-center justify-between">
-              <DialogTitle class="text-lg font-semibold leading-6 text-gray-900">
-                {{ isEditing ? 'Edit Email Template' : 'Create Email Template' }}
-              </DialogTitle>
-              <DialogClose class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                <XIcon class="h-6 w-6" />
-              </DialogClose>
-            </div>
+    <Dialog v-model:open="isOpen">
+        <DialogContent class="max-h-[90vh] max-w-4xl overflow-y-auto">
+            <DialogHeader>
+                <DialogTitle>
+                    {{ isEditing ? 'Edit Email Template' : 'Create Email Template' }}
+                </DialogTitle>
+                <DialogDescription></DialogDescription>
+            </DialogHeader>
 
-            <form @submit.prevent="handleSubmit" class="mt-6 space-y-6">
-              <!-- Basic Information -->
-              <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <label for="name" class="block text-sm font-medium text-gray-700">
-                    Template Name *
-                  </label>
-                  <input
-                    id="name"
-                    v-model="form.name"
-                    type="text"
-                    required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    :class="{ 'border-red-300': errors.name }"
-                    placeholder="e.g., Welcome Email, Grade Notification"
-                  />
-                  <p v-if="errors.name" class="mt-1 text-sm text-red-600">{{ errors.name[0] }}</p>
+            <form @submit.prevent="onSubmit" class="space-y-6">
+                <!-- Basic Information -->
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <FormField name="name" v-slot="{ componentField }">
+                        <FormItem>
+                            <FormLabel>Template Name *</FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="e.g., Welcome Email, Grade Notification" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField name="type" v-slot="{ componentField }">
+                        <FormItem>
+                            <FormLabel>Template Type *</FormLabel>
+                            <Select v-bind="componentField">
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select type" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem v-for="(label, value) in templateTypes" :key="value" :value="value">
+                                        {{ label }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField name="description" v-slot="{ componentField }" class="sm:col-span-2">
+                        <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                                <Textarea v-bind="componentField" rows="2" placeholder="Brief description of this template's purpose" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
                 </div>
 
-                <div>
-                  <label for="type" class="block text-sm font-medium text-gray-700">
-                    Template Type *
-                  </label>
-                  <select
-                    id="type"
-                    v-model="form.type"
-                    required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    :class="{ 'border-red-300': errors.type }"
-                  >
-                    <option value="">Select type</option>
-                    <option v-for="(label, value) in templateTypes" :key="value" :value="value">
-                      {{ label }}
-                    </option>
-                  </select>
-                  <p v-if="errors.type" class="mt-1 text-sm text-red-600">{{ errors.type[0] }}</p>
-                </div>
+                <!-- Subject Line -->
+                <FormField name="subject" v-slot="{ componentField }">
+                    <FormItem>
+                        <FormLabel>Subject Line *</FormLabel>
+                        <FormControl>
+                            <Input v-bind="componentField" placeholder="Email subject line (use {{variable}} for dynamic content)" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
 
-                <div class="sm:col-span-2">
-                  <label for="description" class="block text-sm font-medium text-gray-700">
-                    Description
-                  </label>
-                  <textarea
-                    id="description"
-                    v-model="form.description"
-                    rows="2"
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    :class="{ 'border-red-300': errors.description }"
-                    placeholder="Brief description of this template's purpose"
-                  />
-                  <p v-if="errors.description" class="mt-1 text-sm text-red-600">{{ errors.description[0] }}</p>
-                </div>
-              </div>
+                <!-- Content Tabs -->
+                <Tabs v-model="activeTab" class="w-full">
+                    <TabsList class="grid w-full grid-cols-4">
+                        <TabsTrigger value="html">HTML Content</TabsTrigger>
+                        <TabsTrigger value="text">Plain Text</TabsTrigger>
+                        <TabsTrigger value="preview">Preview</TabsTrigger>
+                        <TabsTrigger value="variables">Variables ({{ extractedVariables.length }})</TabsTrigger>
+                    </TabsList>
 
-              <!-- Subject Line -->
-              <div>
-                <label for="subject" class="block text-sm font-medium text-gray-700">
-                  Subject Line *
-                </label>
-                <input
-                  id="subject"
-                  v-model="form.subject"
-                  type="text"
-                  required
-                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  :class="{ 'border-red-300': errors.subject }"
-                  placeholder="Email subject line (use {{variable}} for dynamic content)"
-                />
-                <p v-if="errors.subject" class="mt-1 text-sm text-red-600">{{ errors.subject[0] }}</p>
-              </div>
+                    <TabsContent value="html" class="space-y-4">
+                        <FormField name="html_content" v-slot="{ componentField }">
+                            <FormItem>
+                                <FormLabel>HTML Content *</FormLabel>
+                                <FormControl>
+                                    <Textarea v-bind="componentField" rows="12" class="font-mono" placeholder="Enter HTML content here. Use {{variable_name}} for dynamic content." />
+                                </FormControl>
+                                <FormDescription> Use {{ `variable_name` }} syntax for dynamic content. HTML tags are supported. </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </TabsContent>
 
-              <!-- Content Tabs -->
-              <div>
-                <div class="border-b border-gray-200">
-                  <nav class="-mb-px flex space-x-8">
-                    <button
-                      type="button"
-                      @click="activeTab = 'html'"
-                      :class="[
-                        'py-2 px-1 border-b-2 font-medium text-sm',
-                        activeTab === 'html'
-                          ? 'border-indigo-500 text-indigo-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      ]"
-                    >
-                      HTML Content
-                    </button>
-                    <button
-                      type="button"
-                      @click="activeTab = 'text'"
-                      :class="[
-                        'py-2 px-1 border-b-2 font-medium text-sm',
-                        activeTab === 'text'
-                          ? 'border-indigo-500 text-indigo-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      ]"
-                    >
-                      Plain Text
-                    </button>
-                    <button
-                      type="button"
-                      @click="activeTab = 'preview'"
-                      :class="[
-                        'py-2 px-1 border-b-2 font-medium text-sm',
-                        activeTab === 'preview'
-                          ? 'border-indigo-500 text-indigo-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      ]"
-                    >
-                      Preview
-                    </button>
-                    <button
-                      type="button"
-                      @click="activeTab = 'variables'"
-                      :class="[
-                        'py-2 px-1 border-b-2 font-medium text-sm',
-                        activeTab === 'variables'
-                          ? 'border-indigo-500 text-indigo-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      ]"
-                    >
-                      Variables ({{ extractedVariables.length }})
-                    </button>
-                  </nav>
-                </div>
+                    <TabsContent value="text" class="space-y-4">
+                        <FormField name="text_content" v-slot="{ componentField }">
+                            <FormItem>
+                                <FormLabel>Plain Text Content</FormLabel>
+                                <FormControl>
+                                    <Textarea v-bind="componentField" rows="12" class="font-mono" placeholder="Enter plain text version (optional). Use {{variable_name}} for dynamic content." />
+                                </FormControl>
+                                <FormDescription> Optional plain text version for email clients that don't support HTML. </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </TabsContent>
 
-                <div class="mt-4">
-                  <!-- HTML Content Tab -->
-                  <div v-show="activeTab === 'html'" class="space-y-4">
-                    <div>
-                      <label for="html_content" class="block text-sm font-medium text-gray-700">
-                        HTML Content *
-                      </label>
-                      <div class="mt-1">
-                        <textarea
-                          id="html_content"
-                          v-model="form.html_content"
-                          rows="12"
-                          required
-                          class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
-                          :class="{ 'border-red-300': errors.html_content }"
-                          placeholder="Enter HTML content here. Use {{variable_name}} for dynamic content."
-                        />
-                      </div>
-                      <p class="mt-1 text-xs text-gray-500">
-                        Use {{variable_name}} syntax for dynamic content. HTML tags are supported.
-                      </p>
-                      <p v-if="errors.html_content" class="mt-1 text-sm text-red-600">{{ errors.html_content[0] }}</p>
-                    </div>
-                  </div>
+                    <TabsContent value="preview" class="space-y-4">
+                        <div class="bg-muted/50 rounded-lg p-4">
+                            <div class="mb-4 flex items-center justify-between">
+                                <h4 class="text-sm font-medium">Template Preview</h4>
+                                <Button type="button" variant="outline" size="sm" @click="generatePreview" :disabled="isGeneratingPreview">
+                                    <EyeIcon :class="['mr-1 h-3 w-3', { 'animate-spin': isGeneratingPreview }]" />
+                                    {{ isGeneratingPreview ? 'Generating...' : 'Generate Preview' }}
+                                </Button>
+                            </div>
 
-                  <!-- Plain Text Tab -->
-                  <div v-show="activeTab === 'text'" class="space-y-4">
-                    <div>
-                      <label for="text_content" class="block text-sm font-medium text-gray-700">
-                        Plain Text Content
-                      </label>
-                      <div class="mt-1">
-                        <textarea
-                          id="text_content"
-                          v-model="form.text_content"
-                          rows="12"
-                          class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
-                          :class="{ 'border-red-300': errors.text_content }"
-                          placeholder="Enter plain text version (optional). Use {{variable_name}} for dynamic content."
-                        />
-                      </div>
-                      <p class="mt-1 text-xs text-gray-500">
-                        Optional plain text version for email clients that don't support HTML.
-                      </p>
-                      <p v-if="errors.text_content" class="mt-1 text-sm text-red-600">{{ errors.text_content[0] }}</p>
-                    </div>
-                  </div>
+                            <div v-if="previewData" class="space-y-4">
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium">Subject:</label>
+                                    <div class="bg-background rounded border p-2 text-sm">{{ previewData.subject }}</div>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium">HTML Content:</label>
+                                    <div class="bg-background max-h-64 overflow-y-auto rounded border p-4" v-html="previewData.html"></div>
+                                </div>
+                                <div v-if="previewData.text">
+                                    <label class="mb-1 block text-xs font-medium">Plain Text:</label>
+                                    <div class="bg-background rounded border p-2 font-mono text-sm whitespace-pre-wrap">{{ previewData.text }}</div>
+                                </div>
+                            </div>
 
-                  <!-- Preview Tab -->
-                  <div v-show="activeTab === 'preview'" class="space-y-4">
-                    <div class="bg-gray-50 rounded-lg p-4">
-                      <div class="flex items-center justify-between mb-4">
-                        <h4 class="text-sm font-medium text-gray-900">Template Preview</h4>
-                        <button
-                          type="button"
-                          @click="generatePreview"
-                          :disabled="isGeneratingPreview"
-                          class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                        >
-                          <EyeIcon :class="['h-3 w-3 mr-1', { 'animate-spin': isGeneratingPreview }]" />
-                          {{ isGeneratingPreview ? 'Generating...' : 'Generate Preview' }}
-                        </button>
-                      </div>
-
-                      <div v-if="previewData" class="space-y-4">
-                        <div>
-                          <label class="block text-xs font-medium text-gray-700 mb-1">Subject:</label>
-                          <div class="bg-white p-2 rounded border text-sm">{{ previewData.subject }}</div>
+                            <div v-else class="text-muted-foreground py-8 text-center">
+                                <EyeIcon class="mx-auto mb-2 h-8 w-8" />
+                                <p class="text-sm">Click "Generate Preview" to see how your template will look</p>
+                            </div>
                         </div>
-                        <div>
-                          <label class="block text-xs font-medium text-gray-700 mb-1">HTML Content:</label>
-                          <div class="bg-white p-4 rounded border max-h-64 overflow-y-auto" v-html="previewData.html"></div>
+                    </TabsContent>
+
+                    <TabsContent value="variables" class="space-y-4">
+                        <div class="bg-primary/5 rounded-lg p-4">
+                            <h4 class="mb-2 text-sm font-medium">Detected Variables</h4>
+                            <div v-if="extractedVariables.length > 0" class="space-y-2">
+                                <div v-for="variable in extractedVariables" :key="variable" class="bg-background flex items-center justify-between rounded border p-2">
+                                    <code class="text-primary text-sm">{{ variable }}</code>
+                                    <Input v-model="sampleVariables[variable]" :placeholder="`Sample value for ${variable}`" class="ml-2 flex-1 text-sm" />
+                                </div>
+                            </div>
+                            <div v-else class="text-muted-foreground text-sm">No variables detected. Use {{ variable_name }} syntax in your content to create dynamic placeholders.</div>
                         </div>
-                        <div v-if="previewData.text">
-                          <label class="block text-xs font-medium text-gray-700 mb-1">Plain Text:</label>
-                          <div class="bg-white p-2 rounded border text-sm whitespace-pre-wrap font-mono">{{ previewData.text }}</div>
+
+                        <div class="bg-muted/50 rounded-lg p-4">
+                            <h4 class="mb-2 text-sm font-medium">Common Variables</h4>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div v-for="commonVar in commonVariables" :key="commonVar.name" class="flex items-center justify-between">
+                                    <code class="text-muted-foreground">{{ commonVar.name }}</code>
+                                    <span class="text-muted-foreground">{{ commonVar.description }}</span>
+                                </div>
+                            </div>
                         </div>
-                      </div>
+                    </TabsContent>
+                </Tabs>
 
-                      <div v-else class="text-center py-8 text-gray-500">
-                        <EyeIcon class="mx-auto h-8 w-8 mb-2" />
-                        <p class="text-sm">Click "Generate Preview" to see how your template will look</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Variables Tab -->
-                  <div v-show="activeTab === 'variables'" class="space-y-4">
-                    <div class="bg-blue-50 rounded-lg p-4">
-                      <h4 class="text-sm font-medium text-blue-900 mb-2">Detected Variables</h4>
-                      <div v-if="extractedVariables.length > 0" class="space-y-2">
-                        <div v-for="variable in extractedVariables" :key="variable" class="flex items-center justify-between bg-white p-2 rounded border">
-                          <code class="text-sm text-blue-600">{{variable}}</code>
-                          <input
-                            v-model="sampleVariables[variable]"
-                            type="text"
-                            :placeholder="`Sample value for ${variable}`"
-                            class="ml-2 flex-1 text-sm border-gray-300 rounded focus:border-indigo-500 focus:ring-indigo-500"
-                          />
+                <!-- Active Status -->
+                <FormField name="is_active" v-slot="{ componentField }">
+                    <FormItem class="flex flex-row items-start space-y-0 space-x-3">
+                        <FormControl>
+                            <Checkbox v-bind="componentField" />
+                        </FormControl>
+                        <div class="space-y-1 leading-none">
+                            <FormLabel>Set as active template</FormLabel>
                         </div>
-                      </div>
-                      <div v-else class="text-sm text-blue-700">
-                        No variables detected. Use {{variable_name}} syntax in your content to create dynamic placeholders.
-                      </div>
-                    </div>
-
-                    <div class="bg-gray-50 rounded-lg p-4">
-                      <h4 class="text-sm font-medium text-gray-900 mb-2">Common Variables</h4>
-                      <div class="grid grid-cols-2 gap-2 text-xs">
-                        <div v-for="commonVar in commonVariables" :key="commonVar.name" class="flex items-center justify-between">
-                          <code class="text-gray-600">{{ commonVar.name }}</code>
-                          <span class="text-gray-500">{{ commonVar.description }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Active Status -->
-              <div class="flex items-center">
-                <input
-                  id="is_active"
-                  v-model="form.is_active"
-                  type="checkbox"
-                  class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-                <label for="is_active" class="ml-2 block text-sm text-gray-900">
-                  Set as active template
-                </label>
-              </div>
-
-              <!-- Form Actions -->
-              <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  @click="closeModal"
-                  class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  :disabled="isSubmitting"
-                  class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-                >
-                  {{ isSubmitting ? 'Saving...' : (isEditing ? 'Update Template' : 'Create Template') }}
-                </button>
-              </div>
+                    </FormItem>
+                </FormField>
             </form>
-          </div>
-          </div>
-        </div>
-      </DialogContent>
-    </DialogPortal>
-  </DialogRoot>
+
+            <DialogFooter>
+                <Button type="button" variant="outline" @click="closeModal"> Cancel </Button>
+                <Button type="submit" :disabled="isSubmitting" @click="onSubmit">
+                    {{ isSubmitting ? 'Saving...' : isEditing ? 'Update Template' : 'Create Template' }}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>
