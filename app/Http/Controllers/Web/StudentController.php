@@ -541,6 +541,63 @@ class StudentController extends Controller
     }
 
     /**
+     * Get students by student IDs (API endpoint for bulk email)
+     */
+    public function getByStudentIds(Request $request)
+    {
+        $validated = $request->validate([
+            'student_ids' => 'required|array',
+            'student_ids.*' => 'required|string',
+        ]);
+
+        $campusId = session()->get('current_campus_id');
+
+        if (!$campusId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No campus selected',
+            ], 400);
+        }
+
+        $students = Student::with(['curriculumVersion', 'program', 'campus', 'specialization'])
+            ->where('campus_id', $campusId)
+            ->whereIn('student_id', $validated['student_ids'])
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Students retrieved successfully',
+            'data' => [
+                'students' => $students->map(function ($student) {
+                    return [
+                        'id' => $student->id,
+                        'student_id' => $student->student_id,
+                        'fullname' => $student->full_name,
+                        'email' => $student->email,
+                        'name' => $student->full_name, // alias for template compatibility
+                        'curriculum_version_code' => $student->curriculumVersion?->version_code ?? null,
+                        'program_name' => $student->program?->name ?? null,
+                        'campus_name' => $student->campus?->name ?? null,
+                        'specialization_name' => $student->specialization?->name ?? null,
+                        'status' => $student->status,
+                        // Additional fields that can be used as template variables in the future
+                        'template_variables' => [
+                            'name' => $student->full_name,
+                            'email' => $student->email,
+                            'student_id' => $student->student_id,
+                            'program' => $student->program?->name ?? '',
+                            'campus' => $student->campus?->name ?? '',
+                            'specialization' => $student->specialization?->name ?? '',
+                            'curriculum_version' => $student->curriculumVersion?->version_code ?? '',
+                            'status' => $student->status,
+                        ],
+                    ];
+                }),
+            ],
+        ]);
+    }
+
+    /**
      * Show new students (first-semester students) with filtering and bulk operations
      */
     public function newStudents(Request $request): Response|RedirectResponse

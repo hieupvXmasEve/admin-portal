@@ -9,7 +9,7 @@ import {
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { 
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -24,7 +24,7 @@ import {
 import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { useForm } from 'vee-validate'
-import { 
+import {
     FormControl,
     FormDescription,
     FormField,
@@ -33,6 +33,7 @@ import {
     FormMessage
 } from '@/components/ui/form'
 import { useSmtpConfiguration } from '@/composables/useSmtpConfiguration'
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Props {
     configuration?: any
@@ -82,7 +83,6 @@ watch(() => [props.isOpen, props.configuration], ([isOpen, config]) => {
     if (isOpen) {
         // Reset test result when modal opens
         testResult.value = null
-        
         if (config) {
             // Editing existing configuration
             setValues({
@@ -157,7 +157,7 @@ const onCancel = () => {
                 <FormMessage />
             </FormItem>
         </FormField>
-        
+
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <FormField name="host" v-slot="{ componentField }">
                 <FormItem>
@@ -178,7 +178,7 @@ const onCancel = () => {
                 </FormItem>
             </FormField>
         </div>
-        
+
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <FormField name="encryption" v-slot="{ componentField }">
                 <FormItem>
@@ -208,7 +208,7 @@ const onCancel = () => {
                 </FormItem>
             </FormField>
         </div>
-        
+
         <div>
             <FormField name="password" v-slot="{ componentField }">
                 <FormItem>
@@ -226,7 +226,7 @@ const onCancel = () => {
                 </FormItem>
             </FormField>
         </div>
-        
+
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <FormField name="from_address" v-slot="{ componentField }">
                 <FormItem>
@@ -273,10 +273,10 @@ const onCancel = () => {
         </div>
 
         <!-- Active Status -->
-        <FormField name="is_active" v-slot="{ field }">
+        <FormField name="is_active" v-slot="{ value, handleChange }">
             <FormItem class="flex flex-row items-center space-x-3 space-y-0">
                 <FormControl>
-                    <input type="checkbox" v-bind="field" />
+                    <Checkbox :model-value="value" @update:model-value="handleChange" />
                 </FormControl>
                 <FormLabel class="font-normal">
                     Set as active configuration

@@ -21,6 +21,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Settings, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { format } from 'date-fns';
 
 interface Props {
     courseOffering: CourseOffering & {
@@ -84,12 +85,13 @@ const getDeliveryModeLabel = (mode: string) => {
 
 const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString();
+    //format short day - mm/dd/yyyy
+    return format(dateString, 'EEEE, MM/dd/yyyy');
 };
 
 const formatDateTime = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
+    return format(dateString, 'EEEE, MM/dd/yyyy');
 };
 
 const enrollmentPercentage = props.courseOffering.max_capacity > 0 ? Math.round((props.courseOffering.current_enrollment / props.courseOffering.max_capacity) * 100) : 0;
@@ -343,11 +345,11 @@ const getAddSessionButtonText = computed(() => {
 
     const currentCount = props.courseOffering.class_sessions?.length || 0;
     const maxSessions = props.courseOffering.syllabus_template.total_sessions;
-    
+
     if (canAddSession.value) {
         return `Add Class Session (${currentCount}/${maxSessions})`;
     }
-    
+
     return `Session Limit Reached (${currentCount}/${maxSessions})`;
 });
 </script>
@@ -735,8 +737,8 @@ const getAddSessionButtonText = computed(() => {
                         </Table>
                         <!-- Add Class Session Button -->
                         <div class="flex items-center justify-center gap-2">
-                            <Button 
-                                @click="openAddSessionModal" 
+                            <Button
+                                @click="openAddSessionModal"
                                 :disabled="!canAddSession"
                                 :variant="canAddSession ? 'default' : 'outline'"
                             >
@@ -744,7 +746,7 @@ const getAddSessionButtonText = computed(() => {
                                 {{ getAddSessionButtonText }}
                             </Button>
                         </div>
-                        
+
                         <!-- Session limit warning -->
                         <div v-if="!canAddSession && courseOffering.syllabus_template?.total_sessions" class="text-center">
                             <p class="text-sm text-orange-600">

@@ -1,5 +1,6 @@
 import { useApi } from '@/composables/useApiRequest';
 import { ref } from 'vue';
+import { toast } from 'vue-sonner';
 
 interface EmailTemplate {
     id: number;
@@ -99,14 +100,24 @@ export function useEmailTemplate() {
     const createTemplate = async (data: TemplateForm) => {
         try {
             const response = await api.post<EmailTemplate>('/api/email-templates', data);
-
             if (response.data.value?.success && response.data.value.data) {
+                toast.success('Email template created successfully!');
                 return response.data.value.data;
             }
-
+            // console.log('%c response.data.value', 'color: red',response.data.value);
             throw new Error(response.data.value?.message || 'Failed to create template');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to create template:', error);
+
+            // Handle validation errors specifically
+            if (error.data?.status === 422) {
+                const errorMessage = error.data.message || 'Validation failed';
+                toast.error(errorMessage);
+            } else {
+                console.log(error)
+                toast.error(error.message || 'Failed to create template');
+            }
+
             throw error;
         }
     };
@@ -116,12 +127,22 @@ export function useEmailTemplate() {
             const response = await api.put<EmailTemplate>(`/api/email-templates/${id}`, data);
 
             if (response.data.value?.success && response.data.value.data) {
+                toast.success('Email template updated successfully!');
                 return response.data.value.data;
             }
 
             throw new Error(response.data.value?.message || 'Failed to update template');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to update template:', error);
+
+            // Handle validation errors specifically
+            if (error.data?.status === 422) {
+                const errorMessage = error.data.message || 'Validation failed';
+                toast.error(errorMessage);
+            } else {
+                toast.error(error.message || 'Failed to update template');
+            }
+
             throw error;
         }
     };
@@ -131,12 +152,14 @@ export function useEmailTemplate() {
             const response = await api.delete(`/api/email-templates/${id}`);
 
             if (response.data.value?.success) {
+                toast.success('Email template deleted successfully!');
                 return true;
             }
 
             throw new Error(response.data.value?.message || 'Failed to delete template');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to delete template:', error);
+            toast.error(error.message || 'Failed to delete template');
             throw error;
         }
     };

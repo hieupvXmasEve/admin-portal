@@ -17,7 +17,7 @@ withDefaults(defineProps<Props>(), {
 <template>
     <AppShell variant="sidebar">
         <AppSidebar />
-        <AppContent variant="sidebar" class="flex flex-col h-screen">
+        <AppContent variant="sidebar" class="flex flex-col h-screen overflow-x-auto">
             <AppSidebarHeader :breadcrumbs="breadcrumbs" />
             <div class="flex-1 overflow-y-auto overflow-x-auto">
                 <slot />

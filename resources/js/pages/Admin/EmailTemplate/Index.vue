@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import ConfirmationModal from '@/components/ui/ConfirmationModal.vue';
 import { useEmailTemplate } from '@/composables/useEmailTemplate';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { useDebounceFn } from '@vueuse/core';
 import {
     AlertTriangleIcon,
@@ -22,9 +22,8 @@ import {
     TrashIcon,
 } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
-import EmailTemplateModal from './components/EmailTemplateModal.vue';
 import TemplatePreviewModal from './components/TemplatePreviewModal.vue';
-
+import { Head, Link, router } from '@inertiajs/vue3';
 interface EmailTemplate {
     id: number;
     name: string;
@@ -41,6 +40,7 @@ interface EmailTemplate {
 }
 
 const { templates, templateTypes, isLoading, isRefreshing, loadTemplates, deleteTemplate: deleteTemplateAction, previewTemplate: previewTemplateAction } = useEmailTemplate();
+const { confirmDelete } = useGlobalConfirmDialog();
 
 const filters = ref({
     type: '',
@@ -48,13 +48,9 @@ const filters = ref({
     search: '',
 });
 
-const showCreateModal = ref(false);
 const showPreviewModal = ref(false);
-const showDeleteModal = ref(false);
-const editingTemplate = ref<EmailTemplate | null>(null);
 const previewingTemplate = ref<EmailTemplate | null>(null);
 const previewData = ref<any>(null);
-const deletingTemplate = ref<EmailTemplate | null>(null);
 
 onMounted(() => {
     loadTemplates();
@@ -73,13 +69,11 @@ const refreshTemplates = () => {
 };
 
 const editTemplate = (template: EmailTemplate) => {
-    editingTemplate.value = template;
-    showCreateModal.value = true;
+    router.visit(`/systems/email-templates/${template.id}/edit`)
 };
 
 const createVersion = (template: EmailTemplate) => {
-    editingTemplate.value = { ...template, id: 0, version: template.version + 1 };
-    showCreateModal.value = true;
+    router.visit(`/systems/email-templates/create?template_id=${template.id}&create_version=true`)
 };
 
 const previewTemplate = async (template: EmailTemplate) => {
@@ -94,24 +88,16 @@ const previewTemplate = async (template: EmailTemplate) => {
 };
 
 const deleteTemplate = (template: EmailTemplate) => {
-    deletingTemplate.value = template;
-    showDeleteModal.value = true;
+    confirmDelete(
+        template.name,
+        'template',
+        async () => {
+            await deleteTemplateAction(template.id);
+            loadTemplates(filters.value);
+        }
+    );
 };
 
-const confirmDelete = async () => {
-    if (deletingTemplate.value) {
-        await deleteTemplateAction(deletingTemplate.value.id);
-        deletingTemplate.value = null;
-        showDeleteModal.value = false;
-        loadTemplates(filters.value);
-    }
-};
-
-const onTemplateSaved = () => {
-    showCreateModal.value = false;
-    editingTemplate.value = null;
-    loadTemplates(filters.value);
-};
 
 const previousPage = () => {
     if (templates.value.prev_page_url) {
@@ -177,13 +163,13 @@ const formatDate = (dateString: string) => {
                     <RefreshCwIcon :class="['mr-2 h-4 w-4', { 'animate-spin': isRefreshing }]" />
                     Refresh
                 </button>
-                <button
-                    @click="showCreateModal = true"
+                <a
+                    href="/systems/email-templates/create"
                     class="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-3 py-2 text-sm leading-4 font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
                 >
                     <PlusIcon class="mr-2 h-4 w-4" />
                     Create Template
-                </button>
+                </a>
             </div>
         </div>
 
@@ -305,13 +291,13 @@ const formatDate = (dateString: string) => {
                 <h3 class="mt-2 text-sm font-medium text-gray-900">No templates</h3>
                 <p class="mt-1 text-sm text-gray-500">Get started by creating your first email template.</p>
                 <div class="mt-6">
-                    <button
-                        @click="showCreateModal = true"
+                    <a
+                        href="/systems/email-templates/create"
                         class="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
                     >
                         <PlusIcon class="mr-2 h-4 w-4" />
                         Create Template
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -369,20 +355,7 @@ const formatDate = (dateString: string) => {
             </div>
         </div>
 
-        <!-- Create/Edit Modal -->
-        <EmailTemplateModal v-model:open="showCreateModal" :template="editingTemplate" :template-types="templateTypes" @saved="onTemplateSaved" />
-
         <!-- Preview Modal -->
         <TemplatePreviewModal v-model:open="showPreviewModal" :template="previewingTemplate" :preview-data="previewData" />
-
-        <!-- Delete Confirmation Modal -->
-        <ConfirmationModal
-            v-model:open="showDeleteModal"
-            title="Delete Template"
-            :message="`Are you sure you want to delete the template '${deletingTemplate?.name}'? This action cannot be undone.`"
-            confirm-text="Delete"
-            confirm-variant="danger"
-            @confirm="confirmDelete"
-        />
     </div>
 </template>

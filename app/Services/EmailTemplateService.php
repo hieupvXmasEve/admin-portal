@@ -359,6 +359,14 @@ class EmailTemplateService
     protected function validateTemplateData(array $data, ?int $excludeId = null): void
     {
         $rules = EmailTemplate::validationRules();
+        $messages = [
+            'name.unique' => 'A template with this name and version already exists. Please choose a different name or create a new version of the existing template.',
+            'name.required' => 'Template name is required.',
+            'type.required' => 'Template type is required.',
+            'type.in' => 'Please select a valid template type.',
+            'subject.required' => 'Email subject is required.',
+            'html_content.required' => 'Email content is required.',
+        ];
 
         // Add unique name rule for create/update
         if ($excludeId) {
@@ -367,7 +375,7 @@ class EmailTemplateService
             $rules['name'] = $rules['name'] . '|unique:email_templates,name,NULL,id,version,' . ($data['version'] ?? 1);
         }
 
-        $validator = Validator::make($data, $rules);
+        $validator = Validator::make($data, $rules, $messages);
 
         if ($validator->fails()) {
             throw new ValidationException($validator);

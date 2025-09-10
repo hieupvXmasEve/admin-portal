@@ -44,7 +44,9 @@ class SendBulkEmailJob implements ShouldQueue
         protected array $attachments = [],
         protected ?int $userId = null,
         protected ?string $customBatchId = null,
-        protected ?int $chunkIndex = null
+        protected ?int $chunkIndex = null,
+        protected ?array $perRecipientVariables = null,
+        protected ?array $globalVariables = null
     ) {
         $this->onQueue('bulk-emails');
     }
@@ -63,11 +65,43 @@ class SendBulkEmailJob implements ShouldQueue
 
         foreach ($this->recipients as $recipient) {
             try {
+                // Optionally render per-recipient if template is present and variables provided
+                $renderedSubject = $this->subject;
+                $renderedHtml = $this->htmlContent;
+                $renderedText = $this->textContent;
+
+                // Build variables: merge global fallbacks with per-recipient values (per-recipient wins)
+                try {
+                    $perVars = [];
+                    if (is_array($this->perRecipientVariables)) {
+                        $perVars = $this->perRecipientVariables[$recipient] ?? [];
+                        if (empty($perVars)) {
+                            $perVars = $this->perRecipientVariables[strtolower($recipient)] ?? [];
+                        }
+                    }
+                    $vars = array_merge($this->globalVariables ?? [], $perVars ?? []);
+
+                    if (!empty($vars)) {
+                        $emailService = app(EmailService::class);
+                        $renderedSubject = $emailService->substituteVariables($this->subject, $vars);
+                        $renderedHtml = $emailService->substituteVariables($this->htmlContent, $vars);
+                        if ($this->textContent) {
+                            $renderedText = $emailService->substituteVariables($this->textContent, $vars);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Variable substitution failed; using original content', [
+                        'recipient' => $recipient,
+                        'batch_id' => $this->customBatchId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
                 // Create email log entry
                 $emailLog = EmailLog::create([
                     'recipient' => $recipient,
                     'sender' => config('mail.from.address'),
-                    'subject' => $this->subject,
+                    'subject' => $renderedSubject,
                     'template_id' => $this->templateId,
                     'status' => EmailLog::STATUS_PENDING,
                     'user_id' => $this->userId,
@@ -75,14 +109,15 @@ class SendBulkEmailJob implements ShouldQueue
                     'metadata' => [
                         'attachments' => array_map(fn($file) => basename($file), $this->attachments),
                         'bulk_send' => true,
+                        'content' => $renderedHtml,
                     ],
                 ]);
 
                 // Queue individual email job
                 dispatch(new SendSingleEmailJob(
                     $emailLog,
-                    $this->htmlContent,
-                    $this->textContent,
+                    $renderedHtml,
+                    $renderedText,
                     $this->attachments
                 ));
 

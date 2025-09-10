@@ -52,6 +52,7 @@ const isOpen = computed({
 const isSubmitting = ref(false)
 
 const handleFormSubmit = async (formValues: any) => {
+    console.log('formValues', formValues)
     if (!props.configuration?.id) {
         console.error('No configuration ID provided for update');
         return;

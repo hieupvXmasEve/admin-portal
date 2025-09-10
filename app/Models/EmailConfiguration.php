@@ -175,6 +175,7 @@ class EmailConfiguration extends AuditableModel
             'from_name' => 'required|string|max:255',
             'daily_limit' => 'required|integer|min:1|max:10000',
             'rate_limit' => 'required|integer|min:1|max:1000',
+            'is_active' => 'required|boolean',
         ];
     }
 
