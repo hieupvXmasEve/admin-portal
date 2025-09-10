@@ -196,7 +196,7 @@ const validateCreditPoints = (value: string) => {
     if (isNaN(num)) {
         form.credit_points = 0;
     } else {
-        form.credit_points = Math.max(0.25, Math.min(999.99, Math.round(num * 100) / 100));
+        form.credit_points = Math.max(0, Math.min(999.99, Math.round(num * 100) / 100));
     }
 };
 
@@ -357,7 +357,7 @@ const selectUnit = (unit: Unit) => {
                             @input="validateCreditPoints($event.target.value)"
                             type="number"
                             step="1"
-                            min="1"
+                            min="0"
                             max="20"
                             placeholder="3.00"
                             :class="{
