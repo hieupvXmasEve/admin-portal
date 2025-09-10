@@ -311,10 +311,9 @@ export interface StudentOverview {
         status_reason?: string;
         avatar_url?: string;
         cccd_address: string;
-        emergency_contact_name: string
-        emergency_contact_phone: string
-        emergency_contact_relationship: string
-
+        emergency_contact_name: string;
+        emergency_contact_phone: string;
+        emergency_contact_relationship: string;
     };
     program_info: {
         campus?: {
@@ -1072,4 +1071,52 @@ export interface RoomFormData {
     description?: string;
     usage_guidelines?: string;
     booking_notes?: string;
+}
+
+// Email Log interfaces
+export interface EmailLog {
+    id: number;
+    recipient: string;
+    sender: string;
+    subject: string;
+    template_id?: number;
+    status: 'pending' | 'queued' | 'sending' | 'sent' | 'delivered' | 'failed' | 'bounced' | 'rejected';
+    queued_at?: string;
+    sent_at?: string;
+    delivered_at?: string;
+    failed_at?: string;
+    error_message?: string;
+    retry_count: number;
+    metadata?: Record<string, any>;
+    message_id?: string;
+    batch_id?: string;
+    user_id?: number;
+    template?: EmailTemplate;
+    user?: User;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface EmailTemplate {
+    id: number;
+    name: string;
+    type: string;
+    subject: string;
+    html_content: string;
+    text_content?: string;
+    variables: string[];
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    version: number;
+    parent_id?: number;
+    description?: string;
+}
+
+// API Response interfaces
+export interface ApiResponse {
+    success: boolean;
+    message: string;
+    error?: string;
+    errors?: Record<string, string[]>;
 }

@@ -1,5 +1,5 @@
 ---
-alwaysApply: false
+alwaysApply: true
 ---
 # Code Generation Standards
 
@@ -43,7 +43,16 @@ Strict rules for all AI-generated code in this Vue 3 + Inertia + Laravel project
 - Add TODO comment if component needs installation: `<!-- TODO: Run npx shadcn-vue add [component] -->`
 - Always import components explicitly
 - Use proper TypeScript props interface
-
+- Always use `:model-value` and `@update:model-value` for checkbox components
+```ts
+<FormField name="is_active" v-slot="{ value, handleChange }">
+    <FormItem class="flex flex-row items-start space-y-0 space-x-3">
+        <FormControl>
+            <Checkbox :model-value="value" @update:model-value="handleChange" />
+        </FormControl>
+    </FormItem>
+</FormField>
+```
 ## Laravel Conventions
 
 ### Controllers

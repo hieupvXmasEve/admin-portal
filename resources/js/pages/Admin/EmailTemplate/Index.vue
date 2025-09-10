@@ -1,114 +1,150 @@
 <script setup lang="ts">
-import { useEmailTemplate } from '@/composables/useEmailTemplate';
+import DataPagination from '@/components/DataPagination.vue';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
+import { router } from '@inertiajs/vue3';
 import { useDebounceFn } from '@vueuse/core';
-import {
-    AlertTriangleIcon,
-    BellIcon,
-    CheckCircleIcon,
-    ChevronLeftIcon,
-    ChevronRightIcon,
-    ClockIcon,
-    CopyIcon,
-    EyeIcon,
-    FileTextIcon,
-    GraduationCapIcon,
-    MailIcon,
-    MegaphoneIcon,
-    PencilIcon,
-    PlusIcon,
-    RefreshCwIcon,
-    SearchIcon,
-    TrashIcon,
-} from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { AlertTriangleIcon, BellIcon, CheckCircleIcon, ClockIcon, CopyIcon, EyeIcon, FileTextIcon, GraduationCapIcon, MailIcon, MegaphoneIcon, PencilIcon, PlusIcon, RefreshCwIcon, SearchIcon, TrashIcon } from 'lucide-vue-next';
+import { ref } from 'vue';
 import TemplatePreviewModal from './components/TemplatePreviewModal.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+
 interface EmailTemplate {
     id: number;
     name: string;
     type: string;
     subject: string;
-    html_content: string;
-    text_content?: string;
-    variables?: string[];
     is_active: boolean;
     version: number;
     description?: string;
+    variables?: string[];
     created_at: string;
     updated_at: string;
+    variables_count: number;
 }
 
-const { templates, templateTypes, isLoading, isRefreshing, loadTemplates, deleteTemplate: deleteTemplateAction, previewTemplate: previewTemplateAction } = useEmailTemplate();
+interface PaginatedTemplates {
+    data: EmailTemplate[];
+    current_page: number;
+    from: number;
+    to: number;
+    total: number;
+    last_page: number;
+    per_page: number;
+    prev_page_url: string | null;
+    next_page_url: string | null;
+    links: Array<{
+        url: string | null;
+        label: string;
+        active: boolean;
+    }>;
+}
+
+interface Props {
+    templates: PaginatedTemplates;
+    templateTypes: Record<string, string>;
+    filters: {
+        type: string;
+        is_active: string;
+        search: string;
+    };
+}
+
+const props = defineProps<Props>();
 const { confirmDelete } = useGlobalConfirmDialog();
 
 const filters = ref({
-    type: '',
-    is_active: 'all',
-    search: '',
+    type: props.filters.type || 'all',
+    is_active: props.filters.is_active || 'all',
+    search: props.filters.search || '',
 });
 
 const showPreviewModal = ref(false);
 const previewingTemplate = ref<EmailTemplate | null>(null);
 const previewData = ref<any>(null);
-
-onMounted(() => {
-    loadTemplates();
-});
+const isRefreshing = ref(false);
 
 const debouncedSearch = useDebounceFn(() => {
     applyFilters();
 }, 300);
 
 const applyFilters = () => {
-    loadTemplates(filters.value);
+    router.get('/systems/email-templates', filters.value, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
 };
 
 const refreshTemplates = () => {
-    loadTemplates(filters.value);
+    isRefreshing.value = true;
+    router.get('/systems/email-templates', filters.value, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onFinish: () => {
+            isRefreshing.value = false;
+        },
+    });
 };
 
 const editTemplate = (template: EmailTemplate) => {
-    router.visit(`/systems/email-templates/${template.id}/edit`)
+    router.visit(`/systems/email-templates/${template.id}/edit`);
 };
 
 const createVersion = (template: EmailTemplate) => {
-    router.visit(`/systems/email-templates/create?template_id=${template.id}&create_version=true`)
+    router.visit(`/systems/email-templates/create?template_id=${template.id}&create_version=true`);
 };
 
 const previewTemplate = async (template: EmailTemplate) => {
     try {
-        const preview = await previewTemplateAction(template.id);
-        previewingTemplate.value = template;
-        previewData.value = preview;
-        showPreviewModal.value = true;
+        const response = await fetch(`/systems/email-templates/${template.id}/preview`);
+        const data = await response.json();
+
+        if (data.success) {
+            previewingTemplate.value = template;
+            previewData.value = data.previewData;
+            showPreviewModal.value = true;
+        } else {
+            console.error('Failed to preview template:', data.message);
+        }
     } catch (error) {
         console.error('Failed to preview template:', error);
     }
 };
 
 const deleteTemplate = (template: EmailTemplate) => {
-    confirmDelete(
-        template.name,
-        'template',
-        async () => {
-            await deleteTemplateAction(template.id);
-            loadTemplates(filters.value);
-        }
-    );
+    confirmDelete(template.name, 'template', () => {
+        router.delete(`/systems/email-templates/${template.id}`, {
+            onSuccess: () => {
+                // Refresh the current page
+                router.get('/systems/email-templates', filters.value, {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                });
+            },
+        });
+    });
 };
 
-
-const previousPage = () => {
-    if (templates.value.prev_page_url) {
-        loadTemplates(filters.value, templates.value.current_page - 1);
-    }
+const handlePaginationNavigate = (url: string) => {
+    router.get(url, filters.value, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
 };
 
-const nextPage = () => {
-    if (templates.value.next_page_url) {
-        loadTemplates(filters.value, templates.value.current_page + 1);
-    }
+const handlePageSizeChange = (pageSize: number) => {
+    const newFilters = { ...filters.value, per_page: pageSize };
+    router.get('/systems/email-templates', newFilters, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
 };
 
 const getTypeColor = (type: string) => {
@@ -174,53 +210,52 @@ const formatDate = (dateString: string) => {
         </div>
 
         <!-- Filters -->
-        <div class="rounded-lg bg-white p-4 shadow">
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                <div>
-                    <label for="type-filter" class="block text-sm font-medium text-gray-700"> Template Type </label>
-                    <select id="type-filter" v-model="filters.type" @change="applyFilters" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">All Types</option>
-                        <option v-for="(label, value) in templateTypes" :key="value" :value="value">
-                            {{ label }}
-                        </option>
-                    </select>
-                </div>
+        <Card>
+            <CardContent class="p-4">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                    <div class="space-y-2">
+                        <Label for="type-filter">Template Type</Label>
+                        <Select v-model="filters.type" @update:model-value="applyFilters">
+                            <SelectTrigger id="type-filter">
+                                <SelectValue placeholder="All Types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Types</SelectItem>
+                                <SelectItem v-for="(label, value) in templateTypes" :key="value" :value="value">
+                                    {{ label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
 
-                <div>
-                    <label for="status-filter" class="block text-sm font-medium text-gray-700"> Status </label>
-                    <select id="status-filter" v-model="filters.is_active" @change="applyFilters" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="all">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                </div>
+                    <div class="space-y-2">
+                        <Label for="status-filter">Status</Label>
+                        <Select v-model="filters.is_active" @update:model-value="applyFilters">
+                            <SelectTrigger id="status-filter">
+                                <SelectValue placeholder="All Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
 
-                <div class="sm:col-span-2">
-                    <label for="search" class="block text-sm font-medium text-gray-700"> Search </label>
-                    <div class="relative mt-1">
-                        <input
-                            id="search"
-                            v-model="filters.search"
-                            @input="debouncedSearch"
-                            type="text"
-                            placeholder="Search templates..."
-                            class="block w-full rounded-md border-gray-300 pl-10 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        />
-                        <SearchIcon class="absolute top-2.5 left-3 h-4 w-4 text-gray-400" />
+                    <div class="space-y-2 sm:col-span-2">
+                        <Label for="search">Search</Label>
+                        <div class="relative">
+                            <SearchIcon class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                            <Input id="search" v-model="filters.search" @input="debouncedSearch" type="text" placeholder="Search templates..." class="pl-10" />
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </CardContent>
+        </Card>
 
         <!-- Templates List -->
         <div class="overflow-hidden bg-white shadow sm:rounded-md">
-            <div v-if="isLoading" class="p-6">
-                <div class="animate-pulse space-y-4">
-                    <div v-for="i in 5" :key="i" class="h-20 rounded bg-gray-200"></div>
-                </div>
-            </div>
-
-            <ul v-else-if="templates.data && templates.data.length > 0" class="divide-y divide-gray-200">
+            <ul v-if="templates.data && templates.data.length > 0" class="divide-y divide-gray-200">
                 <li v-for="template in templates.data" :key="template.id" class="px-4 py-4 sm:px-6">
                     <div class="flex items-center justify-between">
                         <div class="flex items-start space-x-4">
@@ -243,7 +278,7 @@ const formatDate = (dateString: string) => {
                                 <div class="mt-1 flex items-center text-xs text-gray-500">
                                     <span class="capitalize">{{ templateTypes[template.type] || template.type }}</span>
                                     <span class="mx-2">•</span>
-                                    <span>{{ template.variables?.length || 0 }} variables</span>
+                                    <span>{{ template.variables_count || 0 }} variables</span>
                                     <span class="mx-2">•</span>
                                     <span>Updated {{ formatDate(template.updated_at) }}</span>
                                 </div>
@@ -303,55 +338,7 @@ const formatDate = (dateString: string) => {
 
             <!-- Pagination -->
             <div v-if="templates.data && templates.data.length > 0" class="border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-                <div class="flex items-center justify-between">
-                    <div class="flex flex-1 justify-between sm:hidden">
-                        <button
-                            @click="previousPage"
-                            :disabled="!templates.prev_page_url"
-                            class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Previous
-                        </button>
-                        <button
-                            @click="nextPage"
-                            :disabled="!templates.next_page_url"
-                            class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Next
-                        </button>
-                    </div>
-                    <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                        <div>
-                            <p class="text-sm text-gray-700">
-                                Showing
-                                <span class="font-medium">{{ templates.from || 0 }}</span>
-                                to
-                                <span class="font-medium">{{ templates.to || 0 }}</span>
-                                of
-                                <span class="font-medium">{{ templates.total || 0 }}</span>
-                                results
-                            </p>
-                        </div>
-                        <div>
-                            <nav class="relative z-0 inline-flex -space-x-px rounded-md shadow-sm">
-                                <button
-                                    @click="previousPage"
-                                    :disabled="!templates.prev_page_url"
-                                    class="relative inline-flex items-center rounded-l-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <ChevronLeftIcon class="h-5 w-5" />
-                                </button>
-                                <button
-                                    @click="nextPage"
-                                    :disabled="!templates.next_page_url"
-                                    class="relative inline-flex items-center rounded-r-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <ChevronRightIcon class="h-5 w-5" />
-                                </button>
-                            </nav>
-                        </div>
-                    </div>
-                </div>
+                <DataPagination :pagination-data="templates" item-name="templates" :page-size-options="[10, 15, 25, 50]" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
             </div>
         </div>
 

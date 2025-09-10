@@ -69,7 +69,7 @@ const emit = defineEmits<{
 
 // Tiptap editor setup
 const editor = useEditor({
-    content: () => props.modelValue || '',
+    content: props.modelValue || '',
     extensions: [
         StarterKit.configure({
             // Disable default extensions that we'll configure separately

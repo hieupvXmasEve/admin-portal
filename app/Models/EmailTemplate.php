@@ -193,6 +193,7 @@ class EmailTemplate extends AuditableModel
             'text_content' => 'nullable|string',
             'variables' => 'nullable|array',
             'description' => 'nullable|string|max:1000',
+            'is_active' => 'required|boolean',
         ];
     }
 
