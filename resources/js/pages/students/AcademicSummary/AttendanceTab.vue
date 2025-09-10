@@ -48,7 +48,7 @@ const filteredAttendance = computed(() => {
     // Search filter
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
-        filtered = filtered.filter(unit => 
+        filtered = filtered.filter(unit =>
             unit.unit_name.toLowerCase().includes(query) ||
             unit.unit_code.toLowerCase().includes(query) ||
             unit.semester.toLowerCase().includes(query)
@@ -233,18 +233,18 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-muted-foreground text-sm">Overall Rate</p>
-                                <p 
+                                <p
                                     class="text-2xl font-bold"
-                                    :class="attendance.summary.overall_percentage >= 80 ? 'text-green-600' : 
+                                    :class="attendance.summary.overall_percentage >= 80 ? 'text-green-600' :
                                            attendance.summary.overall_percentage >= 70 ? 'text-yellow-600' : 'text-red-600'"
                                 >
                                     {{ attendance.summary.overall_percentage.toFixed(1) }}%
                                 </p>
                             </div>
-                            <AlertTriangle 
-                                :class="attendance.summary.overall_percentage >= 80 ? 'text-green-600' : 
+                            <AlertTriangle
+                                :class="attendance.summary.overall_percentage >= 80 ? 'text-green-600' :
                                        attendance.summary.overall_percentage >= 70 ? 'text-yellow-600' : 'text-red-600'"
-                                class="h-8 w-8" 
+                                class="h-8 w-8"
                             />
                         </div>
                     </CardContent>
@@ -259,10 +259,10 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                             <Filter class="h-5 w-5" />
                             Filters
                         </span>
-                        <Button 
-                            v-if="hasActiveFilters" 
-                            variant="outline" 
-                            size="sm" 
+                        <Button
+                            v-if="hasActiveFilters"
+                            variant="outline"
+                            size="sm"
                             @click="clearFilters"
                             class="flex items-center gap-2"
                         >
@@ -289,10 +289,10 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                 <SelectValue placeholder="All Semesters" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All Semesters</SelectItem>
-                                <SelectItem 
-                                    v-for="semester in availableSemesters" 
-                                    :key="semester" 
+                                <SelectItem value="all">All Semesters</SelectItem>
+                                <SelectItem
+                                    v-for="semester in availableSemesters"
+                                    :key="semester"
                                     :value="semester"
                                 >
                                     {{ semester }}
@@ -306,7 +306,7 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                 <SelectValue placeholder="All Statuses" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All Statuses</SelectItem>
+                                <SelectItem value="all">All Statuses</SelectItem>
                                 <SelectItem value="excellent">Excellent (90%+)</SelectItem>
                                 <SelectItem value="good">Good (80-89%)</SelectItem>
                                 <SelectItem value="warning">Warning (70-79%)</SelectItem>
@@ -348,7 +348,7 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                 <div class="text-right">
                                     <p class="text-sm text-muted-foreground">Attendance Rate</p>
                                     <div class="flex items-center gap-2">
-                                        <p 
+                                        <p
                                             class="text-xl font-bold"
                                             :class="getAttendanceStatusColor(unit.attendance_status)"
                                         >
@@ -365,11 +365,11 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                     @click="toggleUnitExpansion(unit.unit_id)"
                                     class="flex items-center gap-2"
                                 >
-                                    <ChevronDown 
+                                    <ChevronDown
                                         v-if="expandedUnits.has(unit.unit_id)"
                                         class="h-4 w-4"
                                     />
-                                    <ChevronRight 
+                                    <ChevronRight
                                         v-else
                                         class="h-4 w-4"
                                     />
@@ -410,7 +410,7 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                                 </div>
                                                 <div>
                                                     <p class="text-sm text-muted-foreground">Attendance Rate</p>
-                                                    <p 
+                                                    <p
                                                         class="font-medium text-lg"
                                                         :class="getAttendanceStatusColor(selectedAttendanceDetails.attendance_status)"
                                                     >
@@ -423,8 +423,8 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                             <div class="space-y-3">
                                                 <h4 class="font-semibold">Session Details</h4>
                                                 <div class="space-y-2 max-h-96 overflow-y-auto">
-                                                    <div 
-                                                        v-for="session in selectedAttendanceDetails.sessions" 
+                                                    <div
+                                                        v-for="session in selectedAttendanceDetails.sessions"
                                                         :key="`${session.session_date}-${session.start_time}`"
                                                         class="flex items-center justify-between p-3 border rounded-lg"
                                                     >
@@ -443,12 +443,12 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                                                 </p>
                                                             </div>
                                                             <div class="flex items-center gap-2">
-                                                                <component 
+                                                                <component
                                                                     :is="getSessionStatusIcon(session.status)"
                                                                     :class="getSessionStatusColor(session.status)"
                                                                     class="h-5 w-5"
                                                                 />
-                                                                <Badge :variant="session.status === 'present' ? 'default' : 
+                                                                <Badge :variant="session.status === 'present' ? 'default' :
                                                                                 session.status === 'late' ? 'outline' :
                                                                                 session.status === 'excused' ? 'secondary' : 'destructive'">
                                                                     {{ formatStatus(session.status) }}
@@ -464,7 +464,7 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                             </div>
                         </div>
                     </CardHeader>
-                    
+
                     <Collapsible :open="expandedUnits.has(unit.unit_id)">
                         <CollapsibleContent>
                             <CardContent>
@@ -501,10 +501,10 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                                 {{ unit.attended_count }}/{{ unit.total_sessions }} sessions
                                             </span>
                                         </div>
-                                        <Progress 
-                                            :value="unit.attendance_percentage" 
+                                        <Progress
+                                            :value="unit.attendance_percentage"
                                             class="h-2"
-                                            :class="unit.attendance_percentage >= 80 ? 'text-green-600' : 
+                                            :class="unit.attendance_percentage >= 80 ? 'text-green-600' :
                                                    unit.attendance_percentage >= 70 ? 'text-yellow-600' : 'text-red-600'"
                                         />
                                     </div>
@@ -513,8 +513,8 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                     <div>
                                         <h4 class="font-semibold mb-3">Recent Sessions</h4>
                                         <div class="space-y-2">
-                                            <div 
-                                                v-for="session in unit.sessions.slice(0, 5)" 
+                                            <div
+                                                v-for="session in unit.sessions.slice(0, 5)"
                                                 :key="`${session.session_date}-${session.start_time}`"
                                                 class="flex items-center justify-between p-3 border rounded-lg"
                                             >
@@ -530,12 +530,12 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                                         <p class="font-medium">{{ formatTime(session.check_in_time) }}</p>
                                                     </div>
                                                     <div class="flex items-center gap-2">
-                                                        <component 
+                                                        <component
                                                             :is="getSessionStatusIcon(session.status)"
                                                             :class="getSessionStatusColor(session.status)"
                                                             class="h-5 w-5"
                                                         />
-                                                        <Badge :variant="session.status === 'present' ? 'default' : 
+                                                        <Badge :variant="session.status === 'present' ? 'default' :
                                                                         session.status === 'late' ? 'outline' :
                                                                         session.status === 'excused' ? 'secondary' : 'destructive'">
                                                             {{ formatStatus(session.status) }}
@@ -545,8 +545,8 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                             </div>
                                         </div>
                                         <div v-if="unit.sessions.length > 5" class="text-center mt-3">
-                                            <Button 
-                                                variant="outline" 
+                                            <Button
+                                                variant="outline"
                                                 size="sm"
                                                 @click="openAttendanceDetails(unit)"
                                                 class="flex items-center gap-2"

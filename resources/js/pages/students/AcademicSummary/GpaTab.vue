@@ -42,7 +42,7 @@ const filteredGpaRecords = computed(() => {
     // Search filter
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
-        filtered = filtered.filter(record => 
+        filtered = filtered.filter(record =>
             record.semester.toLowerCase().includes(query) ||
             record.semester_code.toLowerCase().includes(query) ||
             record.academic_year.toLowerCase().includes(query)
@@ -150,7 +150,7 @@ const availableYears = computed(() => {
 // Check for academic concerns
 const hasAcademicConcerns = computed(() => {
     const { current_academic_standing, probation_semesters, warning_semesters } = props.gpa.summary;
-    return ['warning', 'probation', 'suspension'].includes(current_academic_standing) || 
+    return ['warning', 'probation', 'suspension'].includes(current_academic_standing) ||
            probation_semesters > 0 || warning_semesters > 0;
 });
 
@@ -185,7 +185,7 @@ const gpaProgression = computed(() => {
             <Alert v-if="hasAcademicConcerns" variant="destructive" class="mb-6">
                 <AlertTriangle class="h-4 w-4" />
                 <AlertDescription>
-                    <strong>Academic Standing Alert:</strong> 
+                    <strong>Academic Standing Alert:</strong>
                     Current standing: {{ formatStatus(gpa.summary.current_academic_standing) }}.
                     <span v-if="gpa.summary.probation_semesters > 0">
                         {{ gpa.summary.probation_semesters }} probation semester(s).
@@ -204,7 +204,7 @@ const gpaProgression = computed(() => {
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-muted-foreground text-sm">Current GPA</p>
-                                <p 
+                                <p
                                     class="text-2xl font-bold"
                                     :class="getGpaColor(gpa.summary.current_semester_gpa)"
                                 >
@@ -221,7 +221,7 @@ const gpaProgression = computed(() => {
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-muted-foreground text-sm">Cumulative GPA</p>
-                                <p 
+                                <p
                                     class="text-2xl font-bold"
                                     :class="getGpaColor(gpa.summary.current_cumulative_gpa)"
                                 >
@@ -262,7 +262,7 @@ const gpaProgression = computed(() => {
             <Card class="mb-6">
                 <CardHeader>
                     <CardTitle class="flex items-center gap-2">
-                        <component 
+                        <component
                             :is="getTrendIcon(gpa.summary.gpa_trend)"
                             :class="getTrendColor(gpa.summary.gpa_trend)"
                             class="h-5 w-5"
@@ -277,12 +277,12 @@ const gpaProgression = computed(() => {
                             <div>
                                 <p class="text-sm text-muted-foreground">Overall Trend</p>
                                 <div class="flex items-center gap-2">
-                                    <component 
+                                    <component
                                         :is="getTrendIcon(gpa.summary.gpa_trend)"
                                         :class="getTrendColor(gpa.summary.gpa_trend)"
                                         class="h-5 w-5"
                                     />
-                                    <Badge :variant="gpa.summary.gpa_trend === 'improving' ? 'default' : 
+                                    <Badge :variant="gpa.summary.gpa_trend === 'improving' ? 'default' :
                                                    gpa.summary.gpa_trend === 'declining' ? 'destructive' : 'secondary'">
                                         {{ formatStatus(gpa.summary.gpa_trend) }}
                                     </Badge>
@@ -290,7 +290,7 @@ const gpaProgression = computed(() => {
                             </div>
                             <div>
                                 <p class="text-sm text-muted-foreground">Academic Standing</p>
-                                <Badge 
+                                <Badge
                                     :variant="getAcademicStandingBadge(gpa.summary.current_academic_standing) as any"
                                     :class="getAcademicStandingColor(gpa.summary.current_academic_standing)"
                                 >
@@ -308,13 +308,13 @@ const gpaProgression = computed(() => {
                             <div class="space-y-2">
                                 <p class="text-sm font-medium">GPA Progression (Last 8 Semesters)</p>
                                 <div class="h-32 flex items-end justify-between gap-1 p-4 bg-muted rounded-lg">
-                                    <div 
-                                        v-for="(point, index) in gpaProgression.slice(-8)" 
+                                    <div
+                                        v-for="(point, index) in gpaProgression.slice(-8)"
                                         :key="index"
                                         class="flex flex-col items-center gap-1 flex-1"
                                     >
                                         <div class="text-xs text-muted-foreground">{{ formatGpa(point.gpa) }}</div>
-                                        <div 
+                                        <div
                                             class="w-full rounded-t transition-all duration-300"
                                             :class="getGpaColor(point.gpa).replace('text-', 'bg-')"
                                             :style="{ height: `${Math.max((point.gpa / 4.0) * 80, 8)}px` }"
@@ -338,10 +338,10 @@ const gpaProgression = computed(() => {
                             <Filter class="h-5 w-5" />
                             Filters
                         </span>
-                        <Button 
-                            v-if="hasActiveFilters" 
-                            variant="outline" 
-                            size="sm" 
+                        <Button
+                            v-if="hasActiveFilters"
+                            variant="outline"
+                            size="sm"
                             @click="clearFilters"
                             class="flex items-center gap-2"
                         >
@@ -368,10 +368,10 @@ const gpaProgression = computed(() => {
                                 <SelectValue placeholder="All Years" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">All Years</SelectItem>
-                                <SelectItem 
-                                    v-for="year in availableYears" 
-                                    :key="year" 
+                                <SelectItem value="all">All Years</SelectItem>
+                                <SelectItem
+                                    v-for="year in availableYears"
+                                    :key="year"
                                     :value="year"
                                 >
                                     {{ year }}
@@ -420,8 +420,8 @@ const gpaProgression = computed(() => {
                                         No GPA records found matching your criteria.
                                     </TableCell>
                                 </TableRow>
-                                <TableRow 
-                                    v-for="record in filteredGpaRecords" 
+                                <TableRow
+                                    v-for="record in filteredGpaRecords"
                                     :key="record.id"
                                     class="hover:bg-muted/50"
                                 >

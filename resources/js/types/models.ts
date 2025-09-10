@@ -310,6 +310,11 @@ export interface StudentOverview {
         status_change_date?: string;
         status_reason?: string;
         avatar_url?: string;
+        cccd_address: string;
+        emergency_contact_name: string
+        emergency_contact_phone: string
+        emergency_contact_relationship: string
+
     };
     program_info: {
         campus?: {
