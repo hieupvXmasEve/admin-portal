@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import EditorContent from '@/components/EditorContent.vue';
+import EmailEditor from '@/components/EmailEditor.vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -10,7 +10,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useEmailTemplate } from '@/composables/useEmailTemplate';
 import { router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
-import { EyeIcon } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { computed, ref } from 'vue';
 import * as z from 'zod';
@@ -204,40 +203,18 @@ const onSubmit = handleSubmit(async (formValues) => {
             </FormField>
 
             <Tabs default-value="content" :value="activeTab" @update:value="handleTabChange">
-                <TabsList class="grid w-full grid-cols-3">
+                <TabsList class="grid w-full grid-cols-2">
                     <TabsTrigger value="content">Content</TabsTrigger>
-                    <TabsTrigger value="preview">Preview</TabsTrigger>
                     <TabsTrigger value="variables">Variables ({{ extractedVariables.length }})</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="content" class="space-y-2">
                     <FormField name="html_content" v-slot="{ componentField }">
                         <FormItem>
-                            <EditorContent v-bind="componentField" :common-variables="commonVariables" min-height="240px" />
+                            <EmailEditor v-bind="componentField" :common-variables="commonVariables" min-height="300px" :show-preview="true" placeholder="Start typing your email content..." />
                             <FormMessage />
                         </FormItem>
                     </FormField>
-                </TabsContent>
-
-                <TabsContent value="preview" class="space-y-4">
-                    <div class="flex justify-end">
-                        <Button type="button" size="sm" variant="outline" @click="generatePreview" :disabled="isGeneratingPreview"> <EyeIcon class="mr-2 h-4 w-4" /> {{ isGeneratingPreview ? 'Generating...' : 'Generate Preview' }} </Button>
-                    </div>
-                    <div v-if="previewData" class="space-y-4">
-                        <div>
-                            <div class="mb-1 text-xs font-medium">Subject:</div>
-                            <div class="rounded border p-2">{{ previewData.subject }}</div>
-                        </div>
-                        <div>
-                            <div class="mb-1 text-xs font-medium">HTML Content:</div>
-                            <div class="rounded border p-3" v-html="previewData.html"></div>
-                        </div>
-                        <div v-if="previewData.text">
-                            <div class="mb-1 text-xs font-medium">Plain Text:</div>
-                            <div class="rounded border p-2 whitespace-pre-wrap">{{ previewData.text }}</div>
-                        </div>
-                    </div>
-                    <div v-else class="text-muted-foreground text-sm">Click Generate Preview to simulate variables.</div>
                 </TabsContent>
 
                 <TabsContent value="variables" class="space-y-4">

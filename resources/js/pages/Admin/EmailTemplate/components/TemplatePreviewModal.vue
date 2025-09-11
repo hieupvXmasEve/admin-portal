@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import EmailContentRenderer from '@/components/EmailContentRenderer.vue';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import DialogDescription from '@/components/ui/dialog/DialogDescription.vue';
 import { EyeIcon, XIcon } from 'lucide-vue-next';
@@ -231,7 +232,8 @@ const closeModal = () => {
                                 <div class="rounded-lg bg-gray-50 p-4">
                                     <h4 class="mb-2 text-sm font-medium text-gray-900">Email Content</h4>
                                     <div class="max-h-96 overflow-y-auto rounded border bg-white p-4">
-                                        <div v-html="renderedPreview.html"></div>
+                                        <!-- <div v-html="renderedPreview.html"></div> -->
+                                        <EmailContentRenderer :content="renderedPreview.html" />
                                     </div>
                                 </div>
                             </div>

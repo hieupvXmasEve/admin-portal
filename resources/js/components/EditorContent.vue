@@ -49,6 +49,7 @@ interface Props {
     showToolbar?: boolean;
     minHeight?: string;
     commonVariables?: Array<{ name: string; description: string }>;
+    emailMode?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -56,6 +57,7 @@ const props = withDefaults(defineProps<Props>(), {
     placeholder: 'Start typing...',
     showToolbar: true,
     minHeight: '240px',
+    emailMode: false,
     commonVariables: () => [
         { name: 'student_name', description: 'Student name' },
         { name: 'student_id', description: 'Student ID' },
@@ -286,7 +288,10 @@ onBeforeUnmount(() => {
 
         <!-- Editor Content -->
         <div class="rounded-md border" :style="{ minHeight }">
-            <EditorContent :editor="editor" class="prose max-w-none p-3" />
+            <EditorContent 
+                :editor="editor" 
+                :class="emailMode ? 'email-editor max-w-none p-3' : 'prose max-w-none p-3'" 
+            />
         </div>
     </div>
 </template>
@@ -303,5 +308,179 @@ onBeforeUnmount(() => {
     color: #adb5bd;
     pointer-events: none;
     height: 0;
+}
+
+/* Email Mode Styling */
+:deep(.email-editor .ProseMirror) {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* Reset default prose styling for email mode */
+:deep(.email-editor .ProseMirror h1) {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 1em 0 0.5em;
+    color: #111;
+    line-height: 1.3;
+}
+
+:deep(.email-editor .ProseMirror h2) {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 1em 0 0.5em;
+    color: #111;
+    line-height: 1.3;
+}
+
+:deep(.email-editor .ProseMirror h3) {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 1em 0 0.5em;
+    color: #111;
+    line-height: 1.3;
+}
+
+:deep(.email-editor .ProseMirror p) {
+    margin: 0 0 1em;
+    color: #333;
+}
+
+/* Lists - sử dụng same styling như EmailContentRenderer - với !important để override Tailwind */
+:deep(.email-editor .ProseMirror ul) {
+    list-style-type: disc !important;
+    margin: 1em 0 !important;
+    padding-left: 30px !important;
+    list-style-position: outside !important;
+    /* Override list-inside from Tailwind */
+    list-style: revert !important;
+}
+
+:deep(.email-editor .ProseMirror ol) {
+    list-style-type: decimal !important;
+    margin: 1em 0 !important;
+    padding-left: 30px !important;
+    list-style-position: outside !important;
+    /* Override list-inside from Tailwind */
+    list-style: revert !important;
+}
+
+:deep(.email-editor .ProseMirror li) {
+    margin-bottom: 0.5em !important;
+    display: list-item !important;
+    list-style-position: outside !important;
+}
+
+/* Fix for paragraphs inside list items - critical fix */
+:deep(.email-editor .ProseMirror li p) {
+    margin: 0 !important;
+    display: inline;
+}
+
+/* Ensure proper line spacing for list content */
+:deep(.email-editor .ProseMirror li > *) {
+    display: inline;
+}
+
+:deep(.email-editor .ProseMirror li br) {
+    display: none;
+}
+
+/* Override Tailwind list classes specifically in email editor */
+:deep(.email-editor .ProseMirror ul.list-disc.list-inside),
+:deep(.email-editor .ProseMirror ol.list-decimal.list-inside) {
+    list-style: revert !important;
+    list-style-position: outside !important;
+    margin: 1em 0 !important;
+    padding-left: 30px !important;
+}
+
+/* Override Tailwind list reset specifically in email editor */
+:deep(.email-editor .ProseMirror ul),
+:deep(.email-editor .ProseMirror ol) {
+    list-style: revert !important;
+    margin: 1em 0 !important;
+    padding-left: 30px !important;
+}
+
+/* Ensure list items have proper styling */
+:deep(.email-editor .ProseMirror ul li) {
+    list-style-type: disc;
+}
+
+:deep(.email-editor .ProseMirror ol li) {
+    list-style-type: decimal;
+}
+
+:deep(.email-editor .ProseMirror a) {
+    color: #0066cc;
+    text-decoration: underline;
+}
+
+:deep(.email-editor .ProseMirror a:hover) {
+    text-decoration: none;
+}
+
+:deep(.email-editor .ProseMirror table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+
+:deep(.email-editor .ProseMirror th),
+:deep(.email-editor .ProseMirror td) {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+:deep(.email-editor .ProseMirror th) {
+    background-color: #f2f2f2;
+    font-weight: 700;
+}
+
+:deep(.email-editor .ProseMirror blockquote) {
+    border-left: 4px solid #ddd;
+    padding-left: 1em;
+    margin: 1em 0;
+    color: #666;
+    font-style: italic;
+}
+
+:deep(.email-editor .ProseMirror pre),
+:deep(.email-editor .ProseMirror code) {
+    font-family: 'Courier New', monospace;
+    background: #f5f5f5;
+    border-radius: 3px;
+}
+
+:deep(.email-editor .ProseMirror code) {
+    padding: 0.2em 0.4em;
+}
+
+:deep(.email-editor .ProseMirror pre) {
+    padding: 1em;
+    overflow-x: auto;
+    border: 1px solid #e0e0e0;
+}
+
+:deep(.email-editor .ProseMirror hr) {
+    border: none;
+    border-top: 1px solid #ddd;
+    margin: 1.5em 0;
+}
+
+:deep(.email-editor .ProseMirror img) {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Fix for any inline styles that might conflict */
+:deep(.email-editor .ProseMirror li p[style*="text-align"]) {
+    display: inline !important;
+    margin: 0 !important;
+    text-align: inherit !important;
 }
 </style>
