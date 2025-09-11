@@ -10,9 +10,17 @@ Route::get('/', function () {
     return redirect()->route('dashboard');
 })->middleware(['auth', 'verified'])->name('home');
 
-Route::get('dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('dashboard', [\App\Http\Controllers\Web\DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
+
+// Dashboard chart API endpoints
+// Route::middleware(['web', 'verified'])->prefix('api/dashboard')->name('api.dashboard.')->group(function () {
+//     Route::get('student-distribution', [\App\Http\Controllers\Web\DashboardController::class, 'studentDistribution'])->name('student-distribution');
+//     Route::get('enrollment-growth', [\App\Http\Controllers\Web\DashboardController::class, 'enrollmentGrowth'])->name('enrollment-growth');
+//     Route::get('academic-standing', [\App\Http\Controllers\Web\DashboardController::class, 'academicStanding'])->name('academic-standing');
+//     Route::get('graduation-rate', [\App\Http\Controllers\Web\DashboardController::class, 'graduationRate'])->name('graduation-rate');
+// });
 
 Route::middleware(['auth'])->group(callback: function () {
     Route::get('select-campus', [SelectCampus::class, 'index'])->name('select-campus.index');
@@ -86,4 +94,3 @@ require __DIR__ . '/web/student-application.php';
 require __DIR__ . '/web/systems.php';
 require __DIR__ . '/web/email-monitoring.php';
 require __DIR__ . '/web/syllabus-templates.php';
-

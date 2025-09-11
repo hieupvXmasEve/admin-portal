@@ -58,20 +58,20 @@
     --color-sidebar-ring: var(--sidebar-ring);
     --animate-accordion-down: accordion-down 0.2s ease-out;
     --animate-accordion-up: accordion-up 0.2s ease-out;
-  @keyframes accordion-down {
-  from {
-    height: 0;
+    @keyframes accordion-down {
+        from {
+            height: 0;
         }
-  to {
-    height: var(--reka-accordion-content-height);
+        to {
+            height: var(--reka-accordion-content-height);
         }
     }
-  @keyframes accordion-up {
-  from {
-    height: var(--reka-accordion-content-height);
+    @keyframes accordion-up {
+        from {
+            height: var(--reka-accordion-content-height);
         }
-  to {
-    height: 0;
+        to {
+            height: 0;
         }
     }
 }
@@ -97,8 +97,7 @@
 @layer utilities {
     body,
     html {
-        --font-sans:
-            'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+        --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
     }
 }
 
@@ -190,10 +189,18 @@
 */
 
 @layer base {
-    * {
-        @apply border-border outline-ring/50;
-    }
-    body {
-        @apply bg-background text-foreground;
+    :root {
+        /* ... */
+        --vis-tooltip-background-color: none !important;
+        --vis-tooltip-border-color: none !important;
+        --vis-tooltip-text-color: none !important;
+        --vis-tooltip-shadow-color: none !important;
+        --vis-tooltip-backdrop-filter: none !important;
+        --vis-tooltip-padding: none !important;
+
+        --vis-primary-color: var(--primary);
+        /* change to any hsl value you want */
+        --vis-secondary-color: 160 81% 40%;
+        --vis-text-color: var(--muted-foreground);
     }
 }

@@ -4,19 +4,19 @@ import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { useApi } from '@/composables/useApiRequest';
-import { toast } from 'vue-sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useGlobalConfirmDialog } from '@/composables';
-import type { Program, Student, CourseOffering } from '@/types/models';
+import type { CourseOffering, Program, Student } from '@/types/models';
+import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Download, Edit, Eye, FileSpreadsheet, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
+import { toast } from 'vue-sonner';
 
 interface Props {
     students: {
@@ -66,9 +66,6 @@ console.log(props.students);
 
 // Global confirm dialog composable
 const confirmDialog = useGlobalConfirmDialog();
-
-// API composable
-const api = useApi();
 
 // Export state
 const showExportDialog = ref(false);
@@ -153,18 +150,9 @@ const columns: ColumnDef<Student>[] = [
         header: 'Status',
         enableSorting: false,
         cell: ({ row }) => {
-            const status = row.original.status;
-            const statusColors: Record<string, string> = {
-                active: 'bg-green-100 text-green-800',
-                admitted: 'bg-yellow-100 text-yellow-800',
-                inactive: 'bg-gray-100 text-gray-800',
-                suspended: 'bg-red-100 text-red-800',
-                graduated: 'bg-blue-100 text-blue-800',
-                dropped_out: 'bg-red-100 text-red-800',
-            };
-            const colorClass = statusColors[status] || 'bg-gray-100 text-gray-800';
-            const displayText = status ? status.replace('_', ' ').toUpperCase() : 'Unknown';
-
+            const status = row.original.status as string;
+            const colorClass = getStudentStatusBadgeClass(status);
+            const displayText = getStudentStatusLabel(status);
             return h(
                 'span',
                 {
@@ -307,21 +295,7 @@ const closeExportDialog = () => {
     showExportDialog.value = false;
 };
 
-const getStatusDisplayText = (status: string) => {
-    const statusMap: Record<string, string> = {
-        'active': 'Active',
-        'inactive': 'Inactive', 
-        'suspended': 'Suspended',
-        'graduated': 'Graduated',
-        'intake_pre_uni_gc': 'Intake Pre-Uni GC',
-        'intake_course': 'Intake Course',
-        'deferred': 'Deferred',
-        'dropout': 'Dropout',
-        'dropout_transfer': 'Dropout Transfer', 
-        'pending': 'Pending'
-    };
-    return statusMap[status] || status;
-};
+const getStatusDisplayText = (status: string) => getStudentStatusLabel(status);
 
 const exportStudents = async () => {
     isExporting.value = true;
@@ -497,9 +471,7 @@ const exportStudents = async () => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Courses</SelectItem>
-                                <SelectItem v-for="courseOffering in courseOfferings" :key="courseOffering.id" :value="courseOffering.id.toString()">
-                                    {{ courseOffering.unit?.code }} - {{ courseOffering.unit?.name }}
-                                </SelectItem>
+                                <SelectItem v-for="courseOffering in courseOfferings" :key="courseOffering.id" :value="courseOffering.id.toString()"> {{ courseOffering.unit?.code }} - {{ courseOffering.unit?.name }} </SelectItem>
                             </SelectContent>
                         </Select>
                         <Button v-if="hasActiveFilters" variant="ghost" @click="clearFilters">
@@ -612,12 +584,10 @@ const exportStudents = async () => {
                     <div class="mb-2 text-sm font-medium">Export Information</div>
                     <ul class="text-muted-foreground space-y-1 text-xs">
                         <li v-if="exportForm.scope === 'filtered' && filters.search">• Search: "{{ filters.search }}"</li>
-                        <li v-if="exportForm.scope === 'filtered' && filters.program_id !== 'all'">
-                            • Program: {{ programs.find(p => p.id.toString() === filters.program_id)?.name || 'Unknown' }}
-                        </li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.program_id !== 'all'">• Program: {{ programs.find((p) => p.id.toString() === filters.program_id)?.name || 'Unknown' }}</li>
                         <li v-if="exportForm.scope === 'filtered' && filters.status !== 'all'">• Status: {{ getStatusDisplayText(filters.status) }}</li>
                         <li v-if="exportForm.scope === 'filtered' && filters.course_offering_id !== 'all' && courseOfferings">
-                            • Course: {{ courseOfferings.find(c => c.id.toString() === filters.course_offering_id)?.unit?.code }} - {{ courseOfferings.find(c => c.id.toString() === filters.course_offering_id)?.unit?.name }}
+                            • Course: {{ courseOfferings.find((c) => c.id.toString() === filters.course_offering_id)?.unit?.code }} - {{ courseOfferings.find((c) => c.id.toString() === filters.course_offering_id)?.unit?.name }}
                         </li>
                         <li v-if="exportForm.scope === 'all'">• All students from current campus will be exported</li>
                         <li>• Format: {{ exportForm.format === 'xlsx' ? 'Excel (.xlsx)' : 'CSV (.csv)' }}</li>
