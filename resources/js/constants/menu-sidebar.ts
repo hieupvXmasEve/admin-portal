@@ -12,7 +12,6 @@ import {
     ClipboardList,
     Clock,
     DoorOpen,
-    FileSpreadsheet,
     FileText,
     GraduationCap,
     Layers,
@@ -22,23 +21,18 @@ import {
     MailPlus,
     PieChart,
     Presentation,
-    RefreshCw,
-    Repeat,
     School,
     Settings,
     Settings2,
     ShieldCheck,
-    Star,
     Target,
     TrendingUp,
-    Trophy,
     User,
-    UserCheck,
     UserPlus,
     Users,
 } from 'lucide-vue-next';
 
-import { academicSummaryRoutes, assessmentRoutes, attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, reportRoutes, studentRoutes, syllabusRoutes, systemRoutes } from '@/utils/routes';
+import { academicSummaryRoutes, attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, reportRoutes, studentRoutes, syllabusRoutes, systemRoutes } from '@/utils/routes';
 
 export const mainNavItems: NavItem[] = [
     {
@@ -160,31 +154,31 @@ export const mainNavItems: NavItem[] = [
                 icon: FileText,
                 requiredPermissions: ['view_student'], // Will be implemented later
             },
-            {
-                title: 'Program/Specialization Change',
-                href: '#', // Placeholder
-                icon: RefreshCw,
-                requiredPermissions: ['edit_student'], // Will be implemented later
-            },
-            {
-                title: 'Repeat/Retake Courses',
-                href: '#', // Placeholder
-                icon: Repeat,
-                requiredPermissions: ['edit_student'], // Will be implemented later
-            },
-            {
-                title: 'Academic Standing',
-                href: '#', // Placeholder
-                icon: TrendingUp,
-                requiredPermissions: ['view_student'], // Will be implemented later
-            },
+            // {
+            //     title: 'Program/Specialization Change',
+            //     href: '#', // Placeholder
+            //     icon: RefreshCw,
+            //     requiredPermissions: ['edit_student'], // Will be implemented later
+            // },
+            // {
+            //     title: 'Repeat/Retake Courses',
+            //     href: '#', // Placeholder
+            //     icon: Repeat,
+            //     requiredPermissions: ['edit_student'], // Will be implemented later
+            // },
+            // {
+            //     title: 'Academic Standing',
+            //     href: '#', // Placeholder
+            //     icon: TrendingUp,
+            //     requiredPermissions: ['view_student'], // Will be implemented later
+            // },
 
-            {
-                title: 'Student Status Tracking',
-                href: studentRoutes.statusTracking(),
-                icon: UserCheck,
-                requiredPermissions: ['view_student'], // Will be implemented later
-            },
+            // {
+            //     title: 'Student Status Tracking',
+            //     href: studentRoutes.statusTracking(),
+            //     icon: UserCheck,
+            //     requiredPermissions: ['view_student'], // Will be implemented later
+            // },
             {
                 title: 'Student Applications',
                 href: '/student-applications',
@@ -287,49 +281,49 @@ export const mainNavItems: NavItem[] = [
             // },
         ],
     },
-    {
-        title: 'Assessments & Grading',
-        href: '#',
-        icon: Star,
-        children: [
-            {
-                title: 'Assessment Components',
-                href: assessmentRoutes.components(),
-                icon: Target,
-                requiredPermissions: ['view_assessment'], // Will be implemented later
-            },
-            {
-                title: 'Enter Grades',
-                href: assessmentRoutes.enterGrades(),
-                icon: Star,
-                requiredPermissions: ['edit_grade'], // Will be implemented later
-            },
-            {
-                title: 'Academic Results',
-                href: assessmentRoutes.academicResults(),
-                icon: Trophy,
-                requiredPermissions: ['view_grade'], // Will be implemented later
-            },
-            {
-                title: 'Re-assessments',
-                href: assessmentRoutes.reAssessments(),
-                icon: Repeat,
-                requiredPermissions: ['edit_assessment'], // Will be implemented later
-            },
-            {
-                title: 'Semester Grade Reports',
-                href: assessmentRoutes.gradeReports(),
-                icon: FileSpreadsheet,
-                requiredPermissions: ['view_grade'], // Will be implemented later
-            },
-            {
-                title: 'GPA History',
-                href: assessmentRoutes.gpaHistory(),
-                icon: TrendingUp,
-                requiredPermissions: ['view_grade'], // Will be implemented later
-            },
-        ],
-    },
+    // {
+    //     title: 'Assessments & Grading',
+    //     href: '#',
+    //     icon: Star,
+    //     children: [
+    //         {
+    //             title: 'Assessment Components',
+    //             href: assessmentRoutes.components(),
+    //             icon: Target,
+    //             requiredPermissions: ['view_assessment'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Enter Grades',
+    //             href: assessmentRoutes.enterGrades(),
+    //             icon: Star,
+    //             requiredPermissions: ['edit_grade'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Academic Results',
+    //             href: assessmentRoutes.academicResults(),
+    //             icon: Trophy,
+    //             requiredPermissions: ['view_grade'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Re-assessments',
+    //             href: assessmentRoutes.reAssessments(),
+    //             icon: Repeat,
+    //             requiredPermissions: ['edit_assessment'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Semester Grade Reports',
+    //             href: assessmentRoutes.gradeReports(),
+    //             icon: FileSpreadsheet,
+    //             requiredPermissions: ['view_grade'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'GPA History',
+    //             href: assessmentRoutes.gpaHistory(),
+    //             icon: TrendingUp,
+    //             requiredPermissions: ['view_grade'], // Will be implemented later
+    //         },
+    //     ],
+    // },
     {
         title: 'Academic Summary',
         href: '#',

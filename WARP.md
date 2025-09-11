@@ -110,9 +110,9 @@ All data tables use the standard `DataTable.vue` component with:
 - Use `preserveState` & `preserveScroll` in Inertia visits
 
 ### API Integration
-- Use `useApi()` composable for API requests
+- Use `useApi()` composable for API requests. `import { useApi } from '@/composables/useApiRequest';`
 - Pattern: `const api = useApi(); const { data } = await api.get('/endpoint', params)`
-- Handle errors with try/catch and toast notifications
+- Handle errors with try/catch and toast notifications. `import { toast } from 'vue-sonner';`
 - Consistent JSON response formatting via API Resources
 
 ### Testing Strategy
