@@ -47,7 +47,7 @@ class AdminScheduleService
             $conflicts = $this->validateScheduleConflicts($session, $data);
 
             if (! empty($conflicts)) {
-                throw new \InvalidArgumentException('Schedule conflicts detected: '.implode(', ', $conflicts));
+                throw new \InvalidArgumentException('Schedule conflicts detected: ' . implode(', ', $conflicts));
             }
 
             // Convert time strings to proper format if needed
@@ -167,6 +167,14 @@ class AdminScheduleService
 
         if (! empty($filters['room_id'])) {
             $query->where('room_id', $filters['room_id']);
+        }
+
+        // Always filter by current campus
+        $currentCampusId = app('campus')->id;
+        if ($currentCampusId) {
+            $query->whereHas('room', function ($q) use ($currentCampusId) {
+                $q->where('campus_id', $currentCampusId);
+            });
         }
 
         if (! empty($filters['date_range'])) {

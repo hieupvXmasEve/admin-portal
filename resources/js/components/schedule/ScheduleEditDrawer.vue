@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { format, parseISO } from 'date-fns';
-import { z } from 'zod';
-import { toTypedSchema } from '@vee-validate/zod';
-import { useForm } from 'vee-validate';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle, BookOpen, Calendar, Clock, MapPin, Save, User, X } from 'lucide-vue-next';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAdminSchedule } from '@/composables/useAdminSchedule';
 import type { DetailedScheduleSession, ScheduleSession, SessionUpdateData } from '@/types/schedule';
+import { toTypedSchema } from '@vee-validate/zod';
+import { format, parseISO } from 'date-fns';
+import { AlertTriangle, BookOpen, Calendar, Clock, MapPin, Save, User, X } from 'lucide-vue-next';
+import { useForm } from 'vee-validate';
+import { computed, onMounted, ref, watch } from 'vue';
+import { z } from 'zod';
 
 // Props
 interface Props {
@@ -87,7 +87,6 @@ const roomsByCampus = computed(() => {
         }
         grouped[campusName].push(room);
     });
-    console.log('%c grouped', 'color: red', grouped);
     return grouped;
 });
 
@@ -102,7 +101,6 @@ const loadSessionDetails = async () => {
 
         // Populate form with current session data
         if (detailedSession.value?.schedule && detailedSession.value?.room) {
-            console.log('%c detailedSession', 'color: red', detailedSession.value.room);
             setFieldValue('session_date', detailedSession.value.schedule.date);
             setFieldValue('start_time', detailedSession.value.schedule.startTime);
             setFieldValue('end_time', detailedSession.value.schedule.endTime);
@@ -230,7 +228,8 @@ onMounted(async () => {
                     <div class="grid grid-cols-1 gap-3 text-sm">
                         <div class="text-muted-foreground flex items-center space-x-2">
                             <User class="h-4 w-4" />
-                            <span>{{ detailedSession.lecturer?.name }}</span>
+                            <span class="font-bold capitalize">{{ detailedSession.lecturer?.name }}</span>
+                            <span>{{ detailedSession.lecturer?.email }}</span>
                         </div>
                         <div class="text-muted-foreground flex items-center space-x-2">
                             <BookOpen class="h-4 w-4" />

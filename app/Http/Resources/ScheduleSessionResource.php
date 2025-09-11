@@ -25,7 +25,7 @@ class ScheduleSessionResource extends JsonResource
             'section' => $this->courseOffering->section ?? 'A',
             'lecturer' => [
                 'id' => $this->lecture->id ?? null,
-                'name' => $this->lecture->name ?? 'TBA',
+                'name' => $this->lecture->full_name ?? 'TBA',
                 'email' => $this->lecture->email ?? null,
             ],
             'room' => [
