@@ -28,6 +28,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:view_student')
         ->name(StudentRoutes::INDEX);
 
+    // Export route (must come before {student} routes)
+    Route::get('students/export', [StudentController::class, 'export'])
+        ->middleware('can:view_student')
+        ->name('students.export');
+
     // New Students page for first-semester students
     Route::get('students/new-students', [StudentController::class, 'newStudents'])
         ->middleware('can:view_student')
