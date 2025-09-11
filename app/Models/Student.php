@@ -257,6 +257,40 @@ class Student extends StudentAuditableModel
         return $this->belongsTo(User::class, 'status_changed_by');
     }
 
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            'active' => 'Active',
+            'inactive' => 'Inactive',
+            'suspended' => 'Suspended',
+            'graduated' => 'Graduated',
+            'intake_pre_uni_gc' => 'Intake Pre-Uni GC',
+            'intake_course' => 'Intake Course',
+            'deferred' => 'Deferred',
+            'dropout' => 'Dropout',
+            'dropout_transfer' => 'Dropout Transfer',
+            'pending' => 'Pending',
+            default => 'Unknown',
+        };
+    }
+
+    public function getStatusColorAttribute(): string
+    {
+        return match ($this->status) {
+            'active' => 'green',
+            'inactive' => 'gray',
+            'suspended' => 'red',
+            'graduated' => 'blue',
+            'intake_pre_uni_gc' => 'yellow',
+            'intake_course' => 'indigo',
+            'deferred' => 'orange',
+            'dropout' => 'red',
+            'dropout_transfer' => 'red',
+            'pending' => 'yellow',
+            default => 'gray',
+        };
+    }
+
     public function getAcademicStatusLabelAttribute(): string
     {
         return match ($this->academic_status) {

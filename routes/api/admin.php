@@ -93,5 +93,22 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::put('/student-applications/{studentApplication}', [StudentApplicationController::class, 'update']);
     Route::patch('/student-applications/{studentApplication}/status', [StudentApplicationController::class, 'updateStatus']);
     Route::post('/student-applications', [StudentApplicationController::class, 'store']);
+});
 
+// Dashboard API routes - Separated for performance
+Route::middleware(['web'])->prefix('dashboard')->name('api.admin.dashboard.')->group(function () {
+    // Chart 1: Student distribution by campus/program
+    Route::get('/student-distribution', [\App\Http\Controllers\Web\DashboardController::class, 'studentDistribution'])->name('student-distribution');
+
+    // Chart 2: Enrollment growth/trend by term
+    Route::get('/enrollment-growth', [\App\Http\Controllers\Web\DashboardController::class, 'enrollmentGrowth'])->name('enrollment-growth');
+
+    // Chart 3: Academic standings distribution
+    Route::get('/academic-standing', [\App\Http\Controllers\Web\DashboardController::class, 'academicStanding'])->name('academic-standing');
+
+    // Chart 4: Graduation rate analysis
+    Route::get('/graduation-rate', [\App\Http\Controllers\Web\DashboardController::class, 'graduationRate'])->name('graduation-rate');
+
+    // Additional dashboard endpoints
+    Route::get('/recent-activities', [\App\Http\Controllers\Web\DashboardController::class, 'recentActivities'])->name('recent-activities');
 });
