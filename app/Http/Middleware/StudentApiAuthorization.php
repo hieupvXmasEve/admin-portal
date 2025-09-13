@@ -30,7 +30,7 @@ class StudentApiAuthorization
         $student = $request->user();
 
         // Check if student account is active
-        if (! $this->isStudentActive($student)) {
+        if (! $student->isActive()) {
             return ApiResponse::authorizationError(
                 'Student account is not active. Please contact administration.'
             );
@@ -57,14 +57,6 @@ class StudentApiAuthorization
     }
 
     /**
-     * Check if student account is active
-     */
-    protected function isStudentActive(Student $student): bool
-    {
-        return in_array($student->status, ['active', 'enrolled']);
-    }
-
-    /**
      * Check if student has blocking academic holds
      */
     protected function hasBlockingHolds(Student $student, Request $request): bool
@@ -73,7 +65,7 @@ class StudentApiAuthorization
         $routeName = $request->route()?->getName() ?? '';
 
         $blockingHolds = $student->academicHolds()
-            ->where('status', 'active')
+            ->active()
             ->get();
 
         foreach ($blockingHolds as $hold) {
@@ -91,26 +83,34 @@ class StudentApiAuthorization
     protected function holdBlocksRoute($hold, string $routeName): bool
     {
         // Registration holds block course registration
-        if ($hold->hold_category === 'registration' &&
-            str_contains($routeName, 'registration')) {
+        if (
+            $hold->hold_category === 'registration' &&
+            str_contains($routeName, 'registration')
+        ) {
             return true;
         }
 
         // Academic holds block grade access
-        if ($hold->hold_category === 'academic' &&
-            str_contains($routeName, 'grade')) {
+        if (
+            $hold->hold_category === 'academic' &&
+            str_contains($routeName, 'grade')
+        ) {
             return true;
         }
 
         // Financial holds block most services
-        if ($hold->hold_type === 'financial' &&
-            ! str_contains($routeName, 'profile')) {
+        if (
+            $hold->hold_type === 'financial' &&
+            ! str_contains($routeName, 'profile')
+        ) {
             return true;
         }
 
         // All category holds block everything except profile
-        if ($hold->hold_category === 'all' &&
-            ! str_contains($routeName, 'profile')) {
+        if (
+            $hold->hold_category === 'all' &&
+            ! str_contains($routeName, 'profile')
+        ) {
             return true;
         }
 

@@ -16,6 +16,17 @@ class Student extends StudentAuditableModel
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    /**
+     * Statuses that are blocked from active operations (e.g., login)
+     */
+    public const BLOCKED_STATUSES = [
+        'inactive',
+        'deferred',
+        'dropout',
+        'dropout_transfer',
+        'graduated',
+    ];
+
     protected $guard = 'student';
 
     protected $fillable = [
@@ -205,6 +216,14 @@ class Student extends StudentAuditableModel
     {
         return $this->status === 'active' &&
             ! $this->hasActiveHolds();
+    }
+
+    /**
+     * Determine if the student is considered active for authentication/portal access
+     */
+    public function isActive(): bool
+    {
+        return ! in_array($this->status, self::BLOCKED_STATUSES, true);
     }
 
     public function generateStudentId(string $campusCode, int $year): string
