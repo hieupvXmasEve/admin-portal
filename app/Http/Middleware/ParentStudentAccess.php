@@ -15,7 +15,7 @@ class ParentStudentAccess
 {
     /**
      * Handle an incoming request.
-     * 
+     *
      * This middleware allows parents to access student APIs by:
      * 1. If user is Student → pass through normally
      * 2. If user is User (parent) → require student_id, verify relationship, inject Student
@@ -47,9 +47,9 @@ class ParentStudentAccess
     protected function handleParentAccess(Request $request, Closure $next, User $parent): Response
     {
         // Get student_id from multiple possible sources
-        $studentId = $request->input('student_id') 
-                  ?? $request->header('X-Student-ID')
-                  ?? $request->route('student_id');
+        $studentId = $request->input('student_id')
+            ?? $request->header('X-Student-ID')
+            ?? $request->route('student_id');
 
         if (!$studentId) {
             return ApiResponse::validationError([
@@ -59,11 +59,11 @@ class ParentStudentAccess
 
         // Find the student and verify parent relationship
         $student = Student::where('id', $studentId)
-                         ->orWhere('student_id', $studentId)
-                         ->first();
+            ->orWhere('student_id', $studentId)
+            ->first();
 
         if (!$student) {
-            return ApiResponse::notFoundError('Student not found');
+            return ApiResponse::notFound('Student not found');
         }
 
         // Verify parent has access to this student
@@ -109,8 +109,9 @@ class ParentStudentAccess
      */
     protected function isStudentAccessible(Student $student): bool
     {
-        // Check if student account is active
-        if (!in_array($student->status, ['active', 'enrolled'])) {
+        // Check if student account is active or in valid intake status
+        $allowedStatuses = ['active', 'enrolled', 'intake_pre_uni_gc', 'intake_pre_uni', 'intake', 'pre_uni'];
+        if (!$student->isActive()) {
             return false;
         }
 
@@ -122,7 +123,7 @@ class ParentStudentAccess
 
         // Allow access even with holds for parent monitoring
         // You might want to restrict this based on business rules
-        
+
         return true;
     }
 
@@ -132,14 +133,14 @@ class ParentStudentAccess
     protected function getStudentIdFromRoute(Request $request): ?string
     {
         $route = $request->route();
-        
+
         if (!$route) {
             return null;
         }
 
         // Common route parameter names for student ID
         $possibleParams = ['student', 'student_id', 'studentId'];
-        
+
         foreach ($possibleParams as $param) {
             if ($route->hasParameter($param)) {
                 return $route->parameter($param);

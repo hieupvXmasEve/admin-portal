@@ -75,7 +75,7 @@ class SemesterEnrollmentController extends Controller
 
             // Get total eligible students for this campus
             $totalEligibleStudents = Student::query()
-                ->where('status', 'active')
+                ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
                 ->where('academic_status', 'active')
                 ->where('campus_id', $currentCampusId)
                 ->whereNotNull('curriculum_version_id')
@@ -83,7 +83,7 @@ class SemesterEnrollmentController extends Controller
 
             // Get students already enrolled for this semester
             $enrolledStudents = Student::query()
-                ->where('status', 'active')
+                ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
                 ->where('academic_status', 'active')
                 ->where('campus_id', $currentCampusId)
                 ->whereNotNull('curriculum_version_id')
@@ -94,7 +94,7 @@ class SemesterEnrollmentController extends Controller
 
             // Get students not yet enrolled for this semester
             $notEnrolledStudents = Student::query()
-                ->where('status', 'active')
+                ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
                 ->where('academic_status', 'active')
                 ->where('campus_id', $currentCampusId)
                 ->whereNotNull('curriculum_version_id')
@@ -145,12 +145,12 @@ class SemesterEnrollmentController extends Controller
 
             // Get active students with valid curriculum_version_id for current campus
             $eligibleStudents = Student::query()
-                ->where('status', 'active')
-                ->where('academic_status', 'active') // thêm dòng này
+                ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
+                ->where('academic_status', 'active')
                 ->where('campus_id', $currentCampusId)
                 ->whereNotNull('curriculum_version_id')
                 ->whereDoesntHave('enrollments', fn($q) => $q->where('semester_id', $semester->id))
-                ->whereDoesntHave('academicHolds', fn($q) => $q->where('hold_category', 'registration')->where('status', 'active')) // nếu đã có relation
+                ->whereDoesntHave('academicHolds', fn($q) => $q->where('hold_category', 'registration')->where('status', 'active'))
                 ->get();
 
             if ($eligibleStudents->isEmpty()) {
@@ -203,7 +203,7 @@ class SemesterEnrollmentController extends Controller
             // Get updated campus statistics
             $campus = \App\Models\Campus::find($currentCampusId);
             $totalEligibleStudents = Student::query()
-                ->where('status', 'active')
+                ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
                 ->where('academic_status', 'active')
                 ->where('campus_id', $currentCampusId)
                 ->whereNotNull('curriculum_version_id')
@@ -722,7 +722,7 @@ class SemesterEnrollmentController extends Controller
 
                     try {
                         // Basic student status checks
-                        if ($student->status !== 'active' || $student->academic_status !== 'active') {
+                        if (!in_array($student->status, ['intake_pre_uni_gc', 'intake_course']) || $student->academic_status !== 'active') {
                             $skipped++;
                             $results['skipped'][] = [
                                 'student_id' => $student->id,

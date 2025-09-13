@@ -7,13 +7,15 @@ namespace App\Http\Controllers\Api\V1\Student;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Student\LoginRequest;
 use App\Http\Requests\Api\V1\Student\RefreshTokenRequest;
+use App\Http\Requests\Api\V1\Student\GoogleLoginRequest;
 use App\Http\Responses\ApiResponse;
 use App\Models\Student;
+use Google\Client;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -45,8 +47,8 @@ class AuthController extends Controller
             return ApiResponse::authenticationError('Invalid credentials');
         }
 
-        // Check if student account is active
-        if (! in_array($student->status, ['active', 'enrolled'])) {
+        // Student active check
+        if (! $student->isActive()) {
             return ApiResponse::authorizationError(
                 'Account is not active. Please contact administration.'
             );
@@ -187,50 +189,122 @@ class AuthController extends Controller
     }
 
     /**
-     * Student Google OAuth Login
+     * Student Google OAuth Login with ID Token validation
      */
-    public function loginWithGoogle(Request $request): JsonResponse
+    public function loginWithGoogle(GoogleLoginRequest $request): JsonResponse
     {
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
-            'access_token' => 'required|string',
-            'device_name' => 'nullable|string|max:255',
-        ]);
+        // Rate limiting for Google OAuth attempts
+        $key = 'google-login:' . $request->ip();
 
-        if ($validator->fails()) {
-            return ApiResponse::validationError($validator->errors());
-        }
+//        if (RateLimiter::tooManyAttempts($key, 10)) {
+//            $seconds = RateLimiter::availableIn($key);
+//
+//            return ApiResponse::rateLimitError(
+//                "Too many Google login attempts. Try again in {$seconds} seconds."
+//            );
+//        }
 
         try {
-            // Validate Google access token
-            $response = Http::withToken($request->access_token)
-                ->get('https://www.googleapis.com/oauth2/v1/userinfo');
+            Log::debug('[StudentAuth] Google login attempt started', [
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'device_name' => $request->input('device_name'),
+            ]);
 
-            if ($response->failed()) {
-                return ApiResponse::authenticationError('Invalid Google access token');
+            // Initialize Google Client and verify ID token
+            $client = new Client([
+                'client_id' => config('services.google.client_id'),
+            ]);
+            Log::debug('[StudentAuth] Google login request started', [
+                'ip' => $request->ip(),
+                'id_token' => $request->id_token,
+            ]);
+
+            // Verify the ID token
+            $payload = $client->verifyIdToken($request->id_token);
+
+            if (!$payload) {
+//                RateLimiter::hit($key, 300); // 5 minutes
+                Log::warning('[StudentAuth] Google ID token verification failed', [
+                    'ip' => $request->ip(),
+                ]);
+                return ApiResponse::authenticationError('Invalid Google ID token');
             }
 
-            $googleUserData = $response->json();
+            // Extract user data from the verified payload
+            $googleUserData = [
+                'id' => $payload['sub'],
+                'email' => $payload['email'] ?? null,
+                'name' => $payload['name'] ?? null,
+                'picture' => $payload['picture'] ?? null,
+                'email_verified' => $payload['email_verified'] ?? false,
+            ];
 
-            if (! $googleUserData || ! isset($googleUserData['email'])) {
-                return ApiResponse::authenticationError('Unable to retrieve user information from Google');
+            Log::debug('[StudentAuth] Google ID token verified successfully', [
+                'ip' => $request->ip(),
+                'email' => $googleUserData['email'],
+                'email_verified' => $googleUserData['email_verified'],
+            ]);
+
+            // Validate required user data
+            if (!$googleUserData['email']) {
+                RateLimiter::hit($key, 300);
+                Log::warning('[StudentAuth] Google user data missing email', [
+                    'ip' => $request->ip(),
+                ]);
+                return ApiResponse::authenticationError('Unable to retrieve email from Google account');
             }
 
-            // Check for student account
+            if (!$googleUserData['email_verified']) {
+                RateLimiter::hit($key, 300);
+                Log::warning('[StudentAuth] Google account email not verified', [
+                    'ip' => $request->ip(),
+                    'email' => $googleUserData['email'],
+                ]);
+                return ApiResponse::authenticationError('Google account email is not verified');
+            }
+
+            // Find student by email
             $student = Student::where('email', $googleUserData['email'])->first();
+            Log::debug('[StudentAuth] Student lookup by email', [
+                'ip' => $request->ip(),
+                'email' => $googleUserData['email'],
+                'found' => (bool) $student,
+                'student_id' => $student?->id,
+            ]);
 
-            // Update OAuth provider data if not set
-            if (! $student->oauth_provider_id) {
+            if (!$student) {
+                RateLimiter::hit($key, 300);
+                Log::warning('[StudentAuth] No student account found for Google email', [
+                    'ip' => $request->ip(),
+                    'email' => $googleUserData['email'],
+                ]);
+                return ApiResponse::authenticationError('No student account found with this email address');
+            }
+
+            // Update OAuth provider data if not already set
+            if (!$student->oauth_provider_id) {
+                Log::debug('[StudentAuth] Updating OAuth provider fields for student', [
+                    'ip' => $request->ip(),
+                    'student_id' => $student->id,
+                ]);
                 $student->update([
                     'oauth_provider' => 'google',
                     'oauth_provider_id' => $googleUserData['id'],
-                    // 'avatar_url' => $student->avatar_url ?: ($googleUserData['picture'] ?? null),
+                    'avatar_url' => $student->avatar_url ?: $googleUserData['picture'],
                     'email_verified_at' => $student->email_verified_at ?: now(),
                 ]);
             }
 
-            // Check if student account is active
-            if (! in_array($student->status, ['active', 'enrolled'])) {
-                return ApiResponse::authorizationError('Student account is not active');
+            // Student active check
+            if (!$student->isActive()) {
+                RateLimiter::hit($key, 900); // 15 minutes
+                Log::warning('[StudentAuth] Student account blocked by status', [
+                    'ip' => $request->ip(),
+                    'student_id' => $student->id,
+                    'status' => $student->status,
+                ]);
+                return ApiResponse::authorizationError('Student account is not active. Please contact administration.');
             }
 
             // Check for blocking academic holds
@@ -240,16 +314,37 @@ class AuthController extends Controller
                 ->exists();
 
             if ($blockingHolds) {
+                RateLimiter::hit($key, 900);
+                Log::warning('[StudentAuth] Student has blocking academic holds', [
+                    'ip' => $request->ip(),
+                    'student_id' => $student->id,
+                ]);
                 return ApiResponse::authorizationError('Account access is restricted due to academic holds.');
             }
 
-            // Update last login
-            $student->update(['last_login_at' => now()]);
+            // Clear rate limiting on successful authentication
+            RateLimiter::clear($key);
 
-            // Create token
+            // Update last login timestamp
+            $student->update(['last_login_at' => now()]);
+            Log::debug('[StudentAuth] Student last_login_at updated', [
+                'ip' => $request->ip(),
+                'student_id' => $student->id,
+            ]);
+
+            // Create authentication token
             $deviceName = $request->device_name ?? 'Student Portal (Google)';
-            $expiresAt = now()->addHours(8);
+            $expiresAt = $request->remember_me ? now()->addDays(30) : now()->addHours(8);
             $token = $student->createToken($deviceName, ['student'], $expiresAt)->plainTextToken;
+
+            Log::debug('[StudentAuth] Student token created via Google', [
+                'ip' => $request->ip(),
+                'student_id' => $student->id,
+                'email' => $student->email,
+                'device_name' => $deviceName,
+                'expires_at' => $expiresAt->toISOString(),
+                'remember_me' => $request->remember_me,
+            ]);
 
             return ApiResponse::success(
                 data: [
@@ -270,8 +365,80 @@ class AuthController extends Controller
                 ],
                 message: 'Google login successful'
             );
+        } catch (\Google\Exception $e) {
+            RateLimiter::hit($key, 300);
+            Log::error('[StudentAuth] Google library error', [
+                'ip' => $request->ip(),
+                'error' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'id_token_preview' => substr($request->id_token, 0, 50) . '...',
+            ]);
+
+            // Provide more specific error message based on the error
+            if (str_contains($e->getMessage(), 'Wrong number of segments')) {
+                return ApiResponse::authenticationError(
+                    'Invalid Google ID token format. Please ensure you are sending a valid JWT token from Google OAuth, not an email address or other value.'
+                );
+            }
+
+            return ApiResponse::authenticationError('Google authentication failed: Invalid ID token');
         } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to authenticate with Google: ' . $e->getMessage());
+            RateLimiter::hit($key, 60);
+            Log::error('[StudentAuth] Google login unexpected error', [
+                'ip' => $request->ip(),
+                'error' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return ApiResponse::serverError('An unexpected error occurred during Google authentication');
         }
+    }
+
+    /**
+     * Validate Google ID Token format (for debugging)
+     */
+    public function validateGoogleToken(Request $request): JsonResponse
+    {
+        $request->validate([
+            'id_token' => 'required|string',
+        ]);
+
+        $idToken = $request->id_token;
+
+        // Basic JWT format validation
+        $segments = explode('.', $idToken);
+
+        $response = [
+            'is_valid_jwt_format' => count($segments) === 3,
+            'segments_count' => count($segments),
+            'token_length' => strlen($idToken),
+            'starts_with_ey' => str_starts_with($idToken, 'ey'),
+            'contains_email_pattern' => str_contains($idToken, '@'),
+            'preview' => substr($idToken, 0, 50) . '...',
+        ];
+
+        if (count($segments) === 3) {
+            try {
+                // Try to decode the header and payload (without verification)
+                $header = json_decode(base64_decode($segments[0]), true);
+                $payload = json_decode(base64_decode($segments[1]), true);
+
+                $response['header'] = $header;
+                $response['payload_preview'] = [
+                    'iss' => $payload['iss'] ?? null,
+                    'aud' => $payload['aud'] ?? null,
+                    'exp' => $payload['exp'] ?? null,
+                    'email' => $payload['email'] ?? null,
+                ];
+            } catch (\Exception $e) {
+                $response['decode_error'] = $e->getMessage();
+            }
+        }
+
+        $message = count($segments) === 3
+            ? 'Token format appears valid'
+            : 'Invalid JWT format. Expected 3 segments separated by dots, got ' . count($segments);
+
+        return ApiResponse::success($response, [], $message);
     }
 }

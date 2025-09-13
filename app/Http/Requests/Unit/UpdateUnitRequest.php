@@ -33,7 +33,6 @@ class UpdateUnitRequest extends FormRequest
                 'string',
                 'max:255',
                 'min:3',
-                'regex:/^[\pL\pN\s\-\.\,\(\)]+$/u',
             ],
             'credit_points' => [
                 'required',

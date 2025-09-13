@@ -15,12 +15,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly ParentAuthService $service)
-    {
-    }
+    public function __construct(private readonly ParentAuthService $service) {}
 
     public function register(RegisterRequest $request): JsonResponse
     {
@@ -55,7 +54,7 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
-        $key = 'parent_login:'.$request->ip();
+        $key = 'parent_login:' . $request->ip();
         if (RateLimiter::tooManyAttempts($key, 5)) {
             $seconds = RateLimiter::availableIn($key);
             return ApiResponse::rateLimitError("Too many login attempts. Try again in {$seconds} seconds.");
@@ -127,32 +126,69 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return ApiResponse::validationError($validator->errors());
+            Log::debug('[ParentAuth] Google login validation failed', [
+                'ip' => $request->ip(),
+                'errors' => $validator->errors()->toArray(),
+            ]);
+            return ApiResponse::validationError($validator->errors()->toArray());
         }
 
         try {
+            Log::debug('[ParentAuth] Google login attempt started', [
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'device_name' => $request->input('device_name'),
+            ]);
             // Validate Google access token
             $response = Http::withToken($request->access_token)
                 ->get('https://www.googleapis.com/oauth2/v1/userinfo');
 
             if ($response->failed()) {
+                Log::warning('[ParentAuth] Google userinfo request failed', [
+                    'ip' => $request->ip(),
+                    'status' => $response->status(),
+                    'reason' => $response->reason(),
+                ]);
                 return ApiResponse::authenticationError('Invalid Google access token');
             }
 
             $googleUserData = $response->json();
+            Log::debug('[ParentAuth] Google userinfo response received', [
+                'ip' => $request->ip(),
+                'status' => $response->status(),
+                'has_email' => isset($googleUserData['email']),
+            ]);
 
             if (! $googleUserData || ! isset($googleUserData['email'])) {
+                Log::warning('[ParentAuth] Google userinfo missing email', [
+                    'ip' => $request->ip(),
+                ]);
                 return ApiResponse::authenticationError('Unable to retrieve user information from Google');
             }
 
             // Find user by email
             $user = User::where('email', $googleUserData['email'])->first();
+            Log::debug('[ParentAuth] Parent lookup by email', [
+                'ip' => $request->ip(),
+                'email' => $googleUserData['email'],
+                'found' => (bool) $user,
+                'user_id' => $user?->id,
+            ]);
             if (! $user) {
+                Log::warning('[ParentAuth] Parent account not found for Google email', [
+                    'ip' => $request->ip(),
+                    'email' => $googleUserData['email'],
+                ]);
                 return ApiResponse::authenticationError('Parent account not found with this email');
             }
 
             // Check if user is active
             if (! $user->isActive()) {
+                Log::warning('[ParentAuth] Parent account inactive', [
+                    'ip' => $request->ip(),
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                ]);
                 return ApiResponse::authorizationError('Parent account is not active');
             }
 
@@ -160,6 +196,13 @@ class AuthController extends Controller
             $deviceName = $request->device_name ?? 'Parent Portal (Google)';
             $expiresAt = now()->addHours(8);
             $token = $user->createToken($deviceName, ['parent'], $expiresAt)->plainTextToken;
+            Log::debug('[ParentAuth] Parent token created via Google', [
+                'ip' => $request->ip(),
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'device_name' => $deviceName,
+                'expires_at' => $expiresAt->toISOString(),
+            ]);
 
             return ApiResponse::success(
                 data: [
@@ -177,6 +220,11 @@ class AuthController extends Controller
                 message: 'Google login successful'
             );
         } catch (\Exception $e) {
+            Log::error('[ParentAuth] Google login error', [
+                'ip' => $request->ip(),
+                'error' => $e->getMessage(),
+                'code' => $e->getCode(),
+            ]);
             return ApiResponse::serverError('Failed to authenticate with Google: ' . $e->getMessage());
         }
     }
@@ -191,7 +239,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'status' => $user->status,
-                'children' => $user->children()->select('id','student_id','full_name','campus_id')->get(),
+                'children' => $user->children()->select('id', 'student_id', 'full_name', 'campus_id')->get(),
             ],
             message: 'Parent profile retrieved successfully'
         );

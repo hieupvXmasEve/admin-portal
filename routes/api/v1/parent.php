@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 // Public routes
 Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])
-//        ->middleware(['student.api.rate:student-auth'])
+        ->middleware(['api.logging'])
         ->name('register');
 
     Route::post('/login', [AuthController::class, 'login'])

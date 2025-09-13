@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CheckCampusSelected;
+use App\Http\Middleware\EitherMiddleware;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetCampus;
@@ -13,9 +14,9 @@ use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
-        commands: __DIR__.'/../routes/console.php',
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
@@ -40,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'lecturer.api.rate' => \App\Http\Middleware\LecturerApiRateLimiter::class,
             'parent.student.access' => \App\Http\Middleware\ParentStudentAccess::class,
             'api.logging' => \App\Http\Middleware\ApiLogging::class,
+            'either' => EitherMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
