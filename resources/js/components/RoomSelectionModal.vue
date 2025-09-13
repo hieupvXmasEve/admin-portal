@@ -94,7 +94,7 @@ const { handleSubmit, setFieldValue, values } = useForm({
 // Generate time options from 07:00 to 19:00
 const timeOptions = computed(() => {
     const options = [];
-    for (let hour = 7; hour <= 19; hour++) {
+    for (let hour = 6; hour <= 23; hour++) {
         for (let minute = 0; minute < 60; minute += 30) {
             const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
             const displayTime = formatTimeDisplay(time);
