@@ -20,7 +20,7 @@ class CourseOfferingResource extends JsonResource
                 'code' => $this->resource['unit']['code'],
                 'name' => $this->resource['unit']['name'],
                 'description' => $this->resource['unit']['description'],
-                'credit_hours' => $this->resource['unit']['credit_hours'],
+                'credit_points' => $this->resource['unit']['credit_points'],
             ],
             'lecturer' => [
                 'id' => $this->resource['lecturer']['id'],
@@ -35,13 +35,13 @@ class CourseOfferingResource extends JsonResource
             //     'waitlist_available' => $this->resource['enrollment']['waitlist_available'],
             //     'enrollment_status' => $this->getEnrollmentStatus($this->resource['enrollment']),
             // ],
-            'registration_eligibility' => [
-                'can_register' => $this->resource['registration_eligibility']['can_register'],
-                'prerequisites_met' => $this->resource['registration_eligibility']['prerequisites_met'],
-                'has_conflicts' => $this->resource['registration_eligibility']['has_conflicts'],
-                'capacity_available' => $this->resource['registration_eligibility']['capacity_available'],
-                'eligibility_summary' => $this->getEligibilitySummary($this->resource['registration_eligibility']),
-            ],
+//            'registration_eligibility' => [
+//                'can_register' => $this->resource['registration_eligibility']['can_register'],
+//                'prerequisites_met' => $this->resource['registration_eligibility']['prerequisites_met'],
+//                'has_conflicts' => $this->resource['registration_eligibility']['has_conflicts'],
+//                'capacity_available' => $this->resource['registration_eligibility']['capacity_available'],
+//                'eligibility_summary' => $this->getEligibilitySummary($this->resource['registration_eligibility']),
+//            ],
         ];
     }
 
@@ -70,7 +70,7 @@ class CourseOfferingResource extends JsonResource
                 } else {
                     $buildingInfo = $room->building ?? null;
                 }
-                
+
                 $roomData = [
                     'code' => is_array($room) ? ($room['code'] ?? null) : ($room->code ?? null),
                     'name' => is_array($room) ? ($room['name'] ?? null) : ($room->name ?? null),
@@ -160,7 +160,7 @@ class CourseOfferingResource extends JsonResource
     /**
      * Calculate session duration in minutes
      */
-    protected function calculateDuration($startTime, $endTime): int
+    protected function calculateDuration($startTime, $endTime): float
     {
         if (! $startTime || ! $endTime) {
             return 0;
