@@ -106,7 +106,7 @@ Route::middleware([
 
         // Attendance endpoints
         Route::prefix('attendance')->name('attendance.')->group(function () {
-            Route::get('/', [AttendanceController::class, 'index'])->name('index');
+            Route::get('/report', [AttendanceController::class, 'report'])->name('report');
             //        Route::get('/summary', [AttendanceController::class, 'summary'])->name('summary');
             //        Route::get('/alerts', [AttendanceController::class, 'alerts'])->name('alerts');
             Route::get('/course/{courseOfferingId}', [AttendanceController::class, 'courseAttendance'])
@@ -134,7 +134,8 @@ Route::middleware([
         // Curriculum and program tracking endpoints
         Route::prefix('curriculum')->name('curriculum.')->group(function () {
             Route::get('/', [CurriculumController::class, 'index'])->name('index');
-            Route::get('/prerequisite-tree', [CurriculumController::class, 'prerequisiteTree'])->name('prerequisite-tree');
+            Route::get('/by-semester', [CurriculumController::class, 'bySemester'])->name('by-semester');
+//            Route::get('/prerequisite-tree', [CurriculumController::class, 'prerequisiteTree'])->name('prerequisite-tree');
             Route::get('/program-requirements', [CurriculumController::class, 'programRequirements'])->name('program-requirements');
             Route::get('/roadmap', [CurriculumController::class, 'roadmap'])->name('roadmap');
         });
@@ -146,7 +147,7 @@ Route::middleware([
             Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
             Route::get('/preferences', [NotificationController::class, 'preferences'])->name('preferences');
             Route::put('/preferences', [NotificationController::class, 'updatePreferences'])->name('update-preferences');
-            Route::post('/push-subscription', [NotificationController::class, 'subscribeToPush'])->name('push-subscription');
+//            Route::post('/push-subscription', [NotificationController::class, 'subscribeToPush'])->name('push-subscription');
         });
 
         // Academic calendar endpoints

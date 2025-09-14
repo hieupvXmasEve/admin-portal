@@ -161,6 +161,22 @@ class CurriculumService
     }
 
     /**
+     * Get curriculum organized by semester with grades and status
+     */
+    public function getCurriculumBySemester(Student $student): array
+    {
+        $cacheKey = "curriculum:by_semester:student:{$student->id}";
+
+        return Cache::remember($cacheKey, 1800, function () use ($student) {
+            $curriculumUnits = $this->getCurriculumUnitsWithRelations($student);
+            $academicRecords = $this->getAcademicRecords($student);
+            $courseRegistrations = $this->getCourseRegistrations($student);
+            
+            return $this->organizeBySemester($curriculumUnits, $academicRecords, $courseRegistrations);
+        });
+    }
+
+    /**
      * Get curriculum units for student
      */
     protected function getCurriculumUnits(Student $student): Collection
@@ -188,6 +204,238 @@ class CurriculumService
         // For now, return empty collection to avoid relationship issues
         // TODO: Fix course registrations relationship
         return collect();
+    }
+
+    /**
+     * Get curriculum units with all necessary relations
+     */
+    protected function getCurriculumUnitsWithRelations(Student $student): Collection
+    {
+        return CurriculumUnit::where('curriculum_version_id', $student->curriculum_version_id)
+            ->with([
+                'unit',
+                'semester',
+            ])
+            ->orderBy('year_level')
+            ->orderBy('semester_number')
+            ->get();
+    }
+
+    /**
+     * Get academic records for student
+     */
+    protected function getAcademicRecords(Student $student): Collection
+    {
+        return $student->academicRecords()
+            ->with(['unit', 'semester', 'courseOffering'])
+            ->get();
+    }
+
+    /**
+     * Get course registrations for student
+     */
+    protected function getCourseRegistrations(Student $student): Collection
+    {
+        return $student->courseRegistrations()
+            ->with([
+                'courseOffering.unit',
+                'courseOffering.curriculumUnit',
+                'semester'
+            ])
+            ->get();
+    }
+
+    /**
+     * Organize curriculum units by semester with grades and status
+     */
+    protected function organizeBySemester(
+        Collection $curriculumUnits, 
+        Collection $academicRecords, 
+        Collection $courseRegistrations
+    ): array {
+        // Create lookup arrays for efficient access
+        $academicRecordsByUnit = $academicRecords->keyBy('unit_id');
+        $registrationsByUnit = $courseRegistrations->groupBy(function ($registration) {
+            return $registration->courseOffering?->unit_id;
+        });
+
+        // Group curriculum units by year and semester
+        $semesterGroups = $curriculumUnits->groupBy(function ($curriculumUnit) {
+            return "Year {$curriculumUnit->year_level} - Semester {$curriculumUnit->semester_number}";
+        });
+
+        $result = [];
+        
+        foreach ($semesterGroups as $semesterKey => $semesterUnits) {
+            // Extract year and semester from key
+            preg_match('/Year (\d+) - Semester (\d+)/', $semesterKey, $matches);
+            $yearLevel = (int) ($matches[1] ?? 1);
+            $semesterNumber = (int) ($matches[2] ?? 1);
+            
+            $subjects = $semesterUnits->map(function ($curriculumUnit) use ($academicRecordsByUnit, $registrationsByUnit) {
+                $unit = $curriculumUnit->unit;
+                $unitId = $unit->id;
+                
+                // Get academic record (grades) for this unit
+                $academicRecord = $academicRecordsByUnit->get($unitId);
+                
+                // Get course registrations for this unit (to determine study status)
+                $unitRegistrations = $registrationsByUnit->get($unitId, collect());
+                
+                // Determine study status
+                $studyStatus = $this->determineStudyStatus($academicRecord, $unitRegistrations);
+                
+                // Get grade information
+                $gradeInfo = $this->getGradeInfo($academicRecord);
+                
+                // Check if student has registered for classes (to prioritize ordering)
+                $hasRegistration = $unitRegistrations->isNotEmpty();
+                
+                return [
+                    'curriculum_unit' => [
+                        'id' => $curriculumUnit->id,
+                        'year_level' => $curriculumUnit->year_level,
+                        'semester_number' => $curriculumUnit->semester_number,
+                        'unit_scope' => $curriculumUnit->unit_scope,
+                        'note' => $curriculumUnit->note,
+                    ],
+                    'unit' => [
+                        'id' => $unit->id,
+                        'code' => $unit->code,
+                        'name' => $unit->name,
+                        'credit_points' => $unit->credit_points,
+                    ],
+                    'study_status' => $studyStatus,
+                    'grade_info' => $gradeInfo,
+                    'has_registration' => $hasRegistration,
+                    'registrations' => $unitRegistrations->map(function ($registration) {
+                        return [
+                            'id' => $registration->id,
+                            'status' => $registration->registration_status,
+                            'registration_date' => $registration->registration_date?->toDateString(),
+                            'semester' => [
+                                'id' => $registration->semester?->id,
+                                'name' => $registration->semester?->name,
+                                'code' => $registration->semester?->code,
+                            ],
+                        ];
+                    })->values()->toArray(),
+                ];
+            })
+            // Sort by: 1) has registration first, 2) then by unit code
+            ->sortBy([
+                fn($subject) => !$subject['has_registration'], // Registered subjects first
+                fn($subject) => $subject['unit']['code'], // Then alphabetically by code
+            ])
+            ->values()
+            ->toArray();
+            
+            $result[] = [
+                'semester_info' => [
+                    'year_level' => $yearLevel,
+                    'semester_number' => $semesterNumber,
+                    'display_name' => $semesterKey,
+                ],
+                'subjects' => $subjects,
+                'summary' => [
+                    'total_subjects' => count($subjects),
+                    'total_credit_points' => array_sum(array_column(array_column($subjects, 'unit'), 'credit_points')),
+                    'completed_subjects' => count(array_filter($subjects, fn($s) => $s['study_status']['status'] === 'completed')),
+                    'current_subjects' => count(array_filter($subjects, fn($s) => $s['study_status']['status'] === 'in_progress')),
+                    'not_started_subjects' => count(array_filter($subjects, fn($s) => $s['study_status']['status'] === 'not_started')),
+                    'registered_subjects' => count(array_filter($subjects, fn($s) => $s['has_registration'])),
+                ],
+            ];
+        }
+        
+        // Sort semesters by year and semester number
+        usort($result, function ($a, $b) {
+            if ($a['semester_info']['year_level'] !== $b['semester_info']['year_level']) {
+                return $a['semester_info']['year_level'] <=> $b['semester_info']['year_level'];
+            }
+            return $a['semester_info']['semester_number'] <=> $b['semester_info']['semester_number'];
+        });
+        
+        return [
+            'semesters' => $result,
+            'overall_summary' => [
+                'total_semesters' => count($result),
+                'total_subjects' => array_sum(array_column(array_column($result, 'summary'), 'total_subjects')),
+                'total_credit_points' => array_sum(array_column(array_column($result, 'summary'), 'total_credit_points')),
+                'completed_subjects' => array_sum(array_column(array_column($result, 'summary'), 'completed_subjects')),
+                'current_subjects' => array_sum(array_column(array_column($result, 'summary'), 'current_subjects')),
+                'not_started_subjects' => array_sum(array_column(array_column($result, 'summary'), 'not_started_subjects')),
+                'registered_subjects' => array_sum(array_column(array_column($result, 'summary'), 'registered_subjects')),
+            ],
+        ];
+    }
+
+    /**
+     * Determine study status for a unit
+     */
+    protected function determineStudyStatus($academicRecord, Collection $registrations): array
+    {
+        // If there's an academic record, check completion status
+        if ($academicRecord) {
+            if ($academicRecord->completion_status === 'completed') {
+                return [
+                    'status' => 'completed',
+                    'label' => 'Completed',
+                    'description' => 'Subject has been completed',
+                ];
+            } elseif ($academicRecord->completion_status === 'in_progress') {
+                return [
+                    'status' => 'in_progress', 
+                    'label' => 'In Progress',
+                    'description' => 'Subject is currently being studied',
+                ];
+            } elseif ($academicRecord->completion_status === 'failed') {
+                return [
+                    'status' => 'failed',
+                    'label' => 'Failed',
+                    'description' => 'Subject did not meet requirements',
+                ];
+            }
+        }
+        
+        // Check current registrations
+        $activeRegistration = $registrations->first(function ($registration) {
+            return in_array($registration->registration_status, ['pending', 'registered', 'confirmed']);
+        });
+        
+        if ($activeRegistration) {
+            return [
+                'status' => 'registered',
+                'label' => 'Registered',
+                'description' => 'Registered for this semester',
+            ];
+        }
+        
+        // If no academic record and no active registration
+        return [
+            'status' => 'not_started',
+            'label' => 'Not Started',
+            'description' => 'Subject has not been started yet',
+        ];
+    }
+
+    /**
+     * Get grade information for a unit
+     */
+    protected function getGradeInfo($academicRecord): ?array
+    {
+        if (!$academicRecord) {
+            return null;
+        }
+        
+        return [
+            'final_percentage' => $academicRecord->final_percentage,
+            'final_letter_grade' => $academicRecord->final_letter_grade,
+            'grade_points' => $academicRecord->grade_points,
+            'completion_date' => $academicRecord->completion_date?->toDateString(),
+            'grade_status' => $academicRecord->grade_status,
+            'is_passing' => $academicRecord->grade_points > 0,
+        ];
     }
 
     /**
@@ -662,17 +910,23 @@ class CurriculumService
      */
     protected function groupByCategory(Collection $curriculumUnits): array
     {
-        return $curriculumUnits->groupBy('unit_scope')->map->count()->toArray();
+        return $curriculumUnits->groupBy('unit_scope')->map(function ($items) {
+            return $items->count();
+        })->toArray();
     }
 
     protected function groupByYearLevel(Collection $curriculumUnits): array
     {
-        return $curriculumUnits->groupBy('year_level')->map->count()->toArray();
+        return $curriculumUnits->groupBy('year_level')->map(function ($items) {
+            return $items->count();
+        })->toArray();
     }
 
     protected function groupBySemester(Collection $curriculumUnits): array
     {
-        return $curriculumUnits->groupBy('semester_number')->map->count()->toArray();
+        return $curriculumUnits->groupBy('semester_number')->map(function ($items) {
+            return $items->count();
+        })->toArray();
     }
 
     protected function isUnitAvailableWithGroups(Unit $unit, Collection $completedUnitIds): bool
@@ -743,7 +997,7 @@ class CurriculumService
             foreach ($group->conditions as $condition) {
                 if ($condition->required_unit_id) {
                     $prereqUnit = $allUnits->where('unit_id', $condition->required_unit_id)->first();
-                    if ($prereqUnit) {
+                    if ($prereqUnit instanceof \App\Models\CurriculumUnit) {
                         $subChain = $this->buildPrerequisiteChainWithGroups($prereqUnit, $allUnits);
                         $chain = array_merge($subChain, $chain);
                     }

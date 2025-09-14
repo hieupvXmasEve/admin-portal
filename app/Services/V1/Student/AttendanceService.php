@@ -237,7 +237,7 @@ class AttendanceService
             })
             ->selectRaw('WEEK(session_date) as week, COUNT(*) as total_sessions,
                        SUM(CASE WHEN status IN ("present", "late") THEN 1 ELSE 0 END) as present_sessions')
-            ->groupBy('week')
+//            ->groupBy('week')
             ->orderBy('week')
             ->get();
 
@@ -726,6 +726,234 @@ class AttendanceService
         }
 
         return Semester::where('is_active', true)->first();
+    }
+
+    /**
+     * Get comprehensive attendance report with semester filtering
+     */
+    public function getAttendanceReport(Student $student, ?int $semesterId = null): array
+    {
+        // Get all semesters the student has enrollments in
+        $availableSemesters = $this->getStudentSemesters($student);
+
+        if ($availableSemesters->isEmpty()) {
+            return $this->getEmptyAttendanceReport();
+        }
+
+        // Determine which semester to use for the report
+        $targetSemester = $this->determineReportSemester($student, $semesterId, $availableSemesters);
+
+        if (!$targetSemester) {
+            return $this->getEmptyAttendanceReport();
+        }
+
+        // Get report data for the target semester
+        $reportData = $this->generateSemesterAttendanceReport($student, $targetSemester);
+
+        return [
+            'active_semester_id' => $targetSemester->id,
+            'semesters' => $this->formatSemesterList($availableSemesters),
+            'report' => $reportData,
+        ];
+    }
+
+    /**
+     * Get all semesters where student has enrollments
+     */
+    protected function getStudentSemesters(Student $student): Collection
+    {
+        return Semester::whereHas('enrollments', function ($query) use ($student) {
+                $query->where('student_id', $student->id);
+            })
+            ->orderBy('start_date', 'desc')
+            ->get();
+    }
+
+    /**
+     * Determine which semester to use for the report based on priority:
+     * 1. Requested semester (if provided)
+     * 2. Current active semester (if student has enrollment)
+     * 3. Most recent semester with attendance data
+     * 4. Most recent semester with enrollment
+     */
+    protected function determineReportSemester(Student $student, ?int $requestedSemesterId, Collection $availableSemesters): ?Semester
+    {
+        // If specific semester requested, use it if student has enrollment
+        if ($requestedSemesterId) {
+            $requestedSemester = $availableSemesters->firstWhere('id', $requestedSemesterId);
+            if ($requestedSemester instanceof Semester) {
+                return $requestedSemester;
+            }
+        }
+
+        // Try to use current active semester if student has enrollment
+        $activeSemester = $availableSemesters->firstWhere('is_active', true);
+        if ($activeSemester instanceof Semester) {
+            return $activeSemester;
+        }
+
+        // Find most recent semester with attendance data
+        foreach ($availableSemesters as $semester) {
+            $hasAttendanceData = Attendance::where('student_id', $student->id)
+                ->whereHas('classSession.courseOffering', function ($query) use ($semester) {
+                    $query->where('semester_id', $semester->id);
+                })
+                ->exists();
+
+            if ($hasAttendanceData) {
+                return $semester;
+            }
+        }
+
+        // Fallback to most recent semester with enrollment
+        $firstSemester = $availableSemesters->first();
+        return $firstSemester instanceof Semester ? $firstSemester : null;
+    }
+
+    /**
+     * Format semester list for response
+     */
+    protected function formatSemesterList(Collection $semesters): array
+    {
+        return $semesters->map(function (Semester $semester) {
+            return [
+                'id' => $semester->id,
+                'name' => $semester->name,
+                'is_active' => $semester->is_active,
+                'start_date' => $semester->start_date->format('Y-m-d'),
+                'end_date' => $semester->end_date->format('Y-m-d'),
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Generate attendance report for a specific semester
+     */
+    protected function generateSemesterAttendanceReport(Student $student, Semester $semester): array
+    {
+        // Get all course registrations for the semester
+        $courseRegistrations = $student->courseRegistrations()
+            ->where('semester_id', $semester->id)
+            ->whereIn('registration_status', ['registered', 'confirmed'])
+            ->with([
+                'courseOffering.curriculumUnit.unit',
+                'courseOffering.classSessions' => function ($query) {
+                    $query->orderBy('session_date', 'asc');
+                },
+                'courseOffering.classSessions.attendances' => function ($query) use ($student) {
+                    $query->where('student_id', $student->id);
+                }
+            ])
+            ->get();
+
+        if ($courseRegistrations->isEmpty()) {
+            return $this->getEmptyReportData();
+        }
+
+        $subjects = [];
+        $totalClasses = 0;
+        $totalAttended = 0;
+        $totalAbsent = 0;
+
+        foreach ($courseRegistrations as $registration) {
+            $courseOffering = $registration->courseOffering;
+            $unit = $courseOffering->curriculumUnit->unit;
+            $classSessions = $courseOffering->classSessions;
+
+            $subjectData = [
+                'unit_code' => $unit->code,
+                'unit_name' => $unit->name,
+                'total_sessions' => $classSessions->count(),
+                'attended' => 0,
+                'absent' => 0,
+                'attendance_rate' => 0,
+                'sessions' => [],
+            ];
+
+            foreach ($classSessions as $session) {
+                $attendance = $session->attendances->first(); // Since we filtered by student_id
+
+                $sessionData = [
+                    'id' => $session->id,
+                    'date' => $session->session_date->format('Y-m-d'),
+                    'session_type' => $session->session_type ?? 'lecture',
+                    'status' => null,
+                    'status_label' => 'Not Marked',
+                    'created_at' => null,
+                    'recorded_by_lecturer' => null,
+                    'notes' => null,
+                ];
+
+                if ($attendance) {
+                    $sessionData['status'] = $attendance->status;
+                    $sessionData['status_label'] = $this->getStatusDisplay($attendance->status);
+                    $sessionData['created_at'] = $attendance->created_at->format('H:i');
+                    $sessionData['recorded_by_lecturer'] = $attendance->recordedBy?->name ?? 'System';
+                    $sessionData['notes'] = $attendance->notes;
+
+                    if (in_array($attendance->status, ['present', 'late'])) {
+                        $subjectData['attended']++;
+                        $totalAttended++;
+                    } else {
+                        $subjectData['absent']++;
+                        $totalAbsent++;
+                    }
+                }
+
+                $subjectData['sessions'][] = $sessionData;
+                $totalClasses++;
+            }
+
+            // Calculate attendance rate for this subject
+            if ($subjectData['total_sessions'] > 0) {
+                $subjectData['attendance_rate'] = round(
+                    ($subjectData['attended'] / $subjectData['total_sessions']) * 100, 1
+                );
+            }
+
+            $subjects[] = $subjectData;
+        }
+
+        // Calculate overall summary
+        $overallAttendanceRate = $totalClasses > 0 ? round(($totalAttended / $totalClasses) * 100, 1) : 0;
+
+        return [
+            'summary' => [
+                'total_classes' => $totalClasses,
+                'attended' => $totalAttended,
+                'absent' => $totalAbsent,
+                'attendance_rate' => $overallAttendanceRate,
+            ],
+            'subjects' => $subjects,
+        ];
+    }
+
+    /**
+     * Get empty report data structure
+     */
+    protected function getEmptyReportData(): array
+    {
+        return [
+            'summary' => [
+                'total_classes' => 0,
+                'attended' => 0,
+                'absent' => 0,
+                'attendance_rate' => 0,
+            ],
+            'subjects' => [],
+        ];
+    }
+
+    /**
+     * Get empty attendance report
+     */
+    protected function getEmptyAttendanceReport(): array
+    {
+        return [
+            'active_semester_id' => null,
+            'semesters' => [],
+            'report' => $this->getEmptyReportData(),
+        ];
     }
 
     /**
