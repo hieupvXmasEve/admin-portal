@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Student;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\Api\V1\Student\AcademicRoadmapResource;
+use App\Http\Resources\Api\V1\Student\CurriculumBySemesterResource;
 use App\Http\Resources\Api\V1\Student\CurriculumOverviewResource;
-use App\Http\Resources\Api\V1\Student\PrerequisiteTreeResource;
-use App\Http\Resources\Api\V1\Student\ProgramRequirementsResource;
 use App\Http\Responses\ApiResponse;
 use App\Services\V1\Student\CurriculumService;
 use Illuminate\Http\JsonResponse;
@@ -48,23 +46,23 @@ class CurriculumController extends Controller
     /**
      * Get prerequisite tree
      */
-    public function prerequisiteTree(Request $request): JsonResponse
-    {
-        /** @var \App\Models\Student $student */
-        $student = $request->user();
-
-        try {
-            $prerequisiteTree = $this->curriculumService->getPrerequisiteTree($student);
-
-            return ApiResponse::success(
-                new PrerequisiteTreeResource($prerequisiteTree),
-                [],
-                'Prerequisite tree retrieved successfully'
-            );
-        } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to retrieve prerequisite tree');
-        }
-    }
+//    public function prerequisiteTree(Request $request): JsonResponse
+//    {
+//        /** @var \App\Models\Student $student */
+//        $student = $request->user();
+//
+//        try {
+//            $prerequisiteTree = $this->curriculumService->getPrerequisiteTree($student);
+//
+//            return ApiResponse::success(
+//                new PrerequisiteTreeResource($prerequisiteTree),
+//                [],
+//                'Prerequisite tree retrieved successfully'
+//            );
+//        } catch (\Exception $e) {
+//            return ApiResponse::serverError('Failed to retrieve prerequisite tree');
+//        }
+//    }
 
     /**
      * Get program requirements
@@ -78,7 +76,7 @@ class CurriculumController extends Controller
             $programRequirements = $this->curriculumService->getProgramRequirements($student);
 
             return ApiResponse::success(
-                new ProgramRequirementsResource($programRequirements),
+                $programRequirements,
                 [],
                 'Program requirements retrieved successfully'
             );
@@ -99,12 +97,39 @@ class CurriculumController extends Controller
             $roadmap = $this->curriculumService->getAcademicRoadmap($student);
 
             return ApiResponse::success(
-                new AcademicRoadmapResource($roadmap),
+                $roadmap,
                 [],
                 'Academic roadmap retrieved successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to retrieve academic roadmap');
+        }
+    }
+
+    /**
+     * Get curriculum organized by semester with grades and study status
+     */
+    public function bySemester(Request $request): JsonResponse
+    {
+        /** @var \App\Models\Student $student */
+        $student = $request->user();
+
+        try {
+            $curriculumBySemester = $this->curriculumService->getCurriculumBySemester($student);
+
+            return ApiResponse::success(
+                new CurriculumBySemesterResource($curriculumBySemester),
+                [],
+                'Curriculum by semester retrieved successfully'
+            );
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve curriculum by semester', [
+                'student_id' => $student->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return ApiResponse::serverError('Failed to retrieve curriculum by semester');
         }
     }
 }
