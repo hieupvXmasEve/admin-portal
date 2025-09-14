@@ -22,49 +22,41 @@ class CourseRegistrationService
     ) {}
 
     /**
-     * Get available courses for registration
+     * Get courses that the student is currently enrolled in (active semester)
      */
     public function getAvailableCourses(Student $student, array $filters = []): Collection
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
         if (! $currentSemester) {
-            throw new BusinessLogicException('No active semester for registration');
+            throw new BusinessLogicException('No active semester found');
         }
 
-        // B1: Lấy course_offering (1 section mỗi môn)
-        $courseOfferings = CourseOffering::where('semester_id', $currentSemester->id)
-            ->where('is_active', true)
-            ->with([
-                'curriculumUnit.unit',
-                'lecture',
-                'classSessions.room',
-                'courseRegistrations' => function ($q) {
-                    $q->where('registration_status', 'registered');
-                },
-            ])
-            ->get()
-            ->unique('curriculum_unit_id') // giữ lại 1 section/môn
-            ->values();
-        Log::info('Course offerings: ' . json_encode($courseOfferings));
-        // B2: Lấy danh sách curriculum_unit_id mà sinh viên đã đăng ký (không lấy course_offering_id nữa)
-        $registeredCurriculumUnitIds = $student->courseRegistrations()
+        // Get course offerings that the student is registered for in the current semester
+        $studentRegistrations = $student->courseRegistrations()
             ->where('semester_id', $currentSemester->id)
             ->whereIn('registration_status', ['registered', 'pending', 'confirmed'])
-            ->with('courseOffering') // để truy cập curriculum_unit_id
-            ->get()
-            ->pluck('courseOffering.curriculum_unit_id')
-            ->filter() // loại null (phòng trường hợp course_offering bị xóa)
-            ->unique()
-            ->toArray();
-        Log::info('Registered curriculum unit IDs: ' . json_encode($registeredCurriculumUnitIds));
+            ->with([
+                'courseOffering.curriculumUnit.unit',
+                'courseOffering.lecture',
+                'courseOffering.classSessions.room',
+                'courseOffering.semester'
+            ])
+            ->get();
 
-        // B3: Loại những môn đã đăng ký (dù khác section)
-        return $courseOfferings->reject(function ($offering) use ($registeredCurriculumUnitIds) {
-            return in_array($offering->curriculum_unit_id, $registeredCurriculumUnitIds);
-        })->map(function ($offering) use ($student) {
-            return $this->formatCourseOfferingForRegistration($offering, $student);
-        });
+        Log::info('Student registered courses count: ' . $studentRegistrations->count());
+
+        // Filter only course offerings that have class sessions
+        $enrolledCourseOfferings = $studentRegistrations
+            ->filter(function ($registration) {
+                return $registration->courseOffering &&
+                       $registration->courseOffering->classSessions->isNotEmpty();
+            })
+            ->map(function ($registration) use ($student) {
+                return $this->formatCourseOfferingForRegistration($registration->courseOffering, $student);
+            });
+
+        return $enrolledCourseOfferings->values();
     }
 
     /**
@@ -246,19 +238,19 @@ class CourseRegistrationService
                 'code' => $offering->curriculumUnit->unit->code,
                 'name' => $offering->curriculumUnit->unit->name,
                 'description' => $offering->syllabus->description ?? $offering->curriculumUnit->unit->name,
-                'credit_hours' => (float) $offering->curriculumUnit->unit->credit_points,
+                'credit_points' => (float) $offering->curriculumUnit->unit->credit_points,
             ],
             'lecturer' => [
                 'id' => $offering->lecture?->id,
                 'name' => $offering->lecture?->display_name ?? $offering->lecture?->full_name ?? null,
                 'email' => $offering->lecture?->email,
             ],
-            'registration_eligibility' => [
-                'can_register' => $this->canRegisterForCourse($student, $offering),
-                'prerequisites_met' => $this->prerequisiteService->hasMetPrerequisites($student, $offering),
-                'has_conflicts' => ! $this->conflictDetectionService->detectConflicts($student, $offering)->isEmpty(),
-                'capacity_available' => $availableSpots > 0,
-            ],
+//            'registration_eligibility' => [
+//                'can_register' => $this->canRegisterForCourse($student, $offering),
+//                'prerequisites_met' => $this->prerequisiteService->hasMetPrerequisites($student, $offering),
+//                'has_conflicts' => ! $this->conflictDetectionService->detectConflicts($student, $offering)->isEmpty(),
+//                'capacity_available' => $availableSpots > 0,
+//            ],
         ];
     }
 

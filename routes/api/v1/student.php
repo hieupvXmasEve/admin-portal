@@ -60,28 +60,33 @@ Route::middleware([
         });
 
         // Course registration endpoints (TODO)
-        Route::prefix('course-registration')->name('course-registration.')->group(function () {
-            // TODO: complete this endpoint
-            Route::get('/available-courses', [CourseRegistrationController::class, 'availableCourses'])
+        Route::prefix('course')->name('course-registration.')->group(function () {
+            // Course listings - all currently available courses with class sections
+            Route::get('/available', [CourseRegistrationController::class, 'availableCourses'])
                 ->name('available-courses');
+            
+            // Course detail - full schedule and grades for enrolled course
+            Route::get('/available/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])
+                ->name('course-detail');
+            
             // TODO: complete this endpoint
-            Route::post('/register', [CourseRegistrationController::class, 'register'])
-                ->middleware(['student.api.rate:student-registration'])
-                ->name('register');
+//            Route::post('/register', [CourseRegistrationController::class, 'register'])
+//                ->middleware(['student.api.rate:student-registration'])
+//                ->name('register');
 
-            Route::delete('/drop/{registration}', [CourseRegistrationController::class, 'drop'])
-                ->middleware(['student.api.rate:student-registration'])
-                ->name('drop');
+//            Route::delete('/drop/{registration}', [CourseRegistrationController::class, 'drop'])
+//                ->middleware(['student.api.rate:student-registration'])
+//                ->name('drop');
 
             // TODO: complete this endpoint
-            Route::get('/my-registrations', [CourseRegistrationController::class, 'myRegistrations'])
-                ->name('my-registrations');
+//            Route::get('/my-registrations', [CourseRegistrationController::class, 'myRegistrations'])
+//                ->name('my-registrations');
 
-            Route::post('/validate-registration', [CourseRegistrationController::class, 'validateRegistration'])
-                ->name('validate-registration');
+//            Route::post('/validate-registration', [CourseRegistrationController::class, 'validateRegistration'])
+//                ->name('validate-registration');
 
-            Route::get('/schedule-conflicts/{courseOfferingId}', [CourseRegistrationController::class, 'checkScheduleConflicts'])
-                ->name('schedule-conflicts');
+//            Route::get('/schedule-conflicts/{courseOfferingId}', [CourseRegistrationController::class, 'checkScheduleConflicts'])
+//                ->name('schedule-conflicts');
         });
 
         // Timetable endpoints
