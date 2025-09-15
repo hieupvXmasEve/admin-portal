@@ -66,9 +66,9 @@ class StudentAcademicSummaryService
             ];
 
             // Cache the result if no filters and caching is enabled
-            if ($useCache && empty($filters)) {
-                Cache::put($cacheKey, $academicSummary, $cacheTtl);
-            }
+//            if ($useCache && empty($filters)) {
+//                Cache::put($cacheKey, $academicSummary, $cacheTtl);
+//            }
 
             return $academicSummary;
         } catch (\Exception $e) {

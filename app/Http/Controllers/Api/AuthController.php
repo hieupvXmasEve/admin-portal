@@ -37,7 +37,7 @@ class AuthController extends Controller
         }
 
         // Check if student account is active
-        if ($user->status !== 'active') {
+        if (!$user->isActive()) {
             return ApiResponse::authorizationError('Account is not active');
         }
 
