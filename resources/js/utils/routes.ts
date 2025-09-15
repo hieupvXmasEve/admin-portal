@@ -91,6 +91,10 @@ export const systemRoutes = {
         bulkEmail: () => route(SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES.BULK_EMAIL),
         emailHistory: () => route(SYSTEM_EMAIL_CONFIGURATION_ROUTE_NAMES.EMAIL_HISTORY),
     },
+    // form
+    form: {
+        index: () => route('forms.review.index'),
+    }
 } as const;
 
 // Student Management Routes

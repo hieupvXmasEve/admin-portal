@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Admin\EmailController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Web\StudentApplicationController as WebStudentApplicationController;
 use App\Http\Controllers\Web\StudentController as WebStudentController;
+use App\Http\Controllers\Web\FormController;
 use Illuminate\Support\Facades\Route;
 
 // Public authentication routes (Password-based login only - Google login moved to specific controllers)
@@ -83,6 +84,32 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
 
     // Lectures API - for dropdowns and quick edits
     Route::get('/lectures', [\App\Http\Controllers\Web\LectureController::class, 'apiIndex'])->name('lectures.api-index');
+
+    // Form management API routes
+    Route::prefix('forms')->name('api.forms.')->group(function () {
+        Route::get('/', [FormController::class, 'index'])->name('index');
+        Route::post('/', [FormController::class, 'store'])->name('store');
+        Route::get('/metadata', [FormController::class, 'metadata'])->name('metadata');
+        Route::get('/available', [FormController::class, 'available'])->name('available');
+
+        Route::prefix('{form}')->group(function () {
+            Route::get('/', [FormController::class, 'show'])->name('show');
+            Route::put('/', [FormController::class, 'update'])->name('update');
+            Route::delete('/', [FormController::class, 'destroy'])->name('destroy');
+
+            // Form actions
+            Route::post('/clone', [FormController::class, 'clone'])->name('clone');
+            Route::post('/archive', [FormController::class, 'archive'])->name('archive');
+            Route::post('/restore', [FormController::class, 'restore'])->name('restore');
+            Route::get('/statistics', [FormController::class, 'statistics'])->name('statistics');
+
+            // Version management
+            Route::post('/versions/{version}/publish', [FormController::class, 'publish'])->name('version.publish');
+
+            // Target management
+            Route::post('/targets', [FormController::class, 'createTarget'])->name('targets.store');
+        });
+    });
 });
 
 // Admin API routes (for external use)

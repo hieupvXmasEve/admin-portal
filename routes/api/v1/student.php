@@ -64,29 +64,29 @@ Route::middleware([
             // Course listings - all currently available courses with class sections
             Route::get('/available', [CourseRegistrationController::class, 'availableCourses'])
                 ->name('available-courses');
-            
+
             // Course detail - full schedule and grades for enrolled course
             Route::get('/available/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])
                 ->name('course-detail');
-            
-            // TODO: complete this endpoint
-//            Route::post('/register', [CourseRegistrationController::class, 'register'])
-//                ->middleware(['student.api.rate:student-registration'])
-//                ->name('register');
-
-//            Route::delete('/drop/{registration}', [CourseRegistrationController::class, 'drop'])
-//                ->middleware(['student.api.rate:student-registration'])
-//                ->name('drop');
 
             // TODO: complete this endpoint
-//            Route::get('/my-registrations', [CourseRegistrationController::class, 'myRegistrations'])
-//                ->name('my-registrations');
+            //            Route::post('/register', [CourseRegistrationController::class, 'register'])
+            //                ->middleware(['student.api.rate:student-registration'])
+            //                ->name('register');
 
-//            Route::post('/validate-registration', [CourseRegistrationController::class, 'validateRegistration'])
-//                ->name('validate-registration');
+            //            Route::delete('/drop/{registration}', [CourseRegistrationController::class, 'drop'])
+            //                ->middleware(['student.api.rate:student-registration'])
+            //                ->name('drop');
 
-//            Route::get('/schedule-conflicts/{courseOfferingId}', [CourseRegistrationController::class, 'checkScheduleConflicts'])
-//                ->name('schedule-conflicts');
+            // TODO: complete this endpoint
+            //            Route::get('/my-registrations', [CourseRegistrationController::class, 'myRegistrations'])
+            //                ->name('my-registrations');
+
+            //            Route::post('/validate-registration', [CourseRegistrationController::class, 'validateRegistration'])
+            //                ->name('validate-registration');
+
+            //            Route::get('/schedule-conflicts/{courseOfferingId}', [CourseRegistrationController::class, 'checkScheduleConflicts'])
+            //                ->name('schedule-conflicts');
         });
 
         // Timetable endpoints
@@ -140,7 +140,7 @@ Route::middleware([
         Route::prefix('curriculum')->name('curriculum.')->group(function () {
             Route::get('/', [CurriculumController::class, 'index'])->name('index');
             Route::get('/by-semester', [CurriculumController::class, 'bySemester'])->name('by-semester');
-//            Route::get('/prerequisite-tree', [CurriculumController::class, 'prerequisiteTree'])->name('prerequisite-tree');
+            //            Route::get('/prerequisite-tree', [CurriculumController::class, 'prerequisiteTree'])->name('prerequisite-tree');
             Route::get('/program-requirements', [CurriculumController::class, 'programRequirements'])->name('program-requirements');
             Route::get('/roadmap', [CurriculumController::class, 'roadmap'])->name('roadmap');
         });
@@ -152,7 +152,7 @@ Route::middleware([
             Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
             Route::get('/preferences', [NotificationController::class, 'preferences'])->name('preferences');
             Route::put('/preferences', [NotificationController::class, 'updatePreferences'])->name('update-preferences');
-//            Route::post('/push-subscription', [NotificationController::class, 'subscribeToPush'])->name('push-subscription');
+            //            Route::post('/push-subscription', [NotificationController::class, 'subscribeToPush'])->name('push-subscription');
         });
 
         // Academic calendar endpoints
@@ -161,6 +161,13 @@ Route::middleware([
             Route::get('/semester/{semester}/deadlines', [CalendarController::class, 'semesterDeadlines'])->name('semester-deadlines');
             Route::get('/academic-calendar', [CalendarController::class, 'academicCalendar'])->name('academic-calendar');
             Route::get('/current-semester', [CalendarController::class, 'currentSemester'])->name('current-semester');
+        });
+
+        // Form endpoints
+        Route::prefix('forms')->name('forms.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'index'])->name('index');
+            Route::get('/{form}', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'show'])->name('show');
+            Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
         });
     }); // End either middleware group
 

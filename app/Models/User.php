@@ -79,6 +79,14 @@ class User extends UserAuditableModel
     }
 
     /**
+     * Get the campus user role records for this user.
+     */
+    public function campusUserRoles()
+    {
+        return $this->hasMany(CampusUserRole::class);
+    }
+
+    /**
      * Lấy danh sách vai trò của người dùng tại một campus
      */
     public function rolesAtCampus(int $campusId)
