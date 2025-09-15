@@ -745,7 +745,7 @@ class CourseOfferingController extends Controller
                         $reasons = [];
 
                         // Check if student is active
-                        if ($student->status !== 'active') {
+                        if (!$student->isActive()) {
                             $isEligible = false;
                             $reasons[] = "Student status is '{$student->status}' (must be 'active')";
                         }
@@ -871,7 +871,7 @@ class CourseOfferingController extends Controller
                     }
 
                     // Check eligibility
-                    if ($student->status !== 'active') {
+                    if (!$student->isActive()) {
                         $result['message'] = "Student status is '{$student->status}' (must be 'active')";
                         $failureCount++;
                         $results[] = $result;

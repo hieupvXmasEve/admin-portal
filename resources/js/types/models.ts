@@ -207,6 +207,20 @@ export interface Building {
     deleted_at?: string;
 }
 
+export enum StudentStatus {
+    // active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending
+    Active = 'active',
+    Inactive = 'inactive',
+    Suspended = 'suspended',
+    Graduated = 'graduated',
+    IntakePreUniGC = 'intake_pre_uni_gc',
+    IntakeCourse = 'intake_course',
+    Deferred = 'deferred',
+    Dropout = 'dropout',
+    DropoutTransfer = 'dropout_transfer',
+    Pending = 'pending',
+}
+
 export interface Student {
     id: number;
     student_id: string;
@@ -214,7 +228,7 @@ export interface Student {
     email: string;
     phone: string;
     avatar_url: string | null;
-    status: 'admitted' | 'active' | 'inactive' | 'graduated' | 'dropped_out';
+    status: StudentStatus;
     admission_date: string;
     admission_notes?: string;
     // expected_graduation_date?: string;

@@ -31,8 +31,8 @@ class StudentMiddleware
             ], 403);
         }
 
-        // Check if student account is active
-        if ($request->user()->status !== 'active') {
+        // Check if student account is not active
+        if (!$request->user()->isActive()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Student account is not active',

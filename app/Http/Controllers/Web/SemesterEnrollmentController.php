@@ -1206,7 +1206,7 @@ class SemesterEnrollmentController extends Controller
                 $student = $enrollment->student;
 
                 // Skip inactive students
-                if ($student->status !== 'active') {
+                if (!$student->isActive()) {
                     continue;
                 }
 

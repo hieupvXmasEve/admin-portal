@@ -51,7 +51,7 @@ const formSchema = toTypedSchema(
         high_school_graduation_year: z.string().optional(),
         entrance_exam_score: z.string().optional(),
         admission_notes: z.string().optional(),
-        status: z.enum(['active', 'inactive', 'suspended', 'graduated', 'admitted', 'dropped_out']),
+        status: z.enum(['active', 'inactive', 'suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'deferred', 'dropout', 'dropout_transfer', 'pending']),
     }),
 );
 
@@ -371,6 +371,12 @@ const handleAvatarUploaded = (avatarData: any) => {
                                     <SelectItem value="inactive">Inactive</SelectItem>
                                     <SelectItem value="suspended">Suspended</SelectItem>
                                     <SelectItem value="graduated">Graduated</SelectItem>
+                                    <SelectItem value="intake_pre_uni_gc">Intake Pre-Uni GC</SelectItem>
+                                    <SelectItem value="intake_course">Intake Course</SelectItem>
+                                    <SelectItem value="deferred">Deferred</SelectItem>
+                                    <SelectItem value="dropout">Dropout</SelectItem>
+                                    <SelectItem value="dropout_transfer">Dropout Transfer</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -443,24 +449,24 @@ const handleAvatarUploaded = (avatarData: any) => {
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-<!--                    <FormField v-slot="{ componentField }" name="specialization_id">-->
-<!--                        <FormItem>-->
-<!--                            <FormLabel>Specialization</FormLabel>-->
-<!--                            <Select v-bind="componentField" :disabled="!filteredSpecializations.length">-->
-<!--                                <FormControl>-->
-<!--                                    <SelectTrigger>-->
-<!--                                        <SelectValue placeholder="Select specialization" />-->
-<!--                                    </SelectTrigger>-->
-<!--                                </FormControl>-->
-<!--                                <SelectContent>-->
-<!--                                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">-->
-<!--                                        {{ specialization.name }}-->
-<!--                                    </SelectItem>-->
-<!--                                </SelectContent>-->
-<!--                            </Select>-->
-<!--                            <FormMessage />-->
-<!--                        </FormItem>-->
-<!--                    </FormField>-->
+                    <!--                    <FormField v-slot="{ componentField }" name="specialization_id">-->
+                    <!--                        <FormItem>-->
+                    <!--                            <FormLabel>Specialization</FormLabel>-->
+                    <!--                            <Select v-bind="componentField" :disabled="!filteredSpecializations.length">-->
+                    <!--                                <FormControl>-->
+                    <!--                                    <SelectTrigger>-->
+                    <!--                                        <SelectValue placeholder="Select specialization" />-->
+                    <!--                                    </SelectTrigger>-->
+                    <!--                                </FormControl>-->
+                    <!--                                <SelectContent>-->
+                    <!--                                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">-->
+                    <!--                                        {{ specialization.name }}-->
+                    <!--                                    </SelectItem>-->
+                    <!--                                </SelectContent>-->
+                    <!--                            </Select>-->
+                    <!--                            <FormMessage />-->
+                    <!--                        </FormItem>-->
+                    <!--                    </FormField>-->
 
                     <FormField v-slot="{ componentField }" name="curriculum_version_id">
                         <FormItem>

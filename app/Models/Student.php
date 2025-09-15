@@ -222,7 +222,7 @@ class Student extends StudentAuditableModel
 
     public function canRegisterForCourses(): bool
     {
-        return $this->status === 'active' &&
+        return $this->isActive() &&
             ! $this->hasActiveHolds();
     }
 
