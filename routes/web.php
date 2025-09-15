@@ -94,3 +94,4 @@ require __DIR__ . '/web/student-application.php';
 require __DIR__ . '/web/systems.php';
 require __DIR__ . '/web/email-monitoring.php';
 require __DIR__ . '/web/syllabus-templates.php';
+require __DIR__ . '/web/forms.php';

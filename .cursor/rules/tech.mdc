@@ -15,7 +15,7 @@ alwaysApply: false
 ## Frontend
 - **Framework**: Vue.js 3 with TypeScript
 - **Build Tool**: Vite with HMR
-- **UI Library**: Reka-UI (based on shadcn/ui) + TailwindCSS
+- **UI Library**: shadcn-vue + Reka-UI (based on shadcn/ui) + TailwindCSS
 - **Forms**: Vee-validate with Zod schemas
 - **Tables**: TanStack Table
 - **Icons**: Lucide Icons

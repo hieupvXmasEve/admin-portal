@@ -13,6 +13,7 @@ import {
     Clock,
     DoorOpen,
     FileText,
+    FormInput,
     GraduationCap,
     Layers,
     LayoutDashboard,
@@ -281,6 +282,31 @@ export const mainNavItems: NavItem[] = [
             // },
         ],
     },
+    {
+        title: 'Forms & Feedback',
+        href: '#',
+        icon: FormInput,
+        children: [
+            {
+                title: 'Form Management',
+                href: '/forms/admin',
+                icon: FormInput,
+                // requiredPermissions: ['view_form'], // Will be implemented later
+            },
+            {
+                title: 'Response Review',
+                href: '/forms/review',
+                icon: ClipboardCheck,
+                // requiredPermissions: ['review_form'], // Will be implemented later
+            },
+            {
+                title: 'Analytics',
+                href: '/forms/analytics',
+                icon: BarChart3,
+                // requiredPermissions: ['view_form_analytics'], // Will be implemented later
+            },
+        ],
+    },
     // {
     //     title: 'Assessments & Grading',
     //     href: '#',
@@ -448,32 +474,6 @@ export const mainNavItems: NavItem[] = [
             },
         ],
     },
-    // System
-    {
-        title: 'System',
-        href: '#',
-        icon: FileText,
-        children: [
-            {
-                title: 'System Configuration',
-                href: systemRoutes.config.index(),
-                icon: Settings2,
-                requiredPermissions: ['view_system_config'], // Will be implemented later
-            },
-            {
-                title: 'Activity Logs',
-                href: systemRoutes.activityLogs.index(),
-                icon: Clock,
-                requiredPermissions: ['view_system_log'],
-            },
-            {
-                title: 'Email Monitoring',
-                href: '/admin/email-monitoring',
-                icon: BarChart3,
-                requiredPermissions: ['view_email_system'],
-            },
-        ],
-    },
     {
         title: 'Email',
         href: '#',
@@ -503,6 +503,32 @@ export const mainNavItems: NavItem[] = [
                 href: systemRoutes.emailConfiguration.emailHistory(),
                 icon: Clock,
                 requiredPermissions: ['view_email_log'],
+            },
+        ],
+    },
+    // System
+    {
+        title: 'System',
+        href: '#',
+        icon: FileText,
+        children: [
+            {
+                title: 'System Configuration',
+                href: systemRoutes.config.index(),
+                icon: Settings2,
+                requiredPermissions: ['view_system_config'], // Will be implemented later
+            },
+            {
+                title: 'Activity Logs',
+                href: systemRoutes.activityLogs.index(),
+                icon: Clock,
+                requiredPermissions: ['view_system_log'],
+            },
+            {
+                title: 'Email Monitoring',
+                href: '/admin/email-monitoring',
+                icon: BarChart3,
+                requiredPermissions: ['view_email_system'],
             },
         ],
     },

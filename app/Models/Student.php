@@ -207,6 +207,14 @@ class Student extends StudentAuditableModel
         return $this->hasMany(AcademicStanding::class);
     }
 
+    /**
+     * Get the form responses submitted by the student.
+     */
+    public function formResponses(): HasMany
+    {
+        return $this->hasMany(FormResponse::class, 'submitted_by_student_id');
+    }
+
     public function hasActiveHolds(): bool
     {
         return $this->academicHolds()->where('status', 'active')->exists();
@@ -242,7 +250,7 @@ class Student extends StudentAuditableModel
         return $campusCode . $year . str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
     }
 
-    // New Student Management methods
+    // New Review Management methods
     public function hasPendingProgramChange(): bool
     {
         return $this->programChangeRequests()->where('status', 'pending')->exists();

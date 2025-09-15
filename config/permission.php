@@ -258,6 +258,13 @@ return [
             'edit_email_preference' => 'edit_email_preference',
             'manage_user_email_preferences' => 'manage_user_email_preferences',
         ],
+        'forms' => [
+            'view_form' => 'view_form',
+            'edit_form' => 'edit_form',
+            'create_form' => 'create_form',
+            'review_form' => 'review_form',
+            'view_form_analytics' => 'view_form_analytics'
+        ]
     ],
 
     // Simplified module structure
