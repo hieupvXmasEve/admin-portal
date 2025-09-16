@@ -636,22 +636,11 @@ class ClassSessionService
     }
 
     /**
-     * Generate attendance records for all enrolled students in a class session
+     * Generate attendance records for students who don't have attendance yet in a class session
      */
     public function generateAttendanceForSession(ClassSession $session): array
     {
         return DB::transaction(function () use ($session) {
-            // Check if attendance already exists for this session
-            $existingAttendance = $session->attendances()->count();
-
-            if ($existingAttendance > 0) {
-                return [
-                    'success' => false,
-                    'message' => 'Attendance records already exist for this session',
-                    'existing_count' => $existingAttendance,
-                ];
-            }
-
             // Get all enrolled students for this course offering
             $enrolledStudents = $session->courseOffering
                 ->courseRegistrations()
@@ -669,9 +658,26 @@ class ClassSessionService
                 ];
             }
 
-            // Create attendance records for all enrolled students
+            // Get students who already have attendance records
+            $studentsWithAttendance = $session->attendances()->pluck('student_id')->toArray();
+            
+            // Filter out students who already have attendance records
+            $studentsWithoutAttendance = $enrolledStudents->filter(function ($student) use ($studentsWithAttendance) {
+                return !in_array($student->id, $studentsWithAttendance);
+            });
+
+            if ($studentsWithoutAttendance->isEmpty()) {
+                return [
+                    'success' => false,
+                    'message' => 'All enrolled students already have attendance records for this session',
+                    'existing_count' => count($studentsWithAttendance),
+                    'student_count' => $enrolledStudents->count(),
+                ];
+            }
+
+            // Create attendance records for students without attendance
             $attendanceRecords = [];
-            foreach ($enrolledStudents as $student) {
+            foreach ($studentsWithoutAttendance as $student) {
                 $attendanceRecords[] = [
                     'class_session_id' => $session->id,
                     'student_id' => $student->id,
@@ -688,18 +694,29 @@ class ClassSessionService
             // Bulk insert attendance records
             DB::table('attendances')->insert($attendanceRecords);
 
-            // Update session expected attendees count
-            $session->update([
-                'expected_attendees' => $enrolledStudents->count(),
-                'actual_attendees' => 0, // Will be updated when attendance is taken
-                'attendance_percentage' => 0.0,
-            ]);
+            // Update session expected attendees count (only if it's not already set)
+            if (!$session->expected_attendees) {
+                $session->update([
+                    'expected_attendees' => $enrolledStudents->count(),
+                    'actual_attendees' => $session->attendances()->whereIn('status', ['present', 'late'])->count(),
+                ]);
+                
+                // Calculate attendance percentage
+                $attendancePercentage = $session->expected_attendees > 0 
+                    ? round(($session->actual_attendees / $session->expected_attendees) * 100, 2)
+                    : 0.0;
+                    
+                $session->update(['attendance_percentage' => $attendancePercentage]);
+            }
 
             return [
                 'success' => true,
-                'message' => 'Attendance records generated successfully',
+                'message' => count($studentsWithAttendance) > 0 
+                    ? 'Attendance records generated for remaining students' 
+                    : 'Attendance records generated successfully',
                 'student_count' => $enrolledStudents->count(),
-                'records_created' => count($attendanceRecords),
+                'existing_records' => count($studentsWithAttendance),
+                'new_records_created' => count($attendanceRecords),
             ];
         });
     }

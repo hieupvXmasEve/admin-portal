@@ -101,7 +101,7 @@ const { handleSubmit, values } = useForm({
 // Form submission
 const onSubmit = handleSubmit((formValues) => {
     isSubmitting.value = true;
-
+    console.log('%c props', 'color: red', props);
     const data = {
         ...formValues,
         class_session_id: parseInt(formValues.class_session_id),
@@ -111,7 +111,7 @@ const onSubmit = handleSubmit((formValues) => {
     router.put(`/attendance/${props.attendance.id}`, data, {
         onSuccess: () => {
             toast.success('Attendance record updated successfully');
-            router.visit('/attendance');
+            router.visit(`/course-offerings/${props.attendance.class_session?.course_offering_id}`);
         },
         onError: (errors) => {
             toast.error('Failed to update attendance record');

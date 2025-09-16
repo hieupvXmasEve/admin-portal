@@ -275,9 +275,7 @@ class AttendanceController extends Controller
                 'data' => $attendance->load(['classSession', 'student']),
             ]);
         }
-
-        return redirect()->route('attendance.index')
-            ->with('success', 'Attendance record updated successfully');
+        return back()->with('success', 'Attendance record updated successfully');
     }
 
     /**
