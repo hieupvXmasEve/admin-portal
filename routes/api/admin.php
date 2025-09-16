@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AdminScheduleController;
+use App\Http\Controllers\Api\AdminStudentImpersonationController;
 use App\Http\Controllers\Api\StudentApplicationController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
@@ -27,6 +28,10 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     Route::get('students/search', [WebStudentController::class, 'apiSearch'])->name('students.apiSearch');
     Route::post('students/by-ids', [WebStudentController::class, 'getByStudentIds'])->name('students.getByStudentIds');
     Route::get('students/{student}', [WebStudentController::class, 'apiShow'])->name('students.apiShow');
+    
+    // Student Impersonation
+    Route::post('/students/impersonate', [AdminStudentImpersonationController::class, 'impersonateStudent'])->name('students.impersonate');
+    Route::get('/students/impersonation-sessions', [AdminStudentImpersonationController::class, 'getImpersonationSessions'])->name('students.impersonation-sessions');
 
     // Student Applications
     Route::patch('/student-applications/bulk/status', [WebStudentApplicationController::class, 'updateBulkStatus']);
