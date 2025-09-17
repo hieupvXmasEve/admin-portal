@@ -11,6 +11,7 @@ use App\Repositories\V1\Student\ClassSessionRepository;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class TimetableService
 {
@@ -32,7 +33,7 @@ class TimetableService
         $cacheKey = "timetable:student:{$student->id}:semester:{$semester->id}:" . md5(serialize($filters));
 
         $classSessions = $this->classSessionRepository->getStudentClassSessions($student, $semester, $filters);
-
+        Log::debug('$classSessions', [$classSessions]);
         return [
             'semester' => [
                 'id' => $semester->id,
@@ -157,7 +158,7 @@ class TimetableService
      */
     protected function generateWeeklySchedule(Collection $classSessions): array
     {
-        $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         $schedule = [];
 
         foreach ($daysOfWeek as $day) {
@@ -168,11 +169,13 @@ class TimetableService
                 'thursday' => 4,
                 'friday' => 5,
                 'saturday' => 6,
+                'sunday' => 7,
             ];
 
             $schedule[$day] = [
                 'day_name' => ucfirst($day),
                 'day_abbreviation' => strtoupper(substr($day, 0, 3)),
+                'day' => Carbon::now()->startOfWeek(Carbon::SUNDAY)->addDays($dayMap[$day])->day,
                 'sessions' => $classSessions
                     ->filter(function ($session) use ($dayMap, $day) {
                         return Carbon::parse($session->session_date)->dayOfWeek === $dayMap[$day];
@@ -255,7 +258,7 @@ class TimetableService
     protected function generateTimeBlocks(Collection $classSessions): array
     {
         $timeSlots = [];
-        $startHour = 8; // 8 AM
+        $startHour = 6; // 8 AM
         $endHour = 22; // 10 PM
 
         for ($hour = $startHour; $hour < $endHour; $hour++) {
