@@ -34,6 +34,7 @@ class TimetableResource extends JsonResource
         foreach ($weeklySchedule as $day => $dayData) {
             $formatted[$day] = [
                 'day_name' => $dayData['day_name'],
+                'day' => $dayData['day'],
                 'day_abbreviation' => $dayData['day_abbreviation'],
                 'session_count' => $dayData['session_count'],
                 'sessions' => collect($dayData['sessions'])->map(function ($session) use ($day) {
@@ -207,7 +208,7 @@ class TimetableResource extends JsonResource
     {
         $currentDay = strtolower(now()->format('l'));
         $currentTime = now()->format('H:i');
-        
+
         $startTime = $session['start_time'] instanceof \Carbon\Carbon ? $session['start_time']->format('H:i') : $session['start_time'];
         $endTime = $session['end_time'] instanceof \Carbon\Carbon ? $session['end_time']->format('H:i') : $session['end_time'];
 
@@ -223,7 +224,7 @@ class TimetableResource extends JsonResource
     {
         $currentDay = strtolower(now()->format('l'));
         $currentTime = now()->format('H:i');
-        
+
         $startTime = $session['start_time'] instanceof \Carbon\Carbon ? $session['start_time']->format('H:i') : $session['start_time'];
 
         return $day === $currentDay && $currentTime < $startTime;

@@ -6,6 +6,7 @@ namespace App\Http\Resources\Api\V1\Student;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Log;
 
 class DashboardResource extends JsonResource
 {
@@ -89,11 +90,13 @@ class DashboardResource extends JsonResource
      */
     protected function formatUpcomingAssessments(array $assessmentsData): array
     {
+        Log::info('$assessmentsData', [$assessmentsData]);
+
         return [
             'summary' => [
-                'total_upcoming' => $assessmentsData['total_upcoming'],
+                'total_upcoming' => $assessmentsData['total_upcoming'] ?? count($assessmentsData['assessments'] ?? []),
             ],
-            'assessments' => collect($assessmentsData['assessments'])->map(function ($assessment) {
+            'assessments' => collect($assessmentsData['assessments'] ?? [])->map(function ($assessment) {
                 return [
                     'id' => $assessment['id'],
                     'title' => $assessment['title'],
@@ -111,6 +114,7 @@ class DashboardResource extends JsonResource
             }),
         ];
     }
+
 
     /**
      * Format quick stats data
