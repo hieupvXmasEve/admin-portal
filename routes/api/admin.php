@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AdminScheduleController;
 use App\Http\Controllers\Api\AdminStudentImpersonationController;
+use App\Http\Controllers\Api\AdminLecturerImpersonationController;
 use App\Http\Controllers\Api\StudentApplicationController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
@@ -32,6 +33,10 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     // Student Impersonation
     Route::post('/students/impersonate', [AdminStudentImpersonationController::class, 'impersonateStudent'])->name('students.impersonate');
     Route::get('/students/impersonation-sessions', [AdminStudentImpersonationController::class, 'getImpersonationSessions'])->name('students.impersonation-sessions');
+    
+    // Lecturer Impersonation
+    Route::post('/lecturers/impersonate', [AdminLecturerImpersonationController::class, 'impersonateLecturer'])->name('lecturers.impersonate');
+    Route::get('/lecturers/impersonation-sessions', [AdminLecturerImpersonationController::class, 'getImpersonationSessions'])->name('lecturers.impersonation-sessions');
 
     // Student Applications
     Route::patch('/student-applications/bulk/status', [WebStudentApplicationController::class, 'updateBulkStatus']);
