@@ -191,33 +191,6 @@ class StudentService
     }
 
     /**
-     * Admit a student (change status from applicant to active)
-     */
-    public function admitStudent(Student $student, array $data): Student
-    {
-        return DB::transaction(function () use ($student, $data) {
-            // Update student status and admission details
-            $student->update([
-                'status' => 'active',
-                'admission_date' => $data['admission_date'],
-                'admission_notes' => $data['admission_notes'] ?? null,
-            ]);
-
-            // Assign student role to the campus
-            $this->assignStudentRole($student);
-
-            // Log the admission
-            Log::info('Student admitted', [
-                'student_id' => $student->id,
-                'student_id' => $student->student_id,
-                'admission_date' => $data['admission_date'],
-            ]);
-
-            return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion']);
-        });
-    }
-
-    /**
      * Assign student role in campus
      */
     private function assignStudentRole(Student $student): void
@@ -476,7 +449,7 @@ class StudentService
                 } else {
                     $courseRegistrations = $courseRegistrationsQuery->get();
                 }
-                
+
                 foreach ($courseRegistrations as $registration) {
                     if (method_exists($registration, 'forceDelete')) {
                         $registration->forceDelete();
@@ -497,7 +470,7 @@ class StudentService
                 } else {
                     $enrollments = $enrollmentsQuery->get();
                 }
-                
+
                 foreach ($enrollments as $enrollment) {
                     if (method_exists($enrollment, 'forceDelete')) {
                         $enrollment->forceDelete();
@@ -519,7 +492,7 @@ class StudentService
                     } else {
                         $academicRecords = $academicRecordsQuery->get();
                     }
-                    
+
                     foreach ($academicRecords as $record) {
                         if (method_exists($record, 'forceDelete')) {
                             $record->forceDelete();
@@ -542,7 +515,7 @@ class StudentService
                     } else {
                         $academicStandings = $academicStandingsQuery->get();
                     }
-                    
+
                     foreach ($academicStandings as $standing) {
                         if (method_exists($standing, 'forceDelete')) {
                             $standing->forceDelete();
@@ -565,7 +538,7 @@ class StudentService
                     } else {
                         $academicHolds = $academicHoldsQuery->get();
                     }
-                    
+
                     foreach ($academicHolds as $hold) {
                         if (method_exists($hold, 'forceDelete')) {
                             $hold->forceDelete();
@@ -588,7 +561,7 @@ class StudentService
                     } else {
                         $gpaCalculations = $gpaCalculationsQuery->get();
                     }
-                    
+
                     foreach ($gpaCalculations as $gpa) {
                         if (method_exists($gpa, 'forceDelete')) {
                             $gpa->forceDelete();
@@ -611,7 +584,7 @@ class StudentService
                     } else {
                         $programChangeRequests = $programChangeRequestsQuery->get();
                     }
-                    
+
                     foreach ($programChangeRequests as $request) {
                         if (method_exists($request, 'forceDelete')) {
                             $request->forceDelete();
@@ -634,7 +607,7 @@ class StudentService
                     } else {
                         $attendances = $attendancesQuery->get();
                     }
-                    
+
                     foreach ($attendances as $attendance) {
                         if (method_exists($attendance, 'forceDelete')) {
                             $attendance->forceDelete();
@@ -664,220 +637,4 @@ class StudentService
         });
     }
 
-
-    /**
-     * Bulk create enrollment records for students
-     */
-    public function bulkCreateEnrollments(array $studentIds, int $semesterId): array
-    {
-        return DB::transaction(function () use ($studentIds, $semesterId) {
-            $created = 0;
-            $errors = [];
-
-            foreach ($studentIds as $studentId) {
-                try {
-                    $student = Student::findOrFail($studentId);
-
-                    // Check if enrollment already exists
-                    $existingEnrollment = $student->semesterEnrollments()
-                        ->where('semester_id', $semesterId)
-                        ->first();
-
-                    if (! $existingEnrollment) {
-                        $student->semesterEnrollments()->create([
-                            'semester_id' => $semesterId,
-                            'enrollment_status' => 'enrolled',
-                            'enrollment_date' => now(),
-                        ]);
-                        $created++;
-                    }
-                } catch (Exception $e) {
-                    $errors[] = "Student ID {$studentId}: " . $e->getMessage();
-                }
-            }
-
-            Log::info('Bulk enrollment creation completed', [
-                'created' => $created,
-                'errors' => count($errors),
-            ]);
-
-            return [
-                'created' => $created,
-                'errors' => $errors,
-                'total_processed' => count($studentIds),
-            ];
-        });
-    }
-
-    /**
-     * Bulk create course offering records for students
-     */
-    public function bulkCreateCourseOfferings(array $studentIds, int $semesterId, array $unitIds): array
-    {
-        return DB::transaction(function () use ($semesterId, $unitIds) {
-            $created = 0;
-            $errors = [];
-
-            foreach ($unitIds as $unitId) {
-                try {
-                    // Check if course offering already exists
-                    $existingOffering = \App\Models\CourseOffering::where('unit_id', $unitId)
-                        ->where('semester_id', $semesterId)
-                        ->first();
-
-                    if (! $existingOffering) {
-                        \App\Models\CourseOffering::create([
-                            'unit_id' => $unitId,
-                            'semester_id' => $semesterId,
-                            'offering_type' => 'standard',
-                            'status' => 'active',
-                            'max_enrollment' => 100, // Default max enrollment
-                            'current_enrollment' => 0,
-                        ]);
-                        $created++;
-                    }
-                } catch (Exception $e) {
-                    $errors[] = "Unit ID {$unitId}: " . $e->getMessage();
-                }
-            }
-
-            Log::info('Bulk course offering creation completed', [
-                'created' => $created,
-                'errors' => count($errors),
-            ]);
-
-            return [
-                'created' => $created,
-                'errors' => $errors,
-                'total_processed' => count($unitIds),
-            ];
-        });
-    }
-
-    /**
-     * Bulk create course registration records for students
-     */
-    public function bulkCreateCourseRegistrations(array $studentIds, array $courseOfferingIds): array
-    {
-        return DB::transaction(function () use ($studentIds, $courseOfferingIds) {
-            $created = 0;
-            $errors = [];
-
-            foreach ($studentIds as $studentId) {
-                foreach ($courseOfferingIds as $courseOfferingId) {
-                    try {
-                        $student = Student::findOrFail($studentId);
-
-                        // Check if registration already exists
-                        $existingRegistration = $student->courseRegistrations()
-                            ->where('course_offering_id', $courseOfferingId)
-                            ->first();
-
-                        if (! $existingRegistration) {
-                            $student->courseRegistrations()->create([
-                                'course_offering_id' => $courseOfferingId,
-                                'registration_status' => 'enrolled',
-                                'registration_date' => now(),
-                                'grade_status' => 'in_progress',
-                            ]);
-                            $created++;
-                        }
-                    } catch (Exception $e) {
-                        $errors[] = "Student ID {$studentId}, Course Offering ID {$courseOfferingId}: " . $e->getMessage();
-                    }
-                }
-            }
-
-            Log::info('Bulk course registration creation completed', [
-                'created' => $created,
-                'errors' => count($errors),
-            ]);
-
-            return [
-                'created' => $created,
-                'errors' => $errors,
-                'total_processed' => count($studentIds) * count($courseOfferingIds),
-            ];
-        });
-    }
-
-    /**
-     * Complete student onboarding process - enrollments, course offerings, and registrations
-     * Updated to use the new AutomatedEnrollmentService
-     */
-    public function completeStudentOnboarding(array $studentIds, int $semesterId): array
-    {
-        // Get current campus ID from session
-        $currentCampusId = session()->get('current_campus_id');
-
-        if (! $currentCampusId) {
-            throw new Exception('No campus selected. Please select a campus first.');
-        }
-
-        // Use the new AutomatedEnrollmentService
-        $automatedEnrollmentService = new AutomatedEnrollmentService;
-        $results = $automatedEnrollmentService->processAutomatedEnrollment(
-            $studentIds,
-            $semesterId,
-            $currentCampusId
-        );
-
-        // Convert to legacy format for backward compatibility
-        return [
-            'enrollments' => [
-                'created' => $results['enrollments']['created'],
-                'errors' => $results['enrollments']['errors'],
-            ],
-            'course_offerings' => [
-                'created' => $results['course_offerings']['created'],
-                'errors' => $results['course_offerings']['errors'],
-            ],
-            'course_registrations' => [
-                'created' => $results['course_registrations']['created'],
-                'errors' => $results['course_registrations']['errors'],
-            ],
-            'summary' => $results['summary'] ?? [],
-        ];
-    }
-
-    /**
-     * Get first-year units for students based on their programs
-     */
-    private function getFirstYearUnitsForStudents(array $studentIds): array
-    {
-        // Get unique program IDs from students
-        $programIds = Student::whereIn('id', $studentIds)
-            ->distinct()
-            ->pluck('program_id')
-            ->toArray();
-
-        // Get first-year curriculum units for these programs
-        // This assumes there's a relationship and year_level field
-        try {
-            $units = \App\Models\CurriculumUnit::whereHas('curriculumVersion', function ($query) use ($programIds) {
-                $query->whereIn('program_id', $programIds);
-            })
-                ->where('year_level', 1) // First year units
-                ->where('semester_number', 1) // First semester
-                ->pluck('unit_id')
-                ->toArray();
-
-            // If no year-specific units found, get first 3-4 units from each program
-            if (empty($units)) {
-                $units = \App\Models\CurriculumUnit::whereHas('curriculumVersion', function ($query) use ($programIds) {
-                    $query->whereIn('program_id', $programIds);
-                })
-                    ->limit(4) // Default to first 4 units
-                    ->pluck('unit_id')
-                    ->toArray();
-            }
-
-            return $units;
-        } catch (Exception $e) {
-            // Fallback: return some default units or empty array
-            Log::warning('Could not determine first-year units: ' . $e->getMessage());
-
-            return [];
-        }
-    }
 }

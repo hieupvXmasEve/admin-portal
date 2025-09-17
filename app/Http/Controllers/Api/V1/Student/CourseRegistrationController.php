@@ -28,30 +28,60 @@ class CourseRegistrationController extends Controller
     ) {}
 
     /**
-     * Get available courses for registration
+     * Get courses student is currently enrolled in
      */
-    public function availableCourses(AvailableCoursesRequest $request): JsonResponse
+    public function enrolledCourses(AvailableCoursesRequest $request): JsonResponse
     {
         $student = $request->user();
-        Log::info('student id', [$student->id]);
+        Log::info('Getting enrolled courses for student id: ' . $student->id);
+        
         try {
             $filters = $request->validated();
-            $availableCourses = $this->registrationService->getAvailableCourses($student, $filters);
-            Log::info('AvailableCourses: '.$availableCourses);
+            $enrolledCourses = $this->registrationService->getEnrolledCourses($student, $filters);
+            Log::info('Enrolled courses count: ' . $enrolledCourses->count());
 
             return ApiResponse::success(
-                CourseOfferingResource::collection($availableCourses),
+                CourseOfferingResource::collection($enrolledCourses),
                 [],
-                'Available courses retrieved successfully'
+                'Enrolled courses retrieved successfully'
             );
         } catch (BusinessLogicException $e) {
             return ApiResponse::businessLogicError($e->getMessage());
         } catch (\Exception $e) {
-            Log::error('AvailableCourses error: '.$e->getMessage(), [
+            Log::error('Enrolled courses error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return ApiResponse::serverError('Failed to retrieve available courses');
+            return ApiResponse::serverError('Failed to retrieve enrolled courses');
+        }
+    }
+
+    /**
+     * Get courses available for registration (not yet enrolled)
+     */
+    public function availableForRegistration(AvailableCoursesRequest $request): JsonResponse
+    {
+        $student = $request->user();
+        Log::info('Getting available courses for registration for student id: ' . $student->id);
+        
+        try {
+            $filters = $request->validated();
+            $availableCourses = $this->registrationService->getAvailableCoursesForRegistration($student, $filters);
+            Log::info('Available courses for registration count: ' . $availableCourses->count());
+
+            return ApiResponse::success(
+                CourseOfferingResource::collection($availableCourses),
+                [],
+                'Available courses for registration retrieved successfully'
+            );
+        } catch (BusinessLogicException $e) {
+            return ApiResponse::businessLogicError($e->getMessage());
+        } catch (\Exception $e) {
+            Log::error('Available courses for registration error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return ApiResponse::serverError('Failed to retrieve available courses for registration');
         }
     }
 

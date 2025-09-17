@@ -204,6 +204,11 @@ class ProfileService
             'emergency_contact_name' => $student->emergency_contact_name,
             'emergency_contact_phone' => $student->emergency_contact_phone,
             'emergency_contact_relationship' => $student->emergency_contact_relationship,
+            'emergency_contact_email' => $student->emergency_contact_email,
+            'emergency_contact_name_1' => $student->emergency_contact_name_1,
+            'emergency_contact_email_1' => $student->emergency_contact_email_1,
+            'emergency_contact_phone_1' => $student->emergency_contact_phone_1,
+            'emergency_contact_relationship_1' => $student->emergency_contact_relationship_1,
             'address' => $addressData,
             'high_school_name' => $student->high_school_name,
         ];
@@ -271,6 +276,11 @@ class ProfileService
             'national_id' => ! empty($student->national_id),
             'emergency_contact_name' => ! empty($student->emergency_contact_name),
             'emergency_contact_phone' => ! empty($student->emergency_contact_phone),
+            'emergency_contact_email' => ! empty($student->emergency_contact_email),
+            'emergency_contact_name_1' => ! empty($student->emergency_contact_name_1),
+            'emergency_contact_email_2' => ! empty($student->emergency_contact_email_2),
+            'emergency_contact_phone_2' => ! empty($student->emergency_contact_phone_2),
+            'emergency_contact_relationship_2' => ! empty($student->emergency_contact_relationship_2),
             'avatar_url' => ! empty($student->avatar_url),
             'gender' => ! empty($student->gender),
             'nationality' => ! empty($student->nationality),
@@ -307,6 +317,11 @@ class ProfileService
             'emergency_contact_name',
             'emergency_contact_phone',
             'emergency_contact_relationship',
+            'emergency_contact_email',
+            'emergency_contact_name_1',
+            'emergency_contact_email_1',
+            'emergency_contact_phone_1',
+            'emergency_contact_relationship_1',
         ];
 
         return array_intersect_key($data, array_flip($allowedFields));
