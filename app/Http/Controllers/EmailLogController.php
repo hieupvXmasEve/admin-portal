@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Responses\ApiResponse;
 use App\Models\EmailLog;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -95,5 +97,15 @@ class EmailLogController extends Controller
             ],
             'statusOptions' => $statusOptions,
         ]);
+    }
+
+    // API routes
+    // Show email log
+    public function show(EmailLog $emailLog): JsonResponse
+    {
+        return ApiResponse::success(
+            data: $emailLog,
+            message: 'Email log retrieved successfully'
+        );
     }
 }

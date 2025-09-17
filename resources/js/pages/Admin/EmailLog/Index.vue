@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
-import type { PaginatedResponse } from '@/types';
+import type { PaginatedResponse, User } from '@/types';
 import type { EmailLog } from '@/types/models';
 import { Head, router } from '@inertiajs/vue3';
 import { formatDistanceToNow } from 'date-fns';
@@ -16,6 +17,7 @@ import { Eye, Filter, Loader2, RotateCcw, Search } from 'lucide-vue-next';
 import { computed, h, reactive, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
+import EmailLogDetailModal from './components/EmailLogDetailModal.vue';
 
 interface StatusOption {
     value: string;
@@ -37,9 +39,12 @@ interface Props {
 
 const props = defineProps<Props>();
 const api = useApi();
-
+console.log('%c props', 'color: red', props.emailLogs);
 // Reactive data
 const retryingIds = ref<Set<number>>(new Set());
+const isModalOpen = ref(false);
+const selectedEmailLog = ref<EmailLog | null>(null);
+const isLoadingEmailLog = ref(false);
 
 // Initialize filters from props
 const filters = reactive<Filters>({
@@ -155,6 +160,27 @@ const handlePageSizeChange = (pageSize: number) => {
         preserveScroll: true,
     });
 };
+// Show email log details
+const showEmailLog = async (emailLog: EmailLog) => {
+    try {
+        isLoadingEmailLog.value = true;
+        selectedEmailLog.value = null;
+        isModalOpen.value = true;
+
+        const response = await api.get(`/systems/email-history/${emailLog.id}`);
+
+        if (response.data.value?.success) {
+            selectedEmailLog.value = response.data.value.data;
+        } else {
+            throw new Error(response.data.value?.message || 'Failed to load email details');
+        }
+    } catch (error: any) {
+        toast.error(error.message || 'Failed to load email details');
+        isModalOpen.value = false;
+    } finally {
+        isLoadingEmailLog.value = false;
+    }
+};
 
 // Data table columns configuration
 const columns = createColumns<EmailLog>([
@@ -164,6 +190,22 @@ const columns = createColumns<EmailLog>([
         cell: ({ row }) => {
             const recipient = row.getValue('recipient') as string;
             return recipient.length > 30 ? recipient.substring(0, 30) + '...' : recipient;
+        },
+    },
+    {
+        accessorKey: 'user',
+        header: 'User',
+        cell: ({ row }) => {
+            const user = row.getValue('user') as User;
+            return user?.name?.length > 50 ? user.name.substring(0, 50) + '...' : user?.name;
+        },
+    },
+    {
+        accessorKey: 'sender',
+        header: 'Email Sender',
+        cell: ({ row }) => {
+            const sender = row.getValue('sender') as string;
+            return sender?.length > 50 ? sender.substring(0, 50) + '...' : sender;
         },
     },
     {
@@ -204,39 +246,7 @@ const columns = createColumns<EmailLog>([
     {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => {
-            const emailLog = row.original;
-            const isRetrying = retryingIds.value.has(emailLog.id);
-
-            return h('div', { class: 'flex items-center gap-2' }, [
-                // Retry button - only show for failed emails that can be retried
-                canRetry(emailLog) &&
-                    h(
-                        Button,
-                        {
-                            size: 'sm',
-                            variant: 'outline',
-                            disabled: isRetrying,
-                            onClick: () => retryEmail(emailLog),
-                        },
-                        () => [isRetrying && h(Loader2, { class: 'h-4 w-4 mr-2 animate-spin' }), !isRetrying && h(RotateCcw, { class: 'h-4 w-4 mr-2' }), 'Retry'],
-                    ),
-
-                // View details button (placeholder for future implementation)
-                h(
-                    Button,
-                    {
-                        size: 'sm',
-                        variant: 'ghost',
-                        onClick: () => {
-                            // TODO: Implement view details modal
-                            toast.info('Email details view will be implemented soon');
-                        },
-                    },
-                    () => h(Eye, { class: 'h-4 w-4' }),
-                ),
-            ]);
-        },
+        cell: 'actions',
     },
 ]);
 </script>
@@ -313,7 +323,32 @@ const columns = createColumns<EmailLog>([
                 <CardDescription> Showing {{ props.emailLogs.from || 0 }} to {{ props.emailLogs.to || 0 }} of {{ props.emailLogs.total }} emails </CardDescription>
             </CardHeader>
             <CardContent>
-                <DataTable :data="props.emailLogs.data" :columns="columns" class="w-full" />
+                <DataTable :data="props.emailLogs.data" :columns="columns" class="w-full">
+                    <template #cell-actions="{ row }">
+                        <div class="flex items-center gap-2">
+                            <!-- Retry button - only show for failed emails that can be retried -->
+                            <Button v-if="canRetry(row.original)" size="sm" variant="outline" :disabled="retryingIds.has(row.original.id)" @click="retryEmail(row.original)">
+                                <Loader2 v-if="retryingIds.has(row.original.id)" class="mr-2 h-4 w-4 animate-spin" />
+                                <RotateCcw v-else class="mr-2 h-4 w-4" />
+                                Retry
+                            </Button>
+
+                            <!-- View details button -->
+                            <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
+                                <Tooltip>
+                                    <TooltipTrigger as-child>
+                                        <Button size="sm" variant="ghost" @click="showEmailLog(row.original)">
+                                            <Eye class="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>View details</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                    </template>
+                </DataTable>
 
                 <!-- Pagination -->
                 <DataPagination
@@ -345,5 +380,8 @@ const columns = createColumns<EmailLog>([
                 </div>
             </CardContent>
         </Card>
+
+        <!-- Email Log Detail Modal -->
+        <EmailLogDetailModal v-model:is-open="isModalOpen" :email-log="selectedEmailLog" />
     </div>
 </template>

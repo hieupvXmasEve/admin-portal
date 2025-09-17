@@ -21,3 +21,8 @@ Route::middleware(['auth', 'campus.selected'])->group(function () {
 
     Route::get('/systems/bulk-email', [EmailConfigurationController::class, 'bulkEmail'])->name('system.bulk-email.index');
 });
+
+// Api web routes
+Route::middleware(['web'])->name('api.systems.email-history.')->group(function () {
+    Route::get('/systems/email-history/{emailLog}', [EmailLogController::class, 'show'])->name('system.email-history.show');
+});
