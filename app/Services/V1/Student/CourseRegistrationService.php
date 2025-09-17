@@ -24,12 +24,14 @@ class CourseRegistrationService
     /**
      * Get courses that the student is currently enrolled in (active semester)
      */
-    public function getAvailableCourses(Student $student, array $filters = []): Collection
+    public function getEnrolledCourses(Student $student, array $filters = []): Collection
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
+        // Return empty collection if no active semester instead of throwing exception
         if (! $currentSemester) {
-            throw new BusinessLogicException('No active semester found');
+            Log::info('No active semester found, returning empty enrolled courses list for student: ' . $student->id);
+            return collect();
         }
 
         // Get course offerings that the student is registered for in the current semester
@@ -44,7 +46,7 @@ class CourseRegistrationService
             ])
             ->get();
 
-        Log::info('Student registered courses count: ' . $studentRegistrations->count());
+        Log::info('Student enrolled courses count: ' . $studentRegistrations->count());
 
         // Filter only course offerings that have class sessions
         $enrolledCourseOfferings = $studentRegistrations
@@ -57,6 +59,64 @@ class CourseRegistrationService
             });
 
         return $enrolledCourseOfferings->values();
+    }
+
+    /**
+     * Get courses available for registration (not yet enrolled)
+     */
+    public function getAvailableCoursesForRegistration(Student $student, array $filters = []): Collection
+    {
+        $currentSemester = Semester::where('is_active', true)->first();
+
+        // Return empty collection if no active semester
+        if (! $currentSemester) {
+            Log::info('No active semester found, returning empty available courses list for student: ' . $student->id);
+            return collect();
+        }
+
+        // Get all course offerings available for registration in current semester
+        $query = CourseOffering::with([
+            'curriculumUnit.unit',
+            'lecture',
+            'classSessions.room',
+            'semester',
+            'courseRegistrations'
+        ])
+        ->where('semester_id', $currentSemester->id)
+        ->where('is_active', true);
+
+        // Apply filters if provided
+        if (!empty($filters['unit_code'])) {
+            $query->whereHas('curriculumUnit.unit', function ($q) use ($filters) {
+                $q->where('code', 'like', '%' . $filters['unit_code'] . '%');
+            });
+        }
+
+        $availableOfferings = $query->get();
+
+        // Get courses student is already registered for
+        $registeredCourseIds = $student->courseRegistrations()
+            ->where('semester_id', $currentSemester->id)
+            ->whereIn('registration_status', ['registered', 'pending', 'confirmed'])
+            ->pluck('course_offering_id')
+            ->toArray();
+
+        // Filter out courses student is already registered for
+        $availableCourses = $availableOfferings
+            ->reject(function ($offering) use ($registeredCourseIds) {
+                return in_array($offering->id, $registeredCourseIds);
+            })
+            ->filter(function ($offering) {
+                // Only show courses with class sessions
+                return $offering->classSessions->isNotEmpty();
+            })
+            ->map(function ($offering) use ($student) {
+                return $this->formatCourseOfferingForRegistration($offering, $student);
+            });
+
+        Log::info('Available courses for registration count: ' . $availableCourses->count());
+
+        return $availableCourses->values();
     }
 
     /**

@@ -52,7 +52,7 @@ class ProfileResource extends JsonResource
             ],
             'avatar' => [
                 'url' => $personalInfo['avatar_url'],
-                'has_avatar' => ! empty($personalInfo['avatar_url']),
+                'has_avatar' => !empty($personalInfo['avatar_url']),
             ],
         ];
     }
@@ -67,8 +67,8 @@ class ProfileResource extends JsonResource
         $campus = $academicInfo['campus'] ?? [];
         $cvVersion = $cv['version'] ?? null;
 
-        $studyMode = (string) ($academicInfo['study_mode'] ?? '');
-        $status = (string) ($academicInfo['status'] ?? '');
+        $studyMode = (string)($academicInfo['study_mode'] ?? '');
+        $status = (string)($academicInfo['status'] ?? '');
 
         return [
             'program' => [
@@ -113,14 +113,23 @@ class ProfileResource extends JsonResource
             'primary_contact' => [
                 'email' => $contactInfo['email'],
                 'phone' => $contactInfo['phone'],
-                'has_phone' => ! empty($contactInfo['phone']),
+                'has_phone' => !empty($contactInfo['phone']),
             ],
             'emergency_contact' => [
                 'name' => $contactInfo['emergency_contact_name'],
                 'phone' => $contactInfo['emergency_contact_phone'],
+                'email' => $contactInfo['emergency_contact_email'],
                 'relationship' => $contactInfo['emergency_contact_relationship'],
-                'is_complete' => ! empty($contactInfo['emergency_contact_name']) &&
-                    ! empty($contactInfo['emergency_contact_phone']),
+                'is_complete' => !empty($contactInfo['emergency_contact_name']) &&
+                    !empty($contactInfo['emergency_contact_phone']) && !empty($contactInfo['emergency_contact_email']),
+            ],
+            'emergency_contact_secondary' => [
+                'name' => $contactInfo['emergency_contact_name_1'] ?? "",
+                'email' => $contactInfo['emergency_contact_email_1'] ?? "",
+                'phone' => $contactInfo['emergency_contact_phone_1'] ?? "",
+                'relationship' => $contactInfo['emergency_contact_relationship_1'] ?? "",
+                'is_complete' => !empty($contactInfo['emergency_contact_name_1']) &&
+                    !empty($contactInfo['emergency_contact_phone_1']) && !empty($contactInfo['emergency_contact_email_1']),
             ],
             'address' => [
                 'street' => $contactInfo['address']['street'],
@@ -281,9 +290,9 @@ class ProfileResource extends JsonResource
      */
     protected function isAddressComplete(array $address): bool
     {
-        return ! empty($address['street']) &&
-            ! empty($address['city']) &&
-            ! empty($address['country']);
+        return !empty($address['street']) &&
+            !empty($address['city']) &&
+            !empty($address['country']);
     }
 
     /**
@@ -419,6 +428,11 @@ class ProfileResource extends JsonResource
             'address_city' => 'City',
             'emergency_contact_name' => 'Emergency Contact Name',
             'emergency_contact_phone' => 'Emergency Contact Phone',
+            'emergency_contact_email' => 'Emergency Contact Email',
+            'emergency_contact_name_1' => 'Emergency Contact Name 1',
+            'emergency_contact_email_2' => 'Emergency Contact Email 2',
+            'emergency_contact_phone_2' => 'Emergency Contact Phone 2',
+            'emergency_contact_relationship_2' => 'Emergency Contact Relationship 2',
             'avatar_path' => 'Profile Photo',
             default => ucfirst(str_replace('_', ' ', $field)),
         };

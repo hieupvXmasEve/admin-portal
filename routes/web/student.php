@@ -33,16 +33,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:view_student')
         ->name('students.export');
 
-    // New Students page for first-semester students
-    Route::get('students/new-students', [StudentController::class, 'newStudents'])
-        ->middleware('can:view_student')
-        ->name(StudentRoutes::NEW_STUDENTS);
-
-    // Bulk student onboarding for new students
-    Route::post('students/new-students/bulk-onboarding', [StudentController::class, 'bulkStudentOnboarding'])
-        ->middleware('can:edit_student')
-        ->name(StudentRoutes::BULK_ONBOARDING);
-
     Route::get('students/create', [StudentController::class, 'create'])
         ->middleware('can:create_student')
         ->name(StudentRoutes::CREATE);

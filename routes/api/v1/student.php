@@ -59,15 +59,27 @@ Route::middleware([
             Route::get('/upcoming-assessments', [DashboardController::class, 'upcomingAssessments'])->name('upcoming-assessments');
         });
 
-        // Course registration endpoints (TODO)
+        // Course registration endpoints
         Route::prefix('course')->name('course-registration.')->group(function () {
-            // Course listings - all currently available courses with class sections
-            Route::get('/available', [CourseRegistrationController::class, 'availableCourses'])
+            // Get courses student is currently enrolled in
+            Route::get('/enrolled', [CourseRegistrationController::class, 'enrolledCourses'])
+                ->name('enrolled-courses');
+
+            // Get courses available for registration (not yet enrolled)
+            Route::get('/available-for-registration', [CourseRegistrationController::class, 'availableForRegistration'])
+                ->name('available-for-registration');
+
+            // Keep backward compatibility for the current URL
+            Route::get('/available', [CourseRegistrationController::class, 'enrolledCourses'])
                 ->name('available-courses');
 
             // Course detail - full schedule and grades for enrolled course
-            Route::get('/available/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])
+            Route::get('/enrolled/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])
                 ->name('course-detail');
+            
+            // Keep backward compatibility
+            Route::get('/available/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])
+                ->name('course-detail-legacy');
 
             // TODO: complete this endpoint
             //            Route::post('/register', [CourseRegistrationController::class, 'register'])

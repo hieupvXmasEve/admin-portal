@@ -36,6 +36,11 @@ class ProfileUpdateRequest extends FormRequest
             'emergency_contact_phone' => ['required', 'string', 'max:20', 'regex:/^[\+]?[0-9\s\-\(\)]+$/'],
             'emergency_contact_name' => ['required', 'string', 'max:100'],
             'emergency_contact_relationship' => ['required', 'string', 'max:50'],
+            'emergency_contact_email' => ['nullable', 'email', 'max:255'],
+            'emergency_contact_name_1' => ['nullable', 'string', 'max:100'],
+            'emergency_contact_email_1' => ['nullable', 'email', 'max:255'],
+            'emergency_contact_phone_1' => ['nullable', 'string', 'max:20', 'regex:/^[\+]?[0-9\s\-\(\)]+$/'],
+            'emergency_contact_relationship_1' => ['nullable', 'string', 'max:50'],
         ];
     }
 
@@ -59,6 +64,14 @@ class ProfileUpdateRequest extends FormRequest
             'emergency_contact_name.max' => 'Name cannot exceed 100 characters',
             'emergency_contact_name.required' => 'Name cannot be empty',
             'emergency_contact_relationship.required' => 'Relationship cannot be empty',
+            'emergency_contact_email.email' => 'Emergency contact email must be a valid email address',
+            'emergency_contact_email.max' => 'Emergency contact email cannot exceed 255 characters',
+            'emergency_contact_name_1.max' => 'Emergency contact name 1 cannot exceed 100 characters',
+            'emergency_contact_email_2.email' => 'Emergency contact email 2 must be a valid email address',
+            'emergency_contact_email_2.max' => 'Emergency contact email 2 cannot exceed 255 characters',
+            'emergency_contact_phone_2.regex' => 'Emergency contact phone 2 format is invalid',
+            'emergency_contact_phone_2.max' => 'Emergency contact phone 2 cannot exceed 20 characters',
+            'emergency_contact_relationship_2.max' => 'Emergency contact relationship 2 cannot exceed 50 characters',
         ];
     }
 
