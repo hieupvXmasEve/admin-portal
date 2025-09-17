@@ -35,12 +35,29 @@ class TimetableController extends Controller
             unset($filters['semester_id']);
 
             $timetable = $this->timetableService->getStudentTimetable($student, $semesterId, $filters);
+            
+            // Check if we got an empty timetable due to no semester
+            if (empty($timetable['semester']) && isset($timetable['message'])) {
+                return ApiResponse::success(
+                    new TimetableResource($timetable),
+                    [],
+                    $timetable['message']
+                );
+            }
+            
             return ApiResponse::success(
                 new TimetableResource($timetable),
                 [],
                 'Timetable retrieved successfully'
             );
         } catch (\Exception $e) {
+            Log::error('Failed to retrieve timetable', [
+                'user_id' => $student->id,
+                'semester_id' => $semesterId ?? null,
+                'filters' => $filters ?? [],
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return ApiResponse::serverError('Failed to retrieve timetable');
         }
     }
@@ -60,12 +77,28 @@ class TimetableController extends Controller
 
             $weeklyTimetable = $this->timetableService->getWeeklyTimetable($student, $semesterId, $filters);
 
+            // Check if we got an empty timetable due to no semester
+            if (empty($weeklyTimetable['semester']) && isset($weeklyTimetable['message'])) {
+                return ApiResponse::success(
+                    $weeklyTimetable,
+                    [],
+                    $weeklyTimetable['message']
+                );
+            }
+
             return ApiResponse::success(
                 $weeklyTimetable,
                 [],
                 'Weekly timetable retrieved successfully'
             );
         } catch (\Exception $e) {
+            Log::error('Failed to retrieve weekly timetable', [
+                'user_id' => $student->id,
+                'semester_id' => $semesterId ?? null,
+                'filters' => $filters ?? [],
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return ApiResponse::serverError('Failed to retrieve weekly timetable');
         }
     }
@@ -109,6 +142,12 @@ class TimetableController extends Controller
                 'Filter options retrieved successfully'
             );
         } catch (\Exception $e) {
+            Log::error('Failed to retrieve filter options', [
+                'user_id' => $student->id,
+                'semester_id' => $semesterId ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return ApiResponse::serverError('Failed to retrieve filter options');
         }
     }

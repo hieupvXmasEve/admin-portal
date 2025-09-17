@@ -27,7 +27,7 @@ class TimetableService
         $semester = $this->resolveSemester($semesterId);
 
         if (! $semester) {
-            return $this->getEmptyTimetable();
+            return $this->getEmptyTimetable('No active semester found');
         }
 
         $cacheKey = "timetable:student:{$student->id}:semester:{$semester->id}:" . md5(serialize($filters));
@@ -139,7 +139,14 @@ class TimetableService
         $semester = $this->resolveSemester($semesterId);
 
         if (! $semester) {
-            return [];
+            return [
+                'days_of_week' => [],
+                'session_types' => [],
+                'lecturers' => [],
+                'buildings' => [],
+                'time_slots' => [],
+                'message' => 'No active semester found'
+            ];
         }
 
         $classSessions = $this->classSessionRepository->getStudentClassSessions($student, $semester);
@@ -388,13 +395,54 @@ class TimetableService
             return Semester::find($semesterId);
         }
 
-        return Semester::where('is_active', true)->first();
+        // First try to get the manually marked active semester
+        $activeSemester = Semester::where('is_active', true)->first();
+        if ($activeSemester) {
+            return $activeSemester;
+        }
+
+        // If no active semester, try to find current semester based on date
+        $now = now();
+        $currentSemester = Semester::where('start_date', '<=', $now)
+            ->where('end_date', '>=', $now)
+            ->where('is_archived', false)
+            ->orderBy('start_date', 'desc')
+            ->first();
+
+        if ($currentSemester) {
+            Log::warning('No active semester found, using current semester based on dates', [
+                'semester_id' => $currentSemester->id,
+                'semester_name' => $currentSemester->name,
+                'current_date' => $now->toDateString()
+            ]);
+            return $currentSemester;
+        }
+
+        // If still no semester, try to get the most recent non-archived semester
+        $recentSemester = Semester::where('is_archived', false)
+            ->orderBy('start_date', 'desc')
+            ->first();
+
+        if ($recentSemester) {
+            Log::warning('No current semester found, using most recent semester', [
+                'semester_id' => $recentSemester->id,
+                'semester_name' => $recentSemester->name,
+                'current_date' => $now->toDateString()
+            ]);
+            return $recentSemester;
+        }
+
+        Log::error('No semester available for timetable', [
+            'current_date' => $now->toDateString(),
+            'total_semesters' => Semester::count()
+        ]);
+        return null;
     }
 
     /**
      * Get empty timetable structure
      */
-    protected function getEmptyTimetable(): array
+    protected function getEmptyTimetable(?string $reason = null): array
     {
         $emptyDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
         $emptySchedule = [];
@@ -414,6 +462,7 @@ class TimetableService
 
         return [
             'semester' => null,
+            'message' => $reason ?? 'No timetable data available',
             'weekly_schedule' => $emptySchedule,
             'schedule_summary' => [
                 'overview' => [
