@@ -1,4 +1,5 @@
 import { BadgeVariants } from '@/components/ui/badge';
+import { EmergencyContactStatus } from '@/types/student';
 
 export interface Specialization {
     id: number;
@@ -221,6 +222,7 @@ export enum StudentStatus {
     Pending = 'pending',
 }
 
+
 export interface Student {
     id: number;
     student_id: string;
@@ -240,9 +242,16 @@ export interface Student {
     high_school_name: string;
     high_school_graduation_year: string;
     entrance_exam_score?: string;
+
     emergency_contact_name?: string;
+    emergency_contact_email?: string;
     emergency_contact_phone?: string;
-    emergency_contact_relationship?: string;
+    emergency_contact_relationship?: EmergencyContactStatus;
+
+    emergency_contact_name_1?: string;
+    emergency_contact_email_1?: string;
+    emergency_contact_phone_1?: string;
+    emergency_contact_relationship_1?: EmergencyContactStatus;
 
     // Relationships
     campus_id: number;
@@ -325,9 +334,15 @@ export interface StudentOverview {
         status_reason?: string;
         avatar_url?: string;
         cccd_address: string;
-        emergency_contact_name: string;
-        emergency_contact_phone: string;
-        emergency_contact_relationship: string;
+        emergency_contact_name: string | null;
+        emergency_contact_phone: string | null;
+        emergency_contact_email: string | null;
+        emergency_contact_relationship: string | null;
+
+        emergency_contact_name_1: string | null;
+        emergency_contact_phone_1: string | null;
+        emergency_contact_email_1: string | null;
+        emergency_contact_relationship_1: string | null;
     };
     program_info: {
         campus?: {
@@ -351,6 +366,10 @@ export interface StudentOverview {
             version: string;
             version_code: string;
         };
+        semester?: {
+            code: string
+            intake_year: string;
+        }
     };
     academic_stats: {
         total_registrations: number;

@@ -59,9 +59,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name(StudentRoutes::DESTROY);
 
     // Additional student management actions
-    Route::post('students/{student}/assign-program', [StudentController::class, 'assignProgram'])
-        ->middleware('can:edit_student')
-        ->name(StudentRoutes::ASSIGN_PROGRAM);
+//    Route::post('students/{student}/assign-program', [StudentController::class, 'assignProgram'])
+//        ->middleware('can:edit_student')
+//        ->name(StudentRoutes::ASSIGN_PROGRAM);
 
     Route::post('students/{student}/update-status', [StudentController::class, 'updateStatus'])
         ->middleware('can:edit_student')
