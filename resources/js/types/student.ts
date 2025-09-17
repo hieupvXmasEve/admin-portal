@@ -47,3 +47,21 @@ export function getStudentStatusBadgeClass(status: string): string {
     const s = status as StudentStatus;
     return STUDENT_STATUS_BADGE_CLASSES[s] ?? 'bg-gray-100 text-gray-800';
 }
+
+export enum EmergencyContactStatus {
+    DAD = "dad",
+    MOM = "mom",
+    BROTHER = "brother",
+    SISTER = "sister",
+    GUARDIAN = "guardian",
+    SPOUSE = "spouse",
+    GRANDPARENT = "grandparent",
+    UNCLE = "uncle",
+    AUNT = "aunt",
+    COUSIN = "cousin",
+    OTHER = "other",
+}
+export const relationshipOptions = Object.entries(EmergencyContactStatus).map(([key, value]) => ({
+    label: key.charAt(0).toUpperCase() + key.slice(1).toLowerCase(), // Ví dụ: "DAD" → "Dad"
+    value,
+}))

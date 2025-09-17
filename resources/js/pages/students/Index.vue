@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useGlobalConfirmDialog } from '@/composables';
-import { useApi } from '@/composables/useApiRequest';
+import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
 import type { CourseOffering, Program, Student } from '@/types/models';
 import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
@@ -63,13 +63,14 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log(props.students);
 
 // Global confirm dialog composable
 const confirmDialog = useGlobalConfirmDialog();
 
 // API composable
-const api = useApi();
+
+// Student impersonation composable
+const { loginAsStudent } = useStudentImpersonation();
 
 // Export state
 const showExportDialog = ref(false);
@@ -84,10 +85,10 @@ const data = computed(() => props.students.data);
 
 const filters = ref({
     search: props.filters.search || '',
-    campus_id: props.filters.campus_id ? props.filters.campus_id.toString() : 'all',
-    program_id: props.filters.program_id ? props.filters.program_id.toString() : 'all',
-    status: props.filters.status || 'all',
-    course_offering_id: props.filters.course_offering_id ? props.filters.course_offering_id.toString() : 'all',
+    campus_id: props.filters?.campus_id ? props.filters.campus_id.toString() : 'all',
+    program_id: props.filters?.program_id ? props.filters.program_id.toString() : 'all',
+    status: props.filters?.status || 'all',
+    course_offering_id: props.filters?.course_offering_id ? props.filters.course_offering_id.toString() : 'all',
 });
 
 // Column definitions with h function
@@ -222,60 +223,6 @@ const deleteStudent = (student: Student) => {
             },
         });
     });
-};
-
-// Login as student functionality using admin impersonation API
-const loginAsStudent = async (student: Student) => {
-    try {
-        // Show confirmation dialog first
-        if (!confirm(`Are you sure you want to log in as ${student.full_name}?\n\nThis will open the student portal in a new tab with their account.`)) {
-            return;
-        }
-
-        // Use the dedicated admin impersonation API endpoint
-        const { data } = await api.post('/api/students/impersonate', {
-            email: student.email, // Can also use student_id
-            device_name: 'Admin Portal - Student Impersonation',
-            purpose: 'support' // Track why we're impersonating
-        });
-        console.log('%c data', 'color: red', data);
-
-        if (data?.value?.success) {
-            // Get the student portal URL from environment
-            const studentPortalUrl = import.meta.env.VITE_APP_URL_FE || 'http://localhost:3000';
-
-            // Open student portal in new tab with token as query parameter
-            const portalUrl = `${studentPortalUrl}?access_token=${encodeURIComponent(data.value.data.token)}&redirect=dashboard`;
-
-            window.open(portalUrl, '_blank');
-
-            toast.success(`Successfully logged in as ${student.full_name}. Token expires in 2 hours.`);
-        } else {
-            toast.error(data?.value?.message || 'Failed to impersonate student');
-        }
-    } catch (error: any) {
-        console.error('Student impersonation error:', error);
-        let errorMessage = 'Failed to impersonate student';
-
-        if (error.data?.message) {
-            errorMessage = error.data.message;
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
-
-        // Handle specific error cases
-        if (error.response?.status === 403) {
-            errorMessage = 'You do not have permission to impersonate students. Please contact your administrator.';
-        } else if (error.response?.status === 404) {
-            errorMessage = 'Student not found or not available for impersonation.';
-        } else if (errorMessage.includes('inactive student')) {
-            errorMessage = 'Cannot impersonate inactive student. Please check the student status.';
-        } else if (errorMessage.includes('academic holds')) {
-            errorMessage = 'Cannot impersonate student due to active academic holds.';
-        }
-
-        toast.error(errorMessage);
-    }
 };
 
 // Pagination handlers

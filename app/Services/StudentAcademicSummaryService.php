@@ -7,9 +7,11 @@ namespace App\Services;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\Attendance;
 use App\Models\CourseOffering;
+use App\Models\CurriculumVersion;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -47,9 +49,10 @@ class StudentAcademicSummaryService
                 'campus:id,name,code',
                 'program:id,name,code',
                 'specialization:id,name,code',
-                'curriculumVersion:id,version_code,program_id,specialization_id',
+                'curriculumVersion:id,version_code,program_id,specialization_id,semester_id',
                 'curriculumVersion.program:id,name,code',
                 'curriculumVersion.specialization:id,name,code',
+                'curriculumVersion.effectiveFromSemester:id,start_date,code',
             ])->findOrFail($studentId);
 
             // Extract specific filters for each section
@@ -144,8 +147,14 @@ class StudentAcademicSummaryService
                 'avatar_url' => $student->avatar_url,
 
                 'emergency_contact_name' => $student->emergency_contact_name,
+                'emergency_contact_email' => $student->emergency_contact_email,
                 'emergency_contact_phone' => $student->emergency_contact_phone,
                 'emergency_contact_relationship' => $student->emergency_contact_relationship,
+
+                'emergency_contact_name_1' => $student->emergency_contact_name_1,
+                'emergency_contact_email_1' => $student->emergency_contact_email_1,
+                'emergency_contact_phone_1' => $student->emergency_contact_phone_1,
+                'emergency_contact_relationship_1' => $student->emergency_contact_relationship_1,
 
                 'high_school_name' => $student->high_school_name,
 
@@ -174,6 +183,11 @@ class StudentAcademicSummaryService
                     'specialization_name' => $student->curriculumVersion->specialization?->name,
                     'specialization_code' => $student->curriculumVersion->specialization?->code,
                 ] : null,
+                'semester' => [
+                    'code' => $student->curriculumVersion->effectiveFromSemester?->code,
+                    'intake_year' => Carbon::parse($student->curriculumVersion->effectiveFromSemester?->start_date)->year,
+                ]
+
             ],
             'academic_stats' => [
                 'total_registrations' => $student->courseRegistrations()->count(),
@@ -193,11 +207,6 @@ class StudentAcademicSummaryService
                 'academic_standing' => $currentGpa?->academic_standing ?? 'unknown',
                 'active_holds' => $student->academicHolds()->where('status', 'active')->count(),
                 'retake_courses' => $student->courseRegistrations()->where('is_retake', true)->count(),
-            ],
-            'emergency_contact' => [
-                'name' => $student->emergency_contact_name,
-                'phone' => $student->emergency_contact_phone,
-                'relationship' => $student->emergency_contact_relationship,
             ],
             'additional_info' => [
                 'high_school_name' => $student->high_school_name,

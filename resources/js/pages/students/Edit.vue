@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { Campus, CurriculumVersion, Program, Specialization, Student } from '@/types/models';
+import { relationshipOptions } from '@/types/student';
 import { ValidationRules } from '@/types/validation';
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
@@ -46,7 +47,12 @@ const formSchema = toTypedSchema(
         expected_graduation_date: z.string().optional(),
         emergency_contact_name: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
         emergency_contact_phone: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
+        emergency_contact_email: z.string().optional(),
         emergency_contact_relationship: z.string().max(100, 'Emergency contact relationship is too long').optional(),
+        emergency_contact_name_1: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
+        emergency_contact_phone_1: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
+        emergency_contact_email_1: z.string().optional(),
+        emergency_contact_relationship_1: z.string().max(100, 'Emergency contact relationship is too long').optional(),
         high_school_name: z.string().max(ValidationRules.student.highSchoolName.maxLength, 'High school name is too long').optional(),
         high_school_graduation_year: z.string().optional(),
         entrance_exam_score: z.string().optional(),
@@ -74,6 +80,7 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         admission_date: props.student.admission_date || '',
         emergency_contact_name: props.student.emergency_contact_name || '',
         emergency_contact_phone: props.student.emergency_contact_phone || '',
+        emergency_contact_email: props.student.emergency_contact_email || '',
         emergency_contact_relationship: props.student.emergency_contact_relationship || '',
         high_school_name: props.student.high_school_name || '',
         high_school_graduation_year: props.student.high_school_graduation_year?.toString() || '',
@@ -173,12 +180,16 @@ const onSubmit = handleSubmit((formData) => {
         address: formData.address || null,
         expected_graduation_date: formData.expected_graduation_date || null,
         emergency_contact_name: formData.emergency_contact_name || null,
+        emergency_contact_email: formData.emergency_contact_email || null,
         emergency_contact_phone: formData.emergency_contact_phone || null,
         emergency_contact_relationship: formData.emergency_contact_relationship || null,
+        emergency_contact_name_1: formData.emergency_contact_name_1 || null,
+        emergency_contact_email_1: formData.emergency_contact_email_1 || null,
+        emergency_contact_phone_1: formData.emergency_contact_phone_1 || null,
+        emergency_contact_relationship_1: formData.emergency_contact_relationship_1 || null,
         high_school_name: formData.high_school_name || null,
         admission_notes: formData.admission_notes || null,
     };
-
     router.put(route('students.update', props.student.id), submitData, {
         onSuccess: () => {
             toast.success('Student updated successfully');
@@ -520,37 +531,110 @@ const handleAvatarUploaded = (avatarData: any) => {
                     Emergency Contact
                 </CardTitle>
             </CardHeader>
-            <CardContent class="space-y-4">
-                <FormField v-slot="{ componentField }" name="emergency_contact_name">
-                    <FormItem>
-                        <FormLabel>Contact Name</FormLabel>
-                        <FormControl>
-                            <Input v-bind="componentField" placeholder="Enter emergency contact name" />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                </FormField>
+            <CardContent class="">
+                <div class="space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-4 gap-2">
+                        <FormField v-slot="{ componentField }" name="emergency_contact_name">
+                            <FormItem>
+                                <FormLabel>Contact Name</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter emergency contact name" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField v-slot="{ componentField }" name="emergency_contact_phone">
-                        <FormItem>
-                            <FormLabel>Contact Phone</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="Enter emergency contact phone" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                        <FormField v-slot="{ componentField }" name="emergency_contact_phone">
+                            <FormItem>
+                                <FormLabel>Contact Phone</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter emergency contact phone" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                    <FormField v-slot="{ componentField }" name="emergency_contact_relationship">
-                        <FormItem>
-                            <FormLabel>Relationship</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="e.g., Parent, Guardian, Spouse" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                        <FormField v-slot="{ componentField }" name="emergency_contact_email">
+                            <FormItem>
+                                <FormLabel>Contact Email</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter emergency contact email" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+
+                        <FormField v-slot="{ componentField }" name="emergency_contact_relationship">
+                            <FormItem>
+                                <FormLabel>Relationship</FormLabel>
+                                <Select v-bind="componentField">
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select relationship" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem v-for="version in relationshipOptions" :key="version.value" :value="version.value">
+                                            {{ version.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
+                    <div class="space-y-4 gap-2">
+                        <FormField v-slot="{ componentField }" name="emergency_contact_name_1">
+                            <FormItem>
+                                <FormLabel>Contact Name 2</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter emergency contact name 1" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="emergency_contact_phone_1">
+                            <FormItem>
+                                <FormLabel>Contact Phone 2</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter emergency contact phone 1" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="emergency_contact_email_1">
+                            <FormItem>
+                                <FormLabel>Contact Email 2</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter emergency contact email 1" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+
+                        <FormField v-slot="{ componentField }" name="emergency_contact_relationship_1">
+                            <FormItem>
+                                <FormLabel>Relationship 2</FormLabel>
+                                <Select v-bind="componentField">
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select relationship" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem v-for="version in relationshipOptions" :key="version.value" :value="version.value">
+                                            {{ version.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
                 </div>
             </CardContent>
         </Card>

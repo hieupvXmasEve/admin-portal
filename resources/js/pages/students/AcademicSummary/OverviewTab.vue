@@ -16,7 +16,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
 });
-console.log('%c props', 'color: red', props.overview.student_info);
+console.log('%c props overview', 'color: red', props.overview);
 // Status badge styling
 const getStatusBadgeVariant = (status: string) => {
     const variants: Record<string, string> = {
@@ -299,21 +299,44 @@ const hasAcademicConcerns = computed(() => {
                                         <p class="font-medium">{{ overview.student_info.address || 'N/A' }}</p>
                                     </div>
                                 </div>
-                            </div> <div class="pt-4">
-                                <Separator class="mb-4" />
+                            </div> <div class="pt-4 space-y-4">
+                                <Separator />
                                 <div class="flex items-start gap-3">
                                     <User class="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0" />
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-muted-foreground text-sm">Emergency Name</p>
+                                        <p class="text-muted-foreground text-sm">Emergency Name 1</p>
                                         <p class="font-medium">{{ overview.student_info.emergency_contact_name || 'N/A' }}</p>
                                     </div>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-muted-foreground text-sm">Emergency Phone</p>
+                                        <p class="text-muted-foreground text-sm">Emergency Phone 1</p>
                                         <p class="font-medium">{{ overview.student_info.emergency_contact_phone || 'N/A' }}</p>
                                     </div>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-muted-foreground text-sm">Emergency Relationship</p>
+                                        <p class="text-muted-foreground text-sm">Emergency Email 1</p>
+                                        <p class="font-medium">{{ overview.student_info.emergency_contact_email || 'N/A' }}</p>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-muted-foreground text-sm">Emergency Relationship 1</p>
                                         <Badge class="uppercase">{{ overview.student_info.emergency_contact_relationship || 'N/A' }}</Badge>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <User class="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0" />
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-muted-foreground text-sm">Emergency Name 2</p>
+                                        <p class="font-medium">{{ overview.student_info.emergency_contact_name_1 || 'N/A' }}</p>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-muted-foreground text-sm">Emergency Phone 2</p>
+                                        <p class="font-medium">{{ overview.student_info.emergency_contact_phone_1 || 'N/A' }}</p>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-muted-foreground text-sm">Emergency Email 2</p>
+                                        <p class="font-medium">{{ overview.student_info.emergency_contact_email_1 || 'N/A' }}</p>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-muted-foreground text-sm">Emergency Relationship 2</p>
+                                        <Badge class="uppercase">{{ overview.student_info.emergency_contact_relationship_1 || 'N/A' }}</Badge>
                                     </div>
                                 </div>
                             </div>
@@ -362,8 +385,16 @@ const hasAcademicConcerns = computed(() => {
                                 <BookOpen class="text-muted-foreground h-4 w-4 flex-shrink-0" />
                                 <div class="min-w-0 flex-1">
                                     <p class="text-muted-foreground text-sm">Curriculum Version</p>
-                                    <p class="font-medium">{{ overview.program_info.curriculum_version.name }}</p>
-                                    <p class="text-muted-foreground text-xs">{{ overview.program_info.curriculum_version.version_code }}</p>
+                                    <p class="font-medium">{{ overview.program_info.curriculum_version.version_code }}</p>
+                                </div>
+                            </div>
+
+                            <div v-if="overview.program_info.semester" class="flex items-center gap-3">
+                                <BookOpen class="text-muted-foreground h-4 w-4 flex-shrink-0" />
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-muted-foreground text-sm">Intake Year</p>
+                                    <p class="font-medium">{{ overview.program_info.semester.code }}</p>
+                                    <p class="font-medium">{{ overview.program_info.semester.intake_year }}</p>
                                 </div>
                             </div>
 

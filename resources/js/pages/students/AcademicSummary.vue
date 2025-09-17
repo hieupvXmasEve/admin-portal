@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Student, StudentAcademicSummary } from '@/types/models';
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
-import { ArrowLeft, BarChart3, BookOpen, Download, GraduationCap, Target, User, Users } from 'lucide-vue-next';
+import { ArrowLeft, BarChart3, BookOpen, Download, GraduationCap, Target, User, Users, LogIn, Edit } from 'lucide-vue-next';
 import { ref } from 'vue';
 import AttendanceTab from './AcademicSummary/AttendanceTab.vue';
 import GpaTab from './AcademicSummary/GpaTab.vue';
@@ -14,6 +14,8 @@ import GraduationTab from './AcademicSummary/GraduationTab.vue';
 import OverviewTab from './AcademicSummary/OverviewTab.vue';
 import RegistrationsTab from './AcademicSummary/RegistrationsTab.vue';
 import ScoresTab from './AcademicSummary/ScoresTab.vue';
+import { toast } from 'vue-sonner';
+import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
 
 interface Props {
     student: Student;
@@ -21,6 +23,9 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// Student impersonation composable
+const { loginAsStudent } = useStudentImpersonation();
 
 // Tab state management with URL parameters
 const validTabs = ['overview', 'registrations', 'scores', 'attendance', 'gpa', 'graduation'] as const;
@@ -74,8 +79,11 @@ const goBack = () => {
 const exportSummary = () => {
     // TODO: Implement export functionality
     console.log('Export academic summary for student:', props.student.id);
+    toast.warning('The feature is coming soon!')
 };
-
+const editStudent = (student: Student) => {
+    router.visit(studentRoutes.edit(student.id));
+};
 const getStatusBadgeVariant = (status: string) => {
     const variants: Record<string, string> = {
         admitted: 'secondary',
@@ -119,6 +127,14 @@ const formatStatus = (status: string) => {
                 </div>
 
                 <div class="flex items-center gap-2">
+                    <Button variant="outline" size="sm" @click="() => loginAsStudent(student)" class="flex items-center gap-2">
+                        <LogIn class="h-4 w-4" />
+                        Login as student
+                    </Button>
+                    <Button variant="outline" size="sm" @click="() => editStudent(student)" class="flex items-center gap-2">
+                        <Edit class="h-4 w-4" />
+                        Edit
+                    </Button>
                     <Button variant="outline" size="sm" @click="exportSummary" class="flex items-center gap-2">
                         <Download class="h-4 w-4" />
                         Export
