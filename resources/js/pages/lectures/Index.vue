@@ -11,10 +11,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { PaginatedResponse } from '@/types';
 import type { Lecture } from '@/types/models';
 import { lecturerRoutes } from '@/utils/routes';
+import { useApi } from '@/composables/useApiRequest';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
-import { Building2, Edit, Eye, Plus, Search, Trash2 } from 'lucide-vue-next';
+import { Building2, Edit, Eye, LogIn, Plus, Search, Trash2 } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -111,6 +112,61 @@ const goToEditPage = (lecture: Lecture) => {
 
 const goToViewPage = (lecture: Lecture) => {
     router.visit(lecturerRoutes.show(lecture.id));
+};
+
+// Initialize API composable
+const api = useApi();
+
+// Login as lecturer functionality using admin impersonation API
+const loginAsLecturer = async (lecture: Lecture) => {
+    try {
+        // Show confirmation dialog first
+        if (!confirm(`Are you sure you want to log in as ${lecture.display_name}?\n\nThis will open the lecturer portal in a new tab with their account.`)) {
+            return;
+        }
+
+        // Use the dedicated admin impersonation API endpoint
+        const { data } = await api.post('/api/lecturers/impersonate', {
+            email: lecture.email, // Can also use employee_id
+            device_name: 'Admin Portal - Lecturer Impersonation',
+            purpose: 'support' // Track why we're impersonating
+        });
+        console.log('%c data', 'color: red', data);
+
+        if (data?.value?.success) {
+            // Get the lecturer portal URL from environment
+            const lecturerPortalUrl = import.meta.env.VITE_APP_URL_FE_LECTURE || 'http://localhost:3001';
+
+            // Open lecturer portal in new tab with token as query parameter
+            const portalUrl = `${lecturerPortalUrl}/admin-login?access_token=${encodeURIComponent(data.value.data.token)}&redirect=dashboard`;
+            // http://localhost:3000/lecturer?access_token=1129%7CuNT8H54UJ2EgSvhoz3VUr0gg0GdX2MJ27r9L0PUzeab38137&redirect=dashboard
+            window.open(portalUrl, '_blank');
+
+            toast.success(`Successfully logged in as ${lecture.display_name}. Token expires in 2 hours.`);
+        } else {
+            toast.error(data?.value?.message || 'Failed to impersonate lecturer');
+        }
+    } catch (error: any) {
+        console.error('Lecturer impersonation error:', error);
+        let errorMessage = 'Failed to impersonate lecturer';
+
+        if (error.data?.message) {
+            errorMessage = error.data.message;
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        // Handle specific error cases
+        if (error.response?.status === 403) {
+            errorMessage = 'You do not have permission to impersonate lecturers. Please contact your administrator.';
+        } else if (error.response?.status === 404) {
+            errorMessage = 'Lecturer not found or not available for impersonation.';
+        } else if (errorMessage.includes('inactive lecturer')) {
+            errorMessage = 'Cannot impersonate inactive lecturer. Please check the lecturer status.';
+        }
+
+        toast.error(errorMessage);
+    }
 };
 
 const handlePaginationNavigate = (url: string) => {
@@ -356,6 +412,18 @@ const columns: ColumnDef<Lecture>[] = [
                             </TooltipTrigger>
                             <TooltipContent>
                                 <p>View Lecturer</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider :delay-duration="0">
+                        <Tooltip>
+                            <TooltipTrigger as-child>
+                                <Button variant="ghost" size="sm" @click="loginAsLecturer(row.original)" :disabled="!(row.original.is_active && row.original.employment_status === 'active')">
+                                    <LogIn class="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{{ (row.original.is_active && row.original.employment_status === 'active') ? 'Login as Lecturer' : 'Cannot login - Lecturer inactive' }}</p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
