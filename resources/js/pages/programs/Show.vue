@@ -71,16 +71,6 @@ const props = defineProps<{
 // API composable
 const api = useApi();
 
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Programs',
-        href: '/programs',
-    },
-    {
-        title: props.program.name,
-        href: `/programs/${props.program.id}`,
-    },
-];
 
 // Filters and pagination
 const specializationFilters = ref({

@@ -20,7 +20,9 @@ use Inertia\Response;
 
 class ProgramController extends Controller
 {
-    public function __construct(protected ProgramService $programService) {}
+    public function __construct(protected ProgramService $programService)
+    {
+    }
 
     public function index(Request $request): Response
     {
@@ -31,28 +33,19 @@ class ProgramController extends Controller
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
-        $page = (int) $request->query('page', 1);
+        $page = (int)$request->query('page', 1);
 
-        $cacheKey = 'programs:index:'.md5(json_encode([
-            'page' => $page,
-            'per_page' => $validated['per_page'] ?? 15,
-            'search' => $validated['search'] ?? null,
-            'sort' => $validated['sort'] ?? null,
-            'direction' => $validated['direction'] ?? 'asc',
-        ]));
-        $programs = Cache::tags(['programs', 'programs.index'])->rememberForever($cacheKey, function () use ($validated, $page) {
-            return Program::query()
-                ->when($validated['search'] ?? null, function ($query, $search) {
-                    $query->where('name', 'like', "%{$search}%");
-                })
-                ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
-                    $direction = $validated['direction'] ?? 'asc';
-                    $query->orderBy($sort, $direction);
-                })
-                ->orderBy('created_at', 'desc')
-                ->withCount(['specializations', 'curriculumVersions'])
-                ->paginate($validated['per_page'] ?? 15, ['*'], 'page', $page);
-        })->withQueryString();
+        $programs = Program::query()
+            ->when($validated['search'] ?? null, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
+            ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
+                $direction = $validated['direction'] ?? 'asc';
+                $query->orderBy($sort, $direction);
+            })
+            ->orderBy('created_at', 'desc')
+            ->withCount(['specializations', 'curriculumVersions'])
+            ->paginate($validated['per_page'] ?? 15, ['*'], 'page', $page);
 
         return Inertia::render('programs/Index', [
             'programs' => $programs,
@@ -87,32 +80,28 @@ class ProgramController extends Controller
 
     public function show(Program $program): Response
     {
-        [$cachedProgram, $stats] = Cache::tags(['programs', 'programs.show'])
-            ->rememberForever("programs:show:{$program->id}", function () use ($program) {
-                $prog = $program->fresh()->load([
-                    'specializations' => function ($query) {
-                        $query->withCount('curriculumVersions')
-                            ->orderBy('name');
-                    },
-                    'curriculumVersions' => function ($query) {
-                        $query->with(['specialization', 'effectiveFromSemester'])
-                            ->withCount('curriculumUnits')
-                            ->orderBy('created_at', 'desc');
-                    },
-                ]);
+        $prog = $program->fresh()->load([
+            'specializations' => function ($query) {
+                $query->withCount('curriculumVersions')
+                    ->orderBy('name');
+            },
+            'curriculumVersions' => function ($query) {
+                $query->with(['specialization', 'effectiveFromSemester'])
+                    ->withCount('curriculumUnits')
+                    ->orderBy('created_at', 'desc');
+            },
+        ]);
 
-                $statsLocal = [
-                    'totalSpecializations' => $prog->specializations()->count(),
-                    'activeSpecializations' => $prog->activeSpecializations()->count(),
-                    'totalCurriculumVersions' => $prog->curriculumVersions()->count(),
-                ];
+        $statsLocal = [
+            'totalSpecializations' => $prog->specializations()->count(),
+            'activeSpecializations' => $prog->activeSpecializations()->count(),
+            'totalCurriculumVersions' => $prog->curriculumVersions()->count(),
+        ];
 
-                return [$prog, $statsLocal];
-            });
 
         return Inertia::render('programs/Show', [
-            'program' => $cachedProgram,
-            'stats' => $stats,
+            'program' => $prog,
+            'stats' => $statsLocal,
         ]);
     }
 
