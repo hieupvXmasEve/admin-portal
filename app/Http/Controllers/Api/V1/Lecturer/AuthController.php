@@ -6,9 +6,11 @@ namespace App\Http\Controllers\Api\V1\Lecturer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\LoginRequest;
+use App\Http\Requests\Api\V1\Student\GoogleLoginRequest;
 use App\Http\Resources\Api\V1\Lecturer\LecturerResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Lecture;
+use Google\Client;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -155,27 +157,36 @@ class AuthController extends Controller
     /**
      * Lecturer Google OAuth Login
      */
-    public function loginWithGoogle(Request $request): JsonResponse
+    public function loginWithGoogle(GoogleLoginRequest $request): JsonResponse
     {
-        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
-            'access_token' => 'required|string',
-            'device_name' => 'nullable|string|max:255',
-        ]);
-
-        if ($validator->fails()) {
-            return ApiResponse::validationError($validator->errors());
-        }
+        // Rate limiting for Google OAuth attempts
+//        $key = 'google-login:' . $request->ip();
 
         try {
-            // Validate Google access token
-            $response = Http::withToken($request->access_token)
-                ->get('https://www.googleapis.com/oauth2/v1/userinfo');
 
-            if ($response->failed()) {
-                return ApiResponse::authenticationError('Invalid Google access token');
+            $client = new Client([
+                'client_id' => config('services.google.client_id'),
+            ]);
+
+            // Verify the ID token
+            $payload = $client->verifyIdToken($request->id_token);
+
+            if (!$payload) {
+//                RateLimiter::hit($key, 300); // 5 minutes
+                Log::warning('[StudentAuth] Google ID token verification failed', [
+                    'ip' => $request->ip(),
+                ]);
+                return ApiResponse::authenticationError('Invalid Google ID token');
             }
 
-            $googleUserData = $response->json();
+            // Extract user data from the verified payload
+            $googleUserData = [
+                'id' => $payload['sub'],
+                'email' => $payload['email'] ?? null,
+                'name' => $payload['name'] ?? null,
+                'picture' => $payload['picture'] ?? null,
+                'email_verified' => $payload['email_verified'] ?? false,
+            ];
 
             if (! $googleUserData || ! isset($googleUserData['email'])) {
                 return ApiResponse::authenticationError('Unable to retrieve user information from Google');
@@ -213,7 +224,8 @@ class AuthController extends Controller
 
             // Create token
             $deviceName = $request->device_name ?? 'Lecturer Portal (Google)';
-            $token = $lecturer->createToken($deviceName, ['lecturer:access'])->plainTextToken;
+            $expiresAt = $request->remember_me ? now()->addDays(30) : now()->addHours(8);
+            $token = $lecturer->createToken($deviceName, ['lecturer'], $expiresAt)->plainTextToken;
 
             return ApiResponse::success(
                 data: [

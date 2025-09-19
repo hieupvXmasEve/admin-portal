@@ -19,15 +19,32 @@ class LecturerDashboardService
         $semester = $semesterId ? Semester::find($semesterId) : Semester::getActiveSemester();
         $cacheKey = "lecturer-dashboard:{$lecturer->id}:{$semester?->id}";
 
+        // If no semester is found, return empty data structure
+        if (!$semester) {
+            Log::info('No semester found for lecturer dashboard', [
+                'lecturer_id' => $lecturer->id,
+                'requested_semester_id' => $semesterId
+            ]);
+            
+            return [
+                'semester' => null,
+                'teaching_summary' => $this->getEmptyTeachingSummary(),
+                'attendance_overview' => $this->getEmptyAttendanceOverview(),
+                'student_alerts' => $this->getEmptyStudentAlerts(),
+                'upcoming_sessions' => [],
+                'recent_activities' => [],
+            ];
+        }
+
 //        return Cache::remember($cacheKey, 0, function () use ($lecturer, $semester) {
             return [
-                'semester' => $semester ? [
+                'semester' => [
                     'id' => $semester->id,
                     'name' => $semester->name,
                     'code' => $semester->code,
                     'start_date' => $semester->start_date?->format('Y-m-d'),
                     'end_date' => $semester->end_date?->format('Y-m-d'),
-                ] : null,
+                ],
                 'teaching_summary' => $this->getTeachingSummary($lecturer, $semester),
                 'attendance_overview' => $this->getAttendanceOverview($lecturer, $semester),
                 'student_alerts' => $this->getStudentAlerts($lecturer, $semester),
@@ -42,17 +59,22 @@ class LecturerDashboardService
      */
     public function getTeachingSummary(Lecture $lecturer, ?Semester $semester): array
     {
+        // If no semester provided, return empty structure
+        if (!$semester) {
+            Log::info('No semester provided for teaching summary', [
+                'lecturer_id' => $lecturer->id
+            ]);
+            return $this->getEmptyTeachingSummary();
+        }
+
         // Use class session based logic instead of direct course offering relationship
         $query = \App\Models\CourseOffering::query()
             ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
                 $sessionQuery->where('lecture_id', $lecturer->id);
             })
             ->where('campus_id', $lecturer->campus_id)
-            ->where('is_active', true);
-
-        if ($semester) {
-            $query->where('semester_id', $semester->id);
-        }
+            ->where('is_active', true)
+            ->where('semester_id', $semester->id);
 
         $courseOfferings = $query->with([
             'unit', 
@@ -100,14 +122,19 @@ class LecturerDashboardService
      */
     public function getAttendanceOverview(Lecture $lecturer, ?Semester $semester): array
     {
-        $sessionsQuery = $lecturer->classSessions()
-            ->with(['courseOffering.unit', 'attendances']);
+        // If no semester provided, return empty structure
+        if (!$semester) {
+            Log::info('No semester provided for attendance overview', [
+                'lecturer_id' => $lecturer->id
+            ]);
+            return $this->getEmptyAttendanceOverview();
+        }
 
-        if ($semester) {
-            $sessionsQuery->whereHas('courseOffering', function ($query) use ($semester) {
+        $sessionsQuery = $lecturer->classSessions()
+            ->with(['courseOffering.unit', 'attendances'])
+            ->whereHas('courseOffering', function ($query) use ($semester) {
                 $query->where('semester_id', $semester->id);
             });
-        }
 
         $sessions = $sessionsQuery->where('session_date', '<=', now())
             ->orderBy('session_date', 'desc')
@@ -149,6 +176,14 @@ class LecturerDashboardService
      */
     public function getStudentAlerts(Lecture $lecturer, ?Semester $semester): array
     {
+        // If no semester provided, return empty structure
+        if (!$semester) {
+            Log::info('No semester provided for student alerts', [
+                'lecturer_id' => $lecturer->id
+            ]);
+            return $this->getEmptyStudentAlerts();
+        }
+
         // Get students with low attendance (below 75%)
         $lowAttendanceStudents = $this->getLowAttendanceStudents($lecturer, $semester, 75);
 
@@ -300,5 +335,53 @@ class LecturerDashboardService
     {
         // Implementation would find students with consecutive absences
         return [];
+    }
+
+    /**
+     * Get empty teaching summary structure
+     */
+    private function getEmptyTeachingSummary(): array
+    {
+        return [
+            'total_courses' => 0,
+            'total_students' => 0,
+            'total_sessions' => 0,
+            'completed_sessions' => 0,
+            'pending_sessions' => 0,
+            'average_class_size' => 0,
+            'courses' => [],
+        ];
+    }
+
+    /**
+     * Get empty attendance overview structure
+     */
+    private function getEmptyAttendanceOverview(): array
+    {
+        return [
+            'total_sessions' => 0,
+            'sessions_with_attendance' => 0,
+            'pending_attendance_marking' => 0,
+            'average_attendance_rate' => 0,
+            'sessions_requiring_attention' => [],
+            'attendance_trends' => [
+                'weekly_average' => 0,
+                'trend' => 'stable',
+                'last_week_change' => 0,
+            ],
+        ];
+    }
+
+    /**
+     * Get empty student alerts structure
+     */
+    private function getEmptyStudentAlerts(): array
+    {
+        return [
+            'total_alerts' => 0,
+            'low_attendance_students' => [],
+            'recently_absent_students' => [],
+            'critical_alerts' => [],
+        ];
     }
 }

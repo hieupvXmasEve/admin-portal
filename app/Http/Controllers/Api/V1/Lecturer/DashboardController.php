@@ -30,13 +30,36 @@ class DashboardController extends Controller
 
         try {
             $filters = $request->validated();
-            //            $semesterId = $filters['semester_id'] ?? null;
-            //            Get semester has is_active is true
-            $semesterId = Semester::firstWhere('is_active', true)->id;
-            Log::info('$semesterId ', [
-                'semester id' => $semesterId,
-                '$lecturer' => $lecturer
+            
+            // Get active semester or use provided semester_id
+            $activeSemester = Semester::firstWhere('is_active', true);
+            $semesterId = $filters['semester_id'] ?? $activeSemester?->id;
+            
+            Log::info('Dashboard request details', [
+                'semester_id' => $semesterId,
+                'active_semester_found' => $activeSemester !== null,
+                'lecturer_id' => $lecturer->id
             ]);
+            
+            // Handle case when no active semester exists and no semester_id provided
+            if (!$semesterId) {
+                Log::warning('No active semester found and no semester_id provided for lecturer dashboard', [
+                    'lecturer_id' => $lecturer->id
+                ]);
+                
+                return ApiResponse::success(
+                    data: [
+                        'semester' => null,
+                        'teaching_summary' => $this->getEmptyTeachingSummary(),
+                        'attendance_overview' => $this->getEmptyAttendanceOverview(),
+                        'student_alerts' => $this->getEmptyStudentAlerts(),
+                        'upcoming_sessions' => [],
+                        'recent_activities' => [],
+                    ],
+                    message: 'No active semester found. Dashboard showing empty data.'
+                );
+            }
+            
             $dashboardData = $this->dashboardService->getDashboardData($lecturer, $semesterId);
 
             return ApiResponse::success(
@@ -44,7 +67,11 @@ class DashboardController extends Controller
                 message: 'Dashboard data retrieved successfully'
             );
         } catch (\Exception $e) {
-            Log::error($e->getMessage());
+            Log::error('Dashboard data retrieval failed', [
+                'error' => $e->getMessage(),
+                'lecturer_id' => $lecturer->id,
+                'stack_trace' => $e->getTraceAsString()
+            ]);
             return ApiResponse::serverError('Failed to retrieve dashboard data');
         }
     }
@@ -61,6 +88,19 @@ class DashboardController extends Controller
             $semesterId = $request->query('semester_id');
             $semester = $semesterId ? \App\Models\Semester::find($semesterId) : \App\Models\Semester::getActiveSemester();
 
+            // Handle case when no semester is found
+            if (!$semester) {
+                Log::info('No semester found for teaching summary', [
+                    'requested_semester_id' => $semesterId,
+                    'lecturer_id' => $lecturer->id
+                ]);
+                
+                return ApiResponse::success(
+                    data: $this->getEmptyTeachingSummary(),
+                    message: 'No active semester found. Showing empty teaching summary.'
+                );
+            }
+
             $teachingSummary = $this->dashboardService->getTeachingSummary($lecturer, $semester);
 
             return ApiResponse::success(
@@ -68,6 +108,10 @@ class DashboardController extends Controller
                 message: 'Teaching summary retrieved successfully'
             );
         } catch (\Exception $e) {
+            Log::error('Teaching summary retrieval failed', [
+                'error' => $e->getMessage(),
+                'lecturer_id' => $lecturer->id
+            ]);
             return ApiResponse::serverError('Failed to retrieve teaching summary');
         }
     }
@@ -84,6 +128,19 @@ class DashboardController extends Controller
             $semesterId = $request->query('semester_id');
             $semester = $semesterId ? \App\Models\Semester::find($semesterId) : \App\Models\Semester::getActiveSemester();
 
+            // Handle case when no semester is found
+            if (!$semester) {
+                Log::info('No semester found for attendance overview', [
+                    'requested_semester_id' => $semesterId,
+                    'lecturer_id' => $lecturer->id
+                ]);
+                
+                return ApiResponse::success(
+                    data: $this->getEmptyAttendanceOverview(),
+                    message: 'No active semester found. Showing empty attendance overview.'
+                );
+            }
+
             $attendanceOverview = $this->dashboardService->getAttendanceOverview($lecturer, $semester);
 
             return ApiResponse::success(
@@ -91,6 +148,10 @@ class DashboardController extends Controller
                 message: 'Attendance overview retrieved successfully'
             );
         } catch (\Exception $e) {
+            Log::error('Attendance overview retrieval failed', [
+                'error' => $e->getMessage(),
+                'lecturer_id' => $lecturer->id
+            ]);
             return ApiResponse::serverError('Failed to retrieve attendance overview');
         }
     }
@@ -107,6 +168,19 @@ class DashboardController extends Controller
             $semesterId = $request->query('semester_id');
             $semester = $semesterId ? \App\Models\Semester::find($semesterId) : \App\Models\Semester::getActiveSemester();
 
+            // Handle case when no semester is found
+            if (!$semester) {
+                Log::info('No semester found for student alerts', [
+                    'requested_semester_id' => $semesterId,
+                    'lecturer_id' => $lecturer->id
+                ]);
+                
+                return ApiResponse::success(
+                    data: $this->getEmptyStudentAlerts(),
+                    message: 'No active semester found. Showing empty student alerts.'
+                );
+            }
+
             $studentAlerts = $this->dashboardService->getStudentAlerts($lecturer, $semester);
 
             return ApiResponse::success(
@@ -114,6 +188,10 @@ class DashboardController extends Controller
                 message: 'Student alerts retrieved successfully'
             );
         } catch (\Exception $e) {
+            Log::error('Student alerts retrieval failed', [
+                'error' => $e->getMessage(),
+                'lecturer_id' => $lecturer->id
+            ]);
             return ApiResponse::serverError('Failed to retrieve student alerts');
         }
     }
@@ -162,5 +240,53 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to retrieve recent activities');
         }
+    }
+
+    /**
+     * Get empty teaching summary structure
+     */
+    private function getEmptyTeachingSummary(): array
+    {
+        return [
+            'total_courses' => 0,
+            'total_students' => 0,
+            'total_sessions' => 0,
+            'completed_sessions' => 0,
+            'pending_sessions' => 0,
+            'average_class_size' => 0,
+            'courses' => [],
+        ];
+    }
+
+    /**
+     * Get empty attendance overview structure
+     */
+    private function getEmptyAttendanceOverview(): array
+    {
+        return [
+            'total_sessions' => 0,
+            'sessions_with_attendance' => 0,
+            'pending_attendance_marking' => 0,
+            'average_attendance_rate' => 0,
+            'sessions_requiring_attention' => [],
+            'attendance_trends' => [
+                'weekly_average' => 0,
+                'trend' => 'stable',
+                'last_week_change' => 0,
+            ],
+        ];
+    }
+
+    /**
+     * Get empty student alerts structure
+     */
+    private function getEmptyStudentAlerts(): array
+    {
+        return [
+            'total_alerts' => 0,
+            'low_attendance_students' => [],
+            'recently_absent_students' => [],
+            'critical_alerts' => [],
+        ];
     }
 }
