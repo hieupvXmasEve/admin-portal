@@ -225,6 +225,22 @@ class Student extends StudentAuditableModel
         return $this->hasMany(FormResponse::class, 'submitted_by_student_id');
     }
 
+    /**
+     * Get the student's wallet.
+     */
+    public function wallet(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StudentWallet::class);
+    }
+
+    /**
+     * Get the student's wallet transactions.
+     */
+    public function walletTransactions(): HasMany
+    {
+        return $this->hasMany(WalletTransaction::class);
+    }
+
     public function hasActiveHolds(): bool
     {
         return $this->academicHolds()->where('status', 'active')->exists();

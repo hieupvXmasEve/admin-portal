@@ -59,9 +59,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name(StudentRoutes::DESTROY);
 
     // Additional student management actions
-//    Route::post('students/{student}/assign-program', [StudentController::class, 'assignProgram'])
-//        ->middleware('can:edit_student')
-//        ->name(StudentRoutes::ASSIGN_PROGRAM);
+    //    Route::post('students/{student}/assign-program', [StudentController::class, 'assignProgram'])
+    //        ->middleware('can:edit_student')
+    //        ->name(StudentRoutes::ASSIGN_PROGRAM);
 
     Route::post('students/{student}/update-status', [StudentController::class, 'updateStatus'])
         ->middleware('can:edit_student')
@@ -73,6 +73,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [StudentAcademicSummaryController::class, 'show'])
             ->middleware('can:view_student_summary')
             ->name(StudentRoutes::ACADEMIC_SUMMARY_SHOW);
+
+        // Individual tab routes for partial loading
+        Route::get('/overview', [StudentAcademicSummaryController::class, 'overview'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.overview');
+
+        Route::get('/registrations', [StudentAcademicSummaryController::class, 'registrations'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.registrations');
+
+        Route::get('/scores', [StudentAcademicSummaryController::class, 'scores'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.scores');
+
+        Route::get('/attendance', [StudentAcademicSummaryController::class, 'attendance'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.attendance');
+
+        Route::get('/gpa', [StudentAcademicSummaryController::class, 'gpa'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.gpa');
+
+        Route::get('/graduation', [StudentAcademicSummaryController::class, 'graduation'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.graduation');
+
+        Route::get('/wallet', [StudentAcademicSummaryController::class, 'wallet'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.wallet');
 
         Route::get('/filter-by-semester', [StudentAcademicSummaryController::class, 'filterBySemester'])
             ->middleware('can:view_student_summary')

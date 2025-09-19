@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\ProfileController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
+use App\Http\Controllers\Api\StudentWalletController;
+use App\Http\Controllers\Api\WalletTransactionController;
 use Illuminate\Support\Facades\Route;
 
 // Public authentication routes
@@ -180,6 +182,21 @@ Route::middleware([
             Route::get('/', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'index'])->name('index');
             Route::get('/{form}', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'show'])->name('show');
             Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
+        });
+
+        // Wallet endpoints
+        Route::prefix('wallet')->name('wallet.')->group(function () {
+            // Current student wallet
+            Route::get('/', [StudentWalletController::class, 'show'])->name('show');
+            Route::get('/summary', [StudentWalletController::class, 'summary'])->name('summary');
+            
+            // Transaction endpoints
+            Route::prefix('transactions')->name('transactions.')->group(function () {
+                Route::get('/', [WalletTransactionController::class, 'index'])->name('index');
+                Route::get('/recent', [WalletTransactionController::class, 'recent'])->name('recent');
+                Route::get('/stats', [WalletTransactionController::class, 'stats'])->name('stats');
+                Route::get('/{transaction}', [WalletTransactionController::class, 'show'])->name('show');
+            });
         });
     }); // End either middleware group
 

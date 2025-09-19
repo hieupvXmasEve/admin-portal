@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Web\StudentApplicationController as WebStudentApplicationController;
 use App\Http\Controllers\Web\StudentController as WebStudentController;
 use App\Http\Controllers\Web\FormController;
+use App\Http\Controllers\Api\StudentWalletController;
+use App\Http\Controllers\Api\WalletTransactionController;
 use Illuminate\Support\Facades\Route;
 
 // Public authentication routes (Password-based login only - Google login moved to specific controllers)
@@ -118,6 +120,29 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
 
             // Target management
             Route::post('/targets', [FormController::class, 'createTarget'])->name('targets.store');
+        });
+    });
+
+    // Student Wallet Management (Admin)
+    Route::prefix('wallet')->name('wallet.')->group(function () {
+        // Student-specific wallet operations
+        Route::prefix('students/{student}')->name('students.')->group(function () {
+            Route::get('/', [StudentWalletController::class, 'showStudent'])->name('show');
+            Route::get('/summary', [StudentWalletController::class, 'summaryForStudent'])->name('summary');
+            Route::post('/adjust', [StudentWalletController::class, 'adjustBalance'])->name('adjust');
+            Route::post('/check-balance', [StudentWalletController::class, 'checkBalance'])->name('check-balance');
+            
+            // Student transaction endpoints
+            Route::prefix('transactions')->name('transactions.')->group(function () {
+                Route::get('/', [WalletTransactionController::class, 'indexForStudent'])->name('index');
+                Route::get('/recent', [WalletTransactionController::class, 'recentForStudent'])->name('recent');
+                Route::get('/stats', [WalletTransactionController::class, 'statsForStudent'])->name('stats');
+            });
+        });
+        
+        // General transaction management
+        Route::prefix('transactions')->name('transactions.')->group(function () {
+            Route::get('/{transaction}', [WalletTransactionController::class, 'show'])->name('show');
         });
     });
 });
