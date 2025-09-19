@@ -117,11 +117,11 @@ class StudentApplicationService
                         'will_preserve_student_code' => true,
                         'will_update_email' => true,
                     ]);
-                    
+
                     // Update existing student with new data (excluding student_id/student_code to preserve it)
                     $updateData = $studentData;
                     unset($updateData['student_id']); // Don't update student_id to preserve existing student code
-                    
+
                     // Validate update data with email unique constraint (excluding current student)
                     $rules = Student::validationRules();
                     // Allow email updates but exclude current student from unique check
@@ -142,20 +142,20 @@ class StudentApplicationService
                             return $rule;
                         }, $rules['national_id']);
                     }
-                    
+
                     $validator = Validator::make($updateData, $rules, Student::validationMessages());
-                    
+
                     if ($validator->fails()) {
                         return [
                             'success' => false,
                             'errors' => $validator->errors()->toArray(),
                         ];
                     }
-                    
+
                     // Update the existing student (preserving original student_id/student_code)
                     $existingStudent->update($updateData);
                     $student = $existingStudent;
-                    
+
                     Log::info("Successfully updated existing student", [
                         'student_id' => $student->id,
                         'preserved_student_code' => $student->student_id,
@@ -416,7 +416,7 @@ class StudentApplicationService
             'academic_status' => 'active',
 
             // Additional fields with defaults
-            'high_school_name' => null,
+            'high_school_name' => $additionalData['school'] ?? null,
             'high_school_graduation_year' => null,
             // 'entrance_exam_score' => $application->overall, // Use overall English score if available
             'admission_notes' => $this->generateAdmissionNotes($application),

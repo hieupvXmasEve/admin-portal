@@ -24,7 +24,8 @@ class ProgramMappingService
         'Tài chính' => 'FIN',            // TC → Finance
         'Quản trị kinh doanh' => 'BA',             // IT → Business Analytics,
         'Hệ thống IoT Thông minh' => 'IOT',
-        'Công nghệ phần mềm' => 'SWT'
+        'Công nghệ phần mềm' => 'SWT',
+        'IT' => 'IT'
     ];
 
     /**
