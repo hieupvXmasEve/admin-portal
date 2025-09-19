@@ -69,9 +69,9 @@ class StudentAcademicSummaryService
             ];
 
             // Cache the result if no filters and caching is enabled
-//            if ($useCache && empty($filters)) {
-//                Cache::put($cacheKey, $academicSummary, $cacheTtl);
-//            }
+            //            if ($useCache && empty($filters)) {
+            //                Cache::put($cacheKey, $academicSummary, $cacheTtl);
+            //            }
 
             return $academicSummary;
         } catch (\Exception $e) {
@@ -589,6 +589,75 @@ class StudentAcademicSummaryService
     }
 
     /**
+     * Get student overview data
+     *
+     * @param Student $student The student model
+     * @return array Overview data
+     */
+    public function getOverviewData(Student $student): array
+    {
+        return $this->getStudentOverview($student);
+    }
+
+    /**
+     * Get registrations data
+     *
+     * @param Student $student The student model
+     * @param array $filters Optional filters
+     * @param int $perPage Items per page
+     * @return array Registrations data
+     */
+    public function getRegistrationsData(Student $student, array $filters = [], int $perPage = 50): array
+    {
+        return $this->getRegistrations($student, $filters, $perPage);
+    }
+
+    /**
+     * Get scores data
+     *
+     * @param Student $student The student model
+     * @param int $limit Score limit
+     * @return array Scores data
+     */
+    public function getScoresData(Student $student, int $limit = 100): array
+    {
+        return $this->getScores($student, $limit);
+    }
+
+    /**
+     * Get attendance data
+     *
+     * @param Student $student The student model
+     * @return array Attendance data
+     */
+    public function getAttendanceData(Student $student): array
+    {
+        return $this->getAttendance($student);
+    }
+
+    /**
+     * Get GPA data
+     *
+     * @param Student $student The student model
+     * @return array GPA data
+     */
+    public function getGpaData(Student $student): array
+    {
+        return $this->getGpaTranscript($student);
+    }
+
+    /**
+     * Get graduation data
+     *
+     * @param Student $student The student model
+     * @return array Graduation data
+     */
+    public function getGraduationData(Student $student): array
+    {
+        return $this->getGraduationTracker($student);
+    }
+
+    /**
      * Get detailed scores for a specific course offering (for lazy loading)
      *
      * @param Student $student The student model
@@ -1006,8 +1075,8 @@ class StudentAcademicSummaryService
             'semesters_remaining' => $semestersRemaining,
             'projected_date' => $projectedDate->format('Y-m-d'),
             'on_track' => $projectedDate <= ($student->expected_graduation_date ?
-                    \Carbon\Carbon::parse($student->expected_graduation_date) :
-                    now()->addYears(2)),
+                \Carbon\Carbon::parse($student->expected_graduation_date) :
+                now()->addYears(2)),
         ];
     }
 

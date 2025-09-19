@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Http\Controllers\Api\StudentWalletController;
+use App\Http\Controllers\Api\WalletTransactionController;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Services\StudentAcademicSummaryService;
@@ -25,9 +27,20 @@ use Inertia\Response;
 class StudentAcademicSummaryController extends Controller
 {
     public function __construct(
-        private StudentAcademicSummaryService $academicSummaryService
+        private StudentAcademicSummaryService $academicSummaryService,
+        private StudentWalletController $studentWalletController,
+        private WalletTransactionController $walletTransactionController
     ) {
-        $this->middleware('can:view_student_summary')->only(['show']);
+        $this->middleware('can:view_student_summary')->only([
+            'show',
+            'overview',
+            'registrations',
+            'scores',
+            'attendance',
+            'gpa',
+            'graduation'
+        ]);
+        $this->middleware('can:view_student_wallet')->only(['wallet']);
     }
 
     /**
@@ -54,6 +67,164 @@ class StudentAcademicSummaryController extends Controller
                 'curriculumVersion.specialization:id,name,code',
             ]),
             'academicSummary' => $academicSummary,
+        ]);
+    }
+
+    /**
+     * Display the overview tab for academic summary
+     *
+     * @param  Student  $student  The student to display overview for
+     * @return Response Inertia response with overview data
+     */
+    public function overview(Student $student): Response
+    {
+        $this->authorize('view_student_summary', $student);
+
+        // Load necessary relationships
+        $student->load([
+            'campus:id,name,code',
+            'program:id,name,code',
+            'specialization:id,name,code',
+            'curriculumVersion:id,version_code,program_id,specialization_id',
+            'curriculumVersion.program:id,name,code',
+            'curriculumVersion.specialization:id,name,code',
+        ]);
+
+        $overviewData = $this->academicSummaryService->getOverviewData($student);
+
+        return Inertia::render('students/AcademicSummary/Overview', [
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'overview' => $overviewData,
+        ]);
+    }
+
+    /**
+     * Display the registrations tab for academic summary
+     *
+     * @param  Student  $student  The student to display registrations for
+     * @return Response Inertia response with registrations data
+     */
+    public function registrations(Student $student): Response
+    {
+        $this->authorize('view_student_summary', $student);
+
+        // Load necessary relationships
+        $student->load([
+            'campus:id,name,code',
+            'program:id,name,code',
+            'specialization:id,name,code',
+        ]);
+
+        $registrationsData = $this->academicSummaryService->getRegistrationsData($student);
+
+        return Inertia::render('students/AcademicSummary/Registrations', [
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'registrations' => $registrationsData,
+        ]);
+    }
+
+    /**
+     * Display the scores tab for academic summary
+     *
+     * @param  Student  $student  The student to display scores for
+     * @return Response Inertia response with scores data
+     */
+    public function scores(Student $student): Response
+    {
+        $this->authorize('view_student_summary', $student);
+
+        $scoresData = $this->academicSummaryService->getScoresData($student);
+
+        return Inertia::render('students/AcademicSummary/Scores', [
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'scores' => $scoresData,
+        ]);
+    }
+
+    /**
+     * Display the attendance tab for academic summary
+     *
+     * @param  Student  $student  The student to display attendance for
+     * @return Response Inertia response with attendance data
+     */
+    public function attendance(Student $student): Response
+    {
+        $this->authorize('view_student_summary', $student);
+
+        $attendanceData = $this->academicSummaryService->getAttendanceData($student);
+
+        return Inertia::render('students/AcademicSummary/Attendance', [
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'attendance' => $attendanceData,
+        ]);
+    }
+
+    /**
+     * Display the GPA tab for academic summary
+     *
+     * @param  Student  $student  The student to display GPA for
+     * @return Response Inertia response with GPA data
+     */
+    public function gpa(Student $student): Response
+    {
+        $this->authorize('view_student_summary', $student);
+
+        $gpaData = $this->academicSummaryService->getGpaData($student);
+
+        return Inertia::render('students/AcademicSummary/Gpa', [
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'gpa' => $gpaData,
+        ]);
+    }
+
+    /**
+     * Display the graduation tab for academic summary
+     *
+     * @param  Student  $student  The student to display graduation for
+     * @return Response Inertia response with graduation data
+     */
+    public function graduation(Student $student): Response
+    {
+        $this->authorize('view_student_summary', $student);
+
+        $graduationData = $this->academicSummaryService->getGraduationData($student);
+
+        return Inertia::render('students/AcademicSummary/Graduation', [
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'graduation' => $graduationData,
+        ]);
+    }
+
+    /**
+     * Display the wallet tab for academic summary
+     *
+     * @param  Student  $student  The student to display wallet for
+     * @param  Request  $request  The request instance
+     * @return Response Inertia response with wallet data
+     */
+    public function wallet(Student $student, Request $request): Response
+    {
+        $this->authorize('view_student_wallet', $student);
+
+        // Get wallet summary data
+        $walletSummary = $this->studentWalletController->summaryForStudent($student);
+        $walletData = $walletSummary->getData(true);
+
+        // Get recent transactions
+        $recentTransactions = $this->walletTransactionController->recentForStudent($student, $request);
+        $recentTransactionsData = $recentTransactions->getData(true);
+
+        // Get transaction stats
+        $transactionStats = $this->walletTransactionController->statsForStudent($student);
+        $transactionStatsData = $transactionStats->getData(true);
+
+        return Inertia::render('students/AcademicSummary/Wallet', [
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'wallet' => [
+                'summary' => $walletData['data'] ?? $walletData,
+                'recent_transactions' => $recentTransactionsData['data'] ?? $recentTransactionsData,
+                'stats' => $transactionStatsData['data'] ?? $transactionStatsData,
+            ],
         ]);
     }
 

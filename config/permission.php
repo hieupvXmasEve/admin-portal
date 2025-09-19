@@ -264,6 +264,17 @@ return [
             'create_form' => 'create_form',
             'review_form' => 'review_form',
             'view_form_analytics' => 'view_form_analytics'
+        ],
+
+        // Student Wallet Management
+        'student_wallets' => [
+            'view_student_wallet' => 'view_student_wallet',
+            'view_any_student_wallet' => 'view_any_student_wallet',
+            'adjust_wallet_balance' => 'adjust_wallet_balance',
+        ],
+        'wallet_transactions' => [
+            'view_wallet_transaction' => 'view_wallet_transaction',
+            'view_any_wallet_transaction' => 'view_any_wallet_transaction',
         ]
     ],
 
@@ -280,6 +291,7 @@ return [
         'reporting' => ['queries', 'reports'],
         'teaching' => ['teaching_assignments', 'lecturers'],
         'email_management' => ['email_configurations', 'email_templates', 'email_sending', 'email_logs', 'email_preferences'],
+        'wallet_management' => ['student_wallets', 'wallet_transactions'],
     ],
 
     'actions' => [
