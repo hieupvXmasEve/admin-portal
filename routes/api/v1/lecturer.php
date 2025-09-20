@@ -107,9 +107,13 @@ Route::middleware([
             //            ->middleware(['lecturer.api.rate:lecturer-timetable'])
             ->name('index');
 
-        Route::get('/summary', [TimetableController::class, 'summary'])->name('summary');
-        Route::get('/upcoming-sessions', [TimetableController::class, 'upcomingSessions'])->name('upcoming-sessions');
-        Route::get('/available-rooms', [TimetableController::class, 'availableRooms'])->name('available-rooms');
+        // Lecturer Schedule
+        Route::get('/schedule', [TimetableController::class, 'schedule'])
+            ->name('schedule');
+
+        // Route::get('/summary', [TimetableController::class, 'summary'])->name('summary');
+        // Route::get('/upcoming-sessions', [TimetableController::class, 'upcomingSessions'])->name('upcoming-sessions');
+        // Route::get('/available-rooms', [TimetableController::class, 'availableRooms'])->name('available-rooms');
     });
 
     // Session management endpoints
@@ -141,17 +145,17 @@ Route::middleware([
 
     // Assessment management endpoints
     Route::prefix('courses/{courseOffering}/assessments')->name('assessments.')->group(function () {
-        Route::get('/', [AssessmentController::class, 'index']) ->name('index');
-            //            ->middleware(['lecturer.api.rate:lecturer-assessment-management'])
+        Route::get('/', [AssessmentController::class, 'index'])->name('index');
+        //            ->middleware(['lecturer.api.rate:lecturer-assessment-management'])
 
-//        Route::post('/', [AssessmentController::class, 'store'])->name('store');
-//        Route::put('/{assessmentComponent}', [AssessmentController::class, 'update'])->name('update');
-//        Route::delete('/{assessmentComponent}', [AssessmentController::class, 'destroy'])->name('destroy');
+        //        Route::post('/', [AssessmentController::class, 'store'])->name('store');
+        //        Route::put('/{assessmentComponent}', [AssessmentController::class, 'update'])->name('update');
+        //        Route::delete('/{assessmentComponent}', [AssessmentController::class, 'destroy'])->name('destroy');
 
         // Assessment detail management endpoints
-//        Route::post('/{assessmentComponent}/details', [AssessmentController::class, 'storeDetail'])->name('store-detail');
-//        Route::put('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'updateDetail'])->name('update-detail');
-//        Route::delete('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'destroyDetail'])->name('destroy-detail');
+        //        Route::post('/{assessmentComponent}/details', [AssessmentController::class, 'storeDetail'])->name('store-detail');
+        //        Route::put('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'updateDetail'])->name('update-detail');
+        //        Route::delete('/{assessmentComponent}/details/{assessmentDetail}', [AssessmentController::class, 'destroyDetail'])->name('destroy-detail');
 
         // Grading endpoints
         Route::get('/grade/student/{student}', [AssessmentController::class, 'gradeByStudent'])->name('grade-by-student');

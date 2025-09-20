@@ -32,21 +32,74 @@ class LecturerTimetableService
 
         $cacheKey = "lecturer-timetable:{$lecturer->id}:{$startDate->format('Y-m-d')}:{$endDate->format('Y-m-d')}:{$view}";
 
-        return Cache::remember($cacheKey, 300, function () use ($lecturer, $startDate, $endDate, $view) {
-            $sessions = $this->getSessionsInPeriod($lecturer, $startDate, $endDate);
+        // return Cache::remember($cacheKey, 300, function () use ($lecturer, $startDate, $endDate, $view) {
+        $sessions = $this->getSessionsInPeriod($lecturer, $startDate, $endDate);
 
-            return [
-                'period' => [
-                    'start_date' => $startDate->format('Y-m-d'),
-                    'end_date' => $endDate->format('Y-m-d'),
-                    'view' => $view,
-                ],
-                'sessions' => $this->formatSessionsForTimetable($sessions, $view),
-                'summary' => $this->getTimetableSummary($sessions, $startDate, $endDate),
-                'conflicts' => $this->detectScheduleConflicts($sessions),
-                'availability' => $this->getAvailabilitySlots($lecturer, $startDate, $endDate),
-            ];
-        });
+        return [
+            'period' => [
+                'start_date' => $startDate->format('Y-m-d'),
+                'end_date' => $endDate->format('Y-m-d'),
+                'view' => $view,
+            ],
+            'sessions' => $this->formatSessionsForTimetable($sessions, $view),
+            'summary' => $this->getTimetableSummary($sessions, $startDate, $endDate),
+            'conflicts' => $this->detectScheduleConflicts($sessions),
+            'availability' => $this->getAvailabilitySlots($lecturer, $startDate, $endDate),
+        ];
+        // });
+    }
+
+    /**
+     * Get lecturer's schedule for a specific date range
+     */
+    public function getSchedule(
+        Lecture $lecturer,
+        array $filters = []
+    ): array {
+        $startDate = isset($filters['start'])
+            ? Carbon::parse($filters['start'])
+            : now()->startOfMonth();
+
+        $endDate = isset($filters['end'])
+            ? Carbon::parse($filters['end'])
+            : now()->endOfMonth();
+
+        $cacheKey = "lecturer-schedule:{$lecturer->id}:{$startDate->format('Y-m-d')}:{$endDate->format('Y-m-d')}";
+
+        // return Cache::remember($cacheKey, 300, function () use ($lecturer, $startDate, $endDate, $filters) {
+        // Get sessions in the specified period
+        $query = $lecturer->classSessions()
+            ->with(['courseOffering.curriculumUnit.unit', 'room.building'])
+            ->whereBetween('session_date', [$startDate, $endDate]);
+
+        // Apply filters
+        if (isset($filters['course_offering_id'])) {
+            $query->where('course_offering_id', $filters['course_offering_id']);
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!($filters['include_cancelled'] ?? false)) {
+            $query->where('status', '!=', 'cancelled');
+        }
+
+        $sessions = $query->orderBy('session_date')
+            ->orderBy('start_time')
+            ->get();
+
+        return [
+            'period' => [
+                'start_date' => $startDate->format('Y-m-d'),
+                'end_date' => $endDate->format('Y-m-d'),
+                'total_days' => $startDate->diffInDays($endDate) + 1,
+            ],
+            'sessions' => $this->formatScheduleSessions($sessions),
+            'summary' => $this->getScheduleSummary($sessions, $startDate, $endDate),
+            'generated_at' => now()->toISOString(),
+        ];
+        // });
     }
 
     /**
@@ -101,7 +154,7 @@ class LecturerTimetableService
             );
 
             if (! empty($conflicts)) {
-                throw new \Exception('Scheduling conflict detected: '.implode(', ', $conflicts));
+                throw new \Exception('Scheduling conflict detected: ' . implode(', ', $conflicts));
             }
 
             // Create the session
@@ -172,7 +225,7 @@ class LecturerTimetableService
                 );
 
                 if (! empty($conflicts)) {
-                    throw new \Exception('Scheduling conflict detected: '.implode(', ', $conflicts));
+                    throw new \Exception('Scheduling conflict detected: ' . implode(', ', $conflicts));
                 }
             }
 
@@ -488,11 +541,171 @@ class LecturerTimetableService
     }
 
     /**
+     * Format sessions for schedule display
+     */
+    protected function formatScheduleSessions($sessions)
+    {
+        if ($sessions->isEmpty()) {
+            return (object) []; // Return empty object instead of empty array
+        }
+
+        return $sessions->map(function ($session) {
+            return [
+                'id' => $session->id,
+                'course_code' => $session->courseOffering->curriculumUnit->unit->code ?? null,
+                'course_name' => $session->courseOffering->curriculumUnit->unit->name ?? null,
+                'section_code' => $session->courseOffering->section_code,
+                'session_title' => $session->session_title,
+                'session_type' => $session->session_type,
+                'session_type_display' => ucfirst(str_replace('_', ' ', $session->session_type)),
+                'date' => $session->session_date->format('Y-m-d'),
+                'day_of_week' => $session->session_date->format('l'),
+                'day_abbreviation' => $session->session_date->format('D'),
+                'time' => [
+                    'start' => $session->start_time->format('H:i:s'),
+                    'end' => $session->end_time->format('H:i:s'),
+                    'start_display' => $session->start_time->format('g:i A'),
+                    'end_display' => $session->end_time->format('g:i A'),
+                    'display' => $session->start_time->format('g:i A') . ' - ' . $session->end_time->format('g:i A'),
+                    'duration_minutes' => $session->duration_minutes,
+                    'duration_display' => $this->formatDuration($session->duration_minutes),
+                ],
+                'location' => $session->room ? [
+                    'room_code' => $session->room->name,
+                    'room_name' => $session->room->name,
+                    'building' => $session->room->building->name ?? null,
+                    'full_location' => ($session->room->building ? $session->room->building->name . ' - ' : '') . $session->room->name,
+                ] : null,
+                'delivery_mode' => $session->delivery_mode,
+                'status' => $session->status,
+                'status_display' => ucfirst(str_replace('_', ' ', $session->status)),
+                'expected_attendees' => $session->expected_attendees,
+                'attendance_marked' => $session->attendance_marked,
+                'is_today' => $session->session_date->isToday(),
+                'is_upcoming' => $session->session_date->isFuture(),
+                'is_current' => $this->isSessionCurrent($session),
+                'color' => $this->getSessionColor($session->session_type, $session->status),
+            ];
+        })->groupBy('date')->toArray();
+    }
+
+    /**
+     * Get schedule summary statistics
+     */
+    protected function getScheduleSummary($sessions, Carbon $startDate, Carbon $endDate): array
+    {
+        $totalSessions = $sessions->count();
+        $completedSessions = $sessions->where('status', 'completed')->count();
+        $upcomingSessions = $sessions->where('status', 'scheduled')->count();
+        $cancelledSessions = $sessions->where('status', 'cancelled')->count();
+        $inProgressSessions = $sessions->where('status', 'in_progress')->count();
+
+        $totalMinutes = $sessions->sum('duration_minutes');
+        $totalHours = round($totalMinutes / 60, 1);
+
+        $uniqueCourses = $sessions->pluck('course_offering_id')->unique()->count();
+        $sessionsByType = $sessions->groupBy('session_type')->map->count()->toArray();
+        $sessionsByDay = $sessions->groupBy(function ($session) {
+            return $session->session_date->format('l');
+        })->map->count()->toArray();
+
+        // Calculate busiest day
+        $busiestDay = collect($sessionsByDay)->sortDesc()->keys()->first() ?? 'None';
+
+        // Calculate average sessions per day (only counting days with sessions)
+        $daysWithSessions = $sessions->pluck('session_date')->unique()->count();
+        $avgSessionsPerDay = $daysWithSessions > 0 ? round($totalSessions / $daysWithSessions, 1) : 0;
+
+        return [
+            'overview' => [
+                'total_sessions' => $totalSessions,
+                'completed_sessions' => $completedSessions,
+                'upcoming_sessions' => $upcomingSessions,
+                'cancelled_sessions' => $cancelledSessions,
+                'in_progress_sessions' => $inProgressSessions,
+                'unique_courses' => $uniqueCourses,
+                'total_teaching_hours' => $totalHours,
+                'average_sessions_per_day' => $avgSessionsPerDay,
+            ],
+            'schedule_pattern' => [
+                'busiest_day' => $busiestDay,
+                'earliest_start' => $sessions->min('start_time')?->format('H:i:s'),
+                'latest_end' => $sessions->max('end_time')?->format('H:i:s'),
+                'earliest_start_display' => $sessions->min('start_time')?->format('g:i A'),
+                'latest_end_display' => $sessions->max('end_time')?->format('g:i A'),
+            ],
+            'distribution' => [
+                'by_day' => $sessionsByDay,
+                'by_session_type' => $sessionsByType,
+            ],
+        ];
+    }
+
+    /**
+     * Format duration in minutes to human readable format
+     */
+    protected function formatDuration(int $minutes): string
+    {
+        if ($minutes < 60) {
+            return $minutes . 'm';
+        }
+
+        $hours = intval($minutes / 60);
+        $remainingMinutes = $minutes % 60;
+
+        if ($remainingMinutes === 0) {
+            return $hours . 'h';
+        }
+
+        return $hours . 'h ' . $remainingMinutes . 'm';
+    }
+
+    /**
+     * Check if session is currently happening
+     */
+    protected function isSessionCurrent(ClassSession $session): bool
+    {
+        if (!$session->session_date->isToday()) {
+            return false;
+        }
+
+        $now = now();
+        $sessionStart = $session->session_date->copy()->setTimeFrom($session->start_time);
+        $sessionEnd = $session->session_date->copy()->setTimeFrom($session->end_time);
+
+        return $now->between($sessionStart, $sessionEnd);
+    }
+
+    /**
+     * Get session color based on type and status
+     */
+    protected function getSessionColor(string $sessionType, string $status): string
+    {
+        if ($status === 'cancelled') {
+            return '#9CA3AF'; // gray
+        }
+
+        if ($status === 'completed') {
+            return '#10B981'; // green
+        }
+
+        return match ($sessionType) {
+            'lecture' => '#3B82F6', // blue
+            'tutorial' => '#8B5CF6', // purple
+            'lab' => '#F59E0B', // amber
+            'seminar' => '#EF4444', // red
+            'workshop' => '#06B6D4', // cyan
+            default => '#6B7280', // gray
+        };
+    }
+
+    /**
      * Clear timetable-related caches
      */
     protected function clearTimetableCaches(Lecture $lecturer): void
     {
         Cache::forget("lecturer-dashboard:{$lecturer->id}:*");
+        Cache::tags(['lecturer-schedule', "lecturer-{$lecturer->id}"])->flush();
         // Clear other relevant caches
     }
 }

@@ -222,7 +222,6 @@ export enum StudentStatus {
     Pending = 'pending',
 }
 
-
 export interface Student {
     id: number;
     student_id: string;
@@ -367,9 +366,9 @@ export interface StudentOverview {
             version_code: string;
         };
         semester?: {
-            code: string
+            code: string;
             intake_year: string;
-        }
+        };
     };
     academic_stats: {
         total_registrations: number;
@@ -813,6 +812,8 @@ export enum ClassSessionDeliveryMode {
 export interface ClassSession {
     id: number;
     course_offering_id: number;
+    course_offering?: CourseOffering;
+    formatted_time?: string;
     room_id?: number;
     room?: Room;
     room_booking_id?: number;

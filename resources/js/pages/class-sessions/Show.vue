@@ -233,7 +233,7 @@ const getDeliveryModeIcon = (mode: string) => {
 
 // Navigation functions
 const navigateBack = () => {
-    router.visit('/class-sessions');
+    router.visit(`/course-offerings/${props.session.course_offering_id}`);
 };
 
 const editSession = () => {
@@ -285,7 +285,7 @@ const exportAttendance = () => {
             <div class="flex items-center gap-4">
                 <Button variant="ghost" size="sm" @click="navigateBack">
                     <ArrowLeft class="mr-2 h-4 w-4" />
-                    Back to Sessions
+                    Back to
                 </Button>
                 <div>
                     <h1 class="text-3xl font-bold tracking-tight">{{ session.session_title }}</h1>
