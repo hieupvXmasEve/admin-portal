@@ -31,11 +31,11 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     Route::get('students/search', [WebStudentController::class, 'apiSearch'])->name('students.apiSearch');
     Route::post('students/by-ids', [WebStudentController::class, 'getByStudentIds'])->name('students.getByStudentIds');
     Route::get('students/{student}', [WebStudentController::class, 'apiShow'])->name('students.apiShow');
-    
+
     // Student Impersonation
     Route::post('/students/impersonate', [AdminStudentImpersonationController::class, 'impersonateStudent'])->name('students.impersonate');
     Route::get('/students/impersonation-sessions', [AdminStudentImpersonationController::class, 'getImpersonationSessions'])->name('students.impersonation-sessions');
-    
+
     // Lecturer Impersonation
     Route::post('/lecturers/impersonate', [AdminLecturerImpersonationController::class, 'impersonateLecturer'])->name('lecturers.impersonate');
     Route::get('/lecturers/impersonation-sessions', [AdminLecturerImpersonationController::class, 'getImpersonationSessions'])->name('lecturers.impersonation-sessions');
@@ -127,23 +127,23 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     Route::prefix('wallet')->name('wallet.')->group(function () {
         // Student-specific wallet operations
         Route::prefix('students/{student}')->name('students.')->group(function () {
-            Route::get('/', [StudentWalletController::class, 'showStudent'])->name('show');
-            Route::get('/summary', [StudentWalletController::class, 'summaryForStudent'])->name('summary');
+            // Route::get('/', [StudentWalletController::class, 'showStudent'])->name('show');
+            // Route::get('/summary', [StudentWalletController::class, 'summaryForStudent'])->name('summary');
             Route::post('/adjust', [StudentWalletController::class, 'adjustBalance'])->name('adjust');
-            Route::post('/check-balance', [StudentWalletController::class, 'checkBalance'])->name('check-balance');
-            
+            // Route::post('/check-balance', [StudentWalletController::class, 'checkBalance'])->name('check-balance');
+
             // Student transaction endpoints
-            Route::prefix('transactions')->name('transactions.')->group(function () {
-                Route::get('/', [WalletTransactionController::class, 'indexForStudent'])->name('index');
-                Route::get('/recent', [WalletTransactionController::class, 'recentForStudent'])->name('recent');
-                Route::get('/stats', [WalletTransactionController::class, 'statsForStudent'])->name('stats');
-            });
+            // Route::prefix('transactions')->name('transactions.')->group(function () {
+            //     Route::get('/', [WalletTransactionController::class, 'indexForStudent'])->name('index');
+            //     Route::get('/recent', [WalletTransactionController::class, 'recentForStudent'])->name('recent');
+            //     Route::get('/stats', [WalletTransactionController::class, 'statsForStudent'])->name('stats');
+            // });
         });
-        
+
         // General transaction management
-        Route::prefix('transactions')->name('transactions.')->group(function () {
-            Route::get('/{transaction}', [WalletTransactionController::class, 'show'])->name('show');
-        });
+        // Route::prefix('transactions')->name('transactions.')->group(function () {
+        //     Route::get('/{transaction}', [WalletTransactionController::class, 'show'])->name('show');
+        // });
     });
 });
 

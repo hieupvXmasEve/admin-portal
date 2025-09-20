@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useApi } from '@/composables/useApiRequest';
 import type { PaginatedResponse } from '@/types';
 import type { Lecture } from '@/types/models';
 import { lecturerRoutes } from '@/utils/routes';
-import { useApi } from '@/composables/useApiRequest';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
@@ -129,7 +129,7 @@ const loginAsLecturer = async (lecture: Lecture) => {
         const { data } = await api.post('/api/lecturers/impersonate', {
             email: lecture.email, // Can also use employee_id
             device_name: 'Admin Portal - Lecturer Impersonation',
-            purpose: 'support' // Track why we're impersonating
+            purpose: 'support', // Track why we're impersonating
         });
         console.log('%c data', 'color: red', data);
 
@@ -138,7 +138,7 @@ const loginAsLecturer = async (lecture: Lecture) => {
             const lecturerPortalUrl = import.meta.env.VITE_APP_URL_FE_LECTURE || 'http://localhost:3001';
 
             // Open lecturer portal in new tab with token as query parameter
-            const portalUrl = `${lecturerPortalUrl}/admin-login?access_token=${encodeURIComponent(data.value.data.token)}&redirect=dashboard`;
+            const portalUrl = `${lecturerPortalUrl}/dashboard?access_token=${encodeURIComponent(data.value.data.token)}&redirect=dashboard`;
             // http://localhost:3000/lecturer?access_token=1129%7CuNT8H54UJ2EgSvhoz3VUr0gg0GdX2MJ27r9L0PUzeab38137&redirect=dashboard
             window.open(portalUrl, '_blank');
 
@@ -423,7 +423,7 @@ const columns: ColumnDef<Lecture>[] = [
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>{{ (row.original.is_active && row.original.employment_status === 'active') ? 'Login as Lecturer' : 'Cannot login - Lecturer inactive' }}</p>
+                                <p>{{ row.original.is_active && row.original.employment_status === 'active' ? 'Login as Lecturer' : 'Cannot login - Lecturer inactive' }}</p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>

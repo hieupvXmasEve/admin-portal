@@ -27,6 +27,9 @@ php artisan view:cache
 php artisan event:cache
 php artisan optimize
 
+# Update permissions
+php artisan db:seed --class=UpdatePermissionsSeeder
+
 #•  Production nên dùng Supervisor/systemd. Ví dụ Supervisor (/etc/supervisor/conf.d/laravel-worker.conf):
 [program:laravel-worker]
 process_name=%(program_name)s_%(process_num)02d

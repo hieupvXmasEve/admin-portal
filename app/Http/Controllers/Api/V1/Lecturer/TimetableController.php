@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Lecturer;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Lecturer\CreateSessionRequest;
+use App\Http\Requests\Api\V1\Lecturer\ScheduleFilterRequest;
 use App\Http\Requests\Api\V1\Lecturer\TimetableFilterRequest;
 use App\Http\Requests\Api\V1\Lecturer\UpdateSessionRequest;
 use App\Http\Resources\Api\V1\Lecturer\SessionResource;
@@ -36,10 +37,34 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 new TimetableResource($timetable),
+                [],
                 'Timetable retrieved successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to retrieve timetable');
+        }
+    }
+
+    /**
+     * Get lecturer's schedule for a date range
+     */
+    public function schedule(ScheduleFilterRequest $request): JsonResponse
+    {
+        /** @var \App\Models\Lecture $lecturer */
+        $lecturer = $request->user();
+
+        try {
+            $filters = $request->validated();
+
+            $schedule = $this->timetableService->getSchedule($lecturer, $filters);
+
+            return ApiResponse::success(
+                $schedule,
+                [],
+                'Schedule retrieved successfully'
+            );
+        } catch (\Exception $e) {
+            return ApiResponse::serverError('Failed to retrieve schedule');
         }
     }
 
@@ -62,6 +87,7 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 SessionResource::collection($sessions),
+                [],
                 'Upcoming sessions retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -84,6 +110,7 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 $result,
+                [],
                 'Session created successfully'
             );
         } catch (\Exception $e) {
@@ -116,6 +143,7 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 $result,
+                [],
                 'Session updated successfully'
             );
         } catch (\Exception $e) {
@@ -158,6 +186,7 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 $result,
+                [],
                 'Session cancelled successfully'
             );
         } catch (\Exception $e) {
@@ -190,13 +219,14 @@ class TimetableController extends Controller
 
             $rooms = $this->timetableService->getAvailableRooms(
                 $validated['date'],
-                $validated['start_time'].':00',
-                $validated['end_time'].':00',
+                $validated['start_time'] . ':00',
+                $validated['end_time'] . ':00',
                 $validated['exclude_session_id'] ?? null
             );
 
             return ApiResponse::success(
                 $rooms,
+                [],
                 'Available rooms retrieved successfully'
             );
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -229,6 +259,7 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 new SessionResource($session),
+                [],
                 'Session details retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -268,6 +299,7 @@ class TimetableController extends Controller
 
             return ApiResponse::success(
                 $summary,
+                [],
                 'Timetable summary retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -323,7 +355,7 @@ class TimetableController extends Controller
                 'successful_updates' => $successCount,
                 'failed_updates' => $errorCount,
                 'results' => $results,
-            ], 'Bulk session update completed');
+            ], [], 'Bulk session update completed');
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to process bulk session updates');
         }
@@ -340,7 +372,7 @@ class TimetableController extends Controller
 
         foreach ($sessions as $dateSessions) {
             foreach ($dateSessions as $session) {
-                $sessionDateTime = \Carbon\Carbon::parse($session['date'].' '.$session['start_time']);
+                $sessionDateTime = \Carbon\Carbon::parse($session['date'] . ' ' . $session['start_time']);
 
                 if ($sessionDateTime->gt($now)) {
                     $diff = $sessionDateTime->diffInMinutes($now);

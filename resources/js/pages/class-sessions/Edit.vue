@@ -143,7 +143,7 @@ const onSubmit = handleSubmit((formValues) => {
 
 // Navigation
 const navigateBack = () => {
-    router.visit('/class-sessions');
+    router.visit(`/course-offerings/${props.session.course_offering_id}`);
 };
 
 const navigateToShow = () => {
@@ -186,7 +186,7 @@ const today = new Date().toISOString().split('T')[0];
             <div class="flex items-center gap-4">
                 <Button variant="ghost" size="sm" @click="navigateBack">
                     <ArrowLeft class="mr-2 h-4 w-4" />
-                    Back to Sessions
+                    Back
                 </Button>
                 <div>
                     <h1 class="text-3xl font-bold tracking-tight">Edit Class Session</h1>
@@ -375,11 +375,7 @@ const today = new Date().toISOString().split('T')[0];
                                             </FormControl>
                                             <SelectContent>
                                                 <SelectItem value="none">No Room</SelectItem>
-                                                <SelectItem
-                                                    v-for="room in (rooms || [])"
-                                                    :key="room.id"
-                                                    :value="room.id.toString()"
-                                                >
+                                                <SelectItem v-for="room in rooms || []" :key="room.id" :value="room.id.toString()">
                                                     {{ room.name }} ({{ room.code }})
                                                     <span v-if="room.building?.name" class="text-muted-foreground"> • {{ room.building?.name }}</span>
                                                 </SelectItem>
@@ -398,12 +394,7 @@ const today = new Date().toISOString().split('T')[0];
                                         <span v-if="values.delivery_mode === 'online'" class="text-destructive">*</span>
                                     </FormLabel>
                                     <FormControl>
-                                        <Input
-                                            v-bind="componentField"
-                                            type="url"
-                                            placeholder="https://..."
-                                            :disabled="values.delivery_mode === 'in_person'"
-                                        />
+                                        <Input v-bind="componentField" type="url" placeholder="https://..." :disabled="values.delivery_mode === 'in_person'" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
