@@ -25,20 +25,20 @@
     - Include datetime casting for started_at and ended_at
     - _Requirements: 4.3, 5.2, 7.3_
 
-- [-] 3. Create model factories for testing
-  - [-] 3.1 Implement ClubFactory with realistic test data
+- [x] 3. Create model factories for testing
+  - [x] 3.1 Implement ClubFactory with realistic test data
     - Create factory with campus association and varied club data
     - Include social_links JSON structure and achievements array
     - Support different club statuses and founding dates
     - _Requirements: 1.2, 6.2_
 
-  - [ ] 3.2 Implement ClubMemberFactory with role variations
+  - [x] 3.2 Implement ClubMemberFactory with role variations
     - Create factory supporting all role types and statuses
     - Include application_notes and responsibilities JSON data
     - Support different membership scenarios (pending, active, rejected)
     - _Requirements: 2.3, 3.2, 4.2_
 
-  - [ ] 3.3 Create ClubMemberRoleHistoryFactory for audit testing
+  - [x] 3.3 Create ClubMemberRoleHistoryFactory for audit testing
     - Implement factory for role change history records
     - Support role transitions and change reason documentation
     - Include proper timestamp handling for role periods
