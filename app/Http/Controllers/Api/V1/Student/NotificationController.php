@@ -7,7 +7,6 @@ namespace App\Http\Controllers\Api\V1\Student;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Student\MarkNotificationsRequest;
 use App\Http\Requests\Api\V1\Student\NotificationFilterRequest;
-use App\Http\Requests\Api\V1\Student\NotificationPreferenceRequest;
 use App\Http\Resources\Api\V1\Student\NotificationResource;
 use App\Http\Responses\ApiResponse;
 use App\Services\V1\Student\NotificationService;
@@ -32,10 +31,25 @@ class NotificationController extends Controller
             $filters = $request->validated();
             $notifications = $this->notificationService->getNotifications($student, $filters);
 
-            return ApiResponse::success(
-                new NotificationResource($notifications),
+            // Get unread count for meta
+            $unreadCount = $this->notificationService->getUnreadCount($student);
+
+            // Transform the paginated results to use our resource
+            $notifications->getCollection()->transform(function ($notification) {
+                return new NotificationResource($notification);
+            });
+
+            // Get the standard paginated response
+            $response = ApiResponse::paginated(
+                $notifications,
                 'Notifications retrieved successfully'
             );
+
+            // Add unread count to meta
+            $responseData = $response->getData(true);
+            $responseData['meta']['unread_count'] = $unreadCount;
+
+            return response()->json($responseData, $response->getStatusCode());
         } catch (\Exception $e) {
             return ApiResponse::serverError('Failed to retrieve notifications');
         }
@@ -54,6 +68,7 @@ class NotificationController extends Controller
 
             return ApiResponse::success(
                 $summary,
+                [],
                 'Notification summary retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -73,8 +88,10 @@ class NotificationController extends Controller
             $success = $this->notificationService->markAsRead($student, $notificationId);
 
             if ($success) {
+                $unreadCount = $this->notificationService->getUnreadCount($student);
                 return ApiResponse::success(
-                    null,
+                    ['unread_count' => $unreadCount],
+                    [],
                     'Notification marked as read'
                 );
             } else {
@@ -96,9 +113,14 @@ class NotificationController extends Controller
         try {
             $notificationIds = $request->validated()['notification_ids'];
             $updated = $this->notificationService->markMultipleAsRead($student, $notificationIds);
+            $unreadCount = $this->notificationService->getUnreadCount($student);
 
             return ApiResponse::success(
-                ['updated_count' => $updated],
+                [
+                    'updated_count' => $updated,
+                    'unread_count' => $unreadCount
+                ],
+                [],
                 "Marked {$updated} notifications as read"
             );
         } catch (\Exception $e) {
@@ -116,9 +138,14 @@ class NotificationController extends Controller
 
         try {
             $updated = $this->notificationService->markAllAsRead($student);
+            $unreadCount = $this->notificationService->getUnreadCount($student);
 
             return ApiResponse::success(
-                ['updated_count' => $updated],
+                [
+                    'updated_count' => $updated,
+                    'unread_count' => $unreadCount
+                ],
+                [],
                 "Marked all {$updated} notifications as read"
             );
         } catch (\Exception $e) {
@@ -140,6 +167,7 @@ class NotificationController extends Controller
             if ($success) {
                 return ApiResponse::success(
                     null,
+                    [],
                     'Notification deleted successfully'
                 );
             } else {
@@ -150,48 +178,4 @@ class NotificationController extends Controller
         }
     }
 
-    /**
-     * Get notification preferences
-     */
-    public function preferences(Request $request): JsonResponse
-    {
-        /** @var \App\Models\Student $student */
-        $student = $request->user();
-
-        try {
-            $preferences = $this->notificationService->getNotificationPreferences($student);
-
-            return ApiResponse::success(
-                $preferences,
-                'Notification preferences retrieved successfully'
-            );
-        } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to retrieve notification preferences');
-        }
-    }
-
-    /**
-     * Update notification preferences
-     */
-    public function updatePreferences(NotificationPreferenceRequest $request): JsonResponse
-    {
-        /** @var \App\Models\Student $student */
-        $student = $request->user();
-
-        try {
-            $preferences = $request->validated()['preferences'];
-            $success = $this->notificationService->updateNotificationPreferences($student, $preferences);
-
-            if ($success) {
-                return ApiResponse::success(
-                    null,
-                    'Notification preferences updated successfully'
-                );
-            } else {
-                return ApiResponse::businessLogicError('Failed to update notification preferences');
-            }
-        } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to update notification preferences');
-        }
-    }
 }

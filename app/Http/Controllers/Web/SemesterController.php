@@ -97,19 +97,7 @@ class SemesterController extends Controller
             }
         }
 
-        // Cache the paginated list per unique query (short TTL)
-        $cacheKey = 'semesters:index:'.md5(json_encode([
-            'page' => $page,
-            'per_page' => $per_page,
-            'search' => $validated['search'] ?? null,
-            'filter' => $validated['filter'] ?? [],
-        ]));
-
-        $semesters = Cache::tags(['semesters', 'semesters.index'])
-            ->rememberForever($cacheKey, function () use ($query, $per_page, $page) {
-                return $query->paginate($per_page, ['*'], 'page', $page);
-            })
-            ->withQueryString();
+        $semesters = $query->paginate($per_page, ['*'], 'page', $page);
 
         return Inertia::render('semesters/Index', [
             'semesters' => $semesters,

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\V1\Student;
 
 use App\Models\Notification;
-use App\Models\NotificationPreference;
 use App\Models\Student;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -15,31 +14,26 @@ class NotificationService
     /**
      * Get student's notifications
      */
-    public function getNotifications(Student $student, array $filters = []): array
+    public function getNotifications(Student $student, array $filters = [])
     {
-        $cacheKey = "notifications:student:{$student->id}:" . md5(serialize($filters));
+        $query = $student->notifications();
 
-        return Cache::remember($cacheKey, 300, function () use ($student, $filters) {
-            $query = $student->notifications()->with(['notificationType']);
+        // Apply filters
+        $this->applyNotificationFilters($query, $filters);
 
-            // Apply filters
-            $this->applyNotificationFilters($query, $filters);
+        $perPage = $filters['per_page'] ?? 20;
+        $perPage = min(max($perPage, 5), 100); // Ensure between 5 and 100
 
-            $notifications = $query->orderBy('created_at', 'desc')
-                ->paginate($filters['per_page'] ?? 20);
+        return $query->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+    }
 
-            return [
-                'notifications' => $this->formatNotifications($notifications->items()),
-                'pagination' => [
-                    'current_page' => $notifications->currentPage(),
-                    'last_page' => $notifications->lastPage(),
-                    'per_page' => $notifications->perPage(),
-                    'total' => $notifications->total(),
-                ],
-                'summary' => $this->getNotificationSummary($student),
-                'categories' => $this->getNotificationCategories($student),
-            ];
-        });
+    /**
+     * Get student's unread notifications count
+     */
+    public function getUnreadCount(Student $student): int
+    {
+        return $student->notifications()->unread()->count();
     }
 
     /**
@@ -48,48 +42,27 @@ class NotificationService
     public function getNotificationSummary(Student $student): array
     {
         $totalNotifications = $student->notifications()->count();
-        $unreadNotifications = $student->notifications()->where('is_read', false)->count();
+        $unreadNotifications = $this->getUnreadCount($student);
         $todayNotifications = $student->notifications()
             ->whereDate('created_at', today())
             ->count();
 
-        $urgentNotifications = $student->notifications()
-            ->where('is_read', false)
-            ->where('priority', 'high')
+        $importantNotifications = $student->notifications()
+            ->unread()
+            ->where('is_important', true)
             ->count();
 
         return [
             'total_notifications' => $totalNotifications,
             'unread_notifications' => $unreadNotifications,
             'today_notifications' => $todayNotifications,
-            'urgent_notifications' => $urgentNotifications,
+            'important_notifications' => $importantNotifications,
             'read_percentage' => $totalNotifications > 0
                 ? round((($totalNotifications - $unreadNotifications) / $totalNotifications) * 100, 1)
                 : 0,
         ];
     }
 
-    /**
-     * Get notification categories with counts
-     */
-    public function getNotificationCategories(Student $student): array
-    {
-        $categories = $student->notifications()
-            ->selectRaw('category, COUNT(*) as count, SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread_count')
-            ->groupBy('category')
-            ->get();
-
-        return $categories->map(function ($category) {
-            return [
-                'category' => $category->category,
-                'category_display' => $this->getCategoryDisplay($category->category),
-                'total_count' => $category->count,
-                'unread_count' => $category->unread_count,
-                'icon' => $this->getCategoryIcon($category->category),
-                'color' => $this->getCategoryColor($category->category),
-            ];
-        })->toArray();
-    }
 
     /**
      * Mark notification as read
@@ -98,10 +71,7 @@ class NotificationService
     {
         $notification = $student->notifications()->findOrFail($notificationId);
 
-        $updated = $notification->update([
-            'is_read' => true,
-            'read_at' => now(),
-        ]);
+        $updated = $notification->markAsRead();
 
         if ($updated) {
             $this->clearNotificationCache($student);
@@ -117,9 +87,8 @@ class NotificationService
     {
         $updated = $student->notifications()
             ->whereIn('id', $notificationIds)
-            ->where('is_read', false)
+            ->unread()
             ->update([
-                'is_read' => true,
                 'read_at' => now(),
             ]);
 
@@ -136,9 +105,8 @@ class NotificationService
     public function markAllAsRead(Student $student): int
     {
         $updated = $student->notifications()
-            ->where('is_read', false)
+            ->unread()
             ->update([
-                'is_read' => true,
                 'read_at' => now(),
             ]);
 
@@ -150,12 +118,12 @@ class NotificationService
     }
 
     /**
-     * Delete notification
+     * Delete notification (soft delete)
      */
     public function deleteNotification(Student $student, int $notificationId): bool
     {
         $notification = $student->notifications()->findOrFail($notificationId);
-        $deleted = $notification->delete();
+        $deleted = $notification->delete(); // This will be a soft delete
 
         if ($deleted) {
             $this->clearNotificationCache($student);
@@ -164,56 +132,6 @@ class NotificationService
         return $deleted;
     }
 
-    /**
-     * Get notification preferences
-     */
-    public function getNotificationPreferences(Student $student): array
-    {
-        $preferences = NotificationPreference::where('student_id', $student->id)->get();
-
-        $defaultPreferences = $this->getDefaultPreferences();
-
-        // Merge with existing preferences
-        foreach ($preferences as $preference) {
-            $key = $preference->notification_type . '.' . $preference->channel;
-            if (isset($defaultPreferences[$preference->notification_type][$preference->channel])) {
-                $defaultPreferences[$preference->notification_type][$preference->channel]['enabled'] = $preference->is_enabled;
-            }
-        }
-
-        return [
-            'preferences' => $defaultPreferences,
-            'global_settings' => $this->getGlobalSettings($student),
-        ];
-    }
-
-    /**
-     * Update notification preferences
-     */
-    public function updateNotificationPreferences(Student $student, array $preferences): bool
-    {
-        return DB::transaction(function () use ($student, $preferences) {
-            foreach ($preferences as $notificationType => $channels) {
-                foreach ($channels as $channel => $settings) {
-                    NotificationPreference::updateOrCreate(
-                        [
-                            'student_id' => $student->id,
-                            'notification_type' => $notificationType,
-                            'channel' => $channel,
-                        ],
-                        [
-                            'is_enabled' => $settings['enabled'] ?? false,
-                            'settings' => $settings['settings'] ?? [],
-                        ]
-                    );
-                }
-            }
-
-            $this->clearNotificationCache($student);
-
-            return true;
-        });
-    }
 
     /**
      * Create notification for student
@@ -344,12 +262,16 @@ class NotificationService
             $query->where('type', $filters['type']);
         }
 
-        if (! empty($filters['priority'])) {
-            $query->where('priority', $filters['priority']);
+        if (isset($filters['is_important'])) {
+            $query->where('is_important', $filters['is_important']);
         }
 
         if (isset($filters['is_read'])) {
-            $query->where('is_read', $filters['is_read']);
+            if ($filters['is_read']) {
+                $query->read();
+            } else {
+                $query->unread();
+            }
         }
 
         if (! empty($filters['date_from'])) {
@@ -359,188 +281,15 @@ class NotificationService
         if (! empty($filters['date_to'])) {
             $query->whereDate('created_at', '<=', $filters['date_to']);
         }
+
+        // Filter out expired notifications by default unless specifically requested
+        if (!isset($filters['include_expired']) || !$filters['include_expired']) {
+            $query->notExpired();
+        }
     }
 
-    /**
-     * Format notifications for response
-     */
-    protected function formatNotifications(array $notifications): array
-    {
-        return collect($notifications)->map(function ($notification) {
-            return [
-                'id' => $notification->id,
-                'title' => $notification->title,
-                'message' => $notification->message,
-                'category' => $notification->category,
-                'category_display' => $this->getCategoryDisplay($notification->category),
-                'type' => $notification->type,
-                'priority' => $notification->priority,
-                'priority_display' => $this->getPriorityDisplay($notification->priority),
-                'is_read' => $notification->is_read,
-                'created_at' => $notification->created_at->toISOString(),
-                'read_at' => $notification->read_at?->toISOString(),
-                'expires_at' => $notification->expires_at?->toISOString(),
-                'action_url' => $notification->action_url,
-                'data' => $notification->data,
-                'time_ago' => $notification->created_at->diffForHumans(),
-                'is_urgent' => $notification->priority === 'high',
-                'is_expired' => $notification->expires_at && $notification->expires_at->isPast(),
-                'icon' => $this->getNotificationIcon($notification->category, $notification->type),
-                'color' => $this->getNotificationColor($notification->priority),
-            ];
-        })->toArray();
-    }
 
-    /**
-     * Get category display name
-     */
-    protected function getCategoryDisplay(string $category): string
-    {
-        return match ($category) {
-            'assessment' => 'Assessments',
-            'grade' => 'Grades',
-            'attendance' => 'Attendance',
-            'enrollment' => 'Enrollment',
-            'academic' => 'Academic',
-            'system' => 'System',
-            'announcement' => 'Announcements',
-            default => ucfirst($category),
-        };
-    }
 
-    /**
-     * Get category icon
-     */
-    protected function getCategoryIcon(string $category): string
-    {
-        return match ($category) {
-            'assessment' => 'clipboard-document-list',
-            'grade' => 'academic-cap',
-            'attendance' => 'user-check',
-            'enrollment' => 'user-plus',
-            'academic' => 'book-open',
-            'system' => 'cog-6-tooth',
-            'announcement' => 'megaphone',
-            default => 'bell',
-        };
-    }
-
-    /**
-     * Get category color
-     */
-    protected function getCategoryColor(string $category): string
-    {
-        return match ($category) {
-            'assessment' => '#f59e0b', // Amber
-            'grade' => '#22c55e',      // Green
-            'attendance' => '#3b82f6', // Blue
-            'enrollment' => '#8b5cf6', // Purple
-            'academic' => '#06b6d4',   // Cyan
-            'system' => '#6b7280',     // Gray
-            'announcement' => '#ef4444', // Red
-            default => '#6b7280',      // Gray
-        };
-    }
-
-    /**
-     * Get priority display name
-     */
-    protected function getPriorityDisplay(string $priority): string
-    {
-        return match ($priority) {
-            'low' => 'Low Priority',
-            'medium' => 'Medium Priority',
-            'high' => 'High Priority',
-            'urgent' => 'Urgent',
-            default => ucfirst($priority),
-        };
-    }
-
-    /**
-     * Get notification icon
-     */
-    protected function getNotificationIcon(string $category, string $type): string
-    {
-        return match ($type) {
-            'deadline' => 'clock',
-            'grade_release' => 'star',
-            'attendance_alert' => 'exclamation-triangle',
-            'enrollment_reminder' => 'calendar',
-            'system_update' => 'arrow-path',
-            default => $this->getCategoryIcon($category),
-        };
-    }
-
-    /**
-     * Get notification color based on priority
-     */
-    protected function getNotificationColor(string $priority): string
-    {
-        return match ($priority) {
-            'low' => '#6b7280',    // Gray
-            'medium' => '#3b82f6', // Blue
-            'high' => '#f59e0b',   // Amber
-            'urgent' => '#ef4444', // Red
-            default => '#6b7280',  // Gray
-        };
-    }
-
-    /**
-     * Get default notification preferences
-     */
-    protected function getDefaultPreferences(): array
-    {
-        return [
-            'assessment' => [
-                'email' => ['enabled' => true, 'settings' => []],
-                'push' => ['enabled' => true, 'settings' => []],
-                'sms' => ['enabled' => false, 'settings' => []],
-            ],
-            'grade' => [
-                'email' => ['enabled' => true, 'settings' => []],
-                'push' => ['enabled' => true, 'settings' => []],
-                'sms' => ['enabled' => false, 'settings' => []],
-            ],
-            'attendance' => [
-                'email' => ['enabled' => true, 'settings' => []],
-                'push' => ['enabled' => true, 'settings' => []],
-                'sms' => ['enabled' => false, 'settings' => []],
-            ],
-            'enrollment' => [
-                'email' => ['enabled' => true, 'settings' => []],
-                'push' => ['enabled' => false, 'settings' => []],
-                'sms' => ['enabled' => false, 'settings' => []],
-            ],
-            'academic' => [
-                'email' => ['enabled' => true, 'settings' => []],
-                'push' => ['enabled' => false, 'settings' => []],
-                'sms' => ['enabled' => false, 'settings' => []],
-            ],
-            'system' => [
-                'email' => ['enabled' => false, 'settings' => []],
-                'push' => ['enabled' => true, 'settings' => []],
-                'sms' => ['enabled' => false, 'settings' => []],
-            ],
-        ];
-    }
-
-    /**
-     * Get global notification settings
-     */
-    protected function getGlobalSettings(Student $student): array
-    {
-        return [
-            'email_notifications' => true,
-            'push_notifications' => true,
-            'sms_notifications' => false,
-            'quiet_hours' => [
-                'enabled' => false,
-                'start_time' => '22:00',
-                'end_time' => '08:00',
-            ],
-            'digest_frequency' => 'daily', // daily, weekly, never
-        ];
-    }
 
     /**
      * Send notification through enabled channels
