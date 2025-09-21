@@ -15,125 +15,60 @@ class NotificationResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'notifications' => $this->formatNotifications($this->resource['notifications']),
-            'pagination' => $this->resource['pagination'],
-            'summary' => $this->formatSummary($this->resource['summary']),
-            'categories' => $this->formatCategories($this->resource['categories']),
-            'generated_at' => now()->toISOString(),
+            'id' => $this->id,
+            'title' => $this->title,
+            'message' => $this->message,
+            'category' => [
+                'key' => $this->category->value,
+                'display' => $this->category->label(),
+//                'icon' => $this->getCategoryIcon($this->category->value),
+                'color' => $this->getCategoryColor($this->category->value),
+            ],
+//            'type' => $this->type,
+//            'importance' => [
+//                'level' => $this->is_important ? 'high' : 'normal',
+//                'display' => $this->is_important ? 'Important' : 'Normal',
+//                'color' => $this->is_important ? '#ef4444' : '#6b7280',
+//            ],
+            'is_read' => $this->is_read,
+            'is_important' => $this->is_important,
+//            'status' => [
+//                'is_expired' => $this->is_expired,
+//            ],
+            'time_ago' => $this->created_at->diffForHumans(),
+//            'timestamps' => [
+//                'created_at' => $this->created_at->toISOString(),
+//                'read_at' => $this->read_at?->toISOString(),
+//                'expires_at' => $this->expires_at?->toISOString(),
+
+//            ],
+//            'data' => $this->data ?? [],
+//            'channels' => $this->channels ?? [],
+//            'display' => [
+//                'icon' => $this->getNotificationIcon($this->category->value, $this->type),
+//                'color' => $this->is_important ? '#ef4444' : '#6b7280',
+//                'badge' => $this->getNotificationBadge(),
+//            ],
         ];
     }
 
-    /**
-     * Format notifications
-     */
-    protected function formatNotifications(array $notifications): array
-    {
-        return collect($notifications)->map(function ($notification) {
-            return [
-                'id' => $notification['id'],
-                'title' => $notification['title'],
-                'message' => $notification['message'],
-                'category' => [
-                    'key' => $notification['category'],
-                    'display' => $notification['category_display'],
-                    'icon' => $notification['icon'],
-                    'color' => $notification['color'],
-                ],
-                'type' => $notification['type'],
-                'priority' => [
-                    'level' => $notification['priority'],
-                    'display' => $notification['priority_display'],
-                    'color' => $notification['color'],
-                ],
-                'status' => [
-                    'is_read' => $notification['is_read'],
-                    'is_urgent' => $notification['is_urgent'],
-                    'is_expired' => $notification['is_expired'],
-                ],
-                'timestamps' => [
-                    'created_at' => $notification['created_at'],
-                    'read_at' => $notification['read_at'],
-                    'expires_at' => $notification['expires_at'],
-                    'time_ago' => $notification['time_ago'],
-                ],
-                'action_url' => $notification['action_url'],
-                'data' => $notification['data'],
-                'display' => [
-                    'icon' => $notification['icon'],
-                    'color' => $notification['color'],
-                    'badge' => $this->getNotificationBadge($notification),
-                ],
-            ];
-        })->toArray();
-    }
-
-    /**
-     * Format summary
-     */
-    protected function formatSummary(array $summary): array
-    {
-        return [
-            'counts' => [
-                'total' => $summary['total_notifications'],
-                'unread' => $summary['unread_notifications'],
-                'today' => $summary['today_notifications'],
-                'urgent' => $summary['urgent_notifications'],
-            ],
-            'metrics' => [
-                'read_percentage' => $summary['read_percentage'],
-                'engagement_level' => $this->getEngagementLevel($summary['read_percentage']),
-                'notification_frequency' => $this->getNotificationFrequency($summary['today_notifications']),
-            ],
-            'status_indicators' => [
-                'has_unread' => $summary['unread_notifications'] > 0,
-                'has_urgent' => $summary['urgent_notifications'] > 0,
-                'needs_attention' => $summary['urgent_notifications'] > 0 || $summary['unread_notifications'] > 10,
-            ],
-        ];
-    }
-
-    /**
-     * Format categories
-     */
-    protected function formatCategories(array $categories): array
-    {
-        return collect($categories)->map(function ($category) {
-            return [
-                'category' => $category['category'],
-                'display' => $category['category_display'],
-                'counts' => [
-                    'total' => $category['total_count'],
-                    'unread' => $category['unread_count'],
-                ],
-                'visual' => [
-                    'icon' => $category['icon'],
-                    'color' => $category['color'],
-                    'badge_count' => $category['unread_count'],
-                ],
-                'status' => [
-                    'has_unread' => $category['unread_count'] > 0,
-                    'activity_level' => $this->getCategoryActivityLevel($category['total_count']),
-                ],
-            ];
-        })->toArray();
-    }
 
     /**
      * Get notification badge information
      */
-    protected function getNotificationBadge(array $notification): array
+    protected function getNotificationBadge(): array
     {
         $badges = [];
 
-        if ($notification['is_urgent']) {
+        if ($this->is_important) {
             $badges[] = [
-                'type' => 'urgent',
-                'text' => 'Urgent',
+                'type' => 'important',
+                'text' => 'Important',
                 'color' => '#ef4444',
             ];
         }
 
-        if (! $notification['is_read']) {
+        if (!$this->is_read) {
             $badges[] = [
                 'type' => 'unread',
                 'text' => 'New',
@@ -141,7 +76,7 @@ class NotificationResource extends JsonResource
             ];
         }
 
-        if ($notification['is_expired']) {
+        if ($this->is_expired) {
             $badges[] = [
                 'type' => 'expired',
                 'text' => 'Expired',
@@ -150,10 +85,10 @@ class NotificationResource extends JsonResource
         }
 
         // Add category-specific badges
-        switch ($notification['category']) {
-            case 'assessment':
-                if (isset($notification['data']['days_until_due'])) {
-                    $days = $notification['data']['days_until_due'];
+        switch ($this->category->value) {
+            case 'academic':
+                if (isset($this->data['days_until_due'])) {
+                    $days = $this->data['days_until_due'];
                     if ($days <= 1) {
                         $badges[] = [
                             'type' => 'deadline',
@@ -164,10 +99,10 @@ class NotificationResource extends JsonResource
                 }
                 break;
 
-            case 'grade':
+            case 'finance':
                 $badges[] = [
-                    'type' => 'grade',
-                    'text' => 'New Grade',
+                    'type' => 'finance',
+                    'text' => 'Financial',
                     'color' => '#22c55e',
                 ];
                 break;
@@ -176,42 +111,55 @@ class NotificationResource extends JsonResource
         return $badges;
     }
 
+
     /**
-     * Get engagement level based on read percentage
+     * Get category icon
      */
-    protected function getEngagementLevel(float $readPercentage): string
+    protected function getCategoryIcon(string $category): string
     {
-        return match (true) {
-            $readPercentage >= 90 => 'high',
-            $readPercentage >= 70 => 'medium',
-            $readPercentage >= 50 => 'low',
-            default => 'very_low',
+        return match ($category) {
+            'academic' => 'book-open',
+            'system' => 'cog-6-tooth',
+            'finance' => 'banknotes',
+            'personal' => 'user',
+            'event' => 'calendar-days',
+            'club' => 'user-group',
+            'administrative' => 'building-office',
+            default => 'bell',
         };
     }
 
     /**
-     * Get notification frequency level
+     * Get category color
      */
-    protected function getNotificationFrequency(int $todayCount): string
+    protected function getCategoryColor(string $category): string
     {
-        return match (true) {
-            $todayCount >= 10 => 'high',
-            $todayCount >= 5 => 'medium',
-            $todayCount >= 1 => 'low',
-            default => 'none',
+        return match ($category) {
+            'academic' => '#06b6d4',   // Cyan
+            'system' => '#6b7280',     // Gray
+            'finance' => '#22c55e',    // Green
+            'personal' => '#8b5cf6',   // Purple
+            'event' => '#f59e0b',      // Amber
+            'club' => '#3b82f6',       // Blue
+            'administrative' => '#ef4444', // Red
+            default => '#6b7280',      // Gray
         };
     }
 
+
     /**
-     * Get category activity level
+     * Get notification icon
      */
-    protected function getCategoryActivityLevel(int $totalCount): string
+    protected function getNotificationIcon(string $category, string $type): string
     {
-        return match (true) {
-            $totalCount >= 20 => 'high',
-            $totalCount >= 10 => 'medium',
-            $totalCount >= 1 => 'low',
-            default => 'none',
+        return match ($type) {
+            'deadline' => 'clock',
+            'grade_release' => 'star',
+            'payment_due' => 'credit-card',
+            'system_update' => 'arrow-path',
+            'event_reminder' => 'calendar',
+            default => $this->getCategoryIcon($category),
         };
     }
+
 }

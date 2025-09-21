@@ -147,14 +147,14 @@ class CurriculumBySemesterResource extends JsonResource
                 'registered_subjects' => $summary['registered_subjects'],
             ],
             'percentages' => [
-                'completion_percentage' => $summary['total_subjects'] > 0 
-                    ? round(($summary['completed_subjects'] / $summary['total_subjects']) * 100, 1) 
+                'completion_percentage' => $summary['total_subjects'] > 0
+                    ? round(($summary['completed_subjects'] / $summary['total_subjects']) * 100, 1)
                     : 0,
-                'registration_percentage' => $summary['total_subjects'] > 0 
-                    ? round(($summary['registered_subjects'] / $summary['total_subjects']) * 100, 1) 
+                'registration_percentage' => $summary['total_subjects'] > 0
+                    ? round(($summary['registered_subjects'] / $summary['total_subjects']) * 100, 1)
                     : 0,
-                'progress_percentage' => $summary['total_subjects'] > 0 
-                    ? round((($summary['completed_subjects'] + $summary['current_subjects']) / $summary['total_subjects']) * 100, 1) 
+                'progress_percentage' => $summary['total_subjects'] > 0
+                    ? round((($summary['completed_subjects'] + $summary['current_subjects']) / $summary['total_subjects']) * 100, 1)
                     : 0,
             ],
             'semester_status' => $this->getSemesterStatus($summary),
@@ -179,14 +179,14 @@ class CurriculumBySemesterResource extends JsonResource
                 'registered_subjects' => $summary['registered_subjects'],
             ],
             'completion_metrics' => [
-                'overall_completion_percentage' => $summary['total_subjects'] > 0 
-                    ? round(($summary['completed_subjects'] / $summary['total_subjects']) * 100, 1) 
+                'overall_completion_percentage' => $summary['total_subjects'] > 0
+                    ? round(($summary['completed_subjects'] / $summary['total_subjects']) * 100, 1)
                     : 0,
-                'registration_coverage' => $summary['total_subjects'] > 0 
-                    ? round(($summary['registered_subjects'] / $summary['total_subjects']) * 100, 1) 
+                'registration_coverage' => $summary['total_subjects'] > 0
+                    ? round(($summary['registered_subjects'] / $summary['total_subjects']) * 100, 1)
                     : 0,
-                'active_participation' => $summary['total_subjects'] > 0 
-                    ? round((($summary['completed_subjects'] + $summary['current_subjects']) / $summary['total_subjects']) * 100, 1) 
+                'active_participation' => $summary['total_subjects'] > 0
+                    ? round((($summary['completed_subjects'] + $summary['current_subjects']) / $summary['total_subjects']) * 100, 1)
                     : 0,
             ],
             'curriculum_health' => $this->generateCurriculumHealth($summary),
@@ -199,8 +199,8 @@ class CurriculumBySemesterResource extends JsonResource
     protected function generateStudyProgressIndicators(): array
     {
         $summary = $this->resource['overall_summary'];
-        $completionPercentage = $summary['total_subjects'] > 0 
-            ? ($summary['completed_subjects'] / $summary['total_subjects']) * 100 
+        $completionPercentage = $summary['total_subjects'] > 0
+            ? ($summary['completed_subjects'] / $summary['total_subjects']) * 100
             : 0;
 
         return [
@@ -221,7 +221,7 @@ class CurriculumBySemesterResource extends JsonResource
     protected function generateRegistrationInsights(): array
     {
         $registrationRate = $this->calculateRegistrationRate();
-        
+
         return [
             'registration_analytics' => [
                 'current_registration_rate' => $registrationRate,
@@ -236,6 +236,10 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getUnitScopeDisplay(string $scope): string
     {
+        if ($scope === null) {
+            return 'Unspecified';
+        }
+
         return match($scope) {
             'common' => 'Core Subject',
             'specialization_specific' => 'Specialization Subject',
@@ -287,7 +291,7 @@ class CurriculumBySemesterResource extends JsonResource
         }
 
         if ($gradeInfo['final_letter_grade']) {
-            return $gradeInfo['final_letter_grade'] . 
+            return $gradeInfo['final_letter_grade'] .
                 ($gradeInfo['final_percentage'] ? " ({$gradeInfo['final_percentage']}%)" : '');
         }
 
@@ -305,7 +309,7 @@ class CurriculumBySemesterResource extends JsonResource
         }
 
         $gpa = $gradeInfo['grade_points'];
-        
+
         return [
             'performance_level' => match(true) {
                 $gpa >= 3.5 => 'excellent',
@@ -389,7 +393,7 @@ class CurriculumBySemesterResource extends JsonResource
     protected function calculateProgressContribution(array $subject): array
     {
         $creditPoints = $subject['unit']['credit_points'] ?? 0;
-        
+
         return [
             'credit_contribution' => $creditPoints,
             'completion_impact' => match($subject['study_status']['status']) {
@@ -402,8 +406,8 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function generateSemesterProgressIndicators(array $summary): array
     {
-        $completionRate = $summary['total_subjects'] > 0 
-            ? ($summary['completed_subjects'] / $summary['total_subjects']) * 100 
+        $completionRate = $summary['total_subjects'] > 0
+            ? ($summary['completed_subjects'] / $summary['total_subjects']) * 100
             : 0;
 
         return [
@@ -421,14 +425,14 @@ class CurriculumBySemesterResource extends JsonResource
 
         $activeSubjects = $summary['completed_subjects'] + $summary['current_subjects'] + $summary['registered_subjects'];
         $engagementRate = ($activeSubjects / $summary['total_subjects']) * 100;
-        
+
         return min(100, max(0, (int) round($engagementRate)));
     }
 
     protected function getSemesterStatus(array $summary): string
     {
-        $completionRate = $summary['total_subjects'] > 0 
-            ? ($summary['completed_subjects'] / $summary['total_subjects']) * 100 
+        $completionRate = $summary['total_subjects'] > 0
+            ? ($summary['completed_subjects'] / $summary['total_subjects']) * 100
             : 0;
 
         return match(true) {
@@ -442,7 +446,7 @@ class CurriculumBySemesterResource extends JsonResource
     protected function getSemesterHealthStatus(array $summary): string
     {
         $engagementScore = $this->calculateEngagementScore($summary);
-        
+
         return match(true) {
             $engagementScore >= 80 => 'excellent',
             $engagementScore >= 60 => 'good',
@@ -459,8 +463,8 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function generateCurriculumHealth(array $summary): array
     {
-        $completionRate = $summary['total_subjects'] > 0 
-            ? ($summary['completed_subjects'] / $summary['total_subjects']) * 100 
+        $completionRate = $summary['total_subjects'] > 0
+            ? ($summary['completed_subjects'] / $summary['total_subjects']) * 100
             : 0;
 
         return [
@@ -554,8 +558,8 @@ class CurriculumBySemesterResource extends JsonResource
     protected function calculateRegistrationRate(): float
     {
         $summary = $this->resource['overall_summary'];
-        return $summary['total_subjects'] > 0 
-            ? ($summary['registered_subjects'] / $summary['total_subjects']) * 100 
+        return $summary['total_subjects'] > 0
+            ? ($summary['registered_subjects'] / $summary['total_subjects']) * 100
             : 0;
     }
 
@@ -593,19 +597,19 @@ class CurriculumBySemesterResource extends JsonResource
     protected function identifyImprovementAreas(array $summary): array
     {
         $areas = [];
-        
-        $registrationRate = $summary['total_subjects'] > 0 
-            ? ($summary['registered_subjects'] / $summary['total_subjects']) * 100 
+
+        $registrationRate = $summary['total_subjects'] > 0
+            ? ($summary['registered_subjects'] / $summary['total_subjects']) * 100
             : 0;
-            
+
         if ($registrationRate < 50) {
             $areas[] = 'course_registration';
         }
-        
+
         if ($summary['not_started_subjects'] > $summary['completed_subjects']) {
             $areas[] = 'academic_progress';
         }
-        
+
         return $areas;
     }
 }

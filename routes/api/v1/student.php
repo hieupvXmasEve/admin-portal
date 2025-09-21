@@ -78,7 +78,7 @@ Route::middleware([
             // Course detail - full schedule and grades for enrolled course
             Route::get('/enrolled/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])
                 ->name('course-detail');
-            
+
             // Keep backward compatibility
             Route::get('/available/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])
                 ->name('course-detail-legacy');
@@ -162,11 +162,11 @@ Route::middleware([
         // Notification endpoints
         Route::prefix('notifications')->name('notifications.')->group(function () {
             Route::get('/', [NotificationController::class, 'index'])->name('index');
+            Route::get('/summary', [NotificationController::class, 'summary'])->name('summary');
             Route::post('/{notification}/mark-read', [NotificationController::class, 'markAsRead'])->name('mark-read');
+            Route::post('/mark-multiple-read', [NotificationController::class, 'markMultipleAsRead'])->name('mark-multiple-read');
             Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
-            Route::get('/preferences', [NotificationController::class, 'preferences'])->name('preferences');
-            Route::put('/preferences', [NotificationController::class, 'updatePreferences'])->name('update-preferences');
-            //            Route::post('/push-subscription', [NotificationController::class, 'subscribeToPush'])->name('push-subscription');
+            Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
         });
 
         // Academic calendar endpoints
@@ -189,7 +189,7 @@ Route::middleware([
             // Current student wallet
             Route::get('/', [StudentWalletController::class, 'show'])->name('show');
             Route::get('/summary', [StudentWalletController::class, 'summary'])->name('summary');
-            
+
             // Transaction endpoints
             Route::prefix('transactions')->name('transactions.')->group(function () {
                 Route::get('/', [WalletTransactionController::class, 'index'])->name('index');

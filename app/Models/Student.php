@@ -241,6 +241,14 @@ class Student extends StudentAuditableModel
         return $this->hasMany(WalletTransaction::class);
     }
 
+    /**
+     * Get all notifications for this student.
+     */
+    public function notifications(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(Notification::class, 'notifiable');
+    }
+
     public function hasActiveHolds(): bool
     {
         return $this->academicHolds()->where('status', 'active')->exists();
