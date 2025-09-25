@@ -21,11 +21,11 @@ class ProfileService
     {
         $cacheKey = "profile:student:{$student->id}";
 
-        return Cache::remember($cacheKey, 600, function () use ($student) {
+        return Cache::remember($cacheKey, 1, function () use ($student) {
             return [
-                'personal_info' => $this->getPersonalInfo($student),
-                'academic_info' => $this->getAcademicInfo($student),
-                'contact_info' => $this->getContactInfo($student),
+                'info' => $this->getPersonalInfo($student),
+//                'academic_info' => $this->getAcademicInfo($student),
+//                'contact_info' => $this->getContactInfo($student),
                 // 'enrollment_info' => $this->getEnrollmentInfo($student),
                 'preferences' => $this->getPreferences($student),
                 'profile_completion' => $this->calculateProfileCompletion($student),
@@ -142,7 +142,6 @@ class ProfileService
             'first_name' => $firstName,
             'last_name' => $lastName,
             'full_name' => $student->full_name,
-            'preferred_name' => $student->preferred_name,
             'date_of_birth' => $student->date_of_birth?->toDateString(),
             'gender' => $student->gender,
             'nationality' => $student->nationality,
@@ -150,6 +149,41 @@ class ProfileService
             'national_id' => $student->national_id,
             'cccd_address' => $student->cccd_address,
             'address' => $student->address,
+
+            'email' => $student->email,
+            'phone' => $student->phone,
+            'emergency_contact_name' => $student->emergency_contact_name,
+            'emergency_contact_phone' => $student->emergency_contact_phone,
+            'emergency_contact_relationship' => $student->emergency_contact_relationship,
+            'emergency_contact_email' => $student->emergency_contact_email,
+            'emergency_contact_name_1' => $student->emergency_contact_name_1,
+            'emergency_contact_email_1' => $student->emergency_contact_email_1,
+            'emergency_contact_phone_1' => $student->emergency_contact_phone_1,
+            'emergency_contact_relationship_1' => $student->emergency_contact_relationship_1,
+            'high_school_name' => $student->high_school_name,
+
+            'program' => [
+                'id' => $student->program?->id,
+                'name' => $student->program?->name,
+                'code' => $student->program?->code,
+                'degree_type' => $student->program?->degree_type,
+                'duration_years' => $student->program?->duration_years,
+            ],
+            'curriculum_version' => [
+                'id' => $student->curriculumVersion?->id,
+                'version' => $student->curriculumVersion?->version_code,
+                'effective_date' => $student->curriculumVersion?->effective_date?->toDateString(),
+            ],
+            'campus' => [
+                'id' => $student->campus?->id,
+                'name' => $student->campus?->name,
+                'code' => $student->campus?->code,
+                'location' => $student->campus?->location,
+            ],
+            'enrollment_date' => $student->admission_date?->toDateString(),
+            'expected_graduation_date' => $student->expected_graduation_date?->toDateString(),
+            'study_mode' => (string) ($student->study_mode ?? ''),
+            'status' => (string) ($student->status ?? ''),
         ];
     }
 
