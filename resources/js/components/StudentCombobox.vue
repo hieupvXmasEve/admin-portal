@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
+import ComboboxListInline from '@/components/ui/combobox/ComboboxListInline.vue';
 import { useApi } from '@/composables';
 import { cn } from '@/lib/utils';
 import type { Student } from '@/types/models';
@@ -18,6 +19,7 @@ interface Props {
     required?: boolean;
     status?: 'active' | 'inactive' | 'suspended';
     class?: string;
+    inDialog?: boolean;
 }
 
 interface StudentSearchData {
@@ -37,6 +39,7 @@ const props = withDefaults(defineProps<Props>(), {
     required: false,
     status: 'active',
     class: '',
+    inDialog: false,
 });
 
 const emit = defineEmits<{
@@ -89,7 +92,7 @@ const fetchStudents = async (query: string) => {
         const params: Record<string, any> = {
             page: '1',
             limit: '20',
-            status: props.status,
+            // status: props.status,
             query: query.trim(),
         };
 
@@ -180,6 +183,10 @@ const getEnrollmentStatusColor = (status: string) => {
 };
 
 // Watchers
+watch(searchQuery, (newQuery) => {
+    debouncedSearch(newQuery);
+});
+
 watch(
     () => props.modelValue,
     (newValue) => {
@@ -219,10 +226,88 @@ onMounted(() => {
                 </ComboboxTrigger>
             </ComboboxAnchor>
 
-            <ComboboxList class="w-[var(--reka-combobox-trigger-width)]">
+            <!-- Use inline version for dialogs to avoid portal conflicts -->
+            <ComboboxListInline v-if="inDialog" class="w-[var(--reka-combobox-trigger-width)]">
                 <!-- Search Input -->
                 <div class="relative w-full items-center">
-                    <ComboboxInput class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0" placeholder="Search students..." @update:model-value="debouncedSearch" />
+                    <ComboboxInput class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0" placeholder="Search students..." @update:model-value="(value) => (searchQuery = value)" />
+                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center px-3">
+                        <Search class="text-muted-foreground size-4" />
+                    </span>
+                </div>
+
+                <!-- Content with proper height and scrolling -->
+                <ComboboxViewport class="max-h-[300px] overflow-y-auto">
+                    <!-- Loading state -->
+                    <div v-if="loading" class="flex items-center justify-center py-6">
+                        <Loader2 class="size-4 animate-spin" />
+                        <span class="text-muted-foreground ml-2 text-sm">Loading students...</span>
+                    </div>
+
+                    <!-- Error state -->
+                    <div v-else-if="apiError" class="flex items-center justify-center py-6">
+                        <AlertCircle class="text-destructive size-4" />
+                        <span class="text-destructive ml-2 text-sm">{{ apiError }}</span>
+                    </div>
+
+                    <!-- Minimum characters message -->
+                    <div v-else-if="showMinimumCharactersMessage" class="flex items-center justify-center py-6">
+                        <span class="text-muted-foreground text-sm">Type at least 2 characters to search students</span>
+                    </div>
+
+                    <!-- Initial message when no search query -->
+                    <div v-else-if="showInitialMessage" class="flex items-center justify-center py-6">
+                        <span class="text-muted-foreground text-sm">Start typing to search for students...</span>
+                    </div>
+
+                    <!-- Empty states -->
+                    <ComboboxEmpty v-else-if="students.length === 0 && searchQuery.length >= 2"> No students found for "{{ searchQuery }}". </ComboboxEmpty>
+
+                    <!-- Student list -->
+                    <ComboboxGroup v-else-if="students.length > 0">
+                        <ComboboxItem v-for="student in students" :key="student.id" :value="student">
+                            <div class="flex w-full items-center gap-3">
+                                <Avatar class="size-8 shrink-0">
+                                    <AvatarFallback class="text-xs">
+                                        {{ getStudentInitials(student) }}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <p class="truncate text-sm font-medium">{{ student.full_name }}</p>
+                                        <Badge variant="outline" :class="getEnrollmentStatusColor(student.status)" class="shrink-0 text-xs">
+                                            {{ student.status }}
+                                        </Badge>
+                                    </div>
+                                    <div class="text-muted-foreground flex items-center gap-2 text-xs">
+                                        <span>{{ student.student_id }}</span>
+                                        <span>•</span>
+                                        <span class="truncate">{{ student.email }}</span>
+                                    </div>
+                                    <div v-if="student.program" class="text-muted-foreground mt-1 text-xs">
+                                        {{ student.program.name }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <ComboboxItemIndicator>
+                                <Check class="ml-auto size-4" />
+                            </ComboboxItemIndicator>
+                        </ComboboxItem>
+
+                        <!-- Results count indicator -->
+                        <div v-if="students.length === 20" class="border-t p-2 text-center">
+                            <span class="text-muted-foreground text-xs"> Showing first 20 results. Refine your search for more specific results. </span>
+                        </div>
+                    </ComboboxGroup>
+                </ComboboxViewport>
+            </ComboboxListInline>
+
+            <!-- Use normal portal version for non-dialog use -->
+            <ComboboxList v-else class="w-[var(--reka-combobox-trigger-width)]">
+                <!-- Search Input -->
+                <div class="relative w-full items-center">
+                    <ComboboxInput class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0" placeholder="Search students..." @update:model-value="(value) => (searchQuery = value)" />
                     <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center px-3">
                         <Search class="text-muted-foreground size-4" />
                     </span>

@@ -12,6 +12,13 @@ class ClubMemberRoleHistory extends Model
 {
     use HasFactory;
 
+    /**
+     * The table associated with the model.
+     *
+     * @var string
+     */
+    protected $table = 'club_member_roles_history';
+
     protected $fillable = [
         'club_member_id',
         'old_role',

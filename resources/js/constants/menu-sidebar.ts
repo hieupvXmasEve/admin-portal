@@ -1,6 +1,5 @@
 import type { NavItem } from '@/types';
 import {
-    Award,
     BarChart3,
     BookMarked,
     BookOpen,
@@ -11,29 +10,25 @@ import {
     ClipboardCheck,
     ClipboardList,
     Clock,
+    Club,
     DoorOpen,
     FileText,
     FormInput,
     GraduationCap,
     Layers,
     LayoutDashboard,
-    LineChart,
     Mail,
     MailPlus,
-    PieChart,
-    Presentation,
     School,
     Settings,
     Settings2,
     ShieldCheck,
-    Target,
-    TrendingUp,
     User,
     UserPlus,
     Users,
 } from 'lucide-vue-next';
 
-import { academicSummaryRoutes, attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, reportRoutes, studentRoutes, syllabusRoutes, systemRoutes } from '@/utils/routes';
+import { attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, studentRoutes, systemRoutes } from '@/utils/routes';
 
 export const mainNavItems: NavItem[] = [
     {
@@ -350,37 +345,37 @@ export const mainNavItems: NavItem[] = [
     //         },
     //     ],
     // },
-    {
-        title: 'Academic Summary',
-        href: '#',
-        icon: Presentation,
-        children: [
-            {
-                title: 'GPA Calculations',
-                href: academicSummaryRoutes.gpaCalculations(),
-                icon: Target,
-                requiredPermissions: ['view_grade'], // Will be implemented later
-            },
-            {
-                title: 'Degree Classification',
-                href: academicSummaryRoutes.degreeClassification(),
-                icon: Award,
-                requiredPermissions: ['view_grade'], // Will be implemented later
-            },
-            {
-                title: 'Transcript History',
-                href: academicSummaryRoutes.transcriptHistory(),
-                icon: FileText,
-                requiredPermissions: ['view_grade'], // Will be implemented later
-            },
-            {
-                title: 'Academic Performance Report',
-                href: academicSummaryRoutes.performanceReport(),
-                icon: LineChart,
-                requiredPermissions: ['view_grade'], // Will be implemented later
-            },
-        ],
-    },
+    // `{
+    //     title: 'Academic Summary',
+    //     href: '#',
+    //     icon: Presentation,
+    //     children: [
+    //         {
+    //             title: 'GPA Calculations',
+    //             href: academicSummaryRoutes.gpaCalculations(),
+    //             icon: Target,
+    //             requiredPermissions: ['view_grade'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Degree Classification',
+    //             href: academicSummaryRoutes.degreeClassification(),
+    //             icon: Award,
+    //             requiredPermissions: ['view_grade'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Transcript History',
+    //             href: academicSummaryRoutes.transcriptHistory(),
+    //             icon: FileText,
+    //             requiredPermissions: ['view_grade'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Academic Performance Report',
+    //             href: academicSummaryRoutes.performanceReport(),
+    //             icon: LineChart,
+    //             requiredPermissions: ['view_grade'], // Will be implemented later
+    //         },
+    //     ],
+    // },`
     // {
     //     title: 'Program Transfers & Course Retakes',
     //     href: '#',
@@ -412,65 +407,78 @@ export const mainNavItems: NavItem[] = [
     //         },
     //     ],
     // },
+    // {
+    //     title: 'Reports & Analytics',
+    //     href: '#',
+    //     icon: BarChart3,
+    //     children: [
+    //         {
+    //             title: 'Student Statistics',
+    //             href: reportRoutes.studentStatistics(),
+    //             icon: Users,
+    //             requiredPermissions: ['view_report'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Academic Performance Summary',
+    //             href: reportRoutes.performanceSummary(),
+    //             icon: TrendingUp,
+    //             requiredPermissions: ['view_report'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Attendance Summary',
+    //             href: reportRoutes.attendanceSummary(),
+    //             icon: Clock,
+    //             requiredPermissions: ['view_report'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'GPA Distribution Charts',
+    //             href: reportRoutes.gpaDistribution(),
+    //             icon: PieChart,
+    //             requiredPermissions: ['view_report'], // Will be implemented later
+    //         },
+    //     ],
+    // },
+    // {
+    //     title: 'Course Syllabus & Content',
+    //     href: '#',
+    //     icon: FileText,
+    //     children: [
+    //         {
+    //             title: 'Syllabi Management',
+    //             href: '#', // Will use dynamic routes based on unit
+    //             icon: FileText,
+    //             requiredPermissions: ['view_syllabus'],
+    //         },
+    //         {
+    //             title: 'Learning Materials',
+    //             href: syllabusRoutes.learningMaterials(),
+    //             icon: BookOpen,
+    //             requiredPermissions: ['view_syllabus'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Course Learning Outcomes',
+    //             href: syllabusRoutes.learningOutcomes(),
+    //             icon: Target,
+    //             requiredPermissions: ['view_syllabus'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Assessment Rubrics',
+    //             href: syllabusRoutes.assessmentRubrics(),
+    //             icon: CheckSquare,
+    //             requiredPermissions: ['view_syllabus'], // Will be implemented later
+    //         },
+    //     ],
+    // },
     {
-        title: 'Reports & Analytics',
+        title: 'Clubs',
         href: '#',
-        icon: BarChart3,
+        icon: Club,
         children: [
             {
-                title: 'Student Statistics',
-                href: reportRoutes.studentStatistics(),
-                icon: Users,
-                requiredPermissions: ['view_report'], // Will be implemented later
-            },
-            {
-                title: 'Academic Performance Summary',
-                href: reportRoutes.performanceSummary(),
-                icon: TrendingUp,
-                requiredPermissions: ['view_report'], // Will be implemented later
-            },
-            {
-                title: 'Attendance Summary',
-                href: reportRoutes.attendanceSummary(),
-                icon: Clock,
-                requiredPermissions: ['view_report'], // Will be implemented later
-            },
-            {
-                title: 'GPA Distribution Charts',
-                href: reportRoutes.gpaDistribution(),
-                icon: PieChart,
-                requiredPermissions: ['view_report'], // Will be implemented later
-            },
-        ],
-    },
-    {
-        title: 'Course Syllabus & Content',
-        href: '#',
-        icon: FileText,
-        children: [
-            {
-                title: 'Syllabi Management',
-                href: '#', // Will use dynamic routes based on unit
-                icon: FileText,
-                requiredPermissions: ['view_syllabus'],
-            },
-            {
-                title: 'Learning Materials',
-                href: syllabusRoutes.learningMaterials(),
-                icon: BookOpen,
-                requiredPermissions: ['view_syllabus'], // Will be implemented later
-            },
-            {
-                title: 'Course Learning Outcomes',
-                href: syllabusRoutes.learningOutcomes(),
-                icon: Target,
-                requiredPermissions: ['view_syllabus'], // Will be implemented later
-            },
-            {
-                title: 'Assessment Rubrics',
-                href: syllabusRoutes.assessmentRubrics(),
-                icon: CheckSquare,
-                requiredPermissions: ['view_syllabus'], // Will be implemented later
+                title: 'List',
+                href: systemRoutes.clubs.index(),
+                icon: Settings2,
+                requiredPermissions: ['view_clubs'],
             },
         ],
     },

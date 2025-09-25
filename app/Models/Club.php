@@ -31,7 +31,7 @@ class Club extends AuditableModel
     protected $casts = [
         'social_links' => 'array',
         'achievements' => 'array',
-        'founded_date' => 'date',
+        'founded_date' => 'date:Y-m-d',
     ];
 
     /**

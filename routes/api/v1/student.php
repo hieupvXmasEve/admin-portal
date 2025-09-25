@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Student\AttendanceController;
 use App\Http\Controllers\Api\V1\Student\AuthController;
 use App\Http\Controllers\Api\V1\Student\CalendarController;
+use App\Http\Controllers\Api\V1\Student\ClubController;
+use App\Http\Controllers\Api\V1\Student\ClubManagementController;
 use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
@@ -196,6 +198,25 @@ Route::middleware([
                 Route::get('/recent', [WalletTransactionController::class, 'recent'])->name('recent');
                 Route::get('/stats', [WalletTransactionController::class, 'stats'])->name('stats');
                 Route::get('/{transaction}', [WalletTransactionController::class, 'show'])->name('show');
+            });
+        });
+
+        // Club endpoints
+        Route::prefix('clubs')->name('clubs.')->group(function () {
+            // General club operations (available to all students)
+            Route::get('/', [ClubController::class, 'index'])->name('index');
+            Route::get('/my-memberships', [ClubController::class, 'myMemberships'])->name('my-memberships');
+            Route::get('/{club}', [ClubController::class, 'show'])->name('show');
+            Route::post('/{club}/apply', [ClubController::class, 'apply'])->name('apply');
+
+            // Club management operations (president only)
+            Route::middleware('can:manageMembers,club')->group(function () {
+                Route::get('/{club}/manage', [ClubManagementController::class, 'managementDashboard'])->name('manage');
+                Route::put('/{club}', [ClubManagementController::class, 'update'])->name('update');
+                Route::get('/{club}/members', [ClubManagementController::class, 'members'])->name('members');
+                Route::put('/{club}/members/{member}/approve', [ClubManagementController::class, 'approveMember'])->name('approve-member');
+                Route::put('/{club}/members/{member}/reject', [ClubManagementController::class, 'rejectMember'])->name('reject-member');
+                Route::put('/{club}/members/{member}/role', [ClubManagementController::class, 'updateMemberRole'])->name('update-member-role');
             });
         });
     }); // End either middleware group
