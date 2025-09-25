@@ -70,7 +70,7 @@ class AcademicStandingService
      */
     public function bulkUpdateStandings(Semester $semester, User $creator): array
     {
-        $students = Student::where('academic_status', 'active')->get();
+        $students = Student::academicallyActive()->get();
         $updated = 0;
         $errors = [];
 

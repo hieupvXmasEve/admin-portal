@@ -1,6 +1,7 @@
 export * from './auth-routes';
 export * from './campus-routes';
 export * from './class-session-routes';
+export * from './club-routes';
 export * from './course-offering-routes';
 export * from './course-registration-routes';
 export * from './curriculum-routes';

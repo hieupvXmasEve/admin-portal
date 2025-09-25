@@ -1,6 +1,7 @@
 import {
     CAMPUS_ROUTE_NAMES,
     CLASS_SESSION_ROUTE_NAMES,
+    CLUB_ROUTE_NAMES,
     COURSE_OFFERING_ROUTE_NAMES,
     COURSE_REGISTRATION_ROUTE_NAMES,
     CURRICULUM_ROUTE_NAMES,
@@ -94,7 +95,21 @@ export const systemRoutes = {
     // form
     form: {
         index: () => route('forms.review.index'),
-    }
+    },
+    // Club Management Routes
+    clubs: {
+        index: () => route(CLUB_ROUTE_NAMES.INDEX),
+        create: () => route(CLUB_ROUTE_NAMES.CREATE),
+        edit: (id: number) => route(CLUB_ROUTE_NAMES.EDIT, { club: id }),
+        show: (id: number) => route(CLUB_ROUTE_NAMES.SHOW, { club: id }),
+        store: () => route(CLUB_ROUTE_NAMES.STORE),
+        update: (id: number) => route(CLUB_ROUTE_NAMES.UPDATE, { club: id }),
+        destroy: (id: number) => route(CLUB_ROUTE_NAMES.DESTROY, { club: id }),
+        assignPresident: (id: number) => route(CLUB_ROUTE_NAMES.ASSIGN_PRESIDENT, { club: id }),
+        // API routes
+        studentsForAssignment: (id: number) => route(CLUB_ROUTE_NAMES.API_STUDENTS_FOR_ASSIGNMENT, { club: id }),
+        studentsForCampus: () => route(CLUB_ROUTE_NAMES.API_STUDENTS_FOR_CAMPUS),
+    },
 } as const;
 
 // Student Management Routes

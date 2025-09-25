@@ -485,7 +485,7 @@ class StudentController extends Controller
         if ($validated['status'] ?? null) {
             $query->where('status', $validated['status']);
         } else {
-            $query->where('status', 'active'); // Default to active students
+            $query->active(); // Default to active students
         }
 
         // Apply search query
@@ -700,7 +700,6 @@ class StudentController extends Controller
 
             // Return the download
             return Excel::download($export, $filename);
-
         } catch (\Exception $e) {
             Log::error('Student export failed', [
                 'campus_id' => $campusId,

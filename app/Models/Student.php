@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\Cache;
 
 class Student extends StudentAuditableModel
 {
@@ -249,6 +250,14 @@ class Student extends StudentAuditableModel
         return $this->morphMany(Notification::class, 'notifiable');
     }
 
+    /**
+     * Get the student's club memberships.
+     */
+    public function clubMemberships(): HasMany
+    {
+        return $this->hasMany(ClubMember::class);
+    }
+
     public function hasActiveHolds(): bool
     {
         return $this->academicHolds()->where('status', 'active')->exists();
@@ -266,6 +275,22 @@ class Student extends StudentAuditableModel
     public function isActive(): bool
     {
         return ! in_array($this->status, self::BLOCKED_STATUSES, true);
+    }
+
+    /**
+     * Scope a query to only include active students.
+     */
+    public function scopeActive($query)
+    {
+        return $query->whereNotIn('status', self::BLOCKED_STATUSES);
+    }
+
+    /**
+     * Scope a query to only include academically active students.
+     */
+    public function scopeAcademicallyActive($query)
+    {
+        return $query->where('academic_status', 'active');
     }
 
     public function generateStudentId(string $campusCode, int $year): string
@@ -374,5 +399,22 @@ class Student extends StudentAuditableModel
             'withdrawn' => 'gray',
             default => 'gray',
         };
+    }
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Clear cache khi student được tạo, cập nhật, hoặc xóa
+        static::created(function () {
+            Cache::tags(['students', 'clubs.students'])->flush();
+        });
+
+        static::updated(function () {
+            Cache::tags(['students', 'clubs.students'])->flush();
+        });
+
+        static::deleted(function () {
+            Cache::tags(['students', 'clubs.students'])->flush();
+        });
     }
 }

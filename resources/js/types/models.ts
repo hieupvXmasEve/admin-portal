@@ -1088,6 +1088,98 @@ export interface GraduationRequirement {
     updated_at: string;
 }
 
+// Club Management interfaces
+export interface Club {
+    id: number;
+    campus_id: number;
+    name: string;
+    description?: string;
+    founded_date?: string;
+    avatar_url?: string;
+    thumbnail_url?: string;
+    cover_url?: string;
+    social_links?: Record<string, string>;
+    contact_email?: string;
+    contact_phone?: string;
+    status: 'active' | 'inactive';
+    achievements?: string[];
+    campus?: Campus;
+    president?: ClubMember;
+    members?: ClubMember[];
+    active_members_count?: number;
+    pending_applications_count?: number;
+    officers_count?: number;
+    member_count?: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ClubMember {
+    id: number;
+    club_id: number;
+    student_id: number;
+    role: 'president' | 'vice_president' | 'secretary' | 'treasurer' | 'member';
+    status: 'active' | 'pending' | 'rejected' | 'left' | 'banned';
+    application_notes?: string;
+    approved_by?: number;
+    responsibilities?: string[];
+    participation_score: number;
+    last_active_at?: string;
+    joined_at?: string;
+    left_at?: string;
+    club?: Club;
+    student?: Student;
+    approver?: Student;
+    role_history?: ClubMemberRoleHistory[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ClubMemberRoleHistory {
+    id: number;
+    club_member_id: number;
+    old_role?: 'president' | 'vice_president' | 'secretary' | 'treasurer' | 'member';
+    new_role: 'president' | 'vice_president' | 'secretary' | 'treasurer' | 'member';
+    changed_by?: number;
+    change_reason?: string;
+    started_at: string;
+    ended_at?: string;
+    club_member?: ClubMember;
+    changed_by_user?: User;
+    created_at: string;
+    updated_at: string;
+}
+
+// Form data types for Club management
+export interface ClubFormData {
+    name: string;
+    description?: string;
+    campus_id: string;
+    founded_date?: string;
+    contact_email?: string;
+    contact_phone?: string;
+    social_links?: Record<string, string>;
+    president_student_id?: string;
+}
+
+export interface ClubApplicationFormData {
+    application_notes?: string;
+}
+
+export interface AssignPresidentFormData {
+    student_id: string;
+    assignment_reason?: string;
+}
+
+export interface UpdateRoleFormData {
+    role: 'president' | 'vice_president' | 'secretary' | 'treasurer' | 'member';
+    change_reason?: string;
+}
+
+export interface RejectMemberFormData {
+    rejection_reason?: string;
+}
+
 // Form data types for Room
 export interface RoomFormData {
     name: string;
