@@ -15,9 +15,9 @@ class ProfileResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'personal_info' => $this->formatPersonalInfo($this->resource['personal_info']),
-            'academic_info' => $this->formatAcademicInfo($this->resource['academic_info']),
-            'contact_info' => $this->formatContactInfo($this->resource['contact_info']),
+            'info' => $this->formatPersonalInfo($this->resource['info']),
+//            'academic_info' => $this->formatAcademicInfo($this->resource['academic_info']),
+//            'contact_info' => $this->formatContactInfo($this->resource['contact_info']),
             // 'enrollment_info' => $this->formatEnrollmentInfo($this->resource['enrollment_info']),
             'preferences' => $this->formatPreferences($this->resource['preferences']),
             'profile_completion' => $this->formatProfileCompletion($this->resource['profile_completion']),
@@ -30,47 +30,46 @@ class ProfileResource extends JsonResource
      */
     protected function formatPersonalInfo(array $personalInfo): array
     {
+        $program = $personalInfo['program'] ?? [];
+        $cv = $personalInfo['curriculum_version'] ?? [];
+        $campus = $personalInfo['campus'] ?? [];
+        $cvVersion = $cv['version'] ?? null;
+
+        $studyMode = (string)($personalInfo['study_mode'] ?? '');
+        $status = (string)($personalInfo['status'] ?? '');
+
         return [
             'student_id' => $personalInfo['student_id'],
-            'name' => [
-                'first_name' => $personalInfo['first_name'],
-                'last_name' => $personalInfo['last_name'],
-                'full_name' => $personalInfo['full_name'],
-                'preferred_name' => $personalInfo['preferred_name'],
-                'display_name' => $personalInfo['preferred_name'] ?: $personalInfo['full_name'],
-            ],
-            'personal_details' => [
-                'date_of_birth' => $personalInfo['date_of_birth'],
-                'age' => $personalInfo['date_of_birth']
-                    ? \Carbon\Carbon::parse($personalInfo['date_of_birth'])->age
-                    : null,
-                'gender' => $personalInfo['gender'],
-                'nationality' => $personalInfo['nationality'],
-                'national_id' => $personalInfo['national_id'],
-                'address' => $personalInfo['address'],
-                'cccd_address' => $personalInfo['cccd_address'],
-            ],
+            'first_name' => $personalInfo['first_name'],
+            'last_name' => $personalInfo['last_name'],
+            'full_name' => $personalInfo['full_name'],
+
+            'date_of_birth' => $personalInfo['date_of_birth'],
+            'age' => $personalInfo['date_of_birth']
+                ? \Carbon\Carbon::parse($personalInfo['date_of_birth'])->age
+                : null,
+            'gender' => $personalInfo['gender'],
+            'nationality' => $personalInfo['nationality'],
+            'national_id' => $personalInfo['national_id'],
+            'address' => $personalInfo['address'],
+            'email' => $personalInfo['email'],
+            'phone' => $personalInfo['phone'] ?? null,
+            'emergency_contact_name' => $personalInfo['emergency_contact_name'] ?? null,
+            'emergency_contact_phone' => $personalInfo['emergency_contact_phone'] ?? null,
+            'emergency_contact_relationship' => $personalInfo['emergency_contact_relationship'] ?? null,
+            'emergency_contact_email' => $personalInfo['emergency_contact_email'] ?? null,
+            'emergency_contact_name_1' => $personalInfo['emergency_contact_name_1'] ?? null,
+            'emergency_contact_email_1' => $personalInfo['emergency_contact_email_1'] ?? null,
+            'emergency_contact_phone_1' => $personalInfo['emergency_contact_phone_1'] ?? null,
+            'emergency_contact_relationship_1' => $personalInfo['emergency_contact_relationship_1'] ?? null,
+            'high_school_name' => $personalInfo['high_school_name'] ?? null,
+
+
+            'cccd_address' => $personalInfo['cccd_address'],
             'avatar' => [
                 'url' => $personalInfo['avatar_url'],
                 'has_avatar' => !empty($personalInfo['avatar_url']),
             ],
-        ];
-    }
-
-    /**
-     * Format academic information
-     */
-    protected function formatAcademicInfo(array $academicInfo): array
-    {
-        $program = $academicInfo['program'] ?? [];
-        $cv = $academicInfo['curriculum_version'] ?? [];
-        $campus = $academicInfo['campus'] ?? [];
-        $cvVersion = $cv['version'] ?? null;
-
-        $studyMode = (string)($academicInfo['study_mode'] ?? '');
-        $status = (string)($academicInfo['status'] ?? '');
-
-        return [
             'program' => [
                 'id' => $program['id'] ?? null,
                 'name' => $program['name'] ?? null,
@@ -103,75 +102,6 @@ class ProfileResource extends JsonResource
             ],
         ];
     }
-
-    /**
-     * Format contact information
-     */
-    protected function formatContactInfo(array $contactInfo): array
-    {
-        return [
-            'primary_contact' => [
-                'email' => $contactInfo['email'],
-                'phone' => $contactInfo['phone'],
-                'has_phone' => !empty($contactInfo['phone']),
-            ],
-            'emergency_contact' => [
-                'name' => $contactInfo['emergency_contact_name'],
-                'phone' => $contactInfo['emergency_contact_phone'],
-                'email' => $contactInfo['emergency_contact_email'],
-                'relationship' => $contactInfo['emergency_contact_relationship'],
-                'is_complete' => !empty($contactInfo['emergency_contact_name']) &&
-                    !empty($contactInfo['emergency_contact_phone']) && !empty($contactInfo['emergency_contact_email']),
-            ],
-            'emergency_contact_secondary' => [
-                'name' => $contactInfo['emergency_contact_name_1'] ?? "",
-                'email' => $contactInfo['emergency_contact_email_1'] ?? "",
-                'phone' => $contactInfo['emergency_contact_phone_1'] ?? "",
-                'relationship' => $contactInfo['emergency_contact_relationship_1'] ?? "",
-                'is_complete' => !empty($contactInfo['emergency_contact_name_1']) &&
-                    !empty($contactInfo['emergency_contact_phone_1']) && !empty($contactInfo['emergency_contact_email_1']),
-            ],
-            'address' => [
-                'street' => $contactInfo['address']['street'],
-                'city' => $contactInfo['address']['city'],
-                'state' => $contactInfo['address']['state'],
-                'postal_code' => $contactInfo['address']['postal_code'],
-                'country' => $contactInfo['address']['country'],
-                'formatted_address' => $this->formatAddress($contactInfo['address']),
-                'is_complete' => $this->isAddressComplete($contactInfo['address']),
-            ],
-            'high_school_name' => $contactInfo['high_school_name'],
-        ];
-    }
-
-    /**
-     * Format enrollment information
-     */
-    protected function formatEnrollmentInfo(array $enrollmentInfo): array
-    {
-        return [
-            'credit_summary' => [
-                'total_credits_earned' => $enrollmentInfo['total_credits_earned'],
-                'total_credits_required' => $enrollmentInfo['total_credits_required'],
-                'credits_remaining' => $enrollmentInfo['credits_remaining'],
-                'completion_percentage' => $enrollmentInfo['completion_percentage'],
-                'current_semester_credits' => $enrollmentInfo['current_semester_credits'],
-            ],
-            'progress_indicators' => [
-                'completion_status' => $this->getCompletionStatus($enrollmentInfo['completion_percentage']),
-                'progress_color' => $this->getProgressColor($enrollmentInfo['completion_percentage']),
-                'is_on_track' => $enrollmentInfo['completion_percentage'] >= 50, // Simplified logic
-                'academic_standing' => $enrollmentInfo['academic_standing'],
-                'standing_color' => $this->getStandingColor($enrollmentInfo['academic_standing']),
-            ],
-            'milestones' => [
-                'halfway_complete' => $enrollmentInfo['completion_percentage'] >= 50,
-                'near_graduation' => $enrollmentInfo['completion_percentage'] >= 80,
-                'ready_to_graduate' => $enrollmentInfo['completion_percentage'] >= 95,
-            ],
-        ];
-    }
-
     /**
      * Format preferences
      */
