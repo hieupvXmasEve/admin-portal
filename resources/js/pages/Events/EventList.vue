@@ -206,7 +206,7 @@ const handlePageSizeChange = (pageSize: number) => {
 
             <!-- Actions Slot -->
             <template #cell-actions="{ row }">
-                <div class="flex items-center justify-end space-x-2">
+                <div class="flex items-center justify-start space-x-2">
                     <Link :href="route('events.show', row.original.id)" class="text-indigo-600 hover:text-indigo-900"> View </Link>
                     <Link v-if="row.original.status === 'draft'" :href="route('events.edit', row.original.id)" class="text-blue-600 hover:text-blue-900"> Edit </Link>
                 </div>

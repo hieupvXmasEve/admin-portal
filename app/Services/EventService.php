@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\ProcessEventNotificationJob;
 use App\Models\Event;
 use App\Models\User;
 use App\Models\Campus;
@@ -117,8 +118,8 @@ class EventService
                 'published_at' => now(),
             ]);
 
-            // Send notifications to all campus students
-            $this->notificationService->notifyEventPublication($event);
+            // Queue notification job for better performance with large student populations
+            ProcessEventNotificationJob::dispatch($event->id, 'publication');
 
             Log::info('Event published', [
                 'event_id' => $event->id,
@@ -147,8 +148,8 @@ class EventService
                 'cancelled_at' => now(),
             ]);
 
-            // Notify all registered participants
-            $this->notificationService->notifyEventCancellation($event, $reason);
+            // Queue notification job for better performance
+            ProcessEventNotificationJob::dispatch($event->id, 'cancellation', ['reason' => $reason]);
 
             // Cancel all active participations
             $event->participants()
@@ -197,6 +198,9 @@ class EventService
             foreach ($checkedInParticipants as $participant) {
                 $participant->update(['status' => 'completed']);
             }
+
+            // Queue completion notifications
+            ProcessEventNotificationJob::dispatch($event->id, 'completion');
 
             Log::info('Event completed', [
                 'event_id' => $event->id,
