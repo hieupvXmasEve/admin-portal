@@ -170,6 +170,12 @@ Route::middleware([
             Route::post('/mark-multiple-read', [NotificationController::class, 'markMultipleAsRead'])->name('mark-multiple-read');
             Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
             Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
+
+            // Notification preferences
+            Route::prefix('preferences')->name('preferences.')->group(function () {
+                Route::get('/events', [\App\Http\Controllers\Api\V1\NotificationPreferenceController::class, 'getEventPreferences'])->name('events.get');
+                Route::put('/events', [\App\Http\Controllers\Api\V1\NotificationPreferenceController::class, 'updateEventPreferences'])->name('events.update');
+            });
         });
 
         // Academic calendar endpoints

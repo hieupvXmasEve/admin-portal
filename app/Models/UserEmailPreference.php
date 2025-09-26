@@ -45,6 +45,12 @@ class UserEmailPreference extends AuditableModel
     public const TYPE_ASSESSMENT_DEADLINE = 'assessment_deadline';
     public const TYPE_SYSTEM_ANNOUNCEMENT = 'system_announcement';
     public const TYPE_REMINDER = 'reminder';
+    public const TYPE_EVENT_PUBLICATION = 'event_publication';
+    public const TYPE_EVENT_REGISTRATION = 'event_registration';
+    public const TYPE_EVENT_CHECKIN = 'event_checkin';
+    public const TYPE_EVENT_GOLD_REWARD = 'event_gold_reward';
+    public const TYPE_EVENT_CANCELLATION = 'event_cancellation';
+    public const TYPE_EVENT_UPDATE = 'event_update';
     public const TYPE_ALL = 'all';
 
     /**
@@ -69,6 +75,12 @@ class UserEmailPreference extends AuditableModel
             self::TYPE_ASSESSMENT_DEADLINE => 'Assessment Deadlines',
             self::TYPE_SYSTEM_ANNOUNCEMENT => 'System Announcements',
             self::TYPE_REMINDER => 'Reminders',
+            self::TYPE_EVENT_PUBLICATION => 'Event Publications',
+            self::TYPE_EVENT_REGISTRATION => 'Event Registration Confirmations',
+            self::TYPE_EVENT_CHECKIN => 'Event Check-in Confirmations',
+            self::TYPE_EVENT_GOLD_REWARD => 'Event Gold Rewards',
+            self::TYPE_EVENT_CANCELLATION => 'Event Cancellations',
+            self::TYPE_EVENT_UPDATE => 'Event Updates',
             self::TYPE_ALL => 'All Notifications',
         ];
     }
