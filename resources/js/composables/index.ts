@@ -16,6 +16,12 @@ export { usePermissions } from './usePermissions';
 export { useImageUpload } from './useImageUpload';
 export { useUploadConfig } from './useUploadConfig';
 
+// Utility composables
+export { useInitials } from './useInitials';
+
+// QR Scanner composables
+export { useQRScanner } from './useQRScanner';
+
 // Add other composables here as they are created
 // export { useAuth } from './useAuth';
 // export { useNotifications } from './useNotifications';

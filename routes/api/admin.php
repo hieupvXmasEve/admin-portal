@@ -123,6 +123,15 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
         });
     });
 
+    // Event Check-in Management (Admin)
+    Route::prefix('events')->name('events.')->group(function () {
+        Route::post('/validate-qr', [\App\Http\Controllers\Api\EventCheckinController::class, 'validateQRCode'])->name('validate-qr');
+        Route::post('/search-student', [\App\Http\Controllers\Api\EventCheckinController::class, 'searchStudent'])->name('search-student');
+        Route::post('/checkin', [\App\Http\Controllers\Api\EventCheckinController::class, 'checkinStudent'])->name('checkin');
+        Route::get('/{event}/participants', [\App\Http\Controllers\Api\EventCheckinController::class, 'getParticipants'])->name('participants');
+        Route::get('/{event}/statistics', [\App\Http\Controllers\Api\EventCheckinController::class, 'getStatistics'])->name('statistics');
+    });
+
     // Student Wallet Management (Admin)
     Route::prefix('wallet')->name('wallet.')->group(function () {
         // Student-specific wallet operations

@@ -15,3 +15,7 @@ export const formatDateTime = (date: string, time: string) => {
 export const formatDateToShort = (date: string) => {
     return format(new Date(date), 'MMM dd, yyyy');
 };
+// time "2025-10-06T04:00:00.000000Z". format to DD/MM/YYYY HH:mm
+export const formatDateTimeToShort = (date: string) => {
+    return format(new Date(date), 'dd/MM/yyyy HH:mm');
+};

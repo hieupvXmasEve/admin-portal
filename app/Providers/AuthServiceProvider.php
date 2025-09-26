@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Club;
 use App\Models\ClubMember;
+use App\Models\Event;
 use App\Policies\ClubMemberPolicy;
 use App\Policies\ClubPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;

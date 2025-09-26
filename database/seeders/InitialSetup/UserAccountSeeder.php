@@ -48,7 +48,7 @@ class UserAccountSeeder extends Seeder
     private function createSuperAdminUser(): void
     {
         $superAdminEmails = [
-            'hieupv2412@gmail.com',
+            'hieupv28@fpt.edu.vn',
             'hienltt19@fpt.edu.vn',
             'trangnk16@fpt.edu.vn',
             'lienpt13@fpt.edu.vn',
@@ -73,13 +73,13 @@ class UserAccountSeeder extends Seeder
     private function generateSuperAdminName(string $email, int $index): string
     {
         $emailToName = [
-            'hieupv2412@gmail.com' => 'hieupv',
+            'hieupv28@fpt.edu.vn' => 'hieupv',
             'hienltt19@fpt.edu.vn' => 'hienltt',
             'trangnk16@fpt.edu.vn' => 'trangnk',
             'lienpt13@fpt.edu.vn' => 'lienpt',
         ];
 
-        return $emailToName[$email] ?? 'Super Admin '.($index + 1);
+        return $emailToName[$email] ?? 'Super Admin ' . ($index + 1);
     }
 
     private function createCampusAdminUsers(): void
@@ -88,10 +88,10 @@ class UserAccountSeeder extends Seeder
         $adminRole = Role::where('code', 'giam_doc_dao_tao')->first();
 
         $adminUsers = [
-            ['name' => 'Admin Hà Nội', 'email' => 'admin.hanoi@swinburne.edu.vn'],
-            ['name' => 'Admin Hồ Chí Minh', 'email' => 'admin.hcm@swinburne.edu.vn'],
-            ['name' => 'Admin Đà Nẵng', 'email' => 'admin.danang@swinburne.edu.vn'],
-            ['name' => 'Admin Cần Thơ', 'email' => 'admin.cantho@swinburne.edu.vn'],
+            ['name' => 'Admin Hà Nội', 'email' => 'admin.hanoi@fpt.edu.vn'],
+            ['name' => 'Admin Hồ Chí Minh', 'email' => 'admin.hcm@fpt.edu.vn'],
+            ['name' => 'Admin Đà Nẵng', 'email' => 'admin.danang@fpt.edu.vn'],
+            ['name' => 'Admin Cần Thơ', 'email' => 'admin.cantho@fpt.edu.vn'],
         ];
 
         foreach ($campuses as $index => $campus) {

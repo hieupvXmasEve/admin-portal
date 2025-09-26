@@ -110,6 +110,12 @@ export const systemRoutes = {
         studentsForAssignment: (id: number) => route(CLUB_ROUTE_NAMES.API_STUDENTS_FOR_ASSIGNMENT, { club: id }),
         studentsForCampus: () => route(CLUB_ROUTE_NAMES.API_STUDENTS_FOR_CAMPUS),
     },
+    events: {
+        index: () => route('events.index'),
+        create: () => route('events.create'),
+        edit: (id: number) => route('events.edit', { event: id }),
+        show: (id: number) => route('events.show', { event: id }),
+    },
 } as const;
 
 // Student Management Routes

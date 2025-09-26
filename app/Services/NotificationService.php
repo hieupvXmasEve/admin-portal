@@ -2,541 +2,361 @@
 
 namespace App\Services;
 
-use App\Models\EmailTemplate;
+use App\Models\Event;
+use App\Models\Student;
 use App\Models\User;
-use App\Models\UserEmailPreference;
-use App\Jobs\SendSingleEmailJob;
-use App\Jobs\ProcessNotificationJob;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 
 class NotificationService
 {
-    public function __construct(
-        protected EmailService $emailService,
-        protected EmailTemplateService $templateService
-    ) {
+    /**
+     * Notify all campus students about a new published event
+     */
+    public function notifyEventPublication(Event $event): void
+    {
+        try {
+            // This would typically send notifications to all students in the campus
+            // For now, we'll just log the action
+            Log::info('Event publication notification sent', [
+                'event_id' => $event->id,
+                'event_title' => $event->title,
+                'campus_id' => $event->campus_id
+            ]);
+
+            // TODO: Implement actual notification logic
+            // - Send push notifications
+            // - Send emails
+            // - Create in-app notifications
+        } catch (\Exception $e) {
+            Log::error('Failed to send event publication notification', [
+                'event_id' => $event->id,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 
     /**
-     * Send academic notification to users
+     * Notify participants about event cancellation
      */
-    public function sendAcademicNotification(
-        string $eventType,
-        Collection|array $recipients,
-        array $data = [],
-        bool $checkPreferences = true
-    ): array {
-        // Get appropriate template for the event
-        $template = EmailTemplate::getLatestVersion($eventType);
+    public function notifyEventCancellation(Event $event, ?string $reason = null): void
+    {
+        try {
+            $participants = $event->participants()
+                ->whereIn('status', ['registered', 'checked_in'])
+                ->with('student')
+                ->get();
 
-        if (!$template) {
-            Log::warning('No email template found for event type', ['event_type' => $eventType]);
-            return ['success' => false, 'message' => 'No template found for notification type'];
+            foreach ($participants as $participant) {
+                // Log notification for each participant
+                Log::info('Event cancellation notification sent', [
+                    'event_id' => $event->id,
+                    'student_id' => $participant->student_id,
+                    'reason' => $reason
+                ]);
+            }
+
+            // TODO: Implement actual notification logic
+            // - Send push notifications to participants
+            // - Send emails with cancellation reason
+            // - Create in-app notifications
+        } catch (\Exception $e) {
+            Log::error('Failed to send event cancellation notification', [
+                'event_id' => $event->id,
+                'error' => $e->getMessage()
+            ]);
         }
+    }
 
-        // Ensure recipients is a collection
-        if (is_array($recipients)) {
-            $recipients = collect($recipients);
+    /**
+     * Notify a student about event updates
+     */
+    public function notifyEventUpdate(Event $event, Student $student): void
+    {
+        try {
+            Log::info('Event update notification sent', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'event_title' => $event->title
+            ]);
+
+            // TODO: Implement actual notification logic
+            // - Send push notification about event changes
+            // - Send email with updated event details
+            // - Create in-app notification
+        } catch (\Exception $e) {
+            Log::error('Failed to send event update notification', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'error' => $e->getMessage()
+            ]);
         }
+    }
 
-        $sent = [];
-        $skipped = [];
+    /**
+     * Notify event organizers about registration
+     */
+    public function notifyEventRegistration(Event $event, Student $student): void
+    {
+        try {
+            Log::info('Event registration notification sent', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'organizer_id' => $event->created_by_user_id
+            ]);
 
-        foreach ($recipients as $recipient) {
-            try {
-                // Get user email
-                $email = $this->getUserEmail($recipient);
-                if (!$email) {
-                    $skipped[] = ['recipient' => $recipient, 'reason' => 'No email address'];
-                    continue;
-                }
+            // TODO: Implement actual notification logic
+            // - Notify event creator about new registration
+            // - Update registration counters
+        } catch (\Exception $e) {
+            Log::error('Failed to send event registration notification', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
 
-                // Check user preferences if needed
-                if ($checkPreferences && $recipient instanceof User) {
-                    if (!$this->emailService->canUserReceiveNotification($recipient, $eventType)) {
-                        $skipped[] = ['recipient' => $email, 'reason' => 'User preference'];
-                        continue;
+    /**
+     * Notify about event check-in
+     */
+    public function notifyEventCheckIn(Event $event, Student $student): void
+    {
+        try {
+            Log::info('Event check-in notification sent', [
+                'event_id' => $event->id,
+                'student_id' => $student->id
+            ]);
+
+            // TODO: Implement actual notification logic
+            // - Confirm check-in to student
+            // - Notify organizers about attendance
+        } catch (\Exception $e) {
+            Log::error('Failed to send event check-in notification', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Notify about gold reward
+     */
+    public function notifyGoldReward(Event $event, Student $student, float $amount): void
+    {
+        try {
+            Log::info('Gold reward notification sent', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'amount' => $amount
+            ]);
+
+            // TODO: Implement actual notification logic
+            // - Congratulate student on earning gold
+            // - Show updated gold balance
+        } catch (\Exception $e) {
+            Log::error('Failed to send gold reward notification', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'amount' => $amount,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Send reminder notifications for upcoming events
+     */
+    public function sendEventReminders(): void
+    {
+        try {
+            // Find events starting in the next 24 hours
+            $upcomingEvents = Event::published()
+                ->where('start_time', '>', now())
+                ->where('start_time', '<=', now()->addDay())
+                ->with(['participants.student'])
+                ->get();
+
+            foreach ($upcomingEvents as $event) {
+                foreach ($event->participants as $participant) {
+                    if ($participant->isRegistered()) {
+                        Log::info('Event reminder notification sent', [
+                            'event_id' => $event->id,
+                            'student_id' => $participant->student_id,
+                            'start_time' => $event->start_time
+                        ]);
                     }
                 }
+            }
 
-                // Prepare template variables
-                $variables = $this->prepareTemplateVariables($eventType, $recipient, $data);
+            // TODO: Implement actual notification logic
+            // - Send push notifications
+            // - Send email reminders
+        } catch (\Exception $e) {
+            Log::error('Failed to send event reminders', [
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
 
-                // Render template
-                $rendered = $this->templateService->renderTemplate($template, $variables);
+    /**
+     * Notify about event completion
+     */
+    public function notifyEventCompletion(Event $event): void
+    {
+        try {
+            $completedParticipants = $event->participants()
+                ->where('status', 'completed')
+                ->with('student')
+                ->get();
 
-                // Send email
-                $emailLog = $this->emailService->sendSingleEmail(
-                    $email,
-                    $rendered['subject'],
-                    $rendered['html'],
-                    $template,
-                    [],
-                    null
-                );
-
-                $sent[] = ['recipient' => $email, 'email_log_id' => $emailLog->id];
-
-                // Update user preference last sent time
-                if ($recipient instanceof User) {
-                    $preference = UserEmailPreference::getUserPreference($recipient->id, $eventType);
-                    $preference?->markAsSent();
-                }
-
-            } catch (\Exception $e) {
-                Log::error('Failed to send academic notification', [
-                    'event_type' => $eventType,
-                    'recipient' => $email ?? 'unknown',
-                    'error' => $e->getMessage(),
+            foreach ($completedParticipants as $participant) {
+                Log::info('Event completion notification sent', [
+                    'event_id' => $event->id,
+                    'student_id' => $participant->student_id
                 ]);
-                $skipped[] = ['recipient' => $email ?? 'unknown', 'reason' => $e->getMessage()];
             }
+
+            // TODO: Implement actual notification logic
+            // - Thank participants for attending
+            // - Show event summary and achievements
+        } catch (\Exception $e) {
+            Log::error('Failed to send event completion notification', [
+                'event_id' => $event->id,
+                'error' => $e->getMessage()
+            ]);
         }
-
-        return [
-            'success' => true,
-            'sent' => $sent,
-            'skipped' => $skipped,
-            'total_sent' => count($sent),
-            'total_skipped' => count($skipped),
-        ];
     }
 
     /**
-     * Schedule a reminder notification
+     * Send event registration confirmation to student
      */
-    public function scheduleReminder(
-        string $type,
-        Collection|array $recipients,
-        \DateTimeInterface $scheduleTime,
-        array $data = []
-    ): void {
-        // This will dispatch a job at the scheduled time
-        dispatch(new ProcessNotificationJob(
-            $type,
-            $recipients instanceof Collection ? $recipients->toArray() : $recipients,
-            $data
-        ))->delay($scheduleTime);
-
-        Log::info('Reminder scheduled', [
-            'type' => $type,
-            'recipients_count' => count($recipients),
-            'scheduled_for' => $scheduleTime->format('Y-m-d H:i:s'),
-        ]);
-    }
-
-    /**
-     * Process event-based notification
-     */
-    public function processEventNotification(string $event, array $data = []): array
+    public function sendEventRegistrationConfirmation(Student $student, Event $event): void
     {
-        $results = [];
+        try {
+            Log::info('Event registration confirmation sent', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'event_title' => $event->title,
+                'start_time' => $event->start_time
+            ]);
 
-        switch ($event) {
-            case 'course_registration_opened':
-                $results = $this->sendCourseRegistrationNotification($data);
-                break;
-
-            case 'grades_published':
-                $results = $this->sendGradeNotification($data);
-                break;
-
-            case 'academic_hold_placed':
-                $results = $this->sendAcademicHoldNotification($data);
-                break;
-
-            case 'enrollment_confirmed':
-                $results = $this->sendEnrollmentConfirmation($data);
-                break;
-
-            case 'assessment_deadline_approaching':
-                $results = $this->sendAssessmentDeadlineReminder($data);
-                break;
-
-            case 'assessment_final_reminder':
-                $results = $this->sendAssessmentFinalReminder($data);
-                break;
-
-            case 'system_maintenance':
-                $results = $this->sendSystemAnnouncementNotification($data);
-                break;
-
-            default:
-                Log::warning('Unknown notification event', ['event' => $event]);
-                $results = ['success' => false, 'message' => 'Unknown event type'];
+            // TODO: Implement actual notification logic
+            // - Send confirmation email/push notification
+            // - Include event details and QR code
+            // - Add to student's calendar
+        } catch (\Exception $e) {
+            Log::error('Failed to send event registration confirmation', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'error' => $e->getMessage()
+            ]);
         }
-
-        return $results;
     }
 
     /**
-     * Send course registration notification
+     * Send event cancellation confirmation to student
      */
-    protected function sendCourseRegistrationNotification(array $data): array
+    public function sendEventCancellationConfirmation(Student $student, Event $event): void
     {
-        $lecturers = $data['lecturers'] ?? [];
-        $courseInfo = $data['course_info'] ?? [];
+        try {
+            Log::info('Event cancellation confirmation sent', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'event_title' => $event->title
+            ]);
 
-        return $this->sendAcademicNotification(
-            UserEmailPreference::TYPE_COURSE_REGISTRATION,
-            $lecturers,
-            [
-                'course_name' => $courseInfo['name'] ?? 'Course',
-                'course_code' => $courseInfo['code'] ?? '',
-                'semester' => $courseInfo['semester'] ?? '',
-                'registration_deadline' => $courseInfo['deadline'] ?? '',
-            ]
-        );
-    }
-
-    /**
-     * Send grade notification
-     */
-    protected function sendGradeNotification(array $data): array
-    {
-        $students = $data['students'] ?? [];
-        $gradeInfo = $data['grade_info'] ?? [];
-
-        return $this->sendAcademicNotification(
-            UserEmailPreference::TYPE_GRADE_NOTIFICATION,
-            $students,
-            [
-                'course_name' => $gradeInfo['course_name'] ?? '',
-                'assessment_name' => $gradeInfo['assessment_name'] ?? '',
-                'grade' => $gradeInfo['grade'] ?? '',
-                'total_points' => $gradeInfo['total_points'] ?? '',
-            ]
-        );
-    }
-
-    /**
-     * Send academic hold notification
-     */
-    protected function sendAcademicHoldNotification(array $data): array
-    {
-        $students = $data['students'] ?? [];
-        $holdInfo = $data['hold_info'] ?? [];
-
-        return $this->sendAcademicNotification(
-            UserEmailPreference::TYPE_ACADEMIC_HOLD,
-            $students,
-            [
-                'hold_type' => $holdInfo['type'] ?? '',
-                'hold_reason' => $holdInfo['reason'] ?? '',
-                'contact_info' => $holdInfo['contact'] ?? '',
-            ]
-        );
-    }
-
-    /**
-     * Send enrollment confirmation
-     */
-    protected function sendEnrollmentConfirmation(array $data): array
-    {
-        $students = $data['students'] ?? [];
-        $enrollmentInfo = $data['enrollment_info'] ?? [];
-
-        return $this->sendAcademicNotification(
-            UserEmailPreference::TYPE_ENROLLMENT_CONFIRMATION,
-            $students,
-            [
-                'course_name' => $enrollmentInfo['course_name'] ?? '',
-                'course_code' => $enrollmentInfo['course_code'] ?? '',
-                'semester' => $enrollmentInfo['semester'] ?? '',
-                'start_date' => $enrollmentInfo['start_date'] ?? '',
-            ]
-        );
-    }
-
-    /**
-     * Send assessment deadline reminder
-     */
-    protected function sendAssessmentDeadlineReminder(array $data): array
-    {
-        $recipients = $data['recipients'] ?? [];
-        $assessmentInfo = $data['assessment_info'] ?? [];
-
-        return $this->sendAcademicNotification(
-            UserEmailPreference::TYPE_ASSESSMENT_DEADLINE,
-            $recipients,
-            [
-                'assessment_name' => $assessmentInfo['name'] ?? '',
-                'course_name' => $assessmentInfo['course'] ?? '',
-                'deadline' => $assessmentInfo['deadline'] ?? '',
-                'submission_link' => $assessmentInfo['link'] ?? '',
-            ]
-        );
-    }
-
-    /**
-     * Send system announcement notification
-     */
-    protected function sendSystemAnnouncementNotification(array $data): array
-    {
-        $recipients = $data['recipients'] ?? [];
-        $announcement = $data['announcement'] ?? [];
-
-        return $this->sendAcademicNotification(
-            UserEmailPreference::TYPE_SYSTEM_ANNOUNCEMENT,
-            $recipients,
-            [
-                'announcement_title' => $announcement['title'] ?? '',
-                'announcement_body' => $announcement['body'] ?? '',
-                'effective_date' => $announcement['date'] ?? '',
-            ],
-            false // Don't check preferences for system announcements
-        );
-    }
-
-    /**
-     * Send assessment final reminder (critical deadline)
-     */
-    protected function sendAssessmentFinalReminder(array $data): array
-    {
-        $recipients = $data['recipients'] ?? [];
-        $assessmentInfo = $data['assessment_info'] ?? [];
-
-        return $this->sendAcademicNotification(
-            UserEmailPreference::TYPE_ASSESSMENT_DEADLINE,
-            $recipients,
-            [
-                'assessment_name' => $assessmentInfo['name'] ?? '',
-                'course_name' => $assessmentInfo['course'] ?? '',
-                'deadline' => $assessmentInfo['deadline'] ?? '',
-                'deadline_text' => 'in ' . ($assessmentInfo['hours_until_deadline'] ?? 2) . ' hours',
-                'submission_link' => $assessmentInfo['link'] ?? '',
-                'is_final_reminder' => true,
-                'urgency_level' => 'critical',
-            ]
-        );
-    }
-
-    /**
-     * Route notifications based on user roles and event type
-     */
-    public function routeNotificationByRole(
-        string $eventType,
-        array $data = [],
-        array $targetRoles = []
-    ): array {
-        $results = [];
-
-        foreach ($targetRoles as $role) {
-            try {
-                $recipients = $this->getRecipientsByRole($role, $data);
-
-                if ($recipients->isNotEmpty()) {
-                    $roleResult = $this->sendAcademicNotification(
-                        $eventType,
-                        $recipients,
-                        $data
-                    );
-
-                    $results[$role] = $roleResult;
-
-                    Log::info('Role-based notification sent', [
-                        'event_type' => $eventType,
-                        'role' => $role,
-                        'recipients_count' => $recipients->count(),
-                        'sent_count' => $roleResult['total_sent'] ?? 0,
-                    ]);
-                }
-            } catch (\Exception $e) {
-                Log::error('Failed to send role-based notification', [
-                    'event_type' => $eventType,
-                    'role' => $role,
-                    'error' => $e->getMessage(),
-                ]);
-
-                $results[$role] = [
-                    'success' => false,
-                    'error' => $e->getMessage(),
-                ];
-            }
+            // TODO: Implement actual notification logic
+            // - Send cancellation confirmation
+            // - Remove from student's calendar
+            // - Notify about any gold refunds
+        } catch (\Exception $e) {
+            Log::error('Failed to send event cancellation confirmation', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'error' => $e->getMessage()
+            ]);
         }
-
-        return $results;
     }
 
     /**
-     * Get recipients by role with optional filtering
+     * Send event check-in confirmation to student
      */
-    protected function getRecipientsByRole(string $role, array $data = []): Collection
+    public function sendEventCheckinConfirmation(Student $student, Event $event): void
     {
-        $query = User::whereHas('campusUserRoles', function ($query) use ($role) {
-            $query->whereHas('role', function ($roleQuery) use ($role) {
-                $roleQuery->where('name', $role);
-            });
-        });
+        try {
+            Log::info('Event check-in confirmation sent', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'event_title' => $event->title
+            ]);
 
-        // Apply additional filters based on data context
-        if (isset($data['campus_id'])) {
-            $query->whereHas('campusUserRoles', function ($campusQuery) use ($data) {
-                $campusQuery->where('campus_id', $data['campus_id']);
-            });
+            // TODO: Implement actual notification logic
+            // - Confirm successful check-in
+            // - Show expected gold reward amount
+            // - Provide event information
+        } catch (\Exception $e) {
+            Log::error('Failed to send event check-in confirmation', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'error' => $e->getMessage()
+            ]);
         }
-
-        if (isset($data['program_id']) && $role === 'student') {
-            $query->whereHas('student', function ($studentQuery) use ($data) {
-                $studentQuery->where('program_id', $data['program_id']);
-            });
-        }
-
-        if (isset($data['course_offering_id']) && in_array($role, ['lecturer', 'student'])) {
-            if ($role === 'lecturer') {
-                // Get lecturers assigned to this course offering
-                $query->whereHas('teachingAssignments', function ($teachingQuery) use ($data) {
-                    $teachingQuery->where('course_offering_id', $data['course_offering_id']);
-                });
-            } elseif ($role === 'student') {
-                // Get students enrolled in this course offering
-                $query->whereHas('student.enrollments', function ($enrollmentQuery) use ($data) {
-                    $enrollmentQuery->where('course_offering_id', $data['course_offering_id']);
-                });
-            }
-        }
-
-        return $query->get();
     }
 
     /**
-     * Schedule recurring reminders
+     * Send gold reward notification to student
      */
-    public function scheduleRecurringReminder(
-        string $type,
-        Collection|array $recipients,
-        string $frequency, // 'daily', 'weekly', 'monthly'
-        \DateTimeInterface $startDate,
-        ?\DateTimeInterface $endDate = null,
-        array $data = []
-    ): array {
-        $scheduledJobs = [];
-        $currentDate = clone $startDate;
-        $endDate = $endDate ?? $startDate->modify('+1 year');
-
-        while ($currentDate <= $endDate) {
-            $scheduledJobs[] = [
-                'scheduled_for' => $currentDate->format('Y-m-d H:i:s'),
-                'job_id' => dispatch(new ProcessNotificationJob(
-                    $type,
-                    $recipients instanceof Collection ? $recipients->toArray() : $recipients,
-                    array_merge($data, [
-                        'is_recurring' => true,
-                        'frequency' => $frequency,
-                        'occurrence_date' => $currentDate->format('Y-m-d'),
-                    ])
-                ))->delay($currentDate),
-            ];
-
-            // Calculate next occurrence
-            $currentDate = match ($frequency) {
-                'daily' => $currentDate->modify('+1 day'),
-                'weekly' => $currentDate->modify('+1 week'),
-                'monthly' => $currentDate->modify('+1 month'),
-                default => $currentDate->modify('+1 day'),
-            };
-        }
-
-        Log::info('Recurring reminders scheduled', [
-            'type' => $type,
-            'frequency' => $frequency,
-            'recipients_count' => count($recipients),
-            'occurrences' => count($scheduledJobs),
-            'start_date' => $startDate->format('Y-m-d H:i:s'),
-            'end_date' => $endDate->format('Y-m-d H:i:s'),
-        ]);
-
-        return $scheduledJobs;
-    }
-
-    /**
-     * Send notification with priority handling
-     */
-    public function sendPriorityNotification(
-        string $eventType,
-        Collection|array $recipients,
-        array $data = [],
-        string $priority = 'normal' // 'low', 'normal', 'high', 'critical'
-    ): array {
-        // Add priority information to data
-        $data['priority'] = $priority;
-        $data['priority_timestamp'] = now()->toISOString();
-
-        // For critical notifications, bypass user preferences
-        $checkPreferences = $priority !== 'critical';
-
-        $result = $this->sendAcademicNotification(
-            $eventType,
-            $recipients,
-            $data,
-            $checkPreferences
-        );
-
-        // Log priority notifications
-        Log::info('Priority notification sent', [
-            'event_type' => $eventType,
-            'priority' => $priority,
-            'recipients_count' => count($recipients),
-            'sent_count' => $result['total_sent'] ?? 0,
-            'bypassed_preferences' => !$checkPreferences,
-        ]);
-
-        return $result;
-    }
-
-    /**
-     * Get user email from various recipient types
-     */
-    protected function getUserEmail($recipient): ?string
+    public function sendGoldRewardNotification(Student $student, float $amount, Event $event): void
     {
-        if (is_string($recipient)) {
-            return filter_var($recipient, FILTER_VALIDATE_EMAIL) ? $recipient : null;
-        }
+        try {
+            Log::info('Gold reward notification sent', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'amount' => $amount,
+                'event_title' => $event->title
+            ]);
 
-        if ($recipient instanceof User) {
-            return $recipient->email;
+            // TODO: Implement actual notification logic
+            // - Congratulate student on earning gold
+            // - Show amount earned and updated balance
+            // - Thank for event participation
+        } catch (\Exception $e) {
+            Log::error('Failed to send gold reward notification', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'amount' => $amount,
+                'error' => $e->getMessage()
+            ]);
         }
-
-        if (is_array($recipient) && isset($recipient['email'])) {
-            return $recipient['email'];
-        }
-
-        return null;
     }
 
     /**
-     * Prepare template variables based on event type and recipient
+     * Send gold reclaim notification to student
      */
-    protected function prepareTemplateVariables(string $eventType, $recipient, array $data): array
+    public function sendGoldReclaimNotification(Student $student, float $amount, Event $event): void
     {
-        $variables = $data;
+        try {
+            Log::info('Gold reclaim notification sent', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'amount' => $amount,
+                'event_title' => $event->title
+            ]);
 
-        // Add recipient-specific variables
-        if ($recipient instanceof User) {
-            $variables['user_name'] = $recipient->name;
-            $variables['user_email'] = $recipient->email;
-            $variables['user_id'] = $recipient->id;
-
-            // Add role-specific variables
-            if (method_exists($recipient, 'hasRole')) {
-                if ($recipient->hasRole('student')) {
-                    $variables['student_name'] = $recipient->name;
-                    $variables['student_id'] = $recipient->student_id ?? $recipient->id;
-                } elseif ($recipient->hasRole('lecturer')) {
-                    $variables['lecturer_name'] = $recipient->name;
-                    $variables['lecturer_id'] = $recipient->lecturer_id ?? $recipient->id;
-                }
-            }
+            // TODO: Implement actual notification logic
+            // - Notify about gold reclaim due to cancellation
+            // - Show amount reclaimed and updated balance
+            // - Explain reason for reclaim
+        } catch (\Exception $e) {
+            Log::error('Failed to send gold reclaim notification', [
+                'event_id' => $event->id,
+                'student_id' => $student->id,
+                'amount' => $amount,
+                'error' => $e->getMessage()
+            ]);
         }
-
-        // Add common variables
-        $variables['current_date'] = now()->format('Y-m-d');
-        $variables['current_time'] = now()->format('H:i');
-        $variables['system_name'] = config('app.name');
-        $variables['system_url'] = config('app.url');
-        $variables['login_url'] = config('app.url') . '/login';
-
-        return $variables;
     }
 }

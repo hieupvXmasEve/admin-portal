@@ -56,7 +56,9 @@ class CurriculumBySemesterResource extends JsonResource
                     'year_level' => $subject['curriculum_unit']['year_level'],
                     'semester_number' => $subject['curriculum_unit']['semester_number'],
                     'unit_scope' => $subject['curriculum_unit']['unit_scope'],
-                    'unit_scope_display' => $this->getUnitScopeDisplay($subject['curriculum_unit']['unit_scope']),
+                    'unit_scope_display' => $subject['curriculum_unit']['unit_scope'] !== null
+                        ? $this->getUnitScopeDisplay($subject['curriculum_unit']['unit_scope'])
+                        : null,
                     'note' => $subject['curriculum_unit']['note'],
                 ],
                 'unit' => [
@@ -240,7 +242,7 @@ class CurriculumBySemesterResource extends JsonResource
             return 'Unspecified';
         }
 
-        return match($scope) {
+        return match ($scope) {
             'common' => 'Core Subject',
             'specialization_specific' => 'Specialization Subject',
             'cross_program' => 'Elective Subject',
@@ -250,7 +252,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getStudyStatusColor(string $status): string
     {
-        return match($status) {
+        return match ($status) {
             'completed' => 'green',
             'in_progress' => 'blue',
             'registered' => 'purple',
@@ -262,7 +264,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getStudyStatusIcon(string $status): string
     {
-        return match($status) {
+        return match ($status) {
             'completed' => 'check-circle',
             'in_progress' => 'clock',
             'registered' => 'bookmark',
@@ -274,7 +276,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getStudyStatusPriority(string $status): int
     {
-        return match($status) {
+        return match ($status) {
             'completed' => 4,
             'in_progress' => 3,
             'registered' => 2,
@@ -311,14 +313,14 @@ class CurriculumBySemesterResource extends JsonResource
         $gpa = $gradeInfo['grade_points'];
 
         return [
-            'performance_level' => match(true) {
+            'performance_level' => match (true) {
                 $gpa >= 3.5 => 'excellent',
                 $gpa >= 3.0 => 'good',
                 $gpa >= 2.5 => 'satisfactory',
                 $gpa >= 2.0 => 'needs_improvement',
                 default => 'poor',
             },
-            'color' => match(true) {
+            'color' => match (true) {
                 $gpa >= 3.5 => 'green',
                 $gpa >= 3.0 => 'blue',
                 $gpa >= 2.5 => 'yellow',
@@ -330,7 +332,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getRegistrationStatusDisplay(string $status): string
     {
-        return match($status) {
+        return match ($status) {
             'pending' => 'Pending',
             'registered' => 'Registered',
             'confirmed' => 'Confirmed',
@@ -344,7 +346,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getRegistrationStatusColor(string $status): string
     {
-        return match($status) {
+        return match ($status) {
             'pending' => 'yellow',
             'registered' => 'blue',
             'confirmed' => 'green',
@@ -358,7 +360,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getRegistrationStatusIcon(string $status): string
     {
-        return match($status) {
+        return match ($status) {
             'pending' => 'clock',
             'registered' => 'bookmark',
             'confirmed' => 'check-circle',
@@ -396,7 +398,7 @@ class CurriculumBySemesterResource extends JsonResource
 
         return [
             'credit_contribution' => $creditPoints,
-            'completion_impact' => match($subject['study_status']['status']) {
+            'completion_impact' => match ($subject['study_status']['status']) {
                 'completed' => $creditPoints,
                 'in_progress' => $creditPoints * 0.5, // Partial credit for current subjects
                 default => 0,
@@ -435,7 +437,7 @@ class CurriculumBySemesterResource extends JsonResource
             ? ($summary['completed_subjects'] / $summary['total_subjects']) * 100
             : 0;
 
-        return match(true) {
+        return match (true) {
             $completionRate >= 100 => 'completed',
             $completionRate >= 50 => 'in_progress',
             $summary['registered_subjects'] > 0 => 'active',
@@ -447,7 +449,7 @@ class CurriculumBySemesterResource extends JsonResource
     {
         $engagementScore = $this->calculateEngagementScore($summary);
 
-        return match(true) {
+        return match (true) {
             $engagementScore >= 80 => 'excellent',
             $engagementScore >= 60 => 'good',
             $engagementScore >= 40 => 'fair',
@@ -493,7 +495,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getHealthStatus(float $completionRate): string
     {
-        return match(true) {
+        return match (true) {
             $completionRate >= 80 => 'excellent',
             $completionRate >= 60 => 'good',
             $completionRate >= 40 => 'fair',
@@ -504,7 +506,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getOverallProgressStatus(float $percentage): string
     {
-        return match(true) {
+        return match (true) {
             $percentage >= 90 => 'nearing_completion',
             $percentage >= 75 => 'advanced',
             $percentage >= 50 => 'intermediate',
@@ -515,7 +517,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getProgressColor(float $percentage): string
     {
-        return match(true) {
+        return match (true) {
             $percentage >= 80 => 'green',
             $percentage >= 60 => 'blue',
             $percentage >= 40 => 'yellow',
@@ -526,7 +528,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getProgressMilestone(float $percentage): string
     {
-        return match(true) {
+        return match (true) {
             $percentage >= 100 => 'graduation_ready',
             $percentage >= 75 => 'senior_level',
             $percentage >= 50 => 'mid_program',
@@ -565,7 +567,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getRegistrationTrend(float $rate): string
     {
-        return match(true) {
+        return match (true) {
             $rate >= 80 => 'highly_engaged',
             $rate >= 60 => 'well_engaged',
             $rate >= 40 => 'moderately_engaged',
@@ -576,7 +578,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getEngagementLevel(float $rate): string
     {
-        return match(true) {
+        return match (true) {
             $rate >= 75 => 'high',
             $rate >= 50 => 'medium',
             $rate >= 25 => 'low',

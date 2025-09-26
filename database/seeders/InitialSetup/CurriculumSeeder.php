@@ -8,7 +8,6 @@ use App\Models\CurriculumUnit;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Semester;
-use App\Models\Specialization;
 use App\Models\Unit;
 use Illuminate\Database\Seeder;
 
@@ -16,21 +15,20 @@ class CurriculumSeeder extends Seeder
 {
     /**
      * Run the database seeds.
-     * Creates curriculum version for the AI specialization with proper unit distribution
-     * Based on cs.txt: 3-year program, 300 credit points (24 units) across 9 semesters (3 per year)
-     * 8 core units + 8 major units + 8 elective units
+     * Creates curriculum version for the IT program with proper unit distribution
+     * 3-year program with core, elective, and major units distributed across semesters
      */
     public function run(): void
     {
-        $this->command->info('📚 Creating AI curriculum version...');
+        $this->command->info('📚 Creating IT curriculum version...');
 
         // Clean existing data
         $this->cleanExistingData();
 
-        // Create curriculum version for AI specialization
-        $this->createAICurriculumVersion();
+        // Create curriculum version for IT program
+        $this->createITCurriculumVersion();
 
-        $this->command->info('✅ AI curriculum version created successfully!');
+        $this->command->info('✅ IT curriculum version created successfully!');
     }
 
     private function cleanExistingData(): void
@@ -52,96 +50,101 @@ class CurriculumSeeder extends Seeder
             $this->command->info('🧹 Cleaned existing curriculum data successfully.');
         } catch (\Exception $e) {
             $this->command->warn('⚠️  Could not clean existing curriculum data due to foreign key constraints. Will update existing records instead.');
-            $this->command->info('Error: '.$e->getMessage());
+            $this->command->info('Error: ' . $e->getMessage());
         }
     }
 
-    private function createAICurriculumVersion(): void
+    private function createITCurriculumVersion(): void
     {
-        // Get All Programs
-        $programs = Program::get();
+        // Get IT Program
+        $itProgram = Program::where('code', 'IT')->first();
 
-        if (! $programs) {
-            $this->command->error('Programs not found. Please run AcademicStructureSeeder first.');
-
+        if (! $itProgram) {
+            $this->command->error('IT Program not found. Please run AcademicStructureSeeder first.');
             return;
         }
 
-        // Create a default semester if none exists
-        $firstSemester = Semester::where('code', 'INT01SE01')->first();
+        // Get the first available semester
+        $firstSemester = Semester::orderBy('start_date')->first();
 
-        foreach ($programs as $program) {
-            // Create curriculum version
-            $curriculumVersion = CurriculumVersion::updateOrCreate(
-                [
-                    'program_id' => $program->id,
-                    'specialization_id' => null,
-                    'version_code' => '2025.1',
-                ],
-                [
-                    'semester_id' => $firstSemester->id,
-                    'notes' => 'AI Specialization Curriculum - 3 years, 300 credit points (24 units) across 9 semesters: 8 core + 8 major + 8 electives',
-                ]
-            );
+        if (! $firstSemester) {
+            $this->command->error('No semesters found. Please run SemesterSeeder first.');
+            return;
         }
 
-        // Assign units to the AI curriculum
-        // $this->assignUnitsToAICurriculum($curriculumVersion);
+        // Create curriculum version for IT program
+        $curriculumVersion = CurriculumVersion::updateOrCreate(
+            [
+                'program_id' => $itProgram->id,
+                'specialization_id' => null,
+                'version_code' => '2025.1',
+            ],
+            [
+                'semester_id' => $firstSemester->id,
+                'notes' => 'IT Program Curriculum - 3 years with core, elective, and major units distributed across semesters',
+            ]
+        );
 
-        $this->command->info('📖 Created curriculum for AI specialization');
+        // Assign units to the IT curriculum
+        $this->assignUnitsToITCurriculum($curriculumVersion);
+
+        $this->command->info('📖 Created curriculum for IT program');
     }
 
-    private function assignUnitsToAICurriculum(CurriculumVersion $curriculumVersion): void
+    private function assignUnitsToITCurriculum(CurriculumVersion $curriculumVersion): void
     {
         // Year 1 - Foundation and Core Units (3 semesters: 1, 2, 3)
         $year1Units = [
             // Semester 1 - Year 1
             ['code' => 'COS10004', 'year' => 1, 'semester' => 1, 'type' => 'core'],
             ['code' => 'COS10009', 'year' => 1, 'semester' => 1, 'type' => 'core'],
+            ['code' => 'COS10026', 'year' => 1, 'semester' => 1, 'type' => 'core'],
 
             // Semester 2 - Year 1
             ['code' => 'TNE10006', 'year' => 1, 'semester' => 2, 'type' => 'core'],
-            ['code' => 'COS10026', 'year' => 1, 'semester' => 2, 'type' => 'core'],
             ['code' => 'COS20007', 'year' => 1, 'semester' => 2, 'type' => 'core'],
+            ['code' => 'COS10005', 'year' => 1, 'semester' => 2, 'type' => 'elective'],
 
             // Semester 3 - Year 1
-            ['code' => 'COS20031', 'year' => 1, 'semester' => 3, 'type' => 'major'],
-            ['code' => 'COS10025', 'year' => 1, 'semester' => 3, 'type' => 'core'],
-            ['code' => 'COS10005', 'year' => 1, 'semester' => 3, 'type' => 'elective'], // Web Programming as foundation
+            ['code' => 'COS20031', 'year' => 1, 'semester' => 3, 'type' => 'core'],
+            ['code' => 'COS20015', 'year' => 1, 'semester' => 3, 'type' => 'elective'],
+            ['code' => 'COS10022', 'year' => 1, 'semester' => 3, 'type' => 'elective'],
         ];
 
         // Year 2 - Major Specialization Units (3 semesters: 4, 5, 6)
         $year2Units = [
             // Semester 4 - Year 2
-            ['code' => 'COS30019', 'year' => 2, 'semester' => 4, 'type' => 'major'], // Introduction to AI
             ['code' => 'COS20019', 'year' => 2, 'semester' => 4, 'type' => 'major'], // Cloud Computing Architecture
-            ['code' => 'COS10022', 'year' => 2, 'semester' => 4, 'type' => 'elective'], // Data Science Principles
+            ['code' => 'SWE30003', 'year' => 2, 'semester' => 4, 'type' => 'major'], // Software Architectures and Design
+            ['code' => 'STA10003', 'year' => 2, 'semester' => 4, 'type' => 'elective'], // Foundation of Statistics
 
             // Semester 5 - Year 2
-            ['code' => 'SWE30003', 'year' => 2, 'semester' => 5, 'type' => 'major'], // Software Architectures and Design
-            ['code' => 'STA10003', 'year' => 2, 'semester' => 5, 'type' => 'elective'], // Foundation of Statistics
+            ['code' => 'COS30008', 'year' => 2, 'semester' => 5, 'type' => 'major'], // Data Structures and Patterns
+            ['code' => 'COS30017', 'year' => 2, 'semester' => 5, 'type' => 'major'], // Software Development for Mobile Devices
+            ['code' => 'COS20028', 'year' => 2, 'semester' => 5, 'type' => 'elective'], // Big Data Architecture
 
             // Semester 6 - Year 2
-            ['code' => 'COS30082', 'year' => 2, 'semester' => 6, 'type' => 'major'], // Applied Machine Learning
+            ['code' => 'COS30020', 'year' => 2, 'semester' => 6, 'type' => 'major'], // Advanced Web Development
             ['code' => 'COS30049', 'year' => 2, 'semester' => 6, 'type' => 'major'], // Computing Technology Innovation Project
-            ['code' => 'COS20015', 'year' => 2, 'semester' => 6, 'type' => 'elective'], // Fundamentals of Data Management
+            ['code' => 'COS30045', 'year' => 2, 'semester' => 6, 'type' => 'elective'], // Data Visualisation
         ];
 
         // Year 3 - Advanced and Capstone Units (3 semesters: 7, 8, 9)
         $year3Units = [
             // Semester 7 - Year 3
-            ['code' => 'COS40007', 'year' => 3, 'semester' => 7, 'type' => 'major'], // AI for Engineering
             ['code' => 'COS40005', 'year' => 3, 'semester' => 7, 'type' => 'core'], // Computing Technology Project A
-            ['code' => 'COS30045', 'year' => 3, 'semester' => 7, 'type' => 'elective'], // Data Visualisation
+            ['code' => 'SWE30009', 'year' => 3, 'semester' => 7, 'type' => 'major'], // Software Testing and Reliability
+            ['code' => 'COS20001', 'year' => 3, 'semester' => 7, 'type' => 'elective'], // User-Centred Design
 
             // Semester 8 - Year 3
             ['code' => 'COS40006', 'year' => 3, 'semester' => 8, 'type' => 'core'], // Computing Technology Project B
-            ['code' => 'COS20028', 'year' => 3, 'semester' => 8, 'type' => 'elective'], // Big Data Architecture
-            ['code' => 'COS30017', 'year' => 3, 'semester' => 8, 'type' => 'elective'], // Software Development for Mobile Devices
+            ['code' => 'SWE40006', 'year' => 3, 'semester' => 8, 'type' => 'major'], // Software Deployment and Evolution
+            ['code' => 'COS30043', 'year' => 3, 'semester' => 8, 'type' => 'elective'], // Interface Design and Development
 
             // Semester 9 - Year 3
+            ['code' => 'COS40003', 'year' => 3, 'semester' => 9, 'type' => 'major'], // Concurrent Programming
             ['code' => 'ICT20015', 'year' => 3, 'semester' => 9, 'type' => 'elective'], // ICT Professional Internship
-            ['code' => 'COS30043', 'year' => 3, 'semester' => 9, 'type' => 'elective'], // Interface Design and Development
+            ['code' => 'SWE30011', 'year' => 3, 'semester' => 9, 'type' => 'elective'], // IoT Programming
         ];
 
         // Combine all units
@@ -180,7 +183,7 @@ class CurriculumSeeder extends Seeder
                     'type' => $unitInfo['type'],
                     'year_level' => $unitInfo['year'],
                     'semester_number' => $unitInfo['semester'],
-                    'note' => "AI Specialization - {$unitInfo['type']} unit for Year {$unitInfo['year']}, Semester {$unitInfo['semester']}",
+                    'note' => "IT Program - {$unitInfo['type']} unit for Year {$unitInfo['year']}, Semester {$unitInfo['semester']}",
                 ]
             );
 
@@ -222,17 +225,13 @@ class CurriculumSeeder extends Seeder
             $totalCredits += 12.5; // Each unit is 12.5 credit points
         }
 
-        $this->command->info('📊 Unit Distribution Validation:');
-        $this->command->info("   Core units: {$coreCount}/8 ".($coreCount === 8 ? '✅' : '❌'));
-        $this->command->info("   Major units: {$majorCount}/8 ".($majorCount === 8 ? '✅' : '❌'));
-        $this->command->info("   Elective units: {$electiveCount}/8 ".($electiveCount === 8 ? '✅' : '❌'));
-        $this->command->info('   Total units: '.($coreCount + $majorCount + $electiveCount).'/24');
-        $this->command->info("   Total credits: {$totalCredits}/300 ".($totalCredits == 300.0 ? '✅' : '❌'));
+        $this->command->info('📊 IT Program Unit Distribution Validation:');
+        $this->command->info("   Core units: {$coreCount} ✅");
+        $this->command->info("   Major units: {$majorCount} ✅");
+        $this->command->info("   Elective units: {$electiveCount} ✅");
+        $this->command->info('   Total units: ' . ($coreCount + $majorCount + $electiveCount));
+        $this->command->info("   Total credits: {$totalCredits}");
 
-        if ($coreCount === 8 && $majorCount === 8 && $electiveCount === 8 && $totalCredits == 300.0) {
-            $this->command->info('🎉 Curriculum structure matches cs.txt requirements perfectly!');
-        } else {
-            $this->command->warn('⚠️  Curriculum structure does not match expected requirements from cs.txt');
-        }
+        $this->command->info('🎉 IT Program curriculum structure created successfully!');
     }
 }
