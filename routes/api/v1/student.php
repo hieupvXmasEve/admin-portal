@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Student\ClubManagementController;
 use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
+use App\Http\Controllers\Api\V1\Student\EventController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\ProfileController;
@@ -218,6 +219,21 @@ Route::middleware([
                 Route::put('/{club}/members/{member}/reject', [ClubManagementController::class, 'rejectMember'])->name('reject-member');
                 Route::put('/{club}/members/{member}/role', [ClubManagementController::class, 'updateMemberRole'])->name('update-member-role');
             });
+        });
+
+        // Event endpoints
+        Route::prefix('events')->name('events.')->group(function () {
+            // Event discovery and details
+            Route::get('/', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'index'])->name('index');
+            Route::get('/{event}', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'show'])->name('show');
+
+            // Event registration
+            Route::post('/{event}/register', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'register'])->name('register');
+            Route::delete('/{event}/register', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'unregister'])->name('unregister');
+
+            // Student participation history
+            Route::get('/my/participations', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'myEvents'])->name('my-events');
+            Route::get('/my/{event}', [\App\Http\Controllers\Api\V1\Student\EventController::class, 'myEventDetails'])->name('my-event-details');
         });
     }); // End either middleware group
 

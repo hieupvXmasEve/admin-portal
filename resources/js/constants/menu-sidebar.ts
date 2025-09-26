@@ -470,6 +470,19 @@ export const mainNavItems: NavItem[] = [
     //     ],
     // },
     {
+        title: 'Events',
+        href: '#',
+        icon: Calendar,
+        children: [
+            {
+                title: 'List',
+                href: systemRoutes.events.index(),
+                icon: Calendar,
+                requiredPermissions: ['view_event'],
+            },
+        ],
+    },
+    {
         title: 'Clubs',
         href: '#',
         icon: Club,

@@ -26,20 +26,20 @@ class InitialSeederRunner extends Seeder
             // 003. Create Super Admin, Admin, Staff accounts
             UserAccountSeeder::class,
 
-            // 004. Create lecturer user accounts and profiles
-            //            LecturerSeeder::class,
+            // 004. Create programs, specializations, and units
+            AcademicStructureSeeder::class,
 
-            // 005. Create programs, specializations, and units
-            // AcademicStructureSeeder::class,
+            // 005. Create academic semesters for the year
+            SemesterSeeder::class,
 
-            // 006. Create academic semesters for the year
-            // SemesterSeeder::class,
+            // 006. Link units to programs and graduation requirements
+            CurriculumSeeder::class,
 
-            // 007. Link units to programs and graduation requirements
-            //            CurriculumSeeder::class,
+            // 007. Create events
+            EventSeeder::class,
 
-            // // 008. Create syllabus and assessment components for each class
-            //            SyllabusSeeder::class,
+            // Create student
+            StudentSeeder::class,
         ]);
 
         $this->command->info('✅ Initial Setup Seeders completed successfully!');

@@ -96,3 +96,4 @@ require __DIR__ . '/web/email-monitoring.php';
 require __DIR__ . '/web/syllabus-templates.php';
 require __DIR__ . '/web/forms.php';
 require __DIR__ . '/web/clubs.php';
+require __DIR__ . '/web/events.php';

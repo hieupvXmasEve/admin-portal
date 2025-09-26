@@ -41,6 +41,17 @@ export interface User {
     updated_at: string;
 }
 
+export interface Campus {
+    id: number;
+    name: string;
+    code: string;
+    address?: string;
+    buildings_count?: number;
+    users_count?: number;
+    created_at: string;
+    updated_at: string;
+}
+
 export type BreadcrumbItemType = BreadcrumbItem;
 
 export interface PaginationLink {
@@ -68,3 +79,12 @@ export interface PaginatedResponse<T> {
 export interface PageProps<T extends Record<string, unknown> = Record<string, unknown>> extends T {
     auth: Auth | null;
 }
+
+// Re-export event types
+export type {
+    Event,
+    EventParticipant,
+    EventStatistics,
+    EventFilters,
+    PaginatedEvents
+} from './event';
