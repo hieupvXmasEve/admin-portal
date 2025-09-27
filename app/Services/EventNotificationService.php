@@ -10,6 +10,7 @@ use App\Models\Notification;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\UserEmailPreference;
+use Carbon\CarbonInterval;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -58,7 +59,6 @@ class EventNotificationService
                 'total_students' => $students->count(),
                 'notifications_sent' => $notificationsSent
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to send event publication notifications', [
                 'event_id' => $event->id,
@@ -101,7 +101,6 @@ class EventNotificationService
                 'student_id' => $student->id,
                 'event_title' => $event->title
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to send event registration confirmation', [
                 'event_id' => $event->id,
@@ -145,7 +144,6 @@ class EventNotificationService
                 'student_id' => $student->id,
                 'event_title' => $event->title
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to send event check-in confirmation', [
                 'event_id' => $event->id,
@@ -186,7 +184,6 @@ class EventNotificationService
                 'amount' => $amount,
                 'event_title' => $event->title
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to send gold reward notification', [
                 'event_id' => $event->id,
@@ -227,7 +224,6 @@ class EventNotificationService
                 'amount' => $amount,
                 'event_title' => $event->title
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to send gold reclaim notification', [
                 'event_id' => $event->id,
@@ -283,7 +279,6 @@ class EventNotificationService
                 'reason' => $reason,
                 'participants_notified' => $notificationsSent
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to send event cancellation notifications', [
                 'event_id' => $event->id,
@@ -321,7 +316,6 @@ class EventNotificationService
                 'student_id' => $student->id,
                 'event_title' => $event->title
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to send event cancellation confirmation', [
                 'event_id' => $event->id,
@@ -362,7 +356,6 @@ class EventNotificationService
                 'student_id' => $student->id,
                 'event_title' => $event->title
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to send event update notification', [
                 'event_id' => $event->id,
@@ -393,7 +386,10 @@ class EventNotificationService
                         $participant->isRegistered() &&
                         $this->canNotifyStudent($participant->student, UserEmailPreference::TYPE_REMINDER)
                     ) {
-                        $hoursUntilStart = now()->diffInHours($event->start_time);
+                        $hoursUntilStart = CarbonInterval::minutes(now()->diffInMinutes($event->start_time))->forHumans([
+                            'short' => true,
+                            'parts' => 1,
+                        ]);
 
                         $this->createEventNotification(
                             $participant->student,
@@ -420,7 +416,6 @@ class EventNotificationService
             ]);
 
             return $remindersSent;
-
         } catch (\Exception $e) {
             Log::error('Failed to send event reminders', [
                 'error' => $e->getMessage()
@@ -470,7 +465,6 @@ class EventNotificationService
                 'event_title' => $event->title,
                 'participants_notified' => $notificationsSent
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to send event completion notifications', [
                 'event_id' => $event->id,

@@ -40,11 +40,16 @@ class ProcessEventCompletions extends Command
             // Complete events that have ended
             $eventsCompleted = $this->completeEndedEvents($eventService);
 
-            $this->info("Successfully completed {$participationsCompleted} participations and {$eventsCompleted} events.");
+            // Process any failed gold rewards
+            $this->info('Processing failed gold rewards...');
+            $failedGoldProcessed = $participationService->processFailedGoldRewards();
+
+            $this->info("Successfully completed {$participationsCompleted} participations, {$eventsCompleted} events, and processed {$failedGoldProcessed} failed gold rewards.");
 
             Log::info('Event completions command completed', [
                 'participations_completed' => $participationsCompleted,
-                'events_completed' => $eventsCompleted
+                'events_completed' => $eventsCompleted,
+                'failed_gold_processed' => $failedGoldProcessed
             ]);
 
             return Command::SUCCESS;
