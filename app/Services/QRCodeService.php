@@ -17,6 +17,33 @@ class QRCodeService
     protected const CACHE_TTL = 3600; // 1 hour
 
     /**
+     * Parse student QR code to extract participation data
+     */
+    public function parseStudentQRCode(string $qrCode): ?array
+    {
+        // Parse format: "STU_456_EVT_789_PRT_123_abc12345"
+        $pattern = '/^STU_(\d+)_EVT_(\d+)_PRT_(\d+)_([a-f0-9]{8})$/';
+
+        if (!preg_match($pattern, $qrCode, $matches)) {
+            return null;
+        }
+
+        return [
+            'student_id' => (int) $matches[1],
+            'event_id' => (int) $matches[2],
+            'participation_id' => (int) $matches[3],
+            'hash' => $matches[4]
+        ];
+    }
+
+    /**
+     * Validate student QR code format
+     */
+    public function isValidStudentQRCodeFormat(string $qrCode): bool
+    {
+        return $this->parseStudentQRCode($qrCode) !== null;
+    }
+    /**
      * Generate a unique QR code for an event
      */
     public function generateEventQRCode(): string
@@ -152,7 +179,7 @@ class QRCodeService
     {
         // Check if it starts with our prefix and has correct length
         return Str::startsWith($qrCode, self::QR_CODE_PREFIX) &&
-               strlen($qrCode) === strlen(self::QR_CODE_PREFIX) + self::QR_CODE_LENGTH;
+            strlen($qrCode) === strlen(self::QR_CODE_PREFIX) + self::QR_CODE_LENGTH;
     }
 
     /**
@@ -332,8 +359,12 @@ class QRCodeService
             if (isset($options['gradient'])) {
                 $gradient = $options['gradient'];
                 $quar->gradient(
-                    $gradient['start_r'], $gradient['start_g'], $gradient['start_b'],
-                    $gradient['end_r'], $gradient['end_g'], $gradient['end_b'],
+                    $gradient['start_r'],
+                    $gradient['start_g'],
+                    $gradient['start_b'],
+                    $gradient['end_r'],
+                    $gradient['end_g'],
+                    $gradient['end_b'],
                     $gradient['type'] ?? 'vertical'
                 );
             }

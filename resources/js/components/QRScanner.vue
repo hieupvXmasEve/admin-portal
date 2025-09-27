@@ -1,26 +1,16 @@
 <script setup lang="ts">
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQRScanner } from '@/composables/useQRScanner';
 import type { Event, EventParticipant } from '@/types/event';
-import { formatDateTime, formatDateTimeToShort } from '@/utils/date';
+import { formatDateTimeToShort } from '@/utils/date';
 import { router } from '@inertiajs/vue3';
 import { AlertCircle, Camera, CheckCircle, X } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
-
-interface Student {
-    id: number;
-    student_id: string;
-    full_name: string;
-    email: string;
-    participation_status: string;
-    can_check_in: boolean;
-    already_checked_in: boolean;
-}
 
 interface CheckinResult {
     id: number;
@@ -33,11 +23,19 @@ interface CheckinResult {
     checkin_time: string;
 }
 
+interface ScanResultPayload {
+    success: boolean;
+    message: string;
+    participant?: EventParticipant;
+    fromScanner?: boolean;
+}
+
 const props = defineProps<{
     event: Event;
 }>();
 
 const emit = defineEmits<{
+    scan: [qrCode: string];
     checkinSuccess: [participant: EventParticipant];
 }>();
 
@@ -47,13 +45,6 @@ const isScanning = ref(false);
 const scanningStatus = ref('Position QR code within the frame');
 
 const currentEvent = computed(() => props.event);
-
-// Search functionality
-const searchQuery = ref('');
-const searchResults = ref<Student[]>([]);
-const isSearching = ref(false);
-const hasSearched = ref(false);
-
 // Processing state
 const isProcessing = ref(false);
 const processingStudentId = ref<number | null>(null);
@@ -66,7 +57,7 @@ const message = ref('');
 const messageType = ref<'default' | 'destructive'>('default');
 
 // QR Scanner composable
-const { startCamera, stopCamera, validateQRCode, searchStudents: apiSearchStudents, checkinStudent: apiCheckinStudent, getCameraDevices, switchCamera, availableCameras, selectedCameraId } = useQRScanner();
+const { startCamera, stopCamera, getCameraDevices, switchCamera, availableCameras, selectedCameraId, startDecoding, isDecoding } = useQRScanner();
 
 // Scanner controls
 const startScanning = async () => {
@@ -75,6 +66,7 @@ const startScanning = async () => {
     try {
         isScanning.value = true;
         scanningStatus.value = 'Starting camera...';
+        console.debug('[QRScanner] startScanning');
 
         await nextTick();
 
@@ -85,11 +77,11 @@ const startScanning = async () => {
         if (!availableCameras.value.length) {
             await loadAvailableCameras();
         }
+        console.debug('[QRScanner] selectedCameraId before start', selectedCameraId.value);
 
         await startCamera(videoElement.value, selectedCameraId.value || undefined);
         scanningStatus.value = 'Position QR code within the frame';
 
-        // Start QR code detection
         startQRDetection();
     } catch (error) {
         console.error('Failed to start camera:', error);
@@ -101,6 +93,7 @@ const startScanning = async () => {
 const stopScanning = () => {
     isScanning.value = false;
     scanningStatus.value = 'Scanner stopped';
+    console.debug('[QRScanner] stopScanning');
     stopCamera();
 };
 
@@ -116,6 +109,7 @@ const onCameraChange = async (deviceId: string | undefined) => {
     if (!deviceId) return;
 
     selectedCameraId.value = deviceId;
+    console.debug('[QRScanner] onCameraChange', deviceId);
 
     if (!isScanning.value) {
         return;
@@ -125,6 +119,8 @@ const onCameraChange = async (deviceId: string | undefined) => {
         scanningStatus.value = 'Switching camera...';
         await switchCamera(deviceId);
         scanningStatus.value = 'Position QR code within the frame';
+
+        startQRDetection();
     } catch (error) {
         console.error('Failed to switch camera:', error);
         showMessage('Failed to switch camera. Please try again.', 'destructive');
@@ -134,173 +130,88 @@ const onCameraChange = async (deviceId: string | undefined) => {
 
 // QR Code detection
 const startQRDetection = () => {
-    // This would integrate with a QR code detection library
-    // For now, we'll simulate the detection process
-    const detectQR = () => {
-        if (!isScanning.value) return;
+    if (!isScanning.value || !videoElement.value || isDecoding.value) {
+        return;
+    }
 
-        // In a real implementation, this would use a library like jsQR
-        // to detect QR codes from the video stream
+    console.debug('[QRScanner] startQRDetection');
+    startDecoding(
+        videoElement.value,
+        (qrText) => {
+            if (!currentEvent.value) {
+                return;
+            }
 
-        setTimeout(detectQR, 100); // Check every 100ms
-    };
+            isProcessing.value = true;
+            isScanning.value = false;
+            scanningStatus.value = 'QR code detected, processing...';
+            console.debug('[QRScanner] decoded QR text', qrText);
+            emit('scan', qrText);
+        },
+        (decodeError) => {
+            console.error('QR decoding failed:', decodeError);
+            scanningStatus.value = 'Unable to read QR code. Adjust lighting and try again.';
 
-    detectQR();
+            setTimeout(() => {
+                if (!isProcessing.value) {
+                    scanningStatus.value = 'Position QR code within the frame';
+                }
+            }, 1500);
+        },
+    );
 };
 
-const onQRCodeDetected = async (qrCode: string) => {
-    if (!currentEvent.value || isProcessing.value) return;
+const handleScanResult = ({ success, message: feedbackMessage, participant, fromScanner }: ScanResultPayload) => {
+    isProcessing.value = false;
+    processingStudentId.value = null;
 
-    try {
-        isProcessing.value = true;
-        scanningStatus.value = 'Validating QR code...';
+    if (success) {
+        if (participant && participant.student) {
+            recentCheckins.value.unshift({
+                id: participant.id,
+                student: {
+                    id: participant.student.id,
+                    student_id: participant.student.student_id,
+                    full_name: participant.student.full_name,
+                    email: participant.student.email,
+                },
+                checkin_time: participant.checkin_time || new Date().toISOString(),
+            });
 
-        const result = await validateQRCode(qrCode, currentEvent.value.id);
+            if (recentCheckins.value.length > 5) {
+                recentCheckins.value = recentCheckins.value.slice(0, 5);
+            }
 
-        if (result.success) {
-            scanningStatus.value = 'QR code validated! Processing check-in...';
-            // The QR code validation would return student info
-            // For now, we'll show a success message
-            showMessage('QR code validated successfully!', 'default');
+            emit('checkinSuccess', participant);
         } else {
-            scanningStatus.value = 'Invalid QR code';
-            showMessage(result.message || 'Invalid QR code', 'destructive');
+            console.warn('[QRScanner] Successful check-in missing participant/student data');
         }
-    } catch (error) {
-        console.error('QR validation failed:', error);
-        scanningStatus.value = 'Validation failed';
-        showMessage('Failed to validate QR code', 'destructive');
-    } finally {
-        isProcessing.value = false;
+    }
+
+    showMessage(feedbackMessage, success ? 'default' : 'destructive');
+
+    if (fromScanner !== false) {
+        scanningStatus.value = success ? 'Scan complete. Start the scanner again for the next attendee.' : 'Scan failed. Restart the scanner to try again.';
+
         setTimeout(() => {
-            if (isScanning.value) {
+            if (!isProcessing.value) {
                 scanningStatus.value = 'Position QR code within the frame';
             }
         }, 2000);
     }
 };
 
-// Student search
-const onSearchInput = () => {
-    if (searchQuery.value.length > 2) {
-        searchStudents();
-    } else {
-        searchResults.value = [];
-        hasSearched.value = false;
-    }
-};
-
-const searchStudents = async () => {
-    if (!currentEvent.value || !searchQuery.value.trim()) return;
-
-    try {
-        isSearching.value = true;
-        hasSearched.value = true;
-
-        const results = await apiSearchStudents({
-            event_id: currentEvent.value.id,
-            student_id: searchQuery.value,
-            name: searchQuery.value,
-        });
-
-        searchResults.value = results.data || [];
-    } catch (error) {
-        console.error('Student search failed:', error);
-        showMessage('Failed to search students', 'destructive');
-        searchResults.value = [];
-    } finally {
-        isSearching.value = false;
-    }
-};
-
-// Check-in functionality
-const checkinStudent = async (student: Student) => {
-    if (!currentEvent.value || isProcessing.value) return;
-
-    try {
-        isProcessing.value = true;
-        processingStudentId.value = student.id;
-
-        const result = await apiCheckinStudent({
-            event_id: currentEvent.value.id,
-            student_id: student.id,
-        });
-
-        if (result.success && result.data?.participant) {
-            // Add to recent check-ins
-            recentCheckins.value.unshift({
-                id: result.data.participant.id,
-                student: result.data.participant.student,
-                checkin_time: result.data.participant.checkin_time,
-            });
-
-            // Keep only last 5 check-ins
-            if (recentCheckins.value.length > 5) {
-                recentCheckins.value = recentCheckins.value.slice(0, 5);
-            }
-
-            // Update student status in search results
-            const studentIndex = searchResults.value.findIndex((s) => s.id === student.id);
-            if (studentIndex !== -1) {
-                searchResults.value[studentIndex].participation_status = 'checked_in';
-                searchResults.value[studentIndex].already_checked_in = true;
-                searchResults.value[studentIndex].can_check_in = false;
-            }
-
-            emit('checkinSuccess', result.data.participant);
-            showMessage(`${student.full_name} checked in successfully!`, 'default');
-        } else {
-            showMessage(result.message || 'Check-in failed', 'destructive');
-        }
-    } catch (error) {
-        console.error('Check-in failed:', error);
-        showMessage('Failed to check in student', 'destructive');
-    } finally {
-        isProcessing.value = false;
-        processingStudentId.value = null;
-    }
-};
-
-// Utility functions
-const getStatusVariant = (status: string) => {
-    switch (status) {
-        case 'registered':
-            return 'default';
-        case 'checked_in':
-            return 'success';
-        case 'completed':
-            return 'success';
-        case 'cancelled':
-            return 'destructive';
-        default:
-            return 'secondary';
-    }
-};
-
-const formatStatus = (status: string) => {
-    switch (status) {
-        case 'not_registered':
-            return 'Not Registered';
-        case 'registered':
-            return 'Registered';
-        case 'checked_in':
-            return 'Checked In';
-        case 'completed':
-            return 'Completed';
-        case 'cancelled':
-            return 'Cancelled';
-        default:
-            return status;
-    }
-};
-
 const showMessage = (text: string, type: 'default' | 'destructive' = 'default') => {
     message.value = text;
     messageType.value = type;
-
-    setTimeout(() => {
-        clearMessage();
-    }, 5000);
+    if (type === 'default') {
+        toast.success(text, { duration: 5000 });
+    } else {
+        toast.error(text, { duration: 5000 });
+    }
+    // setTimeout(() => {
+    //     clearMessage();
+    // }, 5000);
 };
 
 const clearMessage = () => {
@@ -308,7 +219,6 @@ const clearMessage = () => {
 };
 
 const resetEventState = () => {
-    searchResults.value = [];
     recentCheckins.value = [];
     clearMessage();
 };
@@ -334,6 +244,12 @@ onUnmounted(() => {
     if (isScanning.value) {
         stopScanning();
     }
+});
+
+defineExpose({
+    handleScanResult,
+    startScanning,
+    stopScanning,
 });
 </script>
 
@@ -448,20 +364,6 @@ onUnmounted(() => {
                     <p>No students found matching your search.</p>
                 </div>
             </div> -->
-
-            <!-- Recent Check-ins -->
-            <div v-if="recentCheckins.length > 0" class="rounded-lg border p-4">
-                <h4 class="mb-3 font-medium">Recent Check-ins</h4>
-                <div class="space-y-2">
-                    <div v-for="checkin in recentCheckins" :key="checkin.id" class="bg-muted flex items-center justify-between rounded p-2">
-                        <div>
-                            <p class="font-medium">{{ checkin.student.full_name }}</p>
-                            <p class="text-muted-foreground text-sm">{{ checkin.student.student_id }} • {{ formatDateTime(checkin.checkin_time) }}</p>
-                        </div>
-                        <Badge variant="success"> Checked In </Badge>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Success/Error Messages -->

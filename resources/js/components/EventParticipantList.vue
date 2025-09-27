@@ -8,11 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInitials } from '@/composables/useInitials';
-import { useQRScanner } from '@/composables/useQRScanner';
 import type { Event, EventParticipant } from '@/types/event';
-import { formatDateTime } from '@/utils/date';
-import { Clock, Coins, Eye, MoreHorizontal, RefreshCw, Search, X } from 'lucide-vue-next';
+import { formatDateTimeToShort } from '@/utils/date';
 import type { ColumnDef } from '@tanstack/vue-table';
+import { Clock, Coins, Eye, MoreHorizontal, RefreshCw, Search, X } from 'lucide-vue-next';
 import { onMounted, ref, watch } from 'vue';
 import DataTable from './DataTable.vue';
 
@@ -32,6 +31,36 @@ interface ParticipantStatistics {
     participation_rate: number;
     available_spots: number | null;
     capacity_reached: boolean;
+}
+
+interface PaginationMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+}
+
+interface ParticipantsResponse {
+    success: boolean;
+    data: EventParticipant[];
+    meta: PaginationMeta;
+    message?: string;
+}
+
+interface EventStatisticsResponse {
+    success: boolean;
+    data: ParticipantStatistics;
+    message?: string;
+}
+
+interface CheckinApiResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        participant: EventParticipant;
+    };
 }
 
 const props = defineProps<{
@@ -80,8 +109,74 @@ const pagination = ref({
 const showDetailsModal = ref(false);
 const selectedParticipant = ref<EventParticipant | null>(null);
 
+const getCsrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+const getQueryString = (params: Record<string, any>) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            query.append(key, String(value));
+        }
+    });
+    return query.toString();
+};
+
+const fetchParticipants = async (eventId: number, params: Record<string, any>) => {
+    const queryString = getQueryString(params);
+    const response = await fetch(`/api/events/${eventId}/participants?${queryString}`, {
+        headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+        },
+    });
+
+    const data = (await response.json()) as ParticipantsResponse;
+
+    if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to load participants');
+    }
+
+    return data;
+};
+
+const fetchStatistics = async (eventId: number) => {
+    const response = await fetch(`/api/events/${eventId}/statistics`, {
+        headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+        },
+    });
+
+    const data = (await response.json()) as EventStatisticsResponse;
+
+    if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to load statistics');
+    }
+
+    return data.data;
+};
+
+const postJson = async <T,>(url: string, body: unknown): Promise<T> => {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+        },
+        body: JSON.stringify(body),
+    });
+
+    const data = (await response.json()) as T & { message?: string };
+
+    if (!response.ok) {
+        throw new Error((data as { message?: string })?.message || 'Request failed');
+    }
+
+    return data;
+};
+
 // Composables
-const { getEventParticipants, getEventStatistics, checkinStudent } = useQRScanner();
 const { getInitials } = useInitials();
 
 // Table columns
@@ -129,7 +224,7 @@ const loadParticipants = async () => {
             ...filters.value,
         };
 
-        const response = await getEventParticipants(props.event.id, params);
+        const response = await fetchParticipants(props.event.id, params);
 
         participants.value = response.data || [];
         pagination.value = response.meta || pagination.value;
@@ -144,8 +239,8 @@ const loadStatistics = async () => {
     try {
         isLoadingStats.value = true;
 
-        const response = await getEventStatistics(props.event.id);
-        statistics.value = response.data || statistics.value;
+        const response = await fetchStatistics(props.event.id);
+        statistics.value = response || statistics.value;
     } catch (error) {
         console.error('Failed to load statistics:', error);
     } finally {
@@ -199,20 +294,23 @@ const checkinParticipant = async (participant: EventParticipant) => {
     try {
         processingId.value = participant.id;
 
-        const response = await checkinStudent({
+        const response = await postJson<CheckinApiResponse>('/api/events/checkin', {
             event_id: props.event.id,
             student_id: participant.student.id,
         });
 
-        if (response.success) {
-            // Update participant in list
+        if (response.success && response.data?.participant) {
+            const updatedParticipant = response.data.participant;
+
             const index = participants.value.findIndex((p) => p.id === participant.id);
             if (index !== -1) {
-                participants.value[index] = { ...participants.value[index], ...response.data?.participant };
+                participants.value[index] = { ...participants.value[index], ...updatedParticipant };
             }
 
-            emit('participantUpdated', response.data?.participant!);
+            emit('participantUpdated', updatedParticipant);
             await loadStatistics();
+        } else {
+            throw new Error(response.message || 'Check-in failed');
         }
     } catch (error) {
         console.error('Check-in failed:', error);
@@ -355,99 +453,97 @@ watch(
         </div>
 
         <!-- Participants Table -->
-        <div class="rounded-lg border">
-            <DataTable :data="participants" :columns="columns" :loading="isLoading" :pagination="pagination" @page-change="onPageChange" @sort-change="onSortChange">
-                <!-- Student Info Column -->
-                <template #cell-student="{ row }">
-                    <div class="flex items-center gap-3">
-                        <div class="bg-muted flex h-10 w-10 items-center justify-center rounded-full">
-                            <span class="text-sm font-medium">
-                                {{ getInitials(row.original.student?.full_name || '') }}
-                            </span>
-                        </div>
-                        <div>
-                            <p class="font-medium">{{ row.original.student?.full_name || '' }}</p>
-                            <p class="text-muted-foreground text-sm">{{ row.original.student?.student_id || '' }}</p>
-                            <p class="text-muted-foreground text-xs">{{ row.original.student?.email || '' }}</p>
-                        </div>
+        <DataTable :data="participants" :columns="columns" :loading="isLoading" :pagination="pagination" @page-change="onPageChange" @sort-change="onSortChange">
+            <!-- Student Info Column -->
+            <template #cell-student="{ row }">
+                <div class="flex items-center gap-3">
+                    <div class="bg-muted flex h-10 w-10 items-center justify-center rounded-full">
+                        <span class="text-sm font-medium">
+                            {{ getInitials(row.original.student?.full_name || '') }}
+                        </span>
                     </div>
-                </template>
+                    <div>
+                        <p class="font-medium">{{ row.original.student?.full_name || '' }}</p>
+                        <p class="text-muted-foreground text-sm">{{ row.original.student?.student_id || '' }}</p>
+                        <p class="text-muted-foreground text-xs">{{ row.original.student?.email || '' }}</p>
+                    </div>
+                </div>
+            </template>
 
-                <!-- Status Column -->
-                <template #cell-status="{ row }">
-                    <Badge :variant="getStatusVariant(row.original.status)">
-                        {{ formatStatus(row.original.status) }}
+            <!-- Status Column -->
+            <template #cell-status="{ row }">
+                <Badge :variant="getStatusVariant(row.original.status)">
+                    {{ formatStatus(row.original.status) }}
+                </Badge>
+            </template>
+
+            <!-- Registration Time Column -->
+            <template #cell-registered_at="{ row }">
+                <div class="text-sm">
+                    <p>{{ formatDateTimeToShort(row.original.registered_at) }}</p>
+                    <p class="text-muted-foreground">
+                        {{ getTimeAgo(row.original.registered_at) }}
+                    </p>
+                </div>
+            </template>
+
+            <!-- Check-in Time Column -->
+            <template #cell-checkin_time="{ row }">
+                <div v-if="row.original.checkin_time" class="text-sm">
+                    <p>{{ formatDateTimeToShort(row.original.checkin_time) }}</p>
+                    <p class="text-muted-foreground">
+                        {{ getTimeAgo(row.original.checkin_time) }}
+                    </p>
+                    <p v-if="row.original.checkin_staff" class="text-muted-foreground text-xs">by {{ row.original.checkin_staff?.name }}</p>
+                </div>
+                <span v-else class="text-muted-foreground">-</span>
+            </template>
+
+            <!-- Gold Status Column -->
+            <template #cell-gold_status="{ row }">
+                <div class="flex items-center gap-2">
+                    <Badge v-if="row.original.gold_awarded" variant="success">
+                        <Coins class="mr-1 h-3 w-3" />
+                        Awarded
                     </Badge>
-                </template>
-
-                <!-- Registration Time Column -->
-                <template #cell-registered_at="{ row }">
-                    <div class="text-sm">
-                        <p>{{ formatDateTime(row.original.registered_at) }}</p>
-                        <p class="text-muted-foreground">
-                            {{ getTimeAgo(row.original.registered_at) }}
-                        </p>
-                    </div>
-                </template>
-
-                <!-- Check-in Time Column -->
-                <template #cell-checkin_time="{ row }">
-                    <div v-if="row.original.checkin_time" class="text-sm">
-                        <p>{{ formatDateTime(row.original.checkin_time) }}</p>
-                        <p class="text-muted-foreground">
-                            {{ getTimeAgo(row.original.checkin_time) }}
-                        </p>
-                        <p v-if="row.original.checkin_staff" class="text-muted-foreground text-xs">by {{ row.original.checkin_staff?.name }}</p>
-                    </div>
+                    <Badge v-else-if="row.original.status === 'completed'" variant="outline">
+                        <Clock class="mr-1 h-3 w-3" />
+                        Pending
+                    </Badge>
                     <span v-else class="text-muted-foreground">-</span>
-                </template>
+                </div>
+            </template>
 
-                <!-- Gold Status Column -->
-                <template #cell-gold_status="{ row }">
-                    <div class="flex items-center gap-2">
-                        <Badge v-if="row.original.gold_awarded" variant="success">
-                            <Coins class="mr-1 h-3 w-3" />
-                            Awarded
-                        </Badge>
-                        <Badge v-else-if="row.original.status === 'completed'" variant="outline">
-                            <Clock class="mr-1 h-3 w-3" />
-                            Pending
-                        </Badge>
-                        <span v-else class="text-muted-foreground">-</span>
-                    </div>
-                </template>
+            <!-- Actions Column -->
+            <template #cell-actions="{ row }">
+                <div class="flex items-center gap-2">
+                    <Button v-if="canCheckIn(row.original)" @click="checkinParticipant(row.original)" size="sm" :loading="processingId === row.original.id"> Check In </Button>
 
-                <!-- Actions Column -->
-                <template #cell-actions="{ row }">
-                    <div class="flex items-center gap-2">
-                        <Button v-if="canCheckIn(row.original)" @click="checkinParticipant(row.original)" size="sm" :loading="processingId === row.original.id"> Check In </Button>
+                    <Button v-if="canAwardGold(row.original)" @click="awardGold(row.original)" size="sm" variant="outline" :loading="processingId === row.original.id">
+                        <Coins class="mr-1 h-4 w-4" />
+                        Award Gold
+                    </Button>
 
-                        <Button v-if="canAwardGold(row.original)" @click="awardGold(row.original)" size="sm" variant="outline" :loading="processingId === row.original.id">
-                            <Coins class="mr-1 h-4 w-4" />
-                            Award Gold
-                        </Button>
-
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                    <MoreHorizontal class="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem @click="viewDetails(row.original)">
-                                    <Eye class="mr-2 h-4 w-4" />
-                                    View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem v-if="canCancel(row.original)" @click="cancelParticipation(row.original)" class="text-destructive">
-                                    <X class="mr-2 h-4 w-4" />
-                                    Cancel Registration
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                </template>
-            </DataTable>
-        </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                                <MoreHorizontal class="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem @click="viewDetails(row.original)">
+                                <Eye class="mr-2 h-4 w-4" />
+                                View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem v-if="canCancel(row.original)" @click="cancelParticipation(row.original)" class="text-destructive">
+                                <X class="mr-2 h-4 w-4" />
+                                Cancel Registration
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </template>
+        </DataTable>
 
         <!-- Participant Details Modal -->
         <Dialog v-model:open="showDetailsModal">
@@ -491,7 +587,7 @@ watch(
                                 <div>
                                     <p class="text-sm font-medium">Registered</p>
                                     <p class="text-muted-foreground text-xs">
-                                        {{ formatDateTime(selectedParticipant.registered_at) }}
+                                        {{ formatDateTimeToShort(selectedParticipant.registered_at) }}
                                     </p>
                                 </div>
                             </div>
@@ -501,7 +597,7 @@ watch(
                                 <div>
                                     <p class="text-sm font-medium">Checked In</p>
                                     <p class="text-muted-foreground text-xs">
-                                        {{ formatDateTime(selectedParticipant.checkin_time) }}
+                                        {{ formatDateTimeToShort(selectedParticipant.checkin_time) }}
                                         <span v-if="selectedParticipant.checkin_staff"> by {{ selectedParticipant.checkin_staff.name }} </span>
                                     </p>
                                 </div>
@@ -512,7 +608,7 @@ watch(
                                 <div>
                                     <p class="text-sm font-medium">Gold Awarded</p>
                                     <p class="text-muted-foreground text-xs">
-                                        {{ formatDateTime(selectedParticipant.awarded_at) }}
+                                        {{ formatDateTimeToShort(selectedParticipant.awarded_at) }}
                                     </p>
                                 </div>
                             </div>

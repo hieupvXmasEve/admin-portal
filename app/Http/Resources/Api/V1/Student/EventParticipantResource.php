@@ -22,7 +22,7 @@ class EventParticipantResource extends JsonResource
             'checkin_time' => $this->checkin_time?->format('Y-m-d H:i:s'),
             'gold_awarded' => $this->gold_awarded,
             'awarded_at' => $this->awarded_at?->format('Y-m-d H:i:s'),
-
+            'student_qr_code' => $this->getStudentQRCode(),
             // Event information
             'event' => $this->whenLoaded('event', function () {
                 return [
