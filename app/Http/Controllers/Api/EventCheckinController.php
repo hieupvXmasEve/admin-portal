@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\EventCheckinRequest;
 use App\Http\Requests\EventParticipantSearchRequest;
 use App\Models\Event;
+use App\Models\EventParticipant;
 use App\Models\Student;
 use App\Services\EventParticipationService;
 use App\Services\QRCodeService;
@@ -22,79 +23,6 @@ class EventCheckinController extends Controller
         private QRCodeService $qrCodeService
     ) {}
 
-    /**
-     * Validate QR code and return student/event information
-     */
-    public function validateQRCode(Request $request): JsonResponse
-    {
-        $request->validate([
-            'qr_code' => 'required|string',
-            'event_id' => 'required|exists:events,id'
-        ]);
-
-        try {
-            // Validate QR code format
-            if (!$this->qrCodeService->isValidQRCodeFormat($request->qr_code)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid QR code format'
-                ], 400);
-            }
-
-            // Find event by QR code
-            $event = $this->qrCodeService->validateQRCode($request->qr_code);
-
-            if (!$event) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid QR code'
-                ], 404);
-            }
-
-            // Verify this is the correct event
-            if ($event->id !== (int) $request->event_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'QR code does not match selected event'
-                ], 400);
-            }
-
-            // Check if event allows check-ins
-            if (!$event->canCheckIn()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Event is not available for check-in at this time'
-                ], 400);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'QR code validated successfully',
-                'data' => [
-                    'event' => [
-                        'id' => $event->id,
-                        'title' => $event->title,
-                        'location' => $event->location,
-                        'start_time' => $event->start_time,
-                        'end_time' => $event->end_time,
-                        'gold_reward_amount' => $event->gold_reward_amount
-                    ]
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('QR code validation failed', [
-                'qr_code' => $request->qr_code,
-                'event_id' => $request->event_id,
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to validate QR code'
-            ], 500);
-        }
-    }
 
     /**
      * Search for student by student ID or name
@@ -141,7 +69,6 @@ class EventCheckinController extends Controller
                 'success' => true,
                 'data' => $studentsWithStatus
             ]);
-
         } catch (\Exception $e) {
             Log::error('Student search failed', [
                 'request' => $request->all(),
@@ -162,10 +89,60 @@ class EventCheckinController extends Controller
     {
         try {
             $event = Event::findOrFail($request->event_id);
-            $student = Student::findOrFail($request->student_id);
             $staff = Auth::user();
+            // 1. Parse Student QR Code
+            $qrData = $this->qrCodeService->parseStudentQRCode($request->qr_code);
 
-            // Collect device information
+            if (!$qrData) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid student QR code format'
+                ], 400);
+            }
+
+            // 2. Verify QR belongs to the selected event
+            if ($qrData['event_id'] !== (int) $request->event_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'QR code is for a different event'
+                ], 400);
+            }
+
+            // 3. Find participation record
+            $participation = EventParticipant::find($qrData['participation_id']);
+
+            if (!$participation) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Participation record not found'
+                ], 404);
+            }
+
+            // 4. Validate participation is active
+            if (!$participation->isActive()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Participation is not active'
+                ], 400);
+            }
+
+            // 5. Check if already checked in
+            if ($participation->isCheckedIn() || $participation->isCompleted()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student is already checked in',
+                    'data' => [
+                        'already_checked_in' => true,
+                        'checkin_time' => $participation->checkin_time,
+                        'student' => $participation->student
+                    ]
+                ], 200);
+            }
+
+            // 6. Get student from participation
+            $student = $participation->student;
+
+            // 7. Collect device information
             $deviceInfo = [
                 'user_agent' => $request->header('User-Agent'),
                 'ip_address' => $request->ip(),
@@ -173,7 +150,8 @@ class EventCheckinController extends Controller
                 'timestamp' => now()->toISOString()
             ];
 
-            // Perform check-in
+            // 8. Perform check-in
+            /** @var \App\Models\User $staff */
             $participant = $this->participationService->checkInStudent(
                 $event,
                 $student,
@@ -203,24 +181,21 @@ class EventCheckinController extends Controller
                     ]
                 ]
             ]);
-
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
                 'errors' => $e->errors()
             ], 422);
-
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
-
         } catch (\Exception $e) {
             Log::error('Student check-in failed', [
                 'event_id' => $request->event_id,
-                'student_id' => $request->student_id,
+                'qr_code' => $request->qr_code,
                 'staff_id' => Auth::id(),
                 'error' => $e->getMessage()
             ]);
@@ -259,7 +234,6 @@ class EventCheckinController extends Controller
                     'to' => $participants->lastItem()
                 ]
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to get event participants', [
                 'event_id' => $event->id,
@@ -285,7 +259,6 @@ class EventCheckinController extends Controller
                 'success' => true,
                 'data' => $statistics
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to get event statistics', [
                 'event_id' => $event->id,

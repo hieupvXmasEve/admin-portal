@@ -1,3 +1,4 @@
+import { BrowserQRCodeReader, ChecksumException, FormatException, NotFoundException } from '@zxing/library';
 import { ref } from 'vue';
 
 interface CameraDevice {
@@ -6,84 +7,135 @@ interface CameraDevice {
     kind: string;
 }
 
-interface QRValidationRequest {
-    qr_code: string;
-    event_id: number;
-}
-
-interface QRValidationResponse {
-    success: boolean;
-    message: string;
-    data?: {
-        event: {
-            id: number;
-            title: string;
-            location: string;
-            start_time: string;
-            end_time: string;
-            gold_reward_amount: number;
-        };
-    };
-}
-
-interface StudentSearchRequest {
-    event_id: number;
-    student_id?: string;
-    name?: string;
-    limit?: number;
-}
-
-interface StudentSearchResponse {
-    success: boolean;
-    data: Array<{
-        id: number;
-        student_id: string;
-        full_name: string;
-        email: string;
-        participation_status: string;
-        can_check_in: boolean;
-        already_checked_in: boolean;
-    }>;
-}
-
-interface CheckinRequest {
-    event_id: number;
-    student_id: number;
-    qr_code?: string;
-    force_register?: boolean;
-}
-
-interface CheckinResponse {
-    success: boolean;
-    message: string;
-    data?: {
-        participant: {
-            id: number;
-            status: string;
-            checkin_time: string;
-            student: {
-                id: number;
-                student_id: string;
-                full_name: string;
-                email: string;
-            };
-            event: {
-                id: number;
-                title: string;
-                gold_reward_amount: number;
-            };
-        };
-    };
-}
-
 export function useQRScanner() {
     const stream = ref<MediaStream | null>(null);
-    const isLoading = ref(false);
-    const error = ref<string | null>(null);
     const availableCameras = ref<CameraDevice[]>([]);
     const selectedCameraId = ref<string | null>(null);
     const isStreamActive = ref(false);
     const activeVideoElement = ref<HTMLVideoElement | null>(null);
+    const isDecoding = ref(false);
+
+    let qrCodeReader: BrowserQRCodeReader | null = null;
+    let lastDecodedText: string | null = null;
+    let lastDecodedAt = 0;
+    const duplicateCooldownMs = 1500;
+
+    const getOrCreateReader = () => {
+        if (!qrCodeReader) {
+            qrCodeReader = new BrowserQRCodeReader(250);
+        }
+
+        return qrCodeReader;
+    };
+
+    const resetLastDecoded = () => {
+        lastDecodedAt = 0;
+        lastDecodedText = null;
+    };
+
+    const handleDecodingError = (err: unknown, onError?: (error: Error) => void) => {
+        if (!err) {
+            return;
+        }
+
+        if (err instanceof NotFoundException || err instanceof ChecksumException || err instanceof FormatException) {
+            return;
+        }
+
+        const normalizedError = err instanceof Error ? err : new Error(String(err));
+        console.error('QR decoding error:', normalizedError);
+        onError?.(normalizedError);
+    };
+
+    const stopDecoding = (): void => {
+        if (qrCodeReader) {
+            qrCodeReader.reset();
+            console.debug('[useQRScanner] reader reset');
+        }
+
+        resetLastDecoded();
+        isDecoding.value = false;
+        console.debug('[useQRScanner] stopDecoding');
+    };
+
+    const stopCamera = (): void => {
+        stopDecoding();
+
+        if (stream.value) {
+            stream.value.getTracks().forEach((track) => track.stop());
+            stream.value = null;
+        }
+        if (activeVideoElement.value) {
+            activeVideoElement.value.srcObject = null;
+        }
+        isStreamActive.value = false;
+        console.debug('[useQRScanner] camera stopped');
+    };
+
+    const startDecoding = (videoElement: HTMLVideoElement, onResult: (qrText: string) => void, onError?: (error: Error) => void): void => {
+        if (isDecoding.value) {
+            return;
+        }
+
+        if (!stream.value) {
+            console.warn('[useQRScanner] startDecoding called without active stream');
+            return;
+        }
+
+        const reader = getOrCreateReader();
+        resetLastDecoded();
+        isDecoding.value = true;
+        console.debug('[useQRScanner] startDecoding on element', {
+            hasStream: !!videoElement.srcObject,
+            readyState: videoElement.readyState,
+            videoWidth: videoElement.videoWidth,
+            videoHeight: videoElement.videoHeight,
+            streamTracks: stream.value.getTracks().map((track) => ({
+                kind: track.kind,
+                readyState: track.readyState,
+            })),
+        });
+
+        reader
+            .decodeFromStream(stream.value, videoElement, (result, err) => {
+                console.debug('[useQRScanner] decode callback', {
+                    hasResult: !!result,
+                    hasError: !!err,
+                });
+                if (result) {
+                    const qrText = result.getText();
+                    if (qrText) {
+                        const now = Date.now();
+                        const isDuplicate = qrText === lastDecodedText && now - lastDecodedAt < duplicateCooldownMs;
+
+                        if (!isDuplicate) {
+                            lastDecodedText = qrText;
+                            lastDecodedAt = now;
+
+                            try {
+                                console.debug('[useQRScanner] decoded QR text', qrText);
+                                onResult(qrText);
+                            } catch (callbackError) {
+                                console.error('QR result handler error:', callbackError);
+                            } finally {
+                                stopCamera();
+                            }
+                        }
+                    }
+                }
+
+                if (err) {
+                    handleDecodingError(err, onError);
+                }
+            })
+            .catch((decodeError) => {
+                handleDecodingError(decodeError, onError);
+            })
+            .finally(() => {
+                isDecoding.value = false;
+                console.debug('[useQRScanner] decoding stopped');
+            });
+    };
 
     const selectPreferredCamera = (devices: CameraDevice[]): string | null => {
         if (devices.length === 0) {
@@ -110,9 +162,11 @@ export function useQRScanner() {
                 }));
 
             availableCameras.value = videoDevices;
+            console.debug('[useQRScanner] video input devices', videoDevices);
 
             if (videoDevices.length > 0 && (!selectedCameraId.value || !videoDevices.some((device) => device.deviceId === selectedCameraId.value))) {
                 selectedCameraId.value = selectPreferredCamera(videoDevices);
+                console.debug('[useQRScanner] preferred camera selected', selectedCameraId.value);
             }
 
             return videoDevices;
@@ -127,13 +181,8 @@ export function useQRScanner() {
         return await updateAvailableCameras();
     };
 
-    /**
-     * Start camera for QR scanning
-     */
     const startCamera = async (videoElement: HTMLVideoElement, deviceId?: string): Promise<void> => {
         try {
-            isLoading.value = true;
-            error.value = null;
             activeVideoElement.value = videoElement;
 
             if (stream.value) {
@@ -141,8 +190,8 @@ export function useQRScanner() {
             }
 
             const targetDeviceId = deviceId || selectedCameraId.value;
+            console.debug('[useQRScanner] starting camera with device', targetDeviceId);
 
-            // Request camera access
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: 1280 },
@@ -154,7 +203,6 @@ export function useQRScanner() {
             stream.value = mediaStream;
             videoElement.srcObject = mediaStream;
 
-            // Wait for video to be ready
             await new Promise<void>((resolve, reject) => {
                 videoElement.onloadedmetadata = () => {
                     videoElement
@@ -177,28 +225,18 @@ export function useQRScanner() {
                 selectedCameraId.value = targetDeviceId;
             }
 
+            console.debug('[useQRScanner] active camera track', {
+                activeDeviceId,
+                facingMode: activeTrack?.getSettings().facingMode,
+                label: activeTrack?.label,
+            });
+
             await updateAvailableCameras();
         } catch (err) {
             console.error('Failed to start camera:', err);
-            error.value = 'Failed to access camera. Please check permissions.';
+            stopCamera();
             throw err;
-        } finally {
-            isLoading.value = false;
         }
-    };
-
-    /**
-     * Stop camera stream
-     */
-    const stopCamera = (): void => {
-        if (stream.value) {
-            stream.value.getTracks().forEach((track) => track.stop());
-            stream.value = null;
-        }
-        if (activeVideoElement.value) {
-            activeVideoElement.value.srcObject = null;
-        }
-        isStreamActive.value = false;
     };
 
     const switchCamera = async (deviceId: string): Promise<void> => {
@@ -208,191 +246,18 @@ export function useQRScanner() {
             return;
         }
 
+        console.debug('[useQRScanner] switchCamera', deviceId);
         await startCamera(activeVideoElement.value, deviceId);
     };
 
-    /**
-     * Validate QR code with the server
-     */
-    const validateQRCode = async (qrCode: string, eventId: number): Promise<QRValidationResponse> => {
-        try {
-            isLoading.value = true;
-            error.value = null;
-
-            const response = await fetch('/api/events/validate-qr', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    Accept: 'application/json',
-                },
-                body: JSON.stringify({
-                    qr_code: qrCode,
-                    event_id: eventId,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'QR validation failed');
-            }
-
-            return data;
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'QR validation failed';
-            error.value = errorMessage;
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
-    };
-
-    /**
-     * Search for students
-     */
-    const searchStudents = async (params: StudentSearchRequest): Promise<StudentSearchResponse> => {
-        try {
-            isLoading.value = true;
-            error.value = null;
-
-            const response = await fetch('/api/events/search-student', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    Accept: 'application/json',
-                },
-                body: JSON.stringify(params),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Student search failed');
-            }
-
-            return data;
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Student search failed';
-            error.value = errorMessage;
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
-    };
-
-    /**
-     * Check in a student
-     */
-    const checkinStudent = async (params: CheckinRequest): Promise<CheckinResponse> => {
-        try {
-            isLoading.value = true;
-            error.value = null;
-
-            const response = await fetch('/api/events/checkin', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    Accept: 'application/json',
-                },
-                body: JSON.stringify(params),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Check-in failed');
-            }
-
-            return data;
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Check-in failed';
-            error.value = errorMessage;
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
-    };
-
-    /**
-     * Get event participants
-     */
-    const getEventParticipants = async (eventId: number, filters: Record<string, any> = {}) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
-
-            const params = new URLSearchParams(filters);
-            const response = await fetch(`/api/events/${eventId}/participants?${params}`, {
-                headers: {
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to get participants');
-            }
-
-            return data;
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Failed to get participants';
-            error.value = errorMessage;
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
-    };
-
-    /**
-     * Get event statistics
-     */
-    const getEventStatistics = async (eventId: number) => {
-        try {
-            isLoading.value = true;
-            error.value = null;
-
-            const response = await fetch(`/api/events/${eventId}/statistics`, {
-                headers: {
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to get statistics');
-            }
-
-            return data;
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Failed to get statistics';
-            error.value = errorMessage;
-            throw err;
-        } finally {
-            isLoading.value = false;
-        }
-    };
-
-    /**
-     * Check if browser supports camera access
-     */
     const isCameraSupported = (): boolean => {
         return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     };
 
-    /**
-     * Request camera permissions
-     */
     const requestCameraPermission = async (): Promise<boolean> => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            stream.getTracks().forEach((track) => track.stop());
+            const permissionStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            permissionStream.getTracks().forEach((track) => track.stop());
             return true;
         } catch (err) {
             console.error('Camera permission denied:', err);
@@ -401,27 +266,18 @@ export function useQRScanner() {
     };
 
     return {
-        // State
-        isLoading,
-        error,
         stream,
         isStreamActive,
         availableCameras,
         selectedCameraId,
-
-        // Camera controls
+        isDecoding,
         startCamera,
         stopCamera,
         getCameraDevices,
         switchCamera,
+        startDecoding,
+        stopDecoding,
         isCameraSupported,
         requestCameraPermission,
-
-        // API methods
-        validateQRCode,
-        searchStudents,
-        checkinStudent,
-        getEventParticipants,
-        getEventStatistics,
     };
 }

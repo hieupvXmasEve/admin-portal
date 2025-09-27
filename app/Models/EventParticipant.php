@@ -177,4 +177,24 @@ class EventParticipant extends Model
     {
         return $query->where('student_id', $studentId);
     }
+
+    public function getStudentQRCode(): string
+    {
+        // Format: STU_{student_id}_EVT_{event_id}_{participation_id}_{hash}
+        $hash = substr(md5($this->id . $this->student_id . $this->event_id . $this->created_at), 0, 8);
+        return "STU_{$this->student_id}_EVT_{$this->event_id}_PRT_{$this->id}_{$hash}";
+    }
+
+    public function getQRCodeData(): array
+    {
+        return [
+            'type' => 'student_participation',
+            'participation_id' => $this->id,
+            'student_id' => $this->student_id,
+            'event_id' => $this->event_id,
+            'status' => $this->status,
+            'qr_code' => $this->getStudentQRCode()
+        ];
+    }
+
 }

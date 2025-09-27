@@ -4,9 +4,8 @@ import QRScanner from '@/components/QRScanner.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useQRScanner } from '@/composables/useQRScanner';
+import { useApi } from '@/composables';
 import type { Event, EventParticipant } from '@/types/event';
-import { formatDateTime } from '@/utils/date';
 import { router } from '@inertiajs/vue3';
 import { AlertTriangle, ArrowLeft, CheckCircle } from 'lucide-vue-next';
 import { onMounted, onUnmounted, ref } from 'vue';
@@ -25,7 +24,18 @@ interface ActivityItem {
     status: string;
 }
 
+interface CheckinApiResponse {
+    participant: EventParticipant;
+}
+
+interface EventStatisticsResponse {
+    success: boolean;
+    data: any;
+    message?: string;
+}
+
 const props = defineProps<Props>();
+const api = useApi();
 
 // State
 const selectedEvent = ref<Event>(props.event);
@@ -36,8 +46,20 @@ const recentActivity = ref<ActivityItem[]>([]);
 const showSuccessToast = ref(false);
 const successMessage = ref('');
 
-// Composables
-const { isCameraSupported, getEventStatistics } = useQRScanner();
+const qrScannerRef = ref<InstanceType<typeof QRScanner> | null>(null);
+const isScanProcessing = ref(false);
+
+const isCameraSupported = typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function';
+
+const fetchEventStatistics = async (eventId: number) => {
+    const { data } = await api.get<EventStatisticsResponse>(`/api/events/${eventId}/statistics`);
+
+    if (!data.value?.success) {
+        throw new Error(data.value?.message || 'Failed to load event statistics');
+    }
+
+    return data.value.data;
+};
 
 // Methods
 const onEventChanged = (event: Event) => {
@@ -76,7 +98,7 @@ const onCheckinSuccess = (participant: EventParticipant) => {
     loadEventStatistics();
 };
 
-const onParticipantUpdated = (participant: EventParticipant) => {
+const onParticipantUpdated = () => {
     // Refresh statistics when participant is updated
     loadEventStatistics();
 };
@@ -85,10 +107,49 @@ const loadEventStatistics = async () => {
     if (!selectedEvent.value) return;
 
     try {
-        const response = await getEventStatistics(selectedEvent.value.id);
-        eventStatistics.value = response.data;
+        const stats = await fetchEventStatistics(selectedEvent.value.id);
+        eventStatistics.value = stats;
     } catch (error) {
         console.error('Failed to load event statistics:', error);
+    }
+};
+
+const handleScan = async (qrCode: string) => {
+    if (!selectedEvent.value || isScanProcessing.value) {
+        return;
+    }
+
+    isScanProcessing.value = true;
+
+    try {
+        const result = await api.post<CheckinApiResponse>('/api/events/checkin', {
+            event_id: selectedEvent.value.id,
+            qr_code: qrCode,
+        });
+
+        if (!result.data.value?.success || !result.data.value?.data?.participant) {
+            const json = await result.response.value?.json();
+            throw new Error(json.message || 'Check-in failed');
+        }
+
+        const participant = result.data.value.data.participant;
+
+        qrScannerRef.value?.handleScanResult({
+            success: true,
+            message: `${participant.student?.full_name || 'Participant'} checked in successfully!`,
+            participant,
+            fromScanner: true,
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to process QR code';
+        console.error('QR scan processing failed:', error);
+        qrScannerRef.value?.handleScanResult({
+            success: false,
+            message,
+            fromScanner: true,
+        });
+    } finally {
+        isScanProcessing.value = false;
     }
 };
 
@@ -146,7 +207,7 @@ onUnmounted(() => {
 
         <!-- QR Scanner Component -->
         <div class="bg-card rounded-lg border p-6">
-            <QRScanner :event="selectedEvent" @checkin-success="onCheckinSuccess" />
+            <QRScanner ref="qrScannerRef" :event="selectedEvent" @scan="handleScan" @checkin-success="onCheckinSuccess" />
         </div>
 
         <!-- Participant Management -->
@@ -202,7 +263,7 @@ onUnmounted(() => {
                         </div>
                         <div class="flex justify-between">
                             <span class="text-muted-foreground text-sm">Capacity Status:</span>
-                            <Badge :variant="eventStatistics.capacity_reached ? 'destructive' : 'success'">
+                            <Badge :variant="eventStatistics.capacity_reached ? 'destructive' : 'default'">
                                 {{ eventStatistics.capacity_reached ? 'Full' : 'Available' }}
                             </Badge>
                         </div>
@@ -244,10 +305,10 @@ onUnmounted(() => {
                             <span class="font-medium">{{ activity.event_title }}</span>
                         </p>
                         <p class="text-muted-foreground text-xs">
-                            {{ formatDateTime(activity.timestamp) }}
+                            <!-- {{ formatDateTime(activity.timestamp, 'YYYY-MM-DD HH:mm:ss') }} -->
                         </p>
                     </div>
-                    <Badge variant="success">
+                    <Badge variant="default">
                         {{ activity.status }}
                     </Badge>
                 </div>
