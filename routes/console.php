@@ -22,3 +22,23 @@ Schedule::command('sessions:update-statuses')
     ->onOneServer()
     ->runInBackground();
 
+// Schedule automatic event completions
+Schedule::command('events:process-completions')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
+
+// Schedule automatic event reminders
+Schedule::command('events:send-reminders')
+    ->dailyAt('00:01')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
+
+// Schedule failed gold rewards processing
+Schedule::command('events:process-failed-gold-rewards')
+    ->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();

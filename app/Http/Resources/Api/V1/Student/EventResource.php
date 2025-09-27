@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Student;
 
+use Carbon\CarbonInterval;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -101,8 +102,14 @@ class EventResource extends JsonResource
             // Time-based information
             'timing' => [
                 'duration_minutes' => $this->start_time->diffInMinutes($this->end_time),
-                'starts_in_minutes' => $this->start_time->isFuture() ? (int) now()->diffInMinutes($this->start_time) : null,
-                'ends_in_minutes' => $this->end_time->isFuture() ? (int) now()->diffInMinutes($this->end_time) : null,
+                'starts_in_minutes' => $this->start_time->isFuture() ? CarbonInterval::minutes(now()->diffInMinutes($this->start_time))->forHumans([
+                    'short' => true,
+                    'parts' => 1,
+                ]) : null,
+                'ends_in_minutes' => $this->end_time->isFuture() ? CarbonInterval::minutes(now()->diffInMinutes($this->end_time))->forHumans([
+                    'short' => true,
+                    'parts' => 1,
+                ]) : null,
                 'is_today' => $this->start_time->isToday(),
                 'is_tomorrow' => $this->start_time->isTomorrow(),
                 'is_this_week' => $this->start_time->isCurrentWeek(),

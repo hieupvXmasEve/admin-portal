@@ -198,18 +198,12 @@ class EventParticipationService
     public function awardGoldReward(EventParticipant $participant): bool
     {
         return DB::transaction(function () use ($participant) {
-            // Validate participant is eligible for reward
-            if ($participant->hasBeenAwarded()) {
-                throw new InvalidArgumentException('Gold reward has already been awarded');
-            }
-
-            if (!$participant->isCompleted()) {
-                throw new InvalidArgumentException('Participation must be completed before awarding gold');
-            }
+            // Enhanced validation for gold reward eligibility
+            $this->validateGoldRewardEligibility($participant);
 
             $event = $participant->event;
             $student = $participant->student;
-            $goldAmount = $event->gold_reward_amount;
+            $goldAmount = (float) $event->gold_reward_amount;
 
             if ($goldAmount <= 0) {
                 return false;
@@ -234,14 +228,8 @@ class EventParticipationService
                 // Send reward notification
                 $this->notificationService->sendGoldRewardNotification($student, $goldAmount, $event);
 
-                // Log the reward
-                Log::info('Gold reward awarded', [
-                    'participant_id' => $participant->id,
-                    'event_id' => $event->id,
-                    'student_id' => $student->id,
-                    'amount' => $goldAmount,
-                    'transaction_id' => $transaction->id
-                ]);
+                // Enhanced audit logging
+                $this->logGoldRewardAudit($participant, $transaction, 'awarded');
 
                 return true;
             } catch (\Exception $e) {
@@ -250,12 +238,89 @@ class EventParticipationService
                     'event_id' => $event->id,
                     'student_id' => $student->id,
                     'amount' => $goldAmount,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
+                    'stack_trace' => $e->getTraceAsString()
                 ]);
 
                 throw new InvalidArgumentException('Failed to award gold reward: ' . $e->getMessage());
             }
         });
+    }
+
+    /**
+     * Validate if participant is eligible for gold reward.
+     */
+    private function validateGoldRewardEligibility(EventParticipant $participant): void
+    {
+        if ($participant->hasBeenAwarded()) {
+            throw new InvalidArgumentException('Gold reward has already been awarded');
+        }
+
+        if (!$participant->isCompleted()) {
+            throw new InvalidArgumentException('Participation must be completed before awarding gold');
+        }
+
+        $event = $participant->event;
+        $student = $participant->student;
+
+        // Validate event is eligible for gold rewards
+        if ($event->status !== 'completed' && !$event->hasEnded()) {
+            throw new InvalidArgumentException('Event must be completed or ended to award gold');
+        }
+
+        // Validate student is still active
+        if (!$student->isActive()) {
+            throw new InvalidArgumentException('Cannot award gold to inactive student');
+        }
+
+        // Validate participant was checked in for minimum duration (if required)
+        if ($participant->checkin_time && $event->hasEnded()) {
+            $checkInDuration = $participant->checkin_time->diffInMinutes($event->end_time);
+            $minimumDuration = 15; // Minimum 15 minutes attendance
+
+            if ($checkInDuration < $minimumDuration) {
+                throw new InvalidArgumentException('Participant did not meet minimum attendance duration for gold reward');
+            }
+        }
+
+        // Validate no duplicate participation for same event
+        $duplicateParticipations = EventParticipant::where('student_id', $student->id)
+            ->where('event_id', $event->id)
+            ->where('id', '!=', $participant->id)
+            ->where('gold_awarded', true)
+            ->exists();
+
+        if ($duplicateParticipations) {
+            throw new InvalidArgumentException('Student has already received gold for this event');
+        }
+    }
+
+    /**
+     * Enhanced audit logging for gold rewards.
+     */
+    private function logGoldRewardAudit(EventParticipant $participant, WalletTransaction $transaction, string $action): void
+    {
+        $auditData = [
+            'action' => $action,
+            'participant_id' => $participant->id,
+            'event_id' => $participant->event_id,
+            'student_id' => $participant->student_id,
+            'amount' => $transaction->amount,
+            'transaction_id' => $transaction->id,
+            'event_title' => $participant->event->title,
+            'student_name' => $participant->student->full_name,
+            'checkin_time' => $participant->checkin_time?->toISOString(),
+            'completion_time' => $participant->updated_at->toISOString(),
+            'attendance_duration' => $participant->getCheckInDuration(),
+            'campus_id' => $participant->event->campus_id,
+            'timestamp' => now()->toISOString()
+        ];
+
+        Log::info("Gold reward {$action}", $auditData);
+
+        // Audit trail is already handled by WalletTransaction table
+        // No need for separate audit table since wallet_transactions already contains:
+        // - student_id, amount, type, source_type, source_id, notes, created_at
     }
 
     /**
@@ -270,17 +335,37 @@ class EventParticipationService
 
             $event = $participant->event;
             $student = $participant->student;
-            $goldAmount = $event->gold_reward_amount;
+            $goldAmount = (float) $event->gold_reward_amount;
+
+            // Validate reclaim eligibility
+            $this->validateGoldReclaimEligibility($participant);
 
             try {
-                // Reclaim gold through wallet service
-                $transaction = $this->walletService->deductGold(
-                    $student,
-                    $goldAmount,
-                    WalletTransaction::SOURCE_EVENT,
-                    $event->id,
-                    "Gold reclaimed due to event participation cancellation: {$event->title}"
-                );
+                // Check if student has sufficient balance
+                if (!$this->walletService->hasSufficientBalance($student, $goldAmount)) {
+                    Log::warning('Insufficient balance for gold reclaim', [
+                        'participant_id' => $participant->id,
+                        'student_id' => $student->id,
+                        'required_amount' => $goldAmount,
+                        'current_balance' => $this->walletService->getBalance($student)
+                    ]);
+
+                    // Create negative balance transaction with special handling
+                    $transaction = $this->walletService->adjustBalance(
+                        $student,
+                        -$goldAmount,
+                        "Gold reclaimed due to event participation cancellation (insufficient balance): {$event->title}"
+                    );
+                } else {
+                    // Reclaim gold through wallet service
+                    $transaction = $this->walletService->deductGold(
+                        $student,
+                        $goldAmount,
+                        WalletTransaction::SOURCE_EVENT,
+                        $event->id,
+                        "Gold reclaimed due to event participation cancellation: {$event->title}"
+                    );
+                }
 
                 // Update participant record
                 $participant->update([
@@ -291,14 +376,8 @@ class EventParticipationService
                 // Send reclaim notification
                 $this->notificationService->sendGoldReclaimNotification($student, $goldAmount, $event);
 
-                // Log the reclaim
-                Log::info('Gold reward reclaimed', [
-                    'participant_id' => $participant->id,
-                    'event_id' => $event->id,
-                    'student_id' => $student->id,
-                    'amount' => $goldAmount,
-                    'transaction_id' => $transaction->id
-                ]);
+                // Enhanced audit logging
+                $this->logGoldRewardAudit($participant, $transaction, 'reclaimed');
 
                 return true;
             } catch (\Exception $e) {
@@ -307,12 +386,340 @@ class EventParticipationService
                     'event_id' => $event->id,
                     'student_id' => $student->id,
                     'amount' => $goldAmount,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
+                    'stack_trace' => $e->getTraceAsString()
                 ]);
 
                 throw new InvalidArgumentException('Failed to reclaim gold reward: ' . $e->getMessage());
             }
         });
+    }
+
+    /**
+     * Validate if gold reward can be reclaimed.
+     */
+    private function validateGoldReclaimEligibility(EventParticipant $participant): void
+    {
+        $event = $participant->event;
+        $student = $participant->student;
+
+        // Check if reclaim is allowed based on event timing
+        $reclaimDeadline = $event->end_time->addDays(7); // Allow reclaim within 7 days of event end
+        if (now()->gt($reclaimDeadline)) {
+            throw new InvalidArgumentException('Gold reclaim deadline has passed');
+        }
+
+        // Validate student account is still accessible
+        if (!$student->exists) {
+            throw new InvalidArgumentException('Cannot reclaim gold from deleted student account');
+        }
+
+        // Check if there are any pending transactions that might affect this reclaim
+        $pendingTransactions = WalletTransaction::where('student_id', $student->id)
+            ->where('source_type', WalletTransaction::SOURCE_EVENT)
+            ->where('source_id', $event->id)
+            ->where('created_at', '>', $participant->awarded_at)
+            ->exists();
+
+        if ($pendingTransactions) {
+            Log::warning('Pending transactions found during gold reclaim', [
+                'participant_id' => $participant->id,
+                'student_id' => $student->id,
+                'event_id' => $event->id
+            ]);
+        }
+    }
+
+    /**
+     * Get gold reward statistics for an event.
+     */
+    public function getGoldRewardStatistics(Event $event): array
+    {
+        $participants = $event->participants;
+        $totalAwarded = $participants->where('gold_awarded', true)->count();
+        $totalAmount = $totalAwarded * $event->gold_reward_amount;
+
+        return [
+            'total_participants' => $participants->count(),
+            'eligible_for_gold' => $participants->where('status', 'completed')->count(),
+            'gold_awarded_count' => $totalAwarded,
+            'gold_pending_count' => $participants->where('status', 'completed')->where('gold_awarded', false)->count(),
+            'total_gold_amount' => $totalAmount,
+            'average_attendance_duration' => $participants->where('status', 'completed')->avg(function ($p) {
+                return $p->getCheckInDuration();
+            }),
+            'gold_reclaimed_count' => $participants->where('status', 'cancelled')->where('gold_awarded', false)->count(),
+        ];
+    }
+
+    /**
+     * Process failed gold rewards with retry mechanism.
+     */
+    public function processFailedGoldRewards(): int
+    {
+        $processedCount = 0;
+
+        // Find completed participants who should have gold but don't
+        $failedRewards = EventParticipant::where('status', 'completed')
+            ->where('gold_awarded', false)
+            ->whereHas('event', function ($query) {
+                $query->where('gold_reward_amount', '>', 0)
+                    ->where('end_time', '<', now());
+            })
+            ->with(['event', 'student'])
+            ->get();
+
+        foreach ($failedRewards as $participant) {
+            try {
+                if ($this->awardGoldReward($participant)) {
+                    $processedCount++;
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to process failed gold reward', [
+                    'participant_id' => $participant->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        if ($processedCount > 0) {
+            Log::info('Processed failed gold rewards', [
+                'processed_count' => $processedCount,
+                'total_failed' => $failedRewards->count()
+            ]);
+        }
+
+        return $processedCount;
+    }
+
+    /**
+     * Get gold reward audit trail from wallet transactions.
+     */
+    public function getGoldRewardAuditTrail(array $filters = []): Collection
+    {
+        $query = WalletTransaction::where('source_type', WalletTransaction::SOURCE_EVENT)
+            ->with(['student'])
+            ->orderBy('created_at', 'desc');
+
+        // Apply filters
+        if (isset($filters['student_id'])) {
+            $query->where('student_id', $filters['student_id']);
+        }
+
+        if (isset($filters['event_id'])) {
+            $query->where('source_id', $filters['event_id']);
+        }
+
+        if (isset($filters['start_date'])) {
+            $query->where('created_at', '>=', $filters['start_date']);
+        }
+
+        if (isset($filters['end_date'])) {
+            $query->where('created_at', '<=', $filters['end_date']);
+        }
+
+        if (isset($filters['type'])) {
+            $query->where('type', $filters['type']);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Get gold reward summary from wallet transactions.
+     */
+    public function getGoldRewardSummary(array $filters = []): array
+    {
+        $transactions = $this->getGoldRewardAuditTrail($filters);
+
+        return [
+            'total_transactions' => $transactions->count(),
+            'total_awarded' => $transactions->where('type', WalletTransaction::TYPE_EARN)->count(),
+            'total_reclaimed' => $transactions->where('type', WalletTransaction::TYPE_SPEND)->count(),
+            'total_amount_awarded' => $transactions->where('type', WalletTransaction::TYPE_EARN)->sum('amount'),
+            'total_amount_reclaimed' => abs($transactions->where('type', WalletTransaction::TYPE_SPEND)->sum('amount')),
+            'net_amount' => $transactions->sum('amount'),
+            'unique_students' => $transactions->pluck('student_id')->unique()->count(),
+            'unique_events' => $transactions->pluck('source_id')->unique()->count(),
+            'date_range' => [
+                'start' => $transactions->min('created_at'),
+                'end' => $transactions->max('created_at')
+            ]
+        ];
+    }
+
+    /**
+     * Generate comprehensive gold reward report for an event or campus.
+     */
+    public function generateGoldRewardReport(array $filters = []): array
+    {
+        $query = EventParticipant::with(['event', 'student']);
+
+        // Apply filters
+        if (isset($filters['event_id'])) {
+            $query->where('event_id', $filters['event_id']);
+        }
+
+        if (isset($filters['campus_id'])) {
+            $query->whereHas('event', function ($q) use ($filters) {
+                $q->where('campus_id', $filters['campus_id']);
+            });
+        }
+
+        if (isset($filters['start_date'])) {
+            $query->whereHas('event', function ($q) use ($filters) {
+                $q->where('start_time', '>=', $filters['start_date']);
+            });
+        }
+
+        if (isset($filters['end_date'])) {
+            $query->whereHas('event', function ($q) use ($filters) {
+                $q->where('end_time', '<=', $filters['end_date']);
+            });
+        }
+
+        $participants = $query->get();
+
+        $report = [
+            'summary' => [
+                'total_participants' => $participants->count(),
+                'completed_participants' => $participants->where('status', 'completed')->count(),
+                'gold_awarded_count' => $participants->where('gold_awarded', true)->count(),
+                'gold_pending_count' => $participants->where('status', 'completed')->where('gold_awarded', false)->count(),
+                'total_gold_distributed' => 0,
+                'average_gold_per_participant' => 0,
+                'events_processed' => $participants->pluck('event_id')->unique()->count(),
+            ],
+            'by_event' => [],
+            'by_campus' => [],
+            'failed_rewards' => [],
+            'recent_activity' => []
+        ];
+
+        // Calculate totals and group by event
+        $eventGroups = $participants->groupBy('event_id');
+        foreach ($eventGroups as $eventId => $eventParticipants) {
+            $event = $eventParticipants->first()->event;
+            $awardedCount = $eventParticipants->where('gold_awarded', true)->count();
+            $totalGold = $awardedCount * $event->gold_reward_amount;
+
+            $report['summary']['total_gold_distributed'] += $totalGold;
+
+            $report['by_event'][] = [
+                'event_id' => $event->id,
+                'event_title' => $event->title,
+                'event_date' => $event->start_time->format('Y-m-d'),
+                'gold_reward_amount' => $event->gold_reward_amount,
+                'total_participants' => $eventParticipants->count(),
+                'completed_participants' => $eventParticipants->where('status', 'completed')->count(),
+                'gold_awarded_count' => $awardedCount,
+                'total_gold_distributed' => $totalGold,
+                'pending_rewards' => $eventParticipants->where('status', 'completed')->where('gold_awarded', false)->count(),
+            ];
+        }
+
+        // Group by campus
+        $campusGroups = $participants->groupBy(function ($participant) {
+            return $participant->event->campus_id;
+        });
+
+        foreach ($campusGroups as $campusId => $campusParticipants) {
+            $totalGold = $campusParticipants->where('gold_awarded', true)->sum(function ($p) {
+                return $p->event->gold_reward_amount;
+            });
+
+            $report['by_campus'][] = [
+                'campus_id' => $campusId,
+                'total_participants' => $campusParticipants->count(),
+                'gold_awarded_count' => $campusParticipants->where('gold_awarded', true)->count(),
+                'total_gold_distributed' => $totalGold,
+            ];
+        }
+
+        // Calculate averages
+        if ($report['summary']['gold_awarded_count'] > 0) {
+            $report['summary']['average_gold_per_participant'] =
+                $report['summary']['total_gold_distributed'] / $report['summary']['gold_awarded_count'];
+        }
+
+        // Find failed rewards
+        $report['failed_rewards'] = $participants
+            ->where('status', 'completed')
+            ->where('gold_awarded', false)
+            ->filter(function ($participant) {
+                return $participant->event->gold_reward_amount > 0 && $participant->event->hasEnded();
+            })
+            ->map(function ($participant) {
+                return [
+                    'participant_id' => $participant->id,
+                    'event_id' => $participant->event_id,
+                    'event_title' => $participant->event->title,
+                    'student_id' => $participant->student_id,
+                    'student_name' => $participant->student->full_name,
+                    'gold_amount' => $participant->event->gold_reward_amount,
+                    'completed_at' => $participant->updated_at->format('Y-m-d H:i:s'),
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        return $report;
+    }
+
+    /**
+     * Get gold reward processing metrics for monitoring.
+     */
+    public function getGoldRewardMetrics(): array
+    {
+        $now = now();
+        $last24Hours = $now->copy()->subDay();
+        $lastWeek = $now->copy()->subWeek();
+
+        return [
+            'last_24_hours' => [
+                'rewards_awarded' => EventParticipant::where('gold_awarded', true)
+                    ->where('awarded_at', '>=', $last24Hours)
+                    ->count(),
+                'rewards_reclaimed' => EventParticipant::where('status', 'cancelled')
+                    ->where('updated_at', '>=', $last24Hours)
+                    ->whereNotNull('awarded_at')
+                    ->count(),
+                'total_gold_distributed' => EventParticipant::where('gold_awarded', true)
+                    ->where('awarded_at', '>=', $last24Hours)
+                    ->with('event')
+                    ->get()
+                    ->sum(function ($p) {
+                        return $p->event->gold_reward_amount;
+                    }),
+            ],
+            'last_week' => [
+                'rewards_awarded' => EventParticipant::where('gold_awarded', true)
+                    ->where('awarded_at', '>=', $lastWeek)
+                    ->count(),
+                'events_with_rewards' => EventParticipant::where('gold_awarded', true)
+                    ->where('awarded_at', '>=', $lastWeek)
+                    ->distinct('event_id')
+                    ->count(),
+                'unique_students_rewarded' => EventParticipant::where('gold_awarded', true)
+                    ->where('awarded_at', '>=', $lastWeek)
+                    ->distinct('student_id')
+                    ->count(),
+            ],
+            'pending_processing' => [
+                'failed_rewards' => EventParticipant::where('status', 'completed')
+                    ->where('gold_awarded', false)
+                    ->whereHas('event', function ($query) {
+                        $query->where('gold_reward_amount', '>', 0)
+                            ->where('end_time', '<', now());
+                    })
+                    ->count(),
+                'auto_completions_pending' => EventParticipant::where('status', 'checked_in')
+                    ->whereHas('event', function ($query) {
+                        $query->where('end_time', '<', now());
+                    })
+                    ->count(),
+            ]
+        ];
     }
 
     /**
@@ -403,18 +810,8 @@ class EventParticipationService
             ->get();
 
         foreach ($endedEvents as $event) {
-            foreach ($event->participants as $participant) {
-                try {
-                    $this->completeParticipation($participant);
-                    $completedCount++;
-                } catch (\Exception $e) {
-                    Log::error('Failed to auto-complete participation', [
-                        'participant_id' => $participant->id,
-                        'event_id' => $event->id,
-                        'error' => $e->getMessage()
-                    ]);
-                }
-            }
+            // Use bulk processing for better performance
+            $completedCount += $this->bulkCompleteParticipations($event->participants);
         }
 
         if ($completedCount > 0) {
@@ -425,6 +822,144 @@ class EventParticipationService
         }
 
         return $completedCount;
+    }
+
+    /**
+     * Bulk complete multiple participations for better performance.
+     */
+    public function bulkCompleteParticipations($participants): int
+    {
+        $completedCount = 0;
+        $goldAwards = [];
+        $notifications = [];
+
+        DB::transaction(function () use ($participants, &$completedCount, &$goldAwards, &$notifications) {
+            foreach ($participants as $participant) {
+                try {
+                    if (!$participant->canComplete()) {
+                        continue;
+                    }
+
+                    // Update status to completed
+                    $participant->update(['status' => 'completed']);
+                    $completedCount++;
+
+                    // Prepare gold award if eligible
+                    if (!$participant->hasBeenAwarded() && $participant->event->gold_reward_amount > 0) {
+                        $goldAwards[] = $participant;
+                    }
+
+                    Log::info('Bulk participation completed', [
+                        'participant_id' => $participant->id,
+                        'event_id' => $participant->event_id,
+                        'student_id' => $participant->student_id
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to complete participation in bulk', [
+                        'participant_id' => $participant->id,
+                        'event_id' => $participant->event_id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+        });
+
+        // Process gold awards in batches
+        if (!empty($goldAwards)) {
+            $this->bulkAwardGoldRewards($goldAwards);
+        }
+
+        return $completedCount;
+    }
+
+    /**
+     * Bulk award gold rewards for better performance.
+     */
+    public function bulkAwardGoldRewards(array $participants): int
+    {
+        $awardedCount = 0;
+
+        foreach ($participants as $participant) {
+            try {
+                DB::transaction(function () use ($participant) {
+                    $event = $participant->event;
+                    $student = $participant->student;
+                    $goldAmount = (float) $event->gold_reward_amount;
+
+                    // Award gold through wallet service
+                    $transaction = $this->walletService->addGold(
+                        $student,
+                        $goldAmount,
+                        WalletTransaction::SOURCE_EVENT,
+                        $event->id,
+                        "Gold reward for attending event: {$event->title}"
+                    );
+
+                    // Update participant record
+                    $participant->update([
+                        'gold_awarded' => true,
+                        'awarded_at' => now()
+                    ]);
+
+                    // Send reward notification
+                    $this->notificationService->sendGoldRewardNotification($student, $goldAmount, $event);
+
+                    Log::info('Bulk gold reward awarded', [
+                        'participant_id' => $participant->id,
+                        'event_id' => $event->id,
+                        'student_id' => $student->id,
+                        'amount' => $goldAmount,
+                        'transaction_id' => $transaction->id
+                    ]);
+                });
+
+                $awardedCount++;
+            } catch (\Exception $e) {
+                Log::error('Failed to award gold in bulk', [
+                    'participant_id' => $participant->id,
+                    'event_id' => $participant->event_id,
+                    'student_id' => $participant->student_id,
+                    'amount' => $participant->event->gold_reward_amount,
+                    'error' => $e->getMessage()
+                ]);
+
+                // Retry individual award with exponential backoff
+                $this->retryGoldAward($participant);
+            }
+        }
+
+        return $awardedCount;
+    }
+
+    /**
+     * Retry gold award with exponential backoff.
+     */
+    private function retryGoldAward(EventParticipant $participant, int $attempt = 1, int $maxAttempts = 3): bool
+    {
+        if ($attempt > $maxAttempts) {
+            Log::error('Max retry attempts reached for gold award', [
+                'participant_id' => $participant->id,
+                'event_id' => $participant->event_id,
+                'student_id' => $participant->student_id,
+                'attempts' => $attempt - 1
+            ]);
+            return false;
+        }
+
+        try {
+            // Wait with exponential backoff
+            sleep(pow(2, $attempt - 1));
+
+            return $this->awardGoldReward($participant);
+        } catch (\Exception $e) {
+            Log::warning('Gold award retry failed', [
+                'participant_id' => $participant->id,
+                'attempt' => $attempt,
+                'error' => $e->getMessage()
+            ]);
+
+            return $this->retryGoldAward($participant, $attempt + 1, $maxAttempts);
+        }
     }
 
     /**

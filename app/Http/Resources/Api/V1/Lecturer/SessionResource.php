@@ -173,7 +173,7 @@ class SessionResource extends JsonResource
         $sessionDate = \Carbon\Carbon::parse($date);
 
         return in_array($status, ['completed', 'in_progress']) ||
-               ($status === 'scheduled' && $sessionDate->lte(now()));
+            ($status === 'scheduled' && $sessionDate->lte(now()));
     }
 
     /**
@@ -197,7 +197,7 @@ class SessionResource extends JsonResource
             return false;
         }
 
-        $sessionDateTime = \Carbon\Carbon::parse($date.' '.$startTime);
+        $sessionDateTime = \Carbon\Carbon::parse($date . ' ' . $startTime);
 
         return $sessionDateTime->isPast();
     }
@@ -211,7 +211,7 @@ class SessionResource extends JsonResource
             return false;
         }
 
-        $sessionDateTime = \Carbon\Carbon::parse($date.' '.$startTime);
+        $sessionDateTime = \Carbon\Carbon::parse($date . ' ' . $startTime);
 
         return $sessionDateTime->isFuture();
     }
@@ -225,13 +225,13 @@ class SessionResource extends JsonResource
             return null;
         }
 
-        $sessionDateTime = \Carbon\Carbon::parse($date.' '.$startTime);
+        $sessionDateTime = \Carbon\Carbon::parse($date . ' ' . $startTime);
 
         if ($sessionDateTime->isPast()) {
             return null;
         }
 
-        return now()->diffInMinutes($sessionDateTime);
+        return (int) now()->diffInMinutes($sessionDateTime);
     }
 
     /**
@@ -261,7 +261,7 @@ class SessionResource extends JsonResource
      */
     protected function getFormattedTime(string $startTime, string $endTime): string
     {
-        return $startTime.' - '.$endTime;
+        return $startTime . ' - ' . $endTime;
     }
 
     /**
@@ -273,7 +273,7 @@ class SessionResource extends JsonResource
             return null;
         }
 
-        $sessionDateTime = \Carbon\Carbon::parse($date.' '.$startTime);
+        $sessionDateTime = \Carbon\Carbon::parse($date . ' ' . $startTime);
 
         return $sessionDateTime->diffForHumans();
     }

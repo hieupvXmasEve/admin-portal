@@ -258,7 +258,7 @@ const completeEvent = () => {
                             </div>
                             <div v-if="statistics.participation_rate !== null">
                                 <dt class="text-sm font-medium text-gray-500">Participation Rate</dt>
-                                <dd class="mt-1 text-2xl font-semibold text-indigo-600">{{ Math.round(statistics.participation_rate * 100) || 0 }}%</dd>
+                                <dd class="mt-1 text-2xl font-semibold text-indigo-600">{{ statistics.participation_rate || 0 }}%</dd>
                             </div>
                         </dl>
                     </div>
