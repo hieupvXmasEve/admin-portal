@@ -480,6 +480,12 @@ export const mainNavItems: NavItem[] = [
                 icon: Calendar,
                 requiredPermissions: ['view_event'],
             },
+            {
+                title: 'Reports & Analytics',
+                href: systemRoutes.events.reports(),
+                icon: BarChart3,
+                requiredPermissions: ['view_event'],
+            },
         ],
     },
     {

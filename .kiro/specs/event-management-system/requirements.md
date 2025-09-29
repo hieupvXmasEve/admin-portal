@@ -97,15 +97,33 @@ The Event Management System builds upon the existing club management infrastruct
 
 ### Requirement 7
 
+**User Story:** As an administrator, I want to manually create events for past activities and add student participants with completion status, so that I can record historical events that occurred before the system was implemented and award appropriate gold rewards.
+
+#### Acceptance Criteria
+
+1. WHEN creating a manual event THEN the system SHALL allow setting past dates for start_time and end_time with appropriate validation warnings
+2. WHEN creating a manual event THEN the system SHALL provide an option to mark the event as "historical" to bypass future date validation
+3. WHEN adding students to a manual event THEN the system SHALL allow bulk selection of students from the campus roster
+4. WHEN adding students to a manual event THEN the system SHALL allow setting their participation status directly to "completed" without requiring check-in
+5. WHEN marking students as completed in a manual event THEN the system SHALL automatically award gold rewards according to the event's gold_reward_amount
+6. WHEN processing manual event completions THEN the system SHALL create proper wallet transactions with source_type "event" and appropriate audit trails
+7. WHEN creating manual events THEN the system SHALL clearly mark them as "manually created" in the event record for audit purposes
+8. WHEN adding students to manual events THEN the system SHALL validate that students belong to the same campus as the event
+9. WHEN processing manual gold awards THEN the system SHALL prevent duplicate rewards for the same student and event combination
+10. WHEN viewing manual events THEN the system SHALL display them alongside regular events with clear indicators of their manual creation
+
+### Requirement 8
+
 **User Story:** As a system administrator, I want to manage event data integrity and security, so that the system operates reliably and maintains data consistency.
 
 #### Acceptance Criteria
 
-1. WHEN an event is created THEN the system SHALL validate that start_time is before end_time, both are in the future, and location is specified
-2. WHEN an event is created THEN the system SHALL ensure the QR code is unique across all events and properly formatted
-3. IF a student account is deleted THEN the system SHALL maintain their event participation history for audit purposes while anonymizing personal data
-4. WHEN managing events THEN the system SHALL maintain referential integrity with campus and student data
-5. WHEN processing QR code scans THEN the system SHALL implement rate limiting and fraud detection to prevent abuse
-6. WHEN awarding gold rewards THEN the system SHALL use database transactions to ensure data consistency and prevent double-spending
-7. WHEN handling API requests THEN the system SHALL implement proper authentication, authorization, and input validation
-8. WHEN storing event data THEN the system SHALL maintain audit logs for all critical operations and state changes
+1. WHEN an event is created THEN the system SHALL validate that start_time is before end_time and location is specified
+2. WHEN a regular event is created THEN the system SHALL validate that dates are in the future unless marked as historical
+3. WHEN an event is created THEN the system SHALL ensure the QR code is unique across all events and properly formatted
+4. IF a student account is deleted THEN the system SHALL maintain their event participation history for audit purposes while anonymizing personal data
+5. WHEN managing events THEN the system SHALL maintain referential integrity with campus and student data
+6. WHEN processing QR code scans THEN the system SHALL implement rate limiting and fraud detection to prevent abuse
+7. WHEN awarding gold rewards THEN the system SHALL use database transactions to ensure data consistency and prevent double-spending
+8. WHEN handling API requests THEN the system SHALL implement proper authentication, authorization, and input validation
+9. WHEN storing event data THEN the system SHALL maintain audit logs for all critical operations and state changes

@@ -25,7 +25,10 @@ class Event extends Model
         'organizer_type',
         'organizer_id',
         'status',
-        'created_by_user_id'
+        'created_by_user_id',
+        'is_manual',
+        'is_historical',
+        'created_by_admin_id'
     ];
 
     protected $casts = [
@@ -34,7 +37,9 @@ class Event extends Model
         'published_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'completed_at' => 'datetime',
-        'gold_reward_amount' => 'decimal:2'
+        'gold_reward_amount' => 'decimal:2',
+        'is_manual' => 'boolean',
+        'is_historical' => 'boolean'
     ];
 
     // Relationships
@@ -46,6 +51,11 @@ class Event extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function createdByAdmin(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_admin_id');
     }
 
     public function participants(): HasMany
@@ -96,6 +106,16 @@ class Event extends Model
     public function isDraft(): bool
     {
         return $this->status === 'draft';
+    }
+
+    public function isManual(): bool
+    {
+        return $this->is_manual;
+    }
+
+    public function isHistorical(): bool
+    {
+        return $this->is_historical;
     }
 
     public function canRegister(): bool
@@ -227,5 +247,20 @@ class Event extends Model
     public function scopePast($query)
     {
         return $query->where('end_time', '<', now());
+    }
+
+    public function scopeManual($query)
+    {
+        return $query->where('is_manual', true);
+    }
+
+    public function scopeHistorical($query)
+    {
+        return $query->where('is_historical', true);
+    }
+
+    public function scopeRegular($query)
+    {
+        return $query->where('is_manual', false);
     }
 }

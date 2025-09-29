@@ -1,3 +1,33 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import type { WalletTransaction } from '@/types/wallet'
+
+interface Props {
+  transactions?: WalletTransaction[]
+  loading?: boolean
+  error?: string | null
+  showShowMore?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  transactions: () => [],
+  loading: false,
+  error: null,
+  showShowMore: false,
+})
+
+const emit = defineEmits<{
+  'filter-change': [filter: string]
+  'show-more': []
+}>()
+
+const selectedFilter = ref('')
+
+const onFilterChange = () => {
+  emit('filter-change', selectedFilter.value)
+}
+</script>
+
 <template>
   <div class="bg-white rounded-lg border border-gray-200">
     <div class="px-6 py-4 border-b border-gray-200">
@@ -135,33 +165,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { WalletTransaction } from '@/types/wallet'
-
-interface Props {
-  transactions?: WalletTransaction[]
-  loading?: boolean
-  error?: string | null
-  showShowMore?: boolean
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  transactions: () => [],
-  loading: false,
-  error: null,
-  showShowMore: false,
-})
-
-const emit = defineEmits<{
-  'filter-change': [filter: string]
-  'show-more': []
-}>()
-
-const selectedFilter = ref('')
-
-const onFilterChange = () => {
-  emit('filter-change', selectedFilter.value)
-}
-</script>

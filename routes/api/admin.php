@@ -129,6 +129,17 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
         Route::post('/checkin', [\App\Http\Controllers\Api\EventCheckinController::class, 'checkinStudent'])->name('checkin');
         Route::get('/{event}/participants', [\App\Http\Controllers\Api\EventCheckinController::class, 'getParticipants'])->name('participants');
         Route::get('/{event}/statistics', [\App\Http\Controllers\Api\EventCheckinController::class, 'getStatistics'])->name('statistics');
+
+        // Manual participant management
+        Route::prefix('{event}/manual-participants')->name('manual-participants.')->group(function () {
+            Route::get('/filter-options', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'getFilterOptions'])->name('filter-options');
+            Route::post('/search-students', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'searchStudents'])->name('search-students');
+            Route::post('/add', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'addParticipants'])->name('add');
+            Route::get('/list', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'getParticipants'])->name('list');
+            Route::put('/bulk-update-status', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'bulkUpdateStatus'])->name('bulk-update-status');
+            Route::delete('/remove', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'removeParticipants'])->name('remove');
+            Route::get('/statistics', [\App\Http\Controllers\Api\V1\EventParticipantController::class, 'getStatistics'])->name('statistics');
+        });
     });
 
     // Student Wallet Management (Admin)

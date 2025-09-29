@@ -21,6 +21,7 @@ class StudentResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'status' => $this->status,
+            'academic_status' => $this->academic_status,
             'admission_date' => $this->admission_date?->format('Y-m-d'),
             'admission_notes' => $this->admission_notes,
             // 'expected_graduation_date' => $this->expected_graduation_date?->format('Y-m-d'),

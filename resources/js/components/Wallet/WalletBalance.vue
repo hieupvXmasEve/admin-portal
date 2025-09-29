@@ -1,3 +1,29 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import type { StudentWallet, WalletStats } from '@/types/wallet'
+
+interface Props {
+  wallet?: StudentWallet | null
+  stats?: WalletStats | null
+  loading?: boolean
+  error?: string | null
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  wallet: null,
+  stats: null,
+  loading: false,
+  error: null,
+})
+
+const formatAmount = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+</script>
+
 <template>
   <div class="bg-white rounded-lg border border-gray-200 p-6">
     <div class="flex items-center justify-between">
@@ -53,29 +79,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { computed } from 'vue'
-import type { StudentWallet, WalletStats } from '@/types/wallet'
-
-interface Props {
-  wallet?: StudentWallet | null
-  stats?: WalletStats | null
-  loading?: boolean
-  error?: string | null
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  wallet: null,
-  stats: null,
-  loading: false,
-  error: null,
-})
-
-const formatAmount = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)
-}
-</script>

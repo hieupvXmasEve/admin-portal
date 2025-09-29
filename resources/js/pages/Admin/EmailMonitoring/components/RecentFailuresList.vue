@@ -1,3 +1,40 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { XCircleIcon, RefreshCwIcon, EyeIcon } from 'lucide-vue-next'
+
+interface EmailFailure {
+  id: number
+  recipient: string
+  subject: string
+  error_message: string
+  failed_at: string
+  retry_count: number
+  template_name?: string
+  sender_name?: string
+}
+
+interface Props {
+  failures: EmailFailure[]
+  loading?: boolean
+}
+
+defineProps<Props>()
+
+defineEmits<{
+  'retry-email': [emailId: number]
+}>()
+
+const selectedFailure = ref<EmailFailure | null>(null)
+
+const showDetails = (failure: EmailFailure) => {
+  selectedFailure.value = failure
+}
+
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleString()
+}
+</script>
+
 <template>
   <div class="space-y-4">
     <div v-if="loading" class="animate-pulse">
@@ -154,40 +191,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue'
-import { XCircleIcon, RefreshCwIcon, EyeIcon } from 'lucide-vue-next'
-
-interface EmailFailure {
-  id: number
-  recipient: string
-  subject: string
-  error_message: string
-  failed_at: string
-  retry_count: number
-  template_name?: string
-  sender_name?: string
-}
-
-interface Props {
-  failures: EmailFailure[]
-  loading?: boolean
-}
-
-defineProps<Props>()
-
-defineEmits<{
-  'retry-email': [emailId: number]
-}>()
-
-const selectedFailure = ref<EmailFailure | null>(null)
-
-const showDetails = (failure: EmailFailure) => {
-  selectedFailure.value = failure
-}
-
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleString()
-}
-</script>

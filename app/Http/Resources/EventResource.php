@@ -31,6 +31,8 @@ class EventResource extends JsonResource
             'organizer_type' => $this->organizer_type,
             'organizer_id' => $this->organizer_id,
             'status' => $this->status,
+            'is_manual' => $this->is_manual,
+            'is_historical' => $this->is_historical,
             'published_at' => $this->published_at?->toISOString(),
             'cancelled_at' => $this->cancelled_at?->toISOString(),
             'completed_at' => $this->completed_at?->toISOString(),
@@ -46,11 +48,20 @@ class EventResource extends JsonResource
                     'email' => $this->creator->email,
                 ];
             }),
+            'created_by_admin' => $this->whenLoaded('createdByAdmin', function () {
+                return [
+                    'id' => $this->createdByAdmin->id,
+                    'name' => $this->createdByAdmin->name,
+                    'email' => $this->createdByAdmin->email,
+                ];
+            }),
 
             // Computed properties
             'is_published' => $this->isPublished(),
             'is_cancelled' => $this->isCancelled(),
             'is_completed' => $this->isCompleted(),
+            'is_manual_event' => $this->isManual(),
+            'is_historical_event' => $this->isHistorical(),
             'can_register' => $this->canRegister(),
             'has_reached_capacity' => $this->hasReachedCapacity(),
 

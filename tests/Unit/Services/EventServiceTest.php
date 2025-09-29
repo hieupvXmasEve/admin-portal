@@ -344,13 +344,11 @@ class EventServiceTest extends TestCase
 
         $stats = $this->eventService->getEventStatistics($event);
 
-        $this->assertEquals(3, $stats['total_registered']); // registered + checked_in + completed
-        $this->assertEquals(2, $stats['total_checked_in']); // checked_in + completed
-        $this->assertEquals(1, $stats['total_completed']);
-        $this->assertEquals(1, $stats['total_cancelled']);
-        $this->assertEquals(5.0, $stats['total_gold_awarded']);
-        $this->assertEquals(7, $stats['available_spots']); // 10 - 3 active
-        $this->assertFalse($stats['capacity_reached']);
+        $this->assertEquals(3, $stats['registered_count']); // registered + checked_in + completed
+        $this->assertEquals(2, $stats['checked_in_count']); // checked_in + completed
+        $this->assertEquals(1, $stats['completed_count']);
+        $this->assertEquals(1, $stats['cancelled_count']);
+        $this->assertEquals(5.0, $stats['total_gold_distributed']);
     }
 
     /** @test */

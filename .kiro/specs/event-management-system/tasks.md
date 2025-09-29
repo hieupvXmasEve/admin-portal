@@ -67,7 +67,7 @@
     - Write tests for reward distribution and edge cases
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
 
-- [ ]   9. Build event reporting and analytics dashboard
+- [x]   9. Build event reporting and analytics dashboard
     - Create EventReports.vue component with participation statistics
     - Implement exportable CSV reports for event data
     - Add real-time participant count displays and status breakdowns
@@ -94,7 +94,33 @@
     - Add performance tests for high-load scenarios
     - _Requirements: All requirements validation_
 
-- [ ]   12. Set up monitoring and deployment preparation
+- [x]   12. Implement manual event creation for historical events
+    - Add "historical" flag to event creation form with past date validation bypass
+    - Create manual event creation interface with clear historical event indicators
+    - Implement validation logic to allow past dates for historical events
+    - Add audit logging to track manually created events with creator information
+    - Create database migration to add is_manual and created_by_admin fields to events table
+    - _Requirements: 7.1, 7.2, 7.7, 8.2_
+
+- [ ]   13. Build manual student participation management
+    - Create bulk student selection interface for adding participants to manual events
+    - Implement direct status setting to "completed" without check-in requirement
+    - Add student roster display with campus filtering and search functionality
+    - Create batch participant addition with validation and error handling
+    - Implement manual gold reward distribution for completed participants
+    - Add confirmation dialogs and progress indicators for bulk operations
+    - _Requirements: 7.3, 7.4, 7.5, 7.8, 7.9_
+
+- [ ]   14. Integrate manual events with existing reward system
+    - Extend EventParticipationService to handle manual completion status
+    - Implement automatic gold award processing for manually completed participants
+    - Add duplicate reward prevention for manual event participants
+    - Create proper wallet transaction records with manual event source tracking
+    - Add manual event indicators in participant history and reports
+    - Write tests for manual reward distribution and edge cases
+    - _Requirements: 7.5, 7.6, 7.9, 8.7_
+
+- [ ]   15. Set up monitoring and deployment preparation
     - Add event-specific logging and monitoring
     - Create database seeders for development and testing
     - Set up caching for frequently accessed event data

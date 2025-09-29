@@ -1,3 +1,66 @@
+<script setup lang="ts">
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { 
+  FileText, 
+  MessageSquare, 
+  ClipboardList, 
+  HelpCircle,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Eye
+} from 'lucide-vue-next'
+import type { Form } from '@/types/forms'
+import { format } from 'date-fns'
+
+interface Props {
+  form: Form
+  isCompleted?: boolean
+}
+
+defineProps<Props>()
+defineEmits<{
+  view: [form: Form]
+}>()
+
+const getIcon = (type: string) => {
+  switch (type) {
+    case 'feedback':
+      return MessageSquare
+    case 'survey':
+      return ClipboardList
+    case 'query':
+      return HelpCircle
+    default:
+      return FileText
+  }
+}
+
+const getTypeBadgeVariant = (type: string) => {
+  switch (type) {
+    case 'feedback':
+      return 'default'
+    case 'survey':
+      return 'secondary'
+    case 'query':
+      return 'outline'
+    default:
+      return 'default'
+  }
+}
+
+const formatDate = (dateString?: string) => {
+  if (!dateString) return null
+  try {
+    return format(new Date(dateString), 'MMM d, yyyy')
+  } catch {
+    return dateString
+  }
+}
+</script>
+
 <template>
   <Card class="hover:shadow-lg transition-shadow cursor-pointer" @click="$emit('view', form)">
     <CardHeader>
@@ -75,66 +138,3 @@
     </CardFooter>
   </Card>
 </template>
-
-<script setup lang="ts">
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { 
-  FileText, 
-  MessageSquare, 
-  ClipboardList, 
-  HelpCircle,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Eye
-} from 'lucide-vue-next'
-import type { Form } from '@/types/forms'
-import { format } from 'date-fns'
-
-interface Props {
-  form: Form
-  isCompleted?: boolean
-}
-
-defineProps<Props>()
-defineEmits<{
-  view: [form: Form]
-}>()
-
-const getIcon = (type: string) => {
-  switch (type) {
-    case 'feedback':
-      return MessageSquare
-    case 'survey':
-      return ClipboardList
-    case 'query':
-      return HelpCircle
-    default:
-      return FileText
-  }
-}
-
-const getTypeBadgeVariant = (type: string) => {
-  switch (type) {
-    case 'feedback':
-      return 'default'
-    case 'survey':
-      return 'secondary'
-    case 'query':
-      return 'outline'
-    default:
-      return 'default'
-  }
-}
-
-const formatDate = (dateString?: string) => {
-  if (!dateString) return null
-  try {
-    return format(new Date(dateString), 'MMM d, yyyy')
-  } catch {
-    return dateString
-  }
-}
-</script>

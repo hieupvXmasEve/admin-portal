@@ -25,6 +25,8 @@ interface Event {
     gold_reward_amount: number;
     max_participants: number | null;
     registered_count: number;
+    is_manual: boolean;
+    is_historical: boolean;
 }
 
 interface Props {
@@ -39,7 +41,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-console.log(props.events);
 const searchForm = reactive({
     search: props.filters.search || '',
     status: props.filters.status || 'all',
@@ -122,9 +123,14 @@ const handlePageSizeChange = (pageSize: number) => {
         <!-- Header -->
         <div class="flex items-center justify-between">
             <h2 class="text-xl leading-tight font-semibold text-gray-800">Events</h2>
-            <Link :href="route('events.create')">
-                <Button>Create Event</Button>
-            </Link>
+            <div class="flex gap-2">
+                <Link :href="route('events.create-manual')">
+                    <Button variant="outline">Create Manual Event</Button>
+                </Link>
+                <Link :href="route('events.create')">
+                    <Button>Create Event</Button>
+                </Link>
+            </div>
         </div>
 
         <!-- Filters Card -->
@@ -173,7 +179,11 @@ const handlePageSizeChange = (pageSize: number) => {
             <!-- Event Title Slot -->
             <template #cell-title="{ row }">
                 <div>
-                    <div class="text-sm font-medium text-gray-900">{{ row.original.title }}</div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-gray-900">{{ row.original.title }}</span>
+                        <Badge v-if="row.original.is_manual" variant="secondary" class="text-xs">Manual</Badge>
+                        <Badge v-if="row.original.is_historical" variant="outline" class="text-xs">Historical</Badge>
+                    </div>
                     <div class="max-w-xs truncate text-sm text-gray-500">{{ row.original.description }}</div>
                 </div>
             </template>

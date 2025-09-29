@@ -1,3 +1,56 @@
+<script setup lang="ts">
+import { RefreshCwIcon } from 'lucide-vue-next'
+
+interface QueueStatus {
+  queue_sizes: Record<string, number | string>
+  failed_jobs_count: number
+  recent_statistics?: {
+    last_hour?: { total: number; success_rate: number }
+    last_24_hours?: { total: number; success_rate: number }
+    today?: { total: number; success_rate: number }
+  }
+  active_batches: any[]
+  system_health?: {
+    status: string
+    issues?: string[]
+  }
+  last_updated: string
+}
+
+interface Props {
+  queueStatus: QueueStatus
+  loading?: boolean
+}
+
+defineProps<Props>()
+
+defineEmits<{
+  'refresh-queue': []
+}>()
+
+const formatNumber = (num: number): string => {
+  return new Intl.NumberFormat().format(num)
+}
+
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleString()
+}
+
+const getHealthText = (size: number | string): string => {
+  if (typeof size !== 'number') return 'Unavailable'
+
+  if (size === 0) return 'Healthy'
+  if (size < 100) return 'Normal'
+  if (size < 1000) return 'High Load'
+  return 'Critical'
+}
+
+const getSystemHealthColor = (): string => {
+  // This would be passed from props in a real implementation
+  return 'text-green-600' // Default to healthy
+}
+</script>
+
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
@@ -163,56 +216,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { RefreshCwIcon } from 'lucide-vue-next'
-
-interface QueueStatus {
-  queue_sizes: Record<string, number | string>
-  failed_jobs_count: number
-  recent_statistics?: {
-    last_hour?: { total: number; success_rate: number }
-    last_24_hours?: { total: number; success_rate: number }
-    today?: { total: number; success_rate: number }
-  }
-  active_batches: any[]
-  system_health?: {
-    status: string
-    issues?: string[]
-  }
-  last_updated: string
-}
-
-interface Props {
-  queueStatus: QueueStatus
-  loading?: boolean
-}
-
-defineProps<Props>()
-
-defineEmits<{
-  'refresh-queue': []
-}>()
-
-const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat().format(num)
-}
-
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleString()
-}
-
-const getHealthText = (size: number | string): string => {
-  if (typeof size !== 'number') return 'Unavailable'
-
-  if (size === 0) return 'Healthy'
-  if (size < 100) return 'Normal'
-  if (size < 1000) return 'High Load'
-  return 'Critical'
-}
-
-const getSystemHealthColor = (): string => {
-  // This would be passed from props in a real implementation
-  return 'text-green-600' // Default to healthy
-}
-</script>

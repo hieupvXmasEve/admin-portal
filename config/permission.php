@@ -173,6 +173,7 @@ return [
             'cancel_event' => 'cancel_event',
             'complete_event' => 'complete_event',
             'checkin_event' => 'checkin_event',
+            'manage_participants' => 'manage_participants',
         ],
         'clubs' => [
             'view_clubs' => 'view_clubs',
