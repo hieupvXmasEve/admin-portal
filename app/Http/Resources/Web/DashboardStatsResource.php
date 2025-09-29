@@ -22,10 +22,13 @@ class DashboardStatsResource extends JsonResource
             'students' => [
                 'total' => (int) ($data['students']['total'] ?? 0),
                 'by_status' => [
-                    'active' => (int) ($data['students']['by_status']['active'] ?? 0),
-                    'inactive' => (int) ($data['students']['by_status']['inactive'] ?? 0),
                     'suspended' => (int) ($data['students']['by_status']['suspended'] ?? 0),
                     'graduated' => (int) ($data['students']['by_status']['graduated'] ?? 0),
+                    'intake_pre_uni_gc' => (int) ($data['students']['by_status']['intake_pre_uni_gc'] ?? 0),
+                    'intake_course' => (int) ($data['students']['by_status']['intake_course'] ?? 0),
+                    'deferred' => (int) ($data['students']['by_status']['deferred'] ?? 0),
+                    'dropout' => (int) ($data['students']['by_status']['dropout'] ?? 0),
+                    'dropout_transfer' => (int) ($data['students']['by_status']['dropout_transfer'] ?? 0),
                 ],
             ],
             'lecturers' => [

@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 class DashboardStatsService
 {
     private const CACHE_TTL = 300; // 5 minutes
-    
+
     public function getCampusId(): ?int
     {
         // Prefer bound campus instance, fallback to session
@@ -31,76 +31,76 @@ class DashboardStatsService
     {
         $campusId = $this->getCampusId();
         $cacheKey = "dashboard_stats_campus_{$campusId}";
-        
-        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
-            return [
-                'students' => $this->getStudentStats($campusId),
-                'lecturers' => $this->getLecturerStats($campusId),
-                'academics' => $this->getAcademicStats(),
-                'semester' => $this->getCurrentSemesterInfo(),
-                'rooms' => $this->getRoomStats($campusId),
-            ];
-        });
+
+        // return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
+        return [
+            'students' => $this->getStudentStats($campusId),
+            'lecturers' => $this->getLecturerStats($campusId),
+            'academics' => $this->getAcademicStats(),
+            'semester' => $this->getCurrentSemesterInfo(),
+            'rooms' => $this->getRoomStats($campusId),
+        ];
+        // });
     }
-    
+
     private function getStudentStats(?int $campusId): array
     {
         $baseQuery = Student::query();
         if ($campusId) {
             $baseQuery->where('campus_id', $campusId);
         }
-        
+
         // Use single query with aggregation for better performance
         $statusCounts = (clone $baseQuery)
             ->select('status', DB::raw('COUNT(*) as count'))
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
-            
+
         $total = array_sum($statusCounts);
-        
+
         // Ensure all expected statuses are present
-        $expectedStatuses = ['active', 'inactive', 'suspended', 'graduated'];
+        $expectedStatuses = ['suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'deferred', 'dropout', 'dropout_transfer'];
         $byStatus = [];
         foreach ($expectedStatuses as $status) {
             $byStatus[$status] = $statusCounts[$status] ?? 0;
         }
-        
+
         return [
             'total' => $total,
             'by_status' => $byStatus,
         ];
     }
-    
+
     private function getLecturerStats(?int $campusId): array
     {
         $baseQuery = Lecture::query();
         if ($campusId) {
             $baseQuery->where('campus_id', $campusId);
         }
-        
+
         // Use single query with aggregation
         $employmentCounts = (clone $baseQuery)
             ->select('employment_type', DB::raw('COUNT(*) as count'))
             ->groupBy('employment_type')
             ->pluck('count', 'employment_type')
             ->toArray();
-            
+
         $total = array_sum($employmentCounts);
-        
+
         // Ensure all expected employment types are present
         $expectedTypes = ['full_time', 'part_time', 'visiting', 'contract'];
         $byEmploymentType = [];
         foreach ($expectedTypes as $type) {
             $byEmploymentType[$type] = $employmentCounts[$type] ?? 0;
         }
-        
+
         return [
             'total' => $total,
             'by_employment_type' => $byEmploymentType,
         ];
     }
-    
+
     private function getAcademicStats(): array
     {
         return [
@@ -113,15 +113,15 @@ class DashboardStatsService
                 ->count(),
         ];
     }
-    
+
     private function getCurrentSemesterInfo(): ?array
     {
         $currentSemester = Semester::getActiveSemester();
-        
+
         if (!$currentSemester) {
             return null;
         }
-        
+
         return [
             'id' => $currentSemester->id,
             'code' => $currentSemester->code,
@@ -133,23 +133,23 @@ class DashboardStatsService
             'is_registration_open' => $currentSemester->isRegistrationOpen(),
         ];
     }
-    
+
     private function getRoomStats(?int $campusId): array
     {
         $baseQuery = Room::query();
         if ($campusId) {
             $baseQuery->where('campus_id', $campusId);
         }
-        
+
         // Use single query with aggregation
         $statusCounts = (clone $baseQuery)
             ->select('status', DB::raw('COUNT(*) as count'))
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
-            
+
         $total = array_sum($statusCounts);
-        
+
         return [
             'total' => $total,
             'available' => $statusCounts[Room::STATUS_AVAILABLE] ?? 0,
@@ -157,7 +157,7 @@ class DashboardStatsService
             'maintenance' => $statusCounts[Room::STATUS_MAINTENANCE] ?? 0,
         ];
     }
-    
+
     /**
      * Clear the cache for dashboard stats
      */
@@ -167,7 +167,7 @@ class DashboardStatsService
         $cacheKey = "dashboard_stats_campus_{$campusId}";
         Cache::forget($cacheKey);
     }
-    
+
     /**
      * Get quick stats only (for API endpoints that don't need full data)
      */
@@ -175,7 +175,7 @@ class DashboardStatsService
     {
         $campusId = $this->getCampusId();
         $cacheKey = "dashboard_quick_stats_campus_{$campusId}";
-        
+
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
             return [
                 'students' => $this->getStudentStats($campusId),
@@ -185,16 +185,16 @@ class DashboardStatsService
             ];
         });
     }
-    
+
     /**
      * Get alerts and notifications
      */
     public function getAlerts(): array
     {
         $campusId = $this->getCampusId();
-        
+
         $alerts = [];
-        
+
         // Academic Holds - high priority issues
         $activeHolds = AcademicHold::active()
             ->whereHas('student', function ($q) use ($campusId) {
@@ -204,7 +204,7 @@ class DashboardStatsService
             })
             ->where('priority', 'high')
             ->count();
-            
+
         if ($activeHolds > 0) {
             $alerts[] = [
                 'id' => 1,
@@ -216,7 +216,7 @@ class DashboardStatsService
                 'created_at' => now()->format('M j, Y'),
             ];
         }
-        
+
         // Program Change Requests
         $pendingProgramChanges = ProgramChangeRequest::where('status', 'pending')->count();
         if ($pendingProgramChanges > 0) {
@@ -230,7 +230,7 @@ class DashboardStatsService
                 'created_at' => now()->format('M j, Y'),
             ];
         }
-        
+
         return $alerts;
     }
 }
