@@ -389,6 +389,13 @@ const hasAcademicConcerns = computed(() => {
                                     <p class="font-medium">{{ overview.program_info.semester.intake_year }}</p>
                                 </div>
                             </div>
+                            <div v-if="overview.program_info.semester" class="flex items-center gap-3">
+                                <BookOpen class="text-muted-foreground h-4 w-4 flex-shrink-0" />
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-muted-foreground text-sm">Intake Course</p>
+                                    <p class="font-medium">{{ overview.program_info.semester.intake_year }}</p>
+                                </div>
+                            </div>
 
                             <!-- Academic Progress -->
                             <div class="pt-4">

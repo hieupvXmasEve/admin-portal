@@ -278,7 +278,7 @@ export const mainNavItems: NavItem[] = [
         ],
     },
     {
-        title: 'Forms & Feedback',
+        title: 'Forms Queries & Feedback',
         href: '#',
         icon: FormInput,
         children: [
