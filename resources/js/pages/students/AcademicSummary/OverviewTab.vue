@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import type { StudentOverview } from '@/types/models';
+import { useQRCode } from '@vueuse/integrations/useQRCode';
 import { AlertTriangle, Award, BookOpen, Building, Calendar, GraduationCap, Mail, MapPin, Phone, TrendingUp, User, Users } from 'lucide-vue-next';
 import { computed } from 'vue';
 
@@ -17,6 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
     loading: false,
 });
 console.log('%c props overview', 'color: red', props.overview);
+const qrcode = useQRCode(props.overview.student_info.student_id);
 // Status badge styling
 const getStatusBadgeVariant = (status: string) => {
     const variants: Record<string, string> = {
@@ -30,20 +32,6 @@ const getStatusBadgeVariant = (status: string) => {
         dropped_out: 'outline',
     };
     return variants[status] || 'outline';
-};
-
-const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-        admitted: 'text-gray-600',
-        enrolled: 'text-blue-600',
-        active: 'text-green-600',
-        inactive: 'text-yellow-600',
-        on_leave: 'text-yellow-600',
-        suspended: 'text-red-600',
-        graduated: 'text-purple-600',
-        dropped_out: 'text-gray-600',
-    };
-    return colors[status] || 'text-gray-600';
 };
 
 const getAcademicStandingColor = (standing: string) => {
@@ -122,7 +110,7 @@ const hasAcademicConcerns = computed(() => {
                         <AvatarFallback>Asia</AvatarFallback>
                     </Avatar>
                 </div>
-                <div class="flex-1">
+                <div class="">
                     <h2 class="text-2xl font-bold">{{ overview.student_info.full_name }}</h2>
                     <p class="text-muted-foreground text-lg">{{ overview.student_info.student_id }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -133,6 +121,9 @@ const hasAcademicConcerns = computed(() => {
                             {{ formatStatus(overview.academic_stats.academic_standing) }}
                         </Badge>
                     </div>
+                </div>
+                <div>
+                    <img :src="qrcode" alt="QR Code" class="border" />
                 </div>
             </div>
 
@@ -299,7 +290,8 @@ const hasAcademicConcerns = computed(() => {
                                         <p class="font-medium">{{ overview.student_info.address || 'N/A' }}</p>
                                     </div>
                                 </div>
-                            </div> <div class="pt-4 space-y-4">
+                            </div>
+                            <div class="space-y-4 pt-4">
                                 <Separator />
                                 <div class="flex items-start gap-3">
                                     <User class="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0" />
