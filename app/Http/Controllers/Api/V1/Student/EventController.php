@@ -96,7 +96,7 @@ class EventController extends Controller
             }
 
             // Only show published events to students
-            if (!$event->isPublished()) {
+            if ($event->isDraft()) {
                 return ApiResponse::notFound('Event not found');
             }
 

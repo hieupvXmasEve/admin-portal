@@ -1,63 +1,3 @@
-<template>
-  <form @submit.prevent="handleSubmit" class="space-y-6">
-    <!-- Form Sections -->
-    <div v-for="section in sections" :key="section.id" class="space-y-4">
-      <div v-if="section.title" class="border-b pb-2">
-        <h3 class="text-lg font-semibold">{{ section.title }}</h3>
-        <p v-if="section.description" class="text-sm text-muted-foreground mt-1">
-          {{ section.description }}
-        </p>
-      </div>
-
-      <!-- Questions in Section -->
-      <div v-for="question in getQuestionsForSection(section.id)" :key="question.id" class="space-y-2">
-        <DynamicQuestion
-          :question="question"
-          :model-value="formData[question.id]"
-          :errors="errors[`answers.${question.id}`]"
-          @update:model-value="updateAnswer(question.id, $event)"
-        />
-      </div>
-    </div>
-
-    <!-- Questions without sections -->
-    <div v-if="questionsWithoutSection.length > 0" class="space-y-4">
-      <div v-for="question in questionsWithoutSection" :key="question.id" class="space-y-2">
-        <DynamicQuestion
-          :question="question"
-          :model-value="formData[question.id]"
-          :errors="errors[`answers.${question.id}`]"
-          @update:model-value="updateAnswer(question.id, $event)"
-        />
-      </div>
-    </div>
-
-    <!-- Form Actions -->
-    <div class="flex items-center justify-between pt-6 border-t">
-      <div class="flex items-center gap-4">
-        <Checkbox
-          v-if="allowAnonymous"
-          v-model:checked="isAnonymous"
-          id="anonymous"
-        />
-        <Label v-if="allowAnonymous" for="anonymous" class="text-sm font-medium">
-          Submit anonymously
-        </Label>
-      </div>
-
-      <div class="flex gap-3">
-        <Button type="button" variant="outline" @click="handleCancel">
-          Cancel
-        </Button>
-        <Button type="submit" :disabled="isSubmitting">
-          <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
-          {{ isSubmitting ? 'Submitting...' : 'Submit' }}
-        </Button>
-      </div>
-    </div>
-  </form>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
@@ -197,3 +137,63 @@ defineExpose({
   }
 })
 </script>
+
+<template>
+  <form @submit.prevent="handleSubmit" class="space-y-6">
+    <!-- Form Sections -->
+    <div v-for="section in sections" :key="section.id" class="space-y-4">
+      <div v-if="section.title" class="border-b pb-2">
+        <h3 class="text-lg font-semibold">{{ section.title }}</h3>
+        <p v-if="section.description" class="text-sm text-muted-foreground mt-1">
+          {{ section.description }}
+        </p>
+      </div>
+
+      <!-- Questions in Section -->
+      <div v-for="question in getQuestionsForSection(section.id)" :key="question.id" class="space-y-2">
+        <DynamicQuestion
+          :question="question"
+          :model-value="formData[question.id]"
+          :errors="errors[`answers.${question.id}`]"
+          @update:model-value="updateAnswer(question.id, $event)"
+        />
+      </div>
+    </div>
+
+    <!-- Questions without sections -->
+    <div v-if="questionsWithoutSection.length > 0" class="space-y-4">
+      <div v-for="question in questionsWithoutSection" :key="question.id" class="space-y-2">
+        <DynamicQuestion
+          :question="question"
+          :model-value="formData[question.id]"
+          :errors="errors[`answers.${question.id}`]"
+          @update:model-value="updateAnswer(question.id, $event)"
+        />
+      </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="flex items-center justify-between pt-6 border-t">
+      <div class="flex items-center gap-4">
+        <Checkbox
+          v-if="allowAnonymous"
+          v-model:checked="isAnonymous"
+          id="anonymous"
+        />
+        <Label v-if="allowAnonymous" for="anonymous" class="text-sm font-medium">
+          Submit anonymously
+        </Label>
+      </div>
+
+      <div class="flex gap-3">
+        <Button type="button" variant="outline" @click="handleCancel">
+          Cancel
+        </Button>
+        <Button type="submit" :disabled="isSubmitting">
+          <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
+          {{ isSubmitting ? 'Submitting...' : 'Submit' }}
+        </Button>
+      </div>
+    </div>
+  </form>
+</template>

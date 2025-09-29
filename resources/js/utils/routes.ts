@@ -115,6 +115,7 @@ export const systemRoutes = {
         create: () => route('events.create'),
         edit: (id: number) => route('events.edit', { event: id }),
         show: (id: number) => route('events.show', { event: id }),
+        reports: () => route('events.reports'),
     },
 } as const;
 

@@ -1,3 +1,105 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { BarChart3Icon } from 'lucide-vue-next'
+
+interface TrendData {
+  period: string
+  total: number
+  sent: number
+  delivered: number
+  failed: number
+  bounced: number
+  success_rate: number
+}
+
+interface Props {
+  data: TrendData[]
+  loading?: boolean
+  selectedPeriod?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+  selectedPeriod: 'day'
+})
+
+defineEmits<{
+  'period-change': [period: string]
+}>()
+
+const periods = [
+  { value: 'hour', label: 'Hourly' },
+  { value: 'day', label: 'Daily' },
+  { value: 'week', label: 'Weekly' },
+  { value: 'month', label: 'Monthly' }
+]
+
+// Chart dimensions
+const chartWidth = 800
+const chartHeight = 200
+const padding = 40
+
+// Computed properties for chart calculations
+const maxTotal = computed(() => {
+  return Math.max(...props.data.map(d => d.total), 1)
+})
+
+const barWidth = computed(() => {
+  if (props.data.length === 0) return 0
+  return (chartWidth - padding * 2) / props.data.length * 0.8
+})
+
+const totalEmails = computed(() => {
+  return props.data.reduce((sum, d) => sum + d.total, 0)
+})
+
+const successfulEmails = computed(() => {
+  return props.data.reduce((sum, d) => sum + d.sent + d.delivered, 0)
+})
+
+const failedEmails = computed(() => {
+  return props.data.reduce((sum, d) => sum + d.failed, 0)
+})
+
+const averageSuccessRate = computed(() => {
+  if (props.data.length === 0) return 0
+  const sum = props.data.reduce((sum, d) => sum + d.success_rate, 0)
+  return Math.round(sum / props.data.length)
+})
+
+// Chart calculation functions
+const getXPosition = (index: number): number => {
+  return padding + (index * (chartWidth - padding * 2) / props.data.length)
+}
+
+const getYPosition = (value: number, max: number): number => {
+  const ratio = value / max
+  return chartHeight - padding - (ratio * (chartHeight - padding * 2))
+}
+
+const getBarHeight = (value: number, max: number): number => {
+  const ratio = value / max
+  return ratio * (chartHeight - padding * 2)
+}
+
+const getSuccessRateY = (successRate: number): number => {
+  const ratio = successRate / 100
+  return chartHeight - padding - (ratio * (chartHeight - padding * 2))
+}
+
+const getSuccessRatePoints = (): string => {
+  return props.data.map((point, index) => {
+    const x = getXPosition(index) + barWidth.value / 2
+    const y = getSuccessRateY(point.success_rate)
+    return `${x},${y}`
+  }).join(' ')
+}
+
+const formatNumber = (num: number): string => {
+  return new Intl.NumberFormat().format(num)
+}
+</script>
+
 <template>
   <div class="space-y-4">
     <!-- Period Selector -->
@@ -136,105 +238,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { computed, ref } from 'vue'
-import { BarChart3Icon } from 'lucide-vue-next'
-
-interface TrendData {
-  period: string
-  total: number
-  sent: number
-  delivered: number
-  failed: number
-  bounced: number
-  success_rate: number
-}
-
-interface Props {
-  data: TrendData[]
-  loading?: boolean
-  selectedPeriod?: string
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  loading: false,
-  selectedPeriod: 'day'
-})
-
-defineEmits<{
-  'period-change': [period: string]
-}>()
-
-const periods = [
-  { value: 'hour', label: 'Hourly' },
-  { value: 'day', label: 'Daily' },
-  { value: 'week', label: 'Weekly' },
-  { value: 'month', label: 'Monthly' }
-]
-
-// Chart dimensions
-const chartWidth = 800
-const chartHeight = 200
-const padding = 40
-
-// Computed properties for chart calculations
-const maxTotal = computed(() => {
-  return Math.max(...props.data.map(d => d.total), 1)
-})
-
-const barWidth = computed(() => {
-  if (props.data.length === 0) return 0
-  return (chartWidth - padding * 2) / props.data.length * 0.8
-})
-
-const totalEmails = computed(() => {
-  return props.data.reduce((sum, d) => sum + d.total, 0)
-})
-
-const successfulEmails = computed(() => {
-  return props.data.reduce((sum, d) => sum + d.sent + d.delivered, 0)
-})
-
-const failedEmails = computed(() => {
-  return props.data.reduce((sum, d) => sum + d.failed, 0)
-})
-
-const averageSuccessRate = computed(() => {
-  if (props.data.length === 0) return 0
-  const sum = props.data.reduce((sum, d) => sum + d.success_rate, 0)
-  return Math.round(sum / props.data.length)
-})
-
-// Chart calculation functions
-const getXPosition = (index: number): number => {
-  return padding + (index * (chartWidth - padding * 2) / props.data.length)
-}
-
-const getYPosition = (value: number, max: number): number => {
-  const ratio = value / max
-  return chartHeight - padding - (ratio * (chartHeight - padding * 2))
-}
-
-const getBarHeight = (value: number, max: number): number => {
-  const ratio = value / max
-  return ratio * (chartHeight - padding * 2)
-}
-
-const getSuccessRateY = (successRate: number): number => {
-  const ratio = successRate / 100
-  return chartHeight - padding - (ratio * (chartHeight - padding * 2))
-}
-
-const getSuccessRatePoints = (): string => {
-  return props.data.map((point, index) => {
-    const x = getXPosition(index) + barWidth.value / 2
-    const y = getSuccessRateY(point.success_rate)
-    return `${x},${y}`
-  }).join(' ')
-}
-
-const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat().format(num)
-}
-</script>

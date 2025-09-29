@@ -51,13 +51,69 @@ class EventService
                 'organizer_id' => $data['campus_id'],
                 'status' => 'draft',
                 'created_by_user_id' => $creator->id,
+                'is_manual' => $data['is_manual'] ?? false,
+                'is_historical' => $data['is_historical'] ?? false,
+                'created_by_admin_id' => ($data['is_manual'] ?? false) ? $creator->id : null,
             ]);
 
             Log::info('Event created', [
                 'event_id' => $event->id,
                 'title' => $event->title,
                 'creator_id' => $creator->id,
-                'campus_id' => $event->campus_id
+                'campus_id' => $event->campus_id,
+                'is_manual' => $event->is_manual,
+                'is_historical' => $event->is_historical
+            ]);
+
+            return $event;
+        });
+    }
+
+    /**
+     * Create a manual historical event
+     */
+    public function createManualEvent(array $data, User $creator): Event
+    {
+        // Override validation for historical events
+        $data['is_manual'] = true;
+        $data['is_historical'] = $data['is_historical'] ?? false;
+
+        $this->validateManualEventData($data);
+
+        return DB::transaction(function () use ($data, $creator) {
+            // Generate unique QR code
+            $qrCode = $this->qrCodeService->generateEventQRCode();
+
+            $event = Event::create([
+                'campus_id' => $data['campus_id'],
+                'title' => $data['title'],
+                'description' => $data['description'] ?? null,
+                'start_time' => Carbon::parse($data['start_time']),
+                'end_time' => Carbon::parse($data['end_time']),
+                'location' => $data['location'],
+                'gold_reward_amount' => $data['gold_reward_amount'] ?? 0,
+                'max_participants' => $data['max_participants'] ?? null,
+                'qr_code' => $qrCode,
+                'organizer_type' => 'school',
+                'organizer_id' => $data['campus_id'],
+                'status' => $data['status'] ?? 'completed', // Manual events are typically completed
+                'created_by_user_id' => $creator->id,
+                'is_manual' => true,
+                'is_historical' => $data['is_historical'] ?? false,
+                'created_by_admin_id' => $creator->id,
+                'published_at' => $data['is_historical'] ? Carbon::parse($data['start_time']) : now(),
+                'completed_at' => $data['is_historical'] ? Carbon::parse($data['end_time']) : now(),
+            ]);
+
+            Log::info('Manual event created', [
+                'event_id' => $event->id,
+                'title' => $event->title,
+                'creator_id' => $creator->id,
+                'admin_id' => $creator->id,
+                'campus_id' => $event->campus_id,
+                'is_historical' => $event->is_historical,
+                'start_time' => $event->start_time,
+                'end_time' => $event->end_time
             ]);
 
             return $event;
@@ -272,18 +328,12 @@ class EventService
     public function getEventStatistics(Event $event): array
     {
         return [
-            'total_registered' => $event->getRegisteredCount(),
-            'total_checked_in' => $event->getCheckedInCount(),
-            'total_completed' => $event->getCompletedCount(),
-            'total_cancelled' => $event->getCancelledCount(),
+            'registered_count' => $event->getRegisteredCount(),
+            'checked_in_count' => $event->getCheckedInCount(),
+            'completed_count' => $event->getCompletedCount(),
+            'cancelled_count' => $event->getCancelledCount(),
             'participation_rate' => $event->getParticipationRate(),
-            'total_gold_awarded' => $event->getTotalGoldAwarded(),
-            'available_spots' => $event->getAvailableSpots(),
-            'capacity_reached' => $event->hasReachedCapacity(),
-            'can_register' => $event->canRegister(),
-            'can_check_in' => $event->canCheckIn(),
-            'has_started' => $event->hasStarted(),
-            'has_ended' => $event->hasEnded(),
+            'total_gold_distributed' => $event->getTotalGoldAwarded(),
         ];
     }
 
@@ -321,12 +371,15 @@ class EventService
                 ]);
             }
 
+            // Skip future time validation for manual/historical events
+            $isManualOrHistorical = ($data['is_manual'] ?? false) || ($data['is_historical'] ?? false);
+
             // Only validate future times for new events or if times are being changed
             if (
-                !$existingEvent ||
-                ($existingEvent && ($existingEvent->start_time != $startTime || $existingEvent->end_time != $endTime))
+                !$isManualOrHistorical &&
+                (!$existingEvent ||
+                ($existingEvent && ($existingEvent->start_time != $startTime || $existingEvent->end_time != $endTime)))
             ) {
-
                 if ($startTime->isPast()) {
                     throw ValidationException::withMessages([
                         'start_time' => ['Start time must be in the future.']
@@ -349,6 +402,59 @@ class EventService
                     'max_participants' => ['Cannot set capacity below current registration count.']
                 ]);
             }
+        }
+
+        // Validate gold reward amount
+        if (isset($data['gold_reward_amount']) && $data['gold_reward_amount'] < 0) {
+            throw ValidationException::withMessages([
+                'gold_reward_amount' => ['Gold reward amount cannot be negative.']
+            ]);
+        }
+    }
+
+    /**
+     * Validate manual event data with special rules for historical events
+     */
+    protected function validateManualEventData(array $data): void
+    {
+        // Validate campus exists
+        if (isset($data['campus_id'])) {
+            $campus = Campus::find($data['campus_id']);
+            if (!$campus) {
+                throw ValidationException::withMessages([
+                    'campus_id' => ['The selected campus does not exist.']
+                ]);
+            }
+        }
+
+        // Validate time constraints
+        if (isset($data['start_time']) && isset($data['end_time'])) {
+            $startTime = Carbon::parse($data['start_time']);
+            $endTime = Carbon::parse($data['end_time']);
+
+            if ($startTime->gte($endTime)) {
+                throw ValidationException::withMessages([
+                    'end_time' => ['End time must be after start time.']
+                ]);
+            }
+
+            // For historical events, allow past dates but warn if they're too far in the past
+            if ($data['is_historical'] ?? false) {
+                $oneYearAgo = now()->subYear();
+                if ($startTime->lt($oneYearAgo)) {
+                    Log::warning('Historical event created with very old date', [
+                        'start_time' => $startTime,
+                        'title' => $data['title'] ?? 'Unknown'
+                    ]);
+                }
+            }
+        }
+
+        // Validate max participants
+        if (isset($data['max_participants']) && $data['max_participants'] !== null && $data['max_participants'] < 1) {
+            throw ValidationException::withMessages([
+                'max_participants' => ['Maximum participants must be at least 1.']
+            ]);
         }
 
         // Validate gold reward amount

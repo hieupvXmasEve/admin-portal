@@ -1,3 +1,142 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import {
+  RefreshCwIcon,
+  ActivityIcon,
+  ClockIcon,
+  ListIcon,
+  XCircleIcon,
+  AlertTriangleIcon,
+  AlertCircleIcon,
+  InfoIcon
+} from 'lucide-vue-next'
+import EmailTrendsChart from './components/EmailTrendsChart.vue'
+import RecentFailuresList from './components/RecentFailuresList.vue'
+import QueueStatusTable from './components/QueueStatusTable.vue'
+import ActiveBatchesList from './components/ActiveBatchesList.vue'
+import SystemHealthModal from './components/SystemHealthModal.vue'
+import { useEmailMonitoring } from '@/composables/useEmailMonitoring'
+
+interface Props {
+  initialData: {
+    overview: any
+    queue_status: any
+    recent_failures: any[]
+    system_alerts: any[]
+  }
+}
+
+const props = defineProps<Props>()
+
+const {
+  overview,
+  queueStatus,
+  recentFailures,
+  systemAlerts,
+  deliveryTrends,
+  activeBatches,
+  systemHealthStatus,
+  isRefreshing,
+  isLoadingTrends,
+  refreshData,
+  refreshQueueStatus,
+  loadDeliveryTrends,
+  testSystemHealth,
+  cancelBatch,
+  retryEmail
+} = useEmailMonitoring(props.initialData)
+
+const showSystemHealth = ref(false)
+
+// Auto-refresh interval
+let refreshInterval: NodeJS.Timeout | null = null
+
+onMounted(() => {
+  // Set up auto-refresh every 30 seconds
+  refreshInterval = setInterval(() => {
+    refreshData()
+  }, 30000)
+
+  // Load initial trends data
+  loadDeliveryTrends('day')
+})
+
+onUnmounted(() => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+  }
+})
+
+// Computed properties
+const getTotalQueueSize = () => {
+  if (!queueStatus.value?.queue_sizes) return 0
+
+  return Object.values(queueStatus.value.queue_sizes)
+    .filter(size => typeof size === 'number')
+    .reduce((total: number, size: number) => total + size, 0)
+}
+
+const getQueueHealthColor = () => {
+  const totalSize = getTotalQueueSize()
+  if (totalSize > 5000) return 'text-red-600'
+  if (totalSize > 1000) return 'text-yellow-600'
+  return 'text-green-600'
+}
+
+const getQueueHealthText = () => {
+  const totalSize = getTotalQueueSize()
+  if (totalSize > 5000) return 'Critical backlog'
+  if (totalSize > 1000) return 'High load'
+  return 'Normal'
+}
+
+const getSystemHealthColor = () => {
+  switch (systemHealthStatus.value) {
+    case 'healthy': return 'text-green-600'
+    case 'warning': return 'text-yellow-600'
+    case 'error': return 'text-red-600'
+    default: return 'text-gray-600'
+  }
+}
+
+const getSystemHealthText = () => {
+  switch (systemHealthStatus.value) {
+    case 'healthy': return 'All systems operational'
+    case 'warning': return 'Some issues detected'
+    case 'error': return 'Critical issues found'
+    default: return 'Unknown status'
+  }
+}
+
+// Event handlers
+const onTrendsPeriodChange = (period: string) => {
+  loadDeliveryTrends(period)
+}
+
+const onRetryEmail = (emailId: number) => {
+  retryEmail(emailId)
+}
+
+const onCancelBatch = (batchId: string) => {
+  cancelBatch(batchId)
+}
+
+const onViewBatch = (batchId: string) => {
+  // Navigate to batch details page
+  // This would be implemented based on your routing setup
+  console.log('View batch:', batchId)
+}
+
+const onTestSystemHealth = () => {
+  testSystemHealth()
+}
+
+// Utility functions
+const formatNumber = (num: number): string => {
+  return new Intl.NumberFormat().format(num)
+}
+</script>
+
 <template>
   <div class="space-y-6">
     <!-- Header -->
@@ -255,142 +394,3 @@
     />
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import {
-  RefreshCwIcon,
-  ActivityIcon,
-  ClockIcon,
-  ListIcon,
-  XCircleIcon,
-  AlertTriangleIcon,
-  AlertCircleIcon,
-  InfoIcon
-} from 'lucide-vue-next'
-import EmailTrendsChart from './components/EmailTrendsChart.vue'
-import RecentFailuresList from './components/RecentFailuresList.vue'
-import QueueStatusTable from './components/QueueStatusTable.vue'
-import ActiveBatchesList from './components/ActiveBatchesList.vue'
-import SystemHealthModal from './components/SystemHealthModal.vue'
-import { useEmailMonitoring } from '@/composables/useEmailMonitoring'
-
-interface Props {
-  initialData: {
-    overview: any
-    queue_status: any
-    recent_failures: any[]
-    system_alerts: any[]
-  }
-}
-
-const props = defineProps<Props>()
-
-const {
-  overview,
-  queueStatus,
-  recentFailures,
-  systemAlerts,
-  deliveryTrends,
-  activeBatches,
-  systemHealthStatus,
-  isRefreshing,
-  isLoadingTrends,
-  refreshData,
-  refreshQueueStatus,
-  loadDeliveryTrends,
-  testSystemHealth,
-  cancelBatch,
-  retryEmail
-} = useEmailMonitoring(props.initialData)
-
-const showSystemHealth = ref(false)
-
-// Auto-refresh interval
-let refreshInterval: NodeJS.Timeout | null = null
-
-onMounted(() => {
-  // Set up auto-refresh every 30 seconds
-  refreshInterval = setInterval(() => {
-    refreshData()
-  }, 30000)
-
-  // Load initial trends data
-  loadDeliveryTrends('day')
-})
-
-onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
-})
-
-// Computed properties
-const getTotalQueueSize = () => {
-  if (!queueStatus.value?.queue_sizes) return 0
-
-  return Object.values(queueStatus.value.queue_sizes)
-    .filter(size => typeof size === 'number')
-    .reduce((total: number, size: number) => total + size, 0)
-}
-
-const getQueueHealthColor = () => {
-  const totalSize = getTotalQueueSize()
-  if (totalSize > 5000) return 'text-red-600'
-  if (totalSize > 1000) return 'text-yellow-600'
-  return 'text-green-600'
-}
-
-const getQueueHealthText = () => {
-  const totalSize = getTotalQueueSize()
-  if (totalSize > 5000) return 'Critical backlog'
-  if (totalSize > 1000) return 'High load'
-  return 'Normal'
-}
-
-const getSystemHealthColor = () => {
-  switch (systemHealthStatus.value) {
-    case 'healthy': return 'text-green-600'
-    case 'warning': return 'text-yellow-600'
-    case 'error': return 'text-red-600'
-    default: return 'text-gray-600'
-  }
-}
-
-const getSystemHealthText = () => {
-  switch (systemHealthStatus.value) {
-    case 'healthy': return 'All systems operational'
-    case 'warning': return 'Some issues detected'
-    case 'error': return 'Critical issues found'
-    default: return 'Unknown status'
-  }
-}
-
-// Event handlers
-const onTrendsPeriodChange = (period: string) => {
-  loadDeliveryTrends(period)
-}
-
-const onRetryEmail = (emailId: number) => {
-  retryEmail(emailId)
-}
-
-const onCancelBatch = (batchId: string) => {
-  cancelBatch(batchId)
-}
-
-const onViewBatch = (batchId: string) => {
-  // Navigate to batch details page
-  // This would be implemented based on your routing setup
-  console.log('View batch:', batchId)
-}
-
-const onTestSystemHealth = () => {
-  testSystemHealth()
-}
-
-// Utility functions
-const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat().format(num)
-}
-</script>

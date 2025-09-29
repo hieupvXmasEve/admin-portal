@@ -1,3 +1,78 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { ListIcon, EyeIcon, XIcon, AlertTriangleIcon } from 'lucide-vue-next'
+
+interface EmailBatch {
+  id: string
+  name: string
+  total_jobs: number
+  pending_jobs: number
+  failed_jobs: number
+  progress_percentage: number
+  created_at: string
+}
+
+interface Props {
+  batches: EmailBatch[]
+  loading?: boolean
+}
+
+defineProps<Props>()
+
+const emit = defineEmits<{
+  'cancel-batch': [batchId: string]
+  'view-batch': [batchId: string]
+}>()
+
+const batchToCancel = ref<EmailBatch | null>(null)
+const isCancelling = ref(false)
+
+const confirmCancel = (batch: EmailBatch) => {
+  batchToCancel.value = batch
+}
+
+const handleCancelBatch = async () => {
+  if (!batchToCancel.value) return
+
+  isCancelling.value = true
+
+  try {
+    emit('cancel-batch', batchToCancel.value.id)
+    batchToCancel.value = null
+  } catch (error) {
+    console.error('Failed to cancel batch:', error)
+  } finally {
+    isCancelling.value = false
+  }
+}
+
+const getBatchStatusColor = (progress: number): string => {
+  if (progress >= 100) return 'bg-green-100 text-green-800'
+  if (progress >= 50) return 'bg-blue-100 text-blue-800'
+  return 'bg-yellow-100 text-yellow-800'
+}
+
+const getBatchStatusText = (progress: number): string => {
+  if (progress >= 100) return 'Completed'
+  if (progress >= 50) return 'In Progress'
+  return 'Starting'
+}
+
+const getProgressBarColor = (progress: number): string => {
+  if (progress >= 100) return 'bg-green-500'
+  if (progress >= 50) return 'bg-blue-500'
+  return 'bg-yellow-500'
+}
+
+const formatNumber = (num: number): string => {
+  return new Intl.NumberFormat().format(num)
+}
+
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleString()
+}
+</script>
+
 <template>
   <div class="space-y-4">
     <div v-if="loading" class="animate-pulse">
@@ -157,78 +232,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue'
-import { ListIcon, EyeIcon, XIcon, AlertTriangleIcon } from 'lucide-vue-next'
-
-interface EmailBatch {
-  id: string
-  name: string
-  total_jobs: number
-  pending_jobs: number
-  failed_jobs: number
-  progress_percentage: number
-  created_at: string
-}
-
-interface Props {
-  batches: EmailBatch[]
-  loading?: boolean
-}
-
-defineProps<Props>()
-
-const emit = defineEmits<{
-  'cancel-batch': [batchId: string]
-  'view-batch': [batchId: string]
-}>()
-
-const batchToCancel = ref<EmailBatch | null>(null)
-const isCancelling = ref(false)
-
-const confirmCancel = (batch: EmailBatch) => {
-  batchToCancel.value = batch
-}
-
-const handleCancelBatch = async () => {
-  if (!batchToCancel.value) return
-
-  isCancelling.value = true
-
-  try {
-    emit('cancel-batch', batchToCancel.value.id)
-    batchToCancel.value = null
-  } catch (error) {
-    console.error('Failed to cancel batch:', error)
-  } finally {
-    isCancelling.value = false
-  }
-}
-
-const getBatchStatusColor = (progress: number): string => {
-  if (progress >= 100) return 'bg-green-100 text-green-800'
-  if (progress >= 50) return 'bg-blue-100 text-blue-800'
-  return 'bg-yellow-100 text-yellow-800'
-}
-
-const getBatchStatusText = (progress: number): string => {
-  if (progress >= 100) return 'Completed'
-  if (progress >= 50) return 'In Progress'
-  return 'Starting'
-}
-
-const getProgressBarColor = (progress: number): string => {
-  if (progress >= 100) return 'bg-green-500'
-  if (progress >= 50) return 'bg-blue-500'
-  return 'bg-yellow-500'
-}
-
-const formatNumber = (num: number): string => {
-  return new Intl.NumberFormat().format(num)
-}
-
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleString()
-}
-</script>

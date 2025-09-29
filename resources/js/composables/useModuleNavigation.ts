@@ -80,7 +80,7 @@ export function useModuleNavigation(options: UseModuleNavigationOptions) {
         // console.log('buildRouteUrl - module:', module, 'action:', action);
 
         // Build base URL
-        let baseUrl = `/${module}`;
+        const baseUrl = `/${module}`;
         let finalUrl = '';
 
         // Handle different actions

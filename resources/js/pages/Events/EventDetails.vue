@@ -20,7 +20,14 @@ interface Event {
     gold_reward_amount: number;
     max_participants: number | null;
     qr_code: string;
+    is_manual: boolean;
+    is_historical: boolean;
     creator?: {
+        id: number;
+        name: string;
+        email: string;
+    };
+    created_by_admin?: {
         id: number;
         name: string;
         email: string;
@@ -135,6 +142,9 @@ const completeEvent = () => {
                 <Link v-if="event.status === 'published'" :href="route('events.scanner', event.id)">
                     <Button>Check-in</Button>
                 </Link>
+                <Link v-if="event.is_manual" :href="route('events.manage-participants', event.id)">
+                    <Button variant="outline">Manage Participants</Button>
+                </Link>
             </div>
         </div>
 
@@ -146,9 +156,13 @@ const completeEvent = () => {
                         <CardTitle class="mb-2 text-2xl font-bold text-gray-900">
                             {{ event.title }}
                         </CardTitle>
-                        <Badge :variant="getStatusVariant(event.status)">
-                            {{ event.status }}
-                        </Badge>
+                        <div class="flex gap-2">
+                            <Badge :variant="getStatusVariant(event.status)">
+                                {{ event.status }}
+                            </Badge>
+                            <Badge v-if="event.is_manual" variant="secondary">Manual Event</Badge>
+                            <Badge v-if="event.is_historical" variant="outline">Historical</Badge>
+                        </div>
                     </div>
                     <div class="flex flex-col space-y-2">
                         <Button v-if="event.status === 'draft'" @click="publishEvent" :disabled="publishing" variant="default" class="bg-green-600 hover:bg-green-700">
@@ -221,6 +235,10 @@ const completeEvent = () => {
                             <div v-if="event.creator">
                                 <dt class="text-sm font-medium text-gray-500">Created By</dt>
                                 <dd class="mt-1 text-sm text-gray-900">{{ event.creator.name }} ({{ event.creator.email }})</dd>
+                            </div>
+                            <div v-if="event.is_manual && event.created_by_admin">
+                                <dt class="text-sm font-medium text-gray-500">Manual Event Created By</dt>
+                                <dd class="mt-1 text-sm text-gray-900">{{ event.created_by_admin.name }} ({{ event.created_by_admin.email }})</dd>
                             </div>
                         </dl>
                     </div>

@@ -38,6 +38,9 @@ class EventFactory extends Factory
                 return $attributes['status'] === 'published' ? $this->faker->dateTimeBetween('-7 days', 'now') : null;
             },
             'created_by_user_id' => \App\Models\User::factory(),
+            'is_manual' => false,
+            'is_historical' => false,
+            'created_by_admin_id' => null,
         ];
     }
 
@@ -158,5 +161,46 @@ class EventFactory extends Factory
             'start_time' => $startTime,
             'end_time' => $endTime,
         ]);
+    }
+
+    /**
+     * Indicate that the event is manually created.
+     */
+    public function manual(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_manual' => true,
+            'created_by_admin_id' => \App\Models\User::factory(),
+            'status' => 'completed',
+            'completed_at' => $this->faker->dateTimeBetween('-1 day', 'now'),
+        ]);
+    }
+
+    /**
+     * Indicate that the event is historical.
+     */
+    public function historical(): static
+    {
+        $startTime = $this->faker->dateTimeBetween('-1 year', '-1 month');
+        $endTime = $this->faker->dateTimeBetween($startTime, $startTime->format('Y-m-d H:i:s') . ' +4 hours');
+
+        return $this->state(fn (array $attributes) => [
+            'is_historical' => true,
+            'is_manual' => true,
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'status' => 'completed',
+            'published_at' => $startTime,
+            'completed_at' => $endTime,
+            'created_by_admin_id' => \App\Models\User::factory(),
+        ]);
+    }
+
+    /**
+     * Indicate that the event is both manual and historical.
+     */
+    public function manualHistorical(): static
+    {
+        return $this->manual()->historical();
     }
 }

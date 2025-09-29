@@ -1,3 +1,107 @@
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import type { Question } from '@/types/forms'
+
+interface Props {
+  question: Question
+  modelValue: any
+  errors?: string
+}
+
+const props = defineProps<Props>()
+
+const emit = defineEmits<{
+  'update:modelValue': [value: any]
+}>()
+
+const localValue = ref(props.modelValue)
+const selectedFile = ref<File | null>(null)
+const freeTextValues = ref<Record<number, string>>({})
+const matrixValues = ref<Record<string, any>>({})
+
+// Watch for external changes
+watch(() => props.modelValue, (newVal) => {
+  localValue.value = newVal
+})
+
+// Watch for local changes and emit
+watch(localValue, (newVal) => {
+  emit('update:modelValue', newVal)
+})
+
+// Helper functions for multi-choice questions
+const isOptionSelected = (optionId: number): boolean => {
+  return Array.isArray(localValue.value) && localValue.value.includes(optionId)
+}
+
+const toggleOption = (optionId: number) => {
+  if (!Array.isArray(localValue.value)) {
+    localValue.value = []
+  }
+  
+  const index = localValue.value.indexOf(optionId)
+  if (index > -1) {
+    localValue.value.splice(index, 1)
+  } else {
+    localValue.value.push(optionId)
+  }
+  
+  emit('update:modelValue', {
+    options: localValue.value,
+    freeText: freeTextValues.value
+  })
+}
+
+// Helper function for rating scale
+const getRatingScale = (): number[] => {
+  const min = props.question.validation_rules?.min || 1
+  const max = props.question.validation_rules?.max || 5
+  const scale = []
+  for (let i = min; i <= max; i++) {
+    scale.push(i)
+  }
+  return scale
+}
+
+// Helper functions for matrix questions
+const getMatrixValue = (row: string): any => {
+  if (typeof localValue.value === 'object' && localValue.value !== null) {
+    return localValue.value[row]
+  }
+  return null
+}
+
+const setMatrixValue = (row: string, col: any) => {
+  if (typeof localValue.value !== 'object' || localValue.value === null) {
+    localValue.value = {}
+  }
+  localValue.value[row] = col
+  emit('update:modelValue', localValue.value)
+}
+
+// File handling
+const handleFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0] || null
+  selectedFile.value = file
+  emit('update:modelValue', { file })
+}
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+}
+</script>
+
 <template>
   <div class="space-y-2">
     <!-- Question Label -->
@@ -201,107 +305,3 @@
     </p>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import type { Question } from '@/types/forms'
-
-interface Props {
-  question: Question
-  modelValue: any
-  errors?: string
-}
-
-const props = defineProps<Props>()
-
-const emit = defineEmits<{
-  'update:modelValue': [value: any]
-}>()
-
-const localValue = ref(props.modelValue)
-const selectedFile = ref<File | null>(null)
-const freeTextValues = ref<Record<number, string>>({})
-const matrixValues = ref<Record<string, any>>({})
-
-// Watch for external changes
-watch(() => props.modelValue, (newVal) => {
-  localValue.value = newVal
-})
-
-// Watch for local changes and emit
-watch(localValue, (newVal) => {
-  emit('update:modelValue', newVal)
-})
-
-// Helper functions for multi-choice questions
-const isOptionSelected = (optionId: number): boolean => {
-  return Array.isArray(localValue.value) && localValue.value.includes(optionId)
-}
-
-const toggleOption = (optionId: number) => {
-  if (!Array.isArray(localValue.value)) {
-    localValue.value = []
-  }
-  
-  const index = localValue.value.indexOf(optionId)
-  if (index > -1) {
-    localValue.value.splice(index, 1)
-  } else {
-    localValue.value.push(optionId)
-  }
-  
-  emit('update:modelValue', {
-    options: localValue.value,
-    freeText: freeTextValues.value
-  })
-}
-
-// Helper function for rating scale
-const getRatingScale = (): number[] => {
-  const min = props.question.validation_rules?.min || 1
-  const max = props.question.validation_rules?.max || 5
-  const scale = []
-  for (let i = min; i <= max; i++) {
-    scale.push(i)
-  }
-  return scale
-}
-
-// Helper functions for matrix questions
-const getMatrixValue = (row: string): any => {
-  if (typeof localValue.value === 'object' && localValue.value !== null) {
-    return localValue.value[row]
-  }
-  return null
-}
-
-const setMatrixValue = (row: string, col: any) => {
-  if (typeof localValue.value !== 'object' || localValue.value === null) {
-    localValue.value = {}
-  }
-  localValue.value[row] = col
-  emit('update:modelValue', localValue.value)
-}
-
-// File handling
-const handleFileChange = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0] || null
-  selectedFile.value = file
-  emit('update:modelValue', { file })
-}
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
-}
-</script>

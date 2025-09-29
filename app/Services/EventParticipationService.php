@@ -760,6 +760,411 @@ class EventParticipationService
     }
 
     /**
+     * Search for students by student ID string for manual event participation.
+     */
+    public function searchStudentsForManualEvent(Event $event, string $studentIdsInput): array
+    {
+        if (!$event->isManual()) {
+            throw new InvalidArgumentException('Can only search students for manual events');
+        }
+
+        $studentIds = preg_split('/\s+/', trim($studentIdsInput));
+        $studentIds = array_filter($studentIds);
+        $studentIds = array_unique($studentIds);
+
+        $results = [];
+
+        foreach ($studentIds as $studentId) {
+            $eligibilityInfo = [
+                'student_id' => $studentId,
+                'exists' => false,
+                'is_eligible' => false,
+                'is_already_registered' => false,
+                'eligibility_reasons' => [],
+                'major_code' => 'N/A',
+            ];
+
+            if ($studentId === '') {
+                continue;
+            }
+
+            $student = Student::where('student_id', $studentId)
+                ->where('campus_id', $event->campus_id)
+                ->with(['program:id,code,name', 'specialization:id,code,name'])
+                ->first();
+
+            if (!$student) {
+                $eligibilityInfo['eligibility_reasons'][] = 'Student ID not found in this campus';
+                $results[] = $eligibilityInfo;
+                continue;
+            }
+
+            $eligibilityInfo['exists'] = true;
+            $eligibilityInfo['student_data'] = [
+                'id' => $student->id,
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'email' => $student->email,
+                'program' => $student->program ? [
+                    'code' => $student->program->code,
+                    'name' => $student->program->name,
+                ] : null,
+                'specialization' => $student->specialization ? [
+                    'code' => $student->specialization->code,
+                    'name' => $student->specialization->name,
+                ] : null,
+            ];
+            $eligibilityInfo['major_code'] = $student->specialization?->code ?? $student->program?->code ?? 'N/A';
+
+            $participant = $event->getStudentParticipation($student->id);
+            if ($participant && $participant->isActive()) {
+                $eligibilityInfo['is_already_registered'] = true;
+                $eligibilityInfo['eligibility_reasons'][] = 'Already registered for this event';
+                $results[] = $eligibilityInfo;
+                continue;
+            }
+
+            $isEligible = true;
+            $reasons = [];
+
+            if (!$student->isActive()) {
+                $isEligible = false;
+                $reasons[] = "Student status is '{$student->status}' (must be 'active')";
+            }
+
+            if ($event->hasReachedCapacity()) {
+                $isEligible = false;
+                $reasons[] = 'Event has reached maximum capacity';
+            }
+
+            if ($isEligible) {
+                $reasons[] = 'Eligible for manual registration';
+            }
+
+            $eligibilityInfo['is_eligible'] = $isEligible;
+            $eligibilityInfo['eligibility_reasons'] = $reasons;
+
+            $results[] = $eligibilityInfo;
+        }
+
+        return $results;
+    }
+
+    /**
+     * Add students to a manual event with direct completion status.
+     */
+    public function addManualParticipants(
+        Event $event,
+        array $studentIds,
+        string $status = 'completed',
+        ?User $addedBy = null
+    ): array {
+        if (!$event->isManual()) {
+            throw new InvalidArgumentException('Can only add manual participants to manual events');
+        }
+
+        $results = [
+            'added' => [],
+            'skipped' => [],
+            'errors' => []
+        ];
+
+        return DB::transaction(function () use ($event, $studentIds, $status, $addedBy, $results) {
+            foreach ($studentIds as $studentId) {
+                try {
+                    // Validate student exists and belongs to same campus
+                    $student = Student::where('id', $studentId)
+                        ->where('campus_id', $event->campus_id)
+                        ->first();
+
+                    if (!$student) {
+                        $results['errors'][] = [
+                            'student_id' => $studentId,
+                            'error' => 'Student not found or not in same campus'
+                        ];
+                        continue;
+                    }
+
+                    // Check if student is already registered
+                    $existingParticipation = $event->getStudentParticipation($student->id);
+                    if ($existingParticipation && $existingParticipation->isActive()) {
+                        $results['skipped'][] = [
+                            'student_id' => $studentId,
+                            'student_name' => $student->full_name,
+                            'reason' => 'Already registered'
+                        ];
+                        continue;
+                    }
+
+                    // Validate student is active
+                    if (!$student->isActive()) {
+                        $results['errors'][] = [
+                            'student_id' => $studentId,
+                            'student_name' => $student->full_name,
+                            'error' => 'Student is not active'
+                        ];
+                        continue;
+                    }
+
+                    // Create participation record
+                    $participant = $this->createOrUpdateParticipation($event, $student, $status);
+
+                    // If status is completed, award gold immediately
+                    if ($status === 'completed' && $event->gold_reward_amount > 0) {
+                        $this->awardGoldReward($participant);
+                    }
+
+                    $results['added'][] = [
+                        'student_id' => $studentId,
+                        'student_name' => $student->full_name,
+                        'status' => $status,
+                        'gold_awarded' => $status === 'completed' && $event->gold_reward_amount > 0
+                    ];
+
+                    // Log the manual addition
+                    Log::info('Manual participant added to event', [
+                        'event_id' => $event->id,
+                        'student_id' => $student->id,
+                        'status' => $status,
+                        'added_by' => $addedBy?->id,
+                        'gold_awarded' => $status === 'completed' && $event->gold_reward_amount > 0
+                    ]);
+
+                } catch (\Exception $e) {
+                    $results['errors'][] = [
+                        'student_id' => $studentId,
+                        'error' => $e->getMessage()
+                    ];
+
+                    Log::error('Failed to add manual participant', [
+                        'event_id' => $event->id,
+                        'student_id' => $studentId,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            return $results;
+        });
+    }
+
+    /**
+     * Get students available for manual event participation.
+     */
+    public function getAvailableStudentsForManualEvent(
+        Event $event,
+        array $filters = [],
+        int $perPage = 50
+    ): LengthAwarePaginator {
+        $query = Student::where('campus_id', $event->campus_id)
+            ->where('status', 'active')
+            ->whereNotIn('id', function ($subQuery) use ($event) {
+                $subQuery->select('student_id')
+                    ->from('event_participants')
+                    ->where('event_id', $event->id)
+                    ->whereIn('status', ['registered', 'checked_in', 'completed']);
+            });
+
+        // Apply search filter
+        if (isset($filters['search']) && !empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('student_id', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply program filter
+        if (isset($filters['program_id']) && !empty($filters['program_id'])) {
+            $query->where('program_id', $filters['program_id']);
+        }
+
+        // Apply specialization filter
+        if (isset($filters['specialization_id']) && !empty($filters['specialization_id'])) {
+            $query->where('specialization_id', $filters['specialization_id']);
+        }
+
+        // Apply academic status filter
+        if (isset($filters['academic_status']) && !empty($filters['academic_status'])) {
+            $query->where('academic_status', $filters['academic_status']);
+        }
+
+        return $query->with(['program', 'specialization'])
+            ->orderBy('full_name')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Bulk update participant status for manual events.
+     */
+    public function bulkUpdateParticipantStatus(
+        Event $event,
+        array $participantIds,
+        string $newStatus,
+        ?User $updatedBy = null
+    ): array {
+        if (!$event->isManual()) {
+            throw new InvalidArgumentException('Can only bulk update participants for manual events');
+        }
+
+        $results = [
+            'updated' => [],
+            'errors' => []
+        ];
+
+        return DB::transaction(function () use ($event, $participantIds, $newStatus, $updatedBy, $results) {
+            $participants = EventParticipant::whereIn('id', $participantIds)
+                ->where('event_id', $event->id)
+                ->with('student')
+                ->get();
+
+            foreach ($participants as $participant) {
+                try {
+                    $oldStatus = $participant->status;
+
+                    // Update status
+                    $participant->update(['status' => $newStatus]);
+
+                    // Handle gold rewards based on status change
+                    if ($newStatus === 'completed' && !$participant->hasBeenAwarded() && $event->gold_reward_amount > 0) {
+                        $this->awardGoldReward($participant);
+                    } elseif ($oldStatus === 'completed' && $newStatus !== 'completed' && $participant->hasBeenAwarded()) {
+                        $this->reclaimGoldReward($participant);
+                    }
+
+                    $results['updated'][] = [
+                        'participant_id' => $participant->id,
+                        'student_name' => $participant->student->full_name,
+                        'old_status' => $oldStatus,
+                        'new_status' => $newStatus,
+                        'gold_affected' => ($newStatus === 'completed' && $event->gold_reward_amount > 0) ||
+                                         ($oldStatus === 'completed' && $newStatus !== 'completed')
+                    ];
+
+                    Log::info('Bulk participant status updated', [
+                        'event_id' => $event->id,
+                        'participant_id' => $participant->id,
+                        'student_id' => $participant->student_id,
+                        'old_status' => $oldStatus,
+                        'new_status' => $newStatus,
+                        'updated_by' => $updatedBy?->id
+                    ]);
+
+                } catch (\Exception $e) {
+                    $results['errors'][] = [
+                        'participant_id' => $participant->id,
+                        'student_name' => $participant->student->full_name ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+
+                    Log::error('Failed to update participant status', [
+                        'event_id' => $event->id,
+                        'participant_id' => $participant->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            return $results;
+        });
+    }
+
+    /**
+     * Remove participants from manual event.
+     */
+    public function removeManualParticipants(
+        Event $event,
+        array $participantIds,
+        ?User $removedBy = null
+    ): array {
+        if (!$event->isManual()) {
+            throw new InvalidArgumentException('Can only remove participants from manual events');
+        }
+
+        $results = [
+            'removed' => [],
+            'errors' => []
+        ];
+
+        return DB::transaction(function () use ($event, $participantIds, $removedBy, $results) {
+            $participants = EventParticipant::whereIn('id', $participantIds)
+                ->where('event_id', $event->id)
+                ->with('student')
+                ->get();
+
+            foreach ($participants as $participant) {
+                try {
+                    // Reclaim gold if awarded
+                    if ($participant->hasBeenAwarded()) {
+                        $this->reclaimGoldReward($participant);
+                    }
+
+                    $studentName = $participant->student->full_name;
+                    $wasAwarded = $participant->hasBeenAwarded();
+
+                    // Remove participant
+                    $participant->delete();
+
+                    $results['removed'][] = [
+                        'participant_id' => $participant->id,
+                        'student_name' => $studentName,
+                        'gold_reclaimed' => $wasAwarded
+                    ];
+
+                    Log::info('Manual participant removed from event', [
+                        'event_id' => $event->id,
+                        'participant_id' => $participant->id,
+                        'student_id' => $participant->student_id,
+                        'removed_by' => $removedBy?->id,
+                        'gold_reclaimed' => $wasAwarded
+                    ]);
+
+                } catch (\Exception $e) {
+                    $results['errors'][] = [
+                        'participant_id' => $participant->id,
+                        'student_name' => $participant->student->full_name ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+
+                    Log::error('Failed to remove manual participant', [
+                        'event_id' => $event->id,
+                        'participant_id' => $participant->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            return $results;
+        });
+    }
+
+    /**
+     * Get manual event participation statistics.
+     */
+    public function getManualEventStatistics(Event $event): array
+    {
+        if (!$event->isManual()) {
+            return [];
+        }
+
+        $participants = $event->participants;
+
+        return [
+            'total_added' => $participants->count(),
+            'completed_count' => $participants->where('status', 'completed')->count(),
+            'registered_count' => $participants->where('status', 'registered')->count(),
+            'cancelled_count' => $participants->where('status', 'cancelled')->count(),
+            'gold_awarded_count' => $participants->where('gold_awarded', true)->count(),
+            'total_gold_distributed' => $participants->where('gold_awarded', true)->count() * $event->gold_reward_amount,
+            'completion_rate' => $participants->count() > 0 ?
+                ($participants->where('status', 'completed')->count() / $participants->count()) * 100 : 0,
+            'gold_award_rate' => $participants->where('status', 'completed')->count() > 0 ?
+                ($participants->where('gold_awarded', true)->count() / $participants->where('status', 'completed')->count()) * 100 : 0
+        ];
+    }
+
+    /**
      * Get event participants with filtering and pagination.
      */
     public function getEventParticipants(
