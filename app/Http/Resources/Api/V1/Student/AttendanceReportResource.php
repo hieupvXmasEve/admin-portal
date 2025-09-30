@@ -6,6 +6,7 @@ namespace App\Http\Resources\Api\V1\Student;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Log;
 
 class AttendanceReportResource extends JsonResource
 {
@@ -70,6 +71,7 @@ class AttendanceReportResource extends JsonResource
             return [
                 'unit_code' => $subject['unit_code'],
                 'unit_name' => $subject['unit_name'],
+                'section_code' => $subject['section_code'],
                 'total_sessions' => $subject['total_sessions'],
                 'attended' => $subject['attended'],
                 'absent' => $subject['absent'],
