@@ -10,6 +10,7 @@ use App\Http\Resources\Api\V1\Student\AttendanceResource;
 use App\Http\Resources\Api\V1\Student\AttendanceReportResource;
 //use App\Http\Resources\Api\V1\Student\CourseAttendanceResource;
 use App\Http\Responses\ApiResponse;
+use App\Models\Semester;
 use App\Services\V1\Student\AttendanceService;
 
 use Illuminate\Http\JsonResponse;
@@ -98,11 +99,16 @@ class AttendanceController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
+        $semesterId = null;
 
         try {
-            $semesterId = $request->query('semester_id') ? (int) $request->query('semester_id') : null;
+            $activeSemester = Semester::getActiveSemester();
+            $requestedSemesterId = $request->query('semester_id');
+            $semesterId = $requestedSemesterId !== null
+                ? (int) $requestedSemesterId
+                : ($activeSemester?->id);
             $reportData = $this->attendanceService->getAttendanceReport($student, $semesterId);
-
+            Log::info('Report Data', ['report_data' => $reportData]);
             return ApiResponse::success(
                 new AttendanceReportResource($reportData),
                 [],
@@ -111,7 +117,7 @@ class AttendanceController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to retrieve attendance report', [
                 'student_id' => $student->id,
-                'semester_id' => $semesterId ?? null,
+                'semester_id' => $semesterId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);

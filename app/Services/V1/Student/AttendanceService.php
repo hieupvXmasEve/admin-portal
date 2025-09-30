@@ -762,8 +762,17 @@ class AttendanceService
      */
     protected function getStudentSemesters(Student $student): Collection
     {
-        return Semester::whereHas('enrollments', function ($query) use ($student) {
-                $query->where('student_id', $student->id);
+        return Semester::where(function ($query) use ($student) {
+                $query->whereHas('enrollments', function ($enrollmentQuery) use ($student) {
+                    $enrollmentQuery->where('student_id', $student->id);
+                })
+                ->orWhereHas('courseRegistrations', function ($registrationQuery) use ($student) {
+                    $registrationQuery->where('student_id', $student->id)
+                        ->whereIn('registration_status', ['pending', 'registered', 'confirmed', 'completed']);
+                })
+                ->orWhereHas('courseOfferings.classSessions.attendances', function ($attendanceQuery) use ($student) {
+                    $attendanceQuery->where('student_id', $student->id);
+                });
             })
             ->orderBy('start_date', 'desc')
             ->get();
@@ -834,7 +843,7 @@ class AttendanceService
         // Get all course registrations for the semester
         $courseRegistrations = $student->courseRegistrations()
             ->where('semester_id', $semester->id)
-            ->whereIn('registration_status', ['registered', 'confirmed'])
+            ->whereIn('registration_status', ['pending', 'registered', 'confirmed', 'completed'])
             ->with([
                 'courseOffering.curriculumUnit.unit',
                 'courseOffering.classSessions' => function ($query) {
@@ -863,6 +872,7 @@ class AttendanceService
             $subjectData = [
                 'unit_code' => $unit->code,
                 'unit_name' => $unit->name,
+                'section_code' => $courseOffering->section_code,
                 'total_sessions' => $classSessions->count(),
                 'attended' => 0,
                 'absent' => 0,
