@@ -9,6 +9,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -66,7 +67,13 @@ class ImageUploadService
     /**
      * Upload a file for a specific context.
      */
-    public function upload(UploadedFile $file, string $context, ?int $userId = null, array $metadata = []): UploadRecord
+    public function upload(
+        UploadedFile $file,
+        string $context,
+        ?int $userId = null,
+        ?int $studentId = null,
+        array $metadata = []
+    ): UploadRecord
     {
         // Validate context
         $this->validateContext($context);
@@ -96,6 +103,10 @@ class ImageUploadService
         // Generate URL
         $url = $this->generateUrl($storedPath, $disk, $config);
 
+        $associationKeys = ['response_id', 'answer_id', 'ticket_id', 'reply_id'];
+        $associations = Arr::only($metadata, $associationKeys);
+        $metadata = Arr::except($metadata, $associationKeys);
+
         // Create upload record
         $uploadRecord = UploadRecord::create([
             'filename' => $filename,
@@ -108,7 +119,12 @@ class ImageUploadService
             'url' => $url,
             'hash' => $this->generateFileHash($file),
             'user_id' => $userId,
-            'metadata' => $metadata,
+            'student_id' => $studentId,
+            'response_id' => $associations['response_id'] ?? null,
+            'answer_id' => $associations['answer_id'] ?? null,
+            'ticket_id' => $associations['ticket_id'] ?? null,
+            'reply_id' => $associations['reply_id'] ?? null,
+            'metadata' => $metadata ?: null,
         ]);
 
         Log::info('File uploaded successfully', [
@@ -117,6 +133,7 @@ class ImageUploadService
             'filename' => $filename,
             'size' => $file->getSize(),
             'user_id' => $userId,
+            'student_id' => $studentId,
         ]);
 
         return $uploadRecord;
@@ -125,14 +142,20 @@ class ImageUploadService
     /**
      * Upload multiple files for a specific context.
      */
-    public function uploadMultiple(array $files, string $context, ?int $userId = null, array $metadata = []): array
+    public function uploadMultiple(
+        array $files,
+        string $context,
+        ?int $userId = null,
+        ?int $studentId = null,
+        array $metadata = []
+    ): array
     {
         $uploadRecords = [];
         $failedUploads = [];
 
         foreach ($files as $index => $file) {
             try {
-                $uploadRecords[] = $this->upload($file, $context, $userId, $metadata);
+                $uploadRecords[] = $this->upload($file, $context, $userId, $studentId, $metadata);
             } catch (\Exception $e) {
                 $failedUploads[$index] = [
                     'file' => $file->getClientOriginalName(),
@@ -144,6 +167,7 @@ class ImageUploadService
                     'filename' => $file->getClientOriginalName(),
                     'error' => $e->getMessage(),
                     'user_id' => $userId,
+                    'student_id' => $studentId,
                 ]);
             }
         }

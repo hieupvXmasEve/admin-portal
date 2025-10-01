@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\ImageUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,13 +15,20 @@ class AttachmentResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $uploadService = app(ImageUploadService::class);
+
+        $originalName = $this->original_name ?? $this->filename ?? $this->file_name;
+
         return [
             'id' => $this->id,
-            'file_name' => $this->file_name,
+            'file_name' => $originalName,
+            'filename' => $originalName,
             'mime_type' => $this->mime_type,
-            'size_bytes' => $this->size_bytes,
-            'uploaded_at' => $this->uploaded_at?->format('Y-m-d H:i:s'),
-            'download_url' => $this->when($this->storage_key, route('attachments.download', $this->id)),
+            'size' => $this->size ?? $this->size_bytes,
+            'size_bytes' => $this->size ?? $this->size_bytes,
+            'uploaded_at' => optional($this->created_at)->format('Y-m-d H:i:s'),
+            'storage_key' => $this->path ?? $this->storage_key,
+            'download_url' => $uploadService->getUrl($this->resource),
         ];
     }
 }

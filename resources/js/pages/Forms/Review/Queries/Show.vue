@@ -15,7 +15,6 @@ import { toTypedSchema } from '@vee-validate/zod';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useForm as useVeeForm } from 'vee-validate';
 import { computed, ref, watch } from 'vue';
-import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 import * as z from 'zod';
 
@@ -25,6 +24,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+console.log('props', props.ticket);
 
 // Zod schema for reply form validation
 const replyFormSchema = toTypedSchema(
@@ -93,7 +93,7 @@ const { handleSubmit, setFieldValue, values, resetForm } = useVeeForm({
     },
 });
 
-const fileInputRef = ref<HTMLInputElement | null>(null);
+const fileInputResetKey = ref<number>(0);
 
 // Watch for official answer changes to disable pending checkbox
 watch(
@@ -114,24 +114,18 @@ const submitReply = handleSubmit((values) => {
     if (values.attachment) {
         formData.append('attachment', values.attachment);
     }
-
     // Use Inertia's router for form submission
     router.post(route('forms.queries.replies.store', props.ticket.id), formData, {
         preserveScroll: true,
         forceFormData: true,
         onSuccess: () => {
-            // Reset form values
+            // Reset attachment field and remount the Input component
             setFieldValue('message', '');
             setFieldValue('is_official_answer', true);
             setFieldValue('set_pending', false);
             setFieldValue('attachment', null);
-
-            if (fileInputRef.value) {
-                fileInputRef.value.value = '';
-            }
-
+            fileInputResetKey.value += 1;
             resetForm();
-            toast.success('Reply posted successfully.');
         },
     });
 });
@@ -286,6 +280,7 @@ const backToList = () => {
                 <CardDescription>Review the conversation and provide updates or official answers.</CardDescription>
             </CardHeader>
             <CardContent class="space-y-6">
+                <Separator />
                 <form class="space-y-4" @submit="submitReply">
                     <FormField v-slot="{ value, handleChange }" name="message">
                         <FormItem>
@@ -325,7 +320,7 @@ const backToList = () => {
                         <FormItem>
                             <FormLabel>Attachment</FormLabel>
                             <FormControl>
-                                <Input ref="fileInputRef" type="file" :disabled="isClosed" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.zip" @change="onAttachmentChange" />
+                                <Input :key="fileInputResetKey" type="file" :disabled="isClosed" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.zip" @change="onAttachmentChange" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -335,7 +330,7 @@ const backToList = () => {
                         <Button type="submit" :disabled="isClosed || !values.message"> Send Reply </Button>
                     </div>
                 </form>
-                <Separator />
+
                 <div v-if="!replies.length" class="text-muted-foreground text-sm">No replies yet.</div>
                 <div v-else class="space-y-4">
                     <div v-for="reply in replies" :key="reply.id" class="rounded-lg border p-4">

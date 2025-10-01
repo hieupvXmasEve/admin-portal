@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\UploadRecord;
 
 class FormResponse extends Model
 {
@@ -94,7 +95,7 @@ class FormResponse extends Model
      */
     public function attachments(): HasMany
     {
-        return $this->hasMany(Attachment::class, 'response_id');
+        return $this->hasMany(UploadRecord::class, 'response_id');
     }
 
     /**

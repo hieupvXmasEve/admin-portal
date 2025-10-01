@@ -3,11 +3,17 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
 
 class ImageUploadRequest extends FormRequest
 {
+    /**
+     * Holds a detailed upload error message when PHP reports a failure.
+     */
+    protected ?string $uploadErrorMessage = null;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -26,22 +32,59 @@ class ImageUploadRequest extends FormRequest
     {
         $context = $this->input('context', 'general');
         $contextConfig = config("uploads.contexts.{$context}", config('uploads.defaults'));
+        $maxSizeKilobytes = (int) ($contextConfig['max_size'] ?? config('uploads.defaults.max_size', 10240));
+        $allowedExtensions = array_values(array_unique($contextConfig['allowed_extensions'] ?? []));
+        $allowedMimeTypes = array_values(array_unique($contextConfig['allowed_types'] ?? []));
+
+        if (empty($allowedExtensions)) {
+            $allowedExtensions = array_values(array_unique(config('uploads.defaults.allowed_extensions', [])));
+        }
+
+        if (empty($allowedMimeTypes)) {
+            $allowedMimeTypes = array_values(array_unique(config('uploads.defaults.allowed_types', [])));
+        }
+
+        $fileRules = [
+            'required',
+            'file',
+            function ($attribute, $value, $fail) {
+                if (!$value || !($value instanceof UploadedFile)) {
+                    return;
+                }
+
+                if (!$value->isValid()) {
+                    $message = $this->resolveUploadErrorMessage($value);
+                    $this->uploadErrorMessage = $message;
+                    $fail($message);
+                }
+            },
+            File::types($allowedExtensions)->max($maxSizeKilobytes),
+        ];
+
+        if (!empty($allowedExtensions)) {
+            $fileRules[] = 'mimes:' . implode(',', $allowedExtensions);
+        }
+
+        if (!empty($allowedMimeTypes)) {
+            $fileRules[] = 'mimetypes:' . implode(',', $allowedMimeTypes);
+        }
+
+        $fileRules[] = function ($attribute, $value, $fail) {
+            if (!config('uploads.security.validate_file_signature')) {
+                return;
+            }
+
+            if (!$value) {
+                return;
+            }
+
+            if (!$this->validateFileSignature($value)) {
+                $fail('The file signature does not match the file extension.');
+            }
+        };
 
         return [
-            'file' => [
-                'required',
-                'file',
-                File::types($contextConfig['allowed_extensions'])
-                    ->max($contextConfig['max_size']),
-                'mimes:' . implode(',', $this->getExtensionsFromMimeTypes($contextConfig['allowed_types'])),
-                'mimetypes:' . implode(',', $contextConfig['allowed_types']),
-                function ($attribute, $value, $fail) use ($contextConfig) {
-                    // Custom validation for file signature
-                    if (config('uploads.security.validate_file_signature') && !$this->validateFileSignature($value, $contextConfig['allowed_types'])) {
-                        $fail('The file signature does not match the file extension.');
-                    }
-                },
-            ],
+            'file' => $fileRules,
             'context' => [
                 'required',
                 'string',
@@ -74,14 +117,20 @@ class ImageUploadRequest extends FormRequest
     {
         $context = $this->input('context', 'general');
         $contextConfig = config("uploads.contexts.{$context}", config('uploads.defaults'));
-        $maxSizeMB = round($contextConfig['max_size'] / 1024, 2);
+        $maxSizeKilobytes = (int) ($contextConfig['max_size'] ?? config('uploads.defaults.max_size', 10240));
+        $maxSizeMB = round($maxSizeKilobytes / 1024, 2);
+        $allowedExtensions = array_values(array_unique($contextConfig['allowed_extensions'] ?? []));
+        if (empty($allowedExtensions)) {
+            $allowedExtensions = array_values(array_unique(config('uploads.defaults.allowed_extensions', [])));
+        }
 
         return [
             'file.required' => 'Please select a file to upload.',
             'file.file' => 'The uploaded file is not valid.',
             'file.max' => "The file size cannot exceed {$maxSizeMB}MB for {$context} uploads.",
-            'file.mimes' => 'The file must be one of the following types: ' . implode(', ', $contextConfig['allowed_extensions']) . '.',
+            'file.mimes' => 'The file must be one of the following types: ' . implode(', ', $allowedExtensions) . '.',
             'file.mimetypes' => 'The file MIME type is not allowed for this context.',
+            'file.uploaded' => $this->getUploadFailureMessage(),
             'context.required' => 'Upload context is required.',
             'context.in' => 'Invalid upload context. Allowed contexts: ' . implode(', ', array_keys(config('uploads.contexts'))) . '.',
             'alt_text.max' => 'Alt text cannot exceed 255 characters.',
@@ -99,7 +148,7 @@ class ImageUploadRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'file' => 'image file',
+            'file' => 'uploaded file',
             'context' => 'upload context',
             'alt_text' => 'alternative text',
             'expires_at' => 'expiration date',
@@ -147,7 +196,7 @@ class ImageUploadRequest extends FormRequest
      * @param  array  $allowedMimeTypes
      * @return bool
      */
-    protected function validateFileSignature($file, array $allowedMimeTypes): bool
+    protected function validateFileSignature($file): bool
     {
         if (!$file || !$file->isValid()) {
             return false;
@@ -183,23 +232,23 @@ class ImageUploadRequest extends FormRequest
             ],
         ];
 
-        // Check if file signature matches any allowed MIME type
-        foreach ($allowedMimeTypes as $mimeType) {
-            if (!isset($signatures[$mimeType])) {
-                continue;
+        $mimeType = $file->getMimeType();
+
+        if (!$mimeType || !isset($signatures[$mimeType])) {
+            // No signature validation available for this type
+            return true;
+        }
+
+        foreach ($signatures[$mimeType] as $sig) {
+            if (strpos($signature, $sig) === 0) {
+                return true;
             }
 
-            foreach ($signatures[$mimeType] as $sig) {
-                if (strpos($signature, $sig) === 0) {
+            // Special case for WebP
+            if ($mimeType === 'image/webp' && strpos($signature, 'RIFF') === 0) {
+                $webpSignature = substr($signature, 8, 4);
+                if ($webpSignature === 'WEBP') {
                     return true;
-                }
-
-                // Special case for WebP
-                if ($mimeType === 'image/webp' && strpos($signature, 'RIFF') === 0) {
-                    $webpSignature = substr($signature, 8, 4);
-                    if ($webpSignature === 'WEBP') {
-                        return true;
-                    }
                 }
             }
         }
@@ -339,6 +388,52 @@ class ImageUploadRequest extends FormRequest
                 }
             }
         }
+    }
+
+    /**
+     * Translate PHP upload error codes into human readable messages.
+     */
+    protected function resolveUploadErrorMessage(UploadedFile $file): string
+    {
+        $errorCode = $file->getError();
+
+        if ($errorCode === UPLOAD_ERR_OK) {
+            return $file->getErrorMessage();
+        }
+
+        $uploadMax = ini_get('upload_max_filesize');
+        $postMax = ini_get('post_max_size');
+
+        return match ($errorCode) {
+            UPLOAD_ERR_INI_SIZE => "The file is larger than the server allows (upload_max_filesize = {$uploadMax}).",
+            UPLOAD_ERR_FORM_SIZE => 'The file exceeds the maximum size specified by the form.',
+            UPLOAD_ERR_PARTIAL => 'The file was only partially uploaded. Please try again.',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded. Please select a file and try again.',
+            UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder on the server. Contact support.',
+            UPLOAD_ERR_CANT_WRITE => 'Failed to write the file to disk. Please try again later.',
+            UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the upload. Contact support.',
+            default => "The file could not be uploaded (server limits: upload_max_filesize {$uploadMax}, post_max_size {$postMax}).",
+        };
+    }
+
+    /**
+     * Resolve a friendly message for upload failures.
+     */
+    protected function getUploadFailureMessage(): string
+    {
+        if ($this->uploadErrorMessage) {
+            return $this->uploadErrorMessage;
+        }
+
+        $file = $this->file('file');
+        if ($file instanceof UploadedFile && !$file->isValid()) {
+            return $this->resolveUploadErrorMessage($file);
+        }
+
+        $uploadMax = ini_get('upload_max_filesize');
+        $postMax = ini_get('post_max_size');
+
+        return "The file could not be uploaded (server limits: upload_max_filesize {$uploadMax}, post_max_size {$postMax}).";
     }
 
     /**

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('author_student_id')->nullable()->constrained('students')->nullOnDelete();
             $table->longText('message');
             $table->boolean('is_official_answer')->default(false);
-            $table->foreignId('attachment_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('upload_record_id')->nullable()->constrained('upload_records')->nullOnDelete();
             $table->timestamps();
             
             $table->index(['ticket_id', 'created_at']);

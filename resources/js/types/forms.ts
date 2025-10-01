@@ -209,7 +209,7 @@ export interface QueryReply {
     author_student_id?: number;
     message: string;
     is_official_answer: boolean;
-    attachment_id?: number;
+    upload_record_id?: number;
     created_at: string;
     author?: {
         type: 'student' | 'staff';
@@ -217,7 +217,17 @@ export interface QueryReply {
         name: string;
         student_id?: string;
     };
-    attachment?: Attachment;
+    attachment?: ReplyAttachment;
+}
+
+export interface ReplyAttachment {
+    id: number;
+    file_name: string;
+    filename: string;
+    size: number;
+    size_bytes?: number;
+    mime_type: string;
+    download_url: string;
 }
 
 export interface Role {

@@ -16,7 +16,7 @@ class QueryReply extends Model
         'author_student_id',
         'message',
         'is_official_answer',
-        'attachment_id',
+        'upload_record_id',
     ];
 
     protected $casts = [
@@ -50,9 +50,9 @@ class QueryReply extends Model
     /**
      * Get the attachment for the reply.
      */
-    public function attachment(): BelongsTo
+    public function uploadRecord(): BelongsTo
     {
-        return $this->belongsTo(Attachment::class);
+        return $this->belongsTo(UploadRecord::class);
     }
 
     /**

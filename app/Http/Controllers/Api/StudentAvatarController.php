@@ -89,6 +89,7 @@ class StudentAvatarController extends Controller
                 'url' => $url,
                 'hash' => hash_file('sha256', $file->getRealPath()),
                 'user_id' => $userId,
+                'student_id' => $student->id,
                 'metadata' => $metadata,
             ]);
 

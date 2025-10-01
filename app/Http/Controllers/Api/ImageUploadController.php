@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ImageUploadRequest;
 use App\Models\UploadRecord;
+use App\Models\Student;
+use App\Models\User;
 use App\Services\ImageUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,7 +35,8 @@ class ImageUploadController extends Controller
         try {
             $file = $request->file('file');
             $context = $request->input('context');
-            $userId = Auth::id();
+            $authUser = Auth::user();
+            $userId = $authUser instanceof User ? $authUser->id : null;
 
             // Prepare metadata from request
             $metadata = array_filter([
@@ -43,7 +46,13 @@ class ImageUploadController extends Controller
             ]);
 
             // Upload the file
-            $uploadRecord = $this->uploadService->upload($file, $context, $userId, $metadata);
+            $uploadRecord = $this->uploadService->upload(
+                $file,
+                $context,
+                $userId,
+                $authUser instanceof Student ? $authUser->id : null,
+                $metadata
+            );
 
             return response()->json([
                 'success' => true,
@@ -66,7 +75,7 @@ class ImageUploadController extends Controller
                 'context' => $request->input('context'),
                 'filename' => $request->file('file')?->getClientOriginalName(),
                 'error' => $e->getMessage(),
-                'user_id' => Auth::id(),
+                'user_id' => $userId,
             ]);
 
             return response()->json([
@@ -92,7 +101,8 @@ class ImageUploadController extends Controller
 
             $files = $request->file('files');
             $context = $request->input('context');
-            $userId = Auth::id();
+            $authUser = Auth::user();
+            $userId = $authUser instanceof User ? $authUser->id : null;
 
             // Prepare metadata from request
             $metadata = array_filter([
@@ -102,7 +112,13 @@ class ImageUploadController extends Controller
             ]);
 
             // Upload multiple files
-            $result = $this->uploadService->uploadMultiple($files, $context, $userId, $metadata);
+            $result = $this->uploadService->uploadMultiple(
+                $files,
+                $context,
+                $userId,
+                $authUser instanceof Student ? $authUser->id : null,
+                $metadata
+            );
 
             // Format successful uploads
             $successfulUploads = array_map(function ($uploadRecord) {
@@ -142,7 +158,7 @@ class ImageUploadController extends Controller
                 'context' => $request->input('context'),
                 'file_count' => count($request->file('files', [])),
                 'error' => $e->getMessage(),
-                'user_id' => Auth::id(),
+                'user_id' => $userId,
             ]);
 
             return response()->json([

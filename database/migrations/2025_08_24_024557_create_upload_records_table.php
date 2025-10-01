@@ -23,12 +23,22 @@ return new class extends Migration
             $table->text('url')->nullable(); // Public URL if applicable
             $table->string('hash')->nullable()->index(); // File hash for deduplication
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('student_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('response_id')->nullable()->constrained('responses')->onDelete('set null');
+            $table->foreignId('answer_id')->nullable()->constrained('answers')->onDelete('set null');
+            $table->foreignId('ticket_id')->nullable()->constrained('queries_tickets')->onDelete('set null');
+            $table->foreignId('reply_id')->nullable()->constrained('query_replies')->onDelete('set null');
             $table->json('metadata')->nullable(); // Additional metadata (dimensions, etc.)
             $table->timestamp('expires_at')->nullable(); // For temporary uploads
             $table->timestamps();
 
             // Indexes for common queries
             $table->index(['context', 'user_id']);
+            $table->index(['context', 'student_id']);
+            $table->index(['response_id']);
+            $table->index(['answer_id']);
+            $table->index(['ticket_id']);
+            $table->index(['reply_id']);
             $table->index(['created_at', 'context']);
             $table->index('expires_at');
         });
