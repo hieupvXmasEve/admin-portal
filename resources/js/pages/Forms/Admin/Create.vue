@@ -33,10 +33,10 @@ interface Props {
     questionTypes: Record<string, string>;
     visibilityLevels: Record<string, string>;
     scopeTypes: Record<string, string>;
+    errors: Record<string, string>;
 }
 
 const props = defineProps<Props>();
-
 // Form data
 const form = useForm({
     code: '',
@@ -118,21 +118,19 @@ const generateCode = () => {
         // chuẩn hóa và loại bỏ dấu
         const normalized = form.title
             .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')   // xóa dấu
-            .replace(/đ/g, 'd')                // thay "đ"
-            .replace(/Đ/g, 'D');               // thay "Đ"
+            .replace(/[\u0300-\u036f]/g, '') // xóa dấu
+            .replace(/đ/g, 'd') // thay "đ"
+            .replace(/Đ/g, 'D'); // thay "Đ"
 
         const code = normalized
             .toLowerCase()
-            .replace(/[^a-z0-9\s]/g, '')       // giữ lại chữ & số
-            .replace(/\s+/g, '_')              // đổi khoảng trắng thành "_"
+            .replace(/[^a-z0-9\s]/g, '') // giữ lại chữ & số
+            .replace(/\s+/g, '_') // đổi khoảng trắng thành "_"
             .substring(0, 50);
 
         form.code = code + '_' + Date.now().toString().slice(-6);
     }
 };
-
-
 
 const addBasicQuestion = () => {
     form.questions.push({
@@ -185,7 +183,7 @@ const previewForm = () => {
 watch(
     () => form.title,
     (newTitle) => {
-        if (newTitle ) {
+        if (newTitle) {
             generateCode();
         }
     },
@@ -247,20 +245,6 @@ watch(
                                             {{ form.errors.title }}
                                         </p>
                                     </div>
-
-                                    <div class="space-y-2">
-                                        <Label for="code">Form Code</Label>
-                                        <div class="flex space-x-2">
-                                            <Input id="code" v-model="form.code" placeholder="Form code" :error="form.errors.code" />
-                                            <Button type="button" variant="outline" @click="generateCode" :disabled="!form.title"> Generate </Button>
-                                        </div>
-                                        <p v-if="form.errors.code" class="text-destructive text-sm">
-                                            {{ form.errors.code }}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div class="space-y-2">
                                         <Label for="type">Form Type</Label>
                                         <Select v-model:model-value="form.type">
@@ -361,7 +345,7 @@ watch(
                                         </div>
 
                                         <div class="space-y-2">
-                                            <Label>Question Text</Label>
+                                            <Label>Question Text *</Label>
                                             <Textarea v-model="question.text" placeholder="Enter your question" rows="2" />
                                         </div>
 

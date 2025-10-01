@@ -88,6 +88,11 @@ class FileValidationService
     protected array $virusScanConfig;
 
     /**
+     * Config of the file currently being validated.
+     */
+    protected array $currentFileConfig = [];
+
+    /**
      * Constructor.
      */
     public function __construct()
@@ -105,15 +110,21 @@ class FileValidationService
      */
     public function validateFile(UploadedFile $file, array $config): void
     {
-        $this->validateBasicFile($file);
-        $this->validateFileSize($file, $config);
-        $this->validateMimeType($file, $config);
-        $this->validateExtension($file, $config);
-        $this->validateFileSignature($file);
-        $this->validateFileName($file);
-        $this->scanForMaliciousContent($file);
-        $this->performAdvancedSecurityChecks($file);
-        $this->scanForViruses($file);
+        $this->currentFileConfig = $config;
+
+        try {
+            $this->validateBasicFile($file);
+            $this->validateFileSize($file, $config);
+            $this->validateMimeType($file, $config);
+            $this->validateExtension($file, $config);
+            $this->validateFileSignature($file);
+            $this->validateFileName($file);
+            $this->scanForMaliciousContent($file);
+            $this->performAdvancedSecurityChecks($file);
+            $this->scanForViruses($file);
+        } finally {
+            $this->currentFileConfig = [];
+        }
     }
 
     /**
@@ -370,10 +381,19 @@ class FileValidationService
     {
         $content = file_get_contents($filePath, false, null, 0, 8192); // Read first 8KB
 
+        if ($content === false) {
+            throw new RuntimeException('Unable to read file for PHP code scan');
+        }
+
+        // Skip binary blobs (e.g. XLSX/ZIP) to avoid false positives from compressed data.
+        if (strpos($content, "\0") !== false) {
+            return;
+        }
+
         $phpPatterns = [
             '/<\?php/i',
             '/<\?=/i',
-            '/<\?/i',
+            '/<\?(?!xml)/i',
             '/<%/i',
         ];
 
@@ -478,8 +498,36 @@ class FileValidationService
         $header = fread($fileHandle, 512); // Read more bytes for comprehensive check
         fclose($fileHandle);
 
+        $allowedExtensions = array_map('strtolower', $this->currentFileConfig['allowed_extensions'] ?? []);
+        $allowedMimeTypes = array_map('strtolower', $this->currentFileConfig['allowed_types'] ?? []);
+
         foreach ($this->maliciousSignatures as $signature => $description) {
             if (strpos($header, $signature) === 0) {
+                if ($signature === 'PK') {
+                    $extension = strtolower($file->getClientOriginalExtension() ?? '');
+                    $mimeType = strtolower($file->getMimeType() ?? '');
+
+                    $zipBasedExtensions = ['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp'];
+                    $zipBasedMimeTypes = [
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                        'application/vnd.oasis.opendocument.text',
+                        'application/vnd.oasis.opendocument.spreadsheet',
+                        'application/vnd.oasis.opendocument.presentation',
+                    ];
+
+                    $zipIsAllowed = in_array($extension, $zipBasedExtensions, true)
+                        || in_array($mimeType, $zipBasedMimeTypes, true)
+                        || in_array('zip', $allowedExtensions, true)
+                        || in_array('application/zip', $allowedMimeTypes, true)
+                        || in_array('application/x-zip-compressed', $allowedMimeTypes, true);
+
+                    if ($zipIsAllowed) {
+                        continue;
+                    }
+                }
+
                 Log::warning('Malicious file signature detected', [
                     'filename' => $file->getClientOriginalName(),
                     'signature' => $description,

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\UploadRecord;
 
 class Answer extends Model
 {
@@ -57,7 +58,7 @@ class Answer extends Model
      */
     public function attachments(): HasMany
     {
-        return $this->hasMany(Attachment::class);
+        return $this->hasMany(UploadRecord::class, 'answer_id');
     }
 
     /**
@@ -69,22 +70,22 @@ class Answer extends Model
             case 'short_text':
             case 'long_text':
                 return $this->answer_text;
-            
+
             case 'number':
             case 'rating':
                 return $this->answer_number;
-            
+
             case 'date':
                 return $this->answer_date;
-            
+
             case 'single_choice':
             case 'multi_choice':
             case 'likert':
                 return $this->selectedOptions->pluck('label')->join(', ');
-            
+
             case 'yes_no':
                 return $this->answer_text === '1' ? 'Yes' : 'No';
-            
+
             default:
                 return $this->answer_text;
         }

@@ -63,6 +63,7 @@ class ChunkedUploadService
         int $fileSize,
         string $context,
         ?int $userId = null,
+        ?int $studentId = null,
         array $metadata = []
     ): array {
         // Validate file size
@@ -95,6 +96,7 @@ class ChunkedUploadService
             'uploaded_chunks' => [],
             'created_at' => now()->toISOString(),
             'expires_at' => now()->addMinutes($this->chunkExpiration)->toISOString(),
+            'student_id' => $studentId,
         ];
 
         $this->storeSessionData($uploadId, $sessionData);
@@ -106,6 +108,7 @@ class ChunkedUploadService
             'total_chunks' => $totalChunks,
             'context' => $context,
             'user_id' => $userId,
+            'student_id' => $studentId,
         ]);
 
         return [
@@ -266,6 +269,7 @@ class ChunkedUploadService
                 $uploadedFile,
                 $sessionData['context'],
                 $sessionData['user_id'],
+                $sessionData['student_id'] ?? null,
                 array_merge($sessionData['metadata'], ['chunked_upload' => true])
             );
 

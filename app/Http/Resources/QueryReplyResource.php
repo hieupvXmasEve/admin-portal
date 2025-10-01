@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Services\ImageUploadService;
 
 class QueryReplyResource extends JsonResource
 {
@@ -20,12 +21,8 @@ class QueryReplyResource extends JsonResource
             'message' => $this->message,
             'is_official_answer' => $this->is_official_answer,
             'attachment' => $this->when(
-                $this->relationLoaded('attachment') && $this->attachment,
-                fn() => [
-                    'id' => $this->attachment->id,
-                    'filename' => $this->attachment->file_name,
-                    'size' => $this->attachment->size_bytes,
-                ]
+                $this->relationLoaded('uploadRecord') && $this->uploadRecord,
+                fn() => $this->formatUploadRecord($this->uploadRecord)
             ),
             'created_at' => $this->created_at,
         ];
@@ -46,6 +43,23 @@ class QueryReplyResource extends JsonResource
             'type' => 'staff',
             'id' => $this->author_user_id,
             'name' => $this->whenLoaded('author', fn() => $this->author->name),
+        ];
+    }
+
+    protected function formatUploadRecord($uploadRecord): array
+    {
+        $uploadService = app(\App\Services\ImageUploadService::class);
+
+        $originalName = $uploadRecord->original_name ?? $uploadRecord->filename;
+
+        return [
+            'id' => $uploadRecord->id,
+            'file_name' => $originalName,
+            'filename' => $originalName,
+            'size' => $uploadRecord->size,
+            'size_bytes' => $uploadRecord->size,
+            'mime_type' => $uploadRecord->mime_type,
+            'download_url' => $uploadService->getUrl($uploadRecord),
         ];
     }
 }

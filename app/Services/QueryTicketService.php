@@ -2,18 +2,21 @@
 
 namespace App\Services;
 
-use App\Models\Attachment;
 use App\Models\Campus;
 use App\Models\QueryReply;
 use App\Models\QueryTicket;
 use App\Models\Student;
 use App\Models\User;
+use App\Models\UploadRecord;
+use App\Services\ImageUploadService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 class QueryTicketService
 {
+    public function __construct(private ImageUploadService $imageUploadService) {}
+
     /**
      * Get paginated query tickets for a campus with optional filters.
      */
@@ -96,7 +99,7 @@ class QueryTicketService
                 },
                 'replies' => function ($repliesQuery) {
                     $repliesQuery
-                        ->with(['author', 'authorStudent', 'attachment'])
+                        ->with(['author', 'authorStudent', 'uploadRecord'])
                         ->orderByDesc('created_at');
                 },
             ])
@@ -120,15 +123,27 @@ class QueryTicketService
     public function createReply(QueryTicket $ticket, User $author, array $data): QueryReply
     {
         return DB::transaction(function () use ($ticket, $author, $data) {
-            $attachment = $this->storeAttachment($ticket, $data['attachment'] ?? null);
+            $uploadRecord = $this->storeReplyUpload($ticket, $data['attachment'] ?? null, $author);
 
             /** @var QueryReply $reply */
             $reply = $ticket->replies()->create([
                 'author_user_id' => $author->id,
                 'message' => $data['message'],
                 'is_official_answer' => (bool) ($data['is_official_answer'] ?? false),
-                'attachment_id' => $attachment?->id,
+                'upload_record_id' => $uploadRecord?->id,
             ]);
+
+            if ($uploadRecord) {
+                $metadata = $uploadRecord->metadata ?? [];
+                $metadata['reply_id'] = $reply->id;
+                $metadata['ticket_id'] = $ticket->id;
+
+                $uploadRecord->update([
+                    'reply_id' => $reply->id,
+                    'ticket_id' => $ticket->id,
+                    'metadata' => $metadata,
+                ]);
+            }
 
             if ($reply->is_official_answer) {
                 $ticket->markAsAnswered();
@@ -136,7 +151,7 @@ class QueryTicketService
                 $ticket->update(['status' => QueryTicket::STATUS_PENDING, 'closed_at' => null]);
             }
 
-            return $reply->load(['author', 'authorStudent', 'attachment']);
+            return $reply->load(['author', 'authorStudent', 'uploadRecord']);
         });
     }
 
@@ -146,15 +161,27 @@ class QueryTicketService
     public function createStudentReply(QueryTicket $ticket, Student $student, array $data): QueryReply
     {
         return DB::transaction(function () use ($ticket, $student, $data) {
-            $attachment = $this->storeAttachment($ticket, $data['attachment'] ?? null);
+            $uploadRecord = $this->storeReplyUpload($ticket, $data['attachment'] ?? null, null, $student);
 
             /** @var QueryReply $reply */
             $reply = $ticket->replies()->create([
                 'author_student_id' => $student->id,
                 'message' => $data['message'],
                 'is_official_answer' => false,
-                'attachment_id' => $attachment?->id,
+                'upload_record_id' => $uploadRecord?->id,
             ]);
+
+            if ($uploadRecord) {
+                $metadata = $uploadRecord->metadata ?? [];
+                $metadata['reply_id'] = $reply->id;
+                $metadata['ticket_id'] = $ticket->id;
+
+                $uploadRecord->update([
+                    'reply_id' => $reply->id,
+                    'ticket_id' => $ticket->id,
+                    'metadata' => $metadata,
+                ]);
+            }
 
             if ($ticket->status !== QueryTicket::STATUS_CLOSED) {
                 $ticket->update([
@@ -163,7 +190,7 @@ class QueryTicketService
                 ]);
             }
 
-            return $reply->load(['authorStudent', 'attachment']);
+            return $reply->load(['authorStudent', 'uploadRecord']);
         });
     }
 
@@ -208,23 +235,30 @@ class QueryTicketService
     }
 
     /**
-     * Store attachment for a reply if provided.
+     * Store upload record for a reply if a file is provided.
      */
-    protected function storeAttachment(QueryTicket $ticket, ?UploadedFile $file): ?Attachment
-    {
+    protected function storeReplyUpload(
+        QueryTicket $ticket,
+        ?UploadedFile $file,
+        ?User $user = null,
+        ?Student $student = null
+    ): ?UploadRecord {
         if (!$file) {
             return null;
         }
 
-        $path = $file->store('query-replies/' . date('Y/m'), 'private');
-
-        return Attachment::create([
+        $metadata = array_filter([
+            'ticket_id' => $ticket->id,
             'response_id' => $ticket->response_id,
-            'storage_key' => $path,
-            'file_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getMimeType(),
-            'size_bytes' => $file->getSize(),
-            'uploaded_at' => now(),
+            'uploaded_by' => $user ? 'user' : 'student',
         ]);
+
+        return $this->imageUploadService->upload(
+            $file,
+            'form_attachment',
+            $user?->id,
+            $student?->id,
+            $metadata
+        );
     }
 }

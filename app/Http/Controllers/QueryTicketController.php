@@ -10,6 +10,7 @@ use App\Services\QueryTicketService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\File;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -83,7 +84,7 @@ class QueryTicketController extends Controller
             },
             'replies.author',
             'replies.authorStudent',
-            'replies.attachment',
+            'replies.uploadRecord',
         ]);
 
         return Inertia::render('Forms/Review/Queries/Show', [
@@ -94,11 +95,38 @@ class QueryTicketController extends Controller
 
     public function storeReply(Request $request, QueryTicket $ticket): RedirectResponse
     {
+        $contextConfig = config('uploads.contexts.form_attachment', config('uploads.defaults'));
+        $maxSize = (int) ($contextConfig['max_size'] ?? config('uploads.defaults.max_size', 10240));
+        $allowedExtensions = array_values(array_unique($contextConfig['allowed_extensions'] ?? []));
+        $allowedMimeTypes = array_values(array_unique($contextConfig['allowed_types'] ?? []));
+
+        if (empty($allowedExtensions)) {
+            $allowedExtensions = array_values(array_unique(config('uploads.defaults.allowed_extensions', [])));
+        }
+
+        if (empty($allowedMimeTypes)) {
+            $allowedMimeTypes = array_values(array_unique(config('uploads.defaults.allowed_types', [])));
+        }
+
+        $fileRule = !empty($allowedExtensions)
+            ? File::types($allowedExtensions)->max($maxSize)
+            : File::default()->max($maxSize);
+
+        $attachmentRules = ['nullable', 'file', $fileRule];
+
+        if (!empty($allowedExtensions)) {
+            $attachmentRules[] = 'mimes:' . implode(',', $allowedExtensions);
+        }
+
+        if (!empty($allowedMimeTypes)) {
+            $attachmentRules[] = 'mimetypes:' . implode(',', $allowedMimeTypes);
+        }
+
         $validated = $request->validate([
             'message' => ['required', 'string'],
             'is_official_answer' => ['sometimes', 'boolean'],
             'set_pending' => ['sometimes', 'boolean'],
-            'attachment' => ['nullable', 'file', 'max:10240'],
+            'attachment' => $attachmentRules,
         ]);
 
         $reply = $this->queryTicketService->createReply(

@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\Student\ProfileController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
 use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Api\WalletTransactionController;
+use App\Http\Controllers\Api\ImageUploadController;
 use Illuminate\Support\Facades\Route;
 
 // Public authentication routes
@@ -199,6 +200,13 @@ Route::middleware([
             Route::get('/', [QueryTicketController::class, 'index'])->name('index');
             Route::get('/{ticket}', [QueryTicketController::class, 'show'])->name('show');
             Route::post('/{ticket}/replies', [QueryTicketController::class, 'storeReply'])->name('replies.store');
+        });
+
+        // Student-controlled uploads
+        Route::prefix('uploads')->name('uploads.')->group(function () {
+            Route::post('/', [ImageUploadController::class, 'upload'])
+                // ->middleware(['throttle:uploads-single'])
+                ->name('store');
         });
 
         // Wallet endpoints

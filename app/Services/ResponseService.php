@@ -13,10 +13,13 @@ use App\Models\QueryTicket;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use App\Services\ImageUploadService;
 
 class ResponseService
 {
+    public function __construct(private ImageUploadService $imageUploadService)
+    {
+    }
     /**
      * Submit a form response.
      */
@@ -115,7 +118,7 @@ class ResponseService
             case 'file':
                 // Handle file uploads separately
                 if (isset($answerData['file']) && $answerData['file'] instanceof UploadedFile) {
-                    $this->handleFileUpload($answer, $answerData['file']);
+                    $this->handleFileUpload($answer, $answerData['file'], $response);
                 }
                 break;
         }
@@ -133,17 +136,24 @@ class ResponseService
     /**
      * Handle file upload for an answer.
      */
-    protected function handleFileUpload(Answer $answer, UploadedFile $file): void
+    protected function handleFileUpload(Answer $answer, UploadedFile $file, FormResponse $response): void
     {
-        $path = $file->store('form-attachments/' . date('Y/m'), 'private');
+        $metadata = [
+            'response_id' => $response->id,
+            'answer_id' => $answer->id,
+        ];
 
-        $answer->attachments()->create([
-            'storage_key' => $path,
-            'file_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getMimeType(),
-            'size_bytes' => $file->getSize(),
-            'uploaded_at' => now(),
-        ]);
+        if ($response->submitted_by_student_id) {
+            $metadata['student_id'] = $response->submitted_by_student_id;
+        }
+
+        $this->imageUploadService->upload(
+            $file,
+            'form_attachment',
+            null,
+            $response->submitted_by_student_id,
+            $metadata
+        );
     }
 
     /**

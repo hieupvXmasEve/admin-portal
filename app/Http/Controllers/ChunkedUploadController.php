@@ -7,6 +7,7 @@ use App\Http\Requests\ChunkedUploadRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use App\Models\Student;
 
 class ChunkedUploadController extends Controller
 {
@@ -33,11 +34,22 @@ class ChunkedUploadController extends Controller
         ]);
 
         try {
+            $authUser = auth()->user();
+            $userId = null;
+            $studentId = null;
+
+            if ($authUser instanceof Student) {
+                $studentId = $authUser->id;
+            } else {
+                $userId = $authUser?->id;
+            }
+
             $result = $this->chunkedUploadService->initializeUpload(
                 $request->input('filename'),
                 $request->input('file_size'),
                 $request->input('context'),
-                auth()->id(),
+                $userId,
+                $studentId,
                 $request->input('metadata', [])
             );
 
