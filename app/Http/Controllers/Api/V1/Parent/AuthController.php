@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1\Parent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Parent\LoginRequest;
 use App\Http\Requests\Api\V1\Parent\RegisterRequest;
+use App\Http\Requests\Api\V1\Student\GoogleLoginRequest;
 use App\Http\Responses\ApiResponse;
 use App\Models\User;
 use App\Services\Parent\ParentAuthService;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Google\Client;
 
 class AuthController extends Controller
 {
@@ -118,20 +120,9 @@ class AuthController extends Controller
         return ApiResponse::success(data: null, message: 'Logged out successfully');
     }
 
-    public function loginWithGoogle(Request $request): JsonResponse
+    public function loginWithGoogle(GoogleLoginRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'access_token' => 'required|string',
-            'device_name' => 'nullable|string|max:255',
-        ]);
-
-        if ($validator->fails()) {
-            Log::debug('[ParentAuth] Google login validation failed', [
-                'ip' => $request->ip(),
-                'errors' => $validator->errors()->toArray(),
-            ]);
-            return ApiResponse::validationError($validator->errors()->toArray());
-        }
+        $key = 'google-login:' . $request->ip();
 
         try {
             Log::debug('[ParentAuth] Google login attempt started', [
@@ -139,33 +130,48 @@ class AuthController extends Controller
                 'user_agent' => $request->userAgent(),
                 'device_name' => $request->input('device_name'),
             ]);
-            // Validate Google access token
-            $response = Http::withToken($request->access_token)
-                ->get('https://www.googleapis.com/oauth2/v1/userinfo');
-
-            if ($response->failed()) {
-                Log::warning('[ParentAuth] Google userinfo request failed', [
-                    'ip' => $request->ip(),
-                    'status' => $response->status(),
-                    'reason' => $response->reason(),
-                ]);
-                return ApiResponse::authenticationError('Invalid Google access token');
-            }
-
-            $googleUserData = $response->json();
-            Log::debug('[ParentAuth] Google userinfo response received', [
-                'ip' => $request->ip(),
-                'status' => $response->status(),
-                'has_email' => isset($googleUserData['email']),
+            // Initialize Google Client and verify ID token
+            $client = new Client([
+                'client_id' => config('services.google.client_id'),
             ]);
+            // Validate Google access token
+            // $response = Http::withToken($request->access_token)
+            //     ->get('https://www.googleapis.com/oauth2/v1/userinfo');
+            $payload = $client->verifyIdToken($request->id_token);
 
-            if (! $googleUserData || ! isset($googleUserData['email'])) {
-                Log::warning('[ParentAuth] Google userinfo missing email', [
+            if (!$payload) {
+                //                RateLimiter::hit($key, 300); // 5 minutes
+                Log::warning('[StudentAuth] Google ID token verification failed', [
                     'ip' => $request->ip(),
                 ]);
-                return ApiResponse::authenticationError('Unable to retrieve user information from Google');
+                return ApiResponse::authenticationError('Invalid Google ID token');
             }
 
+            // Extract user data from the verified payload
+            $googleUserData = [
+                'id' => $payload['sub'],
+                'email' => $payload['email'] ?? null,
+                'name' => $payload['name'] ?? null,
+                'picture' => $payload['picture'] ?? null,
+                'email_verified' => $payload['email_verified'] ?? false,
+            ];
+            // Validate required user data
+            if (!$googleUserData['email']) {
+                RateLimiter::hit($key, 300);
+                Log::warning('[ParentAuth] Google user data missing email', [
+                    'ip' => $request->ip(),
+                ]);
+                return ApiResponse::authenticationError('Unable to retrieve email from Google account');
+            }
+
+            if (!$googleUserData['email_verified']) {
+                RateLimiter::hit($key, 300);
+                Log::warning('[StudentAuth] Google account email not verified', [
+                    'ip' => $request->ip(),
+                    'email' => $googleUserData['email'],
+                ]);
+                return ApiResponse::authenticationError('Google account email is not verified');
+            }
             // Find user by email
             $user = User::where('email', $googleUserData['email'])->first();
             Log::debug('[ParentAuth] Parent lookup by email', [
@@ -174,7 +180,7 @@ class AuthController extends Controller
                 'found' => (bool) $user,
                 'user_id' => $user?->id,
             ]);
-            if (! $user) {
+            if (!$user) {
                 Log::warning('[ParentAuth] Parent account not found for Google email', [
                     'ip' => $request->ip(),
                     'email' => $googleUserData['email'],
