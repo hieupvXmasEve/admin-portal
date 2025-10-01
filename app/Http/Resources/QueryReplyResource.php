@@ -16,10 +16,7 @@ class QueryReplyResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'author' => [
-                'id' => $this->author_user_id,
-                'name' => $this->whenLoaded('author', fn() => $this->author->name),
-            ],
+            'author' => $this->resolveAuthor(),
             'message' => $this->message,
             'is_official_answer' => $this->is_official_answer,
             'attachment' => $this->when(
@@ -31,6 +28,24 @@ class QueryReplyResource extends JsonResource
                 ]
             ),
             'created_at' => $this->created_at,
+        ];
+    }
+
+    protected function resolveAuthor(): array
+    {
+        if ($this->author_student_id) {
+            return [
+                'type' => 'student',
+                'id' => $this->author_student_id,
+                'name' => $this->whenLoaded('authorStudent', fn() => $this->authorStudent->full_name),
+                'student_id' => $this->whenLoaded('authorStudent', fn() => $this->authorStudent->student_id),
+            ];
+        }
+
+        return [
+            'type' => 'staff',
+            'id' => $this->author_user_id,
+            'name' => $this->whenLoaded('author', fn() => $this->author->name),
         ];
     }
 }

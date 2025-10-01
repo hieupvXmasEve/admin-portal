@@ -155,7 +155,7 @@ class ResponseService
             'response_id' => $response->id,
             'topic_id' => $data['topic_id'] ?? null,
             'custom_topic_text' => $data['custom_topic_text'] ?? null,
-            'status' => 'open',
+            'status' => QueryTicket::STATUS_OPEN,
             'priority' => $data['priority'] ?? 'normal',
         ]);
     }

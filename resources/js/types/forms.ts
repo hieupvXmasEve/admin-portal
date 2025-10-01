@@ -109,7 +109,12 @@ export interface FormResponse {
     id: number;
     form_id: number;
     form_version_id: number;
+    form?: Form;
     campus_id?: number;
+    campus?: {
+        id?: number;
+        name?: string;
+    };
     target_scope_type: ScopeType;
     target_scope_id?: number;
     submitted_by_student_id?: number;
@@ -131,6 +136,7 @@ export interface FormResponse {
         id: number;
         name: string;
     };
+    content_preview?: string;
 }
 
 export type ResponseStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
@@ -161,6 +167,7 @@ export interface Attachment {
     is_image?: boolean;
     is_document?: boolean;
     extension?: string;
+    download_url?: string;
 }
 
 export interface QueryTicket {
@@ -174,6 +181,7 @@ export interface QueryTicket {
     created_at: string;
     updated_at: string;
     closed_at?: string;
+    can_reply?: boolean;
     response?: FormResponse;
     topic?: QueryTopic;
     assigned_to?: {
@@ -197,14 +205,17 @@ export interface QueryTopic {
 export interface QueryReply {
     id: number;
     ticket_id: number;
-    author_user_id: number;
+    author_user_id?: number;
+    author_student_id?: number;
     message: string;
     is_official_answer: boolean;
     attachment_id?: number;
     created_at: string;
     author?: {
+        type: 'student' | 'staff';
         id: number;
         name: string;
+        student_id?: string;
     };
     attachment?: Attachment;
 }

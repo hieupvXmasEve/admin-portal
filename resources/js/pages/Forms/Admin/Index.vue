@@ -223,7 +223,7 @@ const columns: ColumnDef<Form>[] = [
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div class="flex flex-wrap items-center gap-4">
                     <!-- Search -->
                     <div class="space-y-2">
                         <label class="text-sm font-medium">Search</label>
@@ -266,7 +266,7 @@ const columns: ColumnDef<Form>[] = [
                     </div>
 
                     <!-- Campus Filter -->
-                    <div class="space-y-2">
+                    <!-- <div class="space-y-2">
                         <label class="text-sm font-medium">Campus</label>
                         <Select v-model:model-value="selectedCampus">
                             <SelectTrigger>
@@ -279,12 +279,10 @@ const columns: ColumnDef<Form>[] = [
                                 </SelectItem>
                             </SelectContent>
                         </Select>
+                    </div> -->
+                    <div class="">
+                        <Button variant="outline" @click="clearFilters">Clear</Button>
                     </div>
-                </div>
-
-                <div class="mt-4 flex gap-2">
-                    <Button @click="applyFilters">Apply Filters</Button>
-                    <Button variant="outline" @click="clearFilters">Clear</Button>
                 </div>
             </CardContent>
         </Card>

@@ -13,6 +13,7 @@ class QueryReply extends Model
     protected $fillable = [
         'ticket_id',
         'author_user_id',
+        'author_student_id',
         'message',
         'is_official_answer',
         'attachment_id',
@@ -36,6 +37,14 @@ class QueryReply extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_user_id');
+    }
+
+    /**
+     * Get the student author of the reply.
+     */
+    public function authorStudent(): BelongsTo
+    {
+        return $this->belongsTo(Student::class, 'author_student_id');
     }
 
     /**

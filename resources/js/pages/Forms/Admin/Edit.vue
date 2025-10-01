@@ -45,8 +45,8 @@ const editForm = useForm({
     status: props.form.status,
     effective_from: '',
     effective_to: '',
-    sections: props.form.current_version?.sections || [],
-    questions: props.form.current_version?.questions?.filter((q) => !q.section_id) || [],
+    sections: props.form.versions?.[props.form.versions.length - 1]?.sections || [],
+    questions: props.form.versions?.[props.form.versions.length - 1]?.questions?.filter((q) => !q.section_id) || [],
     visibility_roles: props.form.visibility_roles?.map((role) => role.id) || [],
     result_visibility: props.form.result_visibility || [],
     targets: props.form.targets || [],
@@ -54,7 +54,7 @@ const editForm = useForm({
 
 // Local state
 const currentTab = ref('basic');
-const useAdvancedBuilder = ref((props.form.current_version?.sections?.length || 0) > 0);
+// const useAdvancedBuilder = ref((props.form.versions?.[props.form.versions.length - 1]?.sections?.length || 0) > 0);
 const showPreview = ref(false);
 
 // Computed
@@ -276,9 +276,9 @@ if (props.form.current_version?.questions) {
                             <CardHeader>
                                 <CardTitle class="flex items-center justify-between">
                                     Questions
-<!--                                    <div class="flex space-x-2">-->
-<!--                                        <Button variant="outline" size="sm" @click="useAdvancedBuilder = !useAdvancedBuilder"> {{ useAdvancedBuilder ? 'Simple' : 'Advanced' }} Builder </Button>-->
-<!--                                    </div>-->
+                                    <!--                                    <div class="flex space-x-2">-->
+                                    <!--                                        <Button variant="outline" size="sm" @click="useAdvancedBuilder = !useAdvancedBuilder"> {{ useAdvancedBuilder ? 'Simple' : 'Advanced' }} Builder </Button>-->
+                                    <!--                                    </div>-->
                                 </CardTitle>
                                 <CardDescription>Modify your form questions and structure</CardDescription>
                             </CardHeader>

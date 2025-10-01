@@ -41,7 +41,7 @@ class FormController extends Controller
         });
 
         return Inertia::render('Forms/Review/Index', [
-            'forms' => FormResource::collection($forms),
+            'forms' => FormResource::collection($forms)->resolve($request),
             'campus' => $campus,
         ]);
     }

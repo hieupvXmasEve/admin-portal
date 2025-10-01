@@ -10,6 +10,7 @@ use App\Models\FormResponse;
 use App\Models\Form;
 use App\Models\Campus;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class FormReviewController extends Controller
@@ -31,27 +32,24 @@ class FormReviewController extends Controller
         $responses = $this->responseService->getResponsesForReview($user, $campus, $filters);
 
         // Get forms for filter dropdown
+        $userRoleIds = $user->campusUserRoles()->pluck('role_id');
+
         $forms = Form::active()
-            ->whereHas('resultVisibility', function ($query) use ($user) {
-                $query->whereHas('role', function ($q) use ($user) {
-                    $q->whereIn('id', $user->campusUserRoles()->pluck('role_id'));
-                });
+            ->where(function ($query) use ($userRoleIds) {
+                $query->whereDoesntHave('resultVisibility')
+                    ->orWhereHas('resultVisibility', function ($visibilityQuery) use ($userRoleIds) {
+                        $visibilityQuery->whereHas('role', function ($roleQuery) use ($userRoleIds) {
+                            $roleQuery->whereIn('id', $userRoleIds);
+                        });
+                    });
             })
             ->get();
-
+        Log::info('Forms', ['forms' => $forms]);
         return Inertia::render('Forms/Review/Index', [
             'responses' => FormResponseResource::collection($responses),
-            'forms' => FormResource::collection($forms),
+            'forms' => FormResource::collection($forms)->resolve($request),
             'filters' => $filters,
             'campus' => $campus,
-        ]);
-    }
-    public function test(Request $request)
-    {
-        $user = auth()->user();
-//        $campus = $campus = Campus::findOrFail();
-        return Inertia::render('Forms/Review/Test', [
-
         ]);
     }
 
@@ -60,13 +58,6 @@ class FormReviewController extends Controller
      */
     public function show(FormResponse $response)
     {
-        $user = auth()->user();
-
-        // Check permission
-        if (!$response->canBeReviewedBy($user)) {
-            abort(403, 'You do not have permission to review this response.');
-        }
-
         // Load relationships
         $response->load([
             'form.latestPublishedVersion.questions.options',
