@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
 use App\Http\Controllers\Api\V1\Student\EventController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
+use App\Http\Controllers\Api\V1\Student\QueryTicketController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\ProfileController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
@@ -191,6 +192,13 @@ Route::middleware([
             Route::get('/', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'index'])->name('index');
             Route::get('/{form}', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'show'])->name('show');
             Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
+        });
+
+        // Query ticket endpoints
+        Route::prefix('queries')->name('queries.')->group(function () {
+            Route::get('/', [QueryTicketController::class, 'index'])->name('index');
+            Route::get('/{ticket}', [QueryTicketController::class, 'show'])->name('show');
+            Route::post('/{ticket}/replies', [QueryTicketController::class, 'storeReply'])->name('replies.store');
         });
 
         // Wallet endpoints

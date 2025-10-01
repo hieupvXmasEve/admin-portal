@@ -144,8 +144,8 @@ class FormResponse extends Model
     public function canBeReviewedBy(User $user): bool
     {
         // Check if user has appropriate role in the campus
-        $allowedRoles = ['advisor', 'instructor', 'qa', 'admin'];
-        
+        $allowedRoles = ['admin'];
+
         return $user->campusUserRoles()
             ->where('campus_id', $this->campus_id)
             ->whereHas('role', function ($query) use ($allowedRoles) {

@@ -14,7 +14,8 @@ return new class extends Migration
         Schema::create('query_replies', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ticket_id')->constrained('queries_tickets')->cascadeOnDelete();
-            $table->foreignId('author_user_id')->constrained('users');
+            $table->foreignId('author_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('author_student_id')->nullable()->constrained('students')->nullOnDelete();
             $table->longText('message');
             $table->boolean('is_official_answer')->default(false);
             $table->foreignId('attachment_id')->nullable()->constrained()->nullOnDelete();

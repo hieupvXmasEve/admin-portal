@@ -11,6 +11,22 @@ class QueryTicket extends Model
 {
     use HasFactory;
 
+    public const STATUS_OPEN = 'open';
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_ANSWERED = 'answered';
+    public const STATUS_CLOSED = 'closed';
+
+    public const STATUSES = [
+        self::STATUS_OPEN,
+        self::STATUS_PENDING,
+        self::STATUS_ANSWERED,
+        self::STATUS_CLOSED,
+    ];
+
+    public const PRIORITY_LOW = 'low';
+    public const PRIORITY_NORMAL = 'normal';
+    public const PRIORITY_HIGH = 'high';
+
     protected $table = 'queries_tickets';
 
     protected $fillable = [
@@ -58,7 +74,7 @@ class QueryTicket extends Model
      */
     public function replies(): HasMany
     {
-        return $this->hasMany(QueryReply::class, 'ticket_id')->orderBy('created_at');
+        return $this->hasMany(QueryReply::class, 'ticket_id')->orderByDesc('created_at');
     }
 
     /**
@@ -67,7 +83,7 @@ class QueryTicket extends Model
     public function close(): void
     {
         $this->update([
-            'status' => 'closed',
+            'status' => self::STATUS_CLOSED,
             'closed_at' => now(),
         ]);
     }
@@ -78,7 +94,7 @@ class QueryTicket extends Model
     public function reopen(): void
     {
         $this->update([
-            'status' => 'open',
+            'status' => self::STATUS_OPEN,
             'closed_at' => null,
         ]);
     }
@@ -88,7 +104,10 @@ class QueryTicket extends Model
      */
     public function markAsAnswered(): void
     {
-        $this->update(['status' => 'answered']);
+        $this->update([
+            'status' => self::STATUS_ANSWERED,
+            'closed_at' => null,
+        ]);
     }
 
     /**

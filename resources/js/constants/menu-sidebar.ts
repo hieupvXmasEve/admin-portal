@@ -286,20 +286,20 @@ export const mainNavItems: NavItem[] = [
                 title: 'Form Management',
                 href: '/forms/admin',
                 icon: FormInput,
-                // requiredPermissions: ['view_form'], // Will be implemented later
+                requiredPermissions: ['view_form'], // Will be implemented later
             },
             {
-                title: 'Response Review',
-                href: '/forms/review',
+                title: 'Queries',
+                href: '/forms/queries',
                 icon: ClipboardCheck,
-                // requiredPermissions: ['review_form'], // Will be implemented later
+                requiredPermissions: ['review_form'], // Will be implemented later
             },
-            {
-                title: 'Analytics',
-                href: '/forms/analytics',
-                icon: BarChart3,
-                // requiredPermissions: ['view_form_analytics'], // Will be implemented later
-            },
+            // {
+            //     title: 'Analytics',
+            //     href: '/forms/analytics',
+            //     icon: BarChart3,
+            //     requiredPermissions: ['view_form_analytics'], // Will be implemented later
+            // },
         ],
     },
     // {
