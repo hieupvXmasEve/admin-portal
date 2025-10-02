@@ -48,7 +48,7 @@ class StudentWallet extends Model
      */
     public function transactions(): HasMany
     {
-        return $this->hasMany(WalletTransaction::class, 'student_id', 'student_id')
+        return $this->hasMany(GoldTransaction::class, 'student_id', 'student_id')
             ->orderBy('created_at', 'desc');
     }
 

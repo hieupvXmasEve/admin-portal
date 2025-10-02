@@ -23,6 +23,7 @@ return new class extends Migration
                 'assessment_deadline',
                 'system_announcement',
                 'reminder',
+                'event_publication',
                 'all'
             ])->comment('Type of notification');
             $table->boolean('is_enabled')->default(true)->comment('Whether this notification type is enabled');

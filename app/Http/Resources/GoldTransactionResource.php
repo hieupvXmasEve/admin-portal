@@ -5,7 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class WalletTransactionResource extends JsonResource
+class GoldTransactionResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
@@ -31,7 +31,7 @@ class WalletTransactionResource extends JsonResource
             'created_at' => $this->created_at,
             'formatted_created_at' => $this->created_at?->format('M j, Y g:i A'),
             'time_ago' => $this->created_at?->diffForHumans(),
-            
+
             // Include student data when loaded
             'student' => $this->whenLoaded('student', function () {
                 return [
@@ -41,10 +41,10 @@ class WalletTransactionResource extends JsonResource
                     'email' => $this->student->email,
                 ];
             }),
-            
+
             // Transaction display helpers
-            'display_amount' => $this->isPositive() ? 
-                '+' . number_format($this->amount, 2) : 
+            'display_amount' => $this->isPositive() ?
+                '+' . number_format($this->amount, 2) :
                 number_format($this->amount, 2),
             'amount_class' => $this->isPositive() ? 'text-green-600' : 'text-red-600',
             'type_color' => match ($this->type) {

@@ -13,7 +13,6 @@ use App\Http\Controllers\Web\StudentApplicationController as WebStudentApplicati
 use App\Http\Controllers\Web\StudentController as WebStudentController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\Api\StudentWalletController;
-use App\Http\Controllers\Api\WalletTransactionController;
 use Illuminate\Support\Facades\Route;
 
 // Public authentication routes (Password-based login only - Google login moved to specific controllers)
@@ -151,18 +150,7 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
             Route::post('/adjust', [StudentWalletController::class, 'adjustBalance'])->name('adjust');
             // Route::post('/check-balance', [StudentWalletController::class, 'checkBalance'])->name('check-balance');
 
-            // Student transaction endpoints
-            // Route::prefix('transactions')->name('transactions.')->group(function () {
-            //     Route::get('/', [WalletTransactionController::class, 'indexForStudent'])->name('index');
-            //     Route::get('/recent', [WalletTransactionController::class, 'recentForStudent'])->name('recent');
-            //     Route::get('/stats', [WalletTransactionController::class, 'statsForStudent'])->name('stats');
-            // });
         });
-
-        // General transaction management
-        // Route::prefix('transactions')->name('transactions.')->group(function () {
-        //     Route::get('/{transaction}', [WalletTransactionController::class, 'show'])->name('show');
-        // });
     });
 });
 

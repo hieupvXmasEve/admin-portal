@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Api\StudentWalletController;
-use App\Http\Controllers\Api\WalletTransactionController;
+use App\Http\Controllers\Api\GoldTransactionController;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Services\StudentAcademicSummaryService;
@@ -29,7 +29,7 @@ class StudentAcademicSummaryController extends Controller
     public function __construct(
         private StudentAcademicSummaryService $academicSummaryService,
         private StudentWalletController $studentWalletController,
-        private WalletTransactionController $walletTransactionController
+        private GoldTransactionController $goldTransactionController
     ) {
         $this->middleware('can:view_student_summary')->only([
             'show',
@@ -211,11 +211,11 @@ class StudentAcademicSummaryController extends Controller
         $walletData = $walletSummary->getData(true);
 
         // Get recent transactions
-        $recentTransactions = $this->walletTransactionController->recentForStudent($student, $request);
+        $recentTransactions = $this->goldTransactionController->recentForStudent($student, $request);
         $recentTransactionsData = $recentTransactions->getData(true);
 
         // Get transaction stats
-        $transactionStats = $this->walletTransactionController->statsForStudent($student);
+        $transactionStats = $this->goldTransactionController->statsForStudent($student);
         $transactionStatsData = $transactionStats->getData(true);
 
         return Inertia::render('students/AcademicSummary/Wallet', [

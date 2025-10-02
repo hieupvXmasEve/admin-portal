@@ -5,17 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AdjustWalletBalanceRequest;
 use App\Http\Resources\StudentWalletResource;
-use App\Http\Resources\WalletTransactionResource;
+use App\Http\Resources\GoldTransactionResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Student;
-use App\Services\WalletService;
+use App\Services\GoldService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class StudentWalletController extends Controller
 {
-    public function __construct(private WalletService $walletService)
+    public function __construct(private GoldService $goldService)
     {
         // Middleware will be applied via routes
     }
@@ -27,7 +27,7 @@ class StudentWalletController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        $wallet = $this->walletService->getOrCreateWallet($student);
+        $wallet = $this->goldService->getOrCreateWallet($student);
 
         return ApiResponse::success(
             new StudentWalletResource($wallet->load('student')),
@@ -42,13 +42,13 @@ class StudentWalletController extends Controller
     {
         /** @var \App\Models\Student $student */
         $student = $request->user();
-        $summary = $this->walletService->getWalletSummary($student);
+        $summary = $this->goldService->getWalletSummary($student);
 
         return ApiResponse::success(
             [
                 'wallet' => new StudentWalletResource($summary['wallet']),
                 'stats' => $summary['stats'],
-                'recent_transactions' => WalletTransactionResource::collection($summary['recent_transactions']),
+                'recent_transactions' => GoldTransactionResource::collection($summary['recent_transactions']),
             ],
             message: 'Wallet summary retrieved successfully'
         );
@@ -59,7 +59,7 @@ class StudentWalletController extends Controller
      */
     public function showStudent(Student $student): JsonResponse
     {
-        $wallet = $this->walletService->getOrCreateWallet($student);
+        $wallet = $this->goldService->getOrCreateWallet($student);
 
         return ApiResponse::success(
             new StudentWalletResource($wallet->load('student')),
@@ -72,13 +72,13 @@ class StudentWalletController extends Controller
      */
     public function summaryForStudent(Student $student): JsonResponse
     {
-        $summary = $this->walletService->getWalletSummary($student);
+        $summary = $this->goldService->getWalletSummary($student);
 
         return ApiResponse::success(
             [
                 'wallet' => new StudentWalletResource($summary['wallet']),
                 'stats' => $summary['stats'],
-                'recent_transactions' => WalletTransactionResource::collection($summary['recent_transactions']),
+                'recent_transactions' => GoldTransactionResource::collection($summary['recent_transactions']),
             ],
             message: 'Student wallet summary retrieved successfully'
         );
@@ -95,7 +95,7 @@ class StudentWalletController extends Controller
         $user = Auth::user();
 
         try {
-            $transaction = $this->walletService->adjustBalance(
+            $transaction = $this->goldService->adjustBalance(
                 $student,
                 $validated['amount'],
                 $validated['notes'],
@@ -106,7 +106,7 @@ class StudentWalletController extends Controller
 
             return ApiResponse::success(
                 [
-                    'transaction' => new WalletTransactionResource($transaction),
+                    'transaction' => new GoldTransactionResource($transaction),
                     'wallet' => new StudentWalletResource($wallet),
                 ],
                 message: 'Wallet balance adjusted successfully'
@@ -128,12 +128,12 @@ class StudentWalletController extends Controller
             'amount' => 'required|numeric|min:0.01',
         ]);
 
-        $hasSufficient = $this->walletService->hasSufficientBalance(
+        $hasSufficient = $this->goldService->hasSufficientBalance(
             $student,
             $validated['amount']
         );
 
-        $currentBalance = $this->walletService->getBalance($student);
+        $currentBalance = $this->goldService->getBalance($student);
 
         return ApiResponse::success(
             [

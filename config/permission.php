@@ -278,26 +278,10 @@ return [
             'view_any_student_wallet' => 'view_any_student_wallet',
             'adjust_wallet_balance' => 'adjust_wallet_balance',
         ],
-        'wallet_transactions' => [
-            'view_wallet_transaction' => 'view_wallet_transaction',
-            'view_any_wallet_transaction' => 'view_any_wallet_transaction',
+        'gold_transactions' => [
+            'view_gold_transaction' => 'view_gold_transaction',
+            'view_any_gold_transaction' => 'view_any_gold_transaction',
         ]
-    ],
-
-    // Simplified module structure
-    'modules' => [
-        'user_management' => ['users', 'roles', 'permissions', 'campuses'],
-        'academic_management' => ['programs', 'units', 'curriculum_versions', 'curriculum_units', 'syllabus'],
-        'scheduling' => ['semesters', 'rooms', 'courses'],
-        'student_management' => ['students', 'student_applications'],
-        'student_activities' => ['groups', 'events', 'clubs'],
-        'attendance_management' => ['attendance'],
-        'grading_system' => ['grades', 'assessments'],
-        'financial' => ['fees'],
-        'reporting' => ['queries', 'reports'],
-        'teaching' => ['teaching_assignments', 'lecturers'],
-        'email_management' => ['email_configurations', 'email_templates', 'email_sending', 'email_logs', 'email_preferences'],
-        'wallet_management' => ['student_wallets', 'wallet_transactions'],
     ],
 
     'actions' => [

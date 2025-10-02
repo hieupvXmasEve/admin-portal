@@ -8,7 +8,7 @@ use App\Models\Event;
 use App\Models\EventParticipant;
 use App\Models\Student;
 use App\Models\User;
-use App\Models\WalletTransaction;
+use App\Models\GoldTransaction;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +18,7 @@ use InvalidArgumentException;
 class EventParticipationService
 {
     public function __construct(
-        private WalletService $walletService,
+        private GoldService $GoldService,
         private NotificationService $notificationService
     ) {}
 
@@ -211,10 +211,10 @@ class EventParticipationService
 
             try {
                 // Award gold through wallet service
-                $transaction = $this->walletService->addGold(
+                $transaction = $this->GoldService->addGold(
                     $student,
                     $goldAmount,
-                    WalletTransaction::SOURCE_EVENT,
+                    GoldTransaction::SOURCE_EVENT,
                     $event->id,
                     "Gold reward for attending event: {$event->title}"
                 );
@@ -298,7 +298,7 @@ class EventParticipationService
     /**
      * Enhanced audit logging for gold rewards.
      */
-    private function logGoldRewardAudit(EventParticipant $participant, WalletTransaction $transaction, string $action): void
+    private function logGoldRewardAudit(EventParticipant $participant, GoldTransaction $transaction, string $action): void
     {
         $auditData = [
             'action' => $action,
@@ -318,7 +318,7 @@ class EventParticipationService
 
         Log::info("Gold reward {$action}", $auditData);
 
-        // Audit trail is already handled by WalletTransaction table
+        // Audit trail is already handled by GoldTransaction table
         // No need for separate audit table since wallet_transactions already contains:
         // - student_id, amount, type, source_type, source_id, notes, created_at
     }
@@ -342,26 +342,26 @@ class EventParticipationService
 
             try {
                 // Check if student has sufficient balance
-                if (!$this->walletService->hasSufficientBalance($student, $goldAmount)) {
+                if (!$this->GoldService->hasSufficientBalance($student, $goldAmount)) {
                     Log::warning('Insufficient balance for gold reclaim', [
                         'participant_id' => $participant->id,
                         'student_id' => $student->id,
                         'required_amount' => $goldAmount,
-                        'current_balance' => $this->walletService->getBalance($student)
+                        'current_balance' => $this->GoldService->getBalance($student)
                     ]);
 
                     // Create negative balance transaction with special handling
-                    $transaction = $this->walletService->adjustBalance(
+                    $transaction = $this->GoldService->adjustBalance(
                         $student,
                         -$goldAmount,
                         "Gold reclaimed due to event participation cancellation (insufficient balance): {$event->title}"
                     );
                 } else {
                     // Reclaim gold through wallet service
-                    $transaction = $this->walletService->deductGold(
+                    $transaction = $this->GoldService->deductGold(
                         $student,
                         $goldAmount,
-                        WalletTransaction::SOURCE_EVENT,
+                        GoldTransaction::SOURCE_EVENT,
                         $event->id,
                         "Gold reclaimed due to event participation cancellation: {$event->title}"
                     );
@@ -415,8 +415,8 @@ class EventParticipationService
         }
 
         // Check if there are any pending transactions that might affect this reclaim
-        $pendingTransactions = WalletTransaction::where('student_id', $student->id)
-            ->where('source_type', WalletTransaction::SOURCE_EVENT)
+        $pendingTransactions = GoldTransaction::where('student_id', $student->id)
+            ->where('source_type', GoldTransaction::SOURCE_EVENT)
             ->where('source_id', $event->id)
             ->where('created_at', '>', $participant->awarded_at)
             ->exists();
@@ -497,7 +497,7 @@ class EventParticipationService
      */
     public function getGoldRewardAuditTrail(array $filters = []): Collection
     {
-        $query = WalletTransaction::where('source_type', WalletTransaction::SOURCE_EVENT)
+        $query = GoldTransaction::where('source_type', GoldTransaction::SOURCE_EVENT)
             ->with(['student'])
             ->orderBy('created_at', 'desc');
 
@@ -534,10 +534,10 @@ class EventParticipationService
 
         return [
             'total_transactions' => $transactions->count(),
-            'total_awarded' => $transactions->where('type', WalletTransaction::TYPE_EARN)->count(),
-            'total_reclaimed' => $transactions->where('type', WalletTransaction::TYPE_SPEND)->count(),
-            'total_amount_awarded' => $transactions->where('type', WalletTransaction::TYPE_EARN)->sum('amount'),
-            'total_amount_reclaimed' => abs($transactions->where('type', WalletTransaction::TYPE_SPEND)->sum('amount')),
+            'total_awarded' => $transactions->where('type', GoldTransaction::TYPE_EARN)->count(),
+            'total_reclaimed' => $transactions->where('type', GoldTransaction::TYPE_SPEND)->count(),
+            'total_amount_awarded' => $transactions->where('type', GoldTransaction::TYPE_EARN)->sum('amount'),
+            'total_amount_reclaimed' => abs($transactions->where('type', GoldTransaction::TYPE_SPEND)->sum('amount')),
             'net_amount' => $transactions->sum('amount'),
             'unique_students' => $transactions->pluck('student_id')->unique()->count(),
             'unique_events' => $transactions->pluck('source_id')->unique()->count(),
@@ -929,7 +929,6 @@ class EventParticipationService
                         'added_by' => $addedBy?->id,
                         'gold_awarded' => $status === 'completed' && $event->gold_reward_amount > 0
                     ]);
-
                 } catch (\Exception $e) {
                     $results['errors'][] = [
                         'student_id' => $studentId,
@@ -1039,7 +1038,7 @@ class EventParticipationService
                         'old_status' => $oldStatus,
                         'new_status' => $newStatus,
                         'gold_affected' => ($newStatus === 'completed' && $event->gold_reward_amount > 0) ||
-                                         ($oldStatus === 'completed' && $newStatus !== 'completed')
+                            ($oldStatus === 'completed' && $newStatus !== 'completed')
                     ];
 
                     Log::info('Bulk participant status updated', [
@@ -1050,7 +1049,6 @@ class EventParticipationService
                         'new_status' => $newStatus,
                         'updated_by' => $updatedBy?->id
                     ]);
-
                 } catch (\Exception $e) {
                     $results['errors'][] = [
                         'participant_id' => $participant->id,
@@ -1119,7 +1117,6 @@ class EventParticipationService
                         'removed_by' => $removedBy?->id,
                         'gold_reclaimed' => $wasAwarded
                     ]);
-
                 } catch (\Exception $e) {
                     $results['errors'][] = [
                         'participant_id' => $participant->id,
@@ -1185,8 +1182,8 @@ class EventParticipationService
             $search = $filters['search'];
             $query->whereHas('student', function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                  ->orWhere('student_id', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('student_id', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -1292,10 +1289,10 @@ class EventParticipationService
                     $goldAmount = (float) $event->gold_reward_amount;
 
                     // Award gold through wallet service
-                    $transaction = $this->walletService->addGold(
+                    $transaction = $this->GoldService->addGold(
                         $student,
                         $goldAmount,
-                        WalletTransaction::SOURCE_EVENT,
+                        GoldTransaction::SOURCE_EVENT,
                         $event->id,
                         "Gold reward for attending event: {$event->title}"
                     );

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import WalletAdjustmentModal from '@/components/Wallet/WalletAdjustmentModal.vue';
 import { useApi } from '@/composables/useApiRequest';
-import type { StudentWalletTabData, WalletAdjustmentRequest, WalletTransaction } from '@/types/wallet';
+import type { GoldTransaction, StudentWalletTabData, WalletAdjustmentRequest } from '@/types/wallet';
 import { router } from '@inertiajs/vue3';
 import { ArrowDownIcon, ArrowUpIcon, CoinsIcon, CreditCardIcon, HistoryIcon, PlusIcon, TrendingUpIcon } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -32,7 +32,7 @@ const formatGold = (amount: string | number): string => {
     return `${numAmount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} Gold`;
 };
 
-const getTransactionIcon = (transaction: WalletTransaction) => {
+const getTransactionIcon = (transaction: GoldTransaction) => {
     switch (transaction.type) {
         case 'earn':
             return ArrowUpIcon;
@@ -45,7 +45,7 @@ const getTransactionIcon = (transaction: WalletTransaction) => {
     }
 };
 
-const getTransactionClass = (transaction: WalletTransaction): string => {
+const getTransactionClass = (transaction: GoldTransaction): string => {
     switch (transaction.type) {
         case 'earn':
             return 'text-green-600 bg-green-50';

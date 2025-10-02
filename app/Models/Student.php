@@ -26,6 +26,7 @@ class Student extends StudentAuditableModel
         'dropout',
         'dropout_transfer',
         'graduated',
+        'pending',
     ];
 
     protected $guard = 'student';
@@ -227,7 +228,7 @@ class Student extends StudentAuditableModel
     }
 
     /**
-     * Get the student's wallet.
+     * Get the student's gold.
      */
     public function wallet(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
@@ -237,9 +238,9 @@ class Student extends StudentAuditableModel
     /**
      * Get the student's wallet transactions.
      */
-    public function walletTransactions(): HasMany
+    public function goldTransactions(): HasMany
     {
-        return $this->hasMany(WalletTransaction::class);
+        return $this->hasMany(GoldTransaction::class);
     }
 
     /**
