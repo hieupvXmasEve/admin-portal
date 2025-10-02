@@ -17,7 +17,7 @@ use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\ProfileController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
 use App\Http\Controllers\Api\StudentWalletController;
-use App\Http\Controllers\Api\WalletTransactionController;
+use App\Http\Controllers\Api\GoldTransactionController;
 use App\Http\Controllers\Api\ImageUploadController;
 use Illuminate\Support\Facades\Route;
 
@@ -217,10 +217,10 @@ Route::middleware([
 
             // Transaction endpoints
             Route::prefix('transactions')->name('transactions.')->group(function () {
-                Route::get('/', [WalletTransactionController::class, 'index'])->name('index');
-                Route::get('/recent', [WalletTransactionController::class, 'recent'])->name('recent');
-                Route::get('/stats', [WalletTransactionController::class, 'stats'])->name('stats');
-                Route::get('/{transaction}', [WalletTransactionController::class, 'show'])->name('show');
+                Route::get('/', [GoldTransactionController::class, 'index'])->name('index');
+                Route::get('/recent', [GoldTransactionController::class, 'recent'])->name('recent');
+                Route::get('/stats', [GoldTransactionController::class, 'stats'])->name('stats');
+                Route::get('/{transaction}', [GoldTransactionController::class, 'show'])->name('show');
             });
         });
 

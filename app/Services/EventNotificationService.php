@@ -26,7 +26,7 @@ class EventNotificationService
         try {
             // Get all active students in the campus
             $students = Student::where('campus_id', $event->campus_id)
-                ->where('status', 'active')
+                ->active()
                 ->with('parentUser')
                 ->get();
 
@@ -502,6 +502,8 @@ class EventNotificationService
      */
     private function canReceiveNotification(?User $user, string $notificationType): bool
     {
+        return true;
+
         if (!$user) {
             return true;
         }

@@ -3,18 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\WalletTransactionResource;
+use App\Http\Resources\GoldTransactionResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Student;
-use App\Models\WalletTransaction;
-use App\Services\WalletService;
+use App\Models\GoldTransaction;
+use App\Services\GoldService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class WalletTransactionController extends Controller
+class GoldTransactionController extends Controller
 {
-    public function __construct(private WalletService $walletService)
+    public function __construct(private GoldService $goldService)
     {
         // Middleware will be applied via routes
     }
@@ -31,7 +31,7 @@ class WalletTransactionController extends Controller
             'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
-        $transactions = $this->walletService->getTransactionHistory(
+        $transactions = $this->goldService->getTransactionHistory(
             $student,
             $validated['per_page'] ?? 15,
             $validated['type'] ?? null
@@ -39,7 +39,7 @@ class WalletTransactionController extends Controller
 
         // Transform the paginated results to use our resource
         $transactions->getCollection()->transform(function ($transaction) {
-            return new WalletTransactionResource($transaction);
+            return new GoldTransactionResource($transaction);
         });
 
         return ApiResponse::paginated(
@@ -59,7 +59,7 @@ class WalletTransactionController extends Controller
             'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
-        $transactions = $this->walletService->getTransactionHistory(
+        $transactions = $this->goldService->getTransactionHistory(
             $student,
             $validated['per_page'] ?? 15,
             $validated['type'] ?? null
@@ -67,7 +67,7 @@ class WalletTransactionController extends Controller
 
         // Transform the paginated results to use our resource
         $transactions->getCollection()->transform(function ($transaction) {
-            return new WalletTransactionResource($transaction);
+            return new GoldTransactionResource($transaction);
         });
 
         return ApiResponse::paginated(
@@ -79,7 +79,7 @@ class WalletTransactionController extends Controller
     /**
      * Get a specific transaction.
      */
-    public function show(WalletTransaction $transaction): JsonResponse
+    public function show(GoldTransaction $transaction): JsonResponse
     {
         $user = Auth::user();
         $student = Auth::guard('student')->user();
@@ -92,7 +92,7 @@ class WalletTransactionController extends Controller
         // Staff can view any transaction (handled by policy)
 
         return ApiResponse::success(
-            new WalletTransactionResource($transaction->load('student')),
+            new GoldTransactionResource($transaction->load('student')),
             message: 'Transaction details retrieved successfully'
         );
     }
@@ -108,13 +108,13 @@ class WalletTransactionController extends Controller
             'limit' => 'nullable|integer|min:1|max:50',
         ]);
 
-        $transactions = $this->walletService->getRecentTransactions(
+        $transactions = $this->goldService->getRecentTransactions(
             $student,
             $validated['limit'] ?? 10
         );
 
         return ApiResponse::success(
-            WalletTransactionResource::collection($transactions),
+            GoldTransactionResource::collection($transactions),
             message: 'Recent transactions retrieved successfully'
         );
     }
@@ -129,13 +129,13 @@ class WalletTransactionController extends Controller
             'limit' => 'nullable|integer|min:1|max:50',
         ]);
 
-        $transactions = $this->walletService->getRecentTransactions(
+        $transactions = $this->goldService->getRecentTransactions(
             $student,
             $validated['limit'] ?? 10
         );
 
         return ApiResponse::success(
-            WalletTransactionResource::collection($transactions),
+            GoldTransactionResource::collection($transactions),
             message: 'Student recent transactions retrieved successfully'
         );
     }
@@ -146,7 +146,7 @@ class WalletTransactionController extends Controller
     public function stats(): JsonResponse
     {
         $student = Auth::guard('student')->user();
-        $stats = $this->walletService->getTransactionStats($student);
+        $stats = $this->goldService->getTransactionStats($student);
 
         return ApiResponse::success(
             $stats,
@@ -160,7 +160,7 @@ class WalletTransactionController extends Controller
     public function statsForStudent(Student $student): JsonResponse
     {
 
-        $stats = $this->walletService->getTransactionStats($student);
+        $stats = $this->goldService->getTransactionStats($student);
 
         return ApiResponse::success(
             $stats,

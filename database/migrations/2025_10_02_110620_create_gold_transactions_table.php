@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('wallet_transactions', function (Blueprint $table) {
+        Schema::create('gold_transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('student_id')->constrained('students')->cascadeOnDelete();
             $table->decimal('amount', 10, 2);
@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedBigInteger('source_id')->nullable();
             $table->text('notes')->nullable();
             $table->timestamp('created_at')->useCurrent();
-            
+
             $table->index(['student_id', 'created_at']);
             $table->index(['type', 'created_at']);
             $table->index(['source_type', 'source_id']);
@@ -32,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('wallet_transactions');
+        Schema::dropIfExists('gold_transactions');
     }
 };

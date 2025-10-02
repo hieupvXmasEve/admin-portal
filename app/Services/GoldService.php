@@ -6,12 +6,12 @@ namespace App\Services;
 
 use App\Models\Student;
 use App\Models\StudentWallet;
-use App\Models\WalletTransaction;
+use App\Models\GoldTransaction;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
-class WalletService
+class GoldService
 {
     /**
      * Get or create a wallet for a student.
@@ -43,15 +43,15 @@ class WalletService
         string $sourceType,
         ?int $sourceId = null,
         ?string $notes = null
-    ): WalletTransaction {
+    ): GoldTransaction {
         return DB::transaction(function () use ($student, $amount, $sourceType, $sourceId, $notes) {
             $wallet = $this->getOrCreateWallet($student);
-            
+
             // Create transaction record
-            $transaction = WalletTransaction::create([
+            $transaction = GoldTransaction::create([
                 'student_id' => $student->id,
                 'amount' => abs($amount), // Always positive for earning
-                'type' => WalletTransaction::TYPE_EARN,
+                'type' => GoldTransaction::TYPE_EARN,
                 'source_type' => $sourceType,
                 'source_id' => $sourceId,
                 'notes' => $notes,
@@ -74,20 +74,20 @@ class WalletService
         string $sourceType,
         ?int $sourceId = null,
         ?string $notes = null
-    ): WalletTransaction {
+    ): GoldTransaction {
         return DB::transaction(function () use ($student, $amount, $sourceType, $sourceId, $notes) {
             $wallet = $this->getOrCreateWallet($student);
-            
+
             // Check if sufficient balance
             if ($wallet->balance < abs($amount)) {
                 throw new \InvalidArgumentException('Insufficient wallet balance');
             }
 
             // Create transaction record
-            $transaction = WalletTransaction::create([
+            $transaction = GoldTransaction::create([
                 'student_id' => $student->id,
                 'amount' => -abs($amount), // Always negative for spending
-                'type' => WalletTransaction::TYPE_SPEND,
+                'type' => GoldTransaction::TYPE_SPEND,
                 'source_type' => $sourceType,
                 'source_id' => $sourceId,
                 'notes' => $notes,
@@ -109,16 +109,16 @@ class WalletService
         float $amount,
         string $notes,
         ?int $adjustedBy = null
-    ): WalletTransaction {
+    ): GoldTransaction {
         return DB::transaction(function () use ($student, $amount, $notes, $adjustedBy) {
             $wallet = $this->getOrCreateWallet($student);
-            
+
             // Create transaction record
-            $transaction = WalletTransaction::create([
+            $transaction = GoldTransaction::create([
                 'student_id' => $student->id,
                 'amount' => $amount, // Can be positive or negative
-                'type' => WalletTransaction::TYPE_ADJUST,
-                'source_type' => WalletTransaction::SOURCE_MANUAL,
+                'type' => GoldTransaction::TYPE_ADJUST,
+                'source_type' => GoldTransaction::SOURCE_MANUAL,
                 'source_id' => $adjustedBy,
                 'notes' => $notes,
             ]);
@@ -143,7 +143,7 @@ class WalletService
         int $perPage = 15,
         ?string $type = null
     ): LengthAwarePaginator {
-        $query = $student->walletTransactions()
+        $query = $student->goldTransactions()
             ->orderBy('created_at', 'desc');
 
         if ($type) {
@@ -158,7 +158,7 @@ class WalletService
      */
     public function getRecentTransactions(Student $student, int $limit = 10): Collection
     {
-        return $student->walletTransactions()
+        return $student->goldTransactions()
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();
@@ -169,12 +169,12 @@ class WalletService
      */
     public function getTransactionStats(Student $student): array
     {
-        $transactions = $student->walletTransactions;
+        $transactions = $student->goldTransactions;
 
         return [
-            'total_earned' => $transactions->where('type', WalletTransaction::TYPE_EARN)->sum('amount'),
-            'total_spent' => abs($transactions->where('type', WalletTransaction::TYPE_SPEND)->sum('amount')),
-            'total_adjustments' => $transactions->where('type', WalletTransaction::TYPE_ADJUST)->sum('amount'),
+            'total_earned' => $transactions->where('type', GoldTransaction::TYPE_EARN)->sum('amount'),
+            'total_spent' => abs($transactions->where('type', GoldTransaction::TYPE_SPEND)->sum('amount')),
+            'total_adjustments' => $transactions->where('type', GoldTransaction::TYPE_ADJUST)->sum('amount'),
             'transaction_count' => $transactions->count(),
             'current_balance' => $this->getBalance($student),
         ];

@@ -6,12 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 
-class WalletTransaction extends Model
+class GoldTransaction extends Model
 {
     /**
      * The table associated with the model.
      */
-    protected $table = 'wallet_transactions';
+    protected $table = 'gold_transactions';
 
     /**
      * The attributes that are mass assignable.
