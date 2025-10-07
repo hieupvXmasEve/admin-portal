@@ -80,24 +80,24 @@ This document outlines the implementation tasks for the Fee Management System. E
     - Display import results with errors and warnings
     - _Requirements: 4.6, 4.7, 4.8_
 
-- [ ]   6. Tuition plan management
-- [ ] 6.1 Create tuition plan migrations and models
+- [x]   6. Tuition plan management
+- [x] 6.1 Create tuition plan migrations and models
     - Create migrations for `tuition_plans` and `tuition_plan_terms` tables
     - Create models with relationships
     - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 6.2 Create TuitionPlanService
+- [x] 6.2 Create TuitionPlanService
     - Implement createTuitionPlan, updateTuitionPlan methods
     - Add term management methods (addTerm, updateTerm)
     - Implement validation for curriculum/intake uniqueness
     - _Requirements: 5.1, 5.4, 5.5, 5.6_
 
-- [ ] 6.3 Create TuitionPlanController with Inertia
+- [x] 6.3 Create TuitionPlanController with Inertia
     - Implement CRUD operations
     - Pass curriculum versions and semesters as props
     - _Requirements: 5.1, 5.7_
 
-- [ ] 6.4 Create tuition plan Vue components
+- [x] 6.4 Create tuition plan Vue components
     - Build TuitionPlans/Index.vue with list view
     - Build TuitionPlans/Create.vue and Edit.vue with term management
     - Build TuitionPlans/Show.vue with term breakdown

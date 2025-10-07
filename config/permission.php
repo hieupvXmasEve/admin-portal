@@ -292,6 +292,12 @@ return [
             'create_voucher' => 'create_voucher',
             'edit_voucher' => 'edit_voucher',
             'delete_voucher' => 'delete_voucher',
+        ],
+        'tuition_plans' => [
+            'view_tuition_plan' => 'view_tuition_plan',
+            'create_tuition_plan' => 'create_tuition_plan',
+            'edit_tuition_plan' => 'edit_tuition_plan',
+            'delete_tuition_plan' => 'delete_tuition_plan',
         ]
     ],
 
