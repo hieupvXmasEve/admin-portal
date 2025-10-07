@@ -5,6 +5,7 @@ import {
     BookMarked,
     BookOpen,
     Building2,
+    Calculator,
     Calendar,
     Calendar as CalendarIcon,
     CheckSquare,
@@ -496,6 +497,12 @@ export const mainNavItems: NavItem[] = [
         href: '#',
         icon: DollarSign,
         children: [
+            {
+                title: 'Tuition Plans',
+                href: '/tuition-plans',
+                icon: Calculator,
+                requiredPermissions: ['view_tuition_plan'],
+            },
             {
                 title: 'Scholarships',
                 href: '/scholarships',
