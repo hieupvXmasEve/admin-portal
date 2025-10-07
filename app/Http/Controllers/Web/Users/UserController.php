@@ -26,16 +26,16 @@ class UserController extends Controller
             'page' => 'integer|min:1',
             'per_page' => 'integer|min:1|max:100',
             'search' => 'string|max:255',
-            'filter.name' => 'string|max:255',
-            'filter.email' => 'string|max:255',
+            'role_id' => 'nullable|integer|exists:roles,id',
         ]);
 
         $page = $validated['page'] ?? 1;
         $per_page = $validated['per_page'] ?? 10;
+        $currentCampusId = session('current_campus_id');
 
         $query = $user->newQuery()->orderBy('id', 'desc');
 
-        // Global search
+        // Global search (name and email)
         if (! empty($validated['search'])) {
             $search = $validated['search'];
             $query->where(function ($q) use ($search) {
@@ -44,24 +44,35 @@ class UserController extends Controller
             });
         }
 
-        // Column filters
-        if (! empty($validated['filter'])) {
-            foreach ($validated['filter'] as $column => $value) {
-                if (! empty($value) && in_array($column, ['name', 'email'])) {
-                    $query->where($column, 'like', "%{$value}%");
-                }
-            }
+        // Filter by role
+        if (! empty($validated['role_id'])) {
+            $query->whereHas('campusRoles', function ($q) use ($validated, $currentCampusId) {
+                $q->where('role_id', $validated['role_id'])
+                    ->where('campus_id', $currentCampusId);
+            });
         }
+
+        // Eager load roles for current campus
+        $query->with(['campusRoles' => function ($q) use ($currentCampusId) {
+            $q->wherePivot('campus_id', $currentCampusId);
+        }]);
 
         $users = $query->paginate($per_page, ['*'], 'page', $page)
             ->withQueryString();
 
+        // Get all roles for filter dropdown
+        $roleController = new \App\Http\Controllers\Web\RoleController(
+            new \App\Services\RoleService($this->roleAssignmentService),
+            $this->roleAssignmentService
+        );
+        $roles = $roleController->getRolesWithPermissions();
+
         return Inertia::render('users/Index', [
             'users' => $users,
+            'roles' => $roles,
             'filters' => [
                 'search' => $validated['search'] ?? null,
-                'name' => $validated['filter']['name'] ?? null,
-                'email' => $validated['filter']['email'] ?? null,
+                'role_id' => $validated['role_id'] ?? null,
             ],
         ]);
     }

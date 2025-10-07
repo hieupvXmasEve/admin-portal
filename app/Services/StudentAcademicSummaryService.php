@@ -293,6 +293,7 @@ class StudentAcademicSummaryService
                 'id' => $registration->id,
                 'course_name' => $unit->name ?? 'N/A',
                 'course_code' => $unit->code ?? 'N/A',
+                'section_code' => $registration->courseOffering->section_code ?? 'N/A',
                 'credit_points' => $unit->credit_points ?? 0,
                 'semester' => $semester->name ?? 'N/A',
                 'semester_code' => $semester->code ?? 'N/A',

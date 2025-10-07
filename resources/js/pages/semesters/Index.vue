@@ -7,7 +7,6 @@ import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { PaginatedResponse } from '@/types';
 import { formatDateToShort } from '@/utils/date';
@@ -15,7 +14,7 @@ import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { fromDate } from '@internationalized/date';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Edit, Plus, X } from 'lucide-vue-next';
+import { Edit, Plus } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -161,19 +160,19 @@ const columns: ColumnDef<Semester>[] = [
         header: 'End Date',
         cell: ({ row }) => formatDateToShort(row.original.end_date),
     },
-    {
-        accessorKey: 'enrollment_period',
-        header: 'Enrollment Period',
-        cell: ({ row }) => {
-            const semester = row.original;
-            if (!semester.enrollment_start_date || !semester.enrollment_end_date) {
-                return 'Not set';
-            }
-            const start = formatDateToShort(semester.enrollment_start_date);
-            const end = formatDateToShort(semester.enrollment_end_date);
-            return `${start} - ${end}`;
-        },
-    },
+    // {
+    //     accessorKey: 'enrollment_period',
+    //     header: 'Enrollment Period',
+    //     cell: ({ row }) => {
+    //         const semester = row.original;
+    //         if (!semester.enrollment_start_date || !semester.enrollment_end_date) {
+    //             return 'Not set';
+    //         }
+    //         const start = formatDateToShort(semester.enrollment_start_date);
+    //         const end = formatDateToShort(semester.enrollment_end_date);
+    //         return `${start} - ${end}`;
+    //     },
+    // },
     {
         accessorKey: 'status_badges',
         header: 'Status',
@@ -201,15 +200,15 @@ const columns: ColumnDef<Semester>[] = [
         header: 'Actions',
         cell: ({ row }) => {
             const semester = row.original;
-            const isArchived = semester.is_archived;
+            const disable = semester.is_active;
 
-            return h('div', { class: 'flex items-center gap-2' }, [
+            return h('div', { class: 'flex items-center gap-2 w-20' }, [
                 h(
                     Button,
                     {
                         size: 'sm',
                         variant: 'outline',
-                        disabled: isArchived,
+                        disabled: disable,
                         onClick: () => openEditModal(semester),
                     },
                     () => [h(Edit, { class: 'h-4 w-4' })],
@@ -219,7 +218,7 @@ const columns: ColumnDef<Semester>[] = [
                     {
                         size: 'sm',
                         variant: 'outline',
-                        disabled: isArchived,
+                        disabled: semester.is_archived,
                         onClick: () => navigateToEnrollment(semester),
                     },
                     () => ['Manage Enrollment'],
@@ -434,53 +433,53 @@ const handlePageSizeChange = (pageSize: number) => {
     </div>
 
     <!-- Filters -->
-<!--    <div class="flex flex-wrap items-center gap-4">-->
-<!--        <div class="flex flex-col gap-1">-->
-<!--            <Label for="search">Search</Label>-->
-<!--            <Input id="search" v-model="search" placeholder="Search semesters..." />-->
-<!--        </div>-->
-<!--        <div class="flex flex-col gap-1">-->
-<!--            <Label for="name-filter">Name</Label>-->
-<!--            <Input id="name-filter" v-model="nameFilter" placeholder="Filter by name..." />-->
-<!--        </div>-->
-<!--        <div class="flex flex-col gap-1">-->
-<!--            <Label for="year-filter">Year</Label>-->
-<!--            <Input id="year-filter" v-model="yearFilter" placeholder="e.g., 2025" />-->
-<!--        </div>-->
-<!--        <div class="flex flex-col gap-1">-->
-<!--            <Label for="active-filter">Active Status</Label>-->
-<!--            <Select v-model="isActiveFilterString">-->
-<!--                <SelectTrigger class="w-full">-->
-<!--                    <SelectValue placeholder="Select active status" />-->
-<!--                </SelectTrigger>-->
-<!--                <SelectContent>-->
-<!--                    <SelectItem value="null">All</SelectItem>-->
-<!--                    <SelectItem value="true">Active</SelectItem>-->
-<!--                    <SelectItem value="false">Inactive</SelectItem>-->
-<!--                </SelectContent>-->
-<!--            </Select>-->
-<!--        </div>-->
-<!--        <div class="flex flex-col gap-1">-->
-<!--            <Label for="archived-filter">Archived Status</Label>-->
-<!--            <Select v-model="isArchivedFilterString">-->
-<!--                <SelectTrigger class="w-full">-->
-<!--                    <SelectValue placeholder="Select archived status" />-->
-<!--                </SelectTrigger>-->
-<!--                <SelectContent>-->
-<!--                    <SelectItem value="null">All</SelectItem>-->
-<!--                    <SelectItem value="true">Archived</SelectItem>-->
-<!--                    <SelectItem value="false">Not Archived</SelectItem>-->
-<!--                </SelectContent>-->
-<!--            </Select>-->
-<!--        </div>-->
-<!--        <div class="flex flex-col gap-1">-->
-<!--            <Label class="text-xs text-transparent">Clear</Label>-->
-<!--            <Button variant="outline" @click="clearFilters" :disabled="!hasActiveFilters">-->
-<!--                <X class="h-4 w-4" />-->
-<!--                Clear-->
-<!--            </Button>-->
-<!--        </div>-->
-<!--    </div>-->
+    <!--    <div class="flex flex-wrap items-center gap-4">-->
+    <!--        <div class="flex flex-col gap-1">-->
+    <!--            <Label for="search">Search</Label>-->
+    <!--            <Input id="search" v-model="search" placeholder="Search semesters..." />-->
+    <!--        </div>-->
+    <!--        <div class="flex flex-col gap-1">-->
+    <!--            <Label for="name-filter">Name</Label>-->
+    <!--            <Input id="name-filter" v-model="nameFilter" placeholder="Filter by name..." />-->
+    <!--        </div>-->
+    <!--        <div class="flex flex-col gap-1">-->
+    <!--            <Label for="year-filter">Year</Label>-->
+    <!--            <Input id="year-filter" v-model="yearFilter" placeholder="e.g., 2025" />-->
+    <!--        </div>-->
+    <!--        <div class="flex flex-col gap-1">-->
+    <!--            <Label for="active-filter">Active Status</Label>-->
+    <!--            <Select v-model="isActiveFilterString">-->
+    <!--                <SelectTrigger class="w-full">-->
+    <!--                    <SelectValue placeholder="Select active status" />-->
+    <!--                </SelectTrigger>-->
+    <!--                <SelectContent>-->
+    <!--                    <SelectItem value="null">All</SelectItem>-->
+    <!--                    <SelectItem value="true">Active</SelectItem>-->
+    <!--                    <SelectItem value="false">Inactive</SelectItem>-->
+    <!--                </SelectContent>-->
+    <!--            </Select>-->
+    <!--        </div>-->
+    <!--        <div class="flex flex-col gap-1">-->
+    <!--            <Label for="archived-filter">Archived Status</Label>-->
+    <!--            <Select v-model="isArchivedFilterString">-->
+    <!--                <SelectTrigger class="w-full">-->
+    <!--                    <SelectValue placeholder="Select archived status" />-->
+    <!--                </SelectTrigger>-->
+    <!--                <SelectContent>-->
+    <!--                    <SelectItem value="null">All</SelectItem>-->
+    <!--                    <SelectItem value="true">Archived</SelectItem>-->
+    <!--                    <SelectItem value="false">Not Archived</SelectItem>-->
+    <!--                </SelectContent>-->
+    <!--            </Select>-->
+    <!--        </div>-->
+    <!--        <div class="flex flex-col gap-1">-->
+    <!--            <Label class="text-xs text-transparent">Clear</Label>-->
+    <!--            <Button variant="outline" @click="clearFilters" :disabled="!hasActiveFilters">-->
+    <!--                <X class="h-4 w-4" />-->
+    <!--                Clear-->
+    <!--            </Button>-->
+    <!--        </div>-->
+    <!--    </div>-->
 
     <!-- Table -->
     <DataTable :data="semesters.data" :columns="columns" :empty-message="'No semesters found.'" />

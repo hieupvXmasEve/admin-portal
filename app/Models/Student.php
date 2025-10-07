@@ -49,6 +49,8 @@ class Student extends StudentAuditableModel
         'program_id',
         'specialization_id',
         'curriculum_version_id',
+        'intake_semester_id',
+        'intake_mode',
         'admission_date',
         'expected_graduation_date',
         'emergency_contact_name',
@@ -105,6 +107,8 @@ class Student extends StudentAuditableModel
             'program_id' => ['required', 'exists:programs,id'],
             'specialization_id' => ['nullable', 'exists:specializations,id'],
             'curriculum_version_id' => ['required', 'exists:curriculum_versions,id'],
+            'intake_semester_id' => ['required', 'exists:semesters,id'],
+            'intake_mode' => ['required', 'in:sequential,parallel'],
             'admission_date' => ['required', 'date'],
             'expected_graduation_date' => ['nullable', 'date', 'after:admission_date'],
             'emergency_contact_name' => ['nullable', 'string', 'max:255'],
@@ -120,6 +124,8 @@ class Student extends StudentAuditableModel
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
             'status' => ['nullable', 'in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending'],
+            'intake_semester_id' => ['nullable', 'exists:semesters,id'],
+            'intake_mode' => ['nullable', 'in:sequential,parallel'],
         ];
     }
 
@@ -138,6 +144,8 @@ class Student extends StudentAuditableModel
             'curriculum_version_id.exists' => 'Selected curriculum version does not exist',
             'admission_date.required' => 'Admission date is required',
             'expected_graduation_date.after' => 'Expected graduation date must be after admission date',
+            'intake_semester_id.exists' => 'Selected intake semester does not exist',
+            'intake_mode.in' => 'Invalid intake mode',
         ];
     }
 
@@ -145,6 +153,11 @@ class Student extends StudentAuditableModel
     public function campus(): BelongsTo
     {
         return $this->belongsTo(Campus::class);
+    }
+
+    public function intakeSemester(): BelongsTo
+    {
+        return $this->belongsTo(Semester::class, 'intake_semester_id');
     }
 
     public function parentUser(): BelongsTo
@@ -257,6 +270,14 @@ class Student extends StudentAuditableModel
     public function clubMemberships(): HasMany
     {
         return $this->hasMany(ClubMember::class);
+    }
+
+    /**
+     * Get the student's EGC progress records.
+     */
+    public function egcProgress(): HasMany
+    {
+        return $this->hasMany(EgcStudentProgress::class);
     }
 
     public function hasActiveHolds(): bool
@@ -401,6 +422,91 @@ class Student extends StudentAuditableModel
             default => 'gray',
         };
     }
+    /**
+     * Get the student's current EGC progress record.
+     */
+    public function currentEgcProgress(): ?EgcStudentProgress
+    {
+        return $this->egcProgress()
+            ->whereIn('status', [EgcStudentProgress::STATUS_ASSIGNED, EgcStudentProgress::STATUS_IN_PROGRESS])
+            ->latest('assigned_date')
+            ->first();
+    }
+
+    /**
+     * Check if the student is an EGC student.
+     */
+    public function isEgcStudent(): bool
+    {
+        return $this->status === 'intake_pre_uni_gc';
+    }
+
+    /**
+     * Check if the student can transition to intake_course status.
+     */
+    public function canTransitionToIntakeCourse(): bool
+    {
+        return $this->isEgcStudent() && $this->hasCompletedAllRequiredEgcLevels();
+    }
+
+    /**
+     * Check if the student has completed all required EGC levels.
+     */
+    public function hasCompletedAllRequiredEgcLevels(): bool
+    {
+        // Get the highest EGC level (ENG_LV6)
+        $highestLevel = EgcLevel::where('is_active', true)
+            ->orderByDesc('sequence_order')
+            ->first();
+
+        if (!$highestLevel) {
+            return false;
+        }
+
+        // Check if student has completed the highest level
+        return $this->egcProgress()
+            ->where('egc_level_id', $highestLevel->id)
+            ->where('status', EgcStudentProgress::STATUS_COMPLETED)
+            ->exists();
+    }
+
+    /**
+     * Get the student's current EGC level.
+     */
+    public function getCurrentEgcLevel(): ?EgcLevel
+    {
+        $currentProgress = $this->currentEgcProgress();
+        return $currentProgress?->egcLevel;
+    }
+
+    /**
+     * Get the student's next required EGC level.
+     */
+    public function getNextRequiredEgcLevel(): ?EgcLevel
+    {
+        $currentLevel = $this->getCurrentEgcLevel();
+
+        if (!$currentLevel) {
+            // Return the first level if no current level
+            return EgcLevel::where('is_active', true)
+                ->orderBy('sequence_order')
+                ->first();
+        }
+
+        return $currentLevel->getNextLevel();
+    }
+
+    /**
+     * Get all completed EGC levels for this student.
+     */
+    public function getCompletedEgcLevels(): \Illuminate\Database\Eloquent\Collection
+    {
+        return EgcLevel::whereHas('studentProgress', function ($query) {
+            $query->where('student_id', $this->id)
+                ->where('status', EgcStudentProgress::STATUS_COMPLETED);
+        })->orderBy('sequence_order')->get();
+    }
+
     protected static function boot()
     {
         parent::boot();

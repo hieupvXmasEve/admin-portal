@@ -5,11 +5,11 @@ import { Head } from '@inertiajs/vue3';
 import RegistrationsTab from '../AcademicSummary/RegistrationsTab.vue';
 
 interface Props {
-    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status'>;
+    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email'>;
     registrations: RegistrationsData;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 </script>
 
 <template>

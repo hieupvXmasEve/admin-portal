@@ -956,7 +956,7 @@ class EventParticipationService
         int $perPage = 50
     ): LengthAwarePaginator {
         $query = Student::where('campus_id', $event->campus_id)
-            ->where('status', 'active')
+            ->whereIn('status', ['intake_course', 'intake_pre_uni_gc'])
             ->whereNotIn('id', function ($subQuery) use ($event) {
                 $subQuery->select('student_id')
                     ->from('event_participants')
