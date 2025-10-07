@@ -342,6 +342,11 @@ export interface StudentOverview {
         emergency_contact_phone_1: string | null;
         emergency_contact_email_1: string | null;
         emergency_contact_relationship_1: string | null;
+        intake_semester: {
+            code: string;
+            id: number;
+            name: string;
+        }
     };
     program_info: {
         campus?: {

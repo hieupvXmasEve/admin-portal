@@ -88,6 +88,7 @@ class StudentAcademicSummaryController extends Controller
             'curriculumVersion:id,version_code,program_id,specialization_id',
             'curriculumVersion.program:id,name,code',
             'curriculumVersion.specialization:id,name,code',
+            'intakeSemester:id,code,name'
         ]);
 
         $overviewData = $this->academicSummaryService->getOverviewData($student);

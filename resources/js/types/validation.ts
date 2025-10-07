@@ -116,6 +116,27 @@ export const ValidationRules = {
             maxLength: 1000,
         },
     },
+    scholarship: {
+        code: {
+            minLength: 1,
+            maxLength: 50,
+        },
+        name: {
+            minLength: 1,
+            maxLength: 255,
+        },
+        description: {
+            maxLength: 1000,
+        },
+        amount: {
+            min: 0.01,
+            max: 999999999.99,
+        },
+        percentage: {
+            min: 0.01,
+            max: 100,
+        },
+    },
 } as const;
 
 export const ValidationMessages = {
@@ -179,6 +200,40 @@ export const ValidationMessages = {
         },
         registration_end_date: {
             afterOrEqual: 'Registration end date must be after or equal to start date',
+        },
+    },
+    scholarship: {
+        code: {
+            required: 'Scholarship code is required',
+            unique: 'This scholarship code has already been taken',
+            pattern: 'Code must contain only uppercase letters, numbers, hyphens, and underscores',
+            maxLength: 'Scholarship code cannot exceed 50 characters',
+        },
+        name: {
+            required: 'Scholarship name is required',
+            maxLength: 'Scholarship name cannot exceed 255 characters',
+        },
+        description: {
+            maxLength: 'Description cannot exceed 1000 characters',
+        },
+        type: {
+            required: 'Scholarship type is required',
+            invalid: 'Scholarship type must be either percentage or fixed_amount',
+        },
+        amount: {
+            required: 'Scholarship amount is required',
+            positive: 'Scholarship amount must be greater than zero',
+            max: 'Scholarship amount is too large',
+            percentageMax: 'Percentage discount cannot exceed 100%',
+        },
+        valid_from: {
+            required: 'Valid from date is required',
+            invalid: 'Valid from must be a valid date',
+        },
+        valid_until: {
+            required: 'Valid until date is required',
+            invalid: 'Valid until must be a valid date',
+            after: 'Valid until date must be after valid from date',
         },
     },
 } as const;
