@@ -281,6 +281,11 @@ return [
         'gold_transactions' => [
             'view_gold_transaction' => 'view_gold_transaction',
             'view_any_gold_transaction' => 'view_any_gold_transaction',
+        ],
+        'fee' => [
+            'view_scholarship' => 'view_scholarship',
+            'assign_scholarship' => 'assign_scholarship',
+            'import_student_financial' => 'import_student_financial'
         ]
     ],
 

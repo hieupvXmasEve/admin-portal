@@ -143,14 +143,11 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
 
     // Student Wallet Management (Admin)
     Route::prefix('wallet')->name('wallet.')->group(function () {
-        // Student-specific wallet operations
-        Route::prefix('students/{student}')->name('students.')->group(function () {
-            // Route::get('/', [StudentWalletController::class, 'showStudent'])->name('show');
-            // Route::get('/summary', [StudentWalletController::class, 'summaryForStudent'])->name('summary');
+        // Student-specific gold wallet operations
+        Route::prefix('gold/students/{student}')->name('students.')->group(function () {
             Route::post('/adjust', [StudentWalletController::class, 'adjustBalance'])->name('adjust');
-            // Route::post('/check-balance', [StudentWalletController::class, 'checkBalance'])->name('check-balance');
-
         });
+        // Student cash wallet here
     });
 });
 

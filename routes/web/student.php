@@ -99,6 +99,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.graduation');
 
+        Route::get('/gold', [StudentAcademicSummaryController::class, 'gold'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.gold');
+
         Route::get('/wallet', [StudentAcademicSummaryController::class, 'wallet'])
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.wallet');

@@ -1,5 +1,6 @@
 import type { NavItem } from '@/types';
 import {
+    Award,
     BarChart3,
     BookMarked,
     BookOpen,
@@ -11,6 +12,7 @@ import {
     ClipboardList,
     Clock,
     Club,
+    DollarSign,
     DoorOpen,
     FileText,
     FormInput,
@@ -485,6 +487,25 @@ export const mainNavItems: NavItem[] = [
                 href: systemRoutes.events.reports(),
                 icon: BarChart3,
                 requiredPermissions: ['view_event'],
+            },
+        ],
+    },
+    {
+        title: 'Fee',
+        href: '#',
+        icon: DollarSign,
+        children: [
+            {
+                title: 'Scholarships',
+                href: '/scholarships',
+                icon: Award,
+                requiredPermissions: ['view_scholarship'],
+            },
+            {
+                title: 'Student Scholarships',
+                href: '/student-scholarships',
+                icon: Users,
+                requiredPermissions: ['assign_scholarship'],
             },
         ],
     },

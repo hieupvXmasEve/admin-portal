@@ -111,10 +111,6 @@ class ScholarshipController extends Controller
         return Inertia::render('Scholarships/Show', [
             'scholarship' => $scholarship,
             'students' => $scholarship->studentScholarshipAwards,
-            'can' => [
-                'update' => request()->user()->can('scholarships.update'),
-                'delete' => request()->user()->can('scholarships.delete'),
-            ]
         ]);
     }
 

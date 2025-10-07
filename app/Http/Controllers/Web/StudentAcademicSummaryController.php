@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
-use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Api\GoldTransactionController;
+use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Services\StudentAcademicSummaryService;
+use App\Services\CashWalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,7 +31,8 @@ class StudentAcademicSummaryController extends Controller
     public function __construct(
         private StudentAcademicSummaryService $academicSummaryService,
         private StudentWalletController $studentWalletController,
-        private GoldTransactionController $goldTransactionController
+        private GoldTransactionController $goldTransactionController,
+        private CashWalletService $walletService
     ) {
         $this->middleware('can:view_student_summary')->only([
             'show',
@@ -38,9 +41,10 @@ class StudentAcademicSummaryController extends Controller
             'scores',
             'attendance',
             'gpa',
-            'graduation'
+            'graduation',
+            'gold',
+            'wallet',
         ]);
-        $this->middleware('can:view_student_wallet')->only(['wallet']);
     }
 
     /**
@@ -88,7 +92,9 @@ class StudentAcademicSummaryController extends Controller
             'curriculumVersion:id,version_code,program_id,specialization_id',
             'curriculumVersion.program:id,name,code',
             'curriculumVersion.specialization:id,name,code',
-            'intakeSemester:id,code,name'
+            'intakeSemester:id,code,name',
+            'scholarshipAward',
+            'scholarshipAward.scholarshipDefinition:code,name,amount',
         ]);
 
         $overviewData = $this->academicSummaryService->getOverviewData($student);
@@ -197,19 +203,19 @@ class StudentAcademicSummaryController extends Controller
     }
 
     /**
-     * Display the wallet tab for academic summary
+     * Display the gold tab for academic summary
      *
-     * @param  Student  $student  The student to display wallet for
+     * @param  Student  $student  The student to display gold for
      * @param  Request  $request  The request instance
-     * @return Response Inertia response with wallet data
+     * @return Response Inertia response with gold data
      */
-    public function wallet(Student $student, Request $request): Response
+    public function gold(Student $student, Request $request): Response
     {
-        $this->authorize('view_student_wallet', $student);
+        $this->authorize('view_student_summary', $student);
 
-        // Get wallet summary data
-        $walletSummary = $this->studentWalletController->summaryForStudent($student);
-        $walletData = $walletSummary->getData(true);
+        // Get gold summary data
+        $goldSummary = $this->studentWalletController->summaryForStudent($student);
+        $walletData = $goldSummary->getData(true);
 
         // Get recent transactions
         $recentTransactions = $this->goldTransactionController->recentForStudent($student, $request);
@@ -219,12 +225,46 @@ class StudentAcademicSummaryController extends Controller
         $transactionStats = $this->goldTransactionController->statsForStudent($student);
         $transactionStatsData = $transactionStats->getData(true);
 
-        return Inertia::render('students/AcademicSummary/Wallet', [
+        return Inertia::render('students/AcademicSummary/Gold', [
             'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
-            'wallet' => [
+            'gold' => [
                 'summary' => $walletData['data'] ?? $walletData,
                 'recent_transactions' => $recentTransactionsData['data'] ?? $recentTransactionsData,
                 'stats' => $transactionStatsData['data'] ?? $transactionStatsData,
+            ],
+        ]);
+    }
+
+    /**
+     * Display the wallet tab for academic summary
+     *
+     * @param  Student  $student  The student to display wallet for
+     * @return Response Inertia response with wallet data
+     */
+    public function wallet(Student $student): Response
+    {
+        // Get or create wallet for the student
+        $wallet = $this->walletService->getOrCreateWallet($student->id);
+
+        // Get transaction history with pagination
+        $transactions = $this->walletService->getTransactionHistory($wallet->id, 20);
+
+        // Get wallet statistics
+        $stats = $this->walletService->getWalletStats($wallet->id);
+
+        return Inertia::render('students/AcademicSummary/Wallets/Show', [
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'wallet' => [
+                'id' => $wallet->id,
+                'balance' => $wallet->balance,
+                'currency' => $wallet->currency,
+                'formatted_balance' => $wallet->formatted_balance,
+            ],
+            'transactions' => $transactions,
+            'stats' => $stats,
+            'can' => [
+                'deposit' => Auth::user()->can('wallets.deposit'),
+                'adjust' => Auth::user()->can('wallets.adjust'),
             ],
         ]);
     }

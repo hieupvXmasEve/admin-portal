@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { StudentWallet, WalletStats } from '@/types/wallet'
+import type { GoldStats, StudentWallet } from '@/types/wallet';
 
 interface Props {
   wallet?: StudentWallet | null
-  stats?: WalletStats | null
+  stats?: GoldStats | null
   loading?: boolean
   error?: string | null
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   wallet: null,
   stats: null,
   loading: false,
