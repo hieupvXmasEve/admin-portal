@@ -244,24 +244,24 @@ This document outlines the implementation tasks for the Fee Management System. E
     - Display running balance
     - _Requirements: 12.6_
 
-- [ ]   14. Voucher management
-- [ ] 14.1 Create voucher migrations and models
+- [x]   14. Voucher management
+- [x] 14.1 Create voucher migrations and models
     - Create migrations for `voucher_definitions` and `voucher_redemptions` tables
     - Create models with type handling
     - _Requirements: 13.1, 13.2_
 
-- [ ] 14.2 Create VoucherService
+- [x] 14.2 Create VoucherService
     - Implement createVoucher, updateVoucher methods
     - Add voucher validation logic
     - Implement redemption tracking
     - _Requirements: 13.1, 13.3, 13.4, 13.5_
 
-- [ ] 14.3 Create VoucherController with Inertia
+- [x] 14.3 Create VoucherController with Inertia
     - Implement CRUD operations
     - Implement redeem endpoint
     - _Requirements: 13.1, 13.7_
 
-- [ ] 14.4 Create voucher Vue components
+- [x] 14.4 Create voucher Vue components
     - Build Vouchers/Index.vue with type indicators
     - Build Vouchers/Create.vue and Edit.vue forms
     - Build Vouchers/Show.vue with redemption history

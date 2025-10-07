@@ -100,3 +100,4 @@ require __DIR__ . '/web/events.php';
 require __DIR__ . '/web/scholarships.php';
 require __DIR__ . '/web/student-scholarships.php';
 require __DIR__ . '/web/wallets.php';
+require __DIR__ . '/web/vouchers.php';
