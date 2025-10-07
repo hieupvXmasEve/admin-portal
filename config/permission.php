@@ -286,6 +286,12 @@ return [
             'view_scholarship' => 'view_scholarship',
             'assign_scholarship' => 'assign_scholarship',
             'import_student_financial' => 'import_student_financial'
+        ],
+        'vouchers' => [
+            'view_voucher' => 'view_voucher',
+            'create_voucher' => 'create_voucher',
+            'edit_voucher' => 'edit_voucher',
+            'delete_voucher' => 'delete_voucher',
         ]
     ],
 
