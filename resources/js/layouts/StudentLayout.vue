@@ -60,9 +60,10 @@ const tabs = [
     { key: 'registrations', label: 'Registrations', icon: BookOpen, route: 'students.academic-summary.registrations' },
     { key: 'scores', label: 'Scores', icon: Target, route: 'students.academic-summary.scores' },
     { key: 'attendance', label: 'Attendance', icon: Users, route: 'students.academic-summary.attendance' },
-    { key: 'gpa', label: 'GPA', icon: BarChart3, route: 'students.academic-summary.gpa' },
+    // { key: 'gpa', label: 'GPA', icon: BarChart3, route: 'students.academic-summary.gpa' },
     { key: 'graduation', label: 'Graduation', icon: GraduationCap, route: 'students.academic-summary.graduation' },
-    { key: 'wallet', label: 'Wallet', icon: Wallet, route: 'students.academic-summary.wallet' },
+    { key: 'gold', label: 'Gold', icon: Wallet, route: 'students.academic-summary.gold' },
+    { key: 'wallet', label: 'Cash wallet', icon: Wallet, route: 'students.academic-summary.wallet' },
 ];
 </script>
 

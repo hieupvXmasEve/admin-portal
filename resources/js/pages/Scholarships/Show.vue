@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { AlertCircle, Calendar, DollarSign, Hash, Loader2, Trash2, Users } from 'lucide-vue-next';
+import { AlertCircle, Calendar, DollarSign, Hash, Loader2, Trash2, Users, X } from 'lucide-vue-next';
 import { route } from 'ziggy-js';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -19,12 +19,20 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { ref } from 'vue';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 
 interface Student {
     id: number;
-    student_code: string;
-    first_name: string;
-    last_name: string;
+    student_id: string;
+    full_name: string;
+    email: string;
 }
 
 interface StudentScholarshipAward {
@@ -50,16 +58,15 @@ interface Scholarship {
 interface Props {
     scholarship: Scholarship;
     students: StudentScholarshipAward[];
-    can: {
-        update: boolean;
-        delete: boolean;
-    };
 }
 
 const props = defineProps<Props>();
 
 const deleteForm = useForm({});
 const isDeleting = ref(false);
+const removeAssignmentDialogOpen = ref(false);
+const assignmentToRemove = ref<StudentScholarshipAward | null>(null);
+const removeAssignmentForm = useForm({});
 
 const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -115,9 +122,26 @@ const deleteScholarship = () => {
         },
     });
 };
+
+const confirmRemoveAssignment = (assignment: StudentScholarshipAward) => {
+    assignmentToRemove.value = assignment;
+    removeAssignmentDialogOpen.value = true;
+};
+
+const removeAssignment = () => {
+    if (!assignmentToRemove.value) return;
+
+    removeAssignmentForm.delete(route('student-scholarships.destroy', assignmentToRemove.value.id), {
+        onSuccess: () => {
+            removeAssignmentDialogOpen.value = false;
+            assignmentToRemove.value = null;
+        },
+    });
+};
 </script>
 
 <template>
+
     <Head :title="`Scholarship: ${scholarship.code}`" />
 
     <div class="flex items-center justify-between">
@@ -126,7 +150,7 @@ const deleteScholarship = () => {
             <p class="text-muted-foreground mt-1 text-sm">View and manage scholarship information</p>
         </div>
         <div class="flex gap-2">
-            <Button v-if="can.update" variant="outline" as-child>
+            <Button variant="outline" as-child>
                 <Link :href="route('scholarships.edit', scholarship.id)">Edit Scholarship</Link>
             </Button>
             <Button variant="outline" as-child>
@@ -139,7 +163,8 @@ const deleteScholarship = () => {
     <Alert v-if="isExpired()" variant="destructive" class="mt-6">
         <AlertCircle class="h-4 w-4" />
         <AlertDescription>
-            This scholarship has expired and can no longer be assigned to students. Consider updating the validity period or creating a new scholarship.
+            This scholarship has expired and can no longer be assigned to students. Consider updating the validity
+            period or creating a new scholarship.
         </AlertDescription>
     </Alert>
 
@@ -212,26 +237,41 @@ const deleteScholarship = () => {
                     <Users class="h-5 w-5" />
                     Assigned Students
                 </CardTitle>
-                <CardDescription>Students currently receiving this scholarship</CardDescription>
+                <CardDescription>Students currently receiving this scholarship ({{ students.length }} total)
+                </CardDescription>
             </CardHeader>
             <CardContent>
-                <div class="mb-4">
-                    <p class="text-muted-foreground text-sm">Total Students</p>
-                    <p class="text-3xl font-bold">{{ students.length }}</p>
-                </div>
-
-                <div v-if="students.length > 0" class="space-y-2">
-                    <div v-for="award in students.slice(0, 5)" :key="award.id" class="border-border flex items-center justify-between rounded-lg border p-3">
-                        <div>
-                            <p class="font-medium">{{ award.student.first_name }} {{ award.student.last_name }}</p>
-                            <p class="text-muted-foreground text-sm">{{ award.student.student_code }}</p>
-                        </div>
-                        <Badge variant="outline">{{ formatDate(award.awarded_at) }}</Badge>
-                    </div>
-
-                    <p v-if="students.length > 5" class="text-muted-foreground pt-2 text-center text-sm">
-                        And {{ students.length - 5 }} more students...
-                    </p>
+                <div v-if="students.length > 0" class="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Student</TableHead>
+                                <TableHead>Awarded Date</TableHead>
+                                <TableHead class="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-for="award in students" :key="award.id">
+                                <TableCell>
+                                    <div>
+                                        <p class="font-medium">{{ award.student.full_name }}</p>
+                                        <p class="text-muted-foreground text-sm">{{ award.student.student_id }}</p>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <div class="flex items-center gap-2">
+                                        <Calendar class="text-muted-foreground h-4 w-4" />
+                                        <span class="text-sm">{{ formatDate(award.awarded_at) }}</span>
+                                    </div>
+                                </TableCell>
+                                <TableCell class="text-right">
+                                    <Button variant="ghost" size="sm" @click="confirmRemoveAssignment(award)">
+                                        <X class="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
                 </div>
 
                 <div v-else class="text-muted-foreground py-8 text-center text-sm">
@@ -242,7 +282,7 @@ const deleteScholarship = () => {
     </div>
 
     <!-- Danger Zone -->
-    <Card v-if="can.delete" class="border-destructive mt-6">
+    <Card class="border-destructive mt-6">
         <CardHeader>
             <CardTitle class="text-destructive">Danger Zone</CardTitle>
             <CardDescription>Irreversible actions for this scholarship</CardDescription>
@@ -252,7 +292,8 @@ const deleteScholarship = () => {
                 <div>
                     <p class="font-medium">Delete Scholarship</p>
                     <p class="text-muted-foreground text-sm">Permanently remove this scholarship from the system</p>
-                    <p v-if="students.length > 0" class="text-destructive mt-1 text-sm">⚠️ Cannot delete: {{ students.length }} student(s) are assigned to this scholarship</p>
+                    <p v-if="students.length > 0" class="text-destructive mt-1 text-sm">⚠️ Cannot delete: {{
+                        students.length }} student(s) are assigned to this scholarship</p>
                 </div>
                 <AlertDialog>
                     <AlertDialogTrigger as-child>
@@ -265,12 +306,14 @@ const deleteScholarship = () => {
                         <AlertDialogHeader>
                             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the scholarship <strong>{{ scholarship.code }}</strong> from the system.
+                                This action cannot be undone. This will permanently delete the scholarship <strong>{{
+                                    scholarship.code }}</strong> from the system.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction @click="deleteScholarship" class="bg-destructive hover:bg-destructive/90">
+                            <AlertDialogAction @click="deleteScholarship"
+                                class="bg-destructive hover:bg-destructive/90">
                                 <Loader2 v-if="isDeleting" class="mr-2 h-4 w-4 animate-spin" />
                                 Delete Scholarship
                             </AlertDialogAction>
@@ -280,4 +323,25 @@ const deleteScholarship = () => {
             </div>
         </CardContent>
     </Card>
+
+    <!-- Remove Assignment Confirmation Dialog -->
+    <AlertDialog v-model:open="removeAssignmentDialogOpen">
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Remove Scholarship Assignment?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Are you sure you want to remove the scholarship assignment for
+                    <strong>{{ assignmentToRemove?.student.full_name }}</strong>?
+                    This action cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction @click="removeAssignment" class="bg-destructive hover:bg-destructive/90">
+                    <Loader2 v-if="removeAssignmentForm.processing" class="mr-2 h-4 w-4 animate-spin" />
+                    Remove Assignment
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
 </template>

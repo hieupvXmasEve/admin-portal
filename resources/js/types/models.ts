@@ -347,6 +347,10 @@ export interface StudentOverview {
             id: number;
             name: string;
         }
+        scholarship?: {
+            name: string
+            code: string;
+        }
     };
     program_info: {
         campus?: {

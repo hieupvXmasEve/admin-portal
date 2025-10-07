@@ -397,6 +397,24 @@ const hasAcademicConcerns = computed(() => {
                                 </div>
                             </div>
 
+                            <div v-if="overview.student_info.scholarship" class="flex items-center gap-3">
+                                <Award class="text-muted-foreground h-4 w-4 flex-shrink-0" />
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-muted-foreground text-sm">Scholarship</p>
+                                    <p class="font-medium">{{ overview.student_info.scholarship.name }}</p>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-muted-foreground text-xs">{{ overview.student_info.scholarship.code }}</p>
+                                        <span v-if="overview.student_info.scholarship.amount" class="text-muted-foreground text-xs">•</span>
+                                        <p v-if="overview.student_info.scholarship.amount" class="text-xs font-medium text-green-600">
+                                            {{ Number(overview.student_info.scholarship.amount).toLocaleString('vi-VN') }} VND
+                                        </p>
+                                    </div>
+                                    <p v-if="overview.student_info.scholarship.awarded_at" class="text-muted-foreground text-xs">
+                                        Awarded: {{ formatDate(overview.student_info.scholarship.awarded_at) }}
+                                    </p>
+                                </div>
+                            </div>
+
                             <!-- Academic Progress -->
                             <div class="pt-4">
                                 <Separator class="mb-4" />

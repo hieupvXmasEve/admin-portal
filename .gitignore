@@ -41,3 +41,4 @@ public/.user.ini
 public/favicon.ico
 /backup
 #docs/
+/tests/*

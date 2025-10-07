@@ -98,3 +98,5 @@ require __DIR__ . '/web/forms.php';
 require __DIR__ . '/web/clubs.php';
 require __DIR__ . '/web/events.php';
 require __DIR__ . '/web/scholarships.php';
+require __DIR__ . '/web/student-scholarships.php';
+require __DIR__ . '/web/wallets.php';

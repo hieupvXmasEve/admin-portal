@@ -249,6 +249,22 @@ class Student extends StudentAuditableModel
     }
 
     /**
+     * Get the student's cash wallet.
+     */
+    public function cashWallet(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StudentCashWallet::class);
+    }
+
+    /**
+     * Get the student's scholarship award.
+     */
+    public function scholarshipAward(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StudentScholarshipAward::class);
+    }
+
+    /**
      * Get the student's wallet transactions.
      */
     public function goldTransactions(): HasMany

@@ -42,7 +42,7 @@ export interface GoldTransaction {
     type_color: 'green' | 'red' | 'blue' | 'gray';
 }
 
-export interface WalletStats {
+export interface GoldStats {
     total_earned: number;
     total_spent: number;
     total_adjustments: number;
@@ -97,8 +97,72 @@ export interface TransactionPagination {
 }
 
 // Combined wallet data for academic summary tab
-export interface StudentWalletTabData {
+export interface StudentGoldTabData {
     summary: WalletSummary;
     recent_transactions: GoldTransaction[];
     stats: WalletStats;
+}
+
+
+export interface WalletTransaction {
+  id: number
+  transaction_type: 'deposit' | 'payment' | 'refund' | 'adjustment'
+  amount: number
+  formatted_amount: string
+  balance_before: number
+  balance_after: number
+  formatted_balance_after: string
+  description: string
+  created_at: string
+  updated_at: string
+  created_by?: {
+    id: number
+    name: string
+  }
+  reference_type?: string
+  reference_id?: number
+}
+
+export interface StudentCashWallet {
+  id: number
+  student_id: number
+  balance: number
+  currency: string
+  formatted_balance: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WalletStats {
+  current_balance: number
+  total_deposits: number
+  total_payments: number
+  total_refunds: number
+  transaction_count: number
+  last_transaction_date?: string
+}
+
+export interface PaginatedTransactions {
+  data: WalletTransaction[]
+  from: number
+  to: number
+  total: number
+  current_page: number
+  last_page: number
+  per_page: number
+  prev_page_url: string | null
+  next_page_url: string | null
+  links: any[]
+}
+
+export interface PaymentValidationResult {
+  valid: boolean
+  errors: string[]
+  wallet?: StudentCashWallet
+}
+
+export interface PaymentProcessingResult {
+  success: boolean
+  errors: string[]
+  transaction?: WalletTransaction
 }

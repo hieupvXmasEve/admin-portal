@@ -87,3 +87,41 @@ export const getScholarshipTypeOptions = () => {
         { value: 'percentage', label: 'Percentage' },
     ];
 };
+
+// Student Scholarship Assignment form schema
+export const studentScholarshipAssignmentSchema = z.object({
+    student_identifier: z
+        .string({ required_error: 'Student email or ID is required.' })
+        .min(1, 'Student email or ID is required.')
+        .max(255, 'Student identifier cannot exceed 255 characters.')
+        .describe('Student Email or ID'),
+
+    scholarship_code: z
+        .string({ required_error: 'Scholarship is required.' })
+        .min(1, 'Scholarship is required.')
+        .max(50, 'Scholarship code cannot exceed 50 characters.')
+        .describe('Scholarship'),
+
+    awarded_at: z
+        .string()
+        .optional()
+        .refine(
+            (date) => {
+                if (!date) return true; // Optional field
+                return !isNaN(Date.parse(date));
+            },
+            {
+                message: 'Awarded date must be a valid date.',
+            }
+        )
+        .describe('Awarded Date'),
+
+    notes: z
+        .string()
+        .max(1000, 'Notes cannot exceed 1000 characters.')
+        .optional()
+        .or(z.literal(''))
+        .describe('Notes'),
+});
+
+export type StudentScholarshipAssignmentData = z.infer<typeof studentScholarshipAssignmentSchema>;
