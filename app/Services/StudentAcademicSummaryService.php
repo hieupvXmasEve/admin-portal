@@ -53,6 +53,7 @@ class StudentAcademicSummaryService
                 'curriculumVersion.program:id,name,code',
                 'curriculumVersion.specialization:id,name,code',
                 'curriculumVersion.effectiveFromSemester:id,start_date,code',
+                'intakeSemester:id,code,name',
             ])->findOrFail($studentId);
 
             // Extract specific filters for each section
@@ -145,6 +146,7 @@ class StudentAcademicSummaryService
                 'status_change_date' => $student->status_change_date,
                 'status_reason' => $student->status_reason,
                 'avatar_url' => $student->avatar_url,
+                'intake_mode' => $student->intake_mode,
 
                 'emergency_contact_name' => $student->emergency_contact_name,
                 'emergency_contact_email' => $student->emergency_contact_email,
@@ -157,6 +159,11 @@ class StudentAcademicSummaryService
                 'emergency_contact_relationship_1' => $student->emergency_contact_relationship_1,
 
                 'high_school_name' => $student->high_school_name,
+                'intake_semester' => $student->intakeSemester ? [
+                    'id' => $student->intakeSemester->id,
+                    'code' => $student->intakeSemester->code,
+                    'name' => $student->intakeSemester->name,
+                ] : null,
 
             ],
             'program_info' => [
