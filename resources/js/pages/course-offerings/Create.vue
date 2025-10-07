@@ -67,7 +67,7 @@ const submitError = ref<string | null>(null);
 // Define validation schema that exactly matches backend CourseOffering validation rules
 const formSchema = toTypedSchema(
     z.object({
-        curriculum_unit_id: z.string().min(1, 'Curriculum unit is required'),
+        curriculum_unit_id: z.string().min(1, 'Unit is required'),
         syllabus_template_id: z.string().optional(),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
@@ -293,11 +293,11 @@ const dayOptions = [
                 <CardContent class="space-y-4">
                     <FormField v-slot="{ componentField }" name="curriculum_unit_id">
                         <FormItem>
-                            <FormLabel>Curriculum Unit</FormLabel>
+                            <FormLabel>Unit *</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select curriculum unit" />
+                                        <SelectValue placeholder="Select unit" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem v-for="unit in props.units" :key="unit.curriculum_unit_id" :value="unit.curriculum_unit_id.toString()"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} credits) </SelectItem>

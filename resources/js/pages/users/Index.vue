@@ -1,25 +1,26 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
+import DebouncedInput from '@/components/DebouncedInput.vue';
 import TableActions from '@/components/TableActions.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { PaginatedResponse } from '@/types';
-import type { User } from '@/types/User';
+import type { Role, User } from '@/types/User';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { useDebounceFn } from '@vueuse/core';
 import { FileSpreadsheet, Upload, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
     users: PaginatedResponse<User>;
+    roles: Role[];
     filters?: {
-        name?: string;
-        email?: string;
         search?: string;
+        role_id?: number | null;
     };
 }>();
 
@@ -28,9 +29,8 @@ const data = computed(() => props.users.data);
 
 // Filter state - khởi tạo từ props
 const filters = ref({
-    name: props.filters?.name || '',
-    email: props.filters?.email || '',
     search: props.filters?.search || '',
+    role_id: props.filters?.role_id?.toString() || 'all',
 });
 
 // Edit user function
@@ -43,9 +43,8 @@ const applyFilters = (newFilters: typeof filters.value) => {
     const params = new URLSearchParams();
 
     // Add filters to URL params
-    if (newFilters.name) params.set('filter[name]', newFilters.name);
-    if (newFilters.email) params.set('filter[email]', newFilters.email);
     if (newFilters.search) params.set('search', newFilters.search);
+    if (newFilters.role_id && newFilters.role_id !== 'all') params.set('role_id', newFilters.role_id);
 
     const url = `${systemRoutes.users.index()}${params.toString() ? '?' + params.toString() : ''}`;
 
@@ -56,31 +55,15 @@ const applyFilters = (newFilters: typeof filters.value) => {
     });
 };
 
-// Debounced filter functions
-const debouncedApplyFilters = useDebounceFn((newFilters) => {
-    applyFilters(newFilters);
-}, 500);
-
-const updateNameFilter = (value: string | number) => {
-    filters.value.name = String(value);
-    debouncedApplyFilters(filters.value);
-};
-
-const updateEmailFilter = (value: string | number) => {
-    filters.value.email = String(value);
-    debouncedApplyFilters(filters.value);
-};
-
-const updateSearchFilter = (value: string | number) => {
+const handleSearch = (value: string | number) => {
     filters.value.search = String(value);
-    debouncedApplyFilters(filters.value);
+    applyFilters(filters.value);
 };
 
 const clearFilters = () => {
     filters.value = {
-        name: '',
-        email: '',
         search: '',
+        role_id: 'all',
     };
     router.visit(systemRoutes.users.index(), {
         preserveState: true,
@@ -90,7 +73,7 @@ const clearFilters = () => {
 };
 
 const hasActiveFilters = computed(() => {
-    return filters.value.name || filters.value.email || filters.value.search;
+    return filters.value.search || filters.value.role_id !== 'all';
 });
 
 // Export functionality
@@ -105,9 +88,8 @@ const exportToExcel = async () => {
         // Build export URL with current filters
         const params = new URLSearchParams();
 
-        if (filters.value.name) params.set('filter[name]', filters.value.name);
-        if (filters.value.email) params.set('filter[email]', filters.value.email);
         if (filters.value.search) params.set('search', filters.value.search);
+        if (filters.value.role_id && filters.value.role_id !== 'all') params.set('role_id', filters.value.role_id);
 
         const exportUrl = `${systemRoutes.users.exportFiltered()}${params.toString() ? '?' + params.toString() : ''}`;
 
@@ -149,6 +131,12 @@ const columns: ColumnDef<User>[] = [
         accessorKey: 'email',
         header: 'Email',
         enableSorting: true,
+    },
+    {
+        header: 'Roles',
+        id: 'roles',
+        enableSorting: false,
+        cell: 'roles',
     },
     {
         id: 'actions',
@@ -210,21 +198,28 @@ const handlePageSizeChange = (pageSize: number) => {
 
     <!-- Filters Section -->
     <div class="space-y-4">
-        <!-- Column Filters -->
+        <!-- Filters -->
         <div class="flex flex-wrap items-center gap-2">
-            <!-- Global Search -->
+            <!-- Search -->
             <div class="flex flex-col gap-1">
                 <Label class="text-muted-foreground text-xs">Search</Label>
-                <Input :model-value="filters.search" @update:model-value="updateSearchFilter" placeholder="Search all columns..." class="max-w-sm" />
-            </div>
-            <div class="flex flex-col gap-1">
-                <Label class="text-muted-foreground text-xs">Name</Label>
-                <Input :model-value="filters.name" @update:model-value="updateNameFilter" placeholder="Filter by name..." class="w-48" />
+                <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" placeholder="Search by name or email..." class="w-64" />
             </div>
 
+            <!-- Role Filter -->
             <div class="flex flex-col gap-1">
-                <Label class="text-muted-foreground text-xs">Email</Label>
-                <Input :model-value="filters.email" @update:model-value="updateEmailFilter" placeholder="Filter by email..." class="w-48" />
+                <Label class="text-muted-foreground text-xs">Role</Label>
+                <Select v-model="filters.role_id" @update:model-value="applyFilters(filters)">
+                    <SelectTrigger class="w-48">
+                        <SelectValue placeholder="All roles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All roles</SelectItem>
+                        <SelectItem v-for="role in roles" :key="role.id" :value="role.id.toString()">
+                            {{ role.name }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
 
             <!-- Clear Filters Button -->
@@ -243,21 +238,14 @@ const handlePageSizeChange = (pageSize: number) => {
 
             <div v-if="filters.search" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
                 <span>Search: "{{ filters.search }}"</span>
-                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="updateSearchFilter('')">
+                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="handleSearch('')">
                     <X class="h-3 w-3" />
                 </Button>
             </div>
 
-            <div v-if="filters.name" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
-                <span>Name: "{{ filters.name }}"</span>
-                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="updateNameFilter('')">
-                    <X class="h-3 w-3" />
-                </Button>
-            </div>
-
-            <div v-if="filters.email" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
-                <span>Email: "{{ filters.email }}"</span>
-                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="updateEmailFilter('')">
+            <div v-if="filters.role_id !== 'all'" class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
+                <span>Role: "{{ roles.find(r => r.id.toString() === filters.role_id)?.name }}"</span>
+                <Button variant="ghost" size="icon" class="h-4 w-4 p-0" @click="filters.role_id = 'all'; applyFilters(filters)">
                     <X class="h-3 w-3" />
                 </Button>
             </div>
@@ -266,6 +254,14 @@ const handlePageSizeChange = (pageSize: number) => {
 
     <!-- Data Table -->
     <DataTable :data="data" :columns="columns" :show-column-toggle="false">
+        <template #cell-roles="{ row }">
+            <div class="flex flex-wrap gap-1">
+                <Badge v-for="role in row.original.campus_roles" :key="role.id" variant="secondary">
+                    {{ role.name }}
+                </Badge>
+                <span v-if="!row.original.campus_roles?.length" class="text-muted-foreground text-sm">No roles</span>
+            </div>
+        </template>
         <template #cell-actions="{ row }">
             <TableActions @edit="editUser(row.original)" />
         </template>

@@ -318,8 +318,7 @@ class EventService
         $sortBy = $filters['sort_by'] ?? 'start_time';
         $sortDirection = $filters['sort_direction'] ?? 'asc';
         $query->orderBy($sortBy, $sortDirection);
-
-        return $query->with(['creator', 'campus'])->get();
+        return $query->with(['campus'])->get();
     }
 
     /**

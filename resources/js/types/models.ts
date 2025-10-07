@@ -401,6 +401,7 @@ export interface CourseRegistrationRecord {
     id: number;
     course_name: string;
     course_code: string;
+    section_code?: string;
     credit_points: number;
     semester: string;
     semester_code: string;
@@ -844,6 +845,14 @@ export interface ClassSession {
 }
 
 // Student search and eligibility interfaces
+export interface EgcEligibility {
+    can_enroll: boolean;
+    eligibility_reason: string;
+    current_level_code?: string;
+    current_level_higher: boolean;
+    prerequisite_not_met: boolean;
+}
+
 export interface StudentEligibilityInfo {
     student_id: string;
     exists: boolean;
@@ -865,6 +874,7 @@ export interface StudentEligibilityInfo {
     is_already_registered: boolean;
     eligibility_reasons: string[];
     major_code?: string;
+    egc_eligibility?: EgcEligibility;
 }
 
 export interface StudentSearchResponse {

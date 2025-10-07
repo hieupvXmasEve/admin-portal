@@ -415,8 +415,8 @@ class StudentService
 
         return [
             'total_students' => $query->count(),
-            'active_students' => $query->where('status', 'active')->count(),
-            'enrolled_students' => $query->where('status', 'active')->count(), // Active students are enrolled
+            'active_students' => $query->whereIn('status', ['intake_course', 'intake_pre_uni_gc'])->count(),
+            'enrolled_students' => $query->whereIn('status', ['intake_course', 'intake_pre_uni_gc'])->count(), // Active students are enrolled
             'graduated_students' => $query->where('status', 'graduated')->count(),
             'suspended_students' => $query->where('status', 'suspended')->count(),
             'on_leave_students' => $query->where('status', 'inactive')->count(), // Inactive can be on leave
@@ -636,5 +636,4 @@ class StudentService
             ]);
         });
     }
-
 }

@@ -46,7 +46,7 @@ class EventCheckinController extends Controller
             $query->where('campus_id', $event->campus_id);
 
             // Only active students
-            $query->where('status', 'active');
+            $query->whereIn('status', ['intake_course', 'intake_pre_uni_gc']);
 
             $students = $query->limit(10)->get(['id', 'student_id', 'full_name', 'email', 'campus_id']);
 

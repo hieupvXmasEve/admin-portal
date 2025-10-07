@@ -25,13 +25,9 @@ class EventController extends Controller
     public function index(Request $request): Response
     {
 
-        $campus = $request->user()->campuses()->first();
-        if (!$campus) {
-            abort(403, 'User must be associated with a campus');
-        }
-
+        $currentCampusId = session('current_campus_id');
         $filters = $request->only(['search', 'status', 'date_from', 'date_to']);
-        $events = $this->eventService->getEventsForCampus($campus->id, $filters);
+        $events = $this->eventService->getEventsForCampus($currentCampusId, $filters);
 
         return Inertia::render('Events/EventList', [
             'events' => EventResource::collection($events),
