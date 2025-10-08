@@ -168,6 +168,7 @@ class StudentAcademicSummaryService
                     'code' => $student->scholarshipAward->scholarship_code,
                     'name' => $student->scholarshipAward->scholarshipDefinition?->name ?? $student->scholarshipAward->scholarship_code,
                     'amount' => $student->scholarshipAward->scholarshipDefinition?->amount,
+                    'type' => $student->scholarshipAward->scholarshipDefinition?->type,
                     'awarded_at' => $student->scholarshipAward->awarded_at?->format('Y-m-d'),
                 ] : null,
 

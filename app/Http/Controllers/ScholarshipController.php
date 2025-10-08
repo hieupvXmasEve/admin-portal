@@ -92,7 +92,7 @@ class ScholarshipController extends Controller
         try {
             $scholarship = $this->scholarshipService->createScholarship($request->validated());
 
-            return redirect()->route('scholarships.show', $scholarship)
+            return back()
                 ->with('success', 'Scholarship created successfully.');
         } catch (\Exception $e) {
             return back()

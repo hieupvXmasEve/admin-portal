@@ -277,12 +277,15 @@ const columns: ColumnDef<StudentScholarshipAward>[] = [
         <CardContent class="pt-6">
             <DataTable :columns="columns" :data="assignments.data">
                 <template #cell-student="{ row }">
-                    <div>
+                    <Link
+                        :href="route('students.academic-summary.overview', row.original.student.id)"
+                        class="block transition-colors hover:text-blue-600"
+                    >
                         <p class="font-medium">{{ row.original.student.full_name }}</p>
                         <p class="text-muted-foreground text-sm">
                             {{ row.original.student.student_id }}
                         </p>
-                    </div>
+                    </Link>
                 </template>
 
                 <template #cell-scholarship="{ row }">
