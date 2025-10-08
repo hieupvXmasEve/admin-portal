@@ -350,6 +350,9 @@ export interface StudentOverview {
         scholarship?: {
             name: string
             code: string;
+            amount?: number;
+            type?: 'percentage' | 'fixed_amount';
+            awarded_at?: string;
         }
     };
     program_info: {

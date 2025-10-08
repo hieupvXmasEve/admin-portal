@@ -94,7 +94,7 @@ class StudentAcademicSummaryController extends Controller
             'curriculumVersion.specialization:id,name,code',
             'intakeSemester:id,code,name',
             'scholarshipAward',
-            'scholarshipAward.scholarshipDefinition:code,name,amount',
+            'scholarshipAward.scholarshipDefinition:code,name,amount,type',
         ]);
 
         $overviewData = $this->academicSummaryService->getOverviewData($student);
