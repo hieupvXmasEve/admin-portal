@@ -22,6 +22,10 @@ interface Unit {
     code: string;
     name: string;
     credit_points: number;
+    level: number;
+    base_fee: number | null;
+    retake_fee: number | null;
+    unit_type: string;
     prerequisites_count: number;
     prerequisite_conditions_count: number;
     equivalent_units_count: number;
@@ -240,6 +244,76 @@ const columns: ColumnDef<Unit>[] = [
         enableSorting: true,
         cell: ({ row }) => {
             return h('span', { class: 'font-medium' }, row.original.credit_points);
+        },
+    },
+    {
+        header: 'Level',
+        accessorKey: 'level',
+        enableSorting: true,
+        cell: ({ row }) => {
+            return h('span', { class: 'text-sm' }, row.original.level);
+        },
+    },
+    {
+        header: 'Type',
+        accessorKey: 'unit_type',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const typeMap: Record<string, string> = {
+                general: 'General',
+                egc: 'EGC',
+                semi: 'Semiconductor',
+                ai: 'AI',
+                mkt: 'Marketing',
+                ba: 'Business Admin',
+                cs: 'CS',
+                ee: 'EE',
+                me: 'ME',
+                fin: 'Finance',
+            };
+            return h('span', { class: 'inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800' }, typeMap[row.original.unit_type] || row.original.unit_type);
+        },
+    },
+    {
+        header: 'Base Fee',
+        accessorKey: 'base_fee',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const fee = row.original.base_fee;
+            if (!fee) return h('span', { class: 'text-gray-400' }, '-');
+            
+            // Format fee with K/M notation
+            const formatFee = (value: number): string => {
+                if (value >= 1000000) {
+                    return `${(value / 1000000).toFixed(1)}M`;
+                } else if (value >= 1000) {
+                    return `${(value / 1000).toFixed(1)}K`;
+                }
+                return value.toLocaleString();
+            };
+            
+            return h('span', { class: 'text-sm font-medium text-green-600' }, formatFee(fee));
+        },
+    },
+    {
+        header: 'Retake Fee',
+        accessorKey: 'retake_fee',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const fee = row.original.retake_fee;
+            if (!fee) return h('span', { class: 'text-gray-400' }, '-');
+            
+            // Format fee with K/M notation
+            const formatFee = (value: number): string => {
+                if (value >= 1000000) {
+                    return `${(value / 1000000).toFixed(1)}M`;
+                } else if (value >= 1000) {
+                    return `${(value / 1000).toFixed(1)}K`;
+                }
+                return value.toLocaleString();
+            };
+            
+            return h('span', { class: 'text-sm font-medium text-orange-600' }, formatFee(fee));
         },
     },
     {

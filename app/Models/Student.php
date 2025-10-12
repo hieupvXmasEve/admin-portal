@@ -73,6 +73,9 @@ class Student extends StudentAuditableModel
         'last_login_at',
         'email_verified_at',
         'parent_user_id',
+        'gc_starting_level',
+        'gc_current_level',
+        'gc_total_levels',
     ];
 
     protected $hidden = [

@@ -15,13 +15,17 @@ return new class extends Migration
             $table->id();
             $table->foreignId('voucher_id')->constrained('voucher_definitions')->onDelete('cascade');
             $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
+            $table->foreignId('billing_cycle_id')->nullable()->constrained('billing_cycles')->nullOnDelete();
             $table->unsignedBigInteger('invoice_id')->nullable();
-            $table->timestamp('redeemed_at');
+            $table->enum('status', ['pending', 'redeemed', 'expired', 'cancelled'])->default('pending');
+            $table->timestamp('redeemed_at')->nullable();
             $table->timestamps();
 
             $table->index('voucher_id');
             $table->index('student_id');
+            $table->index('billing_cycle_id');
             $table->index('invoice_id');
+            $table->index('status');
         });
 
         // Add foreign key constraint only if student_invoices table exists

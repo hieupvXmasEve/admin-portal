@@ -18,6 +18,7 @@ import {
     FileText,
     FormInput,
     GraduationCap,
+    Receipt,
     Layers,
     LayoutDashboard,
     Mail,
@@ -497,6 +498,18 @@ export const mainNavItems: NavItem[] = [
         href: '#',
         icon: DollarSign,
         children: [
+            {
+                title: 'Billing Cycles',
+                href: '/billing-cycles',
+                icon: Clock,
+                requiredPermissions: ['view_billing_cycle'],
+            },
+            {
+                title: 'Invoices',
+                href: '/invoices',
+                icon: Receipt,
+                requiredPermissions: ['view_invoice'],
+            },
             {
                 title: 'Tuition Plans',
                 href: '/tuition-plans',

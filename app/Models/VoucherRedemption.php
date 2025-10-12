@@ -10,7 +10,9 @@ class VoucherRedemption extends Model
     protected $fillable = [
         'voucher_id',
         'student_id',
+        'billing_cycle_id',
         'invoice_id',
+        'status',
         'redeemed_at',
     ];
 
@@ -32,6 +34,14 @@ class VoucherRedemption extends Model
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    /**
+     * Get the billing cycle
+     */
+    public function billingCycle(): BelongsTo
+    {
+        return $this->belongsTo(BillingCycle::class);
     }
 
     /**

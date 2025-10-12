@@ -17,10 +17,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/', [VoucherController::class, 'store'])
             ->middleware('can:create_voucher')
             ->name('store');
+        // Voucher import
+        Route::get('import', [VoucherController::class, 'showImport'])
+            ->middleware('can:create_voucher')
+            ->name('import');
 
-        Route::get('{voucher}', [VoucherController::class, 'show'])
-            ->middleware('can:view_voucher')
-            ->name('show');
+        Route::post('import/upload', [VoucherController::class, 'uploadImport'])
+            ->middleware('can:create_voucher')
+            ->name('import.upload');
+
+        Route::post('import/process', [VoucherController::class, 'processImport'])
+            ->middleware('can:create_voucher')
+            ->name('import.process');
 
         Route::get('{voucher}/edit', [VoucherController::class, 'edit'])
             ->middleware('can:edit_voucher')
@@ -36,7 +44,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Voucher redemption
         Route::post('redeem', [VoucherController::class, 'redeem'])
-
             ->name('redeem');
+
+        Route::get('{voucher}', [VoucherController::class, 'show'])
+            ->middleware('can:view_voucher')
+            ->name('show');
     });
 });
