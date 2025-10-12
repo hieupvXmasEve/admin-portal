@@ -3,6 +3,8 @@ export interface UnitData {
     code: string;
     name: string;
     credit_points: number;
+    level: number;
+    unit_type: string;
     created_at: string;
     updated_at: string;
     equivalent_units: Array<{
@@ -86,6 +88,8 @@ export interface Unit {
     code: string;
     name: string;
     credit_points: number;
+    level: number;
+    unit_type: string;
 }
 
 export interface PrerequisiteCondition {

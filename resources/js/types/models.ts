@@ -57,6 +57,8 @@ export interface Unit {
     code: string;
     name: string;
     credit_points: number;
+    level: number;
+    unit_type: string;
     created_at: string;
     updated_at: string;
 }
@@ -346,14 +348,14 @@ export interface StudentOverview {
             code: string;
             id: number;
             name: string;
-        }
+        };
         scholarship?: {
-            name: string
+            name: string;
             code: string;
             amount?: number;
             type?: 'percentage' | 'fixed_amount';
             awarded_at?: string;
-        }
+        };
     };
     program_info: {
         campus?: {
@@ -854,6 +856,14 @@ export interface ClassSession {
     attendance_percentage?: number;
     is_assessment: boolean;
     instructor_notes?: string;
+    attendance_stats?: {
+        total: number;
+        present: number;
+        late: number;
+        absent: number;
+        excused: number;
+        attendance_percentage: number;
+    };
 }
 
 // Student search and eligibility interfaces

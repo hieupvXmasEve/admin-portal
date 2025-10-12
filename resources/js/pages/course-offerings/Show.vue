@@ -18,10 +18,10 @@ import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
+import { format } from 'date-fns';
 import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Settings, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
-import { format } from 'date-fns';
 
 interface Props {
     courseOffering: CourseOffering & {
@@ -92,6 +92,13 @@ const formatDate = (dateString: string | null | undefined): string => {
 const formatDateTime = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
     return format(dateString, 'EEEE, MM/dd/yyyy');
+};
+
+const formatAttendancePercentage = (percentage: number | string | null | undefined): string => {
+    if (percentage === null || percentage === undefined || percentage === '') return '0.00%';
+    const numPercentage = typeof percentage === 'string' ? parseFloat(percentage) : percentage;
+    if (isNaN(numPercentage)) return '0.00%';
+    return `${numPercentage.toFixed(2)}%`;
 };
 
 const enrollmentPercentage = props.courseOffering.max_capacity > 0 ? Math.round((props.courseOffering.current_enrollment / props.courseOffering.max_capacity) * 100) : 0;
@@ -688,6 +695,7 @@ const getAddSessionButtonText = computed(() => {
                                     <TableHead>Room</TableHead>
                                     <TableHead>Lecturer</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Attendance</TableHead>
                                     <TableHead class="w-32">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -718,6 +726,11 @@ const getAddSessionButtonText = computed(() => {
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
+                                        <div class="text-sm font-medium">
+                                            {{ formatAttendancePercentage(session.attendance_percentage) }}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
                                         <div class="flex items-center gap-2">
                                             <Button variant="ghost" size="sm" @click="openQuickEdit(session)" title="Quick Edit">
                                                 <Settings class="h-4 w-4" />
@@ -737,11 +750,7 @@ const getAddSessionButtonText = computed(() => {
                         </Table>
                         <!-- Add Class Session Button -->
                         <div class="flex items-center justify-center gap-2">
-                            <Button
-                                @click="openAddSessionModal"
-                                :disabled="!canAddSession"
-                                :variant="canAddSession ? 'default' : 'outline'"
-                            >
+                            <Button @click="openAddSessionModal" :disabled="!canAddSession" :variant="canAddSession ? 'default' : 'outline'">
                                 <Calendar class="mr-2 h-4 w-4" />
                                 {{ getAddSessionButtonText }}
                             </Button>
@@ -749,9 +758,7 @@ const getAddSessionButtonText = computed(() => {
 
                         <!-- Session limit warning -->
                         <div v-if="!canAddSession && courseOffering.syllabus_template?.total_sessions" class="text-center">
-                            <p class="text-sm text-orange-600">
-                                Session limit reached. Maximum of {{ courseOffering.syllabus_template.total_sessions }} sessions allowed by syllabus template.
-                            </p>
+                            <p class="text-sm text-orange-600">Session limit reached. Maximum of {{ courseOffering.syllabus_template.total_sessions }} sessions allowed by syllabus template.</p>
                         </div>
                     </div>
                 </CardContent>

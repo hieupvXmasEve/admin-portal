@@ -9,6 +9,8 @@ export interface Unit {
     code: string;
     name: string;
     credit_points: number;
+    level: number;
+    unit_type: string;
 }
 
 export interface PrerequisiteCondition {

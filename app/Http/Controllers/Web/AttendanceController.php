@@ -9,6 +9,7 @@ use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\Student;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -185,9 +186,15 @@ class AttendanceController extends Controller
             'excuse_reason' => 'nullable|string',
         ]);
 
-        $validated['recorded_by_lecture_id'] = auth()->id();
+        $validated['recorded_by_lecture_id'] = Auth::user()->id;
 
         $attendance = Attendance::create($validated);
+
+        // Update attendance statistics for the class session
+        $classSession = $attendance->classSession;
+        if ($classSession) {
+            $classSession->updateAttendanceStatistics();
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -262,11 +269,17 @@ class AttendanceController extends Controller
         ]);
 
         if ($validated['is_verified'] ?? false) {
-            $validated['verified_by_user_id'] = auth()->id();
+            $validated['verified_by_user_id'] = Auth::user()->id;
             $validated['verified_at'] = now();
         }
 
         $attendance->update($validated);
+
+        // Update attendance statistics for the class session
+        $classSession = $attendance->classSession;
+        if ($classSession) {
+            $classSession->updateAttendanceStatistics();
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -283,7 +296,13 @@ class AttendanceController extends Controller
      */
     public function destroy(Request $request, Attendance $attendance)
     {
+        $classSession = $attendance->classSession;
         $attendance->delete();
+
+        // Update attendance statistics for the class session
+        if ($classSession) {
+            $classSession->updateAttendanceStatistics();
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -317,12 +336,24 @@ class AttendanceController extends Controller
 
         if ($validated['is_verified'] ?? false) {
             $updateData['is_verified'] = true;
-            $updateData['verified_by_user_id'] = auth()->id();
+            $updateData['verified_by_user_id'] = Auth::user()->id;
             $updateData['verified_at'] = now();
         }
 
         $updated = Attendance::whereIn('id', $validated['attendance_ids'])
             ->update($updateData);
+
+        // Update attendance statistics for affected class sessions
+        $classSessionIds = Attendance::whereIn('id', $validated['attendance_ids'])
+            ->distinct()
+            ->pluck('class_session_id');
+
+        foreach ($classSessionIds as $classSessionId) {
+            $classSession = \App\Models\ClassSession::find($classSessionId);
+            if ($classSession) {
+                $classSession->updateAttendanceStatistics();
+            }
+        }
 
         return response()->json([
             'success' => true,
