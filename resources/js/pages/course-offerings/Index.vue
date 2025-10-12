@@ -319,8 +319,8 @@ const columns: ColumnDef<CourseOffering>[] = [
         header: 'Level',
         cell: ({ row }) => {
             const course = row.original;
-            const level = course.unit?.level;
-            return level !== null && level !== undefined ? h('div', { class: 'text-left font-medium' }, `Level ${level}`) : 'N/A';
+            const level = course.unit?.level ?? 0;
+            return h('div', { class: 'text-left font-medium' }, `Level ${level}`);
         },
     },
     {
@@ -342,7 +342,7 @@ const columns: ColumnDef<CourseOffering>[] = [
                 fin: 'Finance',
             };
             const label = unitType ? typeLabels[unitType as keyof typeof typeLabels] || unitType : 'N/A';
-            return h('div', { class: 'text-center' }, label);
+            return h('div', { class: 'text-left' }, label);
         },
     },
     {
