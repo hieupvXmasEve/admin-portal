@@ -22,6 +22,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_billing_cycle')
             ->name('show');
 
+        Route::get('{billingCycle}/export', [BillingCycleController::class, 'exportInvoices'])
+            ->middleware('can:view_billing_cycle')
+            ->name('export');
+
         Route::get('{billingCycle}/edit', [BillingCycleController::class, 'edit'])
             ->middleware('can:edit_billing_cycle')
             ->name('edit');
