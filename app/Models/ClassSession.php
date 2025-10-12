@@ -7,7 +7,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClassSession extends AuditableModel
 {
@@ -21,7 +20,7 @@ class ClassSession extends AuditableModel
             // Check if status is being updated to 'in_progress'
             if ($classSession->isDirty('status') && $classSession->status === 'in_progress') {
                 $oldStatus = $classSession->getOriginal('status');
-                
+
                 // Only create attendance if it wasn't already in_progress
                 if ($oldStatus !== 'in_progress') {
                     // Set started_at timestamp if not already set
@@ -36,7 +35,7 @@ class ClassSession extends AuditableModel
             // After the model is saved, create attendance if status changed to in_progress
             if ($classSession->wasChanged('status') && $classSession->status === 'in_progress') {
                 $oldStatus = $classSession->getOriginal('status');
-                
+
                 // Only create attendance if it wasn't already in_progress
                 if ($oldStatus !== 'in_progress') {
                     $classSession->createDefaultAttendance();
@@ -161,7 +160,7 @@ class ClassSession extends AuditableModel
             $now->copy()->subDay()->toDateString(),
             $now->copy()->addDay()->toDateString()
         ])
-        ->whereNotIn('status', ['cancelled', 'postponed', 'moved']);
+            ->whereNotIn('status', ['cancelled', 'postponed', 'moved']);
     }
 
     // Accessors & Mutators
@@ -247,7 +246,7 @@ class ClassSession extends AuditableModel
      */
     protected function getLoggingLevel(): string
     {
-        return static::LOG_LEVEL_STANDARD;
+        return 'standard';
     }
 
     /**
@@ -447,9 +446,9 @@ class ClassSession extends AuditableModel
                 ->whereIn('registration_status', ['registered', 'confirmed'])
                 ->where('semester_id', $this->courseOffering->semester_id);
         })
-        ->where('status', 'active')
-        ->select(['id', 'student_id', 'full_name', 'email'])
-        ->get();
+            ->where('status', 'active')
+            ->select(['id', 'student_id', 'full_name', 'email'])
+            ->get();
     }
 
     /**
@@ -460,9 +459,18 @@ class ClassSession extends AuditableModel
         // Use the AttendanceService
         $attendanceService = app(\App\Services\AttendanceService::class);
         $result = $attendanceService->createAttendanceForSession($this);
-        
+
         if (!$result['success']) {
             \Illuminate\Support\Facades\Log::warning("Failed to auto-create attendance for session {$this->id}: {$result['message']}");
         }
+    }
+
+    /**
+     * Update attendance statistics for this class session
+     */
+    public function updateAttendanceStatistics(): void
+    {
+        $attendanceService = app(\App\Services\AttendanceService::class);
+        $attendanceService->updateAttendanceStatistics($this);
     }
 }

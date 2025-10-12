@@ -42,47 +42,106 @@ class CourseOfferingController extends Controller
     public function index(Request $request): Response
     {
         $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecture', 'unit'])
-            ->where('campus_id', app('campus')->id)
-            ->whereHas('unit', fn($q) => $q->whereNotNull('id'))
-            ->orderBy(
-                Unit::select('code')
-                    ->whereColumn('units.id', 'course_offerings.unit_id')
-                    ->limit(1)
-            );
+            ->join('units', 'course_offerings.unit_id', '=', 'units.id')
+            ->where('course_offerings.campus_id', app('campus')->id)
+            ->whereNotNull('units.id')
+            ->select('course_offerings.*')
+            ->orderBy('units.code');
 
         // Apply filters
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('section_code', 'like', "%{$search}%")
-                    ->orWhere('location', 'like', "%{$search}%")
-                    ->orWhereHas('curriculumUnit.unit', function ($unitQuery) use ($search) {
-                        $unitQuery->where('code', 'like', "%{$search}%")
-                            ->orWhere('name', 'like', "%{$search}%");
-                    });
+                $q->where('course_offerings.section_code', 'like', "%{$search}%")
+                    ->orWhere('course_offerings.location', 'like', "%{$search}%")
+                    ->orWhere('units.code', 'like', "%{$search}%")
+                    ->orWhere('units.name', 'like', "%{$search}%");
             });
         }
 
-        if ($request->filled('semester_id') && $request->semester_id !== 'all') {
-            $query->where('semester_id', $request->semester_id);
+        // Default to current semester if no semester filter is provided
+        $defaultSemesterId = null;
+        if (!$request->filled('semester_id') || $request->semester_id === 'all') {
+            $currentSemester = Semester::getActiveSemester();
+            if ($currentSemester) {
+                $defaultSemesterId = $currentSemester->id;
+                $query->where('course_offerings.semester_id', $currentSemester->id);
+            }
+        } elseif ($request->semester_id !== 'all') {
+            $query->where('course_offerings.semester_id', $request->semester_id);
         }
 
         if ($request->filled('enrollment_status') && $request->enrollment_status !== 'all') {
-            $query->where('enrollment_status', $request->enrollment_status);
+            $query->where('course_offerings.enrollment_status', $request->enrollment_status);
         }
 
         if ($request->filled('delivery_mode') && $request->delivery_mode !== 'all') {
-            $query->where('delivery_mode', $request->delivery_mode);
+            $query->where('course_offerings.delivery_mode', $request->delivery_mode);
+        }
+
+        // Add unit level filter
+        if ($request->filled('unit_level') && $request->unit_level !== 'all') {
+            $query->where('units.level', $request->unit_level);
+        }
+
+        // Add unit type filter
+        if ($request->filled('unit_type') && $request->unit_type !== 'all') {
+            $query->where('units.unit_type', $request->unit_type);
         }
 
         $courseOfferings = $query->paginate(15)->withQueryString();
 
         // Get filter options
         $semesters = Semester::orderBy('start_date', 'desc')->get(['id', 'name', 'code']);
+
+        // Get unique unit levels for filter options
+        $unitLevels = Unit::select('level')
+            ->whereNotNull('level')
+            ->distinct()
+            ->orderBy('level')
+            ->pluck('level')
+            ->map(function ($level) {
+                return ['value' => $level, 'label' => "Level {$level}"];
+            })
+            ->toArray();
+
+        // Get unique unit types for filter options
+        $unitTypes = Unit::select('unit_type')
+            ->whereNotNull('unit_type')
+            ->distinct()
+            ->orderBy('unit_type')
+            ->pluck('unit_type')
+            ->map(function ($type) {
+                $labels = [
+                    'general' => 'General',
+                    'egc' => 'English Global Citizen',
+                    'semi' => 'Semiconductor',
+                    'ai' => 'Artificial Intelligence',
+                    'mkt' => 'Marketing',
+                    'ba' => 'Business Administration',
+                    'cs' => 'Computer Science',
+                    'ee' => 'Electrical Engineering',
+                    'me' => 'Mechanical Engineering',
+                    'fin' => 'Finance',
+                ];
+                return ['value' => $type, 'label' => $labels[$type] ?? ucfirst($type)];
+            })
+            ->toArray();
+
+        // Set default filters
+        $filters = $request->only(['search', 'semester_id', 'enrollment_status', 'delivery_mode', 'unit_level', 'unit_type']);
+
+        // Only set default semester if no semester filter is provided
+        if (!$request->filled('semester_id') && $defaultSemesterId) {
+            $filters['semester_id'] = $defaultSemesterId;
+        }
+
         return Inertia::render('course-offerings/Index', [
             'courseOfferings' => $courseOfferings,
-            'filters' => $request->only(['search', 'semester_id', 'enrollment_status', 'delivery_mode']),
+            'filters' => $filters,
             'semesters' => $semesters,
+            'unitLevels' => $unitLevels,
+            'unitTypes' => $unitTypes,
             'enrollmentStatusOptions' => [
                 ['value' => 'open', 'label' => 'Open'],
                 ['value' => 'closed', 'label' => 'Closed'],
@@ -293,7 +352,9 @@ class CourseOfferingController extends Controller
                     ->orderBy('registration_date', 'desc');
             },
             'classSessions' => function ($query) {
-                $query->with('room:id,name', 'lecture:id,first_name,last_name')->orderBy('session_date')
+                $query->with('room:id,name', 'lecture:id,first_name,last_name')
+                    ->select(['id', 'course_offering_id', 'room_id', 'lecture_id', 'session_title', 'session_description', 'session_date', 'start_time', 'end_time', 'session_type', 'status', 'attendance_percentage'])
+                    ->orderBy('session_date')
                     ->orderBy('start_time');
             },
         ]);
@@ -440,6 +501,26 @@ class CourseOfferingController extends Controller
             abort(404);
         }
 
+        // Check if course offering has scheduled sessions
+        $scheduledSessionsCount = $courseOffering->classSessions()->count();
+
+        // Check if course offering has enrolled students
+        $enrolledStudentsCount = $courseOffering->current_enrollment;
+
+        if ($scheduledSessionsCount > 0 || $enrolledStudentsCount > 0) {
+            $reasons = [];
+            if ($scheduledSessionsCount > 0) {
+                $reasons[] = "{$scheduledSessionsCount} scheduled session(s)";
+            }
+            if ($enrolledStudentsCount > 0) {
+                $reasons[] = "{$enrolledStudentsCount} enrolled student(s)";
+            }
+
+            $reasonText = implode(' and ', $reasons);
+            return Redirect::back()
+                ->with('error', "Cannot delete course offering because it has {$reasonText}. Please cancel the course offering instead or remove all sessions and students first.");
+        }
+
         try {
             DB::beginTransaction();
 
@@ -486,6 +567,33 @@ class CourseOfferingController extends Controller
             $courseOfferings = CourseOffering::whereIn('id', $request->ids)
                 ->where('campus_id', app('campus')->id)
                 ->get();
+
+            // Check for course offerings that cannot be deleted
+            $cannotDelete = [];
+            foreach ($courseOfferings as $courseOffering) {
+                $scheduledSessionsCount = $courseOffering->classSessions()->count();
+                $enrolledStudentsCount = $courseOffering->current_enrollment;
+
+                if ($scheduledSessionsCount > 0 || $enrolledStudentsCount > 0) {
+                    $reasons = [];
+                    if ($scheduledSessionsCount > 0) {
+                        $reasons[] = "{$scheduledSessionsCount} scheduled session(s)";
+                    }
+                    if ($enrolledStudentsCount > 0) {
+                        $reasons[] = "{$enrolledStudentsCount} enrolled student(s)";
+                    }
+
+                    $unitCode = $courseOffering->unit?->code ?? 'Unknown';
+                    $cannotDelete[] = "{$unitCode}: " . implode(' and ', $reasons);
+                }
+            }
+
+            if (!empty($cannotDelete)) {
+                DB::rollBack();
+                $reasonText = implode('; ', $cannotDelete);
+                return Redirect::back()
+                    ->with('error', "Cannot delete the following course offerings: {$reasonText}. Please cancel these course offerings instead or remove all sessions and students first.");
+            }
 
             $totalRegistrations = 0;
 

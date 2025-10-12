@@ -1,41 +1,46 @@
 <script setup lang="ts">
-import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PaginatedResponse } from '@/types';
+import { useApi } from '@/composables/useApiRequest';
+import { createColumns } from '@/lib/table-utils';
 import type { Attendance, ClassSession, Student } from '@/types/models';
 import { formatDate } from '@/utils/date';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { AlertCircle, ArrowLeft, Calendar, Download, Edit, MapPin, UserPlus, Users, Video, X } from 'lucide-vue-next';
+import { toTypedSchema } from '@vee-validate/zod';
+import { AlertCircle, ArrowLeft, Calendar, CheckSquare, Edit, MapPin, UserPlus, Users, Video, X } from 'lucide-vue-next';
+import { useForm } from 'vee-validate';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { z } from 'zod';
 
 interface Props {
     session: ClassSession;
-    attendanceData: PaginatedResponse<Attendance>;
+    attendanceData: Attendance[];
     studentsWithoutAttendance: Student[];
     statusOptions: Record<string, string>;
     filters: {
         search?: string;
         status?: string;
-        per_page?: number;
     };
 }
 
 const props = defineProps<Props>();
 
+const { post: apiCall } = useApi();
+
 // Filter state - Initialize with props or defaults
 const filters = ref({
     search: props.filters?.search || '',
     status: props.filters?.status || 'all',
-    per_page: props.filters?.per_page || 15,
 });
 
 // Server-side filtering functions
@@ -44,7 +49,6 @@ const applyFilters = (newFilters: typeof filters.value) => {
 
     if (newFilters.search) params.set('search', newFilters.search);
     if (newFilters.status && newFilters.status !== 'all') params.set('status', newFilters.status);
-    if (newFilters.per_page) params.set('per_page', newFilters.per_page.toString());
 
     const url = `/class-sessions/${props.session.id}${params.toString() ? '?' + params.toString() : ''}`;
 
@@ -61,8 +65,8 @@ const handleSearch = (value: string | number) => {
     applyFilters(filters.value);
 };
 
-const handleStatusFilter = (value: string) => {
-    filters.value.status = value;
+const handleStatusFilter = (value: any) => {
+    filters.value.status = String(value || 'all');
     applyFilters(filters.value);
 };
 
@@ -70,7 +74,6 @@ const clearFilters = () => {
     filters.value = {
         search: '',
         status: 'all',
-        per_page: 15,
     };
     router.visit(`/class-sessions/${props.session.id}`, {
         preserveState: true,
@@ -84,20 +87,111 @@ const hasActiveFilters = computed(() => {
 });
 
 // Attendance data with computed values
-const data = computed(() => props.attendanceData.data || []);
+const data = computed(() => props.attendanceData || []);
+
+// Bulk update modal state
+const showBulkUpdateModal = ref(false);
+const loading = ref(false);
+
+// Ref to track selected rows to clear after update
+const selectedRows = ref<Attendance[]>([]);
+
+// DataTable ref for clearing selection
+const dataTableRef = ref<any>(null);
+
+// Form schema for bulk update
+const formSchema = toTypedSchema(
+    z.object({
+        status: z.string().min(1, 'Status is required'),
+        attendanceIds: z.array(z.number()).min(1, 'At least one attendance record must be selected'),
+    }),
+);
+
+const { handleSubmit, values, setFieldValue, resetForm } = useForm({
+    validationSchema: formSchema,
+    initialValues: {
+        status: '',
+        attendanceIds: [],
+    },
+});
+
+// Selected attendance count for UI
+const selectedAttendanceCount = ref(0);
+
+// Handle selection change from DataTable
+const handleSelectionChange = (selectedRowsData: Attendance[]) => {
+    selectedRows.value = selectedRowsData;
+    const attendanceIds = selectedRowsData.map((attendance) => attendance.id).filter((id): id is number => id !== undefined);
+
+    selectedAttendanceCount.value = attendanceIds.length;
+    setFieldValue('attendanceIds', attendanceIds);
+};
+
+// Submit bulk update
+const onBulkUpdateSubmit = handleSubmit(async (values) => {
+    try {
+        loading.value = true;
+
+        const result = await apiCall('/api/attendance/bulk-update', {
+            attendance_ids: values.attendanceIds,
+            status: values.status,
+        });
+
+        if (result.error.value) {
+            console.error('API Error:', result.error.value);
+            throw new Error('Failed to update attendance records');
+        }
+
+        if (result.data.value?.success) {
+            toast.success(result.data.value.message || 'Attendance records updated successfully');
+            showBulkUpdateModal.value = false;
+            resetForm();
+
+            // Clear table selection
+            if (dataTableRef.value?.clearSelection) {
+                dataTableRef.value.clearSelection();
+            }
+
+            router.reload({
+                only: ['attendanceData', 'session'],
+                onSuccess: () => {
+                    // Clear selection after reload
+                    selectedAttendanceCount.value = 0;
+                    selectedRows.value = [];
+                },
+            });
+        }
+    } catch (error) {
+        console.error('Failed to update attendance records:', error);
+        toast.error('Failed to update attendance records');
+    } finally {
+        loading.value = false;
+    }
+});
+
+const openBulkUpdateModal = () => {
+    if (selectedAttendanceCount.value === 0) {
+        toast.error('Please select at least one attendance record');
+        return;
+    }
+    showBulkUpdateModal.value = true;
+};
+
+const closeBulkUpdateModal = () => {
+    showBulkUpdateModal.value = false;
+    // Only reset form fields, keep selection data intact
+    setFieldValue('status', '');
+};
 
 // Column definitions for the data table
-const columns: ColumnDef<Attendance>[] = [
+const baseColumns: ColumnDef<Attendance>[] = [
     {
         header: 'No',
         id: 'no',
         enableSorting: false,
         enableHiding: false,
         cell: ({ row }) => {
-            const currentPage = props.attendanceData.current_page;
-            const perPage = props.attendanceData.per_page;
-            const rowIndex = row.index;
-            return (currentPage - 1) * perPage + rowIndex + 1;
+            return row.index + 1;
         },
     },
     {
@@ -182,29 +276,19 @@ const columns: ColumnDef<Attendance>[] = [
     },
 ];
 
-// Pagination handlers
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['attendanceData'],
-    });
-};
-
-const handlePageSizeChange = (pageSize: number) => {
-    filters.value.per_page = pageSize;
-    applyFilters(filters.value);
-};
+const columns = createColumns(baseColumns, {
+    enableSelection: true,
+});
 
 // Helper functions
-const getStatusVariant = (status: string) => {
+const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
     switch (status) {
         case 'scheduled':
             return 'default';
         case 'in_progress':
-            return 'warning';
+            return 'secondary';
         case 'completed':
-            return 'success';
+            return 'outline';
         case 'cancelled':
             return 'destructive';
         default:
@@ -212,16 +296,16 @@ const getStatusVariant = (status: string) => {
     }
 };
 
-const getStatusBadgeVariant = (status: string) => {
+const getStatusBadgeVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
     switch (status) {
         case 'present':
-            return 'success';
+            return 'default';
         case 'late':
-            return 'warning';
+            return 'secondary';
         case 'absent':
             return 'destructive';
         case 'excused':
-            return 'secondary';
+            return 'outline';
         default:
             return 'default';
     }
@@ -250,12 +334,12 @@ const generateAttendance = () => {
         `/class-sessions/${props.session.id}/generate-attendance`,
         {},
         {
-            onSuccess: (page) => {
+            onSuccess: (page: any) => {
                 const message = page.props.flash?.success || 'Attendance records generated successfully';
                 toast.success(message);
                 router.reload({ only: ['attendanceData', 'studentsWithoutAttendance', 'session'] });
             },
-            onError: (errors) => {
+            onError: (errors: any) => {
                 console.error('Generate attendance errors:', errors);
                 const message = errors.flash?.error || 'Failed to generate attendance records';
                 toast.error(message);
@@ -265,15 +349,15 @@ const generateAttendance = () => {
 };
 
 // Export attendance to CSV
-const exportAttendance = () => {
-    const params = new URLSearchParams();
-    if (filters.value.search) params.set('search', filters.value.search);
-    if (filters.value.status && filters.value.status !== 'all') params.set('status', filters.value.status);
+// const exportAttendance = () => {
+//     const params = new URLSearchParams();
+//     if (filters.value.search) params.set('search', filters.value.search);
+//     if (filters.value.status && filters.value.status !== 'all') params.set('status', filters.value.status);
 
-    const url = `/class-sessions/${props.session.id}/export-attendance${params.toString() ? '?' + params.toString() : ''}`;
-    window.open(url, '_blank');
-    toast.success('Attendance data exported successfully');
-};
+//     const url = `/class-sessions/${props.session.id}/export-attendance${params.toString() ? '?' + params.toString() : ''}`;
+//     window.open(url, '_blank');
+//     toast.success('Attendance data exported successfully');
+// };
 </script>
 
 <template>
@@ -296,14 +380,14 @@ const exportAttendance = () => {
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <Button variant="outline" @click="exportAttendance">
+                <!-- <Button variant="outline" @click="exportAttendance">
                     <Download class="mr-2 h-4 w-4" />
                     Export CSV
-                </Button>
-                <Button variant="outline" @click="generateAttendance">
+                </Button> -->
+                <!-- <Button variant="outline" @click="generateAttendance">
                     <UserPlus class="mr-2 h-4 w-4" />
                     Generate Attendance
-                </Button>
+                </Button> -->
                 <Button @click="editSession">
                     <Edit class="mr-2 h-4 w-4" />
                     Edit Session
@@ -389,13 +473,13 @@ const exportAttendance = () => {
             <CardContent>
                 <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
                     <div class="space-y-2 text-center">
-                        <Badge variant="success" class="px-3 py-1 text-lg">
+                        <Badge variant="default" class="px-3 py-1 text-lg">
                             {{ session.attendance_stats.present }}
                         </Badge>
                         <p class="text-muted-foreground text-sm">Present</p>
                     </div>
                     <div class="space-y-2 text-center">
-                        <Badge variant="warning" class="px-3 py-1 text-lg">
+                        <Badge variant="secondary" class="px-3 py-1 text-lg">
                             {{ session.attendance_stats.late }}
                         </Badge>
                         <p class="text-muted-foreground text-sm">Late</p>
@@ -407,7 +491,7 @@ const exportAttendance = () => {
                         <p class="text-muted-foreground text-sm">Absent</p>
                     </div>
                     <div class="space-y-2 text-center">
-                        <Badge variant="secondary" class="px-3 py-1 text-lg">
+                        <Badge variant="outline" class="px-3 py-1 text-lg">
                             {{ session.attendance_stats.excused }}
                         </Badge>
                         <p class="text-muted-foreground text-sm">Excused</p>
@@ -455,23 +539,71 @@ const exportAttendance = () => {
             <CardHeader>
                 <CardTitle class="flex items-center gap-2">
                     <Users class="h-5 w-5" />
-                    Student Attendance Details
+                    Student Attendance Details ({{ data.length }})
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <DataTable :data="data" :columns="columns">
+                <!-- Bulk Update Button -->
+                <div v-if="selectedAttendanceCount > 0" class="bg-muted/50 mt-4 flex items-center justify-between rounded-lg border p-4">
+                    <div class="flex items-center gap-2">
+                        <CheckSquare class="text-primary h-5 w-5" />
+                        <span class="font-medium">{{ selectedAttendanceCount }} student{{ selectedAttendanceCount !== 1 ? 's' : '' }} selected</span>
+                    </div>
+                    <Button @click="openBulkUpdateModal">
+                        <CheckSquare class="mr-2 h-4 w-4" />
+                        Bulk Update Attendance
+                    </Button>
+                </div>
+                <DataTable ref="dataTableRef" :data="data" :columns="columns" :enable-row-selection="true" :show-column-toggle="false" @selection-change="handleSelectionChange">
                     <template #cell-actions="{ row }">
                         <Button variant="ghost" size="sm" @click="editAttendance(row.original)">
                             <Edit class="h-4 w-4" />
                         </Button>
                     </template>
                 </DataTable>
-
-                <!-- Pagination -->
-                <div class="mt-4">
-                    <DataPagination :pagination-data="attendanceData" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
-                </div>
             </CardContent>
         </Card>
+
+        <!-- Bulk Update Modal -->
+        <Dialog :open="showBulkUpdateModal" @update:open="closeBulkUpdateModal">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle class="flex items-center gap-2">
+                        <CheckSquare class="h-5 w-5" />
+                        Bulk Update Attendance
+                    </DialogTitle>
+                    <DialogDescription> Update attendance status for {{ selectedAttendanceCount }} selected student{{ selectedAttendanceCount !== 1 ? 's' : '' }} </DialogDescription>
+                </DialogHeader>
+
+                <form @submit="onBulkUpdateSubmit" class="space-y-6">
+                    <FormField v-slot="{ componentField }" name="status">
+                        <FormItem>
+                            <FormLabel>New Status</FormLabel>
+                            <FormControl>
+                                <Select v-bind="componentField">
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select new status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="present">Present</SelectItem>
+                                        <SelectItem value="absent">Absent</SelectItem>
+                                        <SelectItem value="late">Late</SelectItem>
+                                        <SelectItem value="excused">Excused</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" @click="closeBulkUpdateModal"> Cancel </Button>
+                        <Button type="submit" :disabled="loading || !values.status">
+                            {{ loading ? 'Updating...' : `Update ${selectedAttendanceCount} Record${selectedAttendanceCount !== 1 ? 's' : ''}` }}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     </div>
 </template>

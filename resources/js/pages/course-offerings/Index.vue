@@ -27,8 +27,12 @@ interface Props {
         semester_id?: string;
         enrollment_status?: string;
         delivery_mode?: string;
+        unit_level?: string;
+        unit_type?: string;
     };
     semesters: Semester[];
+    unitLevels: { value: string; label: string }[];
+    unitTypes: { value: string; label: string }[];
     enrollmentStatusOptions: { value: string; label: string }[];
     deliveryModeOptions: { value: string; label: string }[];
     flash?: {
@@ -45,6 +49,8 @@ const filters = ref({
     semester_id: props.filters.semester_id || 'all',
     enrollment_status: props.filters.enrollment_status || 'all',
     delivery_mode: props.filters.delivery_mode || 'all',
+    unit_level: props.filters.unit_level || 'all',
+    unit_type: props.filters.unit_type || 'all',
 });
 
 const selectedItems = ref<number[]>([]);
@@ -90,6 +96,8 @@ const updateFilters = () => {
         semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
         enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
         delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
+        unit_level: filters.value.unit_level === 'all' ? undefined : filters.value.unit_level,
+        unit_type: filters.value.unit_type === 'all' ? undefined : filters.value.unit_type,
     };
 
     router.get('/course-offerings', filterParams, {
@@ -116,6 +124,8 @@ const handlePageChange = (pageOrUrl: string) => {
                 semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
                 enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
                 delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
+                unit_level: filters.value.unit_level === 'all' ? undefined : filters.value.unit_level,
+                unit_type: filters.value.unit_type === 'all' ? undefined : filters.value.unit_type,
                 page: page,
             };
 
@@ -134,6 +144,8 @@ const handlePageChange = (pageOrUrl: string) => {
             semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
             enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
             delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
+            unit_level: filters.value.unit_level === 'all' ? undefined : filters.value.unit_level,
+            unit_type: filters.value.unit_type === 'all' ? undefined : filters.value.unit_type,
             page: pageOrUrl,
         };
 
@@ -303,6 +315,37 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
+        accessorKey: 'unit.level',
+        header: 'Level',
+        cell: ({ row }) => {
+            const course = row.original;
+            const level = course.unit?.level;
+            return level !== null && level !== undefined ? h('div', { class: 'text-left font-medium' }, `Level ${level}`) : 'N/A';
+        },
+    },
+    {
+        accessorKey: 'unit.unit_type',
+        header: 'Unit Type',
+        cell: ({ row }) => {
+            const course = row.original;
+            const unitType = course.unit?.unit_type;
+            const typeLabels = {
+                general: 'General',
+                egc: 'EGC',
+                semi: 'Semiconductor',
+                ai: 'AI',
+                mkt: 'Marketing',
+                ba: 'Business Admin',
+                cs: 'Computer Science',
+                ee: 'Electrical Eng',
+                me: 'Mechanical Eng',
+                fin: 'Finance',
+            };
+            const label = unitType ? typeLabels[unitType as keyof typeof typeLabels] || unitType : 'N/A';
+            return h('div', { class: 'text-center' }, label);
+        },
+    },
+    {
         accessorKey: 'semester',
         header: 'Semester',
         cell: ({ row }) => {
@@ -468,7 +511,7 @@ const columns: ColumnDef<CourseOffering>[] = [
             <CardDescription>Filter course offerings by various criteria</CardDescription>
         </CardHeader>
         <CardContent>
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Search</label>
                     <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search courses..." :debounce="300" />
@@ -484,6 +527,36 @@ const columns: ColumnDef<CourseOffering>[] = [
                             <SelectItem value="all">All Semesters</SelectItem>
                             <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
                                 {{ semester.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">Level</label>
+                    <Select v-model="filters.unit_level" @update:model-value="updateFilters">
+                        <SelectTrigger>
+                            <SelectValue placeholder="All Levels" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Levels</SelectItem>
+                            <SelectItem v-for="level in unitLevels" :key="level.value" :value="level.value.toString()">
+                                {{ level.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">Unit Type</label>
+                    <Select v-model="filters.unit_type" @update:model-value="updateFilters">
+                        <SelectTrigger>
+                            <SelectValue placeholder="All Types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Types</SelectItem>
+                            <SelectItem v-for="type in unitTypes" :key="type.value" :value="type.value">
+                                {{ type.label }}
                             </SelectItem>
                         </SelectContent>
                     </Select>

@@ -124,14 +124,13 @@ class ClassSessionController extends Controller
      */
     public function show(Request $request, ClassSession $classSession)
     {
-        $filters = $request->only(['search', 'status', 'per_page']);
-        $perPage = (int) ($request->input('per_page', 15));
-        $perPage = max(1, min($perPage, 100));
-        $filters['per_page'] = $perPage;
+        $filters = $request->only(['search', 'status']);
 
         // Get session with relationships
         $session = $this->classSessionService->getSessionWithRelations($classSession->id);
-        $session->attendance_stats = $session->attendanceStats;
+        // Load attendance stats via accessor
+        $session->loadMissing('attendances');
+        $attendanceStats = $session->attendanceStats;
 
         // Get all enrolled students for this course offering with their attendance
         $enrolledStudentsQuery = $session->courseOffering
@@ -139,7 +138,7 @@ class ClassSessionController extends Controller
             ->with(['student'])
             ->where('registration_status', 'confirmed');
 
-        // Get attendance data with filtering
+        // Get attendance data with filtering (no pagination)
         $attendanceQuery = $session->attendances()
             ->with(['student'])
             ->orderBy('created_at', 'desc');
@@ -159,7 +158,7 @@ class ClassSessionController extends Controller
             $attendanceQuery->where('status', $filters['status']);
         }
 
-        $attendanceData = $attendanceQuery->paginate($perPage);
+        $attendanceData = $attendanceQuery->get();
 
         // Get all enrolled students who don't have attendance records yet
         $studentsWithAttendance = $session->attendances()->pluck('student_id')->toArray();
@@ -179,7 +178,7 @@ class ClassSessionController extends Controller
 
         if ($request->expectsJson()) {
             return response()->json([
-                'session' => $session,
+                'session' => array_merge($session->toArray(), ['attendance_stats' => $attendanceStats]),
                 'attendanceData' => $attendanceData,
                 'studentsWithoutAttendance' => $studentsWithoutAttendance,
                 'statusOptions' => $statusOptions,
@@ -188,7 +187,7 @@ class ClassSessionController extends Controller
         }
 
         return Inertia::render('class-sessions/Show', [
-            'session' => $session,
+            'session' => array_merge($session->toArray(), ['attendance_stats' => $attendanceStats]),
             'attendanceData' => $attendanceData,
             'studentsWithoutAttendance' => $studentsWithoutAttendance,
             'statusOptions' => $statusOptions,
@@ -339,7 +338,7 @@ class ClassSessionController extends Controller
 
         return response($csvContent, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
     }
 
@@ -354,7 +353,7 @@ class ClassSessionController extends Controller
 
         // Escape quotes by doubling them and wrap in quotes if contains comma, quote, or newline
         if (str_contains($field, ',') || str_contains($field, '"') || str_contains($field, "\n")) {
-            return '"'.str_replace('"', '""', $field).'"';
+            return '"' . str_replace('"', '""', $field) . '"';
         }
 
         return $field;

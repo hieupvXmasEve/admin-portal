@@ -11,6 +11,20 @@ class Attendance extends AuditableModel
 {
     use HasFactory;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Update attendance statistics when attendance record is created, updated, or deleted
+        static::saved(function ($attendance) {
+            $attendance->classSession?->updateAttendanceStatistics();
+        });
+
+        static::deleted(function ($attendance) {
+            $attendance->classSession?->updateAttendanceStatistics();
+        });
+    }
+
     protected $fillable = [
         'class_session_id',
         'student_id',
@@ -182,7 +196,7 @@ class Attendance extends AuditableModel
      */
     protected function getLoggingLevel(): string
     {
-        return static::LOG_LEVEL_COMPREHENSIVE;
+        return 'comprehensive';
     }
 
     /**
@@ -220,8 +234,8 @@ class Attendance extends AuditableModel
     protected function getIdentifierForLog(): string
     {
         $studentName = $this->student?->full_name ?? "Student ID {$this->student_id}";
-        $sessionInfo = $this->classSession ? 
-            "Session {$this->classSession->session_number} on {$this->classSession->session_date?->format('Y-m-d')}" : 
+        $sessionInfo = $this->classSession ?
+            "Session {$this->classSession->session_number} on {$this->classSession->session_date?->format('Y-m-d')}" :
             "Session ID {$this->class_session_id}";
 
         return "{$studentName} - {$sessionInfo}";
@@ -316,8 +330,8 @@ class Attendance extends AuditableModel
             'session_id' => $this->class_session_id,
             'session_number' => $this->classSession->session_number,
             'session_date' => $this->classSession->session_date?->format('Y-m-d'),
-            'session_time' => $this->classSession->start_time?->format('H:i') . ' - ' . 
-                            $this->classSession->end_time?->format('H:i'),
+            'session_time' => $this->classSession->start_time?->format('H:i') . ' - ' .
+                $this->classSession->end_time?->format('H:i'),
             'course_offering' => $this->classSession->courseOffering?->code,
             'unit_code' => $this->classSession->courseOffering?->unit?->code,
             'unit_name' => $this->classSession->courseOffering?->unit?->name,
@@ -413,8 +427,8 @@ class Attendance extends AuditableModel
      */
     protected function getCampusIdForLogging(): ?int
     {
-        return $this->student?->campus_id ?? 
-               $this->classSession?->courseOffering?->campus_id ?? 
-               parent::getCampusIdForLogging();
+        return $this->student?->campus_id ??
+            $this->classSession?->courseOffering?->campus_id ??
+            parent::getCampusIdForLogging();
     }
 }
