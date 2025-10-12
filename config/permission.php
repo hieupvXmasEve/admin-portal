@@ -298,6 +298,21 @@ return [
             'create_tuition_plan' => 'create_tuition_plan',
             'edit_tuition_plan' => 'edit_tuition_plan',
             'delete_tuition_plan' => 'delete_tuition_plan',
+        ],
+        'billing-cycles' => [
+            'view_billing_cycle' => 'view_billing_cycle',
+            'create_billing_cycle' => 'create_billing_cycle',
+            'edit_billing_cycle' => 'edit_billing_cycle',
+            'delete_billing_cycle' => 'delete_billing_cycle',
+            'activate_billing_cycle' => 'activate_billing_cycle',
+            'close_billing_cycle' => 'close_billing_cycle',
+        ],
+        'invoices' => [
+            'view_invoice' => 'view_invoice',
+            'create_invoice' => 'create_invoice',
+            'edit_invoice' => 'edit_invoice',
+            'delete_invoice' => 'delete_invoice',
+            'generate_invoice' => 'generate_invoice',
         ]
     ],
 

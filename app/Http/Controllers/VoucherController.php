@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\VoucherImportRequest;
+use App\Models\BillingCycle;
 use App\Models\VoucherDefinition;
+use App\Services\VoucherImportService;
 use App\Services\VoucherService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Http\RedirectResponse;
 
 class VoucherController extends Controller
 {
     public function __construct(
-        protected VoucherService $voucherService
+        protected VoucherService $voucherService,
+        protected VoucherImportService $importService
     ) {}
 
     /**
@@ -27,7 +31,7 @@ class VoucherController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('code', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%");
+                    ->orWhere('name', 'like', "%{$search}%");
             });
         }
 
@@ -40,8 +44,8 @@ class VoucherController extends Controller
         if ($request->filled('status')) {
             if ($request->status === 'active') {
                 $query->where('is_active', true)
-                      ->where('valid_from', '<=', now())
-                      ->where('valid_until', '>=', now());
+                    ->where('valid_from', '<=', now())
+                    ->where('valid_until', '>=', now());
             } elseif ($request->status === 'inactive') {
                 $query->where('is_active', false);
             } elseif ($request->status === 'expired') {
@@ -121,7 +125,7 @@ class VoucherController extends Controller
     public function update(Request $request, VoucherDefinition $voucher): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => 'required|string|max:50|unique:voucher_definitions,code,' . $voucher->id,
+            'code' => 'required|string|max:50|unique:voucher_definitions,code,'.$voucher->id,
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'voucher_type' => 'required|in:informational,discount',
@@ -177,6 +181,70 @@ class VoucherController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Show the voucher import form
+     */
+    public function showImport(): Response
+    {
+        $billingCycles = BillingCycle::with('semester')
+            ->orderBy('start_date', 'desc')
+            ->get();
+
+        return Inertia::render('Vouchers/Import', [
+            'billingCycles' => $billingCycles,
+        ]);
+    }
+
+    /**
+     * Upload and preview voucher import
+     */
+    public function uploadImport(VoucherImportRequest $request): Response
+    {
+        try {
+            $file = $request->file('file');
+            $billingCycleId = $request->input('billing_cycle_id');
+
+            $preview = $this->importService->previewImport($file, $billingCycleId);
+
+            $billingCycles = BillingCycle::with('semester')
+                ->orderBy('start_date', 'desc')
+                ->get();
+
+            return Inertia::render('Vouchers/Import', [
+                'billingCycles' => $billingCycles,
+                'preview' => $preview,
+            ]);
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Process voucher import
+     */
+    public function processImport(VoucherImportRequest $request): Response
+    {
+        try {
+            $file = $request->file('file');
+            $billingCycleId = $request->input('billing_cycle_id');
+
+            $result = $this->importService->processImport($file, $billingCycleId);
+
+            $billingCycles = BillingCycle::with('semester')
+                ->orderBy('start_date', 'desc')
+                ->get();
+
+            return Inertia::render('Vouchers/Import', [
+                'billingCycles' => $billingCycles,
+                'result' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->withErrors(['error' => $e->getMessage()]);
         }
     }
 }

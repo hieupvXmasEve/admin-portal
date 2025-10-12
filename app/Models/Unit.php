@@ -16,10 +16,17 @@ class Unit extends AuditableModel
         'code',
         'name',
         'credit_points',
+        'level',
+        'base_fee',
+        'retake_fee',
+        'unit_type',
     ];
 
     protected $casts = [
         'credit_points' => 'decimal:2',
+        'level' => 'integer',
+        'base_fee' => 'decimal:2',
+        'retake_fee' => 'decimal:2',
     ];
 
     /**
@@ -260,7 +267,7 @@ class Unit extends AuditableModel
     private function getCurriculumUsageStats(): array
     {
         $curriculumUnits = $this->curriculumUnits()->with('curriculumVersion')->get();
-        
+
         return [
             'total_curriculum_versions' => $curriculumUnits->pluck('curriculum_version_id')->unique()->count(),
             'as_core_unit' => $curriculumUnits->where('type', 'core')->count(),
@@ -281,7 +288,7 @@ class Unit extends AuditableModel
     private function getPrerequisiteInfo(): array
     {
         $prerequisiteGroups = $this->prerequisiteGroups()->with('conditions.prerequisiteUnit')->get();
-        
+
         return [
             'has_prerequisites' => $prerequisiteGroups->isNotEmpty(),
             'prerequisite_groups_count' => $prerequisiteGroups->count(),
@@ -303,7 +310,7 @@ class Unit extends AuditableModel
     {
         $equivalentUnits = $this->equivalentUnits()->with('equivalentUnit')->get();
         $equivalentTo = $this->equivalentTo()->with('unit')->get();
-        
+
         return [
             'has_equivalents' => $equivalentUnits->isNotEmpty() || $equivalentTo->isNotEmpty(),
             'equivalent_units' => $equivalentUnits->map(function ($eu) {

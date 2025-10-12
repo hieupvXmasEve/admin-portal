@@ -171,6 +171,7 @@ class StudentFinancialImportService
             'failed' => 0,
             'skipped' => 0,
             'scholarships_assigned' => 0,
+            'vouchers_assigned' => 0,
             'payments_processed' => 0,
             'errors' => [],
             'warnings' => [],
@@ -184,7 +185,7 @@ class StudentFinancialImportService
         // Process in batches to prevent timeout and memory issues
         for ($batchStart = $startRow; $batchStart <= $endRow; $batchStart += $this->batchSize) {
             $batchEnd = min($batchStart + $this->batchSize - 1, $endRow);
-            
+
             try {
                 // Process each batch in its own transaction
                 DB::transaction(function () use ($worksheet, $headers, $columnMapping, $batchStart, $batchEnd, &$results) {
@@ -260,7 +261,7 @@ class StudentFinancialImportService
                 });
 
                 $results['batches_processed']++;
-                
+
                 // Log progress for large imports
                 if ($totalRows > $this->batchSize) {
                     $progress = round(($results['total_rows'] / $totalRows) * 100, 1);
@@ -270,19 +271,19 @@ class StudentFinancialImportService
                         'failed' => $results['failed'],
                     ]);
                 }
-                
+
             } catch (Throwable $e) {
                 // Batch failed - log and stop import to prevent partial data
                 $results['failed'] += ($batchEnd - $batchStart + 1);
                 $results['errors'][] = "Batch {$results['batches_processed']} (rows {$batchStart}-{$batchEnd}): " . $e->getMessage();
-                
+
                 Log::error('Batch processing failed in student financial import', [
                     'batch_start' => $batchStart,
                     'batch_end' => $batchEnd,
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString()
                 ]);
-                
+
                 // Stop processing on batch failure to maintain data consistency
                 throw new \Exception(
                     "Import stopped at batch {$results['batches_processed']} due to errors. " .
@@ -293,6 +294,72 @@ class StudentFinancialImportService
         }
 
         return $results;
+    }
+
+    /**
+     * Get the first active billing cycle by created_at
+     */
+    protected function getActiveBillingCycleId(): ?int
+    {
+        $activeCycle = \App\Models\BillingCycle::where('status', 'active')
+            ->orderBy('created_at', 'asc')
+            ->first();
+
+        return $activeCycle?->id;
+    }
+
+    /**
+     * Process voucher redemptions for a student
+     */
+    protected function processVoucherRedemptions(Student $student, string $voucherCodes, ?int $billingCycleId, int $row): array
+    {
+        $count = 0;
+        $warnings = [];
+
+        // Split voucher codes by comma
+        $codes = array_map('trim', explode(',', $voucherCodes));
+        $codes = array_filter($codes); // Remove empty values
+
+        foreach ($codes as $code) {
+            try {
+                // Find voucher by code
+                $voucher = \App\Models\VoucherDefinition::where('code', $code)->first();
+
+                if (!$voucher) {
+                    $warnings[] = "Row {$row}: Voucher code '{$code}' not found";
+                    continue;
+                }
+
+                // Check if redemption already exists for this student, voucher, and billing cycle
+                $existingRedemption = \App\Models\VoucherRedemption::where('student_id', $student->id)
+                    ->where('voucher_id', $voucher->id)
+                    ->where('billing_cycle_id', $billingCycleId)
+                    ->first();
+
+                if ($existingRedemption) {
+                    $warnings[] = "Row {$row}: Voucher '{$code}' already assigned to student for this billing cycle";
+                    continue;
+                }
+
+                // Create voucher redemption
+                \App\Models\VoucherRedemption::create([
+                    'voucher_id' => $voucher->id,
+                    'student_id' => $student->id,
+                    'billing_cycle_id' => $billingCycleId,
+                    'status' => 'pending',
+                    'redeemed_at' => null,
+                ]);
+
+                $count++;
+            } catch (\Throwable $e) {
+                $warnings[] = "Row {$row}: Failed to assign voucher '{$code}' - " . $e->getMessage();
+            }
+        }
+
+        return [
+            'count' => $count,
+            'warnings' => $warnings,
+        ];
     }
 
     /**
@@ -487,9 +554,9 @@ class StudentFinancialImportService
 
             // Add sample data
             $sampleData = [
-                [1, 'MERIT2024', '', 5000000, '2024-01-15', 'Initial payment'],
-                [2, 'SPORTS2024', 'VOUCHER001,VOUCHER002', 3000000, '2024-01-20', 'Partial payment'],
-                [3, '', '', 10000000, '2024-01-25', 'Full payment'],
+                ['SV001', 'MERIT2024', 'VOUCHER001', 5000000, '2024-01-15', 'Initial payment'],
+                ['SV002', 'SPORTS2024', 'VOUCHER001,VOUCHER002', 3000000, '2024-01-20', 'Partial payment with multiple vouchers'],
+                ['SV003', '', 'SUMMER50', 10000000, '2024-01-25', 'Full payment with voucher only'],
             ];
 
             $sheet->fromArray($sampleData, null, 'A2');

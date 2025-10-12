@@ -41,6 +41,31 @@ class UpdateUnitRequest extends FormRequest
                 'max:999.99',
                 'decimal:0,2',
             ],
+            'level' => [
+                'required',
+                'integer',
+                'min:0',
+                'max:10',
+            ],
+            'base_fee' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:999999999.99',
+                'decimal:0,2',
+            ],
+            'retake_fee' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:999999999.99',
+                'decimal:0,2',
+            ],
+            'unit_type' => [
+                'required',
+                'string',
+                'in:general,egc,semi,ai,mkt,ba,cs,ee,me,fin',
+            ],
 
             // Prerequisite groups validation
             'prerequisite_groups' => ['nullable', 'array'],
@@ -74,6 +99,19 @@ class UpdateUnitRequest extends FormRequest
             'credit_points.required' => 'Credit points are required.',
             'credit_points.min' => 'Credit points must be at least 0.25.',
             'credit_points.max' => 'Credit points cannot exceed 999.99.',
+
+            'level.required' => 'Level is required.',
+            'level.min' => 'Level must be at least 1.',
+            'level.max' => 'Level cannot exceed 10.',
+
+            'base_fee.min' => 'Base fee must be at least 0.',
+            'base_fee.decimal' => 'Base fee can have at most 2 decimal places.',
+
+            'retake_fee.min' => 'Retake fee must be at least 0.',
+            'retake_fee.decimal' => 'Retake fee can have at most 2 decimal places.',
+
+            'unit_type.required' => 'Unit type is required.',
+            'unit_type.in' => 'Invalid unit type selected.',
 
             'prerequisite_expression.max' => 'Prerequisite expression cannot exceed 1000 characters.',
             'prerequisite_description.max' => 'Prerequisite description cannot exceed 500 characters.',

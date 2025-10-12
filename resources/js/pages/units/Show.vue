@@ -86,6 +86,16 @@ const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
 };
 
+// Format fee with K/M notation
+const formatFee = (value: number): string => {
+    if (value >= 1000000) {
+        return `${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+        return `${(value / 1000).toFixed(1)}K`;
+    }
+    return value.toLocaleString();
+};
+
 // Lưu function để tương thích với template có sẵn
 const navigateBackToUnits = navigateBack;
 
@@ -265,6 +275,23 @@ const hasRelationships = () => {
                 <div>
                     <h4 class="mb-1 text-sm font-medium text-gray-500">Credit Points</h4>
                     <p class="text-lg font-semibold text-blue-600">{{ unit.credit_points }}</p>
+                </div>
+                <div>
+                    <h4 class="mb-1 text-sm font-medium text-gray-500">Level</h4>
+                    <p class="text-lg font-semibold">{{ unit.level }}</p>
+                </div>
+                <div>
+                    <h4 class="mb-1 text-sm font-medium text-gray-500">Unit Type</h4>
+                    <p class="text-lg capitalize">{{ unit.unit_type?.replace('_', ' ') || 'General' }}</p>
+                </div>
+                <Separator />
+                <div v-if="unit.base_fee">
+                    <h4 class="mb-1 text-sm font-medium text-gray-500">Base Fee</h4>
+                    <p class="text-lg font-semibold text-green-600">{{ formatFee(unit.base_fee) }}</p>
+                </div>
+                <div v-if="unit.retake_fee">
+                    <h4 class="mb-1 text-sm font-medium text-gray-500">Retake Fee</h4>
+                    <p class="text-lg font-semibold text-orange-600">{{ formatFee(unit.retake_fee) }}</p>
                 </div>
                 <Separator />
                 <div class="grid grid-cols-1 gap-4 text-sm">

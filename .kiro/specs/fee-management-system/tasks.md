@@ -119,53 +119,53 @@ This document outlines the implementation tasks for the Fee Management System. E
     - Display validity status
     - _Requirements: 6.5, 6.8_
 
-- [ ]   8. Billing cycle management
-- [ ] 8.1 Create billing cycle migrations and models
+- [x]   8. Billing cycle management
+- [x] 8.1 Create billing cycle migrations and models
     - Create migration for `billing_cycles` table
     - Create BillingCycle model with status management
     - _Requirements: 7.1, 7.2_
 
-- [ ] 8.2 Create BillingCycleService
+- [x] 8.2 Create BillingCycleService
     - Implement createBillingCycle, activateBillingCycle, closeBillingCycle methods
     - Add date overlap validation
     - _Requirements: 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 8.3 Create BillingCycleController with Inertia
+- [x] 8.3 Create BillingCycleController with Inertia
     - Implement CRUD and status change operations
     - Pass semesters as props
     - _Requirements: 7.1, 7.6_
 
-- [ ] 8.4 Create billing cycle Vue components
+- [x] 8.4 Create billing cycle Vue components
     - Build BillingCycles/Index.vue with status indicators
     - Build BillingCycles/Create.vue form
     - Build BillingCycles/Show.vue with invoice list
     - _Requirements: 7.6_
 
-- [ ]   9. Invoice generation and management
-- [ ] 9.1 Create invoice migrations and models
+- [x]   9. Invoice generation and management
+- [x] 9.1 Create invoice migrations and models
     - Create migrations for `student_invoices`, `invoice_items`, `invoice_discounts` tables
     - Create models with relationships and calculated attributes
     - _Requirements: 8.1, 8.2, 8.5, 8.6_
 
-- [ ] 9.2 Create InvoiceService with generation logic
+- [x] 9.2 Create InvoiceService with generation logic
     - Implement generateInvoicesForCycle method
     - Add tuition item creation from tuition plans
     - Implement automatic scholarship discount application
     - Add invoice total calculation
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 9.3 Implement invoice number generation
+- [x] 9.3 Implement invoice number generation
     - Create unique invoice number generator
     - Add invoice number to invoice creation
     - _Requirements: 8.5_
 
-- [ ] 9.4 Create InvoiceController with Inertia
+- [x] 9.4 Create InvoiceController with Inertia
     - Implement index with filtering
     - Implement show with items and discounts
     - Implement generate endpoint
     - _Requirements: 8.1, 8.6, 8.8_
 
-- [ ] 9.5 Create invoice Vue components
+- [x] 9.5 Create invoice Vue components
     - Build Invoices/Index.vue with filters and status badges
     - Build Invoices/Show.vue with items and discounts tables
     - Build Invoices/Generate.vue form

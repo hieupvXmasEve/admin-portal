@@ -13,7 +13,7 @@ import type { ColumnDef } from '@tanstack/vue-table';
 import { debounce } from 'lodash-es';
 import { reactive } from 'vue';
 import { route } from 'ziggy-js';
-import { Edit, Eye } from 'lucide-vue-next';
+import { Edit, Eye, Upload } from 'lucide-vue-next';
 
 interface Voucher {
     id: number;
@@ -169,6 +169,12 @@ const handlePageSizeChange = (pageSize: number) => {
             <p class="text-muted-foreground mt-1 text-sm">Manage voucher definitions and redemptions</p>
         </div>
         <div class="flex gap-2">
+            <Button variant="outline" as-child>
+                <Link :href="route('vouchers.import')">
+                    <Upload class="mr-2 h-4 w-4" />
+                    Import Vouchers
+                </Link>
+            </Button>
             <Button as-child>
                 <Link :href="route('vouchers.create')">Create Voucher</Link>
             </Button>
