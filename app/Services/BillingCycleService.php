@@ -90,9 +90,24 @@ class BillingCycleService
     {
         $cycle = BillingCycle::findOrFail($id);
 
-        // Only allow updates if cycle is in draft status
-        if (!$cycle->isDraft()) {
-            throw new \Exception('Only draft billing cycles can be updated.');
+        if ($cycle->isClosed()) {
+            throw new \Exception('Closed billing cycles cannot be updated.');
+        }
+
+        if ($cycle->isActive()) {
+            if (!array_key_exists('name', $data)) {
+                throw new \Exception('Name is required to update an active billing cycle.');
+            }
+
+            $payload = [
+                'name' => $data['name'],
+            ];
+
+            return DB::transaction(function () use ($cycle, $payload) {
+                $cycle->update($payload);
+
+                return $cycle->fresh();
+            });
         }
 
         // Validate date sequence if dates are being updated
@@ -107,6 +122,7 @@ class BillingCycleService
 
         return DB::transaction(function () use ($cycle, $data) {
             $cycle->update($data);
+
             return $cycle->fresh();
         });
     }

@@ -21,13 +21,35 @@ class BillingCycleRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'semester_id' => 'required|integer|exists:semesters,id',
-            'name' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
-            'due_date' => 'required|date|after_or_equal:start_date',
-        ];
+        if ($this->isMethod('post')) {
+            return [
+                'semester_id' => 'required|integer|exists:semesters,id',
+                'name' => 'required|string|max:255',
+                'start_date' => 'required|date',
+                'end_date' => 'required|date|after:start_date',
+                'due_date' => 'required|date|after_or_equal:start_date',
+            ];
+        }
+
+        if ($this->isMethod('put') || $this->isMethod('patch')) {
+            $billingCycle = $this->route('billingCycle');
+
+            if ($billingCycle && $billingCycle->isActive()) {
+                return [
+                    'name' => 'required|string|max:255',
+                ];
+            }
+
+            return [
+                'semester_id' => 'required|integer|exists:semesters,id',
+                'name' => 'required|string|max:255',
+                'start_date' => 'required|date',
+                'end_date' => 'required|date|after:start_date',
+                'due_date' => 'required|date|after_or_equal:start_date',
+            ];
+        }
+
+        return [];
     }
 
     /**
