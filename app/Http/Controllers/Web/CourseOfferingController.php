@@ -175,111 +175,19 @@ class CourseOfferingController extends Controller
             ]);
         }
 
-        // Get curriculum units that should be offered in the active semester
-        // The system calculates the current semester_number for each curriculum version based on:
-        // 1. How many semesters have elapsed since the curriculum version started
-        // 2. Each curriculum version's effective starting semester
-        // This ensures proper academic progression for both new and continuing students
-
-        // Get all curriculum versions with their starting semesters
-        $allCurriculumVersions = \App\Models\CurriculumVersion::with(['curriculumUnits.unit', 'effectiveFromSemester'])
-            ->get();
-
-        // Get all semesters ordered by start date to calculate progression
-        $allSemesters = Semester::orderBy('start_date')->get(['id', 'start_date']);
-
-        // Create a mapping of semester_id to its sequential position
-        $semesterSequence = $allSemesters->pluck('id')->flip();
-
-        $availableUnits = collect();
-
-        foreach ($allCurriculumVersions as $curriculumVersion) {
-            // Get the starting semester position for this curriculum version
-            $startingSemesterPosition = $semesterSequence[$curriculumVersion->semester_id] ?? null;
-            $currentSemesterPosition = $semesterSequence[$activeSemester->id] ?? null;
-
-            if ($startingSemesterPosition === null || $currentSemesterPosition === null) {
-                continue;
-            }
-
-            // Calculate how many semesters have passed since this curriculum started
-            $elapsedSemesters = $currentSemesterPosition - $startingSemesterPosition;
-
-            // If curriculum hasn't started yet, skip it
-            if ($elapsedSemesters < 0) {
-                continue;
-            }
-
-            // Calculate the current semester number for this curriculum version
-            // Semester 1 starts when elapsedSemesters = 0, Semester 2 when elapsedSemesters = 1, etc.
-            $currentSemesterNumber = $elapsedSemesters + 1;
-
-            // Get units that should be offered in the current semester for this curriculum version
-            $currentSemesterUnits = $curriculumVersion->curriculumUnits()
-                ->where('semester_number', $currentSemesterNumber)
-                ->with('unit')
-                ->get();
-
-            foreach ($currentSemesterUnits as $curriculumUnit) {
-                $availableUnits->push([
-                    'curriculum_unit_id' => $curriculumUnit->id,
-                    'unit_id' => $curriculumUnit->unit->id,
-                    'code' => $curriculumUnit->unit->code,
-                    'name' => $curriculumUnit->unit->name,
-                    'credit_points' => $curriculumUnit->unit->credit_points,
-                    'year_level' => $curriculumUnit->year_level,
-                    'semester_number' => $curriculumUnit->semester_number,
-                    'curriculum_version_id' => $curriculumVersion->id,
-                    'curriculum_start_semester' => $curriculumVersion->effectiveFromSemester->name ?? 'Unknown',
-                    'elapsed_semesters' => $elapsedSemesters,
-                    'current_semester_in_curriculum' => $currentSemesterNumber,
-                    'source' => $elapsedSemesters === 0 ? 'new_curriculum' : 'continuing_curriculum',
-                ]);
-            }
-        }
-
-        // Add common curriculum units that are available regardless of semester progression
-        // These are foundational units with scope = 'common' and semester_number = null
-        $commonUnits = \App\Models\CurriculumUnit::with(['unit', 'curriculumVersion.effectiveFromSemester'])
-            ->where('unit_scope', 'common')
-            ->whereNull('semester_number')
-            ->get();
-
-        foreach ($commonUnits as $curriculumUnit) {
-            $availableUnits->push([
-                'curriculum_unit_id' => $curriculumUnit->id,
-                'unit_id' => $curriculumUnit->unit->id,
-                'code' => $curriculumUnit->unit->code,
-                'name' => $curriculumUnit->unit->name,
-                'credit_points' => $curriculumUnit->unit->credit_points,
-                'year_level' => $curriculumUnit->year_level ?? 0,
-                'semester_number' => null,
-                'curriculum_version_id' => $curriculumUnit->curriculum_version_id,
-                'curriculum_start_semester' => $curriculumUnit->curriculumVersion->effectiveFromSemester->name ?? 'Unknown',
-                'elapsed_semesters' => null,
-                'current_semester_in_curriculum' => null,
-                'source' => 'common_curriculum',
-            ]);
-        }
-
-        // Remove duplicates by unit_id (same unit can exist in multiple curriculum versions)
-        // Priority: common_curriculum > new_curriculum > continuing_curriculum
-        $unitPriority = [
-            'common_curriculum' => 1,
-            'new_curriculum' => 2,
-            'continuing_curriculum' => 3,
-        ];
-
-        $curriculumUnits = $availableUnits
-            ->groupBy('unit_id')
-            ->map(function ($unitGroup) use ($unitPriority) {
-                // Sort by priority and return the highest priority unit
-                return $unitGroup->sortBy(function ($unit) use ($unitPriority) {
-                    return $unitPriority[$unit['source']] ?? 999;
-                })->first();
-            })
-            ->sortBy('code')
-            ->values();
+        // Get all units from the system, sorted by code
+        $units = Unit::orderBy('code')
+            ->get(['id', 'code', 'name', 'credit_points', 'level', 'unit_type'])
+            ->map(function ($unit) {
+                return [
+                    'unit_id' => $unit->id,
+                    'code' => $unit->code,
+                    'name' => $unit->name,
+                    'credit_points' => $unit->credit_points,
+                    'level' => $unit->level,
+                    'unit_type' => $unit->unit_type,
+                ];
+            });
 
         // Get available lectures
         $lectures = Lecture::active()
@@ -301,7 +209,7 @@ class CourseOfferingController extends Controller
                 'start_date' => $activeSemester->start_date,
                 'end_date' => $activeSemester->end_date,
             ],
-            'units' => $curriculumUnits,
+            'units' => $units,
             'lectures' => $lectures,
             'syllabusTemplates' => $syllabusTemplates,
             'error' => null,
@@ -316,13 +224,8 @@ class CourseOfferingController extends Controller
         $validatedData = $request->validated();
         $validatedData['campus_id'] = app('campus')->id;
 
-        // Get the unit_id from the selected curriculum_unit_id
-        if (isset($validatedData['curriculum_unit_id'])) {
-            $curriculumUnit = \App\Models\CurriculumUnit::with('unit')->find($validatedData['curriculum_unit_id']);
-            if ($curriculumUnit && $curriculumUnit->unit) {
-                $validatedData['unit_id'] = $curriculumUnit->unit->id;
-            }
-        }
+        // unit_id is now passed directly from the form, curriculum_unit_id is optional
+        // No need to derive unit_id from curriculum_unit_id anymore
 
         CourseOffering::create($validatedData);
 
@@ -784,6 +687,20 @@ class CourseOfferingController extends Controller
         $studentIds = array_filter($studentIds); // Remove empty values
         $studentIds = array_unique($studentIds); // Remove duplicates
 
+        // Load unit with courseOffering to check unit type
+        $courseOffering->load('unit');
+        $unit = $courseOffering->unit;
+        $isEgcUnit = $unit && $unit->unit_type === 'egc';
+
+        // Log for debugging
+        Log::info('CourseOffering Unit Info', [
+            'unit_id' => $unit?->id,
+            'unit_code' => $unit?->code,
+            'unit_type' => $unit?->unit_type,
+            'unit_level' => $unit?->level,
+            'is_egc_unit' => $isEgcUnit,
+        ]);
+
         $results = [];
 
         foreach ($studentIds as $studentId) {
@@ -852,26 +769,77 @@ class CourseOfferingController extends Controller
                         $isEligible = true;
                         $reasons = [];
 
-                        // Check if student is active
-                        if (!$student->isActive()) {
+                        // Validate student type based on unit type
+                        if ($isEgcUnit) {
+                            // Log student info for debugging
+                            Log::info('EGC Unit - Checking Student', [
+                                'student_id' => $student->student_id,
+                                'student_status' => $student->status,
+                                'gc_current_level' => $student->gc_current_level,
+                                'unit_level' => $unit->level,
+                            ]);
+
+                            // EGC units: only allow intake_pre_uni_gc students
+                            if ($student->status !== 'intake_pre_uni_gc') {
+                                $isEligible = false;
+                                $reasons[] = "EGC units require student type 'intake_pre_uni_gc' (current: '{$student->status}')";
+                            } else {
+                                // Check if unit has level defined (use is_null to allow level 0)
+                                if (is_null($unit->level)) {
+                                    $isEligible = false;
+                                    $reasons[] = "Unit level is not defined for this EGC unit";
+                                    Log::error('EGC Unit Missing Level', [
+                                        'unit_id' => $unit->id,
+                                        'unit_code' => $unit->code,
+                                    ]);
+                                } 
+                                // Check if student has gc_current_level defined (use is_null to allow level 0)
+                                elseif (is_null($student->gc_current_level)) {
+                                    $isEligible = false;
+                                    $reasons[] = "Student's GC level is not set";
+                                    Log::error('Student Missing GC Level', [
+                                        'student_id' => $student->student_id,
+                                    ]);
+                                }
+                                // Check if student's current GC level matches unit level
+                                elseif ($student->gc_current_level !== $unit->level) {
+                                    $isEligible = false;
+                                    $reasons[] = "Student's current GC level ({$student->gc_current_level}) does not match unit level ({$unit->level})";
+                                    Log::warning('EGC Level Mismatch', [
+                                        'student_id' => $student->student_id,
+                                        'student_level' => $student->gc_current_level,
+                                        'required_level' => $unit->level,
+                                    ]);
+                                }
+                            }
+                        } else {
+                            // Non-EGC units: only allow intake_course students
+                            if ($student->status !== 'intake_course') {
+                                $isEligible = false;
+                                $reasons[] = "This unit requires student type 'intake_course' (current: '{$student->status}')";
+                            }
+                        }
+
+                        // Check if student is active (only if not already failed above validation)
+                        if ($isEligible && !$student->isActive()) {
                             $isEligible = false;
                             $reasons[] = "Student status is '{$student->status}' (must be 'active')";
                         }
 
                         // Check for academic holds (if method exists)
-                        if (method_exists($student, 'hasActiveHolds') && $student->hasActiveHolds()) {
+                        if ($isEligible && method_exists($student, 'hasActiveHolds') && $student->hasActiveHolds()) {
                             $isEligible = false;
                             $reasons[] = 'Student has active academic holds';
                         }
 
                         // Check course offering capacity
-                        if ($courseOffering->isFull()) {
+                        if ($isEligible && $courseOffering->isFull()) {
                             $isEligible = false;
                             $reasons[] = 'Course offering is at full capacity';
                         }
 
                         // Check if registration is open
-                        if (!$courseOffering->isRegistrationOpen()) {
+                        if ($isEligible && !$courseOffering->isRegistrationOpen()) {
                             $isEligible = false;
                             $reasons[] = 'Registration period is not currently open';
                         }
@@ -915,6 +883,11 @@ class CourseOfferingController extends Controller
             'student_ids.*' => ['required', 'string'],
         ]);
 
+        // Load unit to check unit type
+        $courseOffering->load('unit');
+        $unit = $courseOffering->unit;
+        $isEgcUnit = $unit && $unit->unit_type === 'egc';
+
         $studentIds = array_unique($validated['student_ids']);
         $results = [];
         $successCount = 0;
@@ -941,6 +914,56 @@ class CourseOfferingController extends Controller
                         $failureCount++;
                         $results[] = $result;
                         continue;
+                    }
+
+                    // Validate student type based on unit type
+                    if ($isEgcUnit) {
+                        // EGC units: only allow intake_pre_uni_gc students
+                        if ($student->status !== 'intake_pre_uni_gc') {
+                            $result['message'] = "EGC units require student type 'intake_pre_uni_gc' (current: '{$student->status}')";
+                            $failureCount++;
+                            $results[] = $result;
+                            continue;
+                        }
+
+                        // Check if unit has level defined (use is_null to allow level 0)
+                        if (is_null($unit->level)) {
+                            $result['message'] = "Unit level is not defined for this EGC unit";
+                            $failureCount++;
+                            $results[] = $result;
+                            Log::error('EGC Unit Missing Level', [
+                                'unit_id' => $unit->id,
+                                'unit_code' => $unit->code,
+                            ]);
+                            continue;
+                        }
+
+                        // Check if student has gc_current_level defined (use is_null to allow level 0)
+                        if (is_null($student->gc_current_level)) {
+                            $result['message'] = "Student's GC level is not set";
+                            $failureCount++;
+                            $results[] = $result;
+                            Log::error('Student Missing GC Level', [
+                                'student_id' => $student->student_id,
+                            ]);
+                            continue;
+                        }
+
+                        // Check if student's current GC level matches unit level
+                        if ($student->gc_current_level !== $unit->level) {
+                            $result['message'] = "Student's current GC level ({$student->gc_current_level}) does not match unit level ({$unit->level})";
+                            $failureCount++;
+                            $results[] = $result;
+                            continue;
+                        }
+                    } else {
+                        // Non-EGC units: only allow intake_course students
+                        if ($student->status !== 'intake_course') {
+                            $result['message'] = "This unit requires student type 'intake_course' (current: '{$student->status}')";
+                            $failureCount++;
+                            $results[] = $result;
+                            continue;
+                        }
                     }
 
                     // Check if already registered for this specific course offering
