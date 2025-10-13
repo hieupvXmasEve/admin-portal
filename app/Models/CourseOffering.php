@@ -69,7 +69,8 @@ class CourseOffering extends AuditableModel
     {
         return [
             'semester_id' => ['required', 'exists:semesters,id'],
-            'curriculum_unit_id' => ['required', 'exists:curriculum_units,id'],
+            'unit_id' => ['required', 'exists:units,id'],
+            'curriculum_unit_id' => ['nullable', 'exists:curriculum_units,id'],
             'syllabus_template_id' => ['nullable', 'exists:syllabus_templates,id'],
             'lecture_id' => ['nullable', 'exists:lectures,id'],
             'section_code' => ['nullable', 'string', 'max:10'],
@@ -97,7 +98,8 @@ class CourseOffering extends AuditableModel
         return [
             'semester_id.required' => 'Semester is required',
             'semester_id.exists' => 'Selected semester does not exist',
-            'curriculum_unit_id.required' => 'Curriculum unit is required',
+            'unit_id.required' => 'Unit is required',
+            'unit_id.exists' => 'Selected unit does not exist',
             'curriculum_unit_id.exists' => 'Selected curriculum unit does not exist',
             'syllabus_template_id.exists' => 'Selected syllabus template does not exist',
             'lecture_id.exists' => 'Selected lecture does not exist',

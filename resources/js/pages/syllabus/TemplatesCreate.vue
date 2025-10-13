@@ -47,7 +47,7 @@ const formSchema = toTypedSchema(
                 z.object({
                     name: z.string().min(1, { message: 'Component name is required' }),
                     weight: z.number().min(0, { message: 'Weight must be non-negative' }).max(100, { message: 'Weight cannot exceed 100%' }),
-                    type: z.enum(['quiz', 'assignment', 'project', 'exam', 'online_activity', 'other'], {
+                    type: z.enum(['quiz', 'assignment', 'project', 'exam', 'online_activity', 'attendance', 'other'], {
                         errorMap: () => ({ message: 'Please select a valid assessment type' }),
                     }),
                     // is_required_to_sit_final_exam: z.boolean().default(true),
@@ -82,10 +82,11 @@ const formSchema = toTypedSchema(
 );
 
 // Form Setup
+const currentYear = new Date().getFullYear();
 const form = useForm({
     validationSchema: formSchema,
     initialValues: {
-        version: '',
+        version: `v1-${currentYear}`,
         description: '',
         total_hours: 0,
         total_sessions: 1,
@@ -94,24 +95,21 @@ const form = useForm({
         // init 3 components
         assessment_components: [
             {
-                name: '',
+                name: 'Attendance',
+                weight: 10,
+                type: 'attendance',
+                details: [{ name: 'Attendance', weight: 100 }],
+            },
+            {
+                name: 'Middle Exam',
                 weight: 40,
-                type: 'assignment',
-                // is_required_to_sit_final_exam: true,
+                type: 'exam',
                 details: [],
             },
             {
-                name: '',
-                weight: 30,
-                type: 'online_activity',
-                // is_required_to_sit_final_exam: false,
-                details: [],
-            },
-            {
-                name: '',
-                weight: 30,
-                type: 'quiz',
-                // is_required_to_sit_final_exam: false,
+                name: 'Final Exam',
+                weight: 50,
+                type: 'exam',
                 details: [],
             },
         ],
@@ -201,10 +199,25 @@ const getAssessmentTypeColor = (type: string) => {
             return 'bg-red-100 text-red-800';
         case 'online_activity':
             return 'bg-yellow-100 text-yellow-800';
+        case 'attendance':
+            return 'bg-indigo-100 text-indigo-800';
         case 'other':
             return 'bg-gray-100 text-gray-800';
         default:
             return 'bg-gray-100 text-gray-800';
+    }
+};
+
+const handleTypeChange = (componentIndex: number, newType: string) => {
+    const current = form.values.assessment_components || [];
+    const next = [...current];
+    if (next[componentIndex]) {
+        next[componentIndex].type = newType;
+        // If type is attendance, ensure exactly one detail with 100%
+        if (newType === 'attendance') {
+            next[componentIndex].details = [{ name: 'Attendance', weight: 100 }];
+        }
+        form.setFieldValue('assessment_components', next);
     }
 };
 
@@ -499,7 +512,10 @@ const filteredAvailableUnits = computed(() => {
                                 <FormItem>
                                     <FormLabel :for="`component_type_${componentIndex}`">Type</FormLabel>
                                     <FormControl>
-                                        <Select v-bind="componentField">
+                                        <Select
+                                            :model-value="componentField.modelValue"
+                                            @update:model-value="(value) => { componentField['onUpdate:modelValue'](value); handleTypeChange(componentIndex, value); }"
+                                        >
                                             <SelectTrigger>
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -530,7 +546,13 @@ const filteredAvailableUnits = computed(() => {
                                         <span v-if="Math.abs((getSubComponentTotalWeight(componentIndex) || 0) - 100) >= 0.01" class="ml-2 text-red-600">❌ Must equal 100%</span>
                                         <span v-else class="ml-2 text-green-600">✅</span>
                                     </div>
-                                    <Button type="button" variant="outline" size="sm" @click="addComponentDetail(componentIndex)">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        @click="addComponentDetail(componentIndex)"
+                                        :disabled="component.type === 'attendance'"
+                                    >
                                         <Plus class="mr-1 h-3 w-3" />
                                         Add Detail
                                     </Button>
@@ -547,7 +569,11 @@ const filteredAvailableUnits = computed(() => {
                                     <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`">
                                         <FormItem class="flex-1">
                                             <FormControl>
-                                                <Input placeholder="Detail name" v-bind="componentField" />
+                                                <Input
+                                                    placeholder="Detail name"
+                                                    v-bind="componentField"
+                                                    :disabled="component.type === 'attendance'"
+                                                />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -573,6 +599,7 @@ const filteredAvailableUnits = computed(() => {
                                                         minimumFractionDigits: 0,
                                                         maximumFractionDigits: 2,
                                                     }"
+                                                    :disabled="component.type === 'attendance'"
                                                 >
                                                     <NumberFieldContent>
                                                         <NumberFieldInput />
@@ -582,7 +609,13 @@ const filteredAvailableUnits = computed(() => {
                                             <FormMessage />
                                         </FormItem>
                                     </FormField>
-                                    <Button type="button" variant="ghost" size="sm" @click="removeComponentDetail(componentIndex, detailIndex)">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        @click="removeComponentDetail(componentIndex, detailIndex)"
+                                        :disabled="component.type === 'attendance'"
+                                    >
                                         <Trash2 class="h-4 w-4 text-red-600" />
                                     </Button>
                                 </div>

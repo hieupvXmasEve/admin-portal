@@ -16,6 +16,7 @@ interface Unit {
     id: number;
     code: string;
     name: string;
+    level: number;
 }
 interface TemplateRow {
     id: number;
@@ -33,7 +34,7 @@ const props = defineProps<{
     filters: { search?: string; is_active?: string | null; unit_id?: number | null; per_page?: number };
     units: Unit[];
 }>();
-
+console.log(props.items);
 const { filters, updateFieldDebounced, updateField, handlePaginationNavigate, handlePageSizeChange } = useTableFilters<{
     search?: string;
     is_active?: string | null;
@@ -50,7 +51,12 @@ const columns = computed<ColumnDef<TemplateRow>[]>(() => [
     {
         accessorKey: 'unit',
         header: 'Unit',
-        cell: ({ row }) => `${row.original.unit?.code ?? ''} ${row.original.unit?.name ?? ''}`.trim(),
+        cell: ({ row }) => `${row.original.unit?.code ?? ''} - ${row.original.unit?.name ?? ''}`.trim(),
+    },
+    {
+        accessorKey: 'unit',
+        header: 'Level',
+        cell: ({ row }) => row.original.unit?.level ?? '—',
     },
     {
         accessorKey: 'version',

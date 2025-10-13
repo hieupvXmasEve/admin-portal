@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxItemIndicator, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import type { CourseOfferingFormData, Lecture } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
-import { ArrowLeft, Save } from 'lucide-vue-next';
+import { ArrowLeft, Check, ChevronsUpDown, Save, Search } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
@@ -24,18 +25,12 @@ interface Props {
         end_date: string;
     } | null;
     units: Array<{
-        curriculum_unit_id: number;
         unit_id: number;
         code: string;
         name: string;
         credit_points: number;
-        year_level: number;
-        semester_number: number | null;
-        curriculum_version_id: number;
-        curriculum_start_semester: string;
-        elapsed_semesters: number | null;
-        current_semester_in_curriculum: number | null;
-        source: 'new_curriculum' | 'continuing_curriculum' | 'common_curriculum';
+        level: number | null;
+        unit_type: string | null;
     }>;
     lectures: Lecture[];
     syllabusTemplates: Array<{
@@ -67,7 +62,7 @@ const submitError = ref<string | null>(null);
 // Define validation schema that exactly matches backend CourseOffering validation rules
 const formSchema = toTypedSchema(
     z.object({
-        curriculum_unit_id: z.string().min(1, 'Unit is required'),
+        unit_id: z.string().min(1, 'Unit is required'),
         syllabus_template_id: z.string().optional(),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
@@ -91,7 +86,7 @@ const formSchema = toTypedSchema(
 const { handleSubmit, isSubmitting, values, setFieldValue } = useForm({
     validationSchema: formSchema,
     initialValues: {
-        curriculum_unit_id: '',
+        unit_id: '',
         syllabus_template_id: '',
         lecture_id: '',
         section_code: '',
@@ -110,10 +105,23 @@ const { handleSubmit, isSubmitting, values, setFieldValue } = useForm({
     } satisfies Omit<CourseOfferingFormData, 'semester_id'>,
 });
 
-// Get the selected unit based on curriculum_unit_id
+// Get the selected unit based on unit_id
 const selectedUnit = computed(() => {
-    if (!values.curriculum_unit_id) return null;
-    return props.units.find((unit) => unit.curriculum_unit_id.toString() === values.curriculum_unit_id);
+    if (!values.unit_id) return null;
+    return props.units.find((unit) => unit.unit_id.toString() === values.unit_id);
+});
+
+// Search term for filtering units
+const searchTerm = ref('');
+
+// Filtered units based on search term
+const filteredUnits = computed(() => {
+    if (!searchTerm.value) return props.units;
+    const term = searchTerm.value.toLowerCase();
+    return props.units.filter((unit) => 
+        unit.code.toLowerCase().includes(term) || 
+        unit.name.toLowerCase().includes(term)
+    );
 });
 
 // Filter syllabus templates based on selected unit
@@ -122,9 +130,9 @@ const filteredSyllabusTemplates = computed(() => {
     return props.syllabusTemplates.filter((template) => template.unit_id === selectedUnit.value!.unit_id);
 });
 
-// Watch for curriculum unit changes and clear syllabus template selection
+// Watch for unit changes and clear syllabus template selection
 watch(
-    () => values.curriculum_unit_id,
+    () => values.unit_id,
     (newUnitId, oldUnitId) => {
         // Clear syllabus template selection when unit changes
         if (newUnitId !== oldUnitId && values.syllabus_template_id) {
@@ -139,7 +147,7 @@ const onSubmit = handleSubmit((values) => {
     // Transform form data to match backend expectations
     const formData = {
         semester_id: props.activeSemester?.id,
-        curriculum_unit_id: values.curriculum_unit_id,
+        unit_id: values.unit_id,
         syllabus_template_id: !values.syllabus_template_id || values.syllabus_template_id === 'none' || values.syllabus_template_id === '' ? null : values.syllabus_template_id,
         lecture_id: !values.lecture_id || values.lecture_id === '' ? null : values.lecture_id,
         section_code: values.section_code || null,
@@ -270,15 +278,6 @@ const dayOptions = [
                 <p>
                     <strong>{{ props.units.length }}</strong> units available
                 </p>
-                <div class="mt-1 space-y-1">
-                    <div>
-                        <span class="mr-2 inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs text-green-800"> {{ props.units.filter((u) => u.source === 'new_curriculum').length }} New </span>
-                        <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800"> {{ props.units.filter((u) => u.source === 'continuing_curriculum').length }} Continuing </span>
-                    </div>
-                    <div>
-                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-800"> {{ props.units.filter((u) => u.source === 'common_curriculum').length }} Common </span>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -291,18 +290,74 @@ const dayOptions = [
                     <CardTitle>Basic Information</CardTitle>
                 </CardHeader>
                 <CardContent class="space-y-4">
-                    <FormField v-slot="{ componentField }" name="curriculum_unit_id">
+                    <FormField v-slot="{ componentField }" name="unit_id">
                         <FormItem>
                             <FormLabel>Unit *</FormLabel>
                             <FormControl>
-                                <Select v-bind="componentField">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select unit" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="unit in props.units" :key="unit.curriculum_unit_id" :value="unit.curriculum_unit_id.toString()"> {{ unit.code }} - {{ unit.name }} ({{ unit.credit_points }} credits) </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    :model-value="componentField.modelValue ? props.units.find(u => u.unit_id.toString() === componentField.modelValue) : undefined"
+                                    @update:model-value="(val) => { componentField['onUpdate:modelValue'](val?.unit_id.toString() ?? ''); searchTerm = ''; }"
+                                    by="unit_id"
+                                    v-model:search-term="searchTerm"
+                                >
+                                    <ComboboxAnchor as-child>
+                                        <ComboboxTrigger as-child>
+                                            <Button variant="outline" class="w-full justify-between">
+                                                <span class="truncate">
+                                                    {{ componentField.modelValue && selectedUnit ? `${selectedUnit.code} - ${selectedUnit.name}` : 'Search units...' }}
+                                                </span>
+                                                <ChevronsUpDown class="text-muted-foreground ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </ComboboxTrigger>
+                                    </ComboboxAnchor>
+                                    
+                                    <ComboboxList class="w-[var(--reka-combobox-trigger-width)]">
+                                        <!-- Search Input -->
+                                        <div class="relative w-full items-center">
+                                            <ComboboxInput 
+                                                class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0" 
+                                                placeholder="Search units by code or name..."
+                                                @update:model-value="(value) => (searchTerm = value)"
+                                            />
+                                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center px-3">
+                                                <Search class="text-muted-foreground size-4" />
+                                            </span>
+                                        </div>
+
+                                        <!-- Content with proper height and scrolling -->
+                                        <ComboboxViewport class="max-h-[300px] overflow-y-auto">
+                                            <!-- Empty state -->
+                                            <ComboboxEmpty>
+                                                <div class="flex items-center justify-center py-6">
+                                                    <span class="text-muted-foreground text-sm">No units found for "{{ searchTerm }}"</span>
+                                                </div>
+                                            </ComboboxEmpty>
+
+                                            <!-- Unit list -->
+                                            <ComboboxGroup v-if="filteredUnits.length > 0">
+                                                <ComboboxItem
+                                                    v-for="unit in filteredUnits"
+                                                    :key="unit.unit_id"
+                                                    :value="unit"
+                                                >
+                                                    <div class="flex w-full items-center justify-between gap-3">
+                                                        <div class="flex min-w-0 flex-1 flex-col">
+                                                            <span class="truncate font-medium">{{ unit.code }}</span>
+                                                            <span class="text-muted-foreground truncate text-xs">{{ unit.name }}</span>
+                                                        </div>
+                                                        <div class="text-muted-foreground flex shrink-0 items-center gap-2 text-xs">
+                                                            <span v-if="unit.level">Level {{ unit.level }}</span>
+                                                            <span>{{ unit.credit_points }} credits</span>
+                                                        </div>
+                                                    </div>
+                                                    <ComboboxItemIndicator>
+                                                        <Check class="ml-2 h-4 w-4" />
+                                                    </ComboboxItemIndicator>
+                                                </ComboboxItem>
+                                            </ComboboxGroup>
+                                        </ComboboxViewport>
+                                    </ComboboxList>
+                                </Combobox>
                             </FormControl>
                             <FormMessage />
                         </FormItem>

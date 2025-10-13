@@ -163,10 +163,25 @@ const getAssessmentTypeColor = (type: string) => {
             return 'bg-red-100 text-red-800';
         case 'online_activity':
             return 'bg-yellow-100 text-yellow-800';
+        case 'attendance':
+            return 'bg-indigo-100 text-indigo-800';
         case 'other':
             return 'bg-gray-100 text-gray-800';
         default:
             return 'bg-gray-100 text-gray-800';
+    }
+};
+
+const handleTypeChange = (componentIndex: number, newType: string) => {
+    const current = (form.values.assessment_components as any[]) || [];
+    const next = [...current];
+    if (next[componentIndex]) {
+        next[componentIndex].type = newType;
+        // If type is attendance, ensure exactly one detail with 100%
+        if (newType === 'attendance') {
+            next[componentIndex].details = [{ name: 'Attendance', weight: 100 }];
+        }
+        form.setFieldValue('assessment_components', next);
     }
 };
 
@@ -442,7 +457,15 @@ const onSubmit = form.handleSubmit((formData) => {
                             <FormItem>
                                 <FormLabel>Type</FormLabel>
                                 <FormControl>
-                                    <Select v-bind="componentField">
+                                    <Select
+                                        :model-value="componentField.modelValue"
+                                        @update:model-value="
+                                            (value) => {
+                                                componentField['onUpdate:modelValue'](value);
+                                                handleTypeChange(componentIndex, value);
+                                            }
+                                        "
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select type" />
                                         </SelectTrigger>
@@ -458,7 +481,7 @@ const onSubmit = form.handleSubmit((formData) => {
                         </FormField>
 
                         <div class="flex items-end">
-                            <Button type="button" variant="outline" size="sm" @click="addComponentDetail(componentIndex)">
+                            <Button type="button" variant="outline" size="sm" @click="addComponentDetail(componentIndex)" :disabled="component.type === 'attendance'">
                                 <Plus class="mr-1 h-3 w-3" />
                                 Add Detail
                             </Button>
@@ -468,7 +491,7 @@ const onSubmit = form.handleSubmit((formData) => {
                     <FormField v-slot="{ value, handleChange }" :name="`assessment_components.${componentIndex}.is_required_to_sit_final_exam`">
                         <FormItem class="mt-4 flex items-center space-y-0 space-x-3">
                             <FormControl>
-                                <Checkbox :checked="value" @update:checked="handleChange" />
+                                <Checkbox :model-value="value" @update:model-value="handleChange" />
                             </FormControl>
                             <FormLabel class="text-sm">Required to sit final exam</FormLabel>
                         </FormItem>
@@ -489,7 +512,7 @@ const onSubmit = form.handleSubmit((formData) => {
                                         <FormItem class="flex-1">
                                             <FormLabel v-if="detailIndex === 0" class="text-xs">Detail Name</FormLabel>
                                             <FormControl>
-                                                <Input v-bind="componentField" placeholder="e.g., Part A" class="text-sm" />
+                                                <Input v-bind="componentField" placeholder="e.g., Part A" class="text-sm" :disabled="component.type === 'attendance'" />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -513,6 +536,7 @@ const onSubmit = form.handleSubmit((formData) => {
                                                     :default-value="0"
                                                     :min="0"
                                                     :max="100"
+                                                    :disabled="component.type === 'attendance'"
                                                 >
                                                     <NumberFieldContent>
                                                         <NumberFieldInput class="text-sm" />
@@ -523,7 +547,7 @@ const onSubmit = form.handleSubmit((formData) => {
                                         </FormItem>
                                     </FormField>
 
-                                    <Button type="button" variant="ghost" size="sm" @click="removeComponentDetail(componentIndex, detailIndex)" class="mb-1">
+                                    <Button type="button" variant="ghost" size="sm" @click="removeComponentDetail(componentIndex, detailIndex)" class="mb-1" :disabled="component.type === 'attendance'">
                                         <Trash2 class="h-3 w-3" />
                                     </Button>
                                 </div>

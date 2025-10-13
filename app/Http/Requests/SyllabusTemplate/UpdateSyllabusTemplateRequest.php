@@ -10,7 +10,7 @@ class UpdateSyllabusTemplateRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return true;
     }
 
     public function rules(): array
@@ -40,7 +40,7 @@ class UpdateSyllabusTemplateRequest extends FormRequest
             'assessment_components.*.id' => ['nullable', 'integer', 'exists:assessment_components,id'],
             'assessment_components.*.name' => ['required_with:assessment_components', 'string', 'max:255'],
             'assessment_components.*.weight' => ['required_with:assessment_components', 'numeric', 'min:0', 'max:100'],
-            'assessment_components.*.type' => ['required_with:assessment_components', 'in:quiz,assignment,project,exam,online_activity,other'],
+            'assessment_components.*.type' => ['required_with:assessment_components', 'in:quiz,assignment,project,exam,online_activity,other,attendance'],
             'assessment_components.*.details' => ['nullable', 'array'],
             'assessment_components.*.details.*.id' => ['nullable', 'integer', 'exists:assessment_component_details,id'],
             'assessment_components.*.details.*.name' => ['required_with:assessment_components.*.details', 'string', 'max:255'],

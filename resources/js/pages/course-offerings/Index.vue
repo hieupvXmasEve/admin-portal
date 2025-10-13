@@ -180,13 +180,25 @@ const deleteCourseOffering = (courseOffering: CourseOffering) => {
     confirmDialog.confirmDelete(itemName, 'course offering', () => {
         return new Promise((resolve, reject) => {
             router.delete(`/course-offerings/${courseOffering.id}`, {
-                onSuccess: () => {
-                    toast.success('Course offering deleted successfully');
-                    resolve();
+                onSuccess: (page) => {
+                    // Check if there's a flash error message (indicates deletion failed)
+                    if (page.props.flash?.error) {
+                        toast.error(page.props.flash.error as string);
+                        reject(new Error(page.props.flash.error as string));
+                    } else {
+                        // Show success message from flash or default
+                        const successMessage = (page.props.flash?.success as string) || 'Course offering deleted successfully';
+                        toast.success(successMessage);
+                        resolve();
+                    }
                 },
                 onError: (errors) => {
                     console.error('Failed to delete course offering:', errors);
-                    reject(new Error('Failed to delete course offering'));
+                    // Show first error message if available
+                    const firstError = Object.values(errors)[0];
+                    const errorMessage = Array.isArray(firstError) ? firstError[0] : (firstError as string) || 'Failed to delete course offering';
+                    toast.error(errorMessage);
+                    reject(new Error(errorMessage));
                 },
             });
         });
@@ -240,13 +252,26 @@ const bulkDelete = () => {
                 return new Promise((resolve, reject) => {
                     router.delete('/api/course-offerings/bulk-delete', {
                         data: { ids: selectedItems.value },
-                        onSuccess: () => {
-                            selectedItems.value = [];
-                            resolve();
+                        onSuccess: (page) => {
+                            // Check if there's a flash error message (indicates deletion failed)
+                            if (page.props.flash?.error) {
+                                toast.error(page.props.flash.error as string);
+                                reject(new Error(page.props.flash.error as string));
+                            } else {
+                                // Show success message from flash or default
+                                const successMessage = (page.props.flash?.success as string) || 'Course offerings deleted successfully';
+                                toast.success(successMessage);
+                                selectedItems.value = [];
+                                resolve();
+                            }
                         },
                         onError: (errors) => {
                             console.error('Failed to delete course offerings:', errors);
-                            reject(new Error('Failed to delete course offerings'));
+                            // Show first error message if available
+                            const firstError = Object.values(errors)[0];
+                            const errorMessage = Array.isArray(firstError) ? firstError[0] : (firstError as string) || 'Failed to delete course offerings';
+                            toast.error(errorMessage);
+                            reject(new Error(errorMessage));
                         },
                     });
                 });

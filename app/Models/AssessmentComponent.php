@@ -69,6 +69,7 @@ class AssessmentComponent extends AuditableModel
         'project' => 'Project',
         'exam' => 'Exam',
         'online_activity' => 'Online Activity',
+        'attendance' => 'Attendance',
         'other' => 'Other',
     ];
 

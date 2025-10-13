@@ -216,7 +216,7 @@ class SyllabusTemplateController extends Controller
                 $incomingComponents = $request->input('assessment_components', []);
 
                 // Map existing components by id
-                $existingComponents = \App\Models\AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->getKey())
+                $existingComponents = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->getKey())
                     ->get()
                     ->keyBy('id');
 
@@ -314,7 +314,7 @@ class SyllabusTemplateController extends Controller
 
                 // Delete components not present
                 if (!empty($keepComponentIds)) {
-                    $toDelete = \App\Models\AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->getKey())
+                    $toDelete = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->getKey())
                         ->whereNotIn('id', $keepComponentIds)
                         ->get();
                     foreach ($toDelete as $delComp) {
@@ -323,7 +323,7 @@ class SyllabusTemplateController extends Controller
                     }
                 } else {
                     // No components in payload => remove all
-                    $all = \App\Models\AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->getKey())->get();
+                    $all = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->getKey())->get();
                     foreach ($all as $delComp) {
                         \App\Models\AssessmentComponentDetail::where('assessment_component_id', $delComp->getKey())->delete();
                         $delComp->delete();
