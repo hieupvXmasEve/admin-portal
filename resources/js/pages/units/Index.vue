@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
+import DebouncedInput from '@/components/DebouncedInput.vue';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useTableFilters } from '@/composables/useFilters';
 import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { PaginatedResponse } from '@/types';
-import { curriculumRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-// import { useDebounceFn } from '@vueuse/core';
-import { Edit, Eye, FileSpreadsheet, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next';
+import { Edit, Eye, FileSpreadsheet, Plus, Trash2, Upload, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
+
+// Type alias for reka-ui AcceptableValue
+type AcceptableValue = string | number | bigint | Record<string, any> | null;
 
 interface Unit {
     id: number;
@@ -48,6 +49,8 @@ interface UnitsFilters {
     direction?: string;
     per_page?: number;
     page?: number;
+    type?: string;
+    level?: number | null;
     credit_points?: number;
     has_prerequisites?: boolean;
     has_equivalents?: boolean;
@@ -65,12 +68,15 @@ const props = defineProps<{
 // Reactive data
 const data = computed(() => props.units.data);
 
-// Use unified filters - simple and powerful
-const { filters, hasActiveFilters, debouncedApplyFilters, clearFilters, handlePaginationNavigate, handlePageSizeChange, appendCurrentQueryTo, updateFieldDebounced } = useTableFilters<UnitsFilters>(
-    curriculumRoutes.units.index(),
-    props.filters || {},
-    ['units', 'filters'], // Use correct keys that match backend response
-);
+// Filter state - Initialize with props or defaults
+const filters = ref({
+    search: props.filters?.search || '',
+    sort: props.filters?.sort || '',
+    direction: props.filters?.direction || 'asc',
+    per_page: props.filters?.per_page || 15,
+    type: props.filters?.type || 'all',
+    level: props.filters?.level !== undefined && props.filters?.level !== null ? String(props.filters.level) : 'all',
+});
 
 // Module navigation với return param
 const { getLinkUrlWithReturn } = useModuleNavigation({
@@ -122,12 +128,78 @@ const confirmDelete = () => {
     }
 };
 
-// handled by composable
+// Server-side filtering functions
+const applyFilters = () => {
+    const params = new URLSearchParams();
 
-// Simplified with helper method
-const updateSearchFilter = (value: string | number) => {
-    updateFieldDebounced('search', String(value));
+    if (filters.value.search) params.set('search', filters.value.search);
+    if (filters.value.sort) params.set('sort', filters.value.sort);
+    if (filters.value.direction) params.set('direction', filters.value.direction);
+    if (filters.value.per_page) params.set('per_page', filters.value.per_page.toString());
+    if (filters.value.type && filters.value.type !== 'all') params.set('type', filters.value.type);
+    if (filters.value.level && filters.value.level !== 'all') params.set('level', filters.value.level.toString());
+
+    const url = `/units${params.toString() ? '?' + params.toString() : ''}`;
+
+    router.visit(url, {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['units', 'filters'],
+    });
 };
+
+// Search handler for DebouncedInput (debounced event)
+const handleSearch = (value: string | number) => {
+    filters.value.search = String(value);
+    applyFilters();
+};
+
+// Filter change handler
+const handleFilterChange = () => {
+    applyFilters();
+};
+
+// Type filter handler
+const handleTypeChange = (value: AcceptableValue) => {
+    filters.value.type = value ? String(value) : 'all';
+    applyFilters();
+};
+
+// Level filter handler  
+const handleLevelChange = (value: AcceptableValue) => {
+    filters.value.level = value ? String(value) : 'all';
+    applyFilters();
+};
+
+// Unit type options
+const unitTypeOptions = [
+    { value: 'all', label: 'All Types' },
+    { value: 'general', label: 'General' },
+    { value: 'egc', label: 'EGC' },
+    { value: 'semi', label: 'Semiconductor' },
+    { value: 'ai', label: 'AI' },
+    { value: 'mkt', label: 'Marketing' },
+    { value: 'ba', label: 'Business Admin' },
+    { value: 'cs', label: 'CS' },
+    { value: 'ee', label: 'EE' },
+    { value: 'me', label: 'ME' },
+    { value: 'fin', label: 'Finance' },
+];
+
+// Level options
+const levelOptions = [
+    { value: 'all', label: 'All Levels' },
+    { value: '0', label: 'Level 0' },
+    { value: '1', label: 'Level 1' },
+    { value: '2', label: 'Level 2' },
+    { value: '3', label: 'Level 3' },
+    { value: '4', label: 'Level 4' },
+    { value: '5', label: 'Level 5' },
+    { value: '6', label: 'Level 6' },
+    { value: '7', label: 'Level 7' },
+    { value: '8', label: 'Level 8' },
+    { value: '9', label: 'Level 9' },
+];
 
 // Bulk delete functionality
 const isBulkDeleting = ref(false);
@@ -167,6 +239,65 @@ const confirmBulkDelete = async () => {
     }
 };
 
+const clearFilters = () => {
+    filters.value = {
+        search: '',
+        sort: '',
+        direction: 'asc',
+        per_page: 15,
+        type: 'all',
+        level: 'all',
+    };
+    router.visit('/units', {
+        preserveState: true,
+        preserveScroll: true,
+        only: ['units', 'filters'],
+    });
+};
+
+const hasActiveFilters = computed(() => {
+    return filters.value.search || 
+           (filters.value.type && filters.value.type !== 'all') || 
+           (filters.value.level && filters.value.level !== 'all');
+});
+
+// Pagination handlers
+const handlePaginationNavigate = (url: string) => {
+    try {
+        let urlObj: URL;
+        if (url.startsWith('http')) {
+            urlObj = new URL(url);
+        } else {
+            urlObj = new URL(url, window.location.origin);
+        }
+        
+        const page = urlObj.searchParams.get('page');
+        
+        if (page && !isNaN(parseInt(page))) {
+            filters.value.per_page = parseInt(page);
+            applyFilters();
+        } else {
+            router.visit(url, {
+                preserveState: true,
+                preserveScroll: true,
+                only: ['units', 'filters'],
+            });
+        }
+    } catch (error) {
+        console.error('Error parsing pagination URL:', url, error);
+        router.visit(url, {
+            preserveState: true,
+            preserveScroll: true,
+            only: ['units', 'filters'],
+        });
+    }
+};
+
+const handlePageSizeChange = (size: number) => {
+    filters.value.per_page = size;
+    applyFilters();
+};
+
 // Export functionality
 const isExporting = ref(false);
 
@@ -182,6 +313,8 @@ const exportToExcel = async () => {
         if (filters.value.search) params.set('search', filters.value.search);
         if (filters.value.sort) params.set('sort', filters.value.sort);
         if (filters.value.direction) params.set('direction', filters.value.direction);
+        if (filters.value.type && filters.value.type !== 'all') params.set('type', filters.value.type);
+        if (filters.value.level && filters.value.level !== 'all') params.set('level', filters.value.level.toString());
 
         const exportUrl = `/units/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
 
@@ -424,10 +557,33 @@ const columns: ColumnDef<Unit>[] = [
     <!-- Filters Section -->
     <div class="bg-muted/20 flex flex-wrap items-center gap-4 rounded-lg border p-4">
         <div class="min-w-[200px] flex-1">
-            <div class="relative">
-                <Search class="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input placeholder="Search units..." :model-value="filters.search" @update:model-value="updateSearchFilter" class="pl-9" />
-            </div>
+            <DebouncedInput v-model="filters.search" placeholder="Search units..." @debounced="handleSearch" />
+        </div>
+
+        <div class="min-w-[160px]">
+            <Select :model-value="filters.type" @update:model-value="handleTypeChange">
+                <SelectTrigger>
+                    <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem v-for="option in unitTypeOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+
+        <div class="min-w-[140px]">
+            <Select :model-value="filters.level" @update:model-value="handleLevelChange">
+                <SelectTrigger>
+                    <SelectValue placeholder="All Levels" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem v-for="option in levelOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
         </div>
 
         <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
