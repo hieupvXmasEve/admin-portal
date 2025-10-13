@@ -109,6 +109,7 @@ const confirmDelete = () => {
     if (unitToDelete.value) {
         router.delete(`/units/${unitToDelete.value.id}`, {
             preserveScroll: true,
+            only: ['units', 'statistics'],
             onSuccess: () => {
                 toast.success('Unit deleted successfully');
                 deleteDialogOpen.value = false;

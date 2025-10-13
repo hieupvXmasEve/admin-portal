@@ -18,7 +18,12 @@ class UnitValidationService
         }
 
         // Check for prerequisite relationships using the new system
-        if ($unit->prerequisiteGroups()->exists()) {
+        // Only consider groups that have actual conditions
+        $hasPrerequisiteConditions = $unit->prerequisiteGroups()
+            ->whereHas('conditions')
+            ->exists();
+        
+        if ($hasPrerequisiteConditions) {
             $restrictions[] = 'Unit has prerequisite groups';
         }
 

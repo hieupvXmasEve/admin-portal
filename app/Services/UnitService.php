@@ -74,9 +74,20 @@ class UnitService
     {
         DB::transaction(function () use ($unit) {
             Log::warning("Deleting unit {$unit->id}");
-            $unit->prerequisiteGroups()->delete();
+            
+            // Delete prerequisite groups and their conditions
+            $unit->prerequisiteGroups()->each(function ($group) {
+                $group->conditions()->delete();
+                $group->delete();
+            });
+            
+            // Delete equivalent unit relationships
             $unit->equivalentUnits()->delete();
+            
+            // Finally delete the unit itself
             $unit->delete();
+            
+            Log::info("Unit {$unit->id} deleted successfully");
         });
     }
 
