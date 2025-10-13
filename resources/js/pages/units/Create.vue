@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApi } from '@/composables/useApiRequest';
 import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { EquivalentUnit, FormDefaults, PrerequisiteGroup, Unit } from '@/types/Unit';
@@ -23,6 +24,10 @@ const form = useForm({
     code: props.formDefaults.code,
     name: props.formDefaults.name,
     credit_points: props.formDefaults.credit_points,
+    level: 0,
+    base_fee: null,
+    retake_fee: null,
+    unit_type: 'general',
 });
 
 // Separate reactive data for relationships
@@ -193,7 +198,7 @@ const validateCreditPoints = (value: string) => {
     if (isNaN(num)) {
         form.credit_points = 0;
     } else {
-        form.credit_points = Math.max(0.25, Math.min(999.99, Math.round(num * 100) / 100));
+        form.credit_points = Math.max(0, Math.min(999.99, Math.round(num * 100) / 100));
     }
 };
 
@@ -322,6 +327,96 @@ const indexWithCurrentQuery = (): string => {
                         {{ form.errors.credit_points }}
                     </p>
                     <p class="text-sm text-gray-500">Credit points must be between 0 and 999 (e.g., 3.00, 6.00).</p>
+                </div>
+
+                <!-- Level -->
+                <div class="space-y-2">
+                    <Label for="level">Level *</Label>
+                    <Input
+                        id="level"
+                        v-model.number="form.level"
+                        type="number"
+                        step="1"
+                        min="0"
+                        max="10"
+                        placeholder="0"
+                        :class="{
+                            'border-red-500': form.errors.level,
+                        }"
+                        required
+                    />
+                    <p v-if="form.errors.level" class="text-sm text-red-600">
+                        {{ form.errors.level }}
+                    </p>
+                    <p class="text-sm text-gray-500">Unit difficulty level (1-10)</p>
+                </div>
+
+                <!-- Unit Type -->
+                <div class="space-y-2">
+                    <Label for="unit_type">Unit Type *</Label>
+                    <Select v-model="form.unit_type" required>
+                        <SelectTrigger :class="{ 'border-red-500': form.errors.unit_type }">
+                            <SelectValue placeholder="Select unit type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectLabel>Unit Types</SelectLabel>
+                                <SelectItem value="general">General</SelectItem>
+                                <SelectItem value="egc">EGC (English Global Citizen)</SelectItem>
+                                <SelectItem value="semi">Semiconductor</SelectItem>
+                                <SelectItem value="ai">Artificial Intelligence</SelectItem>
+                                <SelectItem value="mkt">Marketing</SelectItem>
+                                <SelectItem value="ba">Business Administration</SelectItem>
+                                <SelectItem value="cs">Computer Science</SelectItem>
+                                <SelectItem value="ee">Electrical Engineering</SelectItem>
+                                <SelectItem value="me">Mechanical Engineering</SelectItem>
+                                <SelectItem value="fin">Finance</SelectItem>
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
+                    <p v-if="form.errors.unit_type" class="text-sm text-red-600">
+                        {{ form.errors.unit_type }}
+                    </p>
+                </div>
+
+                <!-- Base Fee -->
+                <div class="space-y-2">
+                    <Label for="base_fee">Base Fee</Label>
+                    <Input
+                        id="base_fee"
+                        v-model.number="form.base_fee"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        :class="{
+                            'border-red-500': form.errors.base_fee,
+                        }"
+                    />
+                    <p v-if="form.errors.base_fee" class="text-sm text-red-600">
+                        {{ form.errors.base_fee }}
+                    </p>
+                    <p class="text-sm text-gray-500">Fee charged for this unit (leave empty if not applicable)</p>
+                </div>
+
+                <!-- Retake Fee -->
+                <div class="space-y-2">
+                    <Label for="retake_fee">Retake Fee</Label>
+                    <Input
+                        id="retake_fee"
+                        v-model.number="form.retake_fee"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        :class="{
+                            'border-red-500': form.errors.retake_fee,
+                        }"
+                    />
+                    <p v-if="form.errors.retake_fee" class="text-sm text-red-600">
+                        {{ form.errors.retake_fee }}
+                    </p>
+                    <p class="text-sm text-gray-500">Fee charged for retaking this unit (leave empty if not applicable)</p>
                 </div>
             </CardContent>
         </Card>
