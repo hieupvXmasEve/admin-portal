@@ -32,9 +32,11 @@ class UnitController extends Controller
     {
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
-            'sort' => 'nullable|string|in:code,name,credit_points,created_at',
+            'sort' => 'nullable|string|in:code,name,credit_points,level,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
+            'type' => 'nullable|string|in:general,egc,semi,ai,mkt,ba,cs,ee,me,fin',
+            'level' => 'nullable|integer|min:0|max:9',
         ]);
 
         $units = Unit::query()
@@ -43,6 +45,12 @@ class UnitController extends Controller
                     $q->where('code', 'like', "%{$search}%")
                         ->orWhere('name', 'like', "%{$search}%");
                 });
+            })
+            ->when($validated['type'] ?? null, function ($query, $type) {
+                $query->where('unit_type', $type);
+            })
+            ->when(isset($validated['level']), function ($query) use ($validated) {
+                $query->where('level', $validated['level']);
             })
             ->when($validated['sort'] ?? null, callback: function ($query, $sort) use ($validated) {
                 $direction = $validated['direction'] ?? 'asc';
@@ -60,6 +68,8 @@ class UnitController extends Controller
                 'sort' => $validated['sort'] ?? '',
                 'direction' => $validated['direction'] ?? 'asc',
                 'per_page' => $validated['per_page'] ?? 15,
+                'type' => $validated['type'] ?? 'all',
+                'level' => isset($validated['level']) ? $validated['level'] : 'all',
             ],
             'statistics' => [
                 'total_units' => Unit::count(),
