@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Constants\ClubRoutes;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\AddClubMemberRequest;
 use App\Http\Requests\AssignPresidentRequest;
 use App\Http\Requests\CreateClubRequest;
 use App\Http\Requests\UpdateClubRequest;
@@ -27,7 +28,7 @@ class ClubController extends Controller
         $this->middleware('can:create_clubs')->only(['create', 'store']);
         $this->middleware('can:edit_clubs')->only(['edit', 'update']);
         $this->middleware('can:delete_clubs')->only(['destroy']);
-        $this->middleware('can:edit_clubs')->only(['assignPresident']);
+        $this->middleware('can:edit_clubs')->only(['assignPresident', 'addMember']);
     }
 
     /**
@@ -45,7 +46,7 @@ class ClubController extends Controller
         ]);
 
         $page = (int) $request->query('page', 1);
-        $cacheKey = 'clubs:index:' . md5(json_encode([
+        $cacheKey = 'clubs:index:'.md5(json_encode([
             'page' => $page,
             'per_page' => $validated['per_page'] ?? 15,
             'search' => $validated['search'] ?? null,
@@ -105,14 +106,7 @@ class ClubController extends Controller
      */
     public function create(): Response
     {
-        // Get campuses for dropdown
-        $campuses = Cache::tags(['campuses'])->rememberForever('campuses:dropdown', function () {
-            return Campus::select('id', 'name')->orderBy('name')->get();
-        });
-
-        return Inertia::render('clubs/Create', [
-            'campuses' => $campuses,
-        ]);
+        return Inertia::render('clubs/Create');
     }
 
     /**
@@ -123,6 +117,9 @@ class ClubController extends Controller
         $validated = $request->validated();
         $presidentStudentId = $validated['president_student_id'];
         unset($validated['president_student_id']);
+
+        // Add campus_id from session
+        $validated['campus_id'] = session('current_campus_id');
 
         $club = $this->clubService->createClub($validated, $presidentStudentId);
 
@@ -148,7 +145,7 @@ class ClubController extends Controller
         ]);
 
         $page = (int) $request->query('page', 1);
-        $cacheKey = 'clubs:show:' . md5(json_encode([
+        $cacheKey = 'clubs:show:'.md5(json_encode([
             'club_id' => $club->id,
             'page' => $page,
             'per_page' => $validated['per_page'] ?? 15,
@@ -207,14 +204,8 @@ class ClubController extends Controller
      */
     public function edit(Club $club): Response
     {
-        // Get campuses for dropdown (though campus shouldn't be editable)
-        $campuses = Cache::tags(['campuses'])->rememberForever('campuses:dropdown', function () {
-            return Campus::select('id', 'name')->orderBy('name')->get();
-        });
-
         return Inertia::render('clubs/Edit', [
             'club' => $club->load('campus'),
-            'campuses' => $campuses,
         ]);
     }
 
@@ -252,12 +243,33 @@ class ClubController extends Controller
     }
 
     /**
+     * Add a member to the club.
+     */
+    public function addMember(Club $club, AddClubMemberRequest $request): RedirectResponse
+    {
+        $validated = $request->validated();
+
+        $this->clubService->addMember(
+            $club,
+            $validated['student_id'],
+            $validated['role'],
+            $validated['notes'] ?? null
+        );
+
+        // Invalidate club caches after adding member
+        Cache::tags(['clubs'])->flush();
+
+        return redirect()->route(ClubRoutes::SHOW, $club)
+            ->with('success', 'Member added successfully.');
+    }
+
+    /**
      * Get students for president assignment (API endpoint for dropdowns).
      */
     public function studentsForAssignment(Request $request, Club $club)
     {
         $search = (string) ($request->search ?? '');
-        $cacheKey = 'clubs:students:' . md5(json_encode([
+        $cacheKey = 'clubs:students:'.md5(json_encode([
             'campus_id' => $club->campus_id,
             'search' => $search,
             'limit' => 50,
@@ -300,7 +312,7 @@ class ClubController extends Controller
         $campusId = (int) $request->query('campus_id');
         $search = (string) ($request->search ?? '');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Campus ID is required',
@@ -308,7 +320,7 @@ class ClubController extends Controller
             ]);
         }
 
-        $cacheKey = 'clubs:students:campus:' . md5(json_encode([
+        $cacheKey = 'clubs:students:campus:'.md5(json_encode([
             'campus_id' => $campusId,
             'search' => $search,
             'limit' => 50,

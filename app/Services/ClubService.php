@@ -18,9 +18,9 @@ class ClubService
     /**
      * Create a new club with president assignment.
      *
-     * @param array $data Club data
-     * @param int $presidentStudentId Student ID to assign as president
-     * @return Club
+     * @param  array  $data  Club data
+     * @param  int  $presidentStudentId  Student ID to assign as president
+     *
      * @throws BusinessLogicException
      */
     public function createClub(array $data, int $presidentStudentId): Club
@@ -40,7 +40,7 @@ class ClubService
 
             // Validate that the student exists and is on the same campus
             $student = Student::with('campus')->find($presidentStudentId);
-            if (!$student) {
+            if (! $student) {
                 throw new BusinessLogicException(
                     'Student not found.',
                     ['president' => ['Selected student does not exist']]
@@ -74,7 +74,7 @@ class ClubService
                 'club_id' => $club->id,
                 'club_name' => $club->name,
                 'campus_id' => $club->campus_id,
-                'president_student_id' => $presidentStudentId
+                'president_student_id' => $presidentStudentId,
             ]);
 
             // Assign president
@@ -87,9 +87,6 @@ class ClubService
     /**
      * Update club information.
      *
-     * @param Club $club
-     * @param array $data
-     * @return Club
      * @throws BusinessLogicException
      */
     public function updateClub(Club $club, array $data): Club
@@ -116,7 +113,7 @@ class ClubService
             Log::info('Club updated', [
                 'club_id' => $club->id,
                 'club_name' => $club->name,
-                'updated_fields' => array_keys($data)
+                'updated_fields' => array_keys($data),
             ]);
 
             return $club->fresh();
@@ -126,10 +123,6 @@ class ClubService
     /**
      * Assign a new president to a club.
      *
-     * @param Club $club
-     * @param int $studentId
-     * @param string|null $reason
-     * @return ClubMember
      * @throws BusinessLogicException
      */
     public function assignPresident(Club $club, int $studentId, ?string $reason = null): ClubMember
@@ -137,7 +130,7 @@ class ClubService
         return DB::transaction(function () use ($club, $studentId, $reason) {
             // Validate that the student exists and is on the same campus
             $student = Student::find($studentId);
-            if (!$student) {
+            if (! $student) {
                 throw new BusinessLogicException(
                     'Student not found.',
                     ['student_id' => ['Selected student does not exist']]
@@ -183,7 +176,7 @@ class ClubService
                     'club_member_id' => $currentPresident->id,
                     'old_role' => 'president',
                     'new_role' => 'member',
-                    'changed_by' => $studentId, // The new president is making this change
+                    'changed_by' => null, // Admin/staff action, not student
                     'change_reason' => 'New president assigned',
                     'started_at' => now(),
                 ]);
@@ -213,7 +206,7 @@ class ClubService
                     'club_member_id' => $existingMember->id,
                     'old_role' => $oldRole,
                     'new_role' => 'president',
-                    'changed_by' => $studentId,
+                    'changed_by' => null, // Admin/staff action, not student
                     'change_reason' => $reason ?? 'Assigned as president',
                     'started_at' => now(),
                 ]);
@@ -234,7 +227,7 @@ class ClubService
                     'club_member_id' => $newPresident->id,
                     'old_role' => null,
                     'new_role' => 'president',
-                    'changed_by' => $studentId,
+                    'changed_by' => null, // Admin/staff action, not student
                     'change_reason' => $reason ?? 'Initial president assignment',
                     'started_at' => now(),
                 ]);
@@ -245,7 +238,7 @@ class ClubService
                 'club_name' => $club->name,
                 'new_president_id' => $studentId,
                 'previous_president_id' => $currentPresident?->student_id,
-                'reason' => $reason
+                'reason' => $reason,
             ]);
 
             return $newPresident->fresh(['student', 'club']);
@@ -254,14 +247,11 @@ class ClubService
 
     /**
      * Get clubs for a specific student.
-     *
-     * @param int $studentId
-     * @return Collection
      */
     public function getClubsForStudent(int $studentId): Collection
     {
         $student = Student::find($studentId);
-        if (!$student) {
+        if (! $student) {
             return collect();
         }
 
@@ -274,7 +264,7 @@ class ClubService
             'president.student',
             'members' => function ($query) use ($studentId) {
                 $query->where('student_id', $studentId);
-            }
+            },
         ])->get();
 
         // Get all active clubs on the same campus for discovery
@@ -291,18 +281,111 @@ class ClubService
     }
 
     /**
+     * Add a member to the club.
+     *
+     * @throws BusinessLogicException
+     */
+    public function addMember(Club $club, int $studentId, string $role = 'member', ?string $notes = null): ClubMember
+    {
+        return DB::transaction(function () use ($club, $studentId, $role, $notes) {
+            // Validate that the student exists and is on the same campus
+            $student = Student::find($studentId);
+            if (! $student) {
+                throw new BusinessLogicException(
+                    'Student not found.',
+                    ['student_id' => ['Selected student does not exist']]
+                );
+            }
+
+            if ($student->campus_id !== $club->campus_id) {
+                throw new BusinessLogicException(
+                    'Student must be from the same campus as the club.',
+                    ['student_id' => ['Student must belong to the same campus']]
+                );
+            }
+
+            // Check if student is already a member
+            $existingMember = ClubMember::where('club_id', $club->id)
+                ->where('student_id', $studentId)
+                ->first();
+
+            if ($existingMember) {
+                if ($existingMember->status === 'active') {
+                    throw new BusinessLogicException(
+                        'Student is already an active member of this club.',
+                        ['student_id' => ['Student is already a member']]
+                    );
+                }
+
+                // Reactivate if previously left or rejected
+                if (in_array($existingMember->status, ['left', 'rejected'])) {
+                    $oldRole = $existingMember->role;
+
+                    $existingMember->update([
+                        'status' => 'active',
+                        'role' => $role,
+                        'joined_at' => now(),
+                    ]);
+
+                    // Create role history for reactivation
+                    ClubMemberRoleHistory::create([
+                        'club_member_id' => $existingMember->id,
+                        'old_role' => $oldRole,
+                        'new_role' => $role,
+                        'changed_by' => null, // Admin/staff action, not student
+                        'change_reason' => $notes ?? 'Member reactivated',
+                        'started_at' => now(),
+                    ]);
+
+                    Log::info('Club member reactivated', [
+                        'club_id' => $club->id,
+                        'student_id' => $studentId,
+                        'role' => $role,
+                    ]);
+
+                    return $existingMember->fresh(['student', 'club']);
+                }
+            }
+
+            // Create new membership
+            $member = ClubMember::create([
+                'club_id' => $club->id,
+                'student_id' => $studentId,
+                'role' => $role,
+                'status' => 'active',
+                'joined_at' => now(),
+            ]);
+
+            // Create role history
+            ClubMemberRoleHistory::create([
+                'club_member_id' => $member->id,
+                'old_role' => null,
+                'new_role' => $role,
+                'changed_by' => null, // Admin/staff action, not student
+                'change_reason' => $notes ?? 'Added as club member',
+                'started_at' => now(),
+            ]);
+
+            Log::info('Club member added', [
+                'club_id' => $club->id,
+                'student_id' => $studentId,
+                'role' => $role,
+            ]);
+
+            return $member->fresh(['student', 'club']);
+        });
+    }
+
+    /**
      * Get club management data for a president.
      *
-     * @param Club $club
-     * @param int $studentId
-     * @return array
      * @throws BusinessLogicException
      */
     public function getClubManagementData(Club $club, int $studentId): array
     {
         // Verify the student is the president
         $president = $club->president;
-        if (!$president || $president->student_id !== $studentId) {
+        if (! $president || $president->student_id !== $studentId) {
             throw new BusinessLogicException(
                 'Access denied. Only the club president can access management data.',
                 ['authorization' => ['You must be the club president to access this data']]

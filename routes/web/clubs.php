@@ -39,6 +39,10 @@ Route::middleware('auth')->group(function () {
         ->middleware('can:edit_clubs')
         ->name(ClubRoutes::ASSIGN_PRESIDENT);
 
+    Route::post('clubs/{club}/add-member', [ClubController::class, 'addMember'])
+        ->middleware('can:edit_clubs')
+        ->name(ClubRoutes::ADD_MEMBER);
+
     // API routes for dropdown/select usage
     Route::get('api/clubs/{club}/students-for-assignment', [ClubController::class, 'studentsForAssignment'])
         ->middleware('can:edit_clubs')

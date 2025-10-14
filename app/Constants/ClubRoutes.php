@@ -28,6 +28,8 @@ class ClubRoutes
     // Club Management Routes
     public const ASSIGN_PRESIDENT = 'clubs.assign-president';
 
+    public const ADD_MEMBER = 'clubs.add-member';
+
     // Club API Routes
     public const API_STUDENTS_FOR_ASSIGNMENT = 'clubs.students-for-assignment';
 

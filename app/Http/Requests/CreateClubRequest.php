@@ -22,13 +22,14 @@ class CreateClubRequest extends FormRequest
      */
     public function rules(): array
     {
+        $campusId = session('current_campus_id');
+
         return [
-            'campus_id' => ['required', 'integer', 'exists:campuses,id'],
             'name' => [
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('clubs', 'name')->where('campus_id', $this->input('campus_id'))
+                Rule::unique('clubs', 'name')->where('campus_id', $campusId),
             ],
             'description' => ['required', 'string', 'max:2000'],
             'founded_date' => ['nullable', 'date', 'before_or_equal:today'],
@@ -57,9 +58,6 @@ class CreateClubRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'campus_id.required' => 'The campus is required.',
-            'campus_id.integer' => 'The campus must be a valid selection.',
-            'campus_id.exists' => 'The selected campus does not exist.',
             'name.required' => 'The club name is required.',
             'name.string' => 'The club name must be text.',
             'name.max' => 'The club name cannot exceed 255 characters.',
@@ -107,14 +105,14 @@ class CreateClubRequest extends FormRequest
         // Ensure social_links is properly formatted if provided
         if ($this->has('social_links') && is_string($this->input('social_links'))) {
             $this->merge([
-                'social_links' => json_decode($this->input('social_links'), true) ?: []
+                'social_links' => json_decode($this->input('social_links'), true) ?: [],
             ]);
         }
 
         // Ensure achievements is properly formatted if provided
         if ($this->has('achievements') && is_string($this->input('achievements'))) {
             $this->merge([
-                'achievements' => json_decode($this->input('achievements'), true) ?: []
+                'achievements' => json_decode($this->input('achievements'), true) ?: [],
             ]);
         }
     }

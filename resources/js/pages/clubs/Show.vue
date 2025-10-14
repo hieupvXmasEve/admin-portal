@@ -7,15 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import type { PaginatedResponse } from '@/types';
-import type { Club, ClubMember } from '@/types/models';
+import type { Club, ClubMember, Student } from '@/types/models';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, Building, Calendar, Crown, Edit, Mail, Phone, Shield, User, Users, X } from 'lucide-vue-next';
+import { ArrowLeft, Building, Calendar, Crown, Edit, Mail, Phone, Shield, User, UserPlus, Users, X } from 'lucide-vue-next';
 import { computed, h, onMounted, onUnmounted, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -158,6 +159,69 @@ const submitAssignPresident = () => {
     });
 };
 
+// Add member dialog
+const addMemberDialogOpen = ref(false);
+const addMemberForm = ref({
+    student_id: '',
+    role: 'member',
+    notes: '',
+});
+const addMemberErrors = ref<any>({});
+const isAddingMember = ref(false);
+
+const openAddMemberDialog = () => {
+    addMemberDialogOpen.value = true;
+};
+
+const closeAddMemberDialog = () => {
+    addMemberDialogOpen.value = false;
+    addMemberForm.value = {
+        student_id: '',
+        role: 'member',
+        notes: '',
+    };
+    addMemberErrors.value = {};
+};
+
+const handleAddMemberStudentSelect = (student: Student | null) => {
+    if (student) {
+        addMemberForm.value.student_id = student.id.toString();
+    }
+};
+
+const submitAddMember = () => {
+    if (!addMemberForm.value.student_id) {
+        addMemberErrors.value = { student_id: 'Student is required' };
+        return;
+    }
+
+    isAddingMember.value = true;
+    addMemberErrors.value = {};
+
+    const formData = {
+        student_id: Number(addMemberForm.value.student_id),
+        role: addMemberForm.value.role,
+        notes: addMemberForm.value.notes || null,
+    };
+
+    router.post(systemRoutes.clubs.addMember(props.club.id), formData, {
+        preserveScroll: true,
+        onSuccess: () => {
+            isAddingMember.value = false;
+            closeAddMemberDialog();
+            toast.success('Member added successfully');
+        },
+        onError: (errors) => {
+            addMemberErrors.value = errors;
+            isAddingMember.value = false;
+            toast.error('Failed to add member');
+        },
+        onFinish: () => {
+            isAddingMember.value = false;
+        },
+    });
+};
+
 // Event handlers
 const goBack = () => {
     router.visit(systemRoutes.clubs.index());
@@ -268,7 +332,7 @@ const memberColumns: ColumnDef<ClubMember>[] = [
             const icon = role === 'president' ? Crown : role === 'vice_president' ? Shield : User;
             const variant = role === 'president' ? 'default' : role === 'vice_president' ? 'secondary' : 'outline';
 
-            return h('div', { class: 'flex items-center gap-2' }, [h(icon, { class: 'h-4 w-4' }), h(Badge, { variant }, roleLabels[role] || role)]);
+            return h('div', { class: 'flex items-center gap-2' }, [h(icon, { class: 'h-4 w-4' }), h(Badge, { variant }, () => roleLabels[role] || role)]);
         },
     },
     {
@@ -293,7 +357,7 @@ const memberColumns: ColumnDef<ClubMember>[] = [
                 banned: 'destructive',
             };
 
-            return h(Badge, { variant: variants[status] || 'secondary' }, statusLabels[status] || status);
+            return h(Badge, { variant: variants[status] || 'secondary' }, () => statusLabels[status] || status);
         },
     },
     {
@@ -488,6 +552,10 @@ const memberColumns: ColumnDef<ClubMember>[] = [
                         <h3 class="text-lg font-semibold">Members Management</h3>
                         <p class="text-muted-foreground text-sm">Manage club members and applications</p>
                     </div>
+                    <Button @click="openAddMemberDialog" class="gap-2">
+                        <UserPlus class="h-4 w-4" />
+                        Add Member
+                    </Button>
                 </div>
 
                 <!-- Member Filters -->
@@ -586,6 +654,65 @@ const memberColumns: ColumnDef<ClubMember>[] = [
                     <Button type="submit" :disabled="!assignPresidentForm.student_id || isAssigningPresident" class="gap-2">
                         <Crown class="h-4 w-4" />
                         {{ isAssigningPresident ? 'Assigning...' : 'Assign President' }}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Add Member Dialog -->
+    <Dialog :open="addMemberDialogOpen" @update:open="addMemberDialogOpen = $event">
+        <DialogContent class="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle class="flex items-center gap-2">
+                    <UserPlus class="h-5 w-5" />
+                    Add Member
+                </DialogTitle>
+                <DialogDescription> Add a new member to {{ club.name }}. </DialogDescription>
+            </DialogHeader>
+
+            <form @submit.prevent="submitAddMember" class="space-y-4">
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <Label class="text-sm font-medium">Student *</Label>
+                        <StudentCombobox v-model="addMemberForm.student_id" :error-message="addMemberErrors.student_id" placeholder="Search and select a student..." :in-dialog="true" @select="handleAddMemberStudentSelect" />
+                        <p v-if="addMemberErrors.student_id" class="text-destructive text-sm">
+                            {{ addMemberErrors.student_id }}
+                        </p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label class="text-sm font-medium">Role *</Label>
+                        <Select v-model="addMemberForm.role" :disabled="isAddingMember">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="member">Member</SelectItem>
+                                <SelectItem value="vice_president">Vice President</SelectItem>
+                                <SelectItem value="secretary">Secretary</SelectItem>
+                                <SelectItem value="treasurer">Treasurer</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="addMemberErrors.role" class="text-destructive text-sm">
+                            {{ addMemberErrors.role }}
+                        </p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <Label class="text-sm font-medium">Notes</Label>
+                        <Textarea v-model="addMemberForm.notes" placeholder="Optional notes about this member..." rows="3" :disabled="isAddingMember" />
+                        <p v-if="addMemberErrors.notes" class="text-destructive text-sm">
+                            {{ addMemberErrors.notes }}
+                        </p>
+                    </div>
+                </div>
+
+                <DialogFooter class="mt-6">
+                    <Button type="button" variant="outline" @click="closeAddMemberDialog" :disabled="isAddingMember"> Cancel </Button>
+                    <Button type="submit" :disabled="!addMemberForm.student_id || isAddingMember" class="gap-2">
+                        <UserPlus class="h-4 w-4" />
+                        {{ isAddingMember ? 'Adding...' : 'Add Member' }}
                     </Button>
                 </DialogFooter>
             </form>
