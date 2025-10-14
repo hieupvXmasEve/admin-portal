@@ -29,7 +29,7 @@ class ClubMemberResource extends JsonResource
             'student' => $this->whenLoaded('student', function () {
                 return [
                     'id' => $this->student->id,
-                    'student_code' => $this->student->student_code,
+                    'student_code' => $this->student->student_id,
                     'full_name' => $this->student->full_name,
                     'first_name' => $this->student->first_name,
                     'last_name' => $this->student->last_name,
@@ -47,7 +47,7 @@ class ClubMemberResource extends JsonResource
             'approver' => $this->whenLoaded('approver', function () {
                 return $this->approver ? [
                     'id' => $this->approver->id,
-                    'student_code' => $this->approver->student_code,
+                    'student_code' => $this->approver->student_id,
                     'full_name' => $this->approver->full_name,
                 ] : null;
             }),

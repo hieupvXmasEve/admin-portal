@@ -18,7 +18,6 @@ use App\Services\ClubService;
 use App\Services\ClubMembershipService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 
 class ClubManagementController extends Controller
@@ -37,8 +36,8 @@ class ClubManagementController extends Controller
             /** @var \App\Models\Student $student */
             $student = $request->user();
 
-            // Check authorization
-            if (!Gate::allows('manageMembers', $club)) {
+            // Check authorization - must be president
+            if (!$club->isPresident($student->id)) {
                 return ApiResponse::authorizationError('You are not authorized to manage this club');
             }
 
@@ -77,8 +76,8 @@ class ClubManagementController extends Controller
             /** @var \App\Models\Student $student */
             $student = $request->user();
 
-            // Check authorization
-            if (!Gate::allows('update', $club)) {
+            // Check authorization - must be president
+            if (!$club->isPresident($student->id)) {
                 return ApiResponse::authorizationError('You are not authorized to update this club');
             }
 
@@ -118,8 +117,8 @@ class ClubManagementController extends Controller
             /** @var \App\Models\Student $student */
             $student = $request->user();
 
-            // Check authorization
-            if (!Gate::allows('manageMembers', $club)) {
+            // Check authorization - must be president
+            if (!$club->isPresident($student->id)) {
                 return ApiResponse::authorizationError('You are not authorized to view club members');
             }
 
@@ -180,8 +179,8 @@ class ClubManagementController extends Controller
             /** @var \App\Models\Student $student */
             $student = $request->user();
 
-            // Check authorization
-            if (!Gate::allows('approve', $member)) {
+            // Check authorization - must be president
+            if (!$club->isPresident($student->id)) {
                 return ApiResponse::authorizationError('You are not authorized to approve this membership');
             }
 
@@ -226,8 +225,8 @@ class ClubManagementController extends Controller
             /** @var \App\Models\Student $student */
             $student = $request->user();
 
-            // Check authorization
-            if (!Gate::allows('reject', $member)) {
+            // Check authorization - must be president
+            if (!$club->isPresident($student->id)) {
                 return ApiResponse::authorizationError('You are not authorized to reject this membership');
             }
 
@@ -277,8 +276,8 @@ class ClubManagementController extends Controller
             /** @var \App\Models\Student $student */
             $student = $request->user();
 
-            // Check authorization
-            if (!Gate::allows('updateRole', $member)) {
+            // Check authorization - must be president
+            if (!$club->isPresident($student->id)) {
                 return ApiResponse::authorizationError('You are not authorized to update this member\'s role');
             }
 

@@ -55,12 +55,13 @@ class ClubResource extends JsonResource
             }),
             'member_count' => $this->whenCounted('activeMembers'),
             'my_membership' => $this->whenLoaded('members', function () use ($request) {
-                $user = $request->user();
-                if (!$user || !$user->student) {
+                /** @var \App\Models\Student $student */
+                $student = $request->user();
+                if (!$student) {
                     return null;
                 }
 
-                $membership = $this->members->where('student_id', $user->student->id)->first();
+                $membership = $this->members->where('student_id', $student->id)->first();
                 return $membership ? [
                     'id' => $membership->id,
                     'role' => $membership->role,
