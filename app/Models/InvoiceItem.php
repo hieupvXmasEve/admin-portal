@@ -15,6 +15,7 @@ class InvoiceItem extends Model
         'quantity',
         'unit_price',
         'total_price',
+        'paid_amount',
         'reference_id',
         'reference_type',
     ];
@@ -23,6 +24,7 @@ class InvoiceItem extends Model
         'quantity' => 'integer',
         'unit_price' => 'decimal:2',
         'total_price' => 'decimal:2',
+        'paid_amount' => 'decimal:2',
     ];
 
     /**
@@ -47,6 +49,30 @@ class InvoiceItem extends Model
     public function calculateTotal(): void
     {
         $this->total_price = $this->quantity * $this->unit_price;
+    }
+
+    /**
+     * Get the remaining amount to be paid for this item.
+     */
+    public function getRemainingAmountAttribute(): float
+    {
+        return max(0, $this->total_price - $this->paid_amount);
+    }
+
+    /**
+     * Check if the item is fully paid.
+     */
+    public function isFullyPaid(): bool
+    {
+        return $this->paid_amount >= $this->total_price;
+    }
+
+    /**
+     * Check if the item is partially paid.
+     */
+    public function isPartiallyPaid(): bool
+    {
+        return $this->paid_amount > 0 && $this->paid_amount < $this->total_price;
     }
 
     /**

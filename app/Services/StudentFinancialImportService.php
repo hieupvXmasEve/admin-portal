@@ -34,9 +34,6 @@ class StudentFinancialImportService
         'student_id' => ['student id', 'student_id', 'id', 'student code', 'student_code'],
         'scholarship_code' => ['scholarship code', 'scholarship_code', 'scholarship', 'code'],
         'voucher_codes' => ['voucher codes', 'voucher_codes', 'vouchers', 'voucher'],
-        'paid_amount' => ['paid amount', 'paid_amount', 'payment', 'amount', 'payment amount'],
-        'payment_date' => ['payment date', 'payment_date', 'date', 'paid date', 'paid_date'],
-        'notes' => ['notes', 'note', 'remarks', 'comment', 'comments'],
     ];
 
     /**
@@ -172,7 +169,6 @@ class StudentFinancialImportService
             'skipped' => 0,
             'scholarships_assigned' => 0,
             'vouchers_assigned' => 0,
-            'payments_processed' => 0,
             'errors' => [],
             'warnings' => [],
             'batches_processed' => 0,
@@ -229,30 +225,16 @@ class StudentFinancialImportService
 
                                 if ($scholarshipResult['success']) {
                                     $results['scholarships_assigned']++;
+                                    $results['successful']++;
                                 } else {
                                     $results['warnings'][] = $scholarshipResult['message'];
+                                    $results['failed']++;
                                 }
+                            } else {
+                                // No scholarship code provided, skip row
+                                $results['skipped']++;
+                                $results['warnings'][] = "Row {$row}: No scholarship code provided - skipped";
                             }
-
-                            // Process payment
-                            if (!empty($rowData['paid_amount']) && $rowData['paid_amount'] > 0) {
-                                $paymentResult = $this->processPayment(
-                                    $student,
-                                    $rowData['paid_amount'],
-                                    $rowData['payment_date'] ?? now(),
-                                    $rowData['notes'] ?? null,
-                                    $row
-                                );
-
-                                if ($paymentResult['success']) {
-                                    $results['payments_processed']++;
-                                } else {
-                                    // If payment fails, it's a critical error - throw exception to rollback batch
-                                    throw new \Exception($paymentResult['message']);
-                                }
-                            }
-
-                            $results['successful']++;
                         } catch (Throwable $e) {
                             // Throw exception to rollback entire batch
                             throw new \Exception("Row {$row}: " . $e->getMessage(), 0, $e);
@@ -413,92 +395,6 @@ class StudentFinancialImportService
     }
 
     /**
-     * Validate payment amount
-     */
-    protected function validateAmount(float $amount, int $row): void
-    {
-        if ($amount <= 0) {
-            throw new \InvalidArgumentException("Row {$row}: Payment amount must be positive (got: {$amount})");
-        }
-
-        if ($amount > $this->maxAmount) {
-            throw new \InvalidArgumentException(
-                "Row {$row}: Payment amount exceeds maximum limit of " . number_format($this->maxAmount, 0, '.', ',') . " VND"
-            );
-        }
-
-        // Check for excessive decimal places (max 2 decimal places for VND)
-        if (round($amount, 2) != $amount) {
-            throw new \InvalidArgumentException(
-                "Row {$row}: Payment amount must have maximum 2 decimal places (got: {$amount})"
-            );
-        }
-
-        // Check for suspiciously small amounts (less than 1000 VND)
-        if ($amount < 1000) {
-            throw new \InvalidArgumentException(
-                "Row {$row}: Payment amount too small (minimum: 1,000 VND, got: {$amount})"
-            );
-        }
-    }
-
-    /**
-     * Process payment for a student with proper locking and validation
-     */
-    protected function processPayment(Student $student, float $amount, $paymentDate, ?string $notes, int $row): array
-    {
-        try {
-            // Validate amount first
-            $this->validateAmount($amount, $row);
-
-            // Use transaction with wallet locking to prevent race conditions
-            DB::transaction(function () use ($student, $amount, $paymentDate, $notes, $row) {
-                // Lock the wallet for update to prevent concurrent modifications
-                $wallet = StudentCashWallet::lockForUpdate()
-                    ->firstOrCreate(
-                        ['student_id' => $student->id],
-                        ['balance' => 0, 'currency' => 'VND']
-                    );
-
-                // If wallet was just created, we need to lock it again
-                if ($wallet->wasRecentlyCreated) {
-                    $wallet = StudentCashWallet::lockForUpdate()
-                        ->where('student_id', $student->id)
-                        ->first();
-                }
-
-                // Record the deposit transaction
-                $balanceBefore = $wallet->balance;
-                $balanceAfter = $balanceBefore + $amount;
-
-                // Create transaction record
-                WalletTransaction::create([
-                    'wallet_id' => $wallet->id,
-                    'transaction_type' => 'deposit',
-                    'amount' => $amount,
-                    'balance_before' => $balanceBefore,
-                    'balance_after' => $balanceAfter,
-                    'description' => $notes ?? 'Payment imported from Excel',
-                    'created_by' => auth()->id(),
-                ]);
-
-                // Update wallet balance atomically
-                $wallet->update(['balance' => $balanceAfter]);
-            });
-
-            return [
-                'success' => true,
-                'message' => "Row {$row}: Processed payment of " . number_format($amount, 0, '.', ',') . " VND for student {$student->student_id}"
-            ];
-        } catch (Throwable $e) {
-            return [
-                'success' => false,
-                'message' => "Row {$row}: Failed to process payment - " . $e->getMessage()
-            ];
-        }
-    }
-
-    /**
      * Extract row data based on column mapping
      */
     protected function extractRowData($worksheet, int $row, array $headers, array $columnMapping): array
@@ -514,16 +410,6 @@ class StudentFinancialImportService
 
             $columnLetter = $this->getColumnLetter($columnIndex);
             $cellValue = $worksheet->getCell($columnLetter . $row)->getCalculatedValue();
-
-            // Convert Excel date if needed
-            if ($dbField === 'payment_date' && is_numeric($cellValue)) {
-                $cellValue = Date::excelToDateTimeObject($cellValue)->format('Y-m-d');
-            }
-
-            // Convert amount to float
-            if ($dbField === 'paid_amount' && !empty($cellValue)) {
-                $cellValue = (float) $cellValue;
-            }
 
             $rowData[$dbField] = $cellValue;
         }
@@ -544,25 +430,22 @@ class StudentFinancialImportService
             $headers = [
                 'Student ID',
                 'Scholarship Code',
-                'Voucher Codes',
-                'Paid Amount',
-                'Payment Date',
-                'Notes'
+                'Voucher Codes'
             ];
 
             $sheet->fromArray($headers, null, 'A1');
 
             // Add sample data
             $sampleData = [
-                ['SV001', 'MERIT2024', 'VOUCHER001', 5000000, '2024-01-15', 'Initial payment'],
-                ['SV002', 'SPORTS2024', 'VOUCHER001,VOUCHER002', 3000000, '2024-01-20', 'Partial payment with multiple vouchers'],
-                ['SV003', '', 'SUMMER50', 10000000, '2024-01-25', 'Full payment with voucher only'],
+                ['SV001', 'MERIT2024', 'VOUCHER001'],
+                ['SV002', 'SPORTS2024', 'VOUCHER001,VOUCHER002'],
+                ['SV003', 'FULL_RIDE', ''],
             ];
 
             $sheet->fromArray($sampleData, null, 'A2');
 
             // Auto-size columns
-            foreach (range('A', 'F') as $col) {
+            foreach (range('A', 'C') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 

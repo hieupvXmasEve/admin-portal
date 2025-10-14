@@ -4,29 +4,12 @@ import { AlertCircle, Calendar, DollarSign, Hash, Loader2, Trash2, Users } from 
 import { route } from 'ziggy-js';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ref } from 'vue';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 
 interface Student {
     id: number;
@@ -75,6 +58,7 @@ const deleteForm = useForm({});
 const isDeleting = ref(false);
 
 const formatDate = (date: string) => {
+    if (!date) return '';
     return new Date(date).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -83,6 +67,7 @@ const formatDate = (date: string) => {
 };
 
 const formatDateTime = (date: string) => {
+    if (!date) return '';
     return new Date(date).toLocaleString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -175,16 +160,12 @@ const deleteVoucher = () => {
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
                             This will permanently delete the voucher "{{ voucher.code }}". This action cannot be undone.
-                            <span v-if="redemptions.length > 0" class="mt-2 block font-semibold text-destructive">
-                                Warning: This voucher has {{ redemptions.length }} redemption(s).
-                            </span>
+                            <span v-if="redemptions.length > 0" class="text-destructive mt-2 block font-semibold"> Warning: This voucher has {{ redemptions.length }} redemption(s). </span>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction @click="deleteVoucher" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                            Delete Voucher
-                        </AlertDialogAction>
+                        <AlertDialogAction @click="deleteVoucher" class="bg-destructive text-destructive-foreground hover:bg-destructive/90"> Delete Voucher </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
@@ -193,9 +174,7 @@ const deleteVoucher = () => {
 
     <Alert v-if="isExpired()" variant="destructive" class="mt-6">
         <AlertCircle class="h-4 w-4" />
-        <AlertDescription>
-            This voucher has expired and can no longer be redeemed by students.
-        </AlertDescription>
+        <AlertDescription> This voucher has expired and can no longer be redeemed by students. </AlertDescription>
     </Alert>
 
     <div class="mt-6 grid gap-6 md:grid-cols-2">
@@ -260,17 +239,13 @@ const deleteVoucher = () => {
                     </div>
                 </div>
 
-                <div v-else class="text-muted-foreground py-4 text-center text-sm">
-                    This is an informational voucher with no discount value.
-                </div>
+                <div v-else class="text-muted-foreground py-4 text-center text-sm">This is an informational voucher with no discount value.</div>
 
                 <div class="space-y-1">
                     <p class="text-muted-foreground text-sm">Valid Period</p>
                     <div class="flex items-center gap-2">
                         <Calendar class="text-muted-foreground h-4 w-4" />
-                        <p class="text-sm">
-                            {{ formatDate(voucher.valid_from) }} - {{ formatDate(voucher.valid_until) }}
-                        </p>
+                        <p class="text-sm">{{ formatDate(voucher.valid_from) }} - {{ formatDate(voucher.valid_until) }}</p>
                     </div>
                 </div>
             </CardContent>

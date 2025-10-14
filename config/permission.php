@@ -275,8 +275,8 @@ return [
         // Student Wallet Management
         'student_wallets' => [
             'view_student_wallet' => 'view_student_wallet',
-            'view_any_student_wallet' => 'view_any_student_wallet',
             'adjust_wallet_balance' => 'adjust_wallet_balance',
+            'deposit_wallet_balance' => 'deposit_wallet_balance'
         ],
         'gold_transactions' => [
             'view_gold_transaction' => 'view_gold_transaction',
@@ -313,7 +313,8 @@ return [
             'edit_invoice' => 'edit_invoice',
             'delete_invoice' => 'delete_invoice',
             'generate_invoice' => 'generate_invoice',
-        ]
+            'pay_invoice' => 'pay_invoice',
+        ],
     ],
 
     'actions' => [

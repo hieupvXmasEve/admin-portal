@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Exports\BillingCycleInvoicesExport;
 use App\Http\Requests\BillingCycleRequest;
+use App\Http\Requests\PayInvoiceRequest;
 use App\Models\BillingCycle;
 use App\Models\Campus;
 use App\Models\Semester;
+use App\Models\StudentInvoice;
 use App\Services\BillingCycleService;
 use App\Services\ExcelExportService;
+use App\Services\InvoicePaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -19,7 +22,8 @@ class BillingCycleController extends Controller
 {
     public function __construct(
         private BillingCycleService $billingCycleService,
-        private ExcelExportService $excelExportService
+        private ExcelExportService $excelExportService,
+        private InvoicePaymentService $invoicePaymentService
     ) {}
 
     /**
@@ -112,7 +116,7 @@ class BillingCycleController extends Controller
     public function show(Request $request, BillingCycle $billingCycle): Response
     {
         $validated = $request->validate([
-            'status' => 'nullable|string|in:all,draft,pending,paid,overdue,cancelled',
+            'status' => 'nullable|string|in:all,draft,pending,paid,partial,overdue,cancelled',
             'campus_id' => 'nullable|integer|exists:campuses,id',
             'per_page' => 'nullable|integer|min:5|max:100',
             'search' => 'nullable|string|max:255',
@@ -124,6 +128,8 @@ class BillingCycleController extends Controller
             ->with([
                 'student:id,student_id,full_name,campus_id',
                 'student.campus:id,name',
+                'student.cashWallet:id,student_id,balance,currency',
+                'items:id,invoice_id,item_type,description,total_price,paid_amount',
             ]);
 
         if (!empty($validated['status']) && $validated['status'] !== 'all') {
@@ -161,6 +167,7 @@ class BillingCycleController extends Controller
             ['value' => 'draft', 'label' => 'Draft'],
             ['value' => 'pending', 'label' => 'Pending'],
             ['value' => 'paid', 'label' => 'Paid'],
+            ['value' => 'partial', 'label' => 'Partial'],
             ['value' => 'overdue', 'label' => 'Overdue'],
             ['value' => 'cancelled', 'label' => 'Cancelled'],
         ];
@@ -262,7 +269,7 @@ class BillingCycleController extends Controller
     {
         try {
             $validated = $request->validate([
-                'status' => 'nullable|string|in:all,draft,pending,paid,overdue,cancelled',
+                'status' => 'nullable|string|in:all,draft,pending,paid,partial,overdue,cancelled',
                 'campus_id' => 'nullable|integer|exists:campuses,id',
                 'search' => 'nullable|string|max:255',
             ]);
@@ -328,6 +335,165 @@ class BillingCycleController extends Controller
 
             return response()->json([
                 'message' => 'Failed to export invoices: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Pay an invoice using student's cash wallet.
+     */
+    public function payInvoice(PayInvoiceRequest $request, BillingCycle $billingCycle, StudentInvoice $invoice)
+    {
+        try {
+            $result = $this->invoicePaymentService->payInvoiceFromWallet($invoice);
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $result,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+                'data' => $result,
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Invoice payment error', [
+                'invoice_id' => $invoice->id,
+                'billing_cycle_id' => $billingCycle->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk pay all eligible invoices in billing cycle.
+     */
+    public function bulkPayInvoices(Request $request, BillingCycle $billingCycle)
+    {
+        try {
+            // Get all unpaid/partial invoices with student wallets
+            $invoices = $billingCycle->invoices()
+                ->with(['student.cashWallet', 'items'])
+                ->whereIn('status', ['pending', 'partial'])
+                ->where('status', '!=', 'cancelled')
+                ->get();
+
+            $results = [
+                'total_invoices' => $invoices->count(),
+                'successful' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'details' => [],
+            ];
+
+            foreach ($invoices as $invoice) {
+                try {
+                    $wallet = $invoice->student->cashWallet;
+
+                    // Skip if no wallet or insufficient balance
+                    if (!$wallet) {
+                        $results['skipped']++;
+                        $results['details'][] = [
+                            'invoice_id' => $invoice->id,
+                            'invoice_number' => $invoice->invoice_number,
+                            'status' => 'skipped',
+                            'message' => 'No wallet found',
+                        ];
+                        continue;
+                    }
+
+                    if ($wallet->balance <= 0) {
+                        $results['skipped']++;
+                        $results['details'][] = [
+                            'invoice_id' => $invoice->id,
+                            'invoice_number' => $invoice->invoice_number,
+                            'status' => 'skipped',
+                            'message' => 'Insufficient wallet balance',
+                        ];
+                        continue;
+                    }
+
+                    $outstanding = $invoice->total_amount - $invoice->paid_amount;
+                    if ($outstanding <= 0) {
+                        $results['skipped']++;
+                        $results['details'][] = [
+                            'invoice_id' => $invoice->id,
+                            'invoice_number' => $invoice->invoice_number,
+                            'status' => 'skipped',
+                            'message' => 'Already fully paid',
+                        ];
+                        continue;
+                    }
+
+                    // Process payment
+                    $result = $this->invoicePaymentService->payInvoiceFromWallet($invoice);
+
+                    if ($result['success']) {
+                        $results['successful']++;
+                        $results['details'][] = [
+                            'invoice_id' => $invoice->id,
+                            'invoice_number' => $invoice->invoice_number,
+                            'status' => 'success',
+                            'message' => $result['message'],
+                            'amount_paid' => $result['amount_paid'],
+                        ];
+                    } else {
+                        $results['failed']++;
+                        $results['details'][] = [
+                            'invoice_id' => $invoice->id,
+                            'invoice_number' => $invoice->invoice_number,
+                            'status' => 'failed',
+                            'message' => $result['message'],
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    $results['failed']++;
+                    $results['details'][] = [
+                        'invoice_id' => $invoice->id,
+                        'invoice_number' => $invoice->invoice_number,
+                        'status' => 'error',
+                        'message' => $e->getMessage(),
+                    ];
+
+                    Log::error('Bulk payment error for invoice', [
+                        'invoice_id' => $invoice->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $message = "Bulk payment completed: {$results['successful']} successful";
+            if ($results['failed'] > 0) {
+                $message .= ", {$results['failed']} failed";
+            }
+            if ($results['skipped'] > 0) {
+                $message .= ", {$results['skipped']} skipped";
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => $results,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Bulk payment error', [
+                'billing_cycle_id' => $billingCycle->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Bulk payment failed: ' . $e->getMessage(),
             ], 500);
         }
     }

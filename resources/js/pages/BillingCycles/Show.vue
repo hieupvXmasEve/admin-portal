@@ -13,7 +13,7 @@ import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { debounce } from 'lodash-es';
-import { AlertCircle, Download, Edit, Loader2 } from 'lucide-vue-next';
+import { AlertCircle, Download, Edit, Eye, Loader2, Wallet } from 'lucide-vue-next';
 import { computed, h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -30,12 +30,29 @@ interface Campus {
     name: string;
 }
 
+interface CashWallet {
+    id: number;
+    student_id: number;
+    balance: number;
+    currency: string;
+}
+
 interface Student {
     id: number;
     student_code?: string | null;
     student_id?: string | null;
     full_name?: string | null;
     campus?: Campus | null;
+    cash_wallet?: CashWallet | null;
+}
+
+interface InvoiceItem {
+    id: number;
+    invoice_id: number;
+    item_type: 'tuition' | 'egc' | 'retake' | 'miscellaneous';
+    description: string;
+    total_price: number;
+    paid_amount: number;
 }
 
 interface Invoice {
@@ -47,6 +64,7 @@ interface Invoice {
     status: string;
     due_date: string;
     student: Student | null;
+    items?: InvoiceItem[];
 }
 
 interface BillingCycle {
@@ -86,6 +104,8 @@ const isActivating = ref(false);
 const isClosing = ref(false);
 const isDeleting = ref(false);
 const isExporting = ref(false);
+const isBulkPaying = ref(false);
+const payingInvoices = ref<Record<number, boolean>>({});
 
 // Computed filter values from props (synced automatically on page load)
 const currentStatus = computed(() => props.filters?.status ?? 'all');
@@ -239,12 +259,14 @@ const getInvoiceStatusVariant = (status: string) => {
     switch (status) {
         case 'paid':
             return 'default';
+        case 'partial':
+            return 'secondary';
         case 'pending':
             return 'outline';
         case 'overdue':
             return 'destructive';
         default:
-            return 'secondary';
+            return 'outline';
     }
 };
 
@@ -424,6 +446,113 @@ const handleExport = async () => {
     }
 };
 
+const handlePayInvoice = async (invoice: Invoice) => {
+    if (!invoice.student?.cash_wallet) {
+        toast.error('Student does not have a wallet');
+        return;
+    }
+
+    const walletBalance = invoice.student.cash_wallet.balance;
+    const outstandingAmount = invoice.total_amount - invoice.paid_amount;
+
+    if (walletBalance <= 0) {
+        toast.error('Insufficient wallet balance');
+        return;
+    }
+
+    payingInvoices.value[invoice.id] = true;
+
+    try {
+        const response = await fetch(
+            route('billing-cycles.invoices.pay', {
+                billingCycle: props.billingCycle.id,
+                invoice: invoice.id,
+            }),
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            },
+        );
+
+        const result = await response.json();
+
+        if (result.success) {
+            toast.success(result.data.message);
+            // Refresh only the invoices data
+            router.reload({ only: ['invoices'] });
+        } else {
+            toast.error(result.message || 'Payment failed');
+        }
+    } catch (error) {
+        console.error('Payment error:', error);
+        toast.error('An unexpected error occurred during payment. Please try again.');
+    } finally {
+        payingInvoices.value[invoice.id] = false;
+    }
+};
+
+const handleBulkPayInvoices = () => {
+    confirmDialog.showConfirmDialog(
+        {
+            title: 'Bulk Pay All Invoices',
+            message: 'Process payment for all eligible invoices using student wallet balances? This will pay all pending and partial invoices that have sufficient wallet balance.',
+            confirmText: 'Confirm Bulk Payment',
+        },
+        {
+            onConfirm: async () => {
+                isBulkPaying.value = true;
+
+                try {
+                    const response = await fetch(
+                        route('billing-cycles.invoices.bulk-pay', {
+                            billingCycle: props.billingCycle.id,
+                        }),
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                        },
+                    );
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        toast.success(result.message);
+                        // Show detailed results if available
+                        if (result.data) {
+                            const { successful, failed, skipped } = result.data;
+                            console.log('Bulk payment results:', result.data);
+
+                            // Show summary in toast
+                            if (failed > 0 || skipped > 0) {
+                                toast.info(`Details: ${successful} paid, ${failed} failed, ${skipped} skipped`);
+                            }
+                        }
+                        // Refresh the invoices data
+                        router.reload({ only: ['invoices'] });
+                    } else {
+                        toast.error(result.message || 'Bulk payment failed');
+                    }
+                } catch (error) {
+                    console.error('Bulk payment error:', error);
+                    toast.error('An unexpected error occurred during bulk payment. Please try again.');
+                } finally {
+                    isBulkPaying.value = false;
+                }
+            },
+        },
+    );
+};
+
 const invoiceColumns: ColumnDef<Invoice>[] = [
     {
         accessorKey: 'invoice_number',
@@ -478,6 +607,77 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
         accessorKey: 'due_date',
         header: 'Due Date',
         cell: ({ row }) => formatDate(row.original.due_date),
+    },
+    {
+        id: 'wallet_balance',
+        header: 'Wallet Balance',
+        cell: ({ row }) => {
+            const wallet = row.original.student?.cash_wallet;
+            if (!wallet) return 'N/A';
+            return formatCurrency(wallet.balance);
+        },
+    },
+    {
+        id: 'outstanding',
+        header: 'Outstanding',
+        cell: ({ row }) => {
+            const invoice = row.original;
+            // Only show outstanding for invoices that are not fully paid
+            if (invoice.status === 'paid') {
+                return h('span', { class: 'text-green-600 font-medium' }, 'Fully Paid');
+            }
+            const outstanding = invoice.total_amount - invoice.paid_amount;
+            return formatCurrency(outstanding);
+        },
+    },
+    {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => {
+            const invoice = row.original;
+            const wallet = invoice.student?.cash_wallet;
+            const outstanding = invoice.total_amount - invoice.paid_amount;
+            const canPay = can('pay_invoice') && outstanding > 0 && invoice.status !== 'cancelled' && wallet && wallet.balance > 0;
+
+            const buttons = [];
+
+            // View Details button (always visible)
+            buttons.push(
+                h(
+                    Link,
+                    {
+                        href: route('invoices.show', invoice.id),
+                    },
+                    () =>
+                        h(
+                            Button,
+                            {
+                                size: 'sm',
+                                variant: 'ghost',
+                            },
+                            () => [h(Eye, { class: 'mr-2 h-4 w-4' })],
+                        ),
+                ),
+            );
+
+            // Pay with Wallet button (conditional)
+            if (canPay) {
+                buttons.push(
+                    h(
+                        Button,
+                        {
+                            size: 'sm',
+                            variant: 'outline',
+                            disabled: payingInvoices.value[invoice.id],
+                            onClick: () => handlePayInvoice(invoice),
+                        },
+                        () => [payingInvoices.value[invoice.id] ? h(Loader2, { class: 'mr-2 h-4 w-4 animate-spin' }) : h(Wallet, { class: 'mr-2 h-4 w-4' }), 'Pay'],
+                    ),
+                );
+            }
+
+            return h('div', { class: 'flex items-center gap-2' }, buttons);
+        },
     },
 ];
 </script>
@@ -607,8 +807,17 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
 
         <Card>
             <CardHeader>
-                <CardTitle>Invoices ({{ totalInvoices }})</CardTitle>
-                <CardDescription>Invoices generated for this billing cycle</CardDescription>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Invoices ({{ totalInvoices }})</CardTitle>
+                        <CardDescription>Invoices generated for this billing cycle</CardDescription>
+                    </div>
+                    <Button v-if="can('pay_invoice') && hasInvoices" :disabled="isBulkPaying" @click="handleBulkPayInvoices">
+                        <Loader2 v-if="isBulkPaying" class="mr-2 h-4 w-4 animate-spin" />
+                        <Wallet v-else class="mr-2 h-4 w-4" />
+                        Bulk Pay All Invoices
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent class="space-y-4">
                 <DataTable v-if="hasInvoices" :columns="invoiceColumns" :data="invoices.data" />

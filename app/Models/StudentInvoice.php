@@ -104,7 +104,39 @@ class StudentInvoice extends Model
         $this->subtotal = $this->items()->sum('total_price');
         $this->discount_total = $this->discounts()->sum('amount');
         $this->total_amount = max(0, $this->subtotal - $this->discount_total);
+        $this->paid_amount = $this->items()->sum('paid_amount');
+        
+        // Update status based on payment
+        if ($this->paid_amount >= $this->total_amount && $this->total_amount > 0) {
+            $this->status = 'paid';
+            $this->paid_at = $this->paid_at ?? now();
+        } elseif ($this->paid_amount > 0) {
+            $this->status = 'partial';
+        }
+        
         $this->save();
+    }
+
+    /**
+     * Get items grouped by payment status.
+     */
+    public function getItemsByPaymentStatus(): array
+    {
+        $items = $this->items;
+        
+        return [
+            'paid' => $items->filter->isFullyPaid()->values(),
+            'partial' => $items->filter->isPartiallyPaid()->values(),
+            'unpaid' => $items->filter(fn($i) => $i->paid_amount == 0)->values(),
+        ];
+    }
+
+    /**
+     * Get the outstanding amount for this invoice.
+     */
+    public function getOutstandingAmount(): float
+    {
+        return max(0, $this->total_amount - $this->paid_amount);
     }
 
     /**

@@ -45,5 +45,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('{billingCycle}/close', [BillingCycleController::class, 'close'])
             ->middleware('can:close_billing_cycle')
             ->name('close');
+
+        Route::post('{billingCycle}/invoices/{invoice}/pay', [BillingCycleController::class, 'payInvoice'])
+            ->middleware('can:pay_invoice')
+            ->name('invoices.pay');
+
+        Route::post('{billingCycle}/invoices/bulk-pay', [BillingCycleController::class, 'bulkPayInvoices'])
+            ->middleware('can:pay_invoice')
+            ->name('invoices.bulk-pay');
     });
 });
