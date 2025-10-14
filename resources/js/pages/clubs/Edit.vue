@@ -6,7 +6,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Campus, Club } from '@/types/models';
+import type { Club } from '@/types/models';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -16,7 +16,6 @@ import { z } from 'zod';
 
 interface Props {
     club: Club;
-    campuses: Campus[];
 }
 
 const props = defineProps<Props>();
@@ -26,7 +25,6 @@ const updateClubSchema = toTypedSchema(
     z.object({
         name: z.string().min(1, 'Club name is required').max(255, 'Club name must not exceed 255 characters'),
         description: z.string().optional(),
-        campus_id: z.string().min(1, 'Campus is required'),
         founded_date: z.string().optional(),
         contact_email: z.string().email('Invalid email format').optional().or(z.literal('')),
         contact_phone: z.string().optional(),
@@ -38,7 +36,6 @@ const updateClubSchema = toTypedSchema(
 const inertiaForm = useForm({
     name: props.club.name,
     description: props.club.description || '',
-    campus_id: props.club.campus_id.toString(),
     founded_date: props.club.founded_date || '',
     contact_email: props.club.contact_email || '',
     contact_phone: props.club.contact_phone || '',
@@ -99,7 +96,6 @@ console.log(props.club);
                 :initial-values="{
                     name: club.name,
                     description: club.description || '',
-                    campus_id: club.campus_id.toString(),
                     founded_date: club.founded_date || '',
                     contact_email: club.contact_email || '',
                     contact_phone: club.contact_phone || '',
@@ -108,43 +104,28 @@ console.log(props.club);
                 class="space-y-6"
                 @submit="onSubmit"
             >
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <!-- Club Name -->
-                    <FormField v-slot="{ componentField }" name="name">
-                        <FormItem>
-                            <FormLabel class="flex items-center gap-2">
-                                <Hash class="h-4 w-4" />
-                                Club Name *
-                            </FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="e.g., Computer Science Club" :disabled="inertiaForm.processing" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                <!-- Club Name -->
+                <FormField v-slot="{ componentField }" name="name">
+                    <FormItem>
+                        <FormLabel class="flex items-center gap-2">
+                            <Hash class="h-4 w-4" />
+                            Club Name *
+                        </FormLabel>
+                        <FormControl>
+                            <Input v-bind="componentField" placeholder="e.g., Computer Science Club" :disabled="inertiaForm.processing" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
 
-                    <!-- Campus -->
-                    <FormField v-slot="{ componentField }" name="campus_id">
-                        <FormItem>
-                            <FormLabel class="flex items-center gap-2">
-                                <Building class="h-4 w-4" />
-                                Campus *
-                            </FormLabel>
-                            <FormControl>
-                                <Select v-bind="componentField" :disabled="inertiaForm.processing">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select campus" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">
-                                            {{ campus.name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                <!-- Campus (Read-only) -->
+                <div class="rounded-lg border bg-muted/50 p-4">
+                    <div class="flex items-center gap-2 text-sm">
+                        <Building class="h-4 w-4 text-muted-foreground" />
+                        <span class="font-medium text-muted-foreground">Campus:</span>
+                        <span class="font-semibold">{{ club.campus?.name }}</span>
+                    </div>
+                    <p class="mt-1 text-xs text-muted-foreground">Campus cannot be changed after club creation</p>
                 </div>
 
                 <!-- Description -->

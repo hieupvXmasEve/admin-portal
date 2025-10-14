@@ -479,7 +479,8 @@ class StudentController extends Controller
         ]);
 
         $query = Student::query()
-            ->with(['campus', 'program', 'specialization']);
+            ->with(['campus', 'program', 'specialization'])
+            ->where('campus_id', session()->get('current_campus_id'));
 
         // Apply status filter
         if ($validated['status'] ?? null) {

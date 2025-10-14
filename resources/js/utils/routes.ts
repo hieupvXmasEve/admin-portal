@@ -106,6 +106,7 @@ export const systemRoutes = {
         update: (id: number) => route(CLUB_ROUTE_NAMES.UPDATE, { club: id }),
         destroy: (id: number) => route(CLUB_ROUTE_NAMES.DESTROY, { club: id }),
         assignPresident: (id: number) => route(CLUB_ROUTE_NAMES.ASSIGN_PRESIDENT, { club: id }),
+        addMember: (id: number) => route(CLUB_ROUTE_NAMES.ADD_MEMBER, { club: id }),
         // API routes
         studentsForAssignment: (id: number) => route(CLUB_ROUTE_NAMES.API_STUDENTS_FOR_ASSIGNMENT, { club: id }),
         studentsForCampus: () => route(CLUB_ROUTE_NAMES.API_STUDENTS_FOR_CAMPUS),

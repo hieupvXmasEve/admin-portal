@@ -14,6 +14,7 @@ export const CLUB_ROUTE_NAMES = {
 
     // Club Management Routes
     ASSIGN_PRESIDENT: 'clubs.assign-president',
+    ADD_MEMBER: 'clubs.add-member',
 
     // Club API Routes
     API_STUDENTS_FOR_ASSIGNMENT: 'clubs.students-for-assignment',

@@ -31,9 +31,8 @@ class UpdateClubRequest extends FormRequest
                 'max:255',
                 Rule::unique('clubs', 'name')
                     ->where('campus_id', $club?->campus_id)
-                    ->ignore($club?->id)
+                    ->ignore($club?->id),
             ],
-            'campus_id' => ['required', 'integer', 'exists:campuses,id'],
             'description' => ['nullable', 'string', 'max:2000'],
             'founded_date' => ['nullable', 'date', 'before_or_equal:today'],
             'avatar_url' => ['nullable', 'url', 'max:500'],
@@ -65,9 +64,6 @@ class UpdateClubRequest extends FormRequest
             'name.string' => 'The club name must be text.',
             'name.max' => 'The club name cannot exceed 255 characters.',
             'name.unique' => 'A club with this name already exists on this campus.',
-            'campus_id.required' => 'The campus is required.',
-            'campus_id.integer' => 'The campus must be an integer.',
-            'campus_id.exists' => 'The campus does not exist.',
             'description.string' => 'The description must be text.',
             'description.max' => 'The description cannot exceed 2000 characters.',
             'founded_date.date' => 'The founded date must be a valid date.',
