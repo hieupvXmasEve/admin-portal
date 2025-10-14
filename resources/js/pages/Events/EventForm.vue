@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { toTypedSchema } from '@vee-validate/zod';
 import { Loader2 } from 'lucide-vue-next';
+import { useForm } from 'vee-validate';
+import { ref } from 'vue';
+import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
+import { z } from 'zod';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
 interface Event {
@@ -41,28 +47,122 @@ const formatDateTimeLocal = (isoString: string | null) => {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
-const form = useForm({
+// Custom Zod refinement for datetime comparison
+const createEventSchema = (isManual: boolean, isHistorical: boolean) => {
+    return z
+        .object({
+            title: z.string({ required_error: 'Event title is required' }).min(1, 'Event title is required').max(255, 'Event title cannot exceed 255 characters'),
+            description: z.string().max(5000, 'Description cannot exceed 5000 characters').nullable().optional(),
+            start_time: z.string({ required_error: 'Start time is required' }).min(1, 'Start time is required'),
+            end_time: z.string({ required_error: 'End time is required' }).min(1, 'End time is required'),
+            location: z.string({ required_error: 'Location is required' }).min(1, 'Location is required').max(255, 'Location cannot exceed 255 characters'),
+            gold_reward_amount: z.number({ required_error: 'Gold reward amount is required' }).min(0, 'Gold reward amount cannot be negative').max(999999.99, 'Gold reward amount is too large'),
+            max_participants: z.number().int('Maximum participants must be a whole number').min(1, 'Maximum participants must be at least 1').max(10000, 'Maximum participants cannot exceed 10,000').nullable().optional(),
+            is_manual: z.boolean().default(false),
+            is_historical: z.boolean().default(false),
+            status: z.enum(['draft', 'published', 'completed', 'cancelled']).optional(),
+        })
+        .refine(
+            (data) => {
+                // Check if end_time is after start_time
+                if (data.start_time && data.end_time) {
+                    return new Date(data.end_time) > new Date(data.start_time);
+                }
+                return true;
+            },
+            {
+                message: 'End time must be after start time',
+                path: ['end_time'],
+            },
+        )
+        .refine(
+            (data) => {
+                // Check if start_time is in the future (only for non-manual, non-historical events)
+                if (!isManual && !isHistorical && data.start_time) {
+                    return new Date(data.start_time) > new Date();
+                }
+                return true;
+            },
+            {
+                message: 'Start time must be in the future',
+                path: ['start_time'],
+            },
+        );
+};
+
+type EventFormData = z.infer<ReturnType<typeof createEventSchema>>;
+
+// Initial form values
+const initialValues: EventFormData = {
     title: props.event?.title || '',
     description: props.event?.description || '',
     start_time: formatDateTimeLocal(props.event?.start_time || ''),
     end_time: formatDateTimeLocal(props.event?.end_time || ''),
     location: props.event?.location || '',
-    gold_reward_amount: props.event?.gold_reward_amount || 0,
+    gold_reward_amount: Number(props.event?.gold_reward_amount) || 0,
     max_participants: props.event?.max_participants || null,
     is_manual: props.isManual || false,
     is_historical: false,
     status: props.isManual ? 'completed' : 'draft',
+};
+
+const validationSchema = toTypedSchema(createEventSchema(props.isManual || false, initialValues.is_historical));
+
+// vee-validate form
+const { handleSubmit, setFieldValue } = useForm({
+    validationSchema,
+    initialValues,
 });
 
-const submitForm = () => {
-    if (props.isEditing && props.event) {
-        form.put(route('events.update', props.event.id));
-    } else if (props.isManual) {
-        form.post(route('events.store-manual'));
-    } else {
-        form.post(route('events.store'));
-    }
+const isSubmitting = ref(false);
+
+// Update validation schema when is_historical changes
+const updateValidationSchema = (isHistorical: boolean) => {
+    setFieldValue('is_historical', isHistorical);
 };
+
+// Form submission handler using vee-validate actions pattern
+const onSubmit = handleSubmit(async (formValues, actions) => {
+    const submitData = {
+        ...formValues,
+        title: String(formValues.title),
+        description: formValues.description || null,
+        start_time: String(formValues.start_time),
+        end_time: String(formValues.end_time),
+        location: String(formValues.location),
+        gold_reward_amount: Number(formValues.gold_reward_amount),
+        max_participants: formValues.max_participants ? Number(formValues.max_participants) : null,
+        is_manual: Boolean(formValues.is_manual),
+        is_historical: Boolean(formValues.is_historical),
+        status: formValues.status,
+    };
+
+    isSubmitting.value = true;
+
+    const routeName = props.isEditing && props.event ? route('events.update', props.event.id) : props.isManual ? route('events.store-manual') : route('events.store');
+
+    const method = props.isEditing && props.event ? 'put' : 'post';
+
+    router[method](routeName, submitData, {
+        preserveState: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            isSubmitting.value = false;
+            toast.success(props.isEditing ? 'Event updated successfully' : props.isManual ? 'Manual event created successfully' : 'Event created successfully');
+        },
+        onError: (serverErrors) => {
+            isSubmitting.value = false;
+            toast.error('Failed to save event. Please check the form for errors.');
+            console.error('Validation errors:', serverErrors);
+
+            // Use vee-validate actions to set errors
+            actions.setErrors(serverErrors);
+        },
+        onFinish: () => {
+            isSubmitting.value = false;
+        },
+    });
+});
 </script>
 <template>
     <Head :title="isEditing ? 'Edit Event' : 'Create Event'" />
@@ -93,98 +193,116 @@ const submitForm = () => {
                 <AlertDescription> <strong>Manual Event:</strong> This event will be created as a completed event. You can set past dates and manually add participants after creation. </AlertDescription>
             </Alert>
 
-            <form class="space-y-8" @submit.prevent="submitForm">
+            <form class="space-y-8" @submit.prevent="onSubmit">
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <!-- Title -->
-                    <div class="space-y-2 md:col-span-2">
-                        <Label for="title">Event Title *</Label>
-                        <Input id="title" v-model="form.title" type="text" required :disabled="form.processing" :aria-invalid="!!form.errors.title" aria-describedby="title-error" />
-                        <p v-if="form.errors.title" id="title-error" class="text-destructive text-sm">
-                            {{ form.errors.title }}
-                        </p>
-                    </div>
+                    <FormField v-slot="{ componentField }" name="title" class="md:col-span-2">
+                        <FormItem>
+                            <FormLabel>Event Title <span class="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                                <Input type="text" placeholder="Enter event title" :disabled="isSubmitting" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
                     <!-- Description -->
-                    <div class="space-y-2 md:col-span-2">
-                        <Label for="description">Description</Label>
-                        <Textarea id="description" v-model="form.description" rows="4" :disabled="form.processing" :aria-invalid="!!form.errors.description" aria-describedby="description-error" placeholder="Share what this event is about" />
-                        <p v-if="form.errors.description" id="description-error" class="text-destructive text-sm">
-                            {{ form.errors.description }}
-                        </p>
-                    </div>
+                    <FormField v-slot="{ componentField }" name="description" class="md:col-span-2">
+                        <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                                <Textarea rows="4" placeholder="Share what this event is about" :disabled="isSubmitting" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
                     <!-- Start Time -->
-                    <div class="space-y-2">
-                        <Label for="start_time">Start Time *</Label>
-                        <Input id="start_time" v-model="form.start_time" type="datetime-local" required :disabled="form.processing" :aria-invalid="!!form.errors.start_time" aria-describedby="start-time-error" />
-                        <p v-if="form.errors.start_time" id="start-time-error" class="text-destructive text-sm">
-                            {{ form.errors.start_time }}
-                        </p>
-                    </div>
+                    <FormField v-slot="{ componentField }" name="start_time">
+                        <FormItem>
+                            <FormLabel>Start Time <span class="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                                <Input type="datetime-local" :disabled="isSubmitting" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
                     <!-- End Time -->
-                    <div class="space-y-2">
-                        <Label for="end_time">End Time *</Label>
-                        <Input id="end_time" v-model="form.end_time" type="datetime-local" required :disabled="form.processing" :aria-invalid="!!form.errors.end_time" aria-describedby="end-time-error" />
-                        <p v-if="form.errors.end_time" id="end-time-error" class="text-destructive text-sm">
-                            {{ form.errors.end_time }}
-                        </p>
-                    </div>
+                    <FormField v-slot="{ componentField }" name="end_time">
+                        <FormItem>
+                            <FormLabel>End Time <span class="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                                <Input type="datetime-local" :disabled="isSubmitting" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
                     <!-- Location -->
-                    <div class="space-y-2">
-                        <Label for="location">Location *</Label>
-                        <Input id="location" v-model="form.location" type="text" required :disabled="form.processing" :aria-invalid="!!form.errors.location" aria-describedby="location-error" />
-                        <p v-if="form.errors.location" id="location-error" class="text-destructive text-sm">
-                            {{ form.errors.location }}
-                        </p>
-                    </div>
+                    <FormField v-slot="{ componentField }" name="location">
+                        <FormItem>
+                            <FormLabel>Location <span class="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                                <Input type="text" placeholder="Enter event location" :disabled="isSubmitting" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
                     <!-- Gold Reward Amount -->
-                    <div class="space-y-2">
-                        <Label for="gold_reward_amount">Gold Reward Amount *</Label>
-                        <Input id="gold_reward_amount" v-model="form.gold_reward_amount" type="number" step="0.01" min="0" required :disabled="form.processing" :aria-invalid="!!form.errors.gold_reward_amount" aria-describedby="gold-reward-error" />
-                        <p v-if="form.errors.gold_reward_amount" id="gold-reward-error" class="text-destructive text-sm">
-                            {{ form.errors.gold_reward_amount }}
-                        </p>
-                    </div>
+                    <FormField v-slot="{ componentField }" name="gold_reward_amount">
+                        <FormItem>
+                            <FormLabel>Gold Reward Amount <span class="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                                <Input type="number" step="1" min="0" placeholder="0.00" :disabled="isSubmitting" v-bind="componentField" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
                     <!-- Max Participants -->
-                    <div class="space-y-2 md:col-span-2">
-                        <Label for="max_participants">Maximum Participants</Label>
-                        <Input
-                            id="max_participants"
-                            v-model="form.max_participants"
-                            type="number"
-                            min="1"
-                            :disabled="form.processing"
-                            :aria-invalid="!!form.errors.max_participants"
-                            aria-describedby="max-participants-error max-participants-help"
-                            placeholder="Leave empty for unlimited"
-                        />
-                        <p v-if="form.errors.max_participants" id="max-participants-error" class="text-destructive text-sm">
-                            {{ form.errors.max_participants }}
-                        </p>
-                        <p id="max-participants-help" class="text-muted-foreground text-sm">Leave empty for unlimited participants.</p>
-                    </div>
+                    <FormField v-slot="{ componentField }" name="max_participants" class="md:col-span-2">
+                        <FormItem>
+                            <FormLabel>Maximum Participants</FormLabel>
+                            <FormControl>
+                                <Input type="number" min="1" placeholder="Leave empty for unlimited" :disabled="isSubmitting" v-bind="componentField" />
+                            </FormControl>
+                            <FormDescription>Leave empty for unlimited participants.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
                     <!-- Historical Event Checkbox (only for manual events) -->
-                    <div v-if="isManual" class="space-y-2 md:col-span-2">
-                        <div class="flex items-center space-x-2">
-                            <Checkbox id="is_historical" v-model:checked="form.is_historical" :disabled="form.processing" />
-                            <Label for="is_historical" class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"> This is a historical event (occurred before system implementation) </Label>
-                        </div>
-                        <p class="text-muted-foreground text-sm">Check this if the event occurred before the system was implemented. This allows past dates and provides better audit tracking.</p>
-                    </div>
+                    <FormField v-if="isManual" v-slot="{ value, handleChange }" name="is_historical" class="md:col-span-2">
+                        <FormItem class="flex flex-row items-start space-y-0 space-x-3">
+                            <FormControl>
+                                <Checkbox
+                                    :model-value="value"
+                                    :disabled="isSubmitting"
+                                    @update:model-value="
+                                        (checked) => {
+                                            handleChange(checked);
+                                            updateValidationSchema(checked as boolean);
+                                        }
+                                    "
+                                />
+                            </FormControl>
+                            <div class="space-y-1 leading-none">
+                                <FormLabel>This is a historical event (occurred before system implementation)</FormLabel>
+                                <FormDescription> Check this if the event occurred before the system was implemented. This allows past dates and provides better audit tracking. </FormDescription>
+                            </div>
+                        </FormItem>
+                    </FormField>
                 </div>
 
                 <!-- Form Actions -->
                 <div class="flex items-center justify-end gap-3">
-                    <Button type="button" variant="outline" as-child :disabled="form.processing">
+                    <Button type="button" variant="outline" as-child :disabled="isSubmitting">
                         <Link :href="route('events.index')"> Cancel </Link>
                     </Button>
-                    <Button type="submit" :disabled="form.processing" class="gap-2">
-                        <Loader2 v-if="form.processing" class="h-4 w-4 animate-spin" />
+                    <Button type="submit" :disabled="isSubmitting" class="gap-2">
+                        <Loader2 v-if="isSubmitting" class="h-4 w-4 animate-spin" />
                         {{ isEditing ? 'Update Event' : isManual ? 'Create Manual Event' : 'Create Event' }}
                     </Button>
                 </div>

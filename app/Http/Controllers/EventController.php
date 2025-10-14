@@ -6,8 +6,8 @@ use App\Http\Requests\EventRequest;
 use App\Http\Resources\EventParticipantResource;
 use App\Http\Resources\EventResource;
 use App\Models\Event;
-use App\Services\EventService;
 use App\Services\EventParticipationService;
+use App\Services\EventService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,11 +26,40 @@ class EventController extends Controller
     {
 
         $currentCampusId = session('current_campus_id');
-        $filters = $request->only(['search', 'status', 'date_from', 'date_to']);
-        $events = $this->eventService->getEventsForCampus($currentCampusId, $filters);
+        $filters = $request->only(['search', 'status', 'date_from', 'date_to', 'per_page']);
+        $perPage = (int) ($filters['per_page'] ?? 10);
+
+        $events = $this->eventService->getEventsForCampus($currentCampusId, $filters, $perPage);
+
+        // Transform events and add can_delete flag
+        $eventsCollection = EventResource::collection($events);
+        $eventsResponse = $eventsCollection->response($request)->getData(true);
+
+        // Add can_delete flag to each event
+        if (isset($eventsResponse['data']) && is_array($eventsResponse['data'])) {
+            foreach ($eventsResponse['data'] as &$eventData) {
+                // Find the original event model to check if it has participants
+                $originalEvent = $events->firstWhere('id', $eventData['id']);
+                $eventData['can_delete'] = $originalEvent ? $originalEvent->getRegisteredCount() === 0 : false;
+            }
+        }
+
+        // Restructure to match DataPagination component expectations
+        $paginationData = [
+            'data' => $eventsResponse['data'] ?? [],
+            'links' => $eventsResponse['links'] ?? [],
+            'current_page' => $eventsResponse['meta']['current_page'] ?? 1,
+            'last_page' => $eventsResponse['meta']['last_page'] ?? 1,
+            'per_page' => $eventsResponse['meta']['per_page'] ?? $perPage,
+            'total' => $eventsResponse['meta']['total'] ?? 0,
+            'from' => $eventsResponse['meta']['from'] ?? null,
+            'to' => $eventsResponse['meta']['to'] ?? null,
+            'prev_page_url' => $eventsResponse['links']['prev'] ?? null,
+            'next_page_url' => $eventsResponse['links']['next'] ?? null,
+        ];
 
         return Inertia::render('Events/EventList', [
-            'events' => EventResource::collection($events),
+            'events' => $paginationData,
             'filters' => $filters,
         ]);
     }
@@ -67,15 +96,15 @@ class EventController extends Controller
     public function store(EventRequest $request)
     {
 
-        $campus = $request->user()->campuses()->first();
-        if (!$campus) {
+        $campus = session('current_campus_id');
+        if (! $campus) {
             abort(403, 'User must be associated with a campus');
         }
 
         $eventData = array_merge($request->validated(), [
-            'campus_id' => $campus->id,
+            'campus_id' => $campus,
             'organizer_type' => 'school',
-            'organizer_id' => $campus->id,
+            'organizer_id' => $campus,
         ]);
 
         $event = $this->eventService->createEvent($eventData, $request->user());
@@ -90,15 +119,15 @@ class EventController extends Controller
     public function storeManual(EventRequest $request)
     {
 
-        $campus = $request->user()->campuses()->first();
-        if (!$campus) {
+        $campus = session('current_campus_id');
+        if (! $campus) {
             abort(403, 'User must be associated with a campus');
         }
 
         $eventData = array_merge($request->validated(), [
-            'campus_id' => $campus->id,
+            'campus_id' => $campus,
             'organizer_type' => 'school',
-            'organizer_id' => $campus->id,
+            'organizer_id' => $campus,
         ]);
 
         $event = $this->eventService->createManualEvent($eventData, $request->user());
@@ -119,11 +148,8 @@ class EventController extends Controller
             'event' => new EventResource($event->load(['creator', 'campus'])),
             'statistics' => $statistics,
             'can' => [
-                'update' => request()->user()->can('update', $event),
-                'delete' => request()->user()->can('delete', $event),
-                'publish' => request()->user()->can('publish', $event),
-                'cancel' => request()->user()->can('cancel', $event),
-            ]
+                'delete' => $event->getRegisteredCount() === 0,
+            ],
         ]);
     }
 
@@ -156,6 +182,10 @@ class EventController extends Controller
      */
     public function destroy(Event $event)
     {
+        // Check if event has any participants
+        if ($event->getRegisteredCount() > 0) {
+            return back()->with('error', 'Cannot delete event with registered participants.');
+        }
 
         $event->delete();
 
@@ -202,20 +232,17 @@ class EventController extends Controller
      */
     public function scanner(Request $request, Event $event): Response
     {
-        $campus = $request->user()->campuses()->first();
-        if (!$campus) {
+        $campus = session('current_campus_id');
+        if (! $campus) {
             abort(403, 'User must be associated with a campus');
         }
 
-        if ((int) $event->campus_id !== (int) $campus->id) {
+        if ((int) $event->campus_id !== (int) $campus) {
             abort(403, 'You are not authorized to manage this event');
         }
 
         return Inertia::render('Events/EventQRScanner', [
             'event' => (new EventResource($event->loadMissing(['campus', 'creator'])))->resolve(),
-            'can' => [
-                'checkin' => $request->user()->can('events.checkin'),
-            ],
         ]);
     }
 
@@ -224,16 +251,16 @@ class EventController extends Controller
      */
     public function manageParticipants(Request $request, Event $event): Response
     {
-        $campus = $request->user()->campuses()->first();
-        if (!$campus) {
+        $campus = session('current_campus_id');
+        if (! $campus) {
             abort(403, 'User must be associated with a campus');
         }
 
-        if ((int) $event->campus_id !== (int) $campus->id) {
+        if ((int) $event->campus_id !== (int) $campus) {
             abort(403, 'You are not authorized to manage this event');
         }
 
-        if (!$event->isManual()) {
+        if (! $event->isManual()) {
             abort(403, 'Participant management is only available for manual events');
         }
 
@@ -241,11 +268,11 @@ class EventController extends Controller
 
         // Normalize filters (treat "all" or empty as null, convert boolean flags)
         $normalizedFilters = [];
-        if (!empty($filters['status']) && $filters['status'] !== 'all') {
+        if (! empty($filters['status']) && $filters['status'] !== 'all') {
             $normalizedFilters['status'] = $filters['status'];
         }
 
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $normalizedFilters['search'] = $filters['search'];
         }
 
@@ -268,12 +295,8 @@ class EventController extends Controller
         $participantResource = EventParticipantResource::collection($participants);
         $participantArray = $participantResource->response($request)->getData(true);
 
-
         return Inertia::render('Events/ManualParticipants', [
             'event' => new EventResource($event->load(['creator', 'campus'])),
-            'can' => [
-                'manage_participants' => $request->user()->can('events.manage_participants'),
-            ],
             'participants' => $participantArray['data'] ?? [],
             'participantsPagination' => [
                 'current_page' => $participants->currentPage(),
