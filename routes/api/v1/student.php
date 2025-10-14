@@ -233,14 +233,12 @@ Route::middleware([
             Route::post('/{club}/apply', [ClubController::class, 'apply'])->name('apply');
 
             // Club management operations (president only)
-            Route::middleware('can:manageMembers,club')->group(function () {
-                Route::get('/{club}/manage', [ClubManagementController::class, 'managementDashboard'])->name('manage');
-                Route::put('/{club}', [ClubManagementController::class, 'update'])->name('update');
-                Route::get('/{club}/members', [ClubManagementController::class, 'members'])->name('members');
-                Route::put('/{club}/members/{member}/approve', [ClubManagementController::class, 'approveMember'])->name('approve-member');
-                Route::put('/{club}/members/{member}/reject', [ClubManagementController::class, 'rejectMember'])->name('reject-member');
-                Route::put('/{club}/members/{member}/role', [ClubManagementController::class, 'updateMemberRole'])->name('update-member-role');
-            });
+            Route::get('/{club}/manage', [ClubManagementController::class, 'managementDashboard'])->name('manage');
+            Route::put('/{club}', [ClubManagementController::class, 'update'])->name('update');
+            Route::get('/{club}/members', [ClubManagementController::class, 'members'])->name('members');
+            Route::put('/{club}/members/{member}/approve', [ClubManagementController::class, 'approveMember'])->name('approve-member');
+            Route::put('/{club}/members/{member}/reject', [ClubManagementController::class, 'rejectMember'])->name('reject-member');
+            Route::put('/{club}/members/{member}/role', [ClubManagementController::class, 'updateMemberRole'])->name('update-member-role');
         });
 
         // Event endpoints

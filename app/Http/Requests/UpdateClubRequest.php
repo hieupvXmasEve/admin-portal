@@ -48,7 +48,7 @@ class UpdateClubRequest extends FormRequest
             'contact_phone' => ['nullable', 'string', 'max:20'],
             'achievements' => ['nullable', 'array'],
             'achievements.*' => ['string', 'max:500'],
-            'status' => ['required', 'string', 'in:active,inactive'],
+            // 'status' => ['required', 'string', 'in:active,inactive'],
         ];
     }
 
@@ -92,9 +92,9 @@ class UpdateClubRequest extends FormRequest
             'achievements.array' => 'Achievements must be a list.',
             'achievements.*.string' => 'Each achievement must be text.',
             'achievements.*.max' => 'Each achievement cannot exceed 500 characters.',
-            'status.required' => 'The status is required.',
-            'status.string' => 'The status must be text.',
-            'status.in' => 'The status must be either active or inactive.',
+            // 'status.required' => 'The status is required.',
+            // 'status.string' => 'The status must be text.',
+            // 'status.in' => 'The status must be either active or inactive.',
         ];
     }
 }

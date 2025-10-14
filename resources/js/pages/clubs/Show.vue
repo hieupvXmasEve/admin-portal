@@ -83,6 +83,41 @@ onMounted(() => {
 
 // Member data and filters
 const memberData = computed(() => props.members.data);
+
+// Group members by status
+const groupedMembers = computed(() => {
+    const groups = {
+        active: [] as ClubMember[],
+        pending: [] as ClubMember[],
+        rejected: [] as ClubMember[],
+        left: [] as ClubMember[],
+        banned: [] as ClubMember[],
+    };
+
+    memberData.value.forEach(member => {
+        if (member.status in groups) {
+            groups[member.status as keyof typeof groups].push(member);
+        }
+    });
+
+    return groups;
+});
+
+const statusLabels: Record<string, string> = {
+    active: 'Active Members',
+    pending: 'Pending Applications',
+    rejected: 'Rejected',
+    left: 'Left Club',
+    banned: 'Banned',
+};
+
+const statusCounts = computed(() => ({
+    active: groupedMembers.value.active.length,
+    pending: groupedMembers.value.pending.length,
+    rejected: groupedMembers.value.rejected.length,
+    left: groupedMembers.value.left.length,
+    banned: groupedMembers.value.banned.length,
+}));
 const filters = ref({
     search: props.filters?.search || '',
     status: props.filters?.status || '',
@@ -329,8 +364,17 @@ const memberColumns: ColumnDef<ClubMember>[] = [
                 member: 'Member',
             };
 
-            const icon = role === 'president' ? Crown : role === 'vice_president' ? Shield : User;
-            const variant = role === 'president' ? 'default' : role === 'vice_president' ? 'secondary' : 'outline';
+            const roleConfig: Record<string, { icon: any; variant: any; color?: string }> = {
+                president: { icon: Crown, variant: 'purple' },
+                vice_president: { icon: Shield, variant: 'indigo' },
+                secretary: { icon: User, variant: 'info' },
+                treasurer: { icon: User, variant: 'warning' },
+                member: { icon: User, variant: 'outline' },
+            };
+
+            const config = roleConfig[role] || { icon: User, variant: 'outline' };
+            const icon = config.icon;
+            const variant = config.variant;
 
             return h('div', { class: 'flex items-center gap-2' }, [h(icon, { class: 'h-4 w-4' }), h(Badge, { variant }, () => roleLabels[role] || role)]);
         },
@@ -616,11 +660,104 @@ const memberColumns: ColumnDef<ClubMember>[] = [
                     </Button>
                 </div>
 
-                <!-- Members Table -->
-                <DataTable :data="memberData" :columns="memberColumns" />
+                <!-- Members Grouped by Status -->
+                <div v-if="!filters.status" class="space-y-6">
+                    <!-- Active Members -->
+                    <Card v-if="groupedMembers.active.length > 0">
+                        <CardHeader>
+                            <CardTitle class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <Users class="h-5 w-5 text-green-600" />
+                                    <span>{{ statusLabels.active }}</span>
+                                    <Badge variant="success">{{ statusCounts.active }}</Badge>
+                                </div>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <DataTable :data="groupedMembers.active" :columns="memberColumns" />
+                        </CardContent>
+                    </Card>
 
-                <!-- Members Pagination -->
-                <DataPagination :pagination-data="members" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+                    <!-- Pending Applications -->
+                    <Card v-if="groupedMembers.pending.length > 0">
+                        <CardHeader>
+                            <CardTitle class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <Users class="h-5 w-5 text-yellow-600" />
+                                    <span>{{ statusLabels.pending }}</span>
+                                    <Badge variant="warning">{{ statusCounts.pending }}</Badge>
+                                </div>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <DataTable :data="groupedMembers.pending" :columns="memberColumns" />
+                        </CardContent>
+                    </Card>
+
+                    <!-- Rejected -->
+                    <Card v-if="groupedMembers.rejected.length > 0">
+                        <CardHeader>
+                            <CardTitle class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <Users class="h-5 w-5 text-red-600" />
+                                    <span>{{ statusLabels.rejected }}</span>
+                                    <Badge variant="destructive">{{ statusCounts.rejected }}</Badge>
+                                </div>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <DataTable :data="groupedMembers.rejected" :columns="memberColumns" />
+                        </CardContent>
+                    </Card>
+
+                    <!-- Left Club -->
+                    <Card v-if="groupedMembers.left.length > 0">
+                        <CardHeader>
+                            <CardTitle class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <Users class="h-5 w-5 text-gray-600" />
+                                    <span>{{ statusLabels.left }}</span>
+                                    <Badge variant="secondary">{{ statusCounts.left }}</Badge>
+                                </div>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <DataTable :data="groupedMembers.left" :columns="memberColumns" />
+                        </CardContent>
+                    </Card>
+
+                    <!-- Banned -->
+                    <Card v-if="groupedMembers.banned.length > 0">
+                        <CardHeader>
+                            <CardTitle class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <Users class="h-5 w-5 text-red-600" />
+                                    <span>{{ statusLabels.banned }}</span>
+                                    <Badge variant="destructive">{{ statusCounts.banned }}</Badge>
+                                </div>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <DataTable :data="groupedMembers.banned" :columns="memberColumns" />
+                        </CardContent>
+                    </Card>
+
+                    <!-- No Members -->
+                    <Card v-if="memberData.length === 0">
+                        <CardContent class="py-12 text-center">
+                            <Users class="mx-auto h-12 w-12 text-gray-400" />
+                            <h3 class="mt-4 text-lg font-semibold">No members yet</h3>
+                            <p class="text-muted-foreground mt-2">Start by adding members to this club.</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <!-- Filtered Members Table (when filter is applied) -->
+                <div v-else>
+                    <DataTable :data="memberData" :columns="memberColumns" />
+                    <!-- Members Pagination -->
+                    <DataPagination :pagination-data="members" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" class="mt-4" />
+                </div>
             </TabsContent>
         </Tabs>
     </div>

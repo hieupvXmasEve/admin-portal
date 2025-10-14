@@ -103,6 +103,18 @@ class Club extends AuditableModel
     }
 
     /**
+     * Check if a student is the president of this club.
+     */
+    public function isPresident(int $studentId): bool
+    {
+        return $this->members()
+            ->where('student_id', $studentId)
+            ->where('role', 'president')
+            ->where('status', 'active')
+            ->exists();
+    }
+
+    /**
      * Scope to get active clubs.
      */
     public function scopeActive($query)
