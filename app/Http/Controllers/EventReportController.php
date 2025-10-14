@@ -21,7 +21,7 @@ class EventReportController extends Controller
      */
     public function index(Request $request): InertiaResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus) {
             abort(403, 'User must be associated with a campus');
         }
@@ -36,12 +36,12 @@ class EventReportController extends Controller
             $filters['date_to'] = now()->addMonths(1)->format('Y-m-d');
         }
 
-        $analytics = $this->eventReportService->getEventAnalytics($campus->id, $filters);
+        $analytics = $this->eventReportService->getEventAnalytics($campus, $filters);
         return Inertia::render('Events/EventReports', [
             'analytics' => $analytics,
             'filters' => $filters,
             'campus' => [
-                'id' => $campus->id,
+                'id' => $campus,
                 'name' => $campus->name,
             ],
         ]);
@@ -52,13 +52,13 @@ class EventReportController extends Controller
      */
     public function analytics(Request $request): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus) {
             return response()->json(['error' => 'User must be associated with a campus'], 403);
         }
 
         $filters = $request->only(['date_from', 'date_to', 'status']);
-        $analytics = $this->eventReportService->getEventAnalytics($campus->id, $filters);
+        $analytics = $this->eventReportService->getEventAnalytics($campus, $filters);
 
         return response()->json([
             'success' => true,
@@ -71,8 +71,8 @@ class EventReportController extends Controller
      */
     public function eventStats(Request $request, Event $event): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
-        if (!$campus || $event->campus_id !== $campus->id) {
+        $campus = session('current_campus_id');
+        if (!$campus || $event->campus_id !== $campus) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -89,13 +89,13 @@ class EventReportController extends Controller
      */
     public function exportEvents(Request $request): Response
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus) {
             abort(403, 'User must be associated with a campus');
         }
 
         $filters = $request->only(['date_from', 'date_to', 'status']);
-        $csvData = $this->eventReportService->exportEventData($campus->id, $filters);
+        $csvData = $this->eventReportService->exportEventData($campus, $filters);
 
         $filename = 'events_report_' . now()->format('Y-m-d_H-i-s') . '.csv';
 
@@ -118,8 +118,8 @@ class EventReportController extends Controller
      */
     public function exportParticipants(Request $request, Event $event): Response
     {
-        $campus = $request->user()->campuses()->first();
-        if (!$campus || $event->campus_id !== $campus->id) {
+        $campus = session('current_campus_id');
+        if (!$campus || $event->campus_id !== $campus) {
             abort(403, 'Unauthorized');
         }
 
@@ -146,7 +146,7 @@ class EventReportController extends Controller
      */
     public function eventHistory(Request $request): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus) {
             return response()->json(['error' => 'User must be associated with a campus'], 403);
         }
@@ -158,7 +158,7 @@ class EventReportController extends Controller
         $perPage = (int) ($filters['per_page'] ?? 15);
         $offset = ($page - 1) * $perPage;
 
-        $query = Event::forCampus($campus->id)
+        $query = Event::forCampus((int) $campus->id)
             ->with(['creator', 'participants']);
 
         // Apply filters

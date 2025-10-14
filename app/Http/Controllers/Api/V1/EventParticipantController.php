@@ -26,7 +26,7 @@ class EventParticipantController extends Controller
      */
     public function getFilterOptions(Request $request, Event $event): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus || (int) $event->campus_id !== (int) $campus->id) {
             abort(403, 'You are not authorized to manage this event');
         }
@@ -66,7 +66,7 @@ class EventParticipantController extends Controller
      */
     public function searchStudents(Request $request, Event $event): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus || (int) $event->campus_id !== (int) $campus->id) {
             abort(403, 'You are not authorized to manage this event');
         }
@@ -97,7 +97,7 @@ class EventParticipantController extends Controller
      */
     public function addParticipants(Request $request, Event $event): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus || (int) $event->campus_id !== (int) $campus->id) {
             abort(403, 'You are not authorized to manage this event');
         }
@@ -139,7 +139,7 @@ class EventParticipantController extends Controller
      */
     public function getParticipants(Request $request, Event $event): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus || (int) $event->campus_id !== (int) $campus->id) {
             abort(403, 'You are not authorized to manage this event');
         }
@@ -172,7 +172,7 @@ class EventParticipantController extends Controller
      */
     public function bulkUpdateStatus(Request $request, Event $event): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus || (int) $event->campus_id !== (int) $campus->id) {
             abort(403, 'You are not authorized to manage this event');
         }
@@ -214,7 +214,7 @@ class EventParticipantController extends Controller
      */
     public function removeParticipants(Request $request, Event $event): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus || (int) $event->campus_id !== (int) $campus->id) {
             abort(403, 'You are not authorized to manage this event');
         }
@@ -254,7 +254,7 @@ class EventParticipantController extends Controller
      */
     public function getStatistics(Request $request, Event $event): JsonResponse
     {
-        $campus = $request->user()->campuses()->first();
+        $campus = session('current_campus_id');
         if (!$campus || (int) $event->campus_id !== (int) $campus->id) {
             abort(403, 'You are not authorized to manage this event');
         }

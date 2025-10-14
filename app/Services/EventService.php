@@ -3,19 +3,18 @@
 namespace App\Services;
 
 use App\Jobs\ProcessEventNotificationJob;
+use App\Models\Campus;
 use App\Models\Event;
 use App\Models\User;
-use App\Models\Campus;
-use App\Models\EventParticipant;
-use Illuminate\Database\Eloquent\Collection;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
-use Carbon\Carbon;
 
 class EventService
 {
     protected QRCodeService $qrCodeService;
+
     protected NotificationService $notificationService;
 
     public function __construct(
@@ -62,7 +61,7 @@ class EventService
                 'creator_id' => $creator->id,
                 'campus_id' => $event->campus_id,
                 'is_manual' => $event->is_manual,
-                'is_historical' => $event->is_historical
+                'is_historical' => $event->is_historical,
             ]);
 
             return $event;
@@ -113,7 +112,7 @@ class EventService
                 'campus_id' => $event->campus_id,
                 'is_historical' => $event->is_historical,
                 'start_time' => $event->start_time,
-                'end_time' => $event->end_time
+                'end_time' => $event->end_time,
             ]);
 
             return $event;
@@ -150,7 +149,7 @@ class EventService
             Log::info('Event updated', [
                 'event_id' => $event->id,
                 'changes' => array_diff_assoc($event->toArray(), $originalData),
-                'significant_changes' => $significantChanges
+                'significant_changes' => $significantChanges,
             ]);
 
             return $event->fresh();
@@ -162,9 +161,9 @@ class EventService
      */
     public function publishEvent(Event $event): Event
     {
-        if (!$event->isDraft()) {
+        if (! $event->isDraft()) {
             throw ValidationException::withMessages([
-                'status' => ['Only draft events can be published.']
+                'status' => ['Only draft events can be published.'],
             ]);
         }
 
@@ -180,7 +179,7 @@ class EventService
             Log::info('Event published', [
                 'event_id' => $event->id,
                 'title' => $event->title,
-                'campus_id' => $event->campus_id
+                'campus_id' => $event->campus_id,
             ]);
 
             return $event->fresh();
@@ -190,11 +189,11 @@ class EventService
     /**
      * Cancel an event
      */
-    public function cancelEvent(Event $event, string $reason = null): Event
+    public function cancelEvent(Event $event, ?string $reason = null): Event
     {
         if ($event->isCancelled() || $event->isCompleted()) {
             throw ValidationException::withMessages([
-                'status' => ['Cannot cancel an event that is already cancelled or completed.']
+                'status' => ['Cannot cancel an event that is already cancelled or completed.'],
             ]);
         }
 
@@ -216,7 +215,7 @@ class EventService
                 'event_id' => $event->id,
                 'title' => $event->title,
                 'reason' => $reason,
-                'participants_affected' => $event->getRegisteredCount()
+                'participants_affected' => $event->getRegisteredCount(),
             ]);
 
             return $event->fresh();
@@ -228,15 +227,15 @@ class EventService
      */
     public function completeEvent(Event $event): Event
     {
-        if (!$event->isPublished()) {
+        if (! $event->isPublished()) {
             throw ValidationException::withMessages([
-                'status' => ['Only published events can be completed.']
+                'status' => ['Only published events can be completed.'],
             ]);
         }
 
-        if (!$event->hasEnded()) {
+        if (! $event->hasEnded()) {
             throw ValidationException::withMessages([
-                'end_time' => ['Event cannot be completed before its end time.']
+                'end_time' => ['Event cannot be completed before its end time.'],
             ]);
         }
 
@@ -261,7 +260,7 @@ class EventService
             Log::info('Event completed', [
                 'event_id' => $event->id,
                 'title' => $event->title,
-                'participants_completed' => $checkedInParticipants->count()
+                'participants_completed' => $checkedInParticipants->count(),
             ]);
 
             return $event->fresh();
@@ -271,21 +270,21 @@ class EventService
     /**
      * Get events for a specific campus with filters
      */
-    public function getEventsForCampus(int $campusId, array $filters = []): Collection
+    public function getEventsForCampus(int $campusId, array $filters = [], int $perPage = 10)
     {
         $query = Event::forCampus($campusId);
 
         // Apply status filter
-        if (isset($filters['status']) && !empty($filters['status']) && $filters['status'] !== 'all') {
+        if (isset($filters['status']) && ! empty($filters['status']) && $filters['status'] !== 'all') {
             $query->where('status', $filters['status']);
         }
 
         // Apply date range filters
-        if (isset($filters['date_from']) && !empty($filters['date_from'])) {
+        if (isset($filters['date_from']) && ! empty($filters['date_from'])) {
             $query->where('start_time', '>=', Carbon::parse($filters['date_from']));
         }
 
-        if (isset($filters['date_to']) && !empty($filters['date_to'])) {
+        if (isset($filters['date_to']) && ! empty($filters['date_to'])) {
             $query->where('end_time', '<=', Carbon::parse($filters['date_to']));
         }
 
@@ -318,7 +317,8 @@ class EventService
         $sortBy = $filters['sort_by'] ?? 'start_time';
         $sortDirection = $filters['sort_direction'] ?? 'asc';
         $query->orderBy($sortBy, $sortDirection);
-        return $query->with(['campus'])->get();
+
+        return $query->with(['campus'])->paginate($perPage);
     }
 
     /**
@@ -352,9 +352,9 @@ class EventService
         // Validate campus exists
         if (isset($data['campus_id'])) {
             $campus = Campus::find($data['campus_id']);
-            if (!$campus) {
+            if (! $campus) {
                 throw ValidationException::withMessages([
-                    'campus_id' => ['The selected campus does not exist.']
+                    'campus_id' => ['The selected campus does not exist.'],
                 ]);
             }
         }
@@ -366,7 +366,7 @@ class EventService
 
             if ($startTime->gte($endTime)) {
                 throw ValidationException::withMessages([
-                    'end_time' => ['End time must be after start time.']
+                    'end_time' => ['End time must be after start time.'],
                 ]);
             }
 
@@ -375,13 +375,13 @@ class EventService
 
             // Only validate future times for new events or if times are being changed
             if (
-                !$isManualOrHistorical &&
-                (!$existingEvent ||
+                ! $isManualOrHistorical &&
+                (! $existingEvent ||
                 ($existingEvent && ($existingEvent->start_time != $startTime || $existingEvent->end_time != $endTime)))
             ) {
                 if ($startTime->isPast()) {
                     throw ValidationException::withMessages([
-                        'start_time' => ['Start time must be in the future.']
+                        'start_time' => ['Start time must be in the future.'],
                     ]);
                 }
             }
@@ -391,14 +391,14 @@ class EventService
         if (isset($data['max_participants']) && $data['max_participants'] !== null) {
             if ($data['max_participants'] < 1) {
                 throw ValidationException::withMessages([
-                    'max_participants' => ['Maximum participants must be at least 1.']
+                    'max_participants' => ['Maximum participants must be at least 1.'],
                 ]);
             }
 
             // If updating an existing event, ensure new capacity isn't less than current registrations
             if ($existingEvent && $existingEvent->getRegisteredCount() > $data['max_participants']) {
                 throw ValidationException::withMessages([
-                    'max_participants' => ['Cannot set capacity below current registration count.']
+                    'max_participants' => ['Cannot set capacity below current registration count.'],
                 ]);
             }
         }
@@ -406,7 +406,7 @@ class EventService
         // Validate gold reward amount
         if (isset($data['gold_reward_amount']) && $data['gold_reward_amount'] < 0) {
             throw ValidationException::withMessages([
-                'gold_reward_amount' => ['Gold reward amount cannot be negative.']
+                'gold_reward_amount' => ['Gold reward amount cannot be negative.'],
             ]);
         }
     }
@@ -419,9 +419,9 @@ class EventService
         // Validate campus exists
         if (isset($data['campus_id'])) {
             $campus = Campus::find($data['campus_id']);
-            if (!$campus) {
+            if (! $campus) {
                 throw ValidationException::withMessages([
-                    'campus_id' => ['The selected campus does not exist.']
+                    'campus_id' => ['The selected campus does not exist.'],
                 ]);
             }
         }
@@ -433,7 +433,7 @@ class EventService
 
             if ($startTime->gte($endTime)) {
                 throw ValidationException::withMessages([
-                    'end_time' => ['End time must be after start time.']
+                    'end_time' => ['End time must be after start time.'],
                 ]);
             }
 
@@ -443,7 +443,7 @@ class EventService
                 if ($startTime->lt($oneYearAgo)) {
                     Log::warning('Historical event created with very old date', [
                         'start_time' => $startTime,
-                        'title' => $data['title'] ?? 'Unknown'
+                        'title' => $data['title'] ?? 'Unknown',
                     ]);
                 }
             }
@@ -452,14 +452,14 @@ class EventService
         // Validate max participants
         if (isset($data['max_participants']) && $data['max_participants'] !== null && $data['max_participants'] < 1) {
             throw ValidationException::withMessages([
-                'max_participants' => ['Maximum participants must be at least 1.']
+                'max_participants' => ['Maximum participants must be at least 1.'],
             ]);
         }
 
         // Validate gold reward amount
         if (isset($data['gold_reward_amount']) && $data['gold_reward_amount'] < 0) {
             throw ValidationException::withMessages([
-                'gold_reward_amount' => ['Gold reward amount cannot be negative.']
+                'gold_reward_amount' => ['Gold reward amount cannot be negative.'],
             ]);
         }
     }

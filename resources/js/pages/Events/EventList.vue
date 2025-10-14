@@ -7,11 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
+import { usePermissions } from '@/composables/usePermissions';
 import { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { debounce } from 'lodash-es';
+import { Eye, Pencil, Trash2 } from 'lucide-vue-next';
 import { reactive } from 'vue';
+import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
 interface Event {
@@ -27,6 +31,7 @@ interface Event {
     registered_count: number;
     is_manual: boolean;
     is_historical: boolean;
+    can_delete?: boolean;
 }
 
 interface Props {
@@ -41,6 +46,9 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { can } = usePermissions();
+const { confirmDelete } = useGlobalConfirmDialog();
+
 const searchForm = reactive({
     search: props.filters.search || '',
     status: props.filters.status || 'all',
@@ -48,6 +56,20 @@ const searchForm = reactive({
     date_to: props.filters.date_to || '',
     per_page: props.filters.per_page || 10,
 });
+
+const handleDeleteEvent = (event: Event) => {
+    confirmDelete(event.title, 'event', () => {
+        router.delete(route('events.destroy', event.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Event deleted successfully');
+            },
+            onError: (errors) => {
+                toast.error(errors.error || 'Failed to delete event');
+            },
+        });
+    });
+};
 
 const applyFilters = () => {
     router.get(route('events.index'), searchForm, {
@@ -216,9 +238,20 @@ const handlePageSizeChange = (pageSize: number) => {
 
             <!-- Actions Slot -->
             <template #cell-actions="{ row }">
-                <div class="flex items-center justify-start space-x-2">
-                    <Link :href="route('events.show', row.original.id)" class="text-indigo-600 hover:text-indigo-900"> View </Link>
-                    <Link v-if="row.original.status === 'draft'" :href="route('events.edit', row.original.id)" class="text-blue-600 hover:text-blue-900"> Edit </Link>
+                <div class="flex items-center justify-start gap-2">
+                    <Button variant="ghost" size="icon" as-child>
+                        <Link :href="route('events.show', row.original.id)" title="View event">
+                            <Eye class="h-4 w-4" />
+                        </Link>
+                    </Button>
+                    <Button v-if="can('update_event') && row.original.status === 'draft'" variant="ghost" size="icon" as-child>
+                        <Link :href="route('events.edit', row.original.id)" title="Edit event">
+                            <Pencil class="h-4 w-4" />
+                        </Link>
+                    </Button>
+                    <Button v-if="can('delete_event') && row.original.can_delete" variant="ghost" size="icon" title="Delete event" @click="handleDeleteEvent(row.original)">
+                        <Trash2 class="text-destructive h-4 w-4" />
+                    </Button>
                 </div>
             </template>
         </DataTable>
