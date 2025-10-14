@@ -3,9 +3,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { ArrowLeft } from 'lucide-vue-next';
 import { route } from 'ziggy-js';
+
+const handleBack = () => {
+    // Use history.back() to return to previous page
+    // Falls back to invoices index if no history
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        router.visit(route('invoices.index'));
+    }
+};
 
 interface Student {
     id: number;
@@ -154,16 +164,12 @@ const outstandingBalance = props.invoice.total_amount - props.invoice.paid_amoun
     <div class="space-y-6">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
-                <Link :href="route('invoices.index')">
-                    <Button variant="ghost" size="icon">
-                        <ArrowLeft class="h-4 w-4" />
-                    </Button>
-                </Link>
+                <Button variant="ghost" size="icon" @click="handleBack">
+                    <ArrowLeft class="h-4 w-4" />
+                </Button>
                 <div>
                     <h1 class="text-3xl font-bold tracking-tight">Invoice {{ invoice.invoice_number }}</h1>
-                    <p class="text-muted-foreground">
-                        {{ invoice.student.student_id }} - {{ invoice.student.full_name }}
-                    </p>
+                    <p class="text-muted-foreground">{{ invoice.student.student_id }} - {{ invoice.student.full_name }}</p>
                 </div>
             </div>
             <Badge :variant="getStatusVariant(invoice.status)">
@@ -286,7 +292,7 @@ const outstandingBalance = props.invoice.total_amount - props.invoice.paid_amoun
                             <TableCell class="text-right font-medium">{{ formatCurrency(item.total_price) }}</TableCell>
                         </TableRow>
                         <TableRow v-if="invoice.items.length === 0">
-                            <TableCell colspan="5" class="text-center text-muted-foreground">No items found</TableCell>
+                            <TableCell colspan="5" class="text-muted-foreground text-center">No items found</TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
@@ -316,7 +322,7 @@ const outstandingBalance = props.invoice.total_amount - props.invoice.paid_amoun
                             </TableCell>
                             <TableCell>{{ discount.discount_source }}</TableCell>
                             <TableCell>{{ discount.description }}</TableCell>
-                            <TableCell class="text-sm text-muted-foreground">
+                            <TableCell class="text-muted-foreground text-sm">
                                 {{ formatDiscountDetails(discount) }}
                             </TableCell>
                             <TableCell class="text-right font-medium text-green-600">-{{ formatCurrency(discount.amount) }}</TableCell>

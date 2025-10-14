@@ -18,11 +18,11 @@ import {
     FileText,
     FormInput,
     GraduationCap,
-    Receipt,
     Layers,
     LayoutDashboard,
     Mail,
     MailPlus,
+    Receipt,
     School,
     Settings,
     Settings2,
@@ -31,6 +31,7 @@ import {
     User,
     UserPlus,
     Users,
+    Wallet,
 } from 'lucide-vue-next';
 
 import { attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, studentRoutes, systemRoutes } from '@/utils/routes';
@@ -509,6 +510,12 @@ export const mainNavItems: NavItem[] = [
                 href: '/invoices',
                 icon: Receipt,
                 requiredPermissions: ['view_invoice'],
+            },
+            {
+                title: 'Student Wallets',
+                href: '/wallets',
+                icon: Wallet,
+                requiredPermissions: ['view_student_wallet'],
             },
             {
                 title: 'Tuition Plans',
