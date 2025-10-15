@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import TransactionHistory from '@/components/TransactionHistory.vue';
-import { Card, CardContent } from '@/components/ui/card';
-import type { PaginatedTransactions, StudentCashWallet, WalletStats } from '@/types/wallet';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { PaginatedTransactions, StudentCashWallet, TuitionPlan, WalletStats } from '@/types/wallet';
 import { router } from '@inertiajs/vue3';
-import { FileText, RotateCcw, TrendingDown, TrendingUp, Wallet } from 'lucide-vue-next';
+import { Calendar, FileText, GraduationCap, RotateCcw, TrendingDown, TrendingUp, Wallet } from 'lucide-vue-next';
 // import AdjustmentModal from './Wallets/AdjustmentModal.vue';
 // import DepositModal from './Wallets/DepositModal.vue';
 
@@ -11,6 +13,7 @@ interface Props {
     wallet: StudentCashWallet;
     transactions: PaginatedTransactions;
     stats: WalletStats;
+    tuitionPlan?: TuitionPlan | null;
     studentId: number;
     loading?: boolean;
 }
@@ -55,6 +58,67 @@ const handleTransactionNavigate = (url: string) => {
         <!--                Adjust-->
         <!--            </Button>-->
         <!--        </div>-->
+
+        <!-- Tuition Plan Card -->
+        <Card v-if="tuitionPlan">
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CardTitle class="flex items-center gap-2">
+                        <GraduationCap class="text-primary h-5 w-5" />
+                        Tuition Plan
+                    </CardTitle>
+                    <Badge v-if="tuitionPlan.is_active" variant="default">Active</Badge>
+                </div>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Total Amount</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ new Intl.NumberFormat('vi-VN').format(tuitionPlan.total_amount) }} {{ tuitionPlan.currency }}</p>
+                    </div>
+                    <div v-if="tuitionPlan.curriculum_version">
+                        <p class="text-sm font-medium text-gray-500">Curriculum Version</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ tuitionPlan.curriculum_version.version_code }}</p>
+                        <p v-if="tuitionPlan.curriculum_version.program" class="text-sm text-gray-600">
+                            {{ tuitionPlan.curriculum_version.program.name }}
+                        </p>
+                        <p v-if="tuitionPlan.curriculum_version.specialization" class="text-sm text-gray-600">
+                            {{ tuitionPlan.curriculum_version.specialization.name }}
+                        </p>
+                    </div>
+                </div>
+
+                <div v-if="tuitionPlan.intake_semester" class="flex items-center gap-2 rounded-lg bg-gray-50 p-3">
+                    <Calendar class="h-4 w-4 text-gray-600" />
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Intake Semester</p>
+                        <p class="text-sm text-gray-600">{{ tuitionPlan.intake_semester.name }} ({{ tuitionPlan.intake_semester.code }})</p>
+                    </div>
+                </div>
+
+                <div v-if="tuitionPlan.terms && tuitionPlan.terms.length > 0" class="space-y-2">
+                    <Accordion type="single" collapsible>
+                        <AccordionItem value="payment-terms">
+                            <AccordionTrigger class="cursor-pointer text-sm font-medium text-gray-700"> Payment Terms ({{ tuitionPlan.terms.length }} term{{ tuitionPlan.terms.length > 1 ? 's' : '' }}) </AccordionTrigger>
+                            <AccordionContent>
+                                <div class="space-y-2 pt-2">
+                                    <div v-for="term in tuitionPlan.terms" :key="term.id" class="flex items-center justify-between rounded-lg border border-gray-200 p-3 hover:bg-gray-50">
+                                        <div>
+                                            <p class="font-medium text-gray-900">Term {{ term.term_number }}</p>
+                                            <p v-if="term.semester" class="text-sm text-gray-600">{{ term.semester.name }} ({{ term.semester.code }})</p>
+                                            <p v-if="term.due_date" class="text-xs text-gray-500">Due: {{ term.formatted_due_date }}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-semibold text-gray-900">{{ new Intl.NumberFormat('vi-VN').format(term.amount) }} {{ tuitionPlan.currency }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                </div>
+            </CardContent>
+        </Card>
 
         <!-- Wallet Balance Card -->
         <Card>

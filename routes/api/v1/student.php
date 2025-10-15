@@ -209,8 +209,8 @@ Route::middleware([
                 ->name('store');
         });
 
-        // Wallet endpoints
-        Route::prefix('wallet')->name('wallet.')->group(function () {
+        // Gold Wallet endpoints
+        Route::prefix('gold-wallet')->name('wallet.')->group(function () {
             // Current student wallet
             Route::get('/', [StudentWalletController::class, 'show'])->name('show');
             Route::get('/summary', [StudentWalletController::class, 'summary'])->name('summary');

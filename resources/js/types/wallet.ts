@@ -166,3 +166,47 @@ export interface PaymentProcessingResult {
   errors: string[]
   transaction?: WalletTransaction
 }
+
+export interface TuitionPlanTerm {
+  id: number
+  term_number: number
+  amount: number
+  due_date?: string
+  formatted_due_date?: string
+  semester?: {
+    id: number
+    code: string
+    name: string
+    start_date?: string
+    end_date?: string
+  }
+}
+
+export interface TuitionPlan {
+  id: number
+  total_amount: number
+  currency: string
+  is_active: boolean
+  curriculum_version?: {
+    id: number
+    version_code: string
+    program?: {
+      id: number
+      name: string
+      code: string
+    }
+    specialization?: {
+      id: number
+      name: string
+      code: string
+    }
+  }
+  intake_semester?: {
+    id: number
+    code: string
+    name: string
+    start_date?: string
+    end_date?: string
+  }
+  terms: TuitionPlanTerm[]
+}

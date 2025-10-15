@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useApi, usePermissions } from '@/composables';
+import { useApi, useGlobalConfirmDialog, usePermissions } from '@/composables';
 import CurriculumVersionSummaryLayout from '@/layouts/CurriculumVersionSummaryLayout.vue';
 import { createColumns } from '@/lib/table-utils';
 import type { CurriculumUnit, Unit } from '@/types/models';
@@ -70,6 +69,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const api = useApi();
+const { confirmDelete } = useGlobalConfirmDialog();
 
 // Filters state for the tab
 const filters = reactive({
@@ -83,8 +83,6 @@ const filters = reactive({
 const showAddUnitModal = ref(false);
 const showEditUnitModal = ref(false);
 const curriculumUnitToEdit = ref<CurriculumUnit | null>(null);
-const showDeleteDialog = ref(false);
-const unitToDelete = ref<CurriculumUnit | null>(null);
 const isDeleting = ref(false);
 
 const permission = usePermissions();
@@ -361,29 +359,26 @@ const onEditUnitSubmit = async (values: any) => {
 };
 
 const deleteCurriculumUnit = (curriculumUnit: CurriculumUnit) => {
-    unitToDelete.value = curriculumUnit;
-    showDeleteDialog.value = true;
+    confirmDelete(
+        `${curriculumUnit.unit?.code} - ${curriculumUnit.unit?.name}`,
+        'curriculum unit',
+        async () => {
+            isDeleting.value = true;
+            const { data, error, statusCode } = await api.delete(`/api/curriculum-units/${curriculumUnit.id}`);
+
+            if (statusCode.value === 200 && data.value?.success) {
+                toast.success('Curriculum unit deleted successfully');
+                router.reload({ only: ['data'] });
+            } else {
+                const errorMessage = data.value?.message || error.value || 'Failed to delete curriculum unit';
+                toast.error(errorMessage);
+            }
+            isDeleting.value = false;
+        }
+    );
 };
 
-const confirmDelete = async () => {
-    if (!unitToDelete.value) return;
 
-    isDeleting.value = true;
-
-    const { data, error, statusCode } = await api.delete(`/api/curriculum-units/${unitToDelete.value.id}`);
-
-    if (statusCode.value === 200 && data.value?.success) {
-        toast.success('Curriculum unit deleted successfully');
-        showDeleteDialog.value = false;
-        unitToDelete.value = null;
-        router.reload({ only: ['data'] });
-    } else {
-        const errorMessage = data.value?.message || error.value || 'Failed to delete curriculum unit';
-        toast.error(errorMessage);
-    }
-
-    isDeleting.value = false;
-};
 
 const getUnitScopeColor = (scope: string) => {
     switch (scope.toLowerCase()) {
@@ -523,9 +518,14 @@ const organizedUnits = computed(() => {
                                             </div>
                                             <div class="flex items-center justify-between text-xs">
                                                 <span class="text-gray-500">{{ unit.unit?.credit_points }} CP</span>
-                                                <Button v-if="permission.can('edit_curriculum_unit')" variant="ghost" size="sm" @click="editCurriculumUnit(unit)">
-                                                    <Edit class="h-3 w-3" />
-                                                </Button>
+                                                <div class="flex items-center gap-1">
+                                                    <Button v-if="permission.can('edit_curriculum_unit')" variant="ghost" size="sm" @click="editCurriculumUnit(unit)">
+                                                        <Edit class="h-3 w-3" />
+                                                    </Button>
+                                                    <Button v-if="permission.can('delete_curriculum_unit')" variant="ghost" size="sm" @click="deleteCurriculumUnit(unit)">
+                                                        <Trash2 class="h-3 w-3" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
                                     </Card>
@@ -833,27 +833,5 @@ const organizedUnits = computed(() => {
                 </Form>
             </DialogContent>
         </Dialog>
-
-        <!-- Delete Confirmation Dialog -->
-        <AlertDialog :open="showDeleteDialog" @update:open="showDeleteDialog = $event">
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Curriculum Unit</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Are you sure you want to delete the curriculum unit
-                        <strong>{{ unitToDelete?.unit?.code }}</strong>
-                        from this curriculum version?
-                        <br /><br />
-                        This action cannot be undone and will permanently remove this unit from the curriculum structure.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel :disabled="isDeleting">Cancel</AlertDialogCancel>
-                    <AlertDialogAction @click="confirmDelete" :disabled="isDeleting" class="bg-destructive hover:bg-destructive/90 text-white">
-                        {{ isDeleting ? 'Deleting...' : 'Delete Unit' }}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
     </CurriculumVersionSummaryLayout>
 </template>

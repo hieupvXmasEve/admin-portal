@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import StudentLayout from '@/layouts/StudentLayout.vue';
 import type { Student } from '@/types/models';
-import type { PaginatedTransactions, StudentCashWallet, WalletStats } from '@/types/wallet';
+import type { PaginatedTransactions, StudentCashWallet, TuitionPlan, WalletStats } from '@/types/wallet';
 import { Head } from '@inertiajs/vue3';
 import WalletTab from '../WalletTab.vue';
 
@@ -10,10 +10,7 @@ interface Props {
     wallet: StudentCashWallet;
     transactions: PaginatedTransactions;
     stats: WalletStats;
-    can: {
-        deposit: boolean;
-        adjust: boolean;
-    };
+    tuitionPlan?: TuitionPlan | null;
 }
 
 defineProps<Props>();
@@ -24,7 +21,7 @@ defineProps<Props>();
         <Head :title="`Academic Summary - Wallet - ${student.full_name}`" />
 
         <StudentLayout :student="student" current-tab="wallet">
-            <WalletTab :wallet="wallet" :transactions="transactions" :stats="stats" :student-id="student.id" :can="can" :loading="false" />
+            <WalletTab :wallet="wallet" :transactions="transactions" :stats="stats" :tuition-plan="tuitionPlan" :student-id="student.id" :loading="false" />
         </StudentLayout>
     </div>
 </template>
