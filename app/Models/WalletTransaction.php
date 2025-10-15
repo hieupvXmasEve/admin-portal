@@ -20,9 +20,9 @@ class WalletTransaction extends Model
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
-        'balance_before' => 'decimal:2',
-        'balance_after' => 'decimal:2',
+        'amount' => 'decimal:0',
+        'balance_before' => 'decimal:0',
+        'balance_after' => 'decimal:0',
     ];
 
     /**
@@ -58,7 +58,7 @@ class WalletTransaction extends Model
     public function getFormattedAmountAttribute(): string
     {
         $sign = in_array($this->transaction_type, ['deposit', 'refund']) ? '+' : '-';
-        return $sign . number_format($this->amount, 0, '.', ',');
+        return $sign . number_format($this->amount, 0, ',', '.');
     }
 
     /**
@@ -66,7 +66,7 @@ class WalletTransaction extends Model
      */
     public function getFormattedBalanceAfterAttribute(): string
     {
-        return number_format($this->balance_after, 0, '.', ',');
+        return number_format($this->balance_after, 0, ',', '.');
     }
 
     /**
