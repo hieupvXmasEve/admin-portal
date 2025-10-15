@@ -104,7 +104,12 @@ class StudentInvoice extends Model
         $this->subtotal = $this->items()->sum('total_price');
         $this->discount_total = $this->discounts()->sum('amount');
         $this->total_amount = max(0, $this->subtotal - $this->discount_total);
-        $this->paid_amount = $this->items()->sum('paid_amount');
+        
+        // Sum of all items' paid_amount is the actual amount paid
+        $itemsPaidSum = $this->items()->sum('paid_amount');
+        
+        // Paid amount cannot exceed total amount after discount
+        $this->paid_amount = min($itemsPaidSum, $this->total_amount);
         
         // Update status based on payment
         if ($this->paid_amount >= $this->total_amount && $this->total_amount > 0) {

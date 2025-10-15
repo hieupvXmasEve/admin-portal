@@ -71,14 +71,45 @@ class InvoicePaymentService
                 ];
             }
 
+            // Calculate invoice outstanding (respect discount)
+            $invoiceOutstanding = $invoice->total_amount - $invoice->paid_amount;
+            
+            // Maximum amount we can pay is the minimum of wallet balance and invoice outstanding
+            $maxPayableAmount = min($availableBalance, $invoiceOutstanding);
+            
+            if ($maxPayableAmount <= 0) {
+                return [
+                    'success' => false,
+                    'amount_paid' => 0,
+                    'remaining_balance' => $availableBalance,
+                    'paid_items' => [],
+                    'partial_items' => [],
+                    'unpaid_items' => [],
+                    'message' => 'Invoice is already fully paid or no outstanding amount.',
+                ];
+            }
+
             $totalAmountPaid = 0;
             $paidItems = [];
             $partialItems = [];
             $unpaidItems = [];
-            $currentBalance = $availableBalance;
+            $currentBalance = $maxPayableAmount; // Use capped amount
 
             // Process each item in priority order
             foreach ($payableItems as $item) {
+                // Stop if we've paid enough to cover the invoice total (after discount)
+                if ($totalAmountPaid >= $maxPayableAmount) {
+                    $unpaidItems[] = [
+                        'id' => $item->id,
+                        'item_type' => $item->item_type,
+                        'description' => $item->description,
+                        'total_price' => (float) $item->total_price,
+                        'paid_amount' => (float) $item->paid_amount,
+                        'remaining_amount' => $item->total_price - $item->paid_amount,
+                    ];
+                    continue;
+                }
+
                 $remainingAmount = $item->total_price - $item->paid_amount;
 
                 if ($currentBalance <= 0) {
@@ -94,8 +125,11 @@ class InvoicePaymentService
                     continue;
                 }
 
-                if ($currentBalance >= $remainingAmount) {
-                    // Can pay full remaining amount
+                // Calculate how much we can pay for this item without exceeding invoice total
+                $maxForThisItem = min($remainingAmount, $currentBalance, $maxPayableAmount - $totalAmountPaid);
+
+                if ($maxForThisItem >= $remainingAmount) {
+                    // Can pay full remaining amount of this item
                     $amountToPay = $remainingAmount;
                     $item->paid_amount += $amountToPay;
                     $item->save();
@@ -114,12 +148,12 @@ class InvoicePaymentService
                     ];
                 } else {
                     // Can only pay partial
-                    $amountToPay = $currentBalance;
+                    $amountToPay = $maxForThisItem;
                     $item->paid_amount += $amountToPay;
                     $item->save();
 
                     $totalAmountPaid += $amountToPay;
-                    $currentBalance = 0;
+                    $currentBalance -= $amountToPay;
 
                     $partialItems[] = [
                         'id' => $item->id,
