@@ -252,6 +252,22 @@ class StudentAcademicSummaryController extends Controller
         // Get wallet statistics
         $stats = $this->walletService->getWalletStats($wallet->id);
 
+        // Get tuition plan for the student
+        $tuitionPlan = \App\Models\TuitionPlan::where('curriculum_version_id', $student->curriculum_version_id)
+            ->where('intake_semester_id', $student->intake_semester_id)
+            ->where('is_active', true)
+            ->with([
+                'curriculumVersion:id,version_code,program_id,specialization_id',
+                'curriculumVersion.program:id,name,code',
+                'curriculumVersion.specialization:id,name,code',
+                'intakeSemester:id,code,name,start_date,end_date',
+                'terms' => function ($query) {
+                    $query->with('semester:id,code,name,start_date,end_date')
+                        ->orderBy('term_number');
+                },
+            ])
+            ->first();
+
         return Inertia::render('students/AcademicSummary/Wallets/Show', [
             'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
             'wallet' => [
@@ -262,10 +278,27 @@ class StudentAcademicSummaryController extends Controller
             ],
             'transactions' => $transactions,
             'stats' => $stats,
-            'can' => [
-                'deposit' => Auth::user()->can('wallets.deposit'),
-                'adjust' => Auth::user()->can('wallets.adjust'),
-            ],
+            'tuitionPlan' => $tuitionPlan ? [
+                'id' => $tuitionPlan->id,
+                'total_amount' => $tuitionPlan->total_amount,
+                'currency' => $tuitionPlan->currency,
+                'is_active' => $tuitionPlan->is_active,
+                'curriculum_version' => $tuitionPlan->curriculumVersion ? [
+                    'id' => $tuitionPlan->curriculumVersion->id,
+                    'version_code' => $tuitionPlan->curriculumVersion->version_code,
+                    'program' => $tuitionPlan->curriculumVersion->program,
+                    'specialization' => $tuitionPlan->curriculumVersion->specialization,
+                ] : null,
+                'intake_semester' => $tuitionPlan->intakeSemester,
+                'terms' => $tuitionPlan->terms->map(fn($term) => [
+                    'id' => $term->id,
+                    'term_number' => $term->term_number,
+                    'amount' => $term->amount,
+                    'due_date' => $term->due_date?->format('Y-m-d'),
+                    'formatted_due_date' => $term->due_date?->format('d/m/Y'),
+                    'semester' => $term->semester,
+                ]),
+            ] : null,
         ]);
     }
 
