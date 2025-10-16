@@ -154,15 +154,6 @@ return [
             'create_report' => 'create_report',
             'export_report' => 'export_report',
         ],
-
-        // Student Activities
-        'groups' => [
-            'view_groups' => 'view_groups',
-            'create_groups' => 'create_groups',
-            'create_student_group' => 'create_student_group',
-            'edit_groups' => 'edit_groups',
-            'delete_groups' => 'delete_groups',
-        ],
         'events' => [
             'view_event' => 'view_event',
             'show_event' => 'show_event',
@@ -205,14 +196,6 @@ return [
             'export_lecturer' => 'export_lecturer',
         ],
 
-        // Teaching Assignment Management
-        'teaching_assignments' => [
-            'view_teaching_assignment' => 'view_teaching_assignment',
-            'assign_lecturer' => 'assign_lecturer',
-            'unassign_lecturer' => 'unassign_lecturer',
-            'export_teaching_assignment' => 'export_teaching_assignment',
-            'manage_teaching_assignment' => 'manage_teaching_assignment',
-        ],
 
         // Assessment Management
         'assessments' => [
