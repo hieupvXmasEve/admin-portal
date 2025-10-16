@@ -26,14 +26,14 @@ class CourseOfferingResource extends JsonResource
             'schedule_time_start' => $this->schedule_time_start?->format('H:i'),
             'schedule_time_end' => $this->schedule_time_end?->format('H:i'),
 
-            // Curriculum Unit Information
-            'curriculum_unit' => $this->whenLoaded('curriculumUnit', function () {
+            // Unit Information
+            'unit' => $this->whenLoaded('unit', function () {
                 return [
-                    'id' => $this->curriculumUnit->id,
-                    'code' => $this->curriculumUnit->unit->code,
-                    'name' => $this->curriculumUnit->unit->name,
-                    'credit_hours' => $this->curriculumUnit->credit_hours,
-                    'description' => $this->curriculumUnit->description,
+                    'id' => $this->unit->id,
+                    'code' => $this->unit->code,
+                    'name' => $this->unit->name,
+                    'credit_points' => $this->unit->credit_points,
+                    'description' => $this->unit->description,
                 ];
             }),
 

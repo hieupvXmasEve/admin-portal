@@ -89,11 +89,11 @@ class LecturerResource extends JsonResource
                         'delivery_mode' => $offering->delivery_mode,
                         'current_enrollment' => $offering->current_enrollment,
                         'max_capacity' => $offering->max_capacity,
-                        'curriculum_unit' => $this->when($offering->relationLoaded('curriculumUnit'), [
-                            'id' => $offering->curriculumUnit->id,
-                            'unit_code' => $offering->curriculumUnit->unit_code,
-                            'unit_name' => $offering->curriculumUnit->unit_name,
-                            'credit_hours' => $offering->curriculumUnit->credit_hours,
+                        'unit' => $this->when($offering->relationLoaded('unit'), [
+                            'id' => $offering->unit->id,
+                            'code' => $offering->unit->code,
+                            'name' => $offering->unit->name,
+                            'credit_points' => $offering->unit->credit_points,
                         ]),
                         'semester' => $this->when($offering->relationLoaded('semester'), [
                             'id' => $offering->semester->id,

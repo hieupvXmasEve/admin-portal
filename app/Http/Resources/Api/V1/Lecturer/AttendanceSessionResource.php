@@ -36,8 +36,8 @@ class AttendanceSessionResource extends JsonResource
             'course' => $this->whenLoaded('courseOffering', function () {
                 return [
                     'id' => $this->courseOffering->id,
-                    'unit_code' => $this->courseOffering->curriculumUnit->unit_code,
-                    'unit_name' => $this->courseOffering->curriculumUnit->unit_name,
+                    'unit_code' => $this->courseOffering->unit->code,
+                    'unit_name' => $this->courseOffering->unit->name,
                     'section_code' => $this->courseOffering->section_code,
                     'enrollment' => $this->courseOffering->current_enrollment,
                     'semester' => $this->when($this->courseOffering->relationLoaded('semester'), [

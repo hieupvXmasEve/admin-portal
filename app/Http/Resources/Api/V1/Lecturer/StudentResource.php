@@ -32,8 +32,8 @@ class StudentResource extends JsonResource
                 return $this->courseRegistrations->map(function ($registration) {
                     return [
                         'course_offering_id' => $registration->courseOffering->id,
-                        'unit_code' => $registration->courseOffering->curriculumUnit->unit_code,
-                        'unit_name' => $registration->courseOffering->curriculumUnit->unit_name,
+                        'unit_code' => $registration->courseOffering->unit->code,
+                        'unit_name' => $registration->courseOffering->unit->name,
                         'section_code' => $registration->courseOffering->section_code,
                         'registration_status' => $registration->registration_status,
                         'registration_date' => $registration->created_at->format('Y-m-d'),

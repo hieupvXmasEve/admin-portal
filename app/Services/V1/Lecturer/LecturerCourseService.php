@@ -30,14 +30,14 @@ class LecturerCourseService
                 $sessionQuery->where('lecture_id', $lecturer->id);
             })
             ->with([
-                'curriculumUnit',
+                'unit',
                 'semester',
                 'courseRegistrations' => function ($q) {
                     $q->where('registration_status', 'confirmed');
                 },
                 'classSessions' => function ($q) use ($lecturer) {
                     $q->where('lecture_id', $lecturer->id)
-                      ->orderBy('session_date', 'desc');
+                        ->orderBy('session_date', 'desc');
                 },
             ])
             ->where('is_active', true);
@@ -64,12 +64,12 @@ class LecturerCourseService
                     $sessionQuery->where('lecture_id', $lecturer->id);
                 })
                 ->with([
-                    'curriculumUnit',
+                    'unit',
                     'semester',
                     'courseRegistrations.student',
                     'classSessions' => function ($q) use ($lecturer) {
                         $q->where('lecture_id', $lecturer->id)
-                          ->orderBy('session_date', 'asc');
+                            ->orderBy('session_date', 'asc');
                     },
                 ])
                 ->where('id', $courseOfferingId)
@@ -108,7 +108,7 @@ class LecturerCourseService
             return null;
         }
 
-        return $courseOffering->curriculumUnit->unit;
+        return $courseOffering->unit;
     }
 
     /**
@@ -122,10 +122,10 @@ class LecturerCourseService
                 $sessionQuery->where('lecture_id', $lecturer->id);
             })
             ->with([
-                'courseRegistrations', 
+                'courseRegistrations',
                 'classSessions' => function ($q) use ($lecturer) {
                     $q->where('lecture_id', $lecturer->id)
-                      ->with('attendances');
+                        ->with('attendances');
                 }
             ])
             ->where('id', $courseOfferingId)
@@ -308,7 +308,7 @@ class LecturerCourseService
 
         if (! empty($filters['search'])) {
             $search = $filters['search'];
-            $query->whereHas('curriculumUnit.unit', function ($q) use ($search) {
+            $query->whereHas('unit', function ($q) use ($search) {
                 $q->where('code', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%");
             });
@@ -351,12 +351,12 @@ class LecturerCourseService
             'schedule_days' => $courseOffering->schedule_days,
             'schedule_time_start' => $courseOffering->schedule_time_start?->format('H:i'),
             'schedule_time_end' => $courseOffering->schedule_time_end?->format('H:i'),
-            'curriculum_unit' => [
-                'id' => $courseOffering->curriculumUnit->id,
-                'unit_code' => $courseOffering->curriculumUnit->unit->code,
-                'unit_name' => $courseOffering->curriculumUnit->unit->name,
-                'credit_points' => $courseOffering->curriculumUnit->unit->credit_points,
-                'description' => $courseOffering->curriculumUnit->note,
+            'unit' => [
+                'id' => $courseOffering->unit->id,
+                'code' => $courseOffering->unit->code,
+                'name' => $courseOffering->unit->name,
+                'credit_points' => $courseOffering->unit->credit_points,
+                'description' => $courseOffering->unit->description,
             ],
             'semester' => [
                 'id' => $courseOffering->semester->id,

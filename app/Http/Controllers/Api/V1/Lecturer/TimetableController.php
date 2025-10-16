@@ -249,7 +249,7 @@ class TimetableController extends Controller
 
         try {
             $session = $lecturer->classSessions()
-                ->with(['courseOffering.curriculumUnit', 'room'])
+                ->with(['courseOffering.unit', 'room'])
                 ->where('id', $sessionId)
                 ->first();
 

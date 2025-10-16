@@ -146,7 +146,7 @@ class AuthController extends Controller
         }
 
         // Load relationships for complete profile
-        $lecturer->load(['campus', 'courseOfferings.curriculumUnit', 'courseOfferings.semester']);
+        $lecturer->load(['campus', 'courseOfferings.unit', 'courseOfferings.semester']);
 
         return ApiResponse::success(
             data: new LecturerResource($lecturer),
