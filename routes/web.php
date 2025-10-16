@@ -85,7 +85,6 @@ require __DIR__ . '/web/course-registrations.php';
 require __DIR__ . '/web/campuses.php';
 require __DIR__ . '/web/rooms.php';
 require __DIR__ . '/web/lectures.php';
-require __DIR__ . '/web/teaching-assignments.php';
 require __DIR__ . '/web/student.php';
 require __DIR__ . '/web/class-sessions.php';
 require __DIR__ . '/web/attendance.php';

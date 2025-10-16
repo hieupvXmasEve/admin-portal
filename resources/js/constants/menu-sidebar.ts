@@ -201,12 +201,6 @@ export const mainNavItems: NavItem[] = [
                 requiredPermissions: ['view_lecturer'], // Will be implemented later
             },
             // {
-            //     title: 'Teaching Assignments',
-            //     href: '/teaching-assignments',
-            //     icon: BookOpen,
-            //     requiredPermissions: ['view_teaching_assignment'],
-            // },
-            // {
             //     title: 'Lecturer Timetable',
             //     href: lecturerRoutes.index(), // Placeholder
             //     icon: CalendarIcon,
