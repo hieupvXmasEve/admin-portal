@@ -343,11 +343,13 @@ class CourseOfferingController extends Controller
         }
 
         // Load the course offering with its related semester and curriculum unit data
+        // Note: unit_id is already loaded on the main $courseOffering model
         $courseOffering->load([
             'semester:id,name,code,start_date,end_date',
             'curriculumUnit:id,unit_id,year_level,semester_number',
             'curriculumUnit.unit:id,code,name,credit_points',
             'syllabusTemplate:id,title,version,description',
+            'unit:id,code,name,credit_points',
         ]);
 
         // Get available lectures

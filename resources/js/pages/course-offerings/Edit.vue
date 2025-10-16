@@ -40,9 +40,11 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
 // Define validation schema following development standards
 const formSchema = toTypedSchema(
     z.object({
+        unit_id: z.number().int().positive('Unit ID is required'),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
         syllabus_template_id: z.string().optional(),
@@ -72,6 +74,7 @@ const formatDateForInput = (dateString: string | null): string => {
 const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
+        unit_id: props.courseOffering.unit_id || props.courseOffering.curriculum_unit?.unit_id,
         section_code: props.courseOffering.section_code || '',
         syllabus_template_id: props.courseOffering.syllabus_template?.id.toString() || '',
         max_capacity: props.courseOffering.max_capacity,
@@ -93,6 +96,7 @@ const onSubmit = handleSubmit((values) => {
     const formData = {
         semester_id: props.courseOffering.semester_id,
         curriculum_unit_id: props.courseOffering.curriculum_unit_id,
+        unit_id: Number(values.unit_id) || Number(props.courseOffering.unit_id) || Number(props.courseOffering.curriculum_unit?.unit_id),
         lecture_id: values.lecture_id === '' || values.lecture_id === 'none' ? null : values.lecture_id,
         section_code: values.section_code || null,
         syllabus_template_id: values.syllabus_template_id === 'none' || values.syllabus_template_id === '' ? null : values.syllabus_template_id,
