@@ -178,17 +178,17 @@ class CourseOffering extends AuditableModel
     // Computed Properties / Accessors
     public function getCourseCodeAttribute(): ?string
     {
-        return $this->curriculumUnit?->unit?->code;
+        return $this->unit?->code;
     }
 
     public function getCourseTitleAttribute(): ?string
     {
-        return $this->curriculumUnit?->unit?->name;
+        return $this->unit?->name;
     }
 
     public function getCreditHoursAttribute(): ?int
     {
-        return $this->curriculumUnit?->unit ? (int)$this->curriculumUnit->unit->credit_points : null;
+        return $this->unit ? (int)$this->unit->credit_points : null;
     }
 
     public function getStatusAttribute(): string
@@ -438,7 +438,7 @@ class CourseOffering extends AuditableModel
     {
         $query->with([
             'semester:id,name,code,start_date,end_date',
-            'curriculumUnit.unit:id,code,name,credit_points',
+            'unit:id,code,name,credit_points',
             'lecture:id,employee_id,first_name,last_name,title,department,faculty,campus_id',
             'lecture.campus:id,name,code',
         ]);
@@ -560,7 +560,7 @@ class CourseOffering extends AuditableModel
      */
     protected function getIdentifierForLog(): string
     {
-        $courseCode = $this->curriculumUnit?->unit?->code ?? 'Unknown Course';
+        $courseCode = $this->unit?->code ?? 'Unknown Course';
         $section = $this->section_code ? " Section {$this->section_code}" : '';
         $semester = $this->semester?->code ?? '';
 
