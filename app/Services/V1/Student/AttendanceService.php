@@ -50,7 +50,7 @@ class AttendanceService
      */
     public function getCourseAttendance(Student $student, int $courseOfferingId): array
     {
-        $courseOffering = CourseOffering::with(['curriculumUnit.unit', 'semester', 'lecture'])
+        $courseOffering = CourseOffering::with(['unit', 'semester', 'lecture'])
             ->findOrFail($courseOfferingId);
 
         // Verify student is enrolled
@@ -72,8 +72,8 @@ class AttendanceService
         return [
             'course_info' => [
                 'id' => $courseOffering->id,
-                'code' => $courseOffering->curriculumUnit->unit->code,
-                'name' => $courseOffering->curriculumUnit->unit->name,
+                'code' => $courseOffering->unit->code,
+                'name' => $courseOffering->unit->name,
                 'semester' => $courseOffering->semester->name,
                 'lecturer' => $courseOffering->lecturer?->full_name,
             ],
@@ -115,7 +115,7 @@ class AttendanceService
             ->whereHas('courseOffering', function ($q) use ($semester) {
                 $q->where('semester_id', $semester->id);
             })
-            ->with(['courseOffering.curriculumUnit.unit', 'classSession']);
+            ->with(['courseOffering.unit', 'classSession']);
 
         // Apply filters
         $this->applyAttendanceFilters($query, $filters);
@@ -129,7 +129,7 @@ class AttendanceService
     protected function applyAttendanceFilters($query, array $filters): void
     {
         if (! empty($filters['course_code'])) {
-            $query->whereHas('courseOffering.curriculumUnit.unit', function ($q) use ($filters) {
+            $query->whereHas('courseOffering.unit', function ($q) use ($filters) {
                 $q->where('code', 'like', '%' . $filters['course_code'] . '%');
             });
         }
@@ -191,8 +191,8 @@ class AttendanceService
 
             return [
                 'course_offering_id' => $courseOfferingId,
-                'course_code' => $courseOffering->curriculumUnit->unit->code,
-                'course_name' => $courseOffering->curriculumUnit->unit->name,
+                'course_code' => $courseOffering->unit->code,
+                'course_name' => $courseOffering->unit->name,
                 'attendance_summary' => $summary,
                 'recent_sessions' => $records->take(5)->map(function ($record) {
                     return [
@@ -268,8 +268,8 @@ class AttendanceService
         return $attendanceRecords->take($limit)->map(function ($record) {
             return [
                 'id' => $record->id,
-                'course_code' => $record->courseOffering->curriculumUnit->unit->code,
-                'course_name' => $record->courseOffering->curriculumUnit->unit->name,
+                'course_code' => $record->courseOffering->unit->code,
+                'course_name' => $record->courseOffering->unit->name,
                 'session_date' => $record->session_date->toDateString(),
                 'session_time' => $record->classSession ?
                     $record->classSession->start_time . ' - ' . $record->classSession->end_time : null,
@@ -498,8 +498,8 @@ class AttendanceService
             $presentSessions = $courseRecords->whereIn('status', ['present', 'late'])->count();
 
             return [
-                'course_code' => $courseOffering->curriculumUnit->unit->code,
-                'course_name' => $courseOffering->curriculumUnit->unit->name,
+                'course_code' => $courseOffering->unit->code,
+                'course_name' => $courseOffering->unit->name,
                 'total_sessions' => $totalSessions,
                 'present_sessions' => $presentSessions,
                 'attendance_rate' => $totalSessions > 0 ? round(($presentSessions / $totalSessions) * 100, 1) : 0,
@@ -669,8 +669,8 @@ class AttendanceService
             $presentSessions = $courseRecords->whereIn('status', ['present', 'late'])->count();
 
             return [
-                'course_code' => $courseOffering->curriculumUnit->unit->code,
-                'course_name' => $courseOffering->curriculumUnit->unit->name,
+                'course_code' => $courseOffering->unit->code,
+                'course_name' => $courseOffering->unit->name,
                 'attendance_rate' => $totalSessions > 0 ? round(($presentSessions / $totalSessions) * 100, 1) : 0,
             ];
         });
@@ -689,8 +689,8 @@ class AttendanceService
             $presentSessions = $courseRecords->whereIn('status', ['present', 'late'])->count();
 
             return [
-                'course_code' => $courseOffering->curriculumUnit->unit->code,
-                'course_name' => $courseOffering->curriculumUnit->unit->name,
+                'course_code' => $courseOffering->unit->code,
+                'course_name' => $courseOffering->unit->name,
                 'attendance_rate' => $totalSessions > 0 ? round(($presentSessions / $totalSessions) * 100, 1) : 0,
             ];
         });
@@ -709,8 +709,8 @@ class AttendanceService
             $courseOffering = $courseRecords->first()->courseOffering;
 
             return [
-                'course_code' => $courseOffering->curriculumUnit->unit->code,
-                'course_name' => $courseOffering->curriculumUnit->unit->name,
+                'course_code' => $courseOffering->unit->code,
+                'course_name' => $courseOffering->unit->name,
                 'total_sessions' => $courseRecords->count(),
             ];
         })->values()->toArray();
@@ -845,7 +845,7 @@ class AttendanceService
             ->where('semester_id', $semester->id)
             ->whereIn('registration_status', ['pending', 'registered', 'confirmed', 'completed'])
             ->with([
-                'courseOffering.curriculumUnit.unit',
+                'courseOffering.unit',
                 'courseOffering.classSessions' => function ($query) {
                     $query->orderBy('session_date', 'asc');
                 },
@@ -866,7 +866,7 @@ class AttendanceService
 
         foreach ($courseRegistrations as $registration) {
             $courseOffering = $registration->courseOffering;
-            $unit = $courseOffering->curriculumUnit->unit;
+            $unit = $courseOffering->unit;
             $classSessions = $courseOffering->classSessions;
 
             $subjectData = [

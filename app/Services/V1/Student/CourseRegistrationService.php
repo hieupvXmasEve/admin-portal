@@ -39,7 +39,7 @@ class CourseRegistrationService
             ->where('semester_id', $currentSemester->id)
             ->whereIn('registration_status', ['registered', 'pending', 'confirmed'])
             ->with([
-                'courseOffering.curriculumUnit.unit',
+                'courseOffering.unit',
                 'courseOffering.lecture',
                 'courseOffering.classSessions.room',
                 'courseOffering.semester'
@@ -76,7 +76,7 @@ class CourseRegistrationService
 
         // Get all course offerings available for registration in current semester
         $query = CourseOffering::with([
-            'curriculumUnit.unit',
+            'unit',
             'lecture',
             'classSessions.room',
             'semester',
@@ -87,7 +87,7 @@ class CourseRegistrationService
 
         // Apply filters if provided
         if (!empty($filters['unit_code'])) {
-            $query->whereHas('curriculumUnit.unit', function ($q) use ($filters) {
+            $query->whereHas('unit', function ($q) use ($filters) {
                 $q->where('code', 'like', '%' . $filters['unit_code'] . '%');
             });
         }
@@ -125,7 +125,7 @@ class CourseRegistrationService
     public function registerForCourse(Student $student, int $courseOfferingId): CourseRegistration
     {
         $courseOffering = CourseOffering::with([
-            'curriculumUnit.unit',
+            'unit',
             'classSessions',
             'courseRegistrations',
         ])->findOrFail($courseOfferingId);
@@ -141,7 +141,7 @@ class CourseRegistrationService
                 'semester_id' => $courseOffering->semester_id,
                 'registration_status' => 'registered',
                 'registration_date' => now(),
-                'credit_hours' => (float) $courseOffering->curriculumUnit->unit->credit_points,
+                'credit_hours' => (float) $courseOffering->unit->credit_points,
                 'registration_method' => 'online',
             ]);
 
@@ -194,7 +194,7 @@ class CourseRegistrationService
     {
         $query = $student->courseRegistrations()
             ->with([
-                'courseOffering.curriculumUnit.unit',
+                'courseOffering.unit',
                 'courseOffering.lecture',
                 'courseOffering.classSessions.room',
                 'semester',
@@ -295,10 +295,10 @@ class CourseRegistrationService
         return [
             'id' => $offering->id,
             'unit' => [
-                'code' => $offering->curriculumUnit->unit->code,
-                'name' => $offering->curriculumUnit->unit->name,
-                'description' => $offering->syllabus->description ?? $offering->curriculumUnit->unit->name,
-                'credit_points' => (float) $offering->curriculumUnit->unit->credit_points,
+                'code' => $offering->unit->code,
+                'name' => $offering->unit->name,
+                'description' => $offering->syllabusTemplate->description ?? $offering->unit->name,
+                'credit_points' => (float) $offering->unit->credit_points,
             ],
             'lecturer' => [
                 'id' => $offering->lecture?->id,
@@ -325,8 +325,8 @@ class CourseRegistrationService
             'registration_date' => $registration->registration_date?->toDateString(),
             'drop_date' => $registration->drop_date?->toDateString(),
             'unit' => [
-                'code' => $registration->courseOffering->curriculumUnit->unit->code,
-                'name' => $registration->courseOffering->curriculumUnit->unit->name,
+                'code' => $registration->courseOffering->unit->code,
+                'name' => $registration->courseOffering->unit->name,
                 'credit_points' => (float) $registration->courseOffering->unit->credit_points,
             ],
             'lecturer' => [
