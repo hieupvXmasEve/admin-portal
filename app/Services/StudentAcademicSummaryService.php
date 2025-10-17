@@ -243,7 +243,7 @@ class StudentAcademicSummaryService
     {
         $query = $student->courseRegistrations()
             ->with([
-                'courseOffering.curriculumUnit.unit:id,name,code,credit_points',
+                'courseOffering.unit:id,name,code,credit_points',
                 'courseOffering.semester:id,name,code,start_date,end_date',
                 'semester:id,name,code,start_date,end_date',
             ]);
@@ -301,7 +301,7 @@ class StudentAcademicSummaryService
         // Transform the data
         $registrations = $paginatedRegistrations->getCollection()->map(function ($registration) {
             $semester = $registration->semester ?? $registration->courseOffering->semester;
-            $unit = $registration->courseOffering->curriculumUnit->unit ?? null;
+            $unit = $registration->courseOffering->unit ?? null;
 
             return [
                 'id' => $registration->id,
@@ -542,7 +542,7 @@ class StudentAcademicSummaryService
     {
         $scores = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->with([
-                'courseOffering.curriculumUnit.unit:id,name,code',
+                'courseOffering.unit:id,name,code',
                 'courseOffering.semester:id,name,code',
                 'assessmentComponentDetail.assessmentComponent:id,name,type,weight',
                 'assessmentComponentDetail:id,assessment_component_id,name,description,due_date,max_points',
@@ -579,8 +579,8 @@ class StudentAcademicSummaryService
 
                 return [
                     'course_offering_id' => $courseOfferingId,
-                    'course_name' => $firstScore->courseOffering->curriculumUnit->unit->name ?? 'N/A',
-                    'course_code' => $firstScore->courseOffering->curriculumUnit->unit->code ?? 'N/A',
+                    'course_name' => $firstScore->courseOffering->unit->name ?? 'N/A',
+                    'course_code' => $firstScore->courseOffering->unit->code ?? 'N/A',
                     'semester' => $firstScore->courseOffering->semester->name ?? 'N/A',
                     'scores' => $allScores, // Limit for initial display
                     'all_scores_count' => $allScores->count(),
@@ -686,7 +686,7 @@ class StudentAcademicSummaryService
         $scores = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->where('course_offering_id', $courseOfferingId)
             ->with([
-                'courseOffering.curriculumUnit.unit:id,name,code',
+                'courseOffering.unit:id,name,code',
                 'courseOffering.semester:id,name,code',
                 'assessmentComponentDetail.assessmentComponent:id,name,type,weight',
                 'assessmentComponentDetail:id,assessment_component_id,name,description,due_date,max_points',
@@ -1110,15 +1110,15 @@ class StudentAcademicSummaryService
         $registrations = $student->courseRegistrations()
             ->where('semester_id', $semesterId)
             ->with([
-                'courseOffering.curriculumUnit.unit:id,name,code,credit_points',
+                'courseOffering.unit:id,name,code,credit_points',
                 'courseOffering.semester:id,name,code,start_date,end_date',
             ])
             ->get()
             ->map(function ($registration) {
                 return [
                     'id' => $registration->id,
-                    'course_name' => $registration->courseOffering->curriculumUnit->unit->name ?? 'N/A',
-                    'course_code' => $registration->courseOffering->curriculumUnit->unit->code ?? 'N/A',
+                    'course_name' => $registration->courseOffering->unit->name ?? 'N/A',
+                    'course_code' => $registration->courseOffering->unit->code ?? 'N/A',
                     'registration_status' => $registration->registration_status,
                     'final_grade' => $registration->final_grade,
                     'credit_hours' => $registration->credit_hours,
@@ -1133,7 +1133,7 @@ class StudentAcademicSummaryService
                 $query->where('semester_id', $semesterId);
             })
             ->with([
-                'courseOffering.curriculumUnit.unit:id,name,code',
+                'courseOffering.unit:id,name,code',
                 'assessmentComponentDetail.assessmentComponent:id,name,type',
                 'assessmentComponentDetail:id,assessment_component_id,name,due_date,max_points',
             ])
@@ -1143,8 +1143,8 @@ class StudentAcademicSummaryService
                 $firstScore = $courseScores->first();
 
                 return [
-                    'course_name' => $firstScore->courseOffering->curriculumUnit->unit->name ?? 'N/A',
-                    'course_code' => $firstScore->courseOffering->curriculumUnit->unit->code ?? 'N/A',
+                    'course_name' => $firstScore->courseOffering->unit->name ?? 'N/A',
+                    'course_code' => $firstScore->courseOffering->unit->code ?? 'N/A',
                     'scores' => $courseScores->map(function ($score) {
                         return [
                             'assessment_name' => $score->assessmentComponentDetail->name ?? 'N/A',
@@ -1176,7 +1176,7 @@ class StudentAcademicSummaryService
     public function filterByCourseOffering(int $studentId, int $courseOfferingId): array
     {
         $student = Student::findOrFail($studentId);
-        $courseOffering = CourseOffering::with(['curriculumUnit.unit:id,name,code', 'semester:id,name,code'])
+        $courseOffering = CourseOffering::with(['unit:id,name,code', 'semester:id,name,code'])
             ->findOrFail($courseOfferingId);
 
         // Get registration for this course offering
@@ -1214,8 +1214,8 @@ class StudentAcademicSummaryService
         return [
             'course_info' => [
                 'id' => $courseOffering->id,
-                'name' => $courseOffering->curriculumUnit->unit->name ?? 'N/A',
-                'code' => $courseOffering->curriculumUnit->unit->code ?? 'N/A',
+                'name' => $courseOffering->unit->name ?? 'N/A',
+                'code' => $courseOffering->unit->code ?? 'N/A',
                 'semester' => $courseOffering->semester->name ?? 'N/A',
             ],
             'registration' => $registration ? [
@@ -1323,7 +1323,7 @@ class StudentAcademicSummaryService
      */
     public function getScoreDetails(int $studentId, int $courseOfferingId): array
     {
-        $courseOffering = CourseOffering::with(['curriculumUnit.unit:id,name,code', 'semester:id,name,code'])
+        $courseOffering = CourseOffering::with(['unit:id,name,code', 'semester:id,name,code'])
             ->findOrFail($courseOfferingId);
 
         $scores = AssessmentComponentDetailScore::where('student_id', $studentId)
@@ -1375,8 +1375,8 @@ class StudentAcademicSummaryService
         return [
             'course_info' => [
                 'id' => $courseOffering->id,
-                'name' => $courseOffering->curriculumUnit->unit->name ?? 'N/A',
-                'code' => $courseOffering->curriculumUnit->unit->code ?? 'N/A',
+                'name' => $courseOffering->unit->name ?? 'N/A',
+                'code' => $courseOffering->unit->code ?? 'N/A',
                 'semester' => $courseOffering->semester->name ?? 'N/A',
             ],
             'assessment_components' => $scores,

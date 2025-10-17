@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Campus;
 use App\Services\EventReportService;
 use App\Models\Event;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class EventReportController extends Controller
      */
     public function index(Request $request): InertiaResponse
     {
-        $campus = session('current_campus_id');
+        $campus = Campus::find(session('current_campus_id'));
         if (!$campus) {
             abort(403, 'User must be associated with a campus');
         }
@@ -36,12 +37,12 @@ class EventReportController extends Controller
             $filters['date_to'] = now()->addMonths(1)->format('Y-m-d');
         }
 
-        $analytics = $this->eventReportService->getEventAnalytics($campus, $filters);
+        $analytics = $this->eventReportService->getEventAnalytics($campus->id, $filters);
         return Inertia::render('Events/EventReports', [
             'analytics' => $analytics,
             'filters' => $filters,
             'campus' => [
-                'id' => $campus,
+                'id' => $campus->id,
                 'name' => $campus->name,
             ],
         ]);

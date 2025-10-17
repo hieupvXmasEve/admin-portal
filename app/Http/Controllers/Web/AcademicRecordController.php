@@ -75,7 +75,6 @@ class AcademicRecordController extends Controller
      */
     public function index(Student $student, Request $request): Response
     {
-        $this->authorize('view', $student);
 
         $validated = $request->validate([
             'semester_id' => 'nullable|exists:semesters,id',
@@ -101,7 +100,6 @@ class AcademicRecordController extends Controller
      */
     public function show(Student $student, int $recordId, Request $request): Response|JsonResponse
     {
-        $this->authorize('view', $student);
 
         $record = $student->academicRecords()
             ->with(['unit', 'semester'])
@@ -122,7 +120,6 @@ class AcademicRecordController extends Controller
      */
     public function transcript(Student $student): Response
     {
-        $this->authorize('view', $student);
 
         $transcriptData = $this->academicRecordService->generateTranscript($student);
 
@@ -134,7 +131,6 @@ class AcademicRecordController extends Controller
      */
     public function gpaHistory(Student $student): Response
     {
-        $this->authorize('view', $student);
 
         $performanceAnalytics = $this->academicRecordService->getPerformanceAnalytics($student);
 
@@ -149,12 +145,11 @@ class AcademicRecordController extends Controller
      */
     public function store(Student $student, Request $request): RedirectResponse|JsonResponse
     {
-        $this->authorize('update', $student);
 
         $validated = $request->validate([
             'semester_id' => 'required|exists:semesters,id',
             'unit_id' => 'required|exists:units,id',
-            'final_grade' => 'required|string|max:10',
+            'final_letter_grade' => 'required|string|max:10',
             'status' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
