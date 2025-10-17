@@ -22,7 +22,7 @@ class AdminScheduleService
     public function getScheduleData(array $filters): Collection
     {
         $query = ClassSession::with([
-            'courseOffering.curriculumUnit.unit',
+            'courseOffering.unit',
             'courseOffering.semester',
             'lecture',
             'room.campus',

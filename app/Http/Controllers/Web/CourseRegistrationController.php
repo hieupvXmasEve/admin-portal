@@ -40,7 +40,7 @@ class CourseRegistrationController extends Controller
         $query = CourseRegistration::with([
             'student',
             'semester',
-            'courseOffering.curriculumUnit.unit',
+            'courseOffering.unit',
             'courseOffering.semester',
         ])->orderBy('created_at', 'desc');
 
@@ -52,7 +52,7 @@ class CourseRegistrationController extends Controller
                     ->orWhere('student_id', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             })->orWhereHas('courseOffering', function ($q) use ($search) {
-                $q->whereHas('curriculumUnit.unit', function ($unitQuery) use ($search) {
+                $q->whereHas('unit', function ($unitQuery) use ($search) {
                     $unitQuery->where('code', 'like', "%{$search}%")
                         ->orWhere('name', 'like', "%{$search}%");
                 });
@@ -85,7 +85,7 @@ class CourseRegistrationController extends Controller
                     ->orWhere('student_id', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             })->orWhereHas('courseOffering', function ($q) use ($search) {
-                $q->whereHas('curriculumUnit.unit', function ($unitQuery) use ($search) {
+                $q->whereHas('unit', function ($unitQuery) use ($search) {
                     $unitQuery->where('code', 'like', "%{$search}%")
                         ->orWhere('name', 'like', "%{$search}%");
                 });
@@ -116,18 +116,17 @@ class CourseRegistrationController extends Controller
         // Get course offerings for the selected semester
         $courseOfferings = collect();
         if ($request->filled('semester_id') && $request->semester_id !== 'all') {
-            $courseOfferings = CourseOffering::with(['curriculumUnit.unit'])
+            $courseOfferings = CourseOffering::with(['unit'])
                 ->where('course_offerings.semester_id', $request->semester_id)
                 ->where('course_offerings.is_active', true)
-                ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
-                ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
+                ->join('units', 'course_offerings.unit_id', '=', 'units.id')
                 ->orderBy('units.code')
                 ->orderBy('course_offerings.section_code')
                 ->select('course_offerings.*')
                 ->get()
-                ->map(fn ($offering) => [
+                ->map(fn($offering) => [
                     'value' => $offering->id,
-                    'label' => "{$offering->course_code} - {$offering->course_title}".
+                    'label' => "{$offering->course_code} - {$offering->course_title}" .
                         ($offering->section_code ? " (Section {$offering->section_code})" : ''),
                 ]);
         }
@@ -163,11 +162,10 @@ class CourseRegistrationController extends Controller
         if ($request->filled('semester_id')) {
             $selectedSemester = Semester::find($request->semester_id);
 
-            $courseOfferings = CourseOffering::with(['curriculumUnit.unit', 'lecture'])
+            $courseOfferings = CourseOffering::with(['unit', 'lecture'])
                 ->where('course_offerings.semester_id', $request->semester_id)
                 ->where('course_offerings.is_active', true)
-                ->join('curriculum_units', 'course_offerings.curriculum_unit_id', '=', 'curriculum_units.id')
-                ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
+                ->join('units', 'course_offerings.unit_id', '=', 'units.id')
                 ->orderBy('units.code')
                 ->orderBy('course_offerings.section_code')
                 ->select('course_offerings.*')
@@ -209,8 +207,8 @@ class CourseRegistrationController extends Controller
                 foreach ($request->unit_ids as $unitId) {
                     try {
                         // Find the best course offering for this unit in the active semester
-                        $courseOffering = CourseOffering::with(['curriculumUnit.unit'])
-                            ->whereHas('curriculumUnit', function ($query) use ($unitId) {
+                        $courseOffering = CourseOffering::with(['unit'])
+                            ->whereHas('unit', function ($query) use ($unitId) {
                                 $query->where('unit_id', $unitId);
                             })
                             ->where('course_offerings.semester_id', $activeSemester->id)
@@ -235,7 +233,7 @@ class CourseRegistrationController extends Controller
                             'semester_id' => $activeSemester->id,
                             'registration_date' => now(),
                             'registration_status' => 'confirmed',
-                            'credit_hours' => $courseOffering->curriculumUnit->unit->credit_points,
+                            'credit_hours' => $courseOffering->unit->credit_points,
                             'notes' => $request->notes,
                         ]);
 
@@ -245,7 +243,7 @@ class CourseRegistrationController extends Controller
 
                         $registeredCount++;
                     } catch (\Exception $e) {
-                        $errors[] = "Unit ID {$unitId}: ".$e->getMessage();
+                        $errors[] = "Unit ID {$unitId}: " . $e->getMessage();
                     }
                 }
             });
@@ -253,7 +251,7 @@ class CourseRegistrationController extends Controller
             if ($registeredCount > 0) {
                 $message = "Successfully registered student for {$registeredCount} unit(s).";
                 if (! empty($errors)) {
-                    $message .= ' Some units could not be registered: '.implode('; ', $errors);
+                    $message .= ' Some units could not be registered: ' . implode('; ', $errors);
                 }
 
                 return Redirect::route(CourseRegistrationRoutes::INDEX)
@@ -261,7 +259,7 @@ class CourseRegistrationController extends Controller
             } else {
                 return Redirect::back()
                     ->withInput()
-                    ->with('error', 'No units were registered. Errors: '.implode('; ', $errors));
+                    ->with('error', 'No units were registered. Errors: ' . implode('; ', $errors));
             }
         } catch (\Exception $e) {
             return Redirect::back()
@@ -277,7 +275,7 @@ class CourseRegistrationController extends Controller
     {
         $adminCourseRegistration->load([
             'student',
-            'courseOffering.curriculumUnit.unit',
+            'courseOffering.unit',
             'courseOffering.semester',
             'courseOffering.lecture',
         ]);
@@ -294,7 +292,7 @@ class CourseRegistrationController extends Controller
     {
         $adminCourseRegistration->load([
             'student',
-            'courseOffering.curriculumUnit.unit',
+            'courseOffering.unit',
             'courseOffering.semester',
             'courseOffering.lecture',
         ]);
@@ -338,7 +336,7 @@ class CourseRegistrationController extends Controller
         } catch (\Exception $e) {
             return Redirect::back()
                 ->withInput()
-                ->with('error', 'Failed to update course registration: '.$e->getMessage());
+                ->with('error', 'Failed to update course registration: ' . $e->getMessage());
         }
     }
 
@@ -361,7 +359,7 @@ class CourseRegistrationController extends Controller
                 ->with('success', 'Course registration deleted successfully.');
         } catch (\Exception $e) {
             return Redirect::back()
-                ->with('error', 'Failed to delete course registration: '.$e->getMessage());
+                ->with('error', 'Failed to delete course registration: ' . $e->getMessage());
         }
     }
 
@@ -395,7 +393,7 @@ class CourseRegistrationController extends Controller
                 ->with('success', 'Selected course registrations deleted successfully.');
         } catch (\Exception $e) {
             return Redirect::back()
-                ->with('error', 'Failed to delete course registrations: '.$e->getMessage());
+                ->with('error', 'Failed to delete course registrations: ' . $e->getMessage());
         }
     }
 
@@ -502,7 +500,7 @@ class CourseRegistrationController extends Controller
             $unitsData = [];
             foreach ($availableCourses as $courseData) {
                 $offering = $courseData['offering'];
-                $unit = $offering->curriculumUnit->unit;
+                $unit = $offering->unit;
 
                 if (! isset($unitsData[$unit->id])) {
                     $unitsData[$unit->id] = [
@@ -531,12 +529,12 @@ class CourseRegistrationController extends Controller
             $registrations = CourseRegistration::where('student_id', $student->id)
                 ->where('semester_id', $activeSemester->id)
                 ->whereIn('registration_status', ['registered', 'confirmed'])
-                ->with('courseOffering.curriculumUnit.unit')
+                ->with('courseOffering.unit')
                 ->get();
 
             $registeredUnitIds = [];
             foreach ($registrations as $registration) {
-                $unit = $registration->courseOffering->curriculumUnit->unit;
+                $unit = $registration->courseOffering->unit;
                 $registeredUnitIds[] = $unit->id;
 
                 $registeredUnits[] = [
@@ -611,7 +609,7 @@ class CourseRegistrationController extends Controller
             'semester_id' => 'nullable|exists:semesters,id',
         ]);
 
-        $query = CourseRegistration::with(['courseOffering.curriculumUnit.unit'])
+        $query = CourseRegistration::with(['courseOffering.unit'])
             ->where('student_id', $request->student_id);
 
         if ($request->filled('semester_id')) {

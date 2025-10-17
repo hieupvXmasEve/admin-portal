@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Semester;
-use App\Models\Student;
 use App\Services\RegistrationService;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -42,7 +41,7 @@ class RegistrationController extends Controller
         }
 
         $query = CourseRegistration::with([
-            'courseOffering.curriculumUnit.unit',
+            'courseOffering.unit',
             'courseOffering.lecture',
             'semester',
         ])->where('student_id', $student->id);

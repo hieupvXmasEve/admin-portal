@@ -166,7 +166,7 @@ class NotificationService
             ->whereNull('achieved_score')
             ->where('due_date', '>=', now())
             ->where('due_date', '<=', now()->addDays(7))
-            ->with(['courseOffering.curriculumUnit.unit'])
+            ->with(['courseOffering.unit'])
             ->get();
 
         $notificationsCreated = 0;
@@ -184,13 +184,13 @@ class NotificationService
 
                 $this->createNotification($student, [
                     'title' => 'Assessment Due Soon',
-                    'message' => "{$assessment->assessmentComponentDetail->name} for {$assessment->courseOffering->curriculumUnit->unit->code} is due in {$daysUntilDue} day(s)",
+                    'message' => "{$assessment->assessmentComponentDetail->name} for {$assessment->courseOffering->unit->code} is due in {$daysUntilDue} day(s)",
                     'category' => 'assessment',
                     'type' => 'deadline',
                     'priority' => $urgency,
                     'data' => [
                         'assessment_id' => $assessment->id,
-                        'course_code' => $assessment->courseOffering->curriculumUnit->unit->code,
+                        'course_code' => $assessment->courseOffering->unit->code,
                         'due_date' => $assessment->due_date->toDateString(),
                         'days_until_due' => $daysUntilDue,
                     ],
@@ -222,7 +222,7 @@ class NotificationService
         $recentGrades = $student->assessmentComponentDetailScores()
             ->whereNotNull('achieved_score')
             ->where('graded_at', '>=', now()->subDays(1))
-            ->with(['courseOffering.curriculumUnit.unit'])
+            ->with(['courseOffering.unit'])
             ->get();
 
         $notificationsCreated = 0;
@@ -230,13 +230,13 @@ class NotificationService
         foreach ($recentGrades as $grade) {
             $this->createNotification($student, [
                 'title' => 'New Grade Available',
-                'message' => "Your grade for {$grade->assessmentComponentDetail->name} in {$grade->courseOffering->curriculumUnit->unit->code} is now available",
+                'message' => "Your grade for {$grade->assessmentComponentDetail->name} in {$grade->courseOffering->unit->code} is now available",
                 'category' => 'grade',
                 'type' => 'grade_release',
                 'priority' => 'medium',
                 'data' => [
                     'assessment_id' => $grade->id,
-                    'course_code' => $grade->courseOffering->curriculumUnit->unit->code,
+                    'course_code' => $grade->courseOffering->unit->code,
                     'achieved_score' => $grade->achieved_score,
                     'max_score' => $grade->max_score,
                 ],

@@ -533,12 +533,12 @@ class SemesterEnrollmentController extends Controller
     {
         try {
             $query = CourseOffering::where('semester_id', $semester->id)
-                ->with(['curriculumUnit.unit', 'lecture', 'courseRegistrations.student']);
+                ->with(['unit', 'lecture', 'courseRegistrations.student']);
 
             // Apply filters
             if ($request->filled('unit_id')) {
-                $query->whereHas('curriculumUnit.unit', function ($q) use ($request) {
-                    $q->where('unit_id', $request->unit_id);
+                $query->whereHas('unit', function ($q) use ($request) {
+                    $q->where('id', $request->unit_id);
                 });
             }
 

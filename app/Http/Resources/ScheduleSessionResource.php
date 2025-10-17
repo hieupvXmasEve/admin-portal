@@ -20,8 +20,8 @@ class ScheduleSessionResource extends JsonResource
             'id' => $this->id,
             'title' => $this->session_title,
             'description' => $this->session_description,
-            'unitCode' => $this->courseOffering->curriculumUnit->unit->code ?? 'N/A',
-            'unitName' => $this->courseOffering->curriculumUnit->unit->name ?? 'N/A',
+            'unitCode' => $this->courseOffering->unit->code ?? 'N/A',
+            'unitName' => $this->courseOffering->unit->name ?? 'N/A',
             'section' => $this->courseOffering->section ?? 'A',
             'lecturer' => [
                 'id' => $this->lecture->id ?? null,

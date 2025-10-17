@@ -209,7 +209,7 @@ class StudentController extends Controller
             'program',
             'specialization',
             'curriculumVersion',
-            'courseRegistrations.courseOffering.curriculumUnit.unit',
+            'courseRegistrations.courseOffering.unit',
             'academicHolds' => function ($query) {
                 $query->orderBy('placed_date', 'desc');
             },
