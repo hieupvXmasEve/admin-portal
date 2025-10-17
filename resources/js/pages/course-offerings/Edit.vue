@@ -47,7 +47,7 @@ const formSchema = toTypedSchema(
         unit_id: z.number().int().positive('Unit ID is required'),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
-        syllabus_template_id: z.string().optional(),
+        syllabus_template_id: z.string().min(1, 'Syllabus template is required'),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(1000, 'Max capacity cannot exceed 1000'),
         waitlist_capacity: z.number().int().min(0, 'Waitlist capacity must be 0 or greater').max(100, 'Waitlist capacity cannot exceed 100'),
         delivery_mode: z.enum(['in_person', 'online', 'hybrid', 'blended'], {
@@ -74,7 +74,7 @@ const formatDateForInput = (dateString: string | null): string => {
 const { handleSubmit, isSubmitting } = useForm({
     validationSchema: formSchema,
     initialValues: {
-        unit_id: props.courseOffering.unit_id || props.courseOffering.curriculum_unit?.unit_id,
+        unit_id: props.courseOffering.unit_id,
         section_code: props.courseOffering.section_code || '',
         syllabus_template_id: props.courseOffering.syllabus_template?.id.toString() || '',
         max_capacity: props.courseOffering.max_capacity,
@@ -95,11 +95,10 @@ const { handleSubmit, isSubmitting } = useForm({
 const onSubmit = handleSubmit((values) => {
     const formData = {
         semester_id: props.courseOffering.semester_id,
-        curriculum_unit_id: props.courseOffering.curriculum_unit_id,
-        unit_id: Number(values.unit_id) || Number(props.courseOffering.unit_id) || Number(props.courseOffering.curriculum_unit?.unit_id),
+        unit_id: Number(values.unit_id) || Number(props.courseOffering.unit_id),
         lecture_id: values.lecture_id === '' || values.lecture_id === 'none' ? null : values.lecture_id,
         section_code: values.section_code || null,
-        syllabus_template_id: values.syllabus_template_id === 'none' || values.syllabus_template_id === '' ? null : values.syllabus_template_id,
+        syllabus_template_id: values.syllabus_template_id,
         max_capacity: Number(values.max_capacity),
         waitlist_capacity: Number(values.waitlist_capacity) || 0,
         delivery_mode: values.delivery_mode,
@@ -191,7 +190,7 @@ const enrollmentStatusOptions = [
                         </div>
                     </div>
 
-                    <!-- Read-only Curriculum Unit Information -->
+                    <!-- Read-only Unit Information -->
                     <div class="rounded-lg border border-green-200 bg-green-50 p-4">
                         <div class="flex items-start">
                             <div class="flex-shrink-0">
@@ -200,16 +199,13 @@ const enrollmentStatusOptions = [
                                 </svg>
                             </div>
                             <div class="ml-3 flex-1">
-                                <h3 class="text-sm font-medium text-green-800">Curriculum Unit</h3>
+                                <h3 class="text-sm font-medium text-green-800">Unit</h3>
                                 <div class="mt-1 text-sm text-green-700">
                                     <p>
-                                        <strong>{{ courseOffering.curriculum_unit?.unit?.code }} - {{ courseOffering.curriculum_unit?.unit?.name }}</strong>
+                                        <strong>{{ courseOffering.unit?.code }} - {{ courseOffering.unit?.name }}</strong>
                                     </p>
-                                    <p class="mt-1 text-xs" v-if="courseOffering.curriculum_unit?.unit">
-                                        {{ courseOffering.curriculum_unit.unit.credit_points }} credits
-                                        <template v-if="courseOffering.curriculum_unit.year_level && courseOffering.curriculum_unit.semester_number">
-                                            • Y{{ courseOffering.curriculum_unit.year_level }}S{{ courseOffering.curriculum_unit.semester_number }}
-                                        </template>
+                                    <p class="mt-1 text-xs" v-if="courseOffering.unit">
+                                        {{ courseOffering.unit.credit_points }} credits
                                     </p>
                                 </div>
                             </div>
@@ -228,14 +224,13 @@ const enrollmentStatusOptions = [
 
                     <FormField v-slot="{ componentField }" name="syllabus_template_id">
                         <FormItem>
-                            <FormLabel>Syllabus Template</FormLabel>
+                            <FormLabel>Syllabus Template *</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField">
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select syllabus template (optional)" />
+                                        <SelectValue placeholder="Select syllabus template" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">No syllabus template</SelectItem>
                                         <template v-if="syllabusTemplates">
                                             <SelectItem v-for="template in syllabusTemplates" :key="template.id" :value="template.id.toString()">
                                                 <div class="flex flex-col">

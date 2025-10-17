@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CourseOffering extends AuditableModel
 {
@@ -20,7 +19,6 @@ class CourseOffering extends AuditableModel
 
     protected $fillable = [
         'semester_id',
-        'curriculum_unit_id',
         'unit_id',
         'syllabus_template_id',
         'lecture_id',
@@ -70,8 +68,7 @@ class CourseOffering extends AuditableModel
         return [
             'semester_id' => ['required', 'exists:semesters,id'],
             'unit_id' => ['required', 'exists:units,id'],
-            'curriculum_unit_id' => ['nullable', 'exists:curriculum_units,id'],
-            'syllabus_template_id' => ['nullable', 'exists:syllabus_templates,id'],
+            'syllabus_template_id' => ['required', 'exists:syllabus_templates,id'],
             'lecture_id' => ['nullable', 'exists:lectures,id'],
             'section_code' => ['nullable', 'string', 'max:10'],
             'max_capacity' => ['required', 'integer', 'min:1', 'max:1000'],
@@ -100,7 +97,8 @@ class CourseOffering extends AuditableModel
             'semester_id.exists' => 'Selected semester does not exist',
             'unit_id.required' => 'Unit is required',
             'unit_id.exists' => 'Selected unit does not exist',
-            'curriculum_unit_id.exists' => 'Selected curriculum unit does not exist',
+
+            'syllabus_template_id.required' => 'Syllabus template is required',
             'syllabus_template_id.exists' => 'Selected syllabus template does not exist',
             'lecture_id.exists' => 'Selected lecture does not exist',
             'section_code.max' => 'Section code cannot exceed 10 characters',
@@ -130,11 +128,6 @@ class CourseOffering extends AuditableModel
     public function semester(): BelongsTo
     {
         return $this->belongsTo(Semester::class);
-    }
-
-    public function curriculumUnit(): BelongsTo
-    {
-        return $this->belongsTo(CurriculumUnit::class);
     }
 
     public function unit(): BelongsTo
@@ -188,7 +181,7 @@ class CourseOffering extends AuditableModel
 
     public function getCreditHoursAttribute(): ?int
     {
-        return $this->unit ? (int)$this->unit->credit_points : null;
+        return $this->unit ? (int) $this->unit->credit_points : null;
     }
 
     public function getStatusAttribute(): string
@@ -226,7 +219,7 @@ class CourseOffering extends AuditableModel
     {
         return $this->is_active
             && $this->enrollment_status === 'open'
-            && !$this->isFull()
+            && ! $this->isFull()
             && $this->isRegistrationOpen();
     }
 
@@ -235,7 +228,7 @@ class CourseOffering extends AuditableModel
         return $this->is_active
             && in_array($this->enrollment_status, ['open', 'waitlist_only'])
             && $this->isFull()
-            && !$this->isWaitlistFull()
+            && ! $this->isWaitlistFull()
             && $this->isRegistrationOpen();
     }
 
@@ -253,15 +246,15 @@ class CourseOffering extends AuditableModel
     {
         $now = Carbon::now()->toDateString();
 
-        $startOk = !$this->registration_start_date || $this->registration_start_date <= $now;
-        $endOk = !$this->registration_end_date || $this->registration_end_date >= $now;
+        $startOk = ! $this->registration_start_date || $this->registration_start_date <= $now;
+        $endOk = ! $this->registration_end_date || $this->registration_end_date >= $now;
 
         return $startOk && $endOk;
     }
 
     public function getEnrollmentStatusText(): string
     {
-        if (!$this->isRegistrationOpen()) {
+        if (! $this->isRegistrationOpen()) {
             return 'Registration Closed';
         }
 
@@ -290,11 +283,6 @@ class CourseOffering extends AuditableModel
     public function scopeForSemester(Builder $query, int $semesterId): void
     {
         $query->where('course_offerings.semester_id', $semesterId);
-    }
-
-    public function scopeForCurriculumUnit(Builder $query, int $curriculumUnitId): void
-    {
-        $query->where('curriculum_unit_id', $curriculumUnitId);
     }
 
     public function scopeByLecture(Builder $query, int $lectureId): void
@@ -357,7 +345,7 @@ class CourseOffering extends AuditableModel
     // Helper methods for instructor assignment
     public function hasInstructor(): bool
     {
-        return !is_null($this->lecture_id);
+        return ! is_null($this->lecture_id);
     }
 
     public function needsInstructorBeforeClasses(): bool
@@ -367,7 +355,7 @@ class CourseOffering extends AuditableModel
         }
 
         // Check if semester has started
-        if (!$this->semester) {
+        if (! $this->semester) {
             return true; // Default to needing instructor if no semester info
         }
 
@@ -499,7 +487,7 @@ class CourseOffering extends AuditableModel
     public function canBeAssignedTo(Lecture $lecturer): bool
     {
         // Check if lecturer is available for assignment
-        if (!$lecturer->isAvailableForAssignment()) {
+        if (! $lecturer->isAvailableForAssignment()) {
             return false;
         }
 
@@ -590,11 +578,12 @@ class CourseOffering extends AuditableModel
     {
         return [
             'semester_id' => $this->semester_id,
+            'unit_id' => $this->unit_id,
             'campus_id' => $this->campus_id,
             'max_capacity' => $this->max_capacity,
             'current_enrollment' => $this->current_enrollment,
             'enrollment_status' => $this->enrollment_status,
-            'instructor_assigned' => !is_null($this->lecture_id),
+            'instructor_assigned' => ! is_null($this->lecture_id),
         ];
     }
 }
