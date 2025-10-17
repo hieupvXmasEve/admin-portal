@@ -24,8 +24,8 @@ class ProfileService
         return Cache::remember($cacheKey, 1, function () use ($student) {
             return [
                 'info' => $this->getPersonalInfo($student),
-//                'academic_info' => $this->getAcademicInfo($student),
-//                'contact_info' => $this->getContactInfo($student),
+                //                'academic_info' => $this->getAcademicInfo($student),
+                //                'contact_info' => $this->getContactInfo($student),
                 // 'enrollment_info' => $this->getEnrollmentInfo($student),
                 'preferences' => $this->getPreferences($student),
                 'profile_completion' => $this->calculateProfileCompletion($student),
@@ -397,13 +397,13 @@ class ProfileService
         return $student->courseRegistrations()
             ->where('semester_id', $currentSemester->id)
             ->where('registration_status', 'registered')
-            ->with(['courseOffering.curriculumUnit.unit'])
+            ->with(['courseOffering.unit'])
             ->get()
             ->map(function ($registration) {
                 return [
-                    'unit_code' => $registration->courseOffering?->curriculumUnit?->unit?->code,
-                    'unit_name' => $registration->courseOffering?->curriculumUnit?->unit?->name,
-                    'credit_hours' => $registration->courseOffering?->curriculumUnit?->credit_hours,
+                    'unit_code' => $registration->courseOffering?->unit?->code,
+                    'unit_name' => $registration->courseOffering?->unit?->name,
+                    'credit_hours' => $registration->courseOffering?->credit_hours,
                     'registration_date' => $registration->registration_date?->toDateString(),
                 ];
             })
@@ -603,9 +603,9 @@ class ProfileService
         return $student->courseRegistrations()
             ->where('semester_id', $currentSemester->id)
             ->where('registration_status', 'registered')
-            ->with('courseOffering.curriculumUnit')
+            ->with('courseOffering')
             ->get()
-            ->sum('courseOffering.curriculumUnit.credit_hours');
+            ->sum('courseOffering.credit_hours');
     }
 
     /**

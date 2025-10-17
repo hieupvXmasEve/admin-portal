@@ -69,7 +69,7 @@ class LecturerTimetableService
         // return Cache::remember($cacheKey, 300, function () use ($lecturer, $startDate, $endDate, $filters) {
         // Get sessions in the specified period
         $query = $lecturer->classSessions()
-            ->with(['courseOffering.curriculumUnit.unit', 'room.building'])
+            ->with(['courseOffering.unit', 'room.building'])
             ->whereBetween('session_date', [$startDate, $endDate]);
 
         // Apply filters
@@ -113,7 +113,7 @@ class LecturerTimetableService
         $endDate = now()->addDays($days);
 
         $sessions = $lecturer->classSessions()
-            ->with(['courseOffering.curriculumUnit', 'room'])
+            ->with(['courseOffering', 'room'])
             ->where('session_date', '>=', now())
             ->where('session_date', '<=', $endDate)
             ->where('status', 'scheduled')
@@ -185,7 +185,7 @@ class LecturerTimetableService
             $this->clearTimetableCaches($lecturer);
 
             return [
-                'session' => $this->formatSessionDetails($session->load(['courseOffering.curriculumUnit', 'room'])),
+                'session' => $this->formatSessionDetails($session->load(['courseOffering', 'room'])),
                 'message' => 'Session created successfully',
             ];
         });
@@ -243,7 +243,7 @@ class LecturerTimetableService
             $this->clearTimetableCaches($lecturer);
 
             return [
-                'session' => $this->formatSessionDetails($session->load(['courseOffering.curriculumUnit', 'room'])),
+                'session' => $this->formatSessionDetails($session->load(['courseOffering', 'room'])),
                 'message' => 'Session updated successfully',
             ];
         });
@@ -346,7 +346,7 @@ class LecturerTimetableService
         Carbon $endDate
     ): \Illuminate\Database\Eloquent\Collection {
         return $lecturer->classSessions()
-            ->with(['courseOffering.curriculumUnit', 'room'])
+            ->with(['courseOffering', 'room'])
             ->whereBetween('session_date', [$startDate, $endDate])
             ->orderBy('session_date')
             ->orderBy('start_time')
@@ -390,8 +390,8 @@ class LecturerTimetableService
             'status' => $session->status,
             'course' => [
                 'id' => $session->courseOffering->id,
-                'unit_code' => $session->courseOffering->curriculumUnit->unit_code,
-                'unit_name' => $session->courseOffering->curriculumUnit->unit_name,
+                'unit_code' => $session->courseOffering->unit->code,
+                'unit_name' => $session->courseOffering->unit->name,
                 'section_code' => $session->courseOffering->section_code,
             ],
             'room' => $session->room ? [
@@ -552,8 +552,8 @@ class LecturerTimetableService
         return $sessions->map(function ($session) {
             return [
                 'id' => $session->id,
-                'course_code' => $session->courseOffering->curriculumUnit->unit->code ?? null,
-                'course_name' => $session->courseOffering->curriculumUnit->unit->name ?? null,
+                'course_code' => $session->courseOffering->unit->code ?? null,
+                'course_name' => $session->courseOffering->unit->name ?? null,
                 'section_code' => $session->courseOffering->section_code,
                 'session_title' => $session->session_title,
                 'session_type' => $session->session_type,

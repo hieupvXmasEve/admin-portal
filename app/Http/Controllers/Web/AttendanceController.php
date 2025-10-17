@@ -21,7 +21,7 @@ class AttendanceController extends Controller
     public function index(Request $request): Response
     {
         $query = Attendance::with([
-            'classSession.courseOffering.curriculumUnit.unit',
+            'classSession.courseOffering.unit',
             'classSession.lecture',
             'student',
             'recordedBy',
@@ -42,7 +42,7 @@ class AttendanceController extends Controller
                     ->orWhereHas('classSession', function ($q) use ($search) {
                         $q->where('session_title', 'like', "%{$search}%");
                     })
-                    ->orWhereHas('classSession.courseOffering.curriculumUnit.unit', function ($q) use ($search) {
+                    ->orWhereHas('classSession.courseOffering.unit', function ($q) use ($search) {
                         $q->where('code', 'like', "%{$search}%")
                             ->orWhere('name', 'like', "%{$search}%");
                     });
@@ -152,7 +152,7 @@ class AttendanceController extends Controller
     {
         $sessionId = $request->get('session_id');
 
-        $classSessions = ClassSession::with('courseOffering.curriculumUnit.unit')
+        $classSessions = ClassSession::with('courseOffering.unit')
             ->orderBy('session_date', 'desc')
             ->get();
 
@@ -214,7 +214,7 @@ class AttendanceController extends Controller
     public function show(Attendance $attendance): Response
     {
         $attendance->load([
-            'classSession.courseOffering.curriculumUnit.unit',
+            'classSession.courseOffering.unit',
             'classSession.lecture',
             'student',
             'recordedBy',
@@ -231,9 +231,9 @@ class AttendanceController extends Controller
      */
     public function edit(Attendance $attendance): Response
     {
-        $attendance->load(['classSession.courseOffering.curriculumUnit.unit', 'student']);
+        $attendance->load(['classSession.courseOffering.unit', 'student']);
 
-        $classSessions = ClassSession::with('courseOffering.curriculumUnit.unit')
+        $classSessions = ClassSession::with('courseOffering.unit')
             ->orderBy('session_date', 'desc')
             ->get();
 

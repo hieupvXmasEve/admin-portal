@@ -28,7 +28,6 @@ class ClassSessionRepository
                     });
             })
             ->with([
-                'courseOffering.curriculumUnit.unit',
                 'courseOffering.unit',
                 'courseOffering.lecture',
                 'room',
@@ -188,7 +187,7 @@ class ClassSessionRepository
             ->where('start_time', '<=', $currentTime)
             ->where('end_time', '>', $currentTime)
             ->with([
-                'courseOffering.curriculumUnit.unit',
+                'courseOffering.unit',
                 'courseOffering.lecturer',
                 'room',
             ])
@@ -217,7 +216,7 @@ class ClassSessionRepository
         })
             ->where('day_of_week', $currentDay)
             ->with([
-                'courseOffering.curriculumUnit.unit',
+                'courseOffering.unit',
                 'courseOffering.lecturer',
                 'room',
             ])
@@ -291,7 +290,7 @@ class ClassSessionRepository
         }
 
         if (! empty($filters['course_code'])) {
-            $query->whereHas('courseOffering.curriculumUnit.unit', function (Builder $q) use ($filters) {
+            $query->whereHas('courseOffering.unit', function (Builder $q) use ($filters) {
                 $q->where('code', 'like', '%' . $filters['course_code'] . '%');
             });
         }
@@ -327,7 +326,7 @@ class ClassSessionRepository
         $sessions = $this->getStudentClassSessions($student, $semester);
 
         $totalSessions = $sessions->count();
-        $uniqueCourses = $sessions->pluck('courseOffering.curriculumUnit.unit.code')->unique()->count();
+        $uniqueCourses = $sessions->pluck('courseOffering.unit.code')->unique()->count();
         $totalHours = $sessions->sum(function ($session) {
             $start = \Carbon\Carbon::createFromTimeString($session->start_time);
             $end = \Carbon\Carbon::createFromTimeString($session->end_time);

@@ -108,9 +108,9 @@ class TimetableService
                 'duration_minutes' => $this->calculateDuration((string) $classSession->start_time, (string) $classSession->end_time),
             ],
             'course' => [
-                'code' => $classSession->courseOffering->curriculumUnit->unit->code,
-                'name' => $classSession->courseOffering->curriculumUnit->unit->name,
-                'credit_hours' => $classSession->courseOffering->curriculumUnit->credit_hours,
+                'code' => $classSession->courseOffering->unit->code,
+                'name' => $classSession->courseOffering->unit->name,
+                'credit_hours' => $classSession->courseOffering->credit_hours,
             ],
             'lecturer' => [
                 'id' => $classSession->courseOffering->lecturer?->id,
@@ -213,7 +213,7 @@ class TimetableService
     protected function generateScheduleSummary(Collection $classSessions): array
     {
         $totalSessions = $classSessions->count();
-        $uniqueCourses = $classSessions->pluck('courseOffering.curriculumUnit.unit.code')->unique()->count();
+        $uniqueCourses = $classSessions->pluck('courseOffering.unit.code')->unique()->count();
         $totalMinutes = $classSessions->sum(function ($session) {
             return $this->calculateDuration($session->start_time, $session->end_time);
         });
@@ -320,8 +320,8 @@ class TimetableService
 
         return [
             'id' => $session->id,
-            'course_code' => $session->courseOffering->curriculumUnit->unit->code,
-            'course_name' => $session->courseOffering->curriculumUnit->unit->name,
+            'course_code' => $session->courseOffering->unit->code,
+            'course_name' => $session->courseOffering->unit->name,
             'session_type' => $session->session_type,
             'start_time' => $session->start_time,
             'end_time' => $session->end_time,
@@ -332,7 +332,7 @@ class TimetableService
                 'name' => $session->room?->name,
                 'building' => $roomBuilding,
             ],
-            'color' => $this->generateSessionColor($session->courseOffering->curriculumUnit->unit->code),
+            'color' => $this->generateSessionColor($session->courseOffering->unit->code),
         ];
     }
 
@@ -343,12 +343,12 @@ class TimetableService
     {
         return [
             'id' => $session->id,
-            'course_code' => $session->courseOffering->curriculumUnit->unit->code,
+            'course_code' => $session->courseOffering->unit->code,
             'session_type' => $session->session_type,
             'room' => $session->room?->code,
             'start_time' => $session->start_time,
             'end_time' => $session->end_time,
-            'color' => $this->generateSessionColor($session->courseOffering->curriculumUnit->unit->code),
+            'color' => $this->generateSessionColor($session->courseOffering->unit->code),
         ];
     }
 

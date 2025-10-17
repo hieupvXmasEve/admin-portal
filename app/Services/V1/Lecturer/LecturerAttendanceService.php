@@ -25,7 +25,7 @@ class LecturerAttendanceService
     ): LengthAwarePaginator {
         $query = ClassSession::where('lecture_id', $lecturer->id)
             ->with([
-                'courseOffering.curriculumUnit',
+                'courseOffering',
                 'courseOffering.semester',
                 'attendances.student',
             ])
@@ -44,7 +44,7 @@ class LecturerAttendanceService
     {
         $session = ClassSession::where('lecture_id', $lecturer->id)
             ->with([
-                'courseOffering.curriculumUnit',
+                'courseOffering',
                 'courseOffering.semester',
                 'courseOffering.courseRegistrations.student.program',
                 'courseOffering.courseRegistrations.student.specialization',
@@ -118,8 +118,8 @@ class LecturerAttendanceService
                 'actual_attendees' => $session->actual_attendees,
                 'course' => [
                     'id' => $session->courseOffering->id,
-                    'unit_code' => $session->courseOffering->curriculumUnit->unit->code,
-                    'unit_name' => $session->courseOffering->curriculumUnit->unit->name,
+                    'unit_code' => $session->courseOffering->unit->code,
+                    'unit_name' => $session->courseOffering->unit->name,
                     'section_code' => $session->courseOffering->section_code,
                     'semester' => $session->courseOffering->semester->name ?? null,
                 ],
@@ -309,7 +309,7 @@ class LecturerAttendanceService
             ->whereDoesntHave('attendances')
             ->where('session_date', '<', now()->subHours(2))
             ->where('status', 'completed')
-            ->with('courseOffering.curriculumUnit')
+            ->with('courseOffering.unit')
             ->get();
 
         foreach ($unmmarkedSessions as $session) {
@@ -317,8 +317,8 @@ class LecturerAttendanceService
                 'type' => 'unmarked_attendance',
                 'priority' => 'high',
                 'session_id' => $session->id,
-                'message' => "Attendance not marked for {$session->courseOffering->curriculumUnit->unit_code} on {$session->session_date->format('M d')}",
-                'course' => $session->courseOffering->curriculumUnit->unit_code,
+                'message' => "Attendance not marked for {$session->courseOffering->unit->code} on {$session->session_date->format('M d')}",
+                'course' => $session->courseOffering->unit->code,
                 'date' => $session->session_date->format('Y-m-d'),
                 'days_overdue' => now()->diffInDays($session->session_date),
             ];
@@ -539,8 +539,8 @@ class LecturerAttendanceService
     {
         return [
             'id' => $courseOffering->id,
-            'unit_code' => $courseOffering->curriculumUnit->unit_code,
-            'unit_name' => $courseOffering->curriculumUnit->unit_name,
+            'unit_code' => $courseOffering->unit->code,
+            'unit_name' => $courseOffering->unit->name,
             'section_code' => $courseOffering->section_code,
             'semester' => $courseOffering->semester->name,
             'enrollment' => $courseOffering->current_enrollment,

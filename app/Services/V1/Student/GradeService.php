@@ -133,7 +133,7 @@ class GradeService
         $query = AssessmentComponentDetailScore::where('student_id', $student->id)
             ->with([
                 'assessmentComponentDetail.assessmentComponent.assessmentType',
-                'courseOffering.curriculumUnit.unit',
+                'courseOffering.unit',
                 'courseOffering.semester',
             ]);
 
@@ -159,7 +159,7 @@ class GradeService
             ->where('id', $assessmentId)
             ->with([
                 'assessmentComponentDetail.assessmentComponent.assessmentType',
-                'courseOffering.curriculumUnit.unit',
+                'courseOffering.unit',
                 'courseOffering.lecturer',
             ])
             ->firstOrFail();
@@ -177,8 +177,8 @@ class GradeService
                 'status' => $assessment->submission_status,
             ],
             'course' => [
-                'code' => $assessment->courseOffering->curriculumUnit->unit->code,
-                'name' => $assessment->courseOffering->curriculumUnit->unit->name,
+                'code' => $assessment->courseOffering->unit->code,
+                'name' => $assessment->courseOffering->unit->name,
                 'lecturer' => $assessment->courseOffering->lecturer?->full_name,
             ],
             'score' => [
@@ -359,7 +359,7 @@ class GradeService
         }
 
         if (! empty($filters['course_code'])) {
-            $query->whereHas('courseOffering.curriculumUnit.unit', function ($q) use ($filters) {
+            $query->whereHas('courseOffering.unit', function ($q) use ($filters) {
                 $q->where('code', 'like', '%' . $filters['course_code'] . '%');
             });
         }
@@ -664,8 +664,8 @@ class GradeService
             return [
                 'id' => $assessment->id,
                 'title' => $assessment->assessmentComponentDetail->name,
-                'course_code' => $assessment->courseOffering->curriculumUnit->unit->code,
-                'course_name' => $assessment->courseOffering->curriculumUnit->unit->name,
+                'course_code' => $assessment->courseOffering->unit->code,
+                'course_name' => $assessment->courseOffering->unit->name,
                 'type' => $assessment->assessmentComponentDetail->assessmentComponent->type,
                 'weight' => $assessment->assessmentComponentDetail->weight,
                 'max_score' => $assessment->max_score,
@@ -713,7 +713,7 @@ class GradeService
             ->where('due_date', '>=', now())
             ->with([
                 'assessmentComponentDetail.assessmentComponent',
-                'courseOffering.curriculumUnit.unit',
+                'courseOffering.unit',
             ])
             ->orderBy('due_date')
             ->limit(10)
@@ -723,7 +723,7 @@ class GradeService
             return [
                 'id' => $assessment->id,
                 'title' => $assessment->assessmentComponentDetail->name,
-                'course_code' => $assessment->courseOffering->curriculumUnit->unit->code,
+                'course_code' => $assessment->courseOffering->unit->code,
                 'type' => $assessment->assessmentComponentDetail->assessmentComponent->type,
                 'weight' => $assessment->assessmentComponentDetail->weight,
                 'due_date' => $assessment->due_date?->toDateString(),

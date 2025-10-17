@@ -218,7 +218,7 @@ class StudentController extends Controller
         $student = $request->user();
 
         $registrations = CourseRegistration::with([
-            'courseOffering.curriculumUnit.unit',
+            'courseOffering.unit',
             'semester',
         ])
             ->where('student_id', $student->id)
@@ -380,7 +380,7 @@ class StudentController extends Controller
         $completedRegistrations = CourseRegistration::where('student_id', $student->id)
             ->where('registration_status', 'completed')
             ->passing()
-            ->with('courseOffering.curriculumUnit.unit')
+            ->with('courseOffering.unit')
             ->get();
 
         $totalCreditsEarned = $completedRegistrations->sum('credit_hours');

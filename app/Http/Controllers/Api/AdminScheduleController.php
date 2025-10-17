@@ -60,7 +60,7 @@ class AdminScheduleController extends Controller
     public function show(ClassSession $session): ScheduleSessionResource
     {
         $session->load([
-            'courseOffering.curriculumUnit.unit',
+            'courseOffering.unit',
             'courseOffering.semester',
             'lecture',
             'room.campus',
@@ -84,7 +84,7 @@ class AdminScheduleController extends Controller
                 'success' => true,
                 'message' => 'Session updated successfully',
                 'data' => new ScheduleSessionResource($updatedSession->load([
-                    'courseOffering.curriculumUnit.unit',
+                    'courseOffering.unit',
                     'courseOffering.semester',
                     'lecture',
                     'room.campus',

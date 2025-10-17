@@ -427,7 +427,7 @@ class ClassSessionService
     public function getPaginatedSessions(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = ClassSession::with([
-            'courseOffering.curriculumUnit.unit',
+            'courseOffering.unit',
             'lecture',
             'attendances',
             'room:id,name'
@@ -445,7 +445,7 @@ class ClassSessionService
     public function getSessionWithRelations(int $sessionId): ?ClassSession
     {
         return ClassSession::with([
-            'courseOffering.curriculumUnit.unit',
+            'courseOffering.unit',
             'lecture',
             'attendances.student',
         ])->find($sessionId);
@@ -470,7 +470,7 @@ class ClassSessionService
      */
     public function getSessionsByStatus(string $status, ?int $limit = null): Collection
     {
-        $query = ClassSession::with(['courseOffering.curriculumUnit.unit', 'lecture'])
+        $query = ClassSession::with(['courseOffering.unit', 'lecture'])
             ->where('status', $status)
             ->orderBy('session_date', 'desc');
 
@@ -553,7 +553,7 @@ class ClassSessionService
             $query->where(function ($q) use ($search) {
                 $q->where('session_title', 'like', "%{$search}%")
                     ->orWhere('session_description', 'like', "%{$search}%")
-                    ->orWhereHas('courseOffering.curriculumUnit.unit', function ($q) use ($search) {
+                    ->orWhereHas('courseOffering.unit', function ($q) use ($search) {
                         $q->where('code', 'like', "%{$search}%")
                             ->orWhere('name', 'like', "%{$search}%");
                     })
@@ -660,7 +660,7 @@ class ClassSessionService
 
             // Get students who already have attendance records
             $studentsWithAttendance = $session->attendances()->pluck('student_id')->toArray();
-            
+
             // Filter out students who already have attendance records
             $studentsWithoutAttendance = $enrolledStudents->filter(function ($student) use ($studentsWithAttendance) {
                 return !in_array($student->id, $studentsWithAttendance);
@@ -700,19 +700,19 @@ class ClassSessionService
                     'expected_attendees' => $enrolledStudents->count(),
                     'actual_attendees' => $session->attendances()->whereIn('status', ['present', 'late'])->count(),
                 ]);
-                
+
                 // Calculate attendance percentage
-                $attendancePercentage = $session->expected_attendees > 0 
+                $attendancePercentage = $session->expected_attendees > 0
                     ? round(($session->actual_attendees / $session->expected_attendees) * 100, 2)
                     : 0.0;
-                    
+
                 $session->update(['attendance_percentage' => $attendancePercentage]);
             }
 
             return [
                 'success' => true,
-                'message' => count($studentsWithAttendance) > 0 
-                    ? 'Attendance records generated for remaining students' 
+                'message' => count($studentsWithAttendance) > 0
+                    ? 'Attendance records generated for remaining students'
                     : 'Attendance records generated successfully',
                 'student_count' => $enrolledStudents->count(),
                 'existing_records' => count($studentsWithAttendance),

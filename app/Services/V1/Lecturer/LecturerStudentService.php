@@ -29,7 +29,7 @@ class LecturerStudentService
             'courseRegistrations' => function ($q) use ($lecturer) {
                 $q->whereHas('courseOffering', function ($courseQuery) use ($lecturer) {
                     $courseQuery->where('lecture_id', $lecturer->id);
-                })->with('courseOffering.curriculumUnit');
+                })->with('courseOffering.unit');
             },
             'attendances' => function ($q) use ($lecturer) {
                 $q->whereHas('classSession', function ($sessionQuery) use ($lecturer) {
@@ -59,12 +59,12 @@ class LecturerStudentService
             'courseRegistrations' => function ($q) use ($lecturer) {
                 $q->whereHas('courseOffering', function ($courseQuery) use ($lecturer) {
                     $courseQuery->where('lecture_id', $lecturer->id);
-                })->with(['courseOffering.curriculumUnit', 'courseOffering.semester']);
+                })->with(['courseOffering.unit', 'courseOffering.semester']);
             },
             'attendances' => function ($q) use ($lecturer) {
                 $q->whereHas('classSession', function ($sessionQuery) use ($lecturer) {
                     $sessionQuery->where('lecture_id', $lecturer->id);
-                })->with('classSession.courseOffering.curriculumUnit');
+                })->with('classSession.courseOffering.unit');
             },
         ])->where('id', $studentId)->first();
 
@@ -304,8 +304,8 @@ class LecturerStudentService
         return $student->courseRegistrations->map(function ($registration) {
             return [
                 'course_offering_id' => $registration->courseOffering->id,
-                'unit_code' => $registration->courseOffering->curriculumUnit->unit_code,
-                'unit_name' => $registration->courseOffering->curriculumUnit->unit_name,
+                'unit_code' => $registration->courseOffering->unit->code,
+                'unit_name' => $registration->courseOffering->unit->name,
                 'section_code' => $registration->courseOffering->section_code,
                 'semester' => $registration->courseOffering->semester->name,
                 'registration_date' => $registration->created_at->format('Y-m-d'),
@@ -394,7 +394,7 @@ class LecturerStudentService
             ->whereHas('classSession', function ($q) use ($lecturer) {
                 $q->where('lecture_id', $lecturer->id);
             })
-            ->with('classSession.courseOffering.curriculumUnit')
+            ->with('classSession.courseOffering.unit')
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get();
@@ -403,7 +403,7 @@ class LecturerStudentService
             return [
                 'type' => 'attendance',
                 'status' => $attendance->status,
-                'course' => $attendance->classSession->courseOffering->curriculumUnit->unit_code,
+                'course' => $attendance->classSession->courseOffering->unit->code,
                 'date' => $attendance->classSession->session_date->format('Y-m-d'),
                 'time' => $attendance->created_at->format('H:i'),
             ];

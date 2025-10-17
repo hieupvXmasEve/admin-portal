@@ -228,7 +228,7 @@ class CalendarService
                 $query->where('semester_id', $semester->id);
             })
             ->whereNotNull('due_date')
-            ->with(['assessmentComponentDetail.assessmentComponent', 'courseOffering.curriculumUnit.unit'])
+            ->with(['assessmentComponentDetail.assessmentComponent', 'courseOffering.unit'])
             ->orderBy('due_date')
             ->get();
 
@@ -236,8 +236,8 @@ class CalendarService
             return [
                 'id' => $assessment->id,
                 'title' => $assessment->assessmentComponentDetail->name,
-                'course_code' => $assessment->courseOffering->curriculumUnit->unit->code,
-                'course_name' => $assessment->courseOffering->curriculumUnit->unit->name,
+                'course_code' => $assessment->courseOffering->unit->code,
+                'course_name' => $assessment->courseOffering->unit->name,
                 'due_date' => $assessment->due_date->toDateString(),
                 'due_time' => $assessment->due_time,
                 'type' => $assessment->assessmentComponentDetail->assessmentComponent->type,
@@ -496,7 +496,7 @@ class CalendarService
     {
         $registrations = $student->courseRegistrations()
             ->where('semester_id', $semester->id)
-            ->with('courseOffering.curriculumUnit.unit')
+            ->with('courseOffering.unit')
             ->get();
 
         return [
@@ -504,7 +504,7 @@ class CalendarService
             'registered_courses' => $registrations->where('registration_status', 'registered')->count(),
             'waitlisted_courses' => $registrations->where('registration_status', 'waitlisted')->count(),
             'total_credit_hours' => $registrations->where('registration_status', 'registered')
-                ->sum('courseOffering.curriculumUnit.credit_hours'),
+                ->sum('courseOffering.credit_hours'),
             'enrollment_status' => $this->getEnrollmentStatus($registrations),
         ];
     }
