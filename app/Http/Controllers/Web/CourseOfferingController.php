@@ -8,9 +8,9 @@ use App\Constants\CourseOfferingRoutes;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCourseOfferingRequest;
 use App\Http\Requests\UpdateCourseOfferingRequest;
+use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\ClassSession;
 use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
@@ -41,7 +41,7 @@ class CourseOfferingController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = CourseOffering::with(['semester', 'curriculumUnit', 'lecture', 'unit'])
+        $query = CourseOffering::with(['semester', 'lecture', 'unit'])
             ->join('units', 'course_offerings.unit_id', '=', 'units.id')
             ->where('course_offerings.campus_id', app('campus')->id)
             ->whereNotNull('units.id')
@@ -61,7 +61,7 @@ class CourseOfferingController extends Controller
 
         // Default to current semester if no semester filter is provided
         $defaultSemesterId = null;
-        if (!$request->filled('semester_id') || $request->semester_id === 'all') {
+        if (! $request->filled('semester_id') || $request->semester_id === 'all') {
             $currentSemester = Semester::getActiveSemester();
             if ($currentSemester) {
                 $defaultSemesterId = $currentSemester->id;
@@ -124,6 +124,7 @@ class CourseOfferingController extends Controller
                     'me' => 'Mechanical Engineering',
                     'fin' => 'Finance',
                 ];
+
                 return ['value' => $type, 'label' => $labels[$type] ?? ucfirst($type)];
             })
             ->toArray();
@@ -132,7 +133,7 @@ class CourseOfferingController extends Controller
         $filters = $request->only(['search', 'semester_id', 'enrollment_status', 'delivery_mode', 'unit_level', 'unit_type']);
 
         // Only set default semester if no semester filter is provided
-        if (!$request->filled('semester_id') && $defaultSemesterId) {
+        if (! $request->filled('semester_id') && $defaultSemesterId) {
             $filters['semester_id'] = $defaultSemesterId;
         }
 
@@ -224,9 +225,6 @@ class CourseOfferingController extends Controller
         $validatedData = $request->validated();
         $validatedData['campus_id'] = app('campus')->id;
 
-        // unit_id is now passed directly from the form, curriculum_unit_id is optional
-        // No need to derive unit_id from curriculum_unit_id anymore
-
         CourseOffering::create($validatedData);
 
         return Redirect::route(CourseOfferingRoutes::INDEX)
@@ -245,7 +243,7 @@ class CourseOfferingController extends Controller
 
         $courseOffering->load([
             'semester',
-            'curriculumUnit.unit',
+            'unit',
             'syllabusTemplate.unit:id,code,name',
             'syllabusTemplate.applicableCampus:id,name',
             'syllabusTemplate.applicableProgram:id,name',
@@ -282,9 +280,9 @@ class CourseOfferingController extends Controller
                 'sunday' => 6,
             ];
             $weekdayIndexes = collect($scheduleDays)
-                ->map(fn($d) => strtolower($d))
-                ->map(fn($d) => $dayToIndex[$d] ?? null)
-                ->filter(static fn($v) => $v !== null)
+                ->map(fn ($d) => strtolower($d))
+                ->map(fn ($d) => $dayToIndex[$d] ?? null)
+                ->filter(static fn ($v) => $v !== null)
                 ->values()
                 ->all();
 
@@ -342,14 +340,11 @@ class CourseOfferingController extends Controller
             abort(404);
         }
 
-        // Load the course offering with its related semester and curriculum unit data
-        // Note: unit_id is already loaded on the main $courseOffering model
+        // Load the course offering with its related semester and unit data
         $courseOffering->load([
             'semester:id,name,code,start_date,end_date',
-            'curriculumUnit:id,unit_id,year_level,semester_number',
-            'curriculumUnit.unit:id,code,name,credit_points',
-            'syllabusTemplate:id,title,version,description',
             'unit:id,code,name,credit_points',
+            'syllabusTemplate:id,title,version,description',
         ]);
 
         // Get available lectures
@@ -389,10 +384,10 @@ class CourseOfferingController extends Controller
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering updated successfully.');
         } catch (\Throwable $th) {
-            Log::error('Failed to update course offering: ' . $th->getMessage());
+            Log::error('Failed to update course offering: '.$th->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to update course offering: ' . $th->getMessage());
+                ->with('error', 'Failed to update course offering: '.$th->getMessage());
         }
     }
 
@@ -422,6 +417,7 @@ class CourseOfferingController extends Controller
             }
 
             $reasonText = implode(' and ', $reasons);
+
             return Redirect::back()
                 ->with('error', "Cannot delete course offering because it has {$reasonText}. Please cancel the course offering instead or remove all sessions and students first.");
         }
@@ -449,10 +445,10 @@ class CourseOfferingController extends Controller
                 ->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to delete course offering: ' . $e->getMessage());
+            Log::error('Failed to delete course offering: '.$e->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to delete course offering: ' . $e->getMessage());
+                ->with('error', 'Failed to delete course offering: '.$e->getMessage());
         }
     }
 
@@ -489,13 +485,14 @@ class CourseOfferingController extends Controller
                     }
 
                     $unitCode = $courseOffering->unit?->code ?? 'Unknown';
-                    $cannotDelete[] = "{$unitCode}: " . implode(' and ', $reasons);
+                    $cannotDelete[] = "{$unitCode}: ".implode(' and ', $reasons);
                 }
             }
 
-            if (!empty($cannotDelete)) {
+            if (! empty($cannotDelete)) {
                 DB::rollBack();
                 $reasonText = implode('; ', $cannotDelete);
+
                 return Redirect::back()
                     ->with('error', "Cannot delete the following course offerings: {$reasonText}. Please cancel these course offerings instead or remove all sessions and students first.");
             }
@@ -527,10 +524,10 @@ class CourseOfferingController extends Controller
                 ->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to bulk delete course offerings: ' . $e->getMessage());
+            Log::error('Failed to bulk delete course offerings: '.$e->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to delete course offerings: ' . $e->getMessage());
+                ->with('error', 'Failed to delete course offerings: '.$e->getMessage());
         }
     }
 
@@ -604,9 +601,9 @@ class CourseOfferingController extends Controller
                 'sunday' => 6,
             ];
             $weekdayIndexes = collect($scheduleDays)
-                ->map(fn($d) => strtolower($d))
-                ->map(fn($d) => $dayToIndex[$d] ?? null)
-                ->filter(static fn($v) => $v !== null)
+                ->map(fn ($d) => strtolower($d))
+                ->map(fn ($d) => $dayToIndex[$d] ?? null)
+                ->filter(static fn ($v) => $v !== null)
                 ->values()
                 ->all();
 
@@ -789,12 +786,12 @@ class CourseOfferingController extends Controller
                                 // Check if unit has level defined (use is_null to allow level 0)
                                 if (is_null($unit->level)) {
                                     $isEligible = false;
-                                    $reasons[] = "Unit level is not defined for this EGC unit";
+                                    $reasons[] = 'Unit level is not defined for this EGC unit';
                                     Log::error('EGC Unit Missing Level', [
                                         'unit_id' => $unit->id,
                                         'unit_code' => $unit->code,
                                     ]);
-                                } 
+                                }
                                 // Check if student has gc_current_level defined (use is_null to allow level 0)
                                 elseif (is_null($student->gc_current_level)) {
                                     $isEligible = false;
@@ -823,7 +820,7 @@ class CourseOfferingController extends Controller
                         }
 
                         // Check if student is active (only if not already failed above validation)
-                        if ($isEligible && !$student->isActive()) {
+                        if ($isEligible && ! $student->isActive()) {
                             $isEligible = false;
                             $reasons[] = "Student status is '{$student->status}' (must be 'active')";
                         }
@@ -841,7 +838,7 @@ class CourseOfferingController extends Controller
                         }
 
                         // Check if registration is open
-                        if ($isEligible && !$courseOffering->isRegistrationOpen()) {
+                        if ($isEligible && ! $courseOffering->isRegistrationOpen()) {
                             $isEligible = false;
                             $reasons[] = 'Registration period is not currently open';
                         }
@@ -911,10 +908,11 @@ class CourseOfferingController extends Controller
                         ->where('campus_id', app('campus')->id)
                         ->first();
 
-                    if (!$student) {
+                    if (! $student) {
                         $result['message'] = 'Student not found';
                         $failureCount++;
                         $results[] = $result;
+
                         continue;
                     }
 
@@ -925,18 +923,20 @@ class CourseOfferingController extends Controller
                             $result['message'] = "EGC units require student type 'intake_pre_uni_gc' (current: '{$student->status}')";
                             $failureCount++;
                             $results[] = $result;
+
                             continue;
                         }
 
                         // Check if unit has level defined (use is_null to allow level 0)
                         if (is_null($unit->level)) {
-                            $result['message'] = "Unit level is not defined for this EGC unit";
+                            $result['message'] = 'Unit level is not defined for this EGC unit';
                             $failureCount++;
                             $results[] = $result;
                             Log::error('EGC Unit Missing Level', [
                                 'unit_id' => $unit->id,
                                 'unit_code' => $unit->code,
                             ]);
+
                             continue;
                         }
 
@@ -948,6 +948,7 @@ class CourseOfferingController extends Controller
                             Log::error('Student Missing GC Level', [
                                 'student_id' => $student->student_id,
                             ]);
+
                             continue;
                         }
 
@@ -956,6 +957,7 @@ class CourseOfferingController extends Controller
                             $result['message'] = "Student's current GC level ({$student->gc_current_level}) does not match unit level ({$unit->level})";
                             $failureCount++;
                             $results[] = $result;
+
                             continue;
                         }
                     } else {
@@ -964,6 +966,7 @@ class CourseOfferingController extends Controller
                             $result['message'] = "This unit requires student type 'intake_course' (current: '{$student->status}')";
                             $failureCount++;
                             $results[] = $result;
+
                             continue;
                         }
                     }
@@ -978,6 +981,7 @@ class CourseOfferingController extends Controller
                         $result['message'] = 'Already registered for this course';
                         $failureCount++;
                         $results[] = $result;
+
                         continue;
                     }
 
@@ -1000,14 +1004,16 @@ class CourseOfferingController extends Controller
                         $result['message'] = $conflictMessage;
                         $failureCount++;
                         $results[] = $result;
+
                         continue;
                     }
 
                     // Check eligibility
-                    if (!$student->isActive()) {
+                    if (! $student->isActive()) {
                         $result['message'] = "Student status is '{$student->status}' (must be 'active')";
                         $failureCount++;
                         $results[] = $result;
+
                         continue;
                     }
 
@@ -1016,6 +1022,7 @@ class CourseOfferingController extends Controller
                         $result['message'] = 'Student has active academic holds';
                         $failureCount++;
                         $results[] = $result;
+
                         continue;
                     }
 
@@ -1032,7 +1039,7 @@ class CourseOfferingController extends Controller
                         'registration_status' => 'confirmed',
                         'registration_date' => now(),
                         'registration_method' => 'admin_override',
-                        'credit_hours' => $courseOffering->curriculumUnit->unit->credit_points ?? 3,
+                        'credit_hours' => $courseOffering->unit->credit_points ?? 3,
                         'attempt_number' => 1,
                         'is_retake' => false,
                         'retake_fee' => 0.00,
@@ -1046,8 +1053,8 @@ class CourseOfferingController extends Controller
                     $result['message'] = 'Successfully registered';
                     $successCount++;
                 } catch (\Exception $e) {
-                    Log::error("Failed to register student {$studentId}: " . $e->getMessage());
-                    $result['message'] = 'Registration failed: ' . $e->getMessage();
+                    Log::error("Failed to register student {$studentId}: ".$e->getMessage());
+                    $result['message'] = 'Registration failed: '.$e->getMessage();
                     $failureCount++;
                 }
 
@@ -1069,11 +1076,11 @@ class CourseOfferingController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Bulk registration failed: ' . $e->getMessage());
+            Log::error('Bulk registration failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk registration failed: ' . $e->getMessage(),
+                'message' => 'Bulk registration failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1146,9 +1153,9 @@ class CourseOfferingController extends Controller
 
                 // Find a unique section code
                 do {
-                    $newSectionCode = $baseSectionCode . '_copy' . ($counter > 1 ? $counter : '');
+                    $newSectionCode = $baseSectionCode.'_copy'.($counter > 1 ? $counter : '');
                     $exists = CourseOffering::where('semester_id', $courseOffering->semester_id)
-                        ->where('curriculum_unit_id', $courseOffering->curriculum_unit_id)
+                        ->where('unit_id', $courseOffering->unit_id)
                         ->where('campus_id', $courseOffering->campus_id)
                         ->where('section_code', $newSectionCode)
                         ->exists();
@@ -1164,10 +1171,10 @@ class CourseOfferingController extends Controller
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering duplicated successfully. Please assign an instructor.');
         } catch (\Exception $e) {
-            Log::error('Failed to duplicate course offering: ' . $e->getMessage());
+            Log::error('Failed to duplicate course offering: '.$e->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to duplicate course offering: ' . $e->getMessage());
+                ->with('error', 'Failed to duplicate course offering: '.$e->getMessage());
         }
     }
 
@@ -1194,7 +1201,7 @@ class CourseOfferingController extends Controller
 
         $courseOffering->load([
             'semester',
-            'curriculumUnit.unit',
+            'unit',
             'lecture',
             'courseRegistrations.student',
         ]);
@@ -1264,7 +1271,7 @@ class CourseOfferingController extends Controller
         }
 
         $sections = $request->sections;
-        $totalStudentsAssigned = collect($sections)->sum(fn($section) => count($section['student_ids']));
+        $totalStudentsAssigned = collect($sections)->sum(fn ($section) => count($section['student_ids']));
 
         if ($totalStudentsAssigned !== $courseOffering->current_enrollment) {
             return Redirect::back()
@@ -1288,7 +1295,7 @@ class CourseOfferingController extends Controller
                 $newOffering = CourseOffering::create([
                     'campus_id' => app('campus')->id,
                     'semester_id' => $courseOffering->semester_id,
-                    'curriculum_unit_id' => $courseOffering->curriculum_unit_id,
+                    'unit_id' => $courseOffering->unit_id,
                     'lecture_id' => $lectureId,
                     'section_code' => $sectionData['section_code'],
                     'max_capacity' => $sectionData['max_capacity'],
@@ -1340,12 +1347,12 @@ class CourseOfferingController extends Controller
             DB::commit();
 
             return Redirect::route(CourseOfferingRoutes::INDEX)
-                ->with('success', 'Course offering successfully split into ' . count($sections) . ' sections. The original course offering has been deleted.');
+                ->with('success', 'Course offering successfully split into '.count($sections).' sections. The original course offering has been deleted.');
         } catch (\Exception $e) {
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to split course offering: ' . $e->getMessage());
+                ->with('error', 'Failed to split course offering: '.$e->getMessage());
         }
     }
 
@@ -1430,7 +1437,7 @@ class CourseOfferingController extends Controller
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to assign lectures: ' . $e->getMessage());
+                ->with('error', 'Failed to assign lectures: '.$e->getMessage());
         }
     }
 
@@ -1456,7 +1463,7 @@ class CourseOfferingController extends Controller
                 ->with('student')
                 ->first();
 
-            if (!$registration) {
+            if (! $registration) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Registration not found or does not belong to this course offering.',
@@ -1485,11 +1492,11 @@ class CourseOfferingController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to delete student registration: ' . $e->getMessage());
+            Log::error('Failed to delete student registration: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to remove student from course: ' . $e->getMessage(),
+                'message' => 'Failed to remove student from course: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -1553,7 +1560,7 @@ class CourseOfferingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update registration status: ' . $e->getMessage(),
+                'message' => 'Failed to update registration status: '.$e->getMessage(),
             ], 500);
         }
     }
