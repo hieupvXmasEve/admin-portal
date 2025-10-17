@@ -63,7 +63,7 @@ const submitError = ref<string | null>(null);
 const formSchema = toTypedSchema(
     z.object({
         unit_id: z.string().min(1, 'Unit is required'),
-        syllabus_template_id: z.string().optional(),
+        syllabus_template_id: z.string().min(1, 'Syllabus template is required'),
         lecture_id: z.string().optional(),
         section_code: z.string().max(10, 'Section code too long').optional(),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(500, 'Max capacity cannot exceed 500'),
@@ -375,20 +375,19 @@ const dayOptions = [
 
                     <FormField v-slot="{ componentField }" name="syllabus_template_id">
                         <FormItem>
-                            <FormLabel>Syllabus Template (Optional)</FormLabel>
+                            <FormLabel>Syllabus Template *</FormLabel>
                             <FormControl>
                                 <Select v-bind="componentField" :disabled="!selectedUnit">
                                     <SelectTrigger>
-                                        <SelectValue :placeholder="!selectedUnit ? 'Select a curriculum unit first' : filteredSyllabusTemplates.length === 0 ? 'No syllabus templates available for this unit' : 'Select syllabus template (optional)'" />
+                                        <SelectValue :placeholder="!selectedUnit ? 'Select a curriculum unit first' : filteredSyllabusTemplates.length === 0 ? 'No syllabus templates available for this unit' : 'Select syllabus template'" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">No syllabus template</SelectItem>
                                         <SelectItem v-for="template in filteredSyllabusTemplates" :key="template.id" :value="template.id.toString()"> {{ template.title }} (v{{ template.version }}) </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormControl>
                             <FormMessage />
-                            <p v-if="selectedUnit && filteredSyllabusTemplates.length === 0" class="text-muted-foreground mt-1 text-sm">No syllabus templates found for {{ selectedUnit.code }}. You can create course offering without a template.</p>
+                            <p v-if="selectedUnit && filteredSyllabusTemplates.length === 0" class="text-muted-foreground mt-1 text-sm">No syllabus templates found for {{ selectedUnit.code }}. Please create a template first before creating a course offering.</p>
                         </FormItem>
                     </FormField>
 
