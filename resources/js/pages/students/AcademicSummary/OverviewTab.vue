@@ -17,7 +17,6 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
 });
-console.log('%c props overview', 'color: red', props.overview.student_info.scholarship);
 const qrcode = useQRCode(props.overview.student_info.student_id);
 // Status badge styling
 const getStatusBadgeVariant = (status: string) => {
@@ -406,17 +405,11 @@ const hasAcademicConcerns = computed(() => {
                                         <p class="text-muted-foreground text-xs">{{ overview.student_info.scholarship.code }}</p>
                                         <span v-if="overview.student_info.scholarship.amount" class="text-muted-foreground text-xs">•</span>
                                         <p v-if="overview.student_info.scholarship.amount" class="text-xs font-medium text-green-600">
-                                            <template v-if="overview.student_info.scholarship.type === 'percentage'">
-                                                {{ overview.student_info.scholarship.amount }}%
-                                            </template>
-                                            <template v-else>
-                                                {{ Number(overview.student_info.scholarship.amount).toLocaleString('vi-VN') }} VND
-                                            </template>
+                                            <template v-if="overview.student_info.scholarship.type === 'percentage'"> {{ overview.student_info.scholarship.amount }}% </template>
+                                            <template v-else> {{ Number(overview.student_info.scholarship.amount).toLocaleString('vi-VN') }} VND </template>
                                         </p>
                                     </div>
-                                    <p v-if="overview.student_info.scholarship.awarded_at" class="text-muted-foreground text-xs">
-                                        Awarded: {{ formatDate(overview.student_info.scholarship.awarded_at) }}
-                                    </p>
+                                    <p v-if="overview.student_info.scholarship.awarded_at" class="text-muted-foreground text-xs">Awarded: {{ formatDate(overview.student_info.scholarship.awarded_at) }}</p>
                                 </div>
                             </div>
 

@@ -69,7 +69,7 @@ class AcademicRecordService
                 'student_id' => $student->id,
                 'unit_id' => $data['unit_id'],
                 'semester_id' => $data['semester_id'],
-                'final_grade' => $data['final_grade'] ?? null,
+                'final_letter_grade' => $data['final_letter_grade'] ?? null,
             ]);
 
             return $record->fresh(['unit', 'semester']);
@@ -84,7 +84,7 @@ class AcademicRecordService
         return DB::transaction(function () use ($student, $semesterId) {
             $records = $student->academicRecords()
                 ->where('semester_id', $semesterId)
-                ->whereNotNull('final_grade')
+                ->whereNotNull('final_letter_grade')
                 ->with('unit')
                 ->get();
 
@@ -96,7 +96,7 @@ class AcademicRecordService
             $totalCredits = 0;
 
             foreach ($records as $record) {
-                $gradePoints = $this->convertGradeToPoints($record->final_grade);
+                $gradePoints = $this->convertGradeToPoints($record->final_letter_grade);
                 $credits = $record->unit->credit_points;
 
                 $totalPoints += $gradePoints * $credits;
@@ -130,7 +130,7 @@ class AcademicRecordService
     {
         return DB::transaction(function () use ($student) {
             $allRecords = $student->academicRecords()
-                ->whereNotNull('final_grade')
+                ->whereNotNull('final_letter_grade')
                 ->with('unit')
                 ->get();
 
@@ -142,7 +142,7 @@ class AcademicRecordService
             $totalCredits = 0;
 
             foreach ($allRecords as $record) {
-                $gradePoints = $this->convertGradeToPoints($record->final_grade);
+                $gradePoints = $this->convertGradeToPoints($record->final_letter_grade);
                 $credits = $record->unit->credit_points;
 
                 $totalPoints += $gradePoints * $credits;
@@ -186,7 +186,7 @@ class AcademicRecordService
 
             $courses = [];
             foreach ($semesterRecords as $record) {
-                $gradePoints = $this->convertGradeToPoints($record->final_grade);
+                $gradePoints = $this->convertGradeToPoints($record->final_letter_grade);
                 $credits = $record->unit->credit_points;
 
                 $semesterCredits += $credits;
@@ -196,7 +196,7 @@ class AcademicRecordService
                     'unit_code' => $record->unit->unit_code,
                     'unit_name' => $record->unit->unit_name,
                     'credits' => $credits,
-                    'grade' => $record->final_grade,
+                    'grade' => $record->final_letter_grade,
                     'grade_points' => $gradePoints,
                 ];
             }
@@ -254,7 +254,7 @@ class AcademicRecordService
         }
 
         $totalCreditsCompleted = $student->academicRecords()
-            ->whereNotNull('final_grade')
+            ->whereNotNull('final_letter_grade')
             ->join('units', 'academic_records.unit_id', '=', 'units.id')
             ->sum('units.credit_points');
 
@@ -312,7 +312,7 @@ class AcademicRecordService
     public function getGradeDistribution(Unit $unit, ?Semester $semester = null): array
     {
         $query = AcademicRecord::where('unit_id', $unit->id)
-            ->whereNotNull('final_grade');
+            ->whereNotNull('final_letter_grade');
 
         if ($semester) {
             $query->where('semester_id', $semester->id);
@@ -336,7 +336,7 @@ class AcademicRecordService
         ];
 
         foreach ($records as $record) {
-            $grade = strtoupper($record->final_grade);
+            $grade = strtoupper($record->final_letter_grade);
             if (isset($distribution[$grade])) {
                 $distribution[$grade]++;
             }
@@ -363,7 +363,7 @@ class AcademicRecordService
     private function calculateUnitAverageGPA(Unit $unit, ?Semester $semester = null): float
     {
         $query = AcademicRecord::where('unit_id', $unit->id)
-            ->whereNotNull('final_grade');
+            ->whereNotNull('final_letter_grade');
 
         if ($semester) {
             $query->where('semester_id', $semester->id);
@@ -377,7 +377,7 @@ class AcademicRecordService
 
         $totalPoints = 0;
         foreach ($records as $record) {
-            $totalPoints += $this->convertGradeToPoints($record->final_grade);
+            $totalPoints += $this->convertGradeToPoints($record->final_letter_grade);
         }
 
         return round($totalPoints / $records->count(), 2);
