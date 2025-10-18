@@ -24,6 +24,8 @@ class CourseStatisticsService
                 'semester:id,name,code',
                 'unit:id,code,name,credit_points',
                 'lecture:id,first_name,last_name',
+                'classSessions:id,course_offering_id',
+                'academicRecords:id,course_offering_id,student_id,total_absences',
             ])
             ->where('course_offerings.campus_id', $campusId)
             ->where('course_offerings.is_active', true);
@@ -174,6 +176,8 @@ class CourseStatisticsService
             ->sortBy('student_id');
 
         $sessions = $courseOffering->classSessions;
+        $totalSessions = $sessions->count();
+        $allowedAbsences = (int) ceil($totalSessions * 0.2); // 20% allowed absences
 
         $attendanceGrid = [];
         foreach ($students as $student) {
@@ -184,31 +188,56 @@ class CourseStatisticsService
                 'sessions' => [],
             ];
 
+            $totalAbsences = 0;
+            $totalPresent = 0;
+            $totalLate = 0;
+
             foreach ($sessions as $session) {
                 $attendance = $session->attendances->firstWhere('student_id', $student->id);
+                $status = $attendance?->status ?? 'not_recorded';
+
+                // Count attendance status
+                if ($status === 'absent') {
+                    $totalAbsences++;
+                } elseif ($status === 'present') {
+                    $totalPresent++;
+                } elseif ($status === 'late') {
+                    $totalLate++;
+                }
 
                 $studentData['sessions'][] = [
                     'session_id' => $session->id,
                     'session_number' => $session->sequence_number,
                     'session_date' => $session->session_date->format('Y-m-d'),
-                    'status' => $attendance?->status ?? 'not_recorded',
+                    'status' => $status,
                     'check_in_time' => $attendance?->check_in_time?->format('H:i'),
                     'minutes_late' => $attendance?->minutes_late,
                 ];
             }
 
-            $academicRecord = $student->academicRecords()
-                ->where('course_offering_id', $courseOfferingId)
-                ->first();
+            // Calculate attendance percentage
+            $attendancePercentage = $totalSessions > 0
+                ? round((($totalPresent + $totalLate) / $totalSessions) * 100, 2)
+                : 0;
 
-            $studentData['total_present'] = $academicRecord?->total_present ?? 0;
-            $studentData['total_absences'] = $academicRecord?->total_absences ?? 0;
-            $studentData['total_late'] = $academicRecord?->total_late ?? 0;
-            $studentData['attendance_percentage'] = $academicRecord?->attendance_percentage ?? 0;
-            $studentData['meets_attendance_requirement'] = $academicRecord?->meets_attendance_requirement ?? true;
+            // Determine if meets requirement based on absences vs allowed
+            $meetsRequirement = $totalAbsences <= $allowedAbsences;
+
+            $studentData['total_present'] = $totalPresent;
+            $studentData['total_absences'] = $totalAbsences;
+            $studentData['total_late'] = $totalLate;
+            $studentData['attendance_percentage'] = $attendancePercentage;
+            $studentData['meets_attendance_requirement'] = $meetsRequirement;
+            $studentData['allowed_absences'] = $allowedAbsences;
+            $studentData['absences_remaining'] = max(0, $allowedAbsences - $totalAbsences);
 
             $attendanceGrid[] = $studentData;
         }
+
+        // Count students who exceeded allowed absences
+        $studentsAbsentExceeded = collect($attendanceGrid)->filter(function ($student) {
+            return ! $student['meets_attendance_requirement'];
+        })->count();
 
         $statistics = [
             'course_code' => $courseOffering->unit->code,
@@ -217,12 +246,9 @@ class CourseStatisticsService
             'semester' => $courseOffering->semester->name,
             'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name.' '.$courseOffering->lecture->last_name) : null,
             'total_students' => $students->count(),
-            'total_sessions' => $sessions->count(),
-            'students_absent_exceeded' => $students->filter(function ($student) use ($courseOfferingId) {
-                $record = $student->academicRecords()->where('course_offering_id', $courseOfferingId)->first();
-
-                return $record && ! $record->meets_attendance_requirement;
-            })->count(),
+            'total_sessions' => $totalSessions,
+            'allowed_absences' => $allowedAbsences,
+            'students_absent_exceeded' => $studentsAbsentExceeded,
         ];
 
         return [

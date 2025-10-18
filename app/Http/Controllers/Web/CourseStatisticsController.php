@@ -29,12 +29,29 @@ class CourseStatisticsController extends Controller
 
         $statistics = $this->service->getStatistics($filters);
 
+        // Post-process each item to recalculate students_absent_exceeded
+        $items = $statistics->items();
+        foreach ($items as $item) {
+            // Get total sessions for this course offering
+            $totalSessions = $item->classSessions()->count();
+            $allowedAbsences = (int) ceil($totalSessions * 0.2);
+
+            // Recalculate students who exceeded based on actual absences count
+            $studentsExceeded = $item->academicRecords()
+                ->where('total_absences', '>', $allowedAbsences)
+                ->count();
+
+            $item->students_absent_exceeded = $studentsExceeded;
+            $item->total_sessions = $totalSessions;
+            $item->allowed_absences = $allowedAbsences;
+        }
+
         $semesters = Semester::where('is_archived', false)
             ->orderBy('start_date', 'desc')
             ->get(['id', 'name', 'code']);
 
         $paginatedData = [
-            'data' => CourseStatisticsResource::collection($statistics->items())->resolve(),
+            'data' => CourseStatisticsResource::collection($items)->resolve(),
             'current_page' => $statistics->currentPage(),
             'last_page' => $statistics->lastPage(),
             'per_page' => $statistics->perPage(),

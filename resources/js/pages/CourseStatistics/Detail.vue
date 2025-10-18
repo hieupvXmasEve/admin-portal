@@ -37,6 +37,8 @@ interface StudentAttendance {
     total_late: number;
     attendance_percentage: number;
     meets_attendance_requirement: boolean;
+    allowed_absences: number;
+    absences_remaining: number;
 }
 
 interface Statistics {
@@ -47,6 +49,7 @@ interface Statistics {
     instructor_name: string | null;
     total_students: number;
     total_sessions: number;
+    allowed_absences: number;
     students_absent_exceeded: number;
 }
 
@@ -195,6 +198,7 @@ const getStatusLabel = (status: string) => {
                         <div>
                             <p class="text-sm text-muted-foreground">Absent Exceeded</p>
                             <p class="text-lg font-bold text-red-600">{{ statistics.students_absent_exceeded }}</p>
+                            <p class="text-xs text-muted-foreground">Max {{ statistics.allowed_absences }} absences allowed</p>
                         </div>
                     </div>
                 </CardContent>
@@ -317,7 +321,7 @@ const getStatusLabel = (status: string) => {
                                         </div>
                                         <div class="flex items-center justify-center gap-1">
                                             <XCircle class="h-3 w-3 text-red-600" />
-                                            <span>{{ student.total_absences }}</span>
+                                            <span>{{ student.total_absences }}/{{ student.allowed_absences }}</span>
                                         </div>
                                         <div class="flex items-center justify-center gap-1">
                                             <Clock class="h-3 w-3 text-yellow-600" />
@@ -325,6 +329,15 @@ const getStatusLabel = (status: string) => {
                                         </div>
                                         <div class="font-bold" :class="Number(student.attendance_percentage) >= 80 ? 'text-green-600' : 'text-red-600'">
                                             {{ Number(student.attendance_percentage).toFixed(1) }}%
+                                        </div>
+                                        <div v-if="student.absences_remaining === 0 && student.meets_attendance_requirement" class="text-orange-600 font-semibold">
+                                            ⚠ At Limit
+                                        </div>
+                                        <div v-else-if="!student.meets_attendance_requirement" class="text-red-600 font-semibold">
+                                            ✗ Failed
+                                        </div>
+                                        <div v-else class="text-green-600">
+                                            ✓ {{ student.absences_remaining }} left
                                         </div>
                                     </div>
                                 </TableCell>
