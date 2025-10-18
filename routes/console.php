@@ -16,9 +16,10 @@ Schedule::command('semester:deactivate-expired')
     ->onOneServer();
 
 // Schedule automatic update of class session statuses
+// Auto-creates attendance when sessions transition to 'in_progress'
 Schedule::command('sessions:update-statuses')
-    ->everyMinute()
-    ->withoutOverlapping()
+    ->everyThirtyMinutes()
+    ->withoutOverlapping(10) // Timeout after 10 minutes
     ->onOneServer()
     ->runInBackground();
 

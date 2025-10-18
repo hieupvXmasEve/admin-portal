@@ -21,7 +21,7 @@ class ClassSession extends AuditableModel
             if ($classSession->isDirty('status') && $classSession->status === 'in_progress') {
                 $oldStatus = $classSession->getOriginal('status');
 
-                // Only create attendance if it wasn't already in_progress
+                // Only set timestamp if it wasn't already in_progress
                 if ($oldStatus !== 'in_progress') {
                     // Set started_at timestamp if not already set
                     if (!$classSession->started_at) {
@@ -31,17 +31,8 @@ class ClassSession extends AuditableModel
             }
         });
 
-        static::updated(function ($classSession) {
-            // After the model is saved, create attendance if status changed to in_progress
-            if ($classSession->wasChanged('status') && $classSession->status === 'in_progress') {
-                $oldStatus = $classSession->getOriginal('status');
-
-                // Only create attendance if it wasn't already in_progress
-                if ($oldStatus !== 'in_progress') {
-                    $classSession->createDefaultAttendance();
-                }
-            }
-        });
+        // Note: Attendance creation is handled in updateStatusIfNeeded() method
+        // to avoid duplicate calls and maintain clearer control flow
     }
 
     protected $fillable = [
@@ -446,7 +437,7 @@ class ClassSession extends AuditableModel
                 ->whereIn('registration_status', ['registered', 'confirmed'])
                 ->where('semester_id', $this->courseOffering->semester_id);
         })
-            ->where('status', 'active')
+            ->whereIn('status', ['preintake_pre_uni_gc', 'intake_course'])
             ->select(['id', 'student_id', 'full_name', 'email'])
             ->get();
     }

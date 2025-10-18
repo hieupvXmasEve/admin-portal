@@ -24,7 +24,7 @@ class AttendanceService
 
             // Lock the class session to prevent race condition
             $lockedSession = ClassSession::lockForUpdate()->find($classSession->id);
-            
+
             if (!$lockedSession) {
                 DB::rollBack();
                 return [
@@ -36,7 +36,7 @@ class AttendanceService
 
             // Check if attendance records already exist (with lock)
             $existingAttendanceCount = Attendance::where('class_session_id', $classSession->id)->count();
-            
+
             if ($existingAttendanceCount > 0) {
                 DB::rollBack();
                 Log::info("Attendance records already exist for class session {$classSession->id}");
@@ -115,7 +115,6 @@ class AttendanceService
                 'created_count' => $insertedCount,
                 'message' => "Successfully created {$insertedCount} attendance records"
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to create attendance for class session {$classSession->id}: " . $e->getMessage());
@@ -138,9 +137,9 @@ class AttendanceService
                 ->whereIn('registration_status', ['registered', 'confirmed'])
                 ->where('semester_id', $classSession->courseOffering->semester_id);
         })
-        ->where('status', 'active')
-        ->select(['id', 'student_id', 'full_name', 'email'])
-        ->get();
+            ->whereIn('status', ['intake_pre_uni_gc', 'intake_course'])
+            ->select(['id', 'student_id', 'full_name', 'email'])
+            ->get();
     }
 
     /**
@@ -203,7 +202,6 @@ class AttendanceService
                 'deleted_count' => $deletedCount,
                 'message' => "Successfully deleted {$deletedCount} attendance records"
             ];
-
         } catch (\Exception $e) {
             Log::error("Failed to delete attendance for class session {$classSession->id}: " . $e->getMessage());
 

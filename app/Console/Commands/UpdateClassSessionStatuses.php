@@ -61,21 +61,38 @@ class UpdateClassSessionStatuses extends Command
                 $currentStatus = $session->status;
                 $expectedStatus = $session->getExpectedStatus();
 
-                if ($currentStatus === $expectedStatus && !$isForce) {
+                $statusNeedsUpdate = $currentStatus !== $expectedStatus;
+                $attendanceNeedsCreation = $session->status === 'in_progress' 
+                    && $session->attendances()->count() === 0;
+
+                if (!$statusNeedsUpdate && !$attendanceNeedsCreation && !$isForce) {
                     if ($isVerbose) {
-                        $this->line("Session {$session->id}: Status '{$currentStatus}' is correct");
+                        $this->line("Session {$session->id}: Status '{$currentStatus}' is correct, attendance exists");
                     }
                     continue;
                 }
 
                 if ($isVerbose || $isDryRun) {
                     $sessionInfo = $this->getSessionInfo($session);
-                    $this->line("Session {$session->id} ({$sessionInfo}): {$currentStatus} → {$expectedStatus}");
+                    if ($statusNeedsUpdate) {
+                        $this->line("Session {$session->id} ({$sessionInfo}): {$currentStatus} → {$expectedStatus}");
+                    }
+                    if ($attendanceNeedsCreation) {
+                        $this->line("Session {$session->id} ({$sessionInfo}): Creating missing attendance");
+                    }
                 }
 
                 if (!$isDryRun) {
-                    $updated = $session->updateStatusIfNeeded();
-                    if ($updated) {
+                    if ($statusNeedsUpdate) {
+                        $updated = $session->updateStatusIfNeeded();
+                        if ($updated) {
+                            $updatedCount++;
+                        }
+                    }
+                    
+                    // Create attendance if missing for in_progress sessions
+                    if ($attendanceNeedsCreation) {
+                        $session->createDefaultAttendance();
                         $updatedCount++;
                     }
                 }
