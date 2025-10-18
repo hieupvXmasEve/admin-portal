@@ -43,6 +43,8 @@ interface CourseStatistic {
     pass_rate: number;
     max_capacity: number;
     current_enrollment: number;
+    total_sessions: number;
+    allowed_absences: number;
 }
 
 interface Props {
@@ -316,37 +318,27 @@ const goToDetailPage = (courseOfferingId: number) => {
                                 <UserX
                                     :class="[
                                         'h-4 w-4',
-                                        row.original.absent_exceeded_percentage > 20
+                                        row.original.students_absent_exceeded > 0
                                             ? 'text-red-600'
-                                            : row.original.absent_exceeded_percentage > 10
-                                              ? 'text-yellow-600'
-                                              : 'text-green-600',
+                                            : 'text-green-600',
                                     ]"
                                 />
                                 <span
                                     :class="[
                                         'font-bold',
-                                        row.original.absent_exceeded_percentage > 20
+                                        row.original.students_absent_exceeded > 0
                                             ? 'text-red-600'
-                                            : row.original.absent_exceeded_percentage > 10
-                                              ? 'text-yellow-600'
-                                              : 'text-green-600',
+                                            : 'text-green-600',
                                     ]"
                                 >
                                     {{ row.original.students_absent_exceeded }}
                                 </span>
                             </div>
-                            <div
-                                :class="[
-                                    'text-xs',
-                                    row.original.absent_exceeded_percentage > 20
-                                        ? 'text-red-600'
-                                        : row.original.absent_exceeded_percentage > 10
-                                          ? 'text-yellow-600'
-                                          : 'text-green-600',
-                                ]"
-                            >
-                                {{ row.original.absent_exceeded_percentage.toFixed(1) }}%
+                            <div class="text-xs text-muted-foreground">
+                                of {{ row.original.total_students }} students
+                            </div>
+                            <div class="text-xs text-muted-foreground">
+                                (Max {{ row.original.allowed_absences }} absences)
                             </div>
                         </div>
                     </template>

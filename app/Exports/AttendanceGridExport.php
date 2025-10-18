@@ -31,6 +31,22 @@ class AttendanceGridExport implements FromArray, WithHeadings, WithStyles, WithT
     {
         $rows = [];
 
+        // Add course information header rows
+        $rows[] = ['Course Information'];
+        $rows[] = ['Course Code:', $this->statistics['course_code']];
+        $rows[] = ['Course Name:', $this->statistics['course_name']];
+        $rows[] = ['Section:', $this->statistics['section_code']];
+        $rows[] = ['Semester:', $this->statistics['semester']];
+        $rows[] = ['Instructor:', $this->statistics['instructor_name'] ?? 'N/A'];
+        $rows[] = ['Total Students:', $this->statistics['total_students']];
+        $rows[] = ['Total Sessions:', $this->statistics['total_sessions']];
+        $rows[] = ['Allowed Absences:', $this->statistics['allowed_absences'].' (20% of sessions)'];
+        $rows[] = ['Students Exceeded:', $this->statistics['students_absent_exceeded']];
+        $rows[] = []; // Empty row separator
+        
+        // Add attendance table headings
+        $rows[] = $this->getAttendanceTableHeadings();
+
         foreach ($this->attendanceGrid as $student) {
             $row = [
                 $student['student_id'],
@@ -51,10 +67,18 @@ class AttendanceGridExport implements FromArray, WithHeadings, WithStyles, WithT
 
             // Add summary columns
             $row[] = $student['total_present'];
-            $row[] = $student['total_absences'];
+            $row[] = $student['total_absences'].'/'.$student['allowed_absences']; // Show X/Y format
             $row[] = $student['total_late'];
             $row[] = number_format((float) $student['attendance_percentage'], 1).'%';
-            $row[] = $student['meets_attendance_requirement'] ? 'Pass' : 'Fail';
+            
+            // Determine status with absences remaining info
+            if (! $student['meets_attendance_requirement']) {
+                $row[] = 'Failed';
+            } elseif ($student['absences_remaining'] === 0) {
+                $row[] = 'At Limit';
+            } else {
+                $row[] = 'Pass ('.$student['absences_remaining'].' left)';
+            }
 
             $rows[] = $row;
         }
@@ -63,6 +87,12 @@ class AttendanceGridExport implements FromArray, WithHeadings, WithStyles, WithT
     }
 
     public function headings(): array
+    {
+        // No headings needed as we're handling them in array()
+        return [];
+    }
+
+    protected function getAttendanceTableHeadings(): array
     {
         $headings = [
             'Student ID',
@@ -76,7 +106,7 @@ class AttendanceGridExport implements FromArray, WithHeadings, WithStyles, WithT
 
         // Add summary headings
         $headings[] = 'Present';
-        $headings[] = 'Absent';
+        $headings[] = 'Absent (Used/Allowed)';
         $headings[] = 'Late';
         $headings[] = 'Attendance %';
         $headings[] = 'Status';
@@ -86,8 +116,29 @@ class AttendanceGridExport implements FromArray, WithHeadings, WithStyles, WithT
 
     public function styles(Worksheet $sheet)
     {
-        // Style header row
-        $sheet->getStyle('1:1')->applyFromArray([
+        // Style course information header (row 1)
+        $sheet->getStyle('A1:B1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'size' => 14,
+                'color' => ['rgb' => '1F2937'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'E5E7EB'],
+            ],
+        ]);
+
+        // Bold labels in course information section (column A, rows 2-10)
+        $sheet->getStyle('A2:A10')->applyFromArray([
+            'font' => ['bold' => true],
+        ]);
+
+        // Calculate attendance table header row (after course info + empty row + heading row)
+        $headerRowNumber = 12; // Row 1-10 = course info, row 11 = empty, row 12 = table headers
+
+        // Style attendance table header row
+        $sheet->getStyle("{$headerRowNumber}:{$headerRowNumber}")->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -108,14 +159,16 @@ class AttendanceGridExport implements FromArray, WithHeadings, WithStyles, WithT
         }
 
         // Highlight students who exceeded absence limit
-        $rowCount = count($this->attendanceGrid) + 1;
-        for ($row = 2; $row <= $rowCount; $row++) {
-            $studentIndex = $row - 2;
+        $firstDataRow = $headerRowNumber + 1;
+        $lastDataRow = $firstDataRow + count($this->attendanceGrid) - 1;
+        
+        for ($row = $firstDataRow; $row <= $lastDataRow; $row++) {
+            $studentIndex = $row - $firstDataRow;
             if (isset($this->attendanceGrid[$studentIndex]) && ! $this->attendanceGrid[$studentIndex]['meets_attendance_requirement']) {
                 $sheet->getStyle("A{$row}:ZZ{$row}")->applyFromArray([
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => 'FEE2E2'],
+                        'startColor' => ['rgb' => 'FEE2E2'], // Light red background
                     ],
                 ]);
             }

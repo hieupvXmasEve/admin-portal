@@ -49,6 +49,8 @@ class CourseStatisticsResource extends JsonResource
                 : 0.0,
             'max_capacity' => $this->max_capacity,
             'current_enrollment' => $this->current_enrollment,
+            'total_sessions' => (int) ($this->total_sessions ?? 0),
+            'allowed_absences' => (int) ($this->allowed_absences ?? 0),
         ];
     }
 }
