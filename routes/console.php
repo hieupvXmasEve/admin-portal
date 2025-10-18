@@ -32,7 +32,7 @@ Schedule::command('events:process-completions')
 
 // Schedule automatic event reminders
 Schedule::command('events:send-reminders')
-    ->dailyAt('00:01')
+    ->dailyAt('00:10')
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();
@@ -40,6 +40,13 @@ Schedule::command('events:send-reminders')
 // Schedule failed gold rewards processing
 Schedule::command('events:process-failed-gold-rewards')
     ->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
+
+// Schedule academic records sync (create new + update existing with latest attendance)
+Schedule::command('academic-records:sync')
+    ->dailyAt('03:00')
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();
