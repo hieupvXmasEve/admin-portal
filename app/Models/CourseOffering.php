@@ -150,6 +150,11 @@ class CourseOffering extends AuditableModel
         return $this->hasMany(ClassSession::class, 'course_offering_id');
     }
 
+    public function academicRecords(): HasMany
+    {
+        return $this->hasMany(AcademicRecord::class, 'course_offering_id');
+    }
+
     // Deprecated: Syllabus relationship removed - use syllabusTemplate instead
     // public function syllabus(): HasOne
     // {

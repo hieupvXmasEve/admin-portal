@@ -257,24 +257,18 @@ export const mainNavItems: NavItem[] = [
                 icon: CalendarIcon,
                 requiredPermissions: ['view_attendance'], // Will be implemented later
             },
-            // {
-            //     title: 'Take Attendance',
-            //     href: attendanceRoutes.attendance.create(),
-            //     icon: CheckSquare,
-            //     requiredPermissions: ['edit_attendance'], // Will be implemented later
-            // },
             {
                 title: 'Attendance Reports',
                 href: attendanceRoutes.attendance.index(),
                 icon: FileText,
                 requiredPermissions: ['view_attendance'], // Will be implemented later
             },
-            // {
-            //     title: 'GPS & Method Tracking',
-            //     href: attendanceRoutes.attendance.index(),
-            //     icon: MapPin,
-            //     requiredPermissions: ['view_attendance'], // Will be implemented later
-            // },
+            {
+                title: 'Course Statistics',
+                href: '/course-statistics',
+                icon: BarChart3,
+                requiredPermissions: ['view_attendance'],
+            },
         ],
     },
     {
