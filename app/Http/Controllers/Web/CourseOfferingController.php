@@ -280,9 +280,9 @@ class CourseOfferingController extends Controller
                 'sunday' => 6,
             ];
             $weekdayIndexes = collect($scheduleDays)
-                ->map(fn ($d) => strtolower($d))
-                ->map(fn ($d) => $dayToIndex[$d] ?? null)
-                ->filter(static fn ($v) => $v !== null)
+                ->map(fn($d) => strtolower($d))
+                ->map(fn($d) => $dayToIndex[$d] ?? null)
+                ->filter(static fn($v) => $v !== null)
                 ->values()
                 ->all();
 
@@ -384,10 +384,10 @@ class CourseOfferingController extends Controller
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering updated successfully.');
         } catch (\Throwable $th) {
-            Log::error('Failed to update course offering: '.$th->getMessage());
+            Log::error('Failed to update course offering: ' . $th->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to update course offering: '.$th->getMessage());
+                ->with('error', 'Failed to update course offering: ' . $th->getMessage());
         }
     }
 
@@ -445,10 +445,10 @@ class CourseOfferingController extends Controller
                 ->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to delete course offering: '.$e->getMessage());
+            Log::error('Failed to delete course offering: ' . $e->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to delete course offering: '.$e->getMessage());
+                ->with('error', 'Failed to delete course offering: ' . $e->getMessage());
         }
     }
 
@@ -485,7 +485,7 @@ class CourseOfferingController extends Controller
                     }
 
                     $unitCode = $courseOffering->unit?->code ?? 'Unknown';
-                    $cannotDelete[] = "{$unitCode}: ".implode(' and ', $reasons);
+                    $cannotDelete[] = "{$unitCode}: " . implode(' and ', $reasons);
                 }
             }
 
@@ -524,10 +524,10 @@ class CourseOfferingController extends Controller
                 ->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to bulk delete course offerings: '.$e->getMessage());
+            Log::error('Failed to bulk delete course offerings: ' . $e->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to delete course offerings: '.$e->getMessage());
+                ->with('error', 'Failed to delete course offerings: ' . $e->getMessage());
         }
     }
 
@@ -601,9 +601,9 @@ class CourseOfferingController extends Controller
                 'sunday' => 6,
             ];
             $weekdayIndexes = collect($scheduleDays)
-                ->map(fn ($d) => strtolower($d))
-                ->map(fn ($d) => $dayToIndex[$d] ?? null)
-                ->filter(static fn ($v) => $v !== null)
+                ->map(fn($d) => strtolower($d))
+                ->map(fn($d) => $dayToIndex[$d] ?? null)
+                ->filter(static fn($v) => $v !== null)
                 ->values()
                 ->all();
 
@@ -1053,8 +1053,8 @@ class CourseOfferingController extends Controller
                     $result['message'] = 'Successfully registered';
                     $successCount++;
                 } catch (\Exception $e) {
-                    Log::error("Failed to register student {$studentId}: ".$e->getMessage());
-                    $result['message'] = 'Registration failed: '.$e->getMessage();
+                    Log::error("Failed to register student {$studentId}: " . $e->getMessage());
+                    $result['message'] = 'Registration failed: ' . $e->getMessage();
                     $failureCount++;
                 }
 
@@ -1076,11 +1076,11 @@ class CourseOfferingController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Bulk registration failed: '.$e->getMessage());
+            Log::error('Bulk registration failed: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Bulk registration failed: '.$e->getMessage(),
+                'message' => 'Bulk registration failed: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -1153,7 +1153,7 @@ class CourseOfferingController extends Controller
 
                 // Find a unique section code
                 do {
-                    $newSectionCode = $baseSectionCode.'_copy'.($counter > 1 ? $counter : '');
+                    $newSectionCode = $baseSectionCode . '_copy' . ($counter > 1 ? $counter : '');
                     $exists = CourseOffering::where('semester_id', $courseOffering->semester_id)
                         ->where('unit_id', $courseOffering->unit_id)
                         ->where('campus_id', $courseOffering->campus_id)
@@ -1171,10 +1171,10 @@ class CourseOfferingController extends Controller
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering duplicated successfully. Please assign an instructor.');
         } catch (\Exception $e) {
-            Log::error('Failed to duplicate course offering: '.$e->getMessage());
+            Log::error('Failed to duplicate course offering: ' . $e->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to duplicate course offering: '.$e->getMessage());
+                ->with('error', 'Failed to duplicate course offering: ' . $e->getMessage());
         }
     }
 
@@ -1271,7 +1271,7 @@ class CourseOfferingController extends Controller
         }
 
         $sections = $request->sections;
-        $totalStudentsAssigned = collect($sections)->sum(fn ($section) => count($section['student_ids']));
+        $totalStudentsAssigned = collect($sections)->sum(fn($section) => count($section['student_ids']));
 
         if ($totalStudentsAssigned !== $courseOffering->current_enrollment) {
             return Redirect::back()
@@ -1347,12 +1347,12 @@ class CourseOfferingController extends Controller
             DB::commit();
 
             return Redirect::route(CourseOfferingRoutes::INDEX)
-                ->with('success', 'Course offering successfully split into '.count($sections).' sections. The original course offering has been deleted.');
+                ->with('success', 'Course offering successfully split into ' . count($sections) . ' sections. The original course offering has been deleted.');
         } catch (\Exception $e) {
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to split course offering: '.$e->getMessage());
+                ->with('error', 'Failed to split course offering: ' . $e->getMessage());
         }
     }
 
@@ -1437,7 +1437,7 @@ class CourseOfferingController extends Controller
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to assign lectures: '.$e->getMessage());
+                ->with('error', 'Failed to assign lectures: ' . $e->getMessage());
         }
     }
 
@@ -1492,11 +1492,11 @@ class CourseOfferingController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to delete student registration: '.$e->getMessage());
+            Log::error('Failed to delete student registration: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to remove student from course: '.$e->getMessage(),
+                'message' => 'Failed to remove student from course: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -1560,7 +1560,7 @@ class CourseOfferingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update registration status: '.$e->getMessage(),
+                'message' => 'Failed to update registration status: ' . $e->getMessage(),
             ], 500);
         }
     }

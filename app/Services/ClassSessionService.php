@@ -630,7 +630,7 @@ class ClassSessionService
      */
     public function getCourseOfferingsForSelect(): Collection
     {
-        return CourseOffering::with('curriculumUnit.unit')
+        return CourseOffering::with('unit')
             ->orderBy('id', 'desc')
             ->get();
     }

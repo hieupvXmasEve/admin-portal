@@ -113,7 +113,7 @@ class RegistrationService
         $semester = Semester::findOrFail($semesterId);
 
         // Get course offerings for the semester and campus
-        $courseOfferings = CourseOffering::with(['curriculumUnit.unit', 'lecture'])
+        $courseOfferings = CourseOffering::with(['unit', 'lecture'])
             ->forSemester($semesterId)
             ->forCampus($student->campus_id)
             ->availableForRegistration()
@@ -188,13 +188,13 @@ class RegistrationService
         // Check prerequisites
         $eligibility = $this->checkCourseEligibility($student, $courseOffering);
         if (! $eligibility['eligible']) {
-            throw new Exception('Prerequisites not met: '.implode(', ', $eligibility['reasons']));
+            throw new Exception('Prerequisites not met: ' . implode(', ', $eligibility['reasons']));
         }
 
         // Check schedule conflicts
         $conflicts = $this->checkScheduleConflicts($student, $courseOffering);
         if (! empty($conflicts)) {
-            throw new Exception('Schedule conflict with: '.implode(', ', $conflicts));
+            throw new Exception('Schedule conflict with: ' . implode(', ', $conflicts));
         }
 
         // Check credit load limits
