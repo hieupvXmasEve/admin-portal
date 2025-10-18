@@ -356,6 +356,10 @@ class ClassSession extends AuditableModel
 
     /**
      * Determine what status this session should have based on current time
+     * 
+     * Buffer time logic:
+     * - in_progress: Starts 10 minutes before official start time
+     * - completed: Transitions 10 minutes after official end time (allows late attendance)
      */
     public function getExpectedStatus(): string
     {
@@ -368,18 +372,22 @@ class ClassSession extends AuditableModel
         $sessionDateTime = $this->session_date->copy()->setTimeFromTimeString($this->start_time->format('H:i:s'));
         $sessionEndDateTime = $this->session_date->copy()->setTimeFromTimeString($this->end_time->format('H:i:s'));
 
-        // If current time is before session start time
-        if ($now->lt($sessionDateTime)) {
+        // Apply buffer times
+        $startWithBuffer = $sessionDateTime->copy()->subMinutes(10); // 10 minutes before start
+        $endWithBuffer = $sessionEndDateTime->copy()->addMinutes(10); // 10 minutes after end
+
+        // If current time is before buffer start time (more than 10 min before class)
+        if ($now->lt($startWithBuffer)) {
             return 'scheduled';
         }
 
-        // If current time is between start and end time
-        if ($now->gte($sessionDateTime) && $now->lt($sessionEndDateTime)) {
+        // If current time is between buffer start and buffer end (10 min before to 10 min after)
+        if ($now->gte($startWithBuffer) && $now->lt($endWithBuffer)) {
             return 'in_progress';
         }
 
-        // If current time is after session end time
-        if ($now->gte($sessionEndDateTime)) {
+        // If current time is after buffer end time (more than 10 min after class ended)
+        if ($now->gte($endWithBuffer)) {
             return 'completed';
         }
 
