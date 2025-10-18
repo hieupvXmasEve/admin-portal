@@ -184,101 +184,109 @@ const closeBulkUpdateModal = () => {
 };
 
 // Column definitions for the data table
-const baseColumns: ColumnDef<Attendance>[] = [
-    {
-        header: 'No',
-        id: 'no',
-        enableSorting: false,
-        enableHiding: false,
-        cell: ({ row }) => {
-            return row.index + 1;
+const baseColumns = computed<ColumnDef<Attendance>[]>(() => {
+    const cols: ColumnDef<Attendance>[] = [
+        {
+            header: 'No',
+            id: 'no',
+            enableSorting: false,
+            enableHiding: false,
+            cell: ({ row }) => {
+                return row.index + 1;
+            },
         },
-    },
-    {
-        header: 'Student Name',
-        accessorKey: 'student.full_name',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'font-medium' }, attendance.student?.full_name || 'N/A');
+        {
+            header: 'Student Name',
+            accessorKey: 'student.full_name',
+            enableSorting: false,
+            cell: ({ row }) => {
+                const attendance = row.original;
+                return h('div', { class: 'font-medium' }, attendance.student?.full_name || 'N/A');
+            },
         },
-    },
-    {
-        header: 'Student ID',
-        accessorKey: 'student.student_id',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'font-mono text-sm' }, attendance.student?.student_id || 'N/A');
+        {
+            header: 'Student ID',
+            accessorKey: 'student.student_id',
+            enableSorting: false,
+            cell: ({ row }) => {
+                const attendance = row.original;
+                return h('div', { class: 'font-mono text-sm' }, attendance.student?.student_id || 'N/A');
+            },
         },
-    },
-    {
-        header: 'Email',
-        accessorKey: 'student.email',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'text-sm text-muted-foreground' }, attendance.student?.email || 'N/A');
+        {
+            header: 'Email',
+            accessorKey: 'student.email',
+            enableSorting: false,
+            cell: ({ row }) => {
+                const attendance = row.original;
+                return h('div', { class: 'text-sm text-muted-foreground' }, attendance.student?.email || 'N/A');
+            },
         },
-    },
-    {
-        header: 'Status',
-        accessorKey: 'status',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            const variant = getStatusBadgeVariant(attendance.status);
-            return h(Badge, { variant, class: 'capitalize' }, () => attendance.status);
+        {
+            header: 'Status',
+            accessorKey: 'status',
+            enableSorting: false,
+            cell: ({ row }) => {
+                const attendance = row.original;
+                const variant = getStatusBadgeVariant(attendance.status);
+                return h(Badge, { variant, class: 'capitalize' }, () => attendance.status);
+            },
         },
-    },
-    {
-        header: 'Check In',
-        accessorKey: 'check_in_time',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'text-sm' }, attendance.formatted_check_in_time || '-');
+        {
+            header: 'Check In',
+            accessorKey: 'check_in_time',
+            enableSorting: false,
+            cell: ({ row }) => {
+                const attendance = row.original;
+                return h('div', { class: 'text-sm' }, attendance.formatted_check_in_time || '-');
+            },
         },
-    },
-    {
-        header: 'Minutes Late',
-        accessorKey: 'minutes_late',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'text-sm' }, attendance.minutes_late ? `${attendance.minutes_late} min` : '-');
+        {
+            header: 'Minutes Late',
+            accessorKey: 'minutes_late',
+            enableSorting: false,
+            cell: ({ row }) => {
+                const attendance = row.original;
+                return h('div', { class: 'text-sm' }, attendance.minutes_late ? `${attendance.minutes_late} min` : '-');
+            },
         },
-    },
-    {
-        header: 'Recording Method',
-        accessorKey: 'recording_method',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'text-sm capitalize' }, attendance.recording_method || 'Manual');
+        {
+            header: 'Recording Method',
+            accessorKey: 'recording_method',
+            enableSorting: false,
+            cell: ({ row }) => {
+                const attendance = row.original;
+                return h('div', { class: 'text-sm capitalize' }, attendance.recording_method || 'Manual');
+            },
         },
-    },
-    {
-        header: 'Recorded At',
-        accessorKey: 'created_at',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'text-sm text-muted-foreground' }, new Date(attendance.created_at).toLocaleString());
+        {
+            header: 'Recorded At',
+            accessorKey: 'created_at',
+            enableSorting: false,
+            cell: ({ row }) => {
+                const attendance = row.original;
+                return h('div', { class: 'text-sm text-muted-foreground' }, new Date(attendance.created_at).toLocaleString());
+            },
         },
-    },
-    {
-        id: 'actions',
-        header: 'Actions',
-        enableHiding: false,
-        enableSorting: false,
-        cell: 'actions',
-    },
-];
+    ];
 
-const columns = createColumns(baseColumns, {
-    enableSelection: true,
+    // Only add Actions column if session is not completed
+    if (props.session.status !== 'completed') {
+        cols.push({
+            id: 'actions',
+            header: 'Actions',
+            enableHiding: false,
+            enableSorting: false,
+            cell: 'actions',
+        });
+    }
+
+    return cols;
 });
+
+const columns = computed(() => createColumns(baseColumns.value, {
+    enableSelection: true,
+}));
 
 // Helper functions
 const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
@@ -388,7 +396,7 @@ const generateAttendance = () => {
                     <UserPlus class="mr-2 h-4 w-4" />
                     Generate Attendance
                 </Button> -->
-                <Button @click="editSession">
+                <Button v-if="session.status !== 'completed'" @click="editSession">
                     <Edit class="mr-2 h-4 w-4" />
                     Edit Session
                 </Button>
@@ -555,7 +563,7 @@ const generateAttendance = () => {
                     </Button>
                 </div>
                 <DataTable ref="dataTableRef" :data="data" :columns="columns" :enable-row-selection="true" :show-column-toggle="false" @selection-change="handleSelectionChange">
-                    <template #cell-actions="{ row }">
+                    <template v-if="session.status !== 'completed'" #cell-actions="{ row }">
                         <Button variant="ghost" size="sm" @click="editAttendance(row.original)">
                             <Edit class="h-4 w-4" />
                         </Button>

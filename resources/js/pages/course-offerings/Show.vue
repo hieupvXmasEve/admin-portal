@@ -136,36 +136,6 @@ const generateClassSessions = async ({ roomId, startDate, weeklySchedule }: { ro
     }
 };
 
-const deleteClassSessions = async () => {
-    showConfirmDialog(
-        {
-            title: 'Delete All Class Sessions',
-            message: 'Are you sure you want to delete all class sessions for this course offering? This action cannot be undone.',
-            confirmText: 'Delete All',
-        },
-        {
-            onConfirm: async () => {
-                try {
-                    const result = await api.delete(`/api/course-offerings/${props.courseOffering.id}/class-sessions`);
-
-                    if (result.data?.value?.success) {
-                        router.reload({
-                            only: ['courseOffering'],
-                        });
-                        toast.success('Class sessions deleted successfully');
-                    } else {
-                        toast.error(result.data?.value?.message || 'Failed to delete class sessions');
-                    }
-                } catch (error) {
-                    console.error('Error deleting class sessions:', error);
-                    toast.error('Failed to delete class sessions');
-                    throw error; // keep dialog open on error per store behavior
-                }
-            },
-        },
-    );
-};
-
 const getSessionTypeIcon = (type: string) => {
     switch (type) {
         case 'lecture':
@@ -358,6 +328,13 @@ const getAddSessionButtonText = computed(() => {
     }
 
     return `Session Limit Reached (${currentCount}/${maxSessions})`;
+});
+
+// Check if any session is in_progress or completed (course has started)
+const hasStartedSessions = computed(() => {
+    return props.courseOffering.class_sessions?.some(
+        (session) => session.status === 'in_progress' || session.status === 'completed'
+    ) ?? false;
 });
 </script>
 
@@ -640,10 +617,6 @@ const getAddSessionButtonText = computed(() => {
                         <div class="flex items-center justify-between">
                             <div class="text-muted-foreground text-sm">{{ courseOffering.class_sessions.length }} session(s)</div>
                             <div class="flex items-center gap-2">
-                                <Button v-if="courseOffering.class_sessions && courseOffering.class_sessions.length > 0" @click="deleteClassSessions" variant="outline" size="sm">
-                                    <Trash2 class="mr-2 h-4 w-4" />
-                                    Delete All
-                                </Button>
                                 <Dialog v-model:open="changeRoomOpen">
                                     <DialogTrigger as-child>
                                         <Button size="sm" variant="outline">Change Room</Button>
@@ -732,7 +705,7 @@ const getAddSessionButtonText = computed(() => {
                                     </TableCell>
                                     <TableCell>
                                         <div class="flex items-center gap-2">
-                                            <Button variant="ghost" size="sm" @click="openQuickEdit(session)" title="Quick Edit">
+                                            <Button v-if="session.status !== 'completed' && session.status !== 'in_progress'" variant="ghost" size="sm" @click="openQuickEdit(session)" title="Quick Edit">
                                                 <Settings class="h-4 w-4" />
                                             </Button>
                                             <Link :href="classSessionRoutes.show(session.id)">
@@ -740,7 +713,14 @@ const getAddSessionButtonText = computed(() => {
                                                     <Eye class="h-4 w-4" />
                                                 </Button>
                                             </Link>
-                                            <Button v-if="session.status !== 'completed'" variant="ghost" size="sm" @click="deleteClassSession(session)" title="Delete Session" class="text-destructive hover:text-destructive hover:bg-destructive/10">
+                                            <Button
+                                                v-if="session.status !== 'completed' && session.status !== 'in_progress'"
+                                                variant="ghost"
+                                                size="sm"
+                                                @click="deleteClassSession(session)"
+                                                title="Delete Session"
+                                                class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            >
                                                 <Trash2 class="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -840,7 +820,7 @@ const getAddSessionButtonText = computed(() => {
                                         {{ registration.registration_method }}
                                     </TableCell>
                                     <TableCell>
-                                        <Button variant="ghost" size="sm" @click="deleteStudentRegistration(registration)" class="text-destructive hover:text-destructive hover:bg-destructive/10">
+                                        <Button v-if="!hasStartedSessions" variant="ghost" size="sm" @click="deleteStudentRegistration(registration)" class="text-destructive hover:text-destructive hover:bg-destructive/10">
                                             <Trash2 class="h-4 w-4" />
                                         </Button>
                                     </TableCell>
