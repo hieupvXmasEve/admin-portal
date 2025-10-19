@@ -94,4 +94,11 @@ class CourseStatisticsController extends Controller
 
         return $this->excelService->download($export, $filename);
     }
+
+    public function assessmentScores(CourseOffering $courseOffering): Response
+    {
+        $data = $this->service->getAssessmentScoresGrid($courseOffering->id);
+
+        return Inertia::render('CourseStatistics/AssessmentScores', $data);
+    }
 }

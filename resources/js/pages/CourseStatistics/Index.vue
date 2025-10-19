@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { PaginatedResponse } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, BookOpen, Calendar, Eye, TrendingDown, TrendingUp, Users, UserX } from 'lucide-vue-next';
+import { BarChart3, BookOpen, Calendar, ClipboardList, Eye, TrendingDown, TrendingUp, Users, UserX } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface CourseStatistic {
@@ -208,6 +208,10 @@ const handlePageSizeChange = (pageSize: number) => {
 const goToDetailPage = (courseOfferingId: number) => {
     router.visit(`/course-statistics/${courseOfferingId}`);
 };
+
+const goToAssessmentScoresPage = (courseOfferingId: number) => {
+    router.visit(`/course-statistics/${courseOfferingId}/assessment-scores`);
+};
 </script>
 
 <template>
@@ -385,10 +389,16 @@ const goToDetailPage = (courseOfferingId: number) => {
                     </template>
 
                     <template #cell-actions="{ row }">
-                        <Button variant="ghost" size="sm" @click="goToDetailPage(row.original.course_offering_id)">
-                            <Eye class="h-4 w-4 mr-2" />
-                            View Detail
-                        </Button>
+                        <div class="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" @click="goToDetailPage(row.original.course_offering_id)">
+                                <Eye class="h-4 w-4 mr-2" />
+                                Attendance
+                            </Button>
+                            <Button variant="ghost" size="sm" @click="goToAssessmentScoresPage(row.original.course_offering_id)">
+                                <ClipboardList class="h-4 w-4 mr-2" />
+                                Scores
+                            </Button>
+                        </div>
                     </template>
                 </DataTable>
             </CardContent>
