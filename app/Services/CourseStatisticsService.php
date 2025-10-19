@@ -267,4 +267,149 @@ class CourseStatisticsService
             'attendance_grid' => $attendanceGrid,
         ];
     }
+
+    public function getAssessmentScoresGrid(int $courseOfferingId): array
+    {
+        $courseOffering = CourseOffering::with([
+            'semester',
+            'unit',
+            'lecture',
+            'campus',
+            'syllabusTemplate.assessmentComponents' => function ($query) {
+                $query->orderBy('sort_order')->orderBy('id');
+            },
+            'syllabusTemplate.assessmentComponents.details' => function ($query) {
+                $query->orderBy('id');
+            },
+            'courseRegistrations.student',
+        ])->findOrFail($courseOfferingId);
+
+        // Get all students enrolled in the course
+        $students = $courseOffering->courseRegistrations()
+            ->with('student')
+            ->get()
+            ->pluck('student')
+            ->filter()
+            ->sortBy('student_id');
+
+        // Get assessment components from syllabus template
+        $assessmentComponents = $courseOffering->syllabusTemplate?->assessmentComponents ?? collect([]);
+
+        // Build list of all assessment component details for columns
+        $assessmentDetails = [];
+        foreach ($assessmentComponents as $component) {
+            // Ensure component has at least one detail (auto-create if missing)
+            if ($component->details->isEmpty()) {
+                $component->ensureHasDetails();
+                $component->load('details'); // Reload details after creation
+            }
+
+            foreach ($component->details as $detail) {
+                $assessmentDetails[] = [
+                    'id' => $detail->id,
+                    'component_id' => $component->id,
+                    'component_name' => $component->name,
+                    'component_type' => $component->type,
+                    'component_weight' => $component->weight,
+                    'detail_name' => $detail->name,
+                    'detail_weight' => $detail->weight,
+                    'max_points' => $detail->max_points,
+                ];
+            }
+        }
+
+        // Get all scores for this course offering
+        $allScores = DB::table('assessment_component_detail_scores')
+            ->whereIn('student_id', $students->pluck('id'))
+            ->where('course_offering_id', $courseOfferingId)
+            ->whereNull('deleted_at')
+            ->get()
+            ->groupBy('student_id');
+
+        // Get academic records for totals and grade status
+        $academicRecords = DB::table('academic_records')
+            ->whereIn('student_id', $students->pluck('id'))
+            ->where('course_offering_id', $courseOfferingId)
+            ->whereNull('deleted_at')
+            ->get()
+            ->keyBy('student_id');
+
+        // Build scores grid - IMPORTANT: Every student must have scores for ALL assessment details
+        $scoresGrid = [];
+        foreach ($students as $student) {
+            $studentScores = $allScores->get($student->id, collect([]));
+            $scoresByDetailId = $studentScores->keyBy('assessment_component_detail_id');
+
+            // CRITICAL: Create scores array for ALL assessment details (even if no score exists)
+            $scores = [];
+            foreach ($assessmentDetails as $detail) {
+                $score = $scoresByDetailId->get($detail['id']);
+
+                // Always add entry for this assessment detail, even if no score
+                $scores[] = [
+                    'component_detail_id' => $detail['id'],
+                    'percentage_score' => $score?->percentage_score ?? null,
+                    'letter_grade' => $score?->letter_grade ?? null,
+                    'status' => $score?->status ?? 'not_submitted',
+                    'score_status' => $score?->score_status ?? 'draft',
+                    'graded_at' => $score?->graded_at ?? null,
+                    'is_late' => $score?->is_late ?? false,
+                    'score_excluded' => $score?->score_excluded ?? false,
+                ];
+            }
+
+            // Get totals from academic_records (not calculated)
+            $academicRecord = $academicRecords->get($student->id);
+
+            $scoresGrid[] = [
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'email' => $student->email,
+                'scores' => $scores, // This array MUST have same length as $assessmentDetails
+                'total_percentage' => $academicRecord?->final_percentage ?? null,
+                'total_letter_grade' => $academicRecord?->final_letter_grade ?? null,
+                'grade_status' => $academicRecord?->grade_status ?? 'not_graded',
+                'completion_status' => $academicRecord?->completion_status ?? 'in_progress',
+            ];
+        }
+
+        // Calculate average from academic records
+        $averageScore = $academicRecords->where('final_percentage', '!=', null)->avg('final_percentage');
+
+        // Calculate statistics
+        $statistics = [
+            'course_code' => $courseOffering->unit->code,
+            'course_name' => $courseOffering->unit->name,
+            'section_code' => $courseOffering->section_code,
+            'semester' => $courseOffering->semester->name,
+            'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name.' '.$courseOffering->lecture->last_name) : null,
+            'total_students' => $students->count(),
+            'total_components' => $assessmentComponents->count(),
+            'total_details' => count($assessmentDetails),
+            'average_score' => $averageScore ? round($averageScore, 2) : 0,
+        ];
+
+        return [
+            'course_offering' => ['id' => $courseOffering->id],
+            'statistics' => $statistics,
+            'assessment_components' => $assessmentComponents->map(function ($component) {
+                return [
+                    'id' => $component->id,
+                    'name' => $component->name,
+                    'type' => $component->type,
+                    'weight' => $component->weight,
+                    'details' => $component->details->map(function ($detail) {
+                        return [
+                            'id' => $detail->id,
+                            'name' => $detail->name,
+                            'weight' => $detail->weight,
+                            'max_points' => $detail->max_points,
+                        ];
+                    })->toArray(),
+                ];
+            })->toArray(),
+            'assessment_details' => $assessmentDetails,
+            'scores_grid' => $scoresGrid,
+        ];
+    }
 }

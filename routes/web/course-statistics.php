@@ -17,4 +17,8 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
     Route::get('course-statistics/{courseOffering}/export', [CourseStatisticsController::class, 'export'])
         ->middleware('can:view_attendance')
         ->name('course-statistics.export');
+
+    Route::get('course-statistics/{courseOffering}/assessment-scores', [CourseStatisticsController::class, 'assessmentScores'])
+        ->middleware('can:view_attendance')
+        ->name('course-statistics.assessment-scores');
 });
