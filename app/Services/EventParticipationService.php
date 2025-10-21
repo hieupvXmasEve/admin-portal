@@ -273,15 +273,8 @@ class EventParticipationService
             throw new InvalidArgumentException('Cannot award gold to inactive student');
         }
 
-        // Validate participant was checked in for minimum duration (if required)
-        if ($participant->checkin_time && $event->hasEnded()) {
-            $checkInDuration = $participant->checkin_time->diffInMinutes($event->end_time);
-            $minimumDuration = 15; // Minimum 15 minutes attendance
-
-            if ($checkInDuration < $minimumDuration) {
-                throw new InvalidArgumentException('Participant did not meet minimum attendance duration for gold reward');
-            }
-        }
+        // No minimum attendance duration check
+        // As long as participant checked in, they are eligible for full gold reward
 
         // Validate no duplicate participation for same event
         $duplicateParticipations = EventParticipant::where('student_id', $student->id)

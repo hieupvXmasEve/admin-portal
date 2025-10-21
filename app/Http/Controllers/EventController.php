@@ -139,14 +139,21 @@ class EventController extends Controller
     /**
      * Display the specified event
      */
-    public function show(Event $event): Response
+    public function show(Request $request, Event $event): Response
     {
 
         $statistics = $this->eventService->getEventStatistics($event);
 
+        // Fetch all participants
+        $participants = $event->participants()
+            ->with(['student.program', 'student.specialization', 'checkinStaff'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return Inertia::render('Events/EventDetails', [
             'event' => new EventResource($event->load(['creator', 'campus'])),
             'statistics' => $statistics,
+            'participants' => EventParticipantResource::collection($participants)->resolve(),
             'can' => [
                 'delete' => $event->getRegisteredCount() === 0,
             ],

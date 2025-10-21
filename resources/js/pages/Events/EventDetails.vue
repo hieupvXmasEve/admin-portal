@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import DataTable from '@/components/DataTable.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { createColumns } from '@/lib/table-utils';
 import { Head, Link, router } from '@inertiajs/vue3';
+import type { ColumnDef } from '@tanstack/vue-table';
 import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -22,6 +25,7 @@ interface Event {
     qr_code: string;
     is_manual: boolean;
     is_historical: boolean;
+    requires_registration: boolean;
     creator?: {
         id: number;
         name: string;
@@ -43,9 +47,45 @@ interface Statistics {
     participation_rate: number | null;
 }
 
+interface Student {
+    id: number;
+    student_id: string;
+    full_name: string;
+    email: string;
+    phone: string | null;
+    program: {
+        id: number;
+        name: string;
+        code: string;
+    } | null;
+    specialization: {
+        id: number;
+        name: string;
+        code: string;
+    } | null;
+}
+
+interface EventParticipant {
+    id: number;
+    event_id: number;
+    student_id: number;
+    status: 'registered' | 'checked_in' | 'completed' | 'cancelled';
+    registered_at: string;
+    checkin_time: string | null;
+    gold_awarded: boolean;
+    awarded_at: string | null;
+    student: Student;
+    checkin_staff: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+}
+
 interface Props {
     event: Event;
     statistics: Statistics;
+    participants: EventParticipant[];
     can: {
         update: boolean;
         delete: boolean;
@@ -56,6 +96,8 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+console.log(props.event);
+console.log('Participants:', props.participants);
 
 const showCancelModal = ref(false);
 const cancelReason = ref('');
@@ -80,6 +122,52 @@ const getStatusVariant = (status: string): 'default' | 'destructive' | 'outline'
     };
     return variants[status as keyof typeof variants] || 'secondary';
 };
+
+const getParticipantStatusVariant = (status: string): 'default' | 'destructive' | 'outline' | 'secondary' => {
+    const variants = {
+        registered: 'secondary' as const,
+        checked_in: 'default' as const,
+        completed: 'outline' as const,
+        cancelled: 'destructive' as const,
+    };
+    return variants[status as keyof typeof variants] || 'secondary';
+};
+
+// Participant table columns
+const participantColumns: ColumnDef<EventParticipant>[] = createColumns<EventParticipant>([
+    {
+        accessorKey: 'student.student_id',
+        header: 'Student ID',
+    },
+    {
+        accessorKey: 'student.full_name',
+        header: 'Full Name',
+    },
+    {
+        accessorKey: 'student.email',
+        header: 'Email',
+    },
+    {
+        accessorKey: 'student.program.name',
+        header: 'Program',
+    },
+    {
+        accessorKey: 'status',
+        header: 'Status',
+    },
+    {
+        accessorKey: 'gold_awarded',
+        header: 'Gold Awarded',
+    },
+    {
+        accessorKey: 'registered_at',
+        header: 'Registered At',
+    },
+    {
+        accessorKey: 'checkin_time',
+        header: 'Check-in Time',
+    },
+]);
 
 const publishEvent = () => {
     publishing.value = true;
@@ -139,7 +227,7 @@ const completeEvent = () => {
                 <Link v-if="event.status === 'draft'" :href="route('events.edit', event.id)">
                     <Button>Edit Event</Button>
                 </Link>
-                <Link v-if="event.status === 'published'" :href="route('events.scanner', event.id)">
+                <Link v-if="event.status === 'published' && !isPastEndTime" :href="route('events.scanner', event.id)">
                     <Button>Check-in</Button>
                 </Link>
                 <Link v-if="event.is_manual" :href="route('events.manage-participants', event.id)">
@@ -162,6 +250,8 @@ const completeEvent = () => {
                             </Badge>
                             <Badge v-if="event.is_manual" variant="secondary">Manual Event</Badge>
                             <Badge v-if="event.is_historical" variant="outline">Historical</Badge>
+                            <Badge v-if="event.requires_registration" variant="default">Registration Required</Badge>
+                            <Badge v-else variant="secondary">Walk-in Allowed</Badge>
                         </div>
                     </div>
                     <div class="flex flex-col space-y-2">
@@ -304,6 +394,57 @@ const completeEvent = () => {
                         <p class="mt-1">The QR code is automatically generated when the event is created.</p>
                     </div>
                 </div>
+            </CardContent>
+        </Card>
+
+        <!-- Participants List Card -->
+        <Card>
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CardTitle>Event Participants</CardTitle>
+                    <div class="text-sm text-gray-500">Total: {{ participants.length }} participant{{ participants.length !== 1 ? 's' : '' }}</div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div v-if="participants.length > 0">
+                    <DataTable :data="participants" :columns="participantColumns" :show-column-toggle="true" empty-message="No participants found.">
+                        <template #cell-student.student_id="{ row }">
+                            {{ row.original.student.student_id }}
+                        </template>
+
+                        <template #cell-student.full_name="{ row }">
+                            {{ row.original.student.full_name }}
+                        </template>
+
+                        <template #cell-student.email="{ row }">
+                            {{ row.original.student.email }}
+                        </template>
+
+                        <template #cell-student.program.name="{ row }">
+                            {{ row.original.student.program?.name || 'N/A' }}
+                        </template>
+
+                        <template #cell-status="{ row }">
+                            <Badge :variant="getParticipantStatusVariant(row.original.status)">
+                                {{ row.original.status.replace('_', ' ').toUpperCase() }}
+                            </Badge>
+                        </template>
+
+                        <template #cell-gold_awarded="{ row }">
+                            <span v-if="row.original.gold_awarded" class="text-green-600">✓ Yes</span>
+                            <span v-else class="text-gray-400">✗ No</span>
+                        </template>
+
+                        <template #cell-registered_at="{ row }">
+                            {{ new Date(row.original.registered_at).toLocaleString() }}
+                        </template>
+
+                        <template #cell-checkin_time="{ row }">
+                            {{ row.original.checkin_time ? new Date(row.original.checkin_time).toLocaleString() : '-' }}
+                        </template>
+                    </DataTable>
+                </div>
+                <div v-else class="py-8 text-center text-sm text-gray-500">No participants registered for this event yet.</div>
             </CardContent>
         </Card>
 
