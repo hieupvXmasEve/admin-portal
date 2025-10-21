@@ -37,6 +37,31 @@ class QRCodeService
     }
 
     /**
+     * Parse QR code - supports both participation format and plain student_id format
+     * 
+     * @return array|null Returns ['type' => 'participation', ...] or ['type' => 'student_id', 'student_id' => string]
+     */
+    public function parseQRCode(string $qrCode): ?array
+    {
+        // Try parsing as participation QR code first
+        $participationData = $this->parseStudentQRCode($qrCode);
+        if ($participationData !== null) {
+            return array_merge(['type' => 'participation'], $participationData);
+        }
+
+        // Check if it's a plain student_id format (e.g., "SE12345", "GCS12345")
+        // Student IDs typically match pattern: 2-4 letters followed by digits
+        if (preg_match('/^[A-Z]{2,4}\d{4,8}$/i', $qrCode)) {
+            return [
+                'type' => 'student_id',
+                'student_id_string' => strtoupper($qrCode)
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * Validate student QR code format
      */
     public function isValidStudentQRCodeFormat(string $qrCode): bool

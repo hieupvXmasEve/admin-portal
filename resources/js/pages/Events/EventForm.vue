@@ -60,6 +60,7 @@ const createEventSchema = (isManual: boolean, isHistorical: boolean) => {
             max_participants: z.number().int('Maximum participants must be a whole number').min(1, 'Maximum participants must be at least 1').max(10000, 'Maximum participants cannot exceed 10,000').nullable().optional(),
             is_manual: z.boolean().default(false),
             is_historical: z.boolean().default(false),
+            requires_registration: z.boolean().default(false),
             status: z.enum(['draft', 'published', 'completed', 'cancelled']).optional(),
         })
         .refine(
@@ -103,6 +104,7 @@ const initialValues: EventFormData = {
     max_participants: props.event?.max_participants || null,
     is_manual: props.isManual || false,
     is_historical: false,
+    requires_registration: false,
     status: props.isManual ? 'completed' : 'draft',
 };
 
@@ -134,6 +136,7 @@ const onSubmit = handleSubmit(async (formValues, actions) => {
         max_participants: formValues.max_participants ? Number(formValues.max_participants) : null,
         is_manual: Boolean(formValues.is_manual),
         is_historical: Boolean(formValues.is_historical),
+        requires_registration: Boolean(formValues.requires_registration),
         status: formValues.status,
     };
 
@@ -270,6 +273,19 @@ const onSubmit = handleSubmit(async (formValues, actions) => {
                             </FormControl>
                             <FormDescription>Leave empty for unlimited participants.</FormDescription>
                             <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <!-- Requires Registration Checkbox -->
+                    <FormField v-slot="{ value, handleChange }" name="requires_registration" class="md:col-span-2">
+                        <FormItem class="flex flex-row items-start space-y-0 space-x-3">
+                            <FormControl>
+                                <Checkbox :model-value="value" :disabled="isSubmitting" @update:model-value="handleChange" />
+                            </FormControl>
+                            <div class="space-y-1 leading-none">
+                                <FormLabel>Require students to register before check-in</FormLabel>
+                                <FormDescription> When unchecked, students can scan their QR code (student ID) directly without prior registration to check-in. </FormDescription>
+                            </div>
                         </FormItem>
                     </FormField>
 

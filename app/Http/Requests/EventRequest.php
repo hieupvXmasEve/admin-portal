@@ -55,6 +55,7 @@ class EventRequest extends FormRequest
             ],
             'is_manual' => ['boolean'],
             'is_historical' => ['boolean'],
+            'requires_registration' => ['boolean'],
             'status' => [
                 'nullable',
                 'string',
@@ -87,6 +88,7 @@ class EventRequest extends FormRequest
             'max_participants.max' => 'Maximum participants cannot exceed 10,000.',
             'is_manual.boolean' => 'Manual flag must be true or false.',
             'is_historical.boolean' => 'Historical flag must be true or false.',
+            'requires_registration.boolean' => 'Registration requirement flag must be true or false.',
             'status.in' => 'Status must be one of: draft, published, completed, cancelled.',
         ];
     }
@@ -108,6 +110,10 @@ class EventRequest extends FormRequest
 
         if (!$this->has('is_historical')) {
             $this->merge(['is_historical' => false]);
+        }
+
+        if (!$this->has('requires_registration')) {
+            $this->merge(['requires_registration' => true]);
         }
     }
 }

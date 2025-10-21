@@ -90,59 +90,124 @@ class EventCheckinController extends Controller
         try {
             $event = Event::findOrFail($request->event_id);
             $staff = Auth::user();
-            // 1. Parse Student QR Code
-            $qrData = $this->qrCodeService->parseStudentQRCode($request->qr_code);
+            
+            // 1. Parse QR Code (supports both participation and student_id formats)
+            $qrData = $this->qrCodeService->parseQRCode($request->qr_code);
 
             if (!$qrData) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid student QR code format'
+                    'message' => 'Invalid QR code format'
                 ], 400);
             }
 
-            // 2. Verify QR belongs to the selected event
-            if ($qrData['event_id'] !== (int) $request->event_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'QR code is for a different event'
-                ], 400);
+            $student = null;
+            $participation = null;
+
+            // 2. Handle based on QR code type
+            if ($qrData['type'] === 'participation') {
+                // Original flow: QR contains participation info
+                
+                // Verify QR belongs to the selected event
+                if ($qrData['event_id'] !== (int) $request->event_id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'QR code is for a different event'
+                    ], 400);
+                }
+
+                // Find participation record
+                $participation = EventParticipant::find($qrData['participation_id']);
+
+                if (!$participation) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Participation record not found'
+                    ], 404);
+                }
+
+                // Validate participation is active
+                if (!$participation->isActive()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Participation is not active'
+                    ], 400);
+                }
+
+                // Check if already checked in
+                if ($participation->isCheckedIn() || $participation->isCompleted()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Student is already checked in',
+                        'data' => [
+                            'already_checked_in' => true,
+                            'checkin_time' => $participation->checkin_time,
+                            'student' => $participation->student
+                        ]
+                    ], 200);
+                }
+
+                $student = $participation->student;
+
+            } elseif ($qrData['type'] === 'student_id') {
+                // New flow: QR contains only student_id
+                
+                // Find student by student_id
+                $student = Student::where('student_id', $qrData['student_id_string'])
+                    ->where('campus_id', $event->campus_id)
+                    ->first();
+
+                if (!$student) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Student not found or not in the same campus as event'
+                    ], 404);
+                }
+
+                // Validate student is active
+                if (!$student->isActive()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Student account is not active'
+                    ], 400);
+                }
+
+                // Check if student already has participation
+                $existingParticipation = $event->getStudentParticipation($student->id);
+                
+                if ($existingParticipation && ($existingParticipation->isCheckedIn() || $existingParticipation->isCompleted())) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Student is already checked in',
+                        'data' => [
+                            'already_checked_in' => true,
+                            'checkin_time' => $existingParticipation->checkin_time,
+                            'student' => $student
+                        ]
+                    ], 200);
+                }
+
+                // Check if event requires registration and student is NOT registered
+                if ($event->requiresRegistration()) {
+                    if (!$existingParticipation || !$existingParticipation->isActive()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'This event requires prior registration. Student must register before check-in.'
+                        ], 400);
+                    }
+                    // Student is registered, continue to check-in
+                }
+
+                // For walk-in events, check capacity
+                if (!$event->requiresRegistration() && $event->hasReachedCapacity()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Event has reached maximum capacity'
+                    ], 400);
+                }
             }
 
-            // 3. Find participation record
-            $participation = EventParticipant::find($qrData['participation_id']);
-
-            if (!$participation) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Participation record not found'
-                ], 404);
-            }
-
-            // 4. Validate participation is active
-            if (!$participation->isActive()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Participation is not active'
-                ], 400);
-            }
-
-            // 5. Check if already checked in
-            if ($participation->isCheckedIn() || $participation->isCompleted()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Student is already checked in',
-                    'data' => [
-                        'already_checked_in' => true,
-                        'checkin_time' => $participation->checkin_time,
-                        'student' => $participation->student
-                    ]
-                ], 200);
-            }
-
-            // 6. Get student from participation
-            $student = $participation->student;
-
-            // 7. Collect device information
+            // 3. Collect device information
             $deviceInfo = [
                 'user_agent' => $request->header('User-Agent'),
                 'ip_address' => $request->ip(),
@@ -150,7 +215,7 @@ class EventCheckinController extends Controller
                 'timestamp' => now()->toISOString()
             ];
 
-            // 8. Perform check-in
+            // 4. Perform check-in (this will auto-register if needed)
             /** @var \App\Models\User $staff */
             $participant = $this->participationService->checkInStudent(
                 $event,

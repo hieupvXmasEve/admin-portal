@@ -53,6 +53,7 @@ class EventService
                 'is_manual' => $data['is_manual'] ?? false,
                 'is_historical' => $data['is_historical'] ?? false,
                 'created_by_admin_id' => ($data['is_manual'] ?? false) ? $creator->id : null,
+                'requires_registration' => $data['requires_registration'] ?? true,
             ]);
 
             Log::info('Event created', [
@@ -102,6 +103,7 @@ class EventService
                 'created_by_admin_id' => $creator->id,
                 'published_at' => $data['is_historical'] ? Carbon::parse($data['start_time']) : now(),
                 'completed_at' => $data['is_historical'] ? Carbon::parse($data['end_time']) : now(),
+                'requires_registration' => $data['requires_registration'] ?? true,
             ]);
 
             Log::info('Manual event created', [
@@ -137,6 +139,7 @@ class EventService
                 'location' => $data['location'] ?? $event->location,
                 'gold_reward_amount' => $data['gold_reward_amount'] ?? $event->gold_reward_amount,
                 'max_participants' => $data['max_participants'] ?? $event->max_participants,
+                'requires_registration' => $data['requires_registration'] ?? $event->requires_registration,
             ]);
 
             // Check if significant changes were made that require participant notification
@@ -245,13 +248,30 @@ class EventService
                 'completed_at' => now(),
             ]);
 
-            // Update all checked-in participants to completed status
+            // Update all checked-in participants to completed status and award gold
             $checkedInParticipants = $event->participants()
                 ->where('status', 'checked_in')
                 ->get();
 
+            $goldAwardedCount = 0;
+            $participationService = app(EventParticipationService::class);
+            
             foreach ($checkedInParticipants as $participant) {
                 $participant->update(['status' => 'completed']);
+                
+                // Award gold if event has gold rewards
+                if ($event->gold_reward_amount > 0 && !$participant->gold_awarded) {
+                    try {
+                        $participationService->awardGoldReward($participant);
+                        $goldAwardedCount++;
+                    } catch (\Exception $e) {
+                        Log::error('Failed to award gold during event completion', [
+                            'event_id' => $event->id,
+                            'participant_id' => $participant->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
             }
 
             // Queue completion notifications
@@ -261,6 +281,7 @@ class EventService
                 'event_id' => $event->id,
                 'title' => $event->title,
                 'participants_completed' => $checkedInParticipants->count(),
+                'gold_awarded_count' => $goldAwardedCount,
             ]);
 
             return $event->fresh();

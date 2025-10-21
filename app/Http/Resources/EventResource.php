@@ -38,6 +38,7 @@ class EventResource extends JsonResource
             'completed_at' => $this->completed_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'requires_registration' => $this->requires_registration,
 
             // Relationships
             'campus' => $this->whenLoaded('campus'),
@@ -65,19 +66,10 @@ class EventResource extends JsonResource
             'can_register' => $this->canRegister(),
             'has_reached_capacity' => $this->hasReachedCapacity(),
 
-            // Participant counts (when available)
-            'registered_count' => $this->when(
-                $this->relationLoaded('participants'),
-                fn() => $this->getRegisteredCount()
-            ),
-            'checked_in_count' => $this->when(
-                $this->relationLoaded('participants'),
-                fn() => $this->getCheckedInCount()
-            ),
-            'completed_count' => $this->when(
-                $this->relationLoaded('participants'),
-                fn() => $this->getCompletedCount()
-            ),
+            // Participant counts (always available via model methods)
+            'registered_count' => $this->getRegisteredCount(),
+            'checked_in_count' => $this->getCheckedInCount(),
+            'completed_count' => $this->getCompletedCount(),
         ];
     }
 }

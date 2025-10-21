@@ -28,7 +28,8 @@ class Event extends Model
         'created_by_user_id',
         'is_manual',
         'is_historical',
-        'created_by_admin_id'
+        'created_by_admin_id',
+        'requires_registration'
     ];
 
     protected $casts = [
@@ -39,7 +40,8 @@ class Event extends Model
         'completed_at' => 'datetime',
         'gold_reward_amount' => 'decimal:0',
         'is_manual' => 'boolean',
-        'is_historical' => 'boolean'
+        'is_historical' => 'boolean',
+        'requires_registration' => 'boolean'
     ];
 
     // Relationships
@@ -116,6 +118,11 @@ class Event extends Model
     public function isHistorical(): bool
     {
         return $this->is_historical;
+    }
+
+    public function requiresRegistration(): bool
+    {
+        return $this->requires_registration;
     }
 
     public function canRegister(): bool
