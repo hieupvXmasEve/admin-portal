@@ -240,6 +240,7 @@ export interface Student {
     nationality: string;
     national_id: string;
     address: string;
+    cccd_address?: string;
     high_school_name: string;
     high_school_graduation_year: string;
     entrance_exam_score?: string;
