@@ -239,7 +239,6 @@ class CurriculumService
         return $student->courseRegistrations()
             ->with([
                 'courseOffering.unit',
-                'courseOffering.curriculumUnit',
                 'semester'
             ])
             ->get();
