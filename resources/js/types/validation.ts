@@ -70,6 +70,9 @@ export const ValidationRules = {
         nationalId: {
             maxLength: 20,
         },
+        cccdAddress: {
+            maxLength: 1000,
+        },
         parentGuardianName: {
             maxLength: 255,
         },

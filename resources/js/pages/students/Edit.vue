@@ -39,6 +39,7 @@ const formSchema = toTypedSchema(
         nationality: z.string().max(ValidationRules.student.nationality.maxLength, 'Nationality is too long').optional(),
         national_id: z.string().max(ValidationRules.student.nationalId.maxLength, 'National ID is too long').optional(),
         address: z.string().optional(),
+        cccd_address: z.string().max(ValidationRules.student.cccdAddress.maxLength, 'CCCD address is too long').optional(),
         campus_id: z.string().min(1, 'Campus is required'),
         program_id: z.string().min(1, 'Program is required'),
         // specialization_id: z.string().optional(),
@@ -73,6 +74,7 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         nationality: props.student.nationality || '',
         national_id: props.student.national_id || '',
         address: props.student.address || '',
+        cccd_address: props.student.cccd_address || '',
         campus_id: props.student.campus_id.toString(),
         program_id: props.student.program_id.toString(),
         // specialization_id: props.student.specialization_id?.toString() || '',
@@ -178,6 +180,7 @@ const onSubmit = handleSubmit((formData) => {
         nationality: formData.nationality || null,
         national_id: formData.national_id || null,
         address: formData.address || null,
+        cccd_address: formData.cccd_address || null,
         expected_graduation_date: formData.expected_graduation_date || null,
         emergency_contact_name: formData.emergency_contact_name || null,
         emergency_contact_email: formData.emergency_contact_email || null,
@@ -400,6 +403,16 @@ const handleAvatarUploaded = (avatarData: any) => {
                         <FormLabel>Address</FormLabel>
                         <FormControl>
                             <Textarea v-bind="componentField" placeholder="Enter full address" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
+
+                <FormField v-slot="{ componentField }" name="cccd_address">
+                    <FormItem>
+                        <FormLabel>CCCD Address</FormLabel>
+                        <FormControl>
+                            <Textarea v-bind="componentField" placeholder="Enter CCCD address" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
