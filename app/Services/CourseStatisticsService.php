@@ -314,6 +314,9 @@ class CourseStatisticsService
                     'detail_name' => $detail->name,
                     'detail_weight' => $detail->weight,
                     'max_points' => $detail->max_points,
+                    'grading_type' => $detail->grading_type ?? 'points',
+                    'submission_types' => $detail->submission_types ?? [],
+                    'canvas_assignment_id' => $detail->canvas_assignment_id,
                 ];
             }
         }
@@ -358,6 +361,91 @@ class CourseStatisticsService
                 ];
             }
 
+            // Calculate component totals for this student
+            $componentTotals = [];
+            foreach ($assessmentComponents as $component) {
+                // Special handling for attendance component type
+                if ($component->type === 'attendance') {
+                    $academicRecord = $academicRecords->get($student->id);
+                    $attendancePercentage = $academicRecord?->attendance_percentage ?? null;
+
+                    $componentTotals[] = [
+                        'component_id' => $component->id,
+                        'percentage_score' => $attendancePercentage !== null ? round((float) $attendancePercentage, 2) : null,
+                        'contribution_to_final' => $attendancePercentage !== null ? round(((float) $attendancePercentage * (float) $component->weight) / 100, 2) : null,
+                        'out_of_weight' => $component->weight,
+                        'is_attendance' => true,
+                    ];
+
+                    continue;
+                }
+
+                // Filter out details with max_points = 0 (they don't contribute to component total)
+                $validDetails = $component->details->filter(function ($detail) {
+                    return $detail->max_points === null || $detail->max_points > 0;
+                });
+
+                $detailIds = $validDetails->pluck('id')->toArray();
+
+                // Get all scores for this component's details
+                $componentScores = $studentScores->whereIn('assessment_component_detail_id', $detailIds);
+
+                // Check if details have weights defined
+                $detailsHaveWeights = $validDetails->filter(fn ($d) => $d->weight !== null && $d->weight > 0)->count() > 0;
+
+                // Calculate weighted sum based on detail weights
+                $totalWeightedScore = 0;
+                $maxPossibleScore = 0;
+                $hasAnyScore = false;
+                $detailCount = $validDetails->count();
+
+                if ($detailsHaveWeights) {
+                    // Use actual weights from details
+                    foreach ($validDetails as $detail) {
+                        $score = $componentScores->firstWhere('assessment_component_detail_id', $detail->id);
+                        $detailWeight = $detail->weight ?? 0;
+                        $maxPossibleScore += $detailWeight;
+
+                        if ($score && ! $score->score_excluded && $score->percentage_score !== null) {
+                            $hasAnyScore = true;
+                            $totalWeightedScore += ($score->percentage_score * $detailWeight) / 100;
+                        }
+                    }
+                } else {
+                    // No weights defined, treat all valid details equally
+                    $equalWeight = $detailCount > 0 ? 100 / $detailCount : 0;
+                    foreach ($validDetails as $detail) {
+                        $score = $componentScores->firstWhere('assessment_component_detail_id', $detail->id);
+                        $maxPossibleScore += $equalWeight;
+
+                        if ($score && ! $score->score_excluded && $score->percentage_score !== null) {
+                            $hasAnyScore = true;
+                            $totalWeightedScore += ($score->percentage_score * $equalWeight) / 100;
+                        }
+                    }
+                }
+
+                // Calculate component percentage (out of 100%)
+                $componentPercentage = null;
+                if ($hasAnyScore && $maxPossibleScore > 0) {
+                    $componentPercentage = ($totalWeightedScore / $maxPossibleScore) * 100;
+                }
+
+                // Calculate actual contribution to final grade (component percentage × component weight)
+                $contributionToFinal = null;
+                if ($componentPercentage !== null) {
+                    $contributionToFinal = ($componentPercentage * $component->weight) / 100;
+                }
+
+                $componentTotals[] = [
+                    'component_id' => $component->id,
+                    'percentage_score' => $componentPercentage !== null ? round($componentPercentage, 2) : null,
+                    'contribution_to_final' => $contributionToFinal !== null ? round($contributionToFinal, 2) : null,
+                    'out_of_weight' => $component->weight,
+                    'is_attendance' => false,
+                ];
+            }
+
             // Get totals from academic_records (not calculated)
             $academicRecord = $academicRecords->get($student->id);
 
@@ -366,6 +454,7 @@ class CourseStatisticsService
                 'full_name' => $student->full_name,
                 'email' => $student->email,
                 'scores' => $scores, // This array MUST have same length as $assessmentDetails
+                'component_totals' => $componentTotals, // NEW: Component totals for this student
                 'total_percentage' => $academicRecord?->final_percentage ?? null,
                 'total_letter_grade' => $academicRecord?->final_letter_grade ?? null,
                 'grade_status' => $academicRecord?->grade_status ?? 'not_graded',

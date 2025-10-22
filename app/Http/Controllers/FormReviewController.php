@@ -107,7 +107,7 @@ class FormReviewController extends Controller
     public function analytics(Request $request, Form $form)
     {
         $user = auth()->user();
-        $campus = Campus::findOrFail(session('campus_id'));
+        $campus = Campus::findOrFail(session('current_campus_id'));
 
         // Check if user has permission to view analytics
         $hasPermission = $form->resultVisibility()
@@ -138,7 +138,7 @@ class FormReviewController extends Controller
     public function export(Request $request, Form $form)
     {
         $user = auth()->user();
-        $campus = Campus::findOrFail(session('campus_id'));
+        $campus = Campus::findOrFail(session('current_campus_id'));
 
         // Check permission
         $hasPermission = $form->resultVisibility()

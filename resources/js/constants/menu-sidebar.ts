@@ -20,6 +20,7 @@ import {
     GraduationCap,
     Layers,
     LayoutDashboard,
+    Link2,
     Mail,
     MailPlus,
     Receipt,
@@ -479,6 +480,25 @@ export const mainNavItems: NavItem[] = [
                 href: systemRoutes.events.reports(),
                 icon: BarChart3,
                 requiredPermissions: ['view_event'],
+            },
+        ],
+    },
+    {
+        title: 'Canvas LMS Integration',
+        href: '#',
+        icon: Link2,
+        children: [
+            {
+                title: 'Integrations',
+                href: '/admin/canvas/integrations',
+                icon: Settings2,
+                requiredPermissions: ['view_canvas_integration'],
+            },
+            {
+                title: 'Courses',
+                href: '/admin/canvas/courses',
+                icon: BookOpen,
+                requiredPermissions: ['view_canvas_integration'],
             },
         ],
     },
