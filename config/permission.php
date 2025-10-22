@@ -173,6 +173,16 @@ return [
             'delete_clubs' => 'delete_clubs',
         ],
 
+        // Canvas LMS Integration
+        'canvas' => [
+            'view_canvas_integration' => 'view_canvas_integration',
+            'create_canvas_integration' => 'create_canvas_integration',
+            'edit_canvas_integration' => 'edit_canvas_integration',
+            'delete_canvas_integration' => 'delete_canvas_integration',
+            'sync_canvas_courses' => 'sync_canvas_courses',
+            'map_canvas_courses' => 'map_canvas_courses',
+        ],
+
         // Financial Management
         'fees' => [
             'view_fees' => 'view_fees',

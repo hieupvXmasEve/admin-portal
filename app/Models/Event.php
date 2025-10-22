@@ -134,8 +134,10 @@ class Event extends Model
 
     public function canCheckIn(): bool
     {
+        $checkInStartTime = $this->start_time->subHours(2);
+
         return $this->isPublished()
-            && $this->start_time->isPast()
+            && $checkInStartTime->isPast()
             && $this->end_time->isFuture();
     }
 

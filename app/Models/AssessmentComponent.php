@@ -42,6 +42,9 @@ class AssessmentComponent extends AuditableModel
         'status',
         'sort_order',
         'category',
+        'is_canvas_synced',
+        'canvas_assignment_group_id',
+        'canvas_group_weight',
     ];
 
     protected $casts = [

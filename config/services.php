@@ -48,4 +48,9 @@ return [
         ],
     ],
 
+    'canvas' => [
+        'default_scopes' => env('CANVAS_DEFAULT_SCOPES', ''),
+        'timeout' => env('CANVAS_API_TIMEOUT', 30),
+    ],
+
 ];

@@ -39,6 +39,8 @@ class CourseOffering extends AuditableModel
         'registration_end_date',
         'special_requirements',
         'notes',
+        'is_canvas_synced',
+        'canvas_synced_at',
     ];
 
     protected $casts = [
@@ -49,6 +51,8 @@ class CourseOffering extends AuditableModel
         'schedule_time_start' => 'datetime:H:i',
         'schedule_time_end' => 'datetime:H:i',
         'is_active' => 'boolean',
+        'is_canvas_synced' => 'boolean',
+        'canvas_synced_at' => 'datetime',
         'schedule_days' => 'array',
         'registration_start_date' => 'date',
         'registration_end_date' => 'date',

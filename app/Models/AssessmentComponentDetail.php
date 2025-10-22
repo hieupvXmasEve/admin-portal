@@ -15,13 +15,22 @@ class AssessmentComponentDetail extends AuditableModel
     protected $fillable = [
         'assessment_component_id',
         'name',
+        'canvas_assignment_id',
+        'canvas_synced_at',
+        'grading_type',
+        'submission_types',
         'weight',
-        'max_points'
+        'max_points',
+        'due_date',
+        'description',
     ];
 
     protected $casts = [
         'weight' => 'decimal:2',
-        'max_points' => 'decimal:2'
+        'max_points' => 'decimal:2',
+        'canvas_synced_at' => 'datetime',
+        'due_date' => 'date',
+        'submission_types' => 'array',
     ];
 
     /**

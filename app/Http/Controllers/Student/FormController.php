@@ -26,7 +26,7 @@ class FormController extends Controller
     public function index(Request $request)
     {
         $student = auth('student')->user();
-        $campus = Campus::findOrFail(session('campus_id'));
+        $campus = Campus::findOrFail(session('current_campus_id'));
 
         $forms = $this->formService->getAvailableFormsForStudent($student, $campus);
 
@@ -52,7 +52,7 @@ class FormController extends Controller
     public function show(Form $form)
     {
         $student = auth('student')->user();
-        $campus = Campus::findOrFail(session('campus_id'));
+        $campus = Campus::findOrFail(session('current_campus_id'));
 
         // Check if student can access this form
         if (!$this->formService->canStudentSubmitForm($student, $form, $campus)) {
@@ -75,7 +75,7 @@ class FormController extends Controller
     public function submit(SubmitFormResponseRequest $request, Form $form)
     {
         $student = auth('student')->user();
-        $campus = Campus::findOrFail(session('campus_id'));
+        $campus = Campus::findOrFail(session('current_campus_id'));
 
         // Check if student can submit
         if (!$this->formService->canStudentSubmitForm($student, $form, $campus)) {
@@ -127,7 +127,7 @@ class FormController extends Controller
     public function history(Request $request)
     {
         $student = auth('student')->user();
-        $campus = Campus::findOrFail(session('campus_id'));
+        $campus = Campus::findOrFail(session('current_campus_id'));
 
         $responses = $student->formResponses()
             ->with(['form', 'campus'])
