@@ -37,7 +37,7 @@ class CourseRetakeController extends Controller
         ]);
 
         // Get retake registrations from the current campus
-        $retakesQuery = CourseRegistration::with(['student', 'courseOffering.curriculumUnit.unit', 'courseOffering.semester'])
+        $retakesQuery = CourseRegistration::with(['student', 'courseOffering.unit', 'courseOffering.semester'])
             ->where('is_retake', true)
             ->whereHas('student', function ($q) use ($campusId) {
                 $q->where('campus_id', $campusId);

@@ -95,6 +95,11 @@ class ClassSession extends AuditableModel
         'cancelled_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'formatted_date',
+        'formatted_time',
+    ];
+
     // Relationships
     public function courseOffering(): BelongsTo
     {

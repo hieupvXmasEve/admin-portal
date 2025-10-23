@@ -12,7 +12,7 @@ import type { Attendance } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
 import { Calendar, CheckCircle, Clock, Edit, Eye, FileText, MoreHorizontal, QrCode, Trash2, User, UserCheck, X, XCircle } from 'lucide-vue-next';
-import { computed, h, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface Props {
@@ -60,6 +60,22 @@ const filters = ref({
 });
 
 const data = computed(() => props.attendances.data);
+
+// Helper function to map attendance status to badge variant
+const getStatusBadgeVariant = (status: string | undefined): 'success' | 'warning' | 'destructive' | 'purple' | 'default' => {
+    switch (status) {
+        case 'present':
+            return 'success'; // Green - student attended
+        case 'late':
+            return 'warning'; // Yellow - student was late
+        case 'absent':
+            return 'destructive'; // Red - student did not attend
+        case 'excused':
+            return 'purple'; // Purple - absence is excused
+        default:
+            return 'default';
+    }
+};
 
 // Server-side filtering
 const applyFilters = (newFilters: typeof filters.value) => {
@@ -128,131 +144,31 @@ const columns: ColumnDef<Attendance>[] = [
         id: 'no',
         enableSorting: false,
         enableHiding: false,
-        cell: ({ row }) => {
-            const currentPage = props.attendances.current_page;
-            const perPage = props.attendances.per_page;
-            const rowIndex = row.index;
-            return (currentPage - 1) * perPage + rowIndex + 1;
-        },
+        cell: 'no',
     },
     {
         header: 'Student',
         id: 'student',
         enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'flex items-center gap-2' }, [h(User, { class: 'h-4 w-4' }), h('span', { class: 'font-medium' }, attendance.student?.full_name)]),
-                h('div', { class: 'text-xs text-muted-foreground' }, attendance.student?.student_id),
-                h('div', { class: 'text-xs text-muted-foreground' }, attendance.student?.email),
-            ]);
-        },
+        cell: 'student',
     },
     {
         header: 'Session Details',
         id: 'session_details',
         enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            const session = attendance.class_session;
-            return h('div', { class: 'space-y-1' }, [
-                h('div', { class: 'font-medium text-sm' }, session?.session_title),
-                h('div', { class: 'text-xs text-muted-foreground' }, `${session?.course_offering?.curriculum_unit?.unit.code} - ${session?.course_offering?.curriculum_unit?.unit.name}`),
-                h('div', { class: 'flex items-center gap-1 text-xs text-muted-foreground' }, [h(Calendar, { class: 'h-3 w-3' }), h('span', session?.formatted_date)]),
-                h('div', { class: 'text-xs text-muted-foreground' }, session?.instructor?.name),
-            ]);
-        },
+        cell: 'session_details',
     },
     {
         header: 'Attendance Status',
         id: 'attendance_status',
         enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            const statusIcons = {
-                present: CheckCircle,
-                late: Clock,
-                absent: XCircle,
-                excused: UserCheck,
-            };
-            const IconComponent = statusIcons[attendance.status as keyof typeof statusIcons] || User;
-
-            return h('div', { class: 'flex items-center gap-2' }, [
-                h(
-                    Badge,
-                    {
-                        variant: attendance.status_badge_color as any,
-                        class: 'capitalize',
-                    },
-                    () => [h(IconComponent, { class: 'mr-1 h-3 w-3' }), attendance.status?.replace('_', ' ')],
-                ),
-            ]);
-        },
-    },
-    {
-        header: 'Time Details',
-        id: 'time_details',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'space-y-1 text-xs' }, [
-                attendance.check_in_time && h('div', [h('span', { class: 'text-muted-foreground' }, 'In: '), h('span', attendance.formatted_check_in_time)]),
-                attendance.check_out_time && h('div', [h('span', { class: 'text-muted-foreground' }, 'Out: '), h('span', attendance.formatted_check_out_time)]),
-                attendance.minutes_late && attendance.minutes_late > 0 && h('div', { class: 'text-orange-600' }, `${attendance.minutes_late} min late`),
-                attendance.minutes_present && h('div', { class: 'text-green-600' }, `${attendance.minutes_present} min present`),
-            ]);
-        },
-    },
-    {
-        header: 'Participation',
-        id: 'participation',
-        enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            return h('div', { class: 'space-y-1' }, [
-                attendance.participation_score && h('div', { class: 'font-medium text-sm' }, `Score: ${attendance.participation_score}%`),
-                attendance.participation_level &&
-                    h(
-                        Badge,
-                        {
-                            variant: 'outline',
-                            class: 'text-xs capitalize',
-                        },
-                        attendance.participation_level,
-                    ),
-            ]);
-        },
+        cell: 'attendance_status',
     },
     {
         header: 'Recording Method',
         id: 'recording_method',
         enableSorting: false,
-        cell: ({ row }) => {
-            const attendance = row.original;
-            const methodIcons = {
-                qr_code: QrCode,
-                manual: Edit,
-                rfid: User,
-                geolocation: User,
-                biometric: User,
-                mobile_app: User,
-            };
-            const IconComponent = methodIcons[attendance.recording_method as keyof typeof methodIcons] || User;
-
-            return h('div', { class: 'flex items-center gap-2' }, [
-                h(IconComponent, { class: 'h-4 w-4' }),
-                h('span', { class: 'text-sm capitalize' }, attendance.recording_method?.replace('_', ' ')),
-                attendance.is_verified &&
-                    h(
-                        Badge,
-                        {
-                            variant: 'secondary',
-                            class: 'text-xs',
-                        },
-                        'Verified',
-                    ),
-            ]);
-        },
+        cell: 'recording_method',
     },
     {
         id: 'actions',
@@ -402,25 +318,6 @@ const viewSessions = () => {
                         </SelectContent>
                     </Select>
 
-                    <!-- Session Filter -->
-                    <Select
-                        :model-value="filters.session_id"
-                        @update:model-value="
-                            (value) => {
-                                filters.session_id = String(value || 'all');
-                                applyFilters(filters);
-                            }
-                        "
-                    >
-                        <SelectTrigger class="w-[200px]">
-                            <SelectValue placeholder="All Sessions" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Sessions</SelectItem>
-                            <SelectItem v-for="session in classSessions" :key="session.id" :value="session.id.toString()"> {{ session.course }} - {{ session.title }} </SelectItem>
-                        </SelectContent>
-                    </Select>
-
                     <!-- Recording Method Filter -->
                     <Select
                         :model-value="filters.recording_method"
@@ -453,6 +350,54 @@ const viewSessions = () => {
 
         <!-- Data Table -->
         <DataTable :data="data" :columns="columns">
+            <template #cell-no="{ row }">
+                {{ (attendances.current_page - 1) * attendances.per_page + row.index + 1 }}
+            </template>
+
+            <template #cell-student="{ row }">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <User class="h-4 w-4" />
+                        <span class="font-medium">{{ row.original.student?.full_name }}</span>
+                    </div>
+                    <div class="text-muted-foreground text-xs">{{ row.original.student?.student_id }}</div>
+                    <div class="text-muted-foreground text-xs">{{ row.original.student?.email }}</div>
+                </div>
+            </template>
+
+            <template #cell-session_details="{ row }">
+                <div class="space-y-1">
+                    <div class="text-sm font-medium">{{ row.original.class_session?.session_title }}</div>
+                    <div class="text-muted-foreground text-xs">{{ row.original.class_session?.course_offering?.unit?.code }} - {{ row.original.class_session?.course_offering?.unit?.name }}</div>
+                    <div class="text-muted-foreground flex items-center gap-1 text-xs">
+                        <Calendar class="h-3 w-3" />
+                        <span>{{ row.original.class_session?.session_date }}</span>
+                    </div>
+                    <div class="text-muted-foreground text-xs">{{ row.original.class_session?.lecture?.display_name }}</div>
+                </div>
+            </template>
+
+            <template #cell-attendance_status="{ row }">
+                <Badge :variant="getStatusBadgeVariant(row.original.status)" class="capitalize">
+                    <CheckCircle v-if="row.original.status === 'present'" class="mr-1 h-3 w-3" />
+                    <Clock v-else-if="row.original.status === 'late'" class="mr-1 h-3 w-3" />
+                    <XCircle v-else-if="row.original.status === 'absent'" class="mr-1 h-3 w-3" />
+                    <UserCheck v-else-if="row.original.status === 'excused'" class="mr-1 h-3 w-3" />
+                    <User v-else class="mr-1 h-3 w-3" />
+                    {{ row.original.status?.replace('_', ' ') }}
+                </Badge>
+            </template>
+
+            <template #cell-recording_method="{ row }">
+                <div class="flex items-center gap-2">
+                    <QrCode v-if="row.original.recording_method === 'qr_code'" class="h-4 w-4" />
+                    <Edit v-else-if="row.original.recording_method === 'manual'" class="h-4 w-4" />
+                    <User v-else class="h-4 w-4" />
+                    <span class="text-sm capitalize">{{ row.original.recording_method?.replace('_', ' ') }}</span>
+                    <Badge v-if="row.original.is_verified" variant="secondary" class="text-xs">Verified</Badge>
+                </div>
+            </template>
+
             <template #cell-actions="{ row }">
                 <div class="flex items-center gap-2">
                     <DropdownMenu>

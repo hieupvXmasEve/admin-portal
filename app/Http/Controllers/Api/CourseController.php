@@ -276,7 +276,7 @@ class CourseController extends Controller
             ], 422);
         }
 
-        $query = CourseOffering::with(['curriculumUnit.unit', 'lecture'])
+        $query = CourseOffering::with(['unit', 'lecture'])
             ->forSemester($semester->id)
             ->forCampus($student->campus_id);
 
@@ -312,7 +312,7 @@ class CourseController extends Controller
                 'current_enrollment' => $course->current_enrollment,
                 'available_spots' => $course->getAvailableSpots(),
                 'status' => $course->status,
-//                'total_cost' => $course->getTotalTuition(),
+                //                'total_cost' => $course->getTotalTuition(),
                 'instructor' => $course->lecture ? [
                     'name' => $course->lecture->display_name,
                     'email' => $course->lecture->email,

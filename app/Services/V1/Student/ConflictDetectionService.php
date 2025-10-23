@@ -132,8 +132,8 @@ class ConflictDetectionService
     protected function formatSessionForConflict(ClassSession $session, CourseOffering $courseOffering): array
     {
         return [
-            'course_code' => $courseOffering->curriculumUnit->unit->code,
-            'course_name' => $courseOffering->curriculumUnit->unit->name,
+            'course_code' => $courseOffering->unit->code,
+            'course_name' => $courseOffering->unit->name,
             'day_of_week' => $session->day_of_week,
             'start_time' => $session->start_time,
             'end_time' => $session->end_time,
@@ -204,7 +204,7 @@ class ConflictDetectionService
         $registrations = $student->courseRegistrations()
             ->where('semester_id', $semester->id)
             ->where('registration_status', 'registered')
-            ->with(['courseOffering.classSessions.room', 'courseOffering.curriculumUnit.unit', 'courseOffering.lecturer'])
+            ->with(['courseOffering.classSessions.room', 'courseOffering.unit', 'courseOffering.lecturer'])
             ->get();
 
         $schedule = [];
@@ -217,8 +217,8 @@ class ConflictDetectionService
         foreach ($registrations as $registration) {
             foreach ($registration->courseOffering->classSessions as $session) {
                 $schedule[$session->day_of_week][] = [
-                    'course_code' => $registration->courseOffering->curriculumUnit->unit->code,
-                    'course_name' => $registration->courseOffering->curriculumUnit->unit->name,
+                    'course_code' => $registration->courseOffering->unit->code,
+                    'course_name' => $registration->courseOffering->unit->name,
                     'lecturer' => $registration->courseOffering->lecturer?->full_name,
                     'start_time' => $session->start_time,
                     'end_time' => $session->end_time,

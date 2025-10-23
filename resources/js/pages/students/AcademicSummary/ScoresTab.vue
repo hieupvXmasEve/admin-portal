@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,12 +35,7 @@ const filteredScores = computed(() => {
     // Search filter
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
-        filtered = filtered.filter(
-            (course) =>
-                course.course_name.toLowerCase().includes(query) ||
-                course.course_code.toLowerCase().includes(query) ||
-                course.semester.toLowerCase().includes(query),
-        );
+        filtered = filtered.filter((course) => course.course_name.toLowerCase().includes(query) || course.course_code.toLowerCase().includes(query) || course.semester.toLowerCase().includes(query));
     }
 
     // Semester filter
@@ -253,9 +248,7 @@ const openScoreDetails = (course: CourseScores) => {
                         </Select>
 
                         <!-- Results Count -->
-                        <div class="text-muted-foreground flex items-center text-sm">
-                            {{ filteredScores.length }} of {{ scores.data.length }} courses
-                        </div>
+                        <div class="text-muted-foreground flex items-center text-sm">{{ filteredScores.length }} of {{ scores.data.length }} courses</div>
                     </div>
                 </CardContent>
             </Card>
@@ -287,12 +280,7 @@ const openScoreDetails = (course: CourseScores) => {
                                         {{ formatPercentage(course.course_average) }}
                                     </p>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    @click="toggleCourseExpansion(course.course_offering_id)"
-                                    class="flex items-center gap-2"
-                                >
+                                <Button variant="ghost" size="sm" @click="toggleCourseExpansion(course.course_offering_id)" class="flex items-center gap-2">
                                     <ChevronDown v-if="expandedCourses.has(course.course_offering_id)" class="h-4 w-4" />
                                     <ChevronRight v-else class="h-4 w-4" />
                                     {{ expandedCourses.has(course.course_offering_id) ? 'Collapse' : 'Expand' }}
@@ -321,9 +309,7 @@ const openScoreDetails = (course: CourseScores) => {
                                         </div>
                                         <div class="text-center">
                                             <p class="text-muted-foreground text-sm">Completion Rate</p>
-                                            <p class="text-xl font-bold">
-                                                {{ Math.round((course.completed_assessments / course.total_assessments) * 100) }}%
-                                            </p>
+                                            <p class="text-xl font-bold">{{ Math.round((course.completed_assessments / course.total_assessments) * 100) }}%</p>
                                         </div>
                                     </div>
 
@@ -331,9 +317,7 @@ const openScoreDetails = (course: CourseScores) => {
                                     <div>
                                         <div class="mb-2 flex items-center justify-between">
                                             <span class="text-sm font-medium">Assessment Progress</span>
-                                            <span class="text-muted-foreground text-sm">
-                                                {{ course.completed_assessments }}/{{ course.total_assessments }}
-                                            </span>
+                                            <span class="text-muted-foreground text-sm"> {{ course.completed_assessments }}/{{ course.total_assessments }} </span>
                                         </div>
                                         <Progress :value="(course.completed_assessments / course.total_assessments) * 100" class="h-2" />
                                     </div>
@@ -342,11 +326,7 @@ const openScoreDetails = (course: CourseScores) => {
                                     <div>
                                         <h4 class="mb-3 font-semibold">Recent Assessments</h4>
                                         <div class="space-y-2">
-                                            <div
-                                                v-for="score in course.scores.slice(0, 5)"
-                                                :key="score.id"
-                                                class="flex items-center justify-between rounded-lg border p-3"
-                                            >
+                                            <div v-for="score in course.scores.slice(0, 5)" :key="score.id" class="flex items-center justify-between rounded-lg border p-3">
                                                 <div class="flex-1">
                                                     <p class="font-medium">{{ score.assessment_name }}</p>
                                                     <p class="text-muted-foreground text-sm">
@@ -415,16 +395,10 @@ const openScoreDetails = (course: CourseScores) => {
                     <div class="space-y-3">
                         <h4 class="font-semibold">Assessment Scores</h4>
                         <div class="space-y-2">
-                            <div
-                                v-for="score in selectedScoreDetails.scores"
-                                :key="score.id"
-                                class="flex items-center justify-between rounded-lg border p-3"
-                            >
+                            <div v-for="score in selectedScoreDetails.scores" :key="score.id" class="flex items-center justify-between rounded-lg border p-3">
                                 <div class="flex-1">
                                     <p class="font-medium">{{ score.assessment_name }}</p>
-                                    <p class="text-muted-foreground text-sm">
-                                        {{ score.assessment_type }} • Due: {{ formatDate(score.due_date) }}
-                                    </p>
+                                    <p class="text-muted-foreground text-sm">{{ score.assessment_type }} • Due: {{ formatDate(score.due_date) }}</p>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="text-right">
@@ -436,10 +410,7 @@ const openScoreDetails = (course: CourseScores) => {
                                     <Badge :variant="getStatusBadgeVariant(score.status) as any">
                                         {{ score.status.toUpperCase() }}
                                     </Badge>
-                                    <Badge
-                                        v-if="score.letter_grade"
-                                        :variant="getScoreBadgeVariant(score.percentage_score) as any"
-                                    >
+                                    <Badge v-if="score.letter_grade" :variant="getScoreBadgeVariant(score.percentage_score) as any">
                                         {{ score.letter_grade }}
                                     </Badge>
                                 </div>

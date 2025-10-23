@@ -181,10 +181,10 @@ class Attendance extends AuditableModel
     public function getStatusBadgeColorAttribute(): string
     {
         return match ($this->status) {
-            'present' => 'success',
-            'late' => 'warning',
-            'absent' => 'destructive',
-            'excused' => 'secondary',
+            'present' => 'success',    // Green - student attended
+            'late' => 'warning',        // Yellow - student was late
+            'absent' => 'destructive',  // Red - student did not attend
+            'excused' => 'purple',      // Purple - absence is excused
             default => 'default',
         };
     }

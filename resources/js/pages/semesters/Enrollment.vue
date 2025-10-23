@@ -213,32 +213,32 @@ const loadRegistrationStats = async () => {
 };
 
 // Bulk register students for course offerings
-const bulkRegisterStudents = async () => {
-    loading.value.bulkRegister = true;
+// const bulkRegisterStudents = async () => {
+//     loading.value.bulkRegister = true;
 
-    try {
-        const { data } = await api.post(`/api/semesters/${props.semester.id}/enrollment/bulk-register`, {
-            registration_method: 'admin_override',
-            force_registration: false,
-            page: 1,
-            per_page: 300,
-        });
+//     try {
+//         const { data } = await api.post(`/api/semesters/${props.semester.id}/enrollment/bulk-register`, {
+//             registration_method: 'admin_override',
+//             force_registration: false,
+//             page: 1,
+//             per_page: 300,
+//         });
 
-        if (data.value?.success) {
-            toast.success(data.value.message);
-            // Refresh registration stats to show updated numbers
-            loadRegistrationStats();
-        } else {
-            console.log('%c error', 'color: red', data.value);
-            toast.error(data.value?.message || 'Failed to bulk register students');
-        }
-    } catch (error) {
-        console.error('Bulk register students error:', error);
-        toast.error('Failed to bulk register students');
-    } finally {
-        loading.value.bulkRegister = false;
-    }
-};
+//         if (data.value?.success) {
+//             toast.success(data.value.message);
+//             // Refresh registration stats to show updated numbers
+//             loadRegistrationStats();
+//         } else {
+//             console.log('%c error', 'color: red', data.value);
+//             toast.error(data.value?.message || 'Failed to bulk register students');
+//         }
+//     } catch (error) {
+//         console.error('Bulk register students error:', error);
+//         toast.error('Failed to bulk register students');
+//     } finally {
+//         loading.value.bulkRegister = false;
+//     }
+// };
 
 // Bulk open courses
 const openBulkOpenModal = () => {
@@ -440,9 +440,7 @@ onMounted(() => {
                 <Users class="h-5 w-5" />
                 {{ campusStats.campus_name }} - Student Enrollment Overview
             </CardTitle>
-            <CardDescription class="text-blue-700">
-                Campus: {{ campusStats.campus_code }} | Enrollment management for {{ semester.name }}
-            </CardDescription>
+            <CardDescription class="text-blue-700"> Campus: {{ campusStats.campus_code }} | Enrollment management for {{ semester.name }} </CardDescription>
         </CardHeader>
         <CardContent>
             <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -475,7 +473,7 @@ onMounted(() => {
             </CardHeader>
             <CardContent>
                 <div class="text-2xl font-bold">{{ enrollmentStats.total_enrolled }}</div>
-                <div class="text-xs text-muted-foreground mt-1" v-if="campusStats">
+                <div class="text-muted-foreground mt-1 text-xs" v-if="campusStats">
                     {{ campusStats.campus_name }}
                 </div>
             </CardContent>
@@ -524,9 +522,7 @@ onMounted(() => {
                     <CardTitle>Generate Student Enrollments</CardTitle>
                     <CardDescription>
                         Create enrollments for all active students in {{ campusStats?.campus_name || 'current campus' }} based on their curriculum progress.
-                        <span v-if="campusStats && campusStats.not_enrolled_students > 0" class="block mt-2 text-amber-600 font-medium">
-                            {{ campusStats.not_enrolled_students }} students are eligible for enrollment.
-                        </span>
+                        <span v-if="campusStats && campusStats.not_enrolled_students > 0" class="mt-2 block font-medium text-amber-600"> {{ campusStats.not_enrolled_students }} students are eligible for enrollment. </span>
                     </CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
@@ -535,25 +531,22 @@ onMounted(() => {
                             <div class="flex-1">
                                 <p class="text-muted-foreground text-sm">This will create enrollment records for students who don't already have one for this semester.</p>
                                 <div v-if="campusStats" class="mt-2 text-sm">
-                                    <span class="text-blue-600 font-medium">{{ campusStats.campus_name }}</span>:
-                                    <span class="text-green-600 ml-2">{{ campusStats.enrolled_students }} enrolled</span> |
-                                    <span class="text-amber-600 ml-2">{{ campusStats.not_enrolled_students }} pending</span> |
-                                    <span class="text-gray-600 ml-2">{{ campusStats.total_eligible_students }} total eligible</span>
+                                    <span class="font-medium text-blue-600">{{ campusStats.campus_name }}</span
+                                    >: <span class="ml-2 text-green-600">{{ campusStats.enrolled_students }} enrolled</span> | <span class="ml-2 text-amber-600">{{ campusStats.not_enrolled_students }} pending</span> |
+                                    <span class="ml-2 text-gray-600">{{ campusStats.total_eligible_students }} total eligible</span>
                                 </div>
                             </div>
                             <div class="flex gap-2">
                                 <Button @click="generateEnrollments" :disabled="loading.generate">
                                     <Loader2 v-if="loading.generate" class="mr-2 h-4 w-4 animate-spin" />
                                     Generate Enrollments
-                                    <span v-if="campusStats && campusStats.not_enrolled_students > 0" class="ml-1">
-                                        ({{ campusStats.not_enrolled_students }})
-                                    </span>
+                                    <span v-if="campusStats && campusStats.not_enrolled_students > 0" class="ml-1"> ({{ campusStats.not_enrolled_students }}) </span>
                                 </Button>
-                                <Button @click="bulkRegisterStudents" :disabled="loading.bulkRegister || enrollmentStats.total_enrolled === 0" variant="outline">
+                                <!-- <Button @click="bulkRegisterStudents" :disabled="loading.bulkRegister || enrollmentStats.total_enrolled === 0" variant="outline">
                                     <Loader2 v-if="loading.bulkRegister" class="mr-2 h-4 w-4 animate-spin" />
                                     <Users class="mr-2 h-4 w-4" />
                                     Auto Register Students
-                                </Button>
+                                </Button> -->
                             </div>
                         </div>
                     </div>
