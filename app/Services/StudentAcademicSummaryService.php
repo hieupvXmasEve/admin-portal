@@ -550,13 +550,13 @@ class StudentAcademicSummaryService
             ->orderBy('graded_at', 'desc')
             ->get()
             ->groupBy('course_offering_id')
-            ->map(function ($courseScores, $courseOfferingId) use ($limit) {
+            ->map(function ($courseScores, $courseOfferingId) use ($student, $limit) {
                 $firstScore = $courseScores->first();
-                Log::info('courseScores', [
-                    'courseScores' => $courseScores->count(),
-                    'courseOfferingId' => $courseOfferingId,
-                    'limit' => $limit,
-                ]);
+
+                // Get final_percentage from academic_records table
+                $academicRecord = $student->academicRecords()
+                    ->where('course_offering_id', $courseOfferingId)
+                    ->first();
 
                 // Map all scores for metadata calculation
                 $allScores = $courseScores->map(function ($score) {
@@ -582,10 +582,10 @@ class StudentAcademicSummaryService
                     'course_name' => $firstScore->courseOffering->unit->name ?? 'N/A',
                     'course_code' => $firstScore->courseOffering->unit->code ?? 'N/A',
                     'semester' => $firstScore->courseOffering->semester->name ?? 'N/A',
-                    'scores' => $allScores, // Limit for initial display
+                    'scores' => $allScores,
                     'all_scores_count' => $allScores->count(),
                     'has_more_scores' => $allScores->count() > $limit,
-                    'course_average' => $courseScores->avg('percentage_score'),
+                    'course_average' => $academicRecord?->final_percentage ?? 0,
                     'total_assessments' => $courseScores->count(),
                     'completed_assessments' => $courseScores->where('status', 'graded')->count(),
                 ];

@@ -235,6 +235,25 @@ const detailsByComponent = computed(() => {
     });
     return groups;
 });
+
+const getGradeStatusVariant = (status: string): 'success' | 'destructive' | 'warning' | 'outline' | 'secondary' => {
+    if (status === 'final') return 'success';
+    if (status === 'provisional') return 'warning';
+    if (status === 'disputed' || status === 'under_review') return 'destructive';
+    if (status === 'not_graded') return 'outline';
+    return 'secondary';
+};
+const getGradeStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+        draft: 'Draft',
+        provisional: 'Provisional',
+        final: 'Final',
+        disputed: 'Disputed',
+        under_review: 'Under Review',
+        not_graded: 'Not Graded',
+    };
+    return labels[status] || status;
+};
 </script>
 
 <template>
@@ -472,7 +491,7 @@ const detailsByComponent = computed(() => {
                                     </TableHead>
                                 </template>
 
-                                <!-- <TableHead class="sticky right-0 z-10 min-w-[80px] bg-white text-center dark:bg-gray-950">Grade Status</TableHead> -->
+                                <TableHead class="sticky right-[120px] z-10 min-w-[100px] bg-white text-center dark:bg-gray-950">Status</TableHead>
                                 <TableHead class="sticky right-0 z-10 min-w-[120px] bg-white text-center dark:bg-gray-950">Total</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -517,16 +536,16 @@ const detailsByComponent = computed(() => {
                                     </TableCell>
                                 </template>
 
-                                <!-- <TableCell class="sticky right-0 z-10 bg-white text-center dark:bg-gray-950">
+                                <TableCell class="sticky right-[120px] z-10 bg-white text-center dark:bg-gray-950">
                                     <Badge :variant="getGradeStatusVariant(student.grade_status)" class="text-xs">
                                         {{ getGradeStatusLabel(student.grade_status) }}
                                     </Badge>
-                                </TableCell> -->
+                                </TableCell>
                                 <TableCell class="sticky right-0 z-10 bg-white text-center dark:bg-gray-950">
                                     <div class="space-y-1">
                                         <Badge v-if="student.total_percentage !== null" :variant="getTotalBadgeVariant(student.total_percentage)" class="text-base font-bold"> {{ Number(student.total_percentage).toFixed(1) }}% </Badge>
                                         <Badge v-else variant="outline" class="text-base"> Not Graded </Badge>
-                                        <div v-if="student.total_letter_grade" class="text-sm font-semibold">{{ student.total_letter_grade }}</div>
+                                        <div v-if="student.total_letter_grade" class="text-sm font-semibold">({{ student.total_letter_grade }})</div>
                                     </div>
                                 </TableCell>
                             </TableRow>

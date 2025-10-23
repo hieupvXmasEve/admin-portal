@@ -133,7 +133,7 @@ class LectureController extends Controller
         $lecture->load([
             'campus',
             'courseOfferings.semester',
-            'courseOfferings.curriculumUnit.unit',
+            'courseOfferings.unit',
         ]);
 
         return Inertia::render('lectures/Show', [
@@ -240,7 +240,7 @@ class LectureController extends Controller
             'search' => 'nullable|string|max:255',
             'limit' => 'nullable|integer|min:1|max:100',
         ]);
-        
+
         // Convert string boolean values to actual booleans
         $isActive = isset($validated['is_active']) ? filter_var($validated['is_active'], FILTER_VALIDATE_BOOLEAN) : null;
         $isAvailableForAssignment = isset($validated['is_available_for_assignment']) ? filter_var($validated['is_available_for_assignment'], FILTER_VALIDATE_BOOLEAN) : null;

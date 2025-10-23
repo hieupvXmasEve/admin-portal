@@ -148,7 +148,7 @@ class RegistrationService
      */
     public function getStudentRegistrations(Student $student, int $semesterId): array
     {
-        return CourseRegistration::with(['courseOffering.curriculumUnit.unit', 'courseOffering.lecture'])
+        return CourseRegistration::with(['courseOffering.unit', 'courseOffering.lecture'])
             ->where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->orderBy('registration_date', 'desc')
@@ -274,7 +274,7 @@ class RegistrationService
      */
     private function getCompletedCourses(Student $student): array
     {
-        return CourseRegistration::with('courseOffering.curriculumUnit.unit')
+        return CourseRegistration::with('courseOffering.unit')
             ->where('student_id', $student->id)
             ->where('registration_status', 'completed')
             ->passing()

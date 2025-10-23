@@ -42,7 +42,7 @@ class SemesterEnrollmentController extends Controller
                 }
             },
             'enrollments.student.curriculumVersion',
-            'courseOfferings.curriculumUnit.unit'
+            'courseOfferings.unit'
         ]);
 
         // Campus-filtered enrollment statistics
