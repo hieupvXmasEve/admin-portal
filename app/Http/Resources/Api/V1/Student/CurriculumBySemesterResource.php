@@ -116,6 +116,9 @@ class CurriculumBySemesterResource extends JsonResource
                 'total_credit_points' => $summary['total_credit_points'],
                 'completed_subjects' => $summary['completed_subjects'],
                 'current_subjects' => $summary['current_subjects'],
+                'failed_subjects' => $summary['failed_subjects'] ?? 0,
+                'retaking_subjects' => $summary['retaking_subjects'] ?? 0,
+                'withdrawn_subjects' => $summary['withdrawn_subjects'] ?? 0,
                 'not_started_subjects' => $summary['not_started_subjects'],
                 'registered_subjects' => $summary['registered_subjects'],
             ],
@@ -148,6 +151,9 @@ class CurriculumBySemesterResource extends JsonResource
             'progress_totals' => [
                 'completed_subjects' => $summary['completed_subjects'],
                 'current_subjects' => $summary['current_subjects'],
+                'failed_subjects' => $summary['failed_subjects'] ?? 0,
+                'retaking_subjects' => $summary['retaking_subjects'] ?? 0,
+                'withdrawn_subjects' => $summary['withdrawn_subjects'] ?? 0,
                 'not_started_subjects' => $summary['not_started_subjects'],
                 'registered_subjects' => $summary['registered_subjects'],
             ],
@@ -228,6 +234,8 @@ class CurriculumBySemesterResource extends JsonResource
             'in_progress' => 'blue',
             'registered' => 'purple',
             'failed' => 'red',
+            'retaking' => 'orange',
+            'withdrawn' => 'yellow',
             'not_started' => 'gray',
             default => 'gray',
         };
@@ -240,6 +248,8 @@ class CurriculumBySemesterResource extends JsonResource
             'in_progress' => 'clock',
             'registered' => 'bookmark',
             'failed' => 'x-circle',
+            'retaking' => 'refresh-cw',
+            'withdrawn' => 'minus-circle',
             'not_started' => 'circle',
             default => 'circle',
         };
@@ -248,10 +258,12 @@ class CurriculumBySemesterResource extends JsonResource
     protected function getStudyStatusPriority(string $status): int
     {
         return match ($status) {
-            'completed' => 4,
+            'completed' => 5,
+            'retaking' => 4,
             'in_progress' => 3,
             'registered' => 2,
             'failed' => 1,
+            'withdrawn' => 1,
             'not_started' => 0,
             default => 0,
         };
@@ -372,6 +384,8 @@ class CurriculumBySemesterResource extends JsonResource
             'completion_impact' => match ($subject['study_status']['status']) {
                 'completed' => $creditPoints,
                 'in_progress' => $creditPoints * 0.5, // Partial credit for current subjects
+                'retaking' => $creditPoints * 0.3, // Partial credit for retaking subjects
+                'registered' => $creditPoints * 0.2, // Minimal credit for registered subjects
                 default => 0,
             },
         ];
@@ -396,7 +410,7 @@ class CurriculumBySemesterResource extends JsonResource
             return 0;
         }
 
-        $activeSubjects = $summary['completed_subjects'] + $summary['current_subjects'] + $summary['registered_subjects'];
+        $activeSubjects = $summary['completed_subjects'] + $summary['current_subjects'] + $summary['retaking_subjects'] + $summary['registered_subjects'];
         $engagementRate = ($activeSubjects / $summary['total_subjects']) * 100;
 
         return min(100, max(0, (int) round($engagementRate)));
@@ -458,7 +472,7 @@ class CurriculumBySemesterResource extends JsonResource
         $registrationWeight = 0.2;
 
         $completionScore = ($summary['completed_subjects'] / $summary['total_subjects']) * 100 * $completionWeight;
-        $progressScore = (($summary['completed_subjects'] + $summary['current_subjects']) / $summary['total_subjects']) * 100 * $progressWeight;
+        $progressScore = (($summary['completed_subjects'] + $summary['current_subjects'] + $summary['retaking_subjects']) / $summary['total_subjects']) * 100 * $progressWeight;
         $registrationScore = ($summary['registered_subjects'] / $summary['total_subjects']) * 100 * $registrationWeight;
 
         return min(100, max(0, (int) round($completionScore + $progressScore + $registrationScore)));
@@ -579,8 +593,12 @@ class CurriculumBySemesterResource extends JsonResource
             $areas[] = 'course_registration';
         }
 
-        if ($summary['not_started_subjects'] > $summary['completed_subjects']) {
+        if (($summary['not_started_subjects'] + $summary['failed_subjects']) > $summary['completed_subjects']) {
             $areas[] = 'academic_progress';
+        }
+
+        if (($summary['failed_subjects'] ?? 0) > 0) {
+            $areas[] = 'failed_subjects_retake';
         }
 
         return $areas;

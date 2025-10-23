@@ -26,7 +26,7 @@ class CurriculumService
             $curriculumVersion = $student->curriculumVersion;
             $program = $student->program;
             Log::info('$curriculumVersion', [
-                'curriculumVersion'=> $curriculumVersion->version_code,
+                'curriculumVersion' => $curriculumVersion->version_code,
             ]);
             // If essential relations are missing, return a safe default structure
             if (! $curriculumVersion || ! $program) {
@@ -171,7 +171,7 @@ class CurriculumService
             $curriculumUnits = $this->getCurriculumUnitsWithRelations($student);
             $academicRecords = $this->getAcademicRecords($student);
             $courseRegistrations = $this->getCourseRegistrations($student);
-            
+
             return $this->organizeBySemester($curriculumUnits, $academicRecords, $courseRegistrations);
         });
     }
@@ -248,12 +248,18 @@ class CurriculumService
      * Organize curriculum units by semester with grades and status
      */
     protected function organizeBySemester(
-        Collection $curriculumUnits, 
-        Collection $academicRecords, 
+        Collection $curriculumUnits,
+        Collection $academicRecords,
         Collection $courseRegistrations
     ): array {
         // Create lookup arrays for efficient access
-        $academicRecordsByUnit = $academicRecords->keyBy('unit_id');
+        // Get the latest academic record for each unit (highest attempt_number, then latest completion_date)
+        $academicRecordsByUnit = $academicRecords->groupBy('unit_id')->map(function ($records) {
+            return $records->sortByDesc('attempt_number')
+                ->sortByDesc('completion_date')
+                ->sortByDesc('enrollment_date')
+                ->first();
+        });
         $registrationsByUnit = $courseRegistrations->groupBy(function ($registration) {
             return $registration->courseOffering?->unit_id;
         });
@@ -264,32 +270,32 @@ class CurriculumService
         });
 
         $result = [];
-        
+
         foreach ($semesterGroups as $semesterKey => $semesterUnits) {
             // Extract year and semester from key
             preg_match('/Year (\d+) - Semester (\d+)/', $semesterKey, $matches);
             $yearLevel = (int) ($matches[1] ?? 1);
             $semesterNumber = (int) ($matches[2] ?? 1);
-            
+
             $subjects = $semesterUnits->map(function ($curriculumUnit) use ($academicRecordsByUnit, $registrationsByUnit) {
                 $unit = $curriculumUnit->unit;
                 $unitId = $unit->id;
-                
+
                 // Get academic record (grades) for this unit
                 $academicRecord = $academicRecordsByUnit->get($unitId);
-                
+
                 // Get course registrations for this unit (to determine study status)
                 $unitRegistrations = $registrationsByUnit->get($unitId, collect());
-                
+
                 // Determine study status
                 $studyStatus = $this->determineStudyStatus($academicRecord, $unitRegistrations);
-                
+
                 // Get grade information
                 $gradeInfo = $this->getGradeInfo($academicRecord);
-                
+
                 // Check if student has registered for classes (to prioritize ordering)
                 $hasRegistration = $unitRegistrations->isNotEmpty();
-                
+
                 return [
                     'curriculum_unit' => [
                         'id' => $curriculumUnit->id,
@@ -321,14 +327,14 @@ class CurriculumService
                     })->values()->toArray(),
                 ];
             })
-            // Sort by: 1) has registration first, 2) then by unit code
-            ->sortBy([
-                fn($subject) => !$subject['has_registration'], // Registered subjects first
-                fn($subject) => $subject['unit']['code'], // Then alphabetically by code
-            ])
-            ->values()
-            ->toArray();
-            
+                // Sort by: 1) has registration first, 2) then by unit code
+                ->sortBy([
+                    fn($subject) => !$subject['has_registration'], // Registered subjects first
+                    fn($subject) => $subject['unit']['code'], // Then alphabetically by code
+                ])
+                ->values()
+                ->toArray();
+
             $result[] = [
                 'semester_info' => [
                     'year_level' => $yearLevel,
@@ -339,23 +345,31 @@ class CurriculumService
                 'summary' => [
                     'total_subjects' => count($subjects),
                     'total_credit_points' => array_sum(array_column(array_column($subjects, 'unit'), 'credit_points')),
-                    'completed_subjects' => count(array_filter($subjects, function($s) {
-                        return $s['grade_info'] && $s['grade_info']['final_percentage'] >= 60;
+                    'completed_subjects' => count(array_filter($subjects, function ($s) {
+                        return $s['study_status']['status'] === 'completed';
                     })),
-                    'current_subjects' => count(array_filter($subjects, function($s) {
-                        return $s['has_registration'] && 
-                               collect($s['registrations'])->contains('status', 'registered');
+                    'current_subjects' => count(array_filter($subjects, function ($s) {
+                        return in_array($s['study_status']['status'], ['in_progress', 'registered']);
                     })),
-                    'remaining_subjects' => count(array_filter($subjects, function($s) {
-                        $isCompleted = $s['grade_info'] && $s['grade_info']['final_percentage'] >= 60;
-                        $isRegistered = $s['has_registration'] && 
-                                       collect($s['registrations'])->contains('status', 'registered');
-                        return !$isCompleted && !$isRegistered;
+                    'failed_subjects' => count(array_filter($subjects, function ($s) {
+                        return $s['study_status']['status'] === 'failed';
+                    })),
+                    'retaking_subjects' => count(array_filter($subjects, function ($s) {
+                        return $s['study_status']['status'] === 'retaking';
+                    })),
+                    'withdrawn_subjects' => count(array_filter($subjects, function ($s) {
+                        return $s['study_status']['status'] === 'withdrawn';
+                    })),
+                    'not_started_subjects' => count(array_filter($subjects, function ($s) {
+                        return $s['study_status']['status'] === 'not_started';
+                    })),
+                    'registered_subjects' => count(array_filter($subjects, function ($s) {
+                        return $s['has_registration'];
                     })),
                 ],
             ];
         }
-        
+
         // Sort semesters by year and semester number
         usort($result, function ($a, $b) {
             if ($a['semester_info']['year_level'] !== $b['semester_info']['year_level']) {
@@ -363,14 +377,18 @@ class CurriculumService
             }
             return $a['semester_info']['semester_number'] <=> $b['semester_info']['semester_number'];
         });
-        
+
         return [
             'semesters' => $result,
             'overall_summary' => [
                 'total_subjects' => array_sum(array_column(array_column($result, 'summary'), 'total_subjects')),
                 'completed_subjects' => array_sum(array_column(array_column($result, 'summary'), 'completed_subjects')),
                 'current_subjects' => array_sum(array_column(array_column($result, 'summary'), 'current_subjects')),
-                'remaining_subjects' => array_sum(array_column(array_column($result, 'summary'), 'remaining_subjects')),
+                'failed_subjects' => array_sum(array_column(array_column($result, 'summary'), 'failed_subjects')),
+                'retaking_subjects' => array_sum(array_column(array_column($result, 'summary'), 'retaking_subjects')),
+                'withdrawn_subjects' => array_sum(array_column(array_column($result, 'summary'), 'withdrawn_subjects')),
+                'not_started_subjects' => array_sum(array_column(array_column($result, 'summary'), 'not_started_subjects')),
+                'registered_subjects' => array_sum(array_column(array_column($result, 'summary'), 'registered_subjects')),
             ],
         ];
     }
@@ -390,24 +408,43 @@ class CurriculumService
                 ];
             } elseif ($academicRecord->completion_status === 'in_progress') {
                 return [
-                    'status' => 'in_progress', 
+                    'status' => 'in_progress',
                     'label' => 'In Progress',
                     'description' => 'Subject is currently being studied',
                 ];
             } elseif ($academicRecord->completion_status === 'failed') {
+                // Check if student has registered to retake this failed subject
+                $hasRetakeRegistration = $registrations->contains(function ($registration) {
+                    return in_array($registration->registration_status, ['pending', 'registered', 'confirmed']);
+                });
+
+                if ($hasRetakeRegistration) {
+                    return [
+                        'status' => 'retaking',
+                        'label' => 'Retaking',
+                        'description' => 'Retaking failed subject',
+                    ];
+                } else {
+                    return [
+                        'status' => 'failed',
+                        'label' => 'Failed',
+                        'description' => 'Subject failed - needs retake',
+                    ];
+                }
+            } elseif ($academicRecord->completion_status === 'withdrawn') {
                 return [
-                    'status' => 'failed',
-                    'label' => 'Failed',
-                    'description' => 'Subject did not meet requirements',
+                    'status' => 'withdrawn',
+                    'label' => 'Withdrawn',
+                    'description' => 'Subject was withdrawn',
                 ];
             }
         }
-        
+
         // Check current registrations
         $activeRegistration = $registrations->first(function ($registration) {
             return in_array($registration->registration_status, ['pending', 'registered', 'confirmed']);
         });
-        
+
         if ($activeRegistration) {
             return [
                 'status' => 'registered',
@@ -415,7 +452,7 @@ class CurriculumService
                 'description' => 'Registered for this semester',
             ];
         }
-        
+
         // If no academic record and no active registration
         return [
             'status' => 'not_started',
@@ -432,7 +469,7 @@ class CurriculumService
         if (!$academicRecord) {
             return null;
         }
-        
+
         return [
             'final_percentage' => $academicRecord->final_percentage,
             'final_letter_grade' => $academicRecord->final_letter_grade,
@@ -603,8 +640,8 @@ class CurriculumService
 
         return $curriculumUnits->filter(function ($curriculumUnit) use ($completedUnitIds, $enrolledUnitIds) {
             return ! $completedUnitIds->contains($curriculumUnit->unit_id) &&
-                   ! $enrolledUnitIds->contains($curriculumUnit->unit_id) &&
-                   $this->isUnitAvailableWithGroups($curriculumUnit->unit, $completedUnitIds);
+                ! $enrolledUnitIds->contains($curriculumUnit->unit_id) &&
+                $this->isUnitAvailableWithGroups($curriculumUnit->unit, $completedUnitIds);
         })->map(function ($curriculumUnit) {
             return [
                 'unit' => [
@@ -634,8 +671,8 @@ class CurriculumService
 
         return $curriculumUnits->filter(function ($curriculumUnit) use ($completedUnitIds, $enrolledUnitIds) {
             return ! $completedUnitIds->contains($curriculumUnit->unit_id) &&
-                   ! $enrolledUnitIds->contains($curriculumUnit->unit_id) &&
-                   ! $this->isUnitAvailableWithGroups($curriculumUnit->unit, $completedUnitIds);
+                ! $enrolledUnitIds->contains($curriculumUnit->unit_id) &&
+                ! $this->isUnitAvailableWithGroups($curriculumUnit->unit, $completedUnitIds);
         })->map(function ($curriculumUnit) use ($completedUnitIds) {
             $unit = $curriculumUnit->unit;
             $prerequisiteGroups = $unit->prerequisiteGroups ?? collect();
@@ -764,7 +801,7 @@ class CurriculumService
         // Filter for general education units - these might be common units or have specific characteristics
         $genEdUnits = $curriculumUnits->filter(function ($curriculumUnit) {
             return $curriculumUnit->unit_scope === 'common' &&
-                   ($curriculumUnit->year_level <= 2); // Typically first/second year units
+                ($curriculumUnit->year_level <= 2); // Typically first/second year units
         });
         $completedUnitIds = $completedUnits->pluck('id');
 
