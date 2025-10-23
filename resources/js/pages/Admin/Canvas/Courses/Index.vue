@@ -314,13 +314,13 @@ const openSyncAssignmentsDialog = async (mapping: CanvasCourseMapping) => {
 
     try {
         const { data, error } = await api.get(route('admin.canvas.courses.assignments.sync-summary', mapping.id));
-        
+
         if (error.value) {
             toast.error('Failed to load sync summary');
             syncAssignmentsDialogOpen.value = false;
             return;
         }
-        
+
         assignmentsSyncSummary.value = data.value;
 
         // Auto-select already synced groups
@@ -402,13 +402,13 @@ const openSyncGradesDialog = async (mapping: CanvasCourseMapping) => {
 
     try {
         const { data, error } = await api.get(route('admin.canvas.courses.grades.sync-summary', mapping.id));
-        
+
         if (error.value) {
             toast.error('Failed to load sync summary');
             syncGradesDialogOpen.value = false;
             return;
         }
-        
+
         gradesSyncSummary.value = data.value;
     } catch (error: any) {
         toast.error('Failed to load sync summary');
@@ -423,7 +423,7 @@ const syncGrades = async () => {
 
     try {
         const { data, error } = await api.post(route('admin.canvas.courses.sync-grades', selectedMappingForSync.value.id), {});
-        
+
         if (error.value) {
             toast.error('Failed to sync grades');
             syncGradesLoading.value = false;
@@ -486,8 +486,18 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                 return h('span', { class: 'text-muted-foreground text-sm' }, '—');
             }
             const offering = mapping.course_offering;
+            const courseUrl = `/course-offerings/${offering.id}`;
+
             return h('div', {}, [
-                h('div', { class: 'font-medium' }, `${offering.course_code} - ${offering.course_title}`),
+                h(
+                    'a',
+                    {
+                        href: courseUrl,
+                        class: 'text-primary font-medium hover:underline transition-colors',
+                        target: '_blank',
+                    },
+                    `${offering.course_code} - ${offering.course_title}`,
+                ),
                 h('div', { class: 'text-xs text-muted-foreground' }, `Section ${offering.section_code}${offering.semester ? ' • ' + offering.semester.name : ''}`),
             ]);
         },
@@ -727,12 +737,8 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
                             <div class="flex items-center justify-between">
                                 <Label class="text-sm font-medium">Assignment Groups ({{ assignmentsSyncSummary.groups?.length || 0 }})</Label>
                                 <div class="flex items-center gap-2">
-                                    <Button v-if="!allGroupsSelected" variant="outline" size="sm" @click="selectAllGroups">
-                                        Select All
-                                    </Button>
-                                    <Button v-else variant="outline" size="sm" @click="deselectAllGroups">
-                                        Deselect All
-                                    </Button>
+                                    <Button v-if="!allGroupsSelected" variant="outline" size="sm" @click="selectAllGroups"> Select All </Button>
+                                    <Button v-else variant="outline" size="sm" @click="deselectAllGroups"> Deselect All </Button>
                                 </div>
                             </div>
                             <ScrollArea class="h-[400px] rounded-lg border">

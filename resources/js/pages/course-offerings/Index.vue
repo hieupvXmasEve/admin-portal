@@ -7,10 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import Tooltip from '@/components/ui/tooltip/Tooltip.vue';
-import TooltipContent from '@/components/ui/tooltip/TooltipContent.vue';
-import TooltipProvider from '@/components/ui/tooltip/TooltipProvider.vue';
-import TooltipTrigger from '@/components/ui/tooltip/TooltipTrigger.vue';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import type { PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
@@ -26,6 +22,7 @@ interface Props {
         search?: string;
         semester_id?: string;
         enrollment_status?: string;
+        course_status?: string;
         delivery_mode?: string;
         unit_level?: string;
         unit_type?: string;
@@ -34,6 +31,7 @@ interface Props {
     unitLevels: { value: string; label: string }[];
     unitTypes: { value: string; label: string }[];
     enrollmentStatusOptions: { value: string; label: string }[];
+    courseStatusOptions: { value: string; label: string }[];
     deliveryModeOptions: { value: string; label: string }[];
     flash?: {
         success?: string;
@@ -48,6 +46,7 @@ const filters = ref({
     search: props.filters.search || '',
     semester_id: props.filters.semester_id || 'all',
     enrollment_status: props.filters.enrollment_status || 'all',
+    course_status: props.filters.course_status || 'all',
     delivery_mode: props.filters.delivery_mode || 'all',
     unit_level: props.filters.unit_level || 'all',
     unit_type: props.filters.unit_type || 'all',
@@ -95,6 +94,7 @@ const updateFilters = () => {
         search: filters.value.search || undefined,
         semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
         enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
+        course_status: filters.value.course_status === 'all' ? undefined : filters.value.course_status,
         delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
         unit_level: filters.value.unit_level === 'all' ? undefined : filters.value.unit_level,
         unit_type: filters.value.unit_type === 'all' ? undefined : filters.value.unit_type,
@@ -123,6 +123,7 @@ const handlePageChange = (pageOrUrl: string) => {
                 search: filters.value.search || undefined,
                 semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
                 enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
+                course_status: filters.value.course_status === 'all' ? undefined : filters.value.course_status,
                 delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
                 unit_level: filters.value.unit_level === 'all' ? undefined : filters.value.unit_level,
                 unit_type: filters.value.unit_type === 'all' ? undefined : filters.value.unit_type,
@@ -143,6 +144,7 @@ const handlePageChange = (pageOrUrl: string) => {
             search: filters.value.search || undefined,
             semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
             enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
+            course_status: filters.value.course_status === 'all' ? undefined : filters.value.course_status,
             delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
             unit_level: filters.value.unit_level === 'all' ? undefined : filters.value.unit_level,
             unit_type: filters.value.unit_type === 'all' ? undefined : filters.value.unit_type,
@@ -280,18 +282,18 @@ const bulkDelete = () => {
     );
 };
 
-const getStatusBadgeVariant = (status: string) => {
+const getCourseStatusBadge = (status: string) => {
     switch (status) {
-        case 'open':
-            return 'default';
-        case 'waitlist_only':
-            return 'secondary';
+        case 'not_started':
+            return { label: 'Not Started', variant: 'secondary' as const };
+        case 'in_progress':
+            return { label: 'In Progress', variant: 'default' as const };
+        case 'completed':
+            return { label: 'Completed', variant: 'outline' as const };
         case 'cancelled':
-            return 'destructive';
-        case 'closed':
-            return 'outline';
+            return { label: 'Cancelled', variant: 'destructive' as const };
         default:
-            return 'outline';
+            return { label: status, variant: 'outline' as const };
     }
 };
 
@@ -396,12 +398,12 @@ const columns: ColumnDef<CourseOffering>[] = [
         },
     },
     {
-        accessorKey: 'enrollment_status',
-        header: 'Status',
+        accessorKey: 'course_status',
+        header: 'Course Status',
         cell: ({ row }) => {
-            const status = row.original.enrollment_status;
-            if (!status) return h('span', {}, 'Unknown');
-            return h(Badge, { variant: getStatusBadgeVariant(status) }, () => status.replace('_', ' ').toUpperCase());
+            const status = row.original.course_status || 'not_started';
+            const badge = getCourseStatusBadge(status);
+            return h(Badge, { variant: badge.variant }, () => badge.label);
         },
     },
     {
@@ -416,53 +418,65 @@ const columns: ColumnDef<CourseOffering>[] = [
     {
         id: 'actions',
         header: 'Actions',
+        enablePinning: true,
         cell: ({ row }) => {
             const course = row.original;
+            const courseStatus = course.course_status || 'not_started';
+            const isCompleted = courseStatus === 'completed';
+            const isCancelled = courseStatus === 'cancelled';
+            const canModify = !isCompleted && !isCancelled;
+
+            const menuItems = [
+                h(
+                    DropdownMenuItem,
+                    {
+                        onClick: () => router.visit(`/course-offerings/${course.id}`),
+                    },
+                    () => [h(Eye, { class: 'mr-2 h-4 w-4' }), 'View Details'],
+                ),
+                h(
+                    DropdownMenuItem,
+                    {
+                        onClick: () => duplicateCourseOffering(course),
+                    },
+                    () => [h(Copy, { class: 'mr-2 h-4 w-4' }), 'Duplicate'],
+                ),
+            ];
+
+            if (canModify) {
+                menuItems.splice(
+                    1,
+                    0,
+                    h(
+                        DropdownMenuItem,
+                        {
+                            onClick: () => router.visit(`/course-offerings/${course.id}/edit`),
+                        },
+                        () => [h(Edit, { class: 'mr-2 h-4 w-4' }), 'Edit'],
+                    ),
+                    h(
+                        DropdownMenuItem,
+                        {
+                            onClick: () => toggleStatus(course),
+                        },
+                        () => [course.enrollment_status === 'open' ? h(ToggleLeft, { class: 'mr-2 h-4 w-4' }) : h(ToggleRight, { class: 'mr-2 h-4 w-4' }), course.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration'],
+                    ),
+                    h(
+                        DropdownMenuItem,
+                        {
+                            onClick: () => deleteCourseOffering(course),
+                            class: 'text-destructive',
+                        },
+                        () => [h(Trash2, { class: 'mr-2 h-4 w-4' }), 'Delete'],
+                    ),
+                );
+            }
+
             return h(
                 DropdownMenu,
                 {},
                 {
-                    default: () => [
-                        h(DropdownMenuTrigger, { asChild: true }, () => h(Button, { variant: 'ghost', class: 'h-8 w-8 p-0' }, () => h(MoreHorizontal, { class: 'h-4 w-4' }))),
-                        h(DropdownMenuContent, { align: 'end' }, () => [
-                            h(
-                                DropdownMenuItem,
-                                {
-                                    onClick: () => router.visit(`/course-offerings/${course.id}`),
-                                },
-                                () => [h(Eye, { class: 'mr-2 h-4 w-4' }), 'View Details'],
-                            ),
-                            h(
-                                DropdownMenuItem,
-                                {
-                                    onClick: () => router.visit(`/course-offerings/${course.id}/edit`),
-                                },
-                                () => [h(Edit, { class: 'mr-2 h-4 w-4' }), 'Edit'],
-                            ),
-                            h(
-                                DropdownMenuItem,
-                                {
-                                    onClick: () => toggleStatus(course),
-                                },
-                                () => [course.enrollment_status === 'open' ? h(ToggleLeft, { class: 'mr-2 h-4 w-4' }) : h(ToggleRight, { class: 'mr-2 h-4 w-4' }), course.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration'],
-                            ),
-                            h(
-                                DropdownMenuItem,
-                                {
-                                    onClick: () => duplicateCourseOffering(course),
-                                },
-                                () => [h(Copy, { class: 'mr-2 h-4 w-4' }), 'Duplicate'],
-                            ),
-                            h(
-                                DropdownMenuItem,
-                                {
-                                    onClick: () => deleteCourseOffering(course),
-                                    class: 'text-destructive',
-                                },
-                                () => [h(Trash2, { class: 'mr-2 h-4 w-4' }), 'Delete'],
-                            ),
-                        ]),
-                    ],
+                    default: () => [h(DropdownMenuTrigger, { asChild: true }, () => h(Button, { variant: 'ghost', class: 'h-8 w-8 p-0' }, () => h(MoreHorizontal, { class: 'h-4 w-4' }))), h(DropdownMenuContent, { align: 'end' }, () => menuItems)],
                 },
             );
         },
@@ -588,14 +602,14 @@ const columns: ColumnDef<CourseOffering>[] = [
                 </div>
 
                 <div class="space-y-2">
-                    <label class="text-sm font-medium">Status</label>
-                    <Select v-model="filters.enrollment_status" @update:model-value="updateFilters">
+                    <label class="text-sm font-medium">Course Status</label>
+                    <Select v-model="filters.course_status" @update:model-value="updateFilters">
                         <SelectTrigger>
                             <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem v-for="option in enrollmentStatusOptions" :key="option.value" :value="option.value">
+                            <SelectItem v-for="option in courseStatusOptions" :key="option.value" :value="option.value">
                                 {{ option.label }}
                             </SelectItem>
                         </SelectContent>
@@ -632,75 +646,7 @@ const columns: ColumnDef<CourseOffering>[] = [
     <!-- Data Table -->
     <Card>
         <CardContent class="px-4">
-            <DataTable :data="courseOfferings.data" :columns="columns" :loading="isLoading" v-model:selected="selectedItems" row-key="id">
-                <template #cell-actions="{ row }">
-                    <div class="flex items-center gap-2">
-                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="router.visit(`/course-offerings/${row.original.id}`)" title="View course offering">
-                                        <Eye class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>View course offering</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="router.visit(`/course-offerings/${row.original.id}/edit`)" title="Edit course offering">
-                                        <Edit class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Edit course offering</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="toggleStatus(row.original)" title="Toggle course offering status">
-                                        <ToggleRight class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>{{ row.original.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration' }}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="duplicateCourseOffering(row.original)" title="Duplicate course offering">
-                                        <Copy class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Duplicate course offering</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-                        <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>
-                            <Tooltip>
-                                <TooltipTrigger as-child>
-                                    <Button variant="ghost" size="sm" @click="deleteCourseOffering(row.original)" title="Delete program">
-                                        <Trash2 class="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Delete course offering</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    </div>
-                </template>
-            </DataTable>
+            <DataTable :data="courseOfferings.data" :columns="columns" :loading="isLoading" v-model:selected="selectedItems" row-key="id" />
         </CardContent>
     </Card>
 

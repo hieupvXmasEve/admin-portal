@@ -4,58 +4,145 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\AcademicRecordGenerationServiceOptimized;
+use App\Models\CanvasCourseMapping;
+use App\Services\Canvas\CanvasGradeSyncService;
 use Illuminate\Console\Command;
 
 class SyncAcademicRecordsCommand extends Command
 {
     protected $signature = 'academic-records:sync
+                            {--course-offering-id= : Sync specific course offering only}
+                            {--chunk-size=10 : Number of courses to process per batch (default: 10)}
+                            {--memory-limit=1024 : Memory limit in MB (default: 1024)}
                             {--dry-run : Run without making changes}';
 
-    protected $description = 'Sync academic records: create new and update existing attendance data (optimized for daily cron)';
+    protected $description = 'Sync academic records from Canvas for all mapped courses';
 
     public function __construct(
-        private AcademicRecordGenerationServiceOptimized $service
+        private CanvasGradeSyncService $gradeSyncService
     ) {
         parent::__construct();
     }
 
     public function handle(): int
     {
-        $this->info('Starting academic records sync...');
-        $this->info('This will create new records and update existing ones with latest attendance data.');
+        $this->info('Starting Canvas grade sync for mapped courses...');
         $this->newLine();
 
         if ($this->option('dry-run')) {
             $this->warn('DRY RUN MODE - No changes will be made');
             $this->newLine();
+
             return self::SUCCESS;
         }
+
+        // Set memory limit
+        $memoryLimitMB = (int) $this->option('memory-limit');
+        $memoryLimitBytes = $memoryLimitMB * 1024 * 1024;
+        ini_set('memory_limit', "{$memoryLimitMB}M");
+        $this->info("Memory limit set to: {$memoryLimitMB}MB");
 
         $startTime = microtime(true);
         $memoryStart = memory_get_usage(true);
 
         try {
-            $progressBar = null;
+            // Get all mapped Canvas courses with canvas sync enabled
+            $query = CanvasCourseMapping::where('sync_status', 'mapped')
+                ->whereNotNull('course_offering_id')
+                ->whereHas('courseOffering', function ($q) {
+                    $q->where('is_canvas_synced', true);
+                })
+                ->with(['courseOffering', 'canvasIntegration']);
 
-            $stats = $this->service->syncAcademicRecords(
-                function ($current, $total, $message) use (&$progressBar) {
-                    if ($progressBar === null) {
-                        $progressBar = $this->output->createProgressBar($total);
-                        $progressBar->setFormat('verbose');
-                    }
-                    $progressBar->setProgress($current);
-                    $progressBar->setMessage($message);
-                }
-            );
-
-            if ($progressBar) {
-                $progressBar->finish();
-                $this->newLine();
+            // Filter by specific course offering if provided
+            if ($courseOfferingId = $this->option('course-offering-id')) {
+                $query->where('course_offering_id', $courseOfferingId);
             }
 
+            $totalMappings = $query->count();
+
+            if ($totalMappings === 0) {
+                $this->warn('No mapped Canvas courses found.');
+
+                return self::SUCCESS;
+            }
+
+            $this->info("Found {$totalMappings} mapped course(s) to sync");
             $this->newLine();
-            $this->displayStats($stats);
+
+            // Get chunk size from option
+            $chunkSize = (int) $this->option('chunk-size');
+            $this->info("Processing in chunks of {$chunkSize} courses");
+            $this->newLine();
+
+            // Initialize stats
+            $totalStats = [
+                'courses_processed' => 0,
+                'courses_success' => 0,
+                'courses_failed' => 0,
+                'students_synced' => 0,
+                'students_skipped' => 0,
+                'total_errors' => 0,
+            ];
+
+            $progressBar = $this->output->createProgressBar($totalMappings);
+            $progressBar->setFormat('verbose');
+
+            // Process in chunks to manage memory
+            $query->chunk($chunkSize, function ($mappings) use (&$totalStats, $progressBar, $memoryLimitBytes) {
+                foreach ($mappings as $mapping) {
+                    $courseOfferingName = $mapping->courseOffering->course_code ?? "ID:{$mapping->course_offering_id}";
+                    $progressBar->setMessage("Syncing: {$courseOfferingName}");
+
+                    try {
+                        $result = $this->gradeSyncService->syncCourseGrades($mapping);
+
+                        if ($result['success']) {
+                            $totalStats['courses_success']++;
+                            $totalStats['students_synced'] += $result['students_synced'] ?? 0;
+                            $totalStats['students_skipped'] += $result['students_skipped'] ?? 0;
+                            $totalStats['total_errors'] += count($result['errors'] ?? []);
+                        } else {
+                            $totalStats['courses_failed']++;
+                        }
+
+                        $totalStats['courses_processed']++;
+                    } catch (\Exception $e) {
+                        $totalStats['courses_failed']++;
+                        $totalStats['courses_processed']++;
+
+                        $this->newLine();
+                        $this->error("Failed to sync course {$courseOfferingName}: {$e->getMessage()}");
+                    }
+
+                    $progressBar->advance();
+
+                    // Check memory usage
+                    $currentMemory = memory_get_usage(true);
+                    $memoryPercentage = ($currentMemory / $memoryLimitBytes) * 100;
+
+                    if ($memoryPercentage > 80) {
+                        $this->newLine();
+                        $this->warn(sprintf(
+                            '⚠️  High memory usage: %.1f%% (%dMB / %dMB)',
+                            $memoryPercentage,
+                            round($currentMemory / 1024 / 1024, 2),
+                            round($memoryLimitBytes / 1024 / 1024, 2)
+                        ));
+                        $this->info('Running garbage collection...');
+                        gc_collect_cycles();
+                    }
+                }
+
+                // Force garbage collection after each chunk
+                gc_collect_cycles();
+            });
+
+            $progressBar->finish();
+            $this->newLine(2);
+
+            // Display results
+            $this->displayStats($totalStats);
 
             $executionTime = round(microtime(true) - $startTime, 2);
             $memoryUsed = round((memory_get_usage(true) - $memoryStart) / 1024 / 1024, 2);
@@ -66,22 +153,25 @@ class SyncAcademicRecordsCommand extends Command
             $this->info("📊 Memory used: {$memoryUsed}MB | Peak: {$memoryPeak}MB");
 
             // Show summary
-            if ($stats['created'] > 0) {
-                $this->info("✓ Created {$stats['created']} new academic records");
+            if ($totalStats['courses_success'] > 0) {
+                $this->info("✓ Successfully synced {$totalStats['courses_success']} course(s)");
             }
-            if ($stats['updated'] > 0) {
-                $this->info("✓ Updated {$stats['updated']} existing academic records");
+            if ($totalStats['students_synced'] > 0) {
+                $this->info("✓ Synced grades for {$totalStats['students_synced']} student(s)");
             }
-            if ($stats['skipped'] > 0) {
-                $this->warn("⚠ Skipped {$stats['skipped']} records (no attendance data or invalid)");
+            if ($totalStats['students_skipped'] > 0) {
+                $this->warn("⚠ Skipped {$totalStats['students_skipped']} student(s) (not found in Canvas)");
             }
-            if ($stats['errors'] > 0) {
-                $this->error("✗ Failed to process {$stats['errors']} records");
+            if ($totalStats['courses_failed'] > 0) {
+                $this->error("✗ Failed to sync {$totalStats['courses_failed']} course(s)");
+            }
+            if ($totalStats['total_errors'] > 0) {
+                $this->error("✗ Encountered {$totalStats['total_errors']} error(s) during sync");
             }
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Error: ' . $e->getMessage());
+            $this->error('Error: '.$e->getMessage());
             $this->error($e->getTraceAsString());
 
             return self::FAILURE;
@@ -91,13 +181,14 @@ class SyncAcademicRecordsCommand extends Command
     private function displayStats(array $stats): void
     {
         $this->table(
-            ['Academic Records Sync', 'Count'],
+            ['Canvas Grade Sync', 'Count'],
             [
-                ['Created (new)', $stats['created']],
-                ['Updated (existing)', $stats['updated']],
-                ['Skipped', $stats['skipped']],
-                ['Errors', $stats['errors']],
-                ['Total Processed', $stats['total_processed']],
+                ['Courses Processed', $stats['courses_processed']],
+                ['Courses Success', $stats['courses_success']],
+                ['Courses Failed', $stats['courses_failed']],
+                ['Students Synced', $stats['students_synced']],
+                ['Students Skipped', $stats['students_skipped']],
+                ['Total Errors', $stats['total_errors']],
             ]
         );
     }

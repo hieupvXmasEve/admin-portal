@@ -35,6 +35,7 @@ class CourseOffering extends AuditableModel
         'location',
         'is_active',
         'enrollment_status',
+        'course_status',
         'registration_start_date',
         'registration_end_date',
         'special_requirements',
@@ -87,6 +88,7 @@ class CourseOffering extends AuditableModel
             'location' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
             'enrollment_status' => ['nullable', 'in:open,closed,waitlist_only,cancelled'],
+            'course_status' => ['nullable', 'in:not_started,in_progress,completed,cancelled'],
             'registration_start_date' => ['nullable', 'date'],
             'registration_end_date' => ['nullable', 'date', 'after_or_equal:registration_start_date'],
             'special_requirements' => ['nullable', 'string', 'max:1000'],
@@ -120,6 +122,7 @@ class CourseOffering extends AuditableModel
             'schedule_time_end.after' => 'End time must be after start time',
             'location.max' => 'Location cannot exceed 255 characters',
             'enrollment_status.in' => 'Invalid enrollment status',
+            'course_status.in' => 'Invalid course status',
             'registration_start_date.date' => 'Registration start date must be a valid date',
             'registration_end_date.date' => 'Registration end date must be a valid date',
             'registration_end_date.after_or_equal' => 'Registration end date must be after or equal to start date',
@@ -409,6 +412,21 @@ class CourseOffering extends AuditableModel
         return $this->is_active
             && $this->enrollment_status === 'open'
             && $this->isRegistrationOpen();
+    }
+
+    public function isCourseCompleted(): bool
+    {
+        return $this->course_status === 'completed';
+    }
+
+    public function isCourseCancelled(): bool
+    {
+        return $this->course_status === 'cancelled';
+    }
+
+    public function canModify(): bool
+    {
+        return ! in_array($this->course_status, ['completed', 'cancelled']);
     }
 
     public function incrementEnrollment(): void
