@@ -232,7 +232,14 @@ class CanvasApiService
             $enrollments = $this->client->get("api/v1/courses/{$courseId}/enrollments", [
                 'user_id' => $userId,
                 'type[]' => 'StudentEnrollment',
-                'include[]' => 'current_grading_period_scores',
+                'include[]' => ['current_grading_period_scores', 'current_points'],
+            ]);
+
+            Log::debug('Fetched student enrollment from Canvas', [
+                'course_id' => $courseId,
+                'user_id' => $userId,
+                'enrollment_count' => count($enrollments),
+                'enrollment_data' => $enrollments[0] ?? null,
             ]);
 
             return $enrollments[0] ?? null;
@@ -295,40 +302,45 @@ class CanvasApiService
             $startTime = microtime(true);
             $allSubmissions = [];
 
-            // Fetch submissions for each assignment
-            // Canvas API: GET /api/v1/courses/:course_id/assignments/:assignment_id/submissions
-            foreach ($assignmentIds as $index => $assignmentId) {
-                $assignmentStartTime = microtime(true);
+            // Process assignments in batches for better memory management
+            $batchSize = 5;
+            $batches = array_chunk($assignmentIds, $batchSize);
 
-                Log::info('Fetching submissions for assignment', [
-                    'assignment_id' => $assignmentId,
-                    'progress' => ($index + 1).'/'.count($assignmentIds),
+            Log::info('Processing assignments in batches', [
+                'total_assignments' => count($assignmentIds),
+                'batch_size' => $batchSize,
+                'total_batches' => count($batches),
+            ]);
+
+            foreach ($batches as $batchIndex => $batchIds) {
+                $batchStartTime = microtime(true);
+
+                Log::info('Processing batch', [
+                    'batch' => ($batchIndex + 1).'/'.count($batches),
+                    'assignments_in_batch' => count($batchIds),
                 ]);
 
-                try {
-                    $submissions = $this->client->getPaginated(
-                        "api/v1/courses/{$courseId}/assignments/{$assignmentId}/submissions",
-                        []
-                    );
+                // Fetch submissions for each assignment in batch
+                $batchSubmissions = $this->fetchSubmissionsParallel($courseId, $batchIds);
 
-                    $assignmentDuration = microtime(true) - $assignmentStartTime;
-
-                    Log::info('Fetched assignment submissions', [
-                        'assignment_id' => $assignmentId,
-                        'submissions_count' => count($submissions),
-                        'duration_seconds' => round($assignmentDuration, 2),
-                    ]);
-
-                    // Merge into all submissions
+                // Merge results
+                $batchTotal = 0;
+                foreach ($batchSubmissions as $assignmentId => $submissions) {
                     $allSubmissions = array_merge($allSubmissions, $submissions);
-
-                } catch (\Exception $e) {
-                    Log::error('Failed to fetch submissions for assignment', [
-                        'assignment_id' => $assignmentId,
-                        'error' => $e->getMessage(),
-                    ]);
-                    // Continue with other assignments
+                    $batchTotal += count($submissions);
                 }
+
+                $batchDuration = microtime(true) - $batchStartTime;
+
+                Log::info('Batch completed', [
+                    'batch' => ($batchIndex + 1).'/'.count($batches),
+                    'submissions_fetched' => $batchTotal,
+                    'duration_seconds' => round($batchDuration, 2),
+                ]);
+
+                // Free batch memory
+                unset($batchSubmissions);
+                gc_collect_cycles();
             }
 
             $duration = microtime(true) - $startTime;
@@ -371,6 +383,37 @@ class CanvasApiService
 
             return [];
         }
+    }
+
+    /**
+     * Fetch submissions for multiple assignments in parallel batches
+     *
+     * @param  string  $courseId  Canvas course ID
+     * @param  array  $assignmentIds  Array of assignment IDs to fetch
+     * @return array Associative array: [assignment_id => submissions[]]
+     */
+    private function fetchSubmissionsParallel(string $courseId, array $assignmentIds): array
+    {
+        $results = [];
+
+        // Execute requests sequentially but track as batch
+        // For true parallel execution, would need Guzzle promises/pool
+        foreach ($assignmentIds as $assignmentId) {
+            try {
+                $results[$assignmentId] = $this->client->getPaginated(
+                    "api/v1/courses/{$courseId}/assignments/{$assignmentId}/submissions",
+                    []
+                );
+            } catch (\Exception $e) {
+                Log::error('Failed to fetch submissions for assignment', [
+                    'assignment_id' => $assignmentId,
+                    'error' => $e->getMessage(),
+                ]);
+                $results[$assignmentId] = [];
+            }
+        }
+
+        return $results;
     }
 
     /**

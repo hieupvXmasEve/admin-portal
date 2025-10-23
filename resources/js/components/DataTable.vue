@@ -35,6 +35,7 @@ const sorting = ref<SortingState>([]);
 const columnVisibility = ref<VisibilityState>({});
 const rowSelection = ref({});
 const expanded = ref<ExpandedState>({});
+const columnPinning = ref({ right: ['actions'] });
 
 // Table instance
 const table = useVueTable({
@@ -66,6 +67,9 @@ const table = useVueTable({
         },
         get expanded() {
             return expanded.value;
+        },
+        get columnPinning() {
+            return columnPinning.value;
         },
     },
     enableRowSelection: props.enableRowSelection,
@@ -178,3 +182,13 @@ defineExpose({
         </div>
     </div>
 </template>
+
+<style scoped>
+[data-pinned='right'] {
+    @apply shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)];
+}
+
+[data-pinned='left'] {
+    @apply shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)];
+}
+</style>

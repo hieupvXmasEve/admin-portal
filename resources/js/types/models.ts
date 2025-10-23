@@ -782,6 +782,7 @@ export interface CourseOffering {
     location?: string;
     is_active: boolean;
     enrollment_status: 'open' | 'closed' | 'waitlist_only' | 'cancelled';
+    course_status?: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
     registration_start_date?: string;
     registration_end_date?: string;
     special_requirements?: string;
