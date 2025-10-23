@@ -201,11 +201,14 @@ class CourseRegistrationController extends Controller
             $assessmentScores = \App\Models\AssessmentComponentDetailScore::where('student_id', $student->id)
                 ->where('course_offering_id', $courseOfferingId)
                 ->with([
-                    'assessmentComponentDetail.assessmentComponent.assessmentType',
                     'assessmentComponentDetail.assessmentComponent'
                 ])
-                //                ->orderBy('due_date')
                 ->get();
+
+            // Get academic record for total grade
+            $academicRecord = \App\Models\AcademicRecord::where('student_id', $student->id)
+                ->where('course_offering_id', $courseOfferingId)
+                ->first();
 
             $courseData = [
                 'course_info' => [
@@ -226,7 +229,7 @@ class CourseRegistrationController extends Controller
                     ],
                 ],
                 'schedule' => $this->formatSchedule($courseOffering->classSessions),
-                'grades' => $this->formatGrades($assessmentScores),
+                'grades' => $this->formatGradesTable($assessmentScores, $academicRecord),
             ];
 
             return ApiResponse::success(
@@ -281,67 +284,51 @@ class CourseRegistrationController extends Controller
     }
 
     /**
-     * Format grades data for API response
+     * Format grades data as a table structure for API response
      */
-    protected function formatGrades($assessmentScores): array
+    protected function formatGradesTable($assessmentScores, $academicRecord): array
     {
+        // Group scores by assessment component (groups)
         $gradesByComponent = $assessmentScores->groupBy('assessmentComponentDetail.assessmentComponent.id');
 
-        return $gradesByComponent->map(function ($scores, $componentId) {
+        $assessmentGroups = $gradesByComponent->map(function ($scores, $componentId) {
             $firstScore = $scores->first();
             $component = $firstScore->assessmentComponentDetail->assessmentComponent;
 
+            // Map all detail scores for this component
+            $details = $scores->map(function ($score) {
+                return [
+                    'id' => $score->id,
+                    'name' => $score->assessmentComponentDetail->name,
+                    'due_date' => $score->assessmentComponentDetail->due_date?->toDateString(),
+                    'points_earned' => $score->points_earned,
+                    'max_points' => $score->assessmentComponentDetail->max_points,
+                    'percentage_score' => $score->percentage_score,
+                    'letter_grade' => $score->letter_grade,
+                    'status' => $score->status,
+                    'graded_at' => $score->graded_at?->toDateString(),
+                ];
+            })->values()->toArray();
+
             return [
-                'component_id' => $component->id,
-                'component_name' => $component->name,
-                'component_code' => $component->code,
-                'component_type' => $component->type,
-                'component_weight' => $component->weight,
-                'due_date' => $component->due_date?->toDateString(),
-                'assessments' => $scores->map(function ($score) {
-                    return [
-                        'id' => $score->id,
-                        'name' => $score->assessmentComponentDetail->name,
-                        'description' => $score->assessmentComponentDetail->description,
-                        'weight' => $score->assessmentComponentDetail->weight,
-                        'max_points' => $score->assessmentComponentDetail->max_points,
-                        'due_date' => $score->due_date?->toDateString(),
-                        'score' => [
-                            'points_earned' => $score->points_earned,
-                            'percentage_score' => $score->percentage_score,
-                            'letter_grade' => $score->letter_grade,
-                            'status' => $this->getGradeStatus($score),
-                        ],
-                        'submission' => [
-                            'submitted_at' => $score->submitted_at?->toDateString(),
-                            'status' => $score->status,
-                            'is_late' => $score->is_late,
-                            'late_penalty_applied' => $score->late_penalty_applied,
-                        ],
-                        'feedback' => [
-                            'instructor_feedback' => $score->instructor_feedback,
-                            'graded_at' => $score->graded_at?->toDateString(),
-                        ],
-                    ];
-                })->values(),
+                'group_id' => $component->id,
+                'group_name' => $component->name,
+                'group_code' => $component->code,
+                'group_type' => $component->type,
+                'group_weight' => (float) $component->weight,
+                'details' => $details,
             ];
         })->values()->toArray();
-    }
 
-    /**
-     * Get grade status for display
-     */
-    protected function getGradeStatus($score): string
-    {
-        if (!$score->points_earned && !$score->percentage_score) {
-            return 'not_available';
-        }
-
-        return match ($score->score_status) {
-            'final' => 'released',
-            'provisional' => 'provisional',
-            'draft' => 'not_available',
-            default => 'not_available',
-        };
+        return [
+            'assessment_groups' => $assessmentGroups,
+            'total_grade' => [
+                'final_percentage' => $academicRecord?->final_percentage,
+                'final_letter_grade' => $academicRecord?->final_letter_grade,
+                'grade_points' => $academicRecord?->grade_points,
+                'grade_status' => $academicRecord?->grade_status,
+                'completion_status' => $academicRecord?->completion_status,
+            ],
+        ];
     }
 }

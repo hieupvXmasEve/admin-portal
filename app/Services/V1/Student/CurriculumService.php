@@ -339,10 +339,19 @@ class CurriculumService
                 'summary' => [
                     'total_subjects' => count($subjects),
                     'total_credit_points' => array_sum(array_column(array_column($subjects, 'unit'), 'credit_points')),
-                    'completed_subjects' => count(array_filter($subjects, fn($s) => $s['study_status']['status'] === 'completed')),
-                    'current_subjects' => count(array_filter($subjects, fn($s) => $s['study_status']['status'] === 'in_progress')),
-                    'not_started_subjects' => count(array_filter($subjects, fn($s) => $s['study_status']['status'] === 'not_started')),
-                    'registered_subjects' => count(array_filter($subjects, fn($s) => $s['has_registration'])),
+                    'completed_subjects' => count(array_filter($subjects, function($s) {
+                        return $s['grade_info'] && $s['grade_info']['final_percentage'] >= 60;
+                    })),
+                    'current_subjects' => count(array_filter($subjects, function($s) {
+                        return $s['has_registration'] && 
+                               collect($s['registrations'])->contains('status', 'registered');
+                    })),
+                    'remaining_subjects' => count(array_filter($subjects, function($s) {
+                        $isCompleted = $s['grade_info'] && $s['grade_info']['final_percentage'] >= 60;
+                        $isRegistered = $s['has_registration'] && 
+                                       collect($s['registrations'])->contains('status', 'registered');
+                        return !$isCompleted && !$isRegistered;
+                    })),
                 ],
             ];
         }
@@ -358,13 +367,10 @@ class CurriculumService
         return [
             'semesters' => $result,
             'overall_summary' => [
-                'total_semesters' => count($result),
                 'total_subjects' => array_sum(array_column(array_column($result, 'summary'), 'total_subjects')),
-                'total_credit_points' => array_sum(array_column(array_column($result, 'summary'), 'total_credit_points')),
                 'completed_subjects' => array_sum(array_column(array_column($result, 'summary'), 'completed_subjects')),
                 'current_subjects' => array_sum(array_column(array_column($result, 'summary'), 'current_subjects')),
-                'not_started_subjects' => array_sum(array_column(array_column($result, 'summary'), 'not_started_subjects')),
-                'registered_subjects' => array_sum(array_column(array_column($result, 'summary'), 'registered_subjects')),
+                'remaining_subjects' => array_sum(array_column(array_column($result, 'summary'), 'remaining_subjects')),
             ],
         ];
     }
@@ -433,6 +439,7 @@ class CurriculumService
             'grade_points' => $academicRecord->grade_points,
             'completion_date' => $academicRecord->completion_date?->toDateString(),
             'grade_status' => $academicRecord->grade_status,
+            'completion_status' => $academicRecord->completion_status,
             'is_passing' => $academicRecord->grade_points > 0,
         ];
     }

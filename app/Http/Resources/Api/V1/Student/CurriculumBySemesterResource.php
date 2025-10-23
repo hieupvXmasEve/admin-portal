@@ -16,10 +16,7 @@ class CurriculumBySemesterResource extends JsonResource
     {
         return [
             'semesters' => $this->formatSemesters($this->resource['semesters']),
-            'overall_summary' => $this->formatOverallSummary($this->resource['overall_summary']),
-            'study_progress' => $this->generateStudyProgressIndicators(),
-            'registration_insights' => $this->generateRegistrationInsights(),
-            'generated_at' => now()->toISOString(),
+            'overall_summary' => $this->resource['overall_summary'],
         ];
     }
 
@@ -34,12 +31,9 @@ class CurriculumBySemesterResource extends JsonResource
                     'year_level' => $semester['semester_info']['year_level'],
                     'semester_number' => $semester['semester_info']['semester_number'],
                     'display_name' => $semester['semester_info']['display_name'],
-                    'short_name' => "Y{$semester['semester_info']['year_level']}S{$semester['semester_info']['semester_number']}",
-                    'academic_period' => $this->formatAcademicPeriod($semester['semester_info']),
                 ],
                 'subjects' => $this->formatSubjects($semester['subjects']),
-                'summary' => $this->formatSemesterSummary($semester['summary']),
-                'progress_indicators' => $this->generateSemesterProgressIndicators($semester['summary']),
+                'summary' => $semester['summary'],
             ];
         })->toArray();
     }
@@ -56,9 +50,6 @@ class CurriculumBySemesterResource extends JsonResource
                     'year_level' => $subject['curriculum_unit']['year_level'],
                     'semester_number' => $subject['curriculum_unit']['semester_number'],
                     'unit_scope' => $subject['curriculum_unit']['unit_scope'],
-                    'unit_scope_display' => $subject['curriculum_unit']['unit_scope'] !== null
-                        ? $this->getUnitScopeDisplay($subject['curriculum_unit']['unit_scope'])
-                        : null,
                     'note' => $subject['curriculum_unit']['note'],
                 ],
                 'unit' => [
@@ -66,32 +57,21 @@ class CurriculumBySemesterResource extends JsonResource
                     'code' => $subject['unit']['code'],
                     'name' => $subject['unit']['name'],
                     'credit_points' => $subject['unit']['credit_points'],
-                    'full_name' => "{$subject['unit']['code']} - {$subject['unit']['name']}",
                 ],
-                'study_status' => [
-                    'status' => $subject['study_status']['status'],
-                    'label' => $subject['study_status']['label'],
-                    'description' => $subject['study_status']['description'],
-                    'color' => $this->getStudyStatusColor($subject['study_status']['status']),
-                    'icon' => $this->getStudyStatusIcon($subject['study_status']['status']),
-                    'priority' => $this->getStudyStatusPriority($subject['study_status']['status']),
-                ],
-                'grade_info' => $this->formatGradeInfo($subject['grade_info']),
+                'study_status' => $subject['study_status'],
+                'total_grade' => $this->formatTotalGrade($subject['grade_info']),
                 'registration_info' => [
                     'has_registration' => $subject['has_registration'],
                     'registrations' => $this->formatRegistrations($subject['registrations']),
-                    'registration_count' => count($subject['registrations']),
-                    'latest_registration_status' => $this->getLatestRegistrationStatus($subject['registrations']),
                 ],
-                'academic_indicators' => $this->generateAcademicIndicators($subject),
             ];
         })->toArray();
     }
 
     /**
-     * Format grade information
+     * Format total grade information from academic_record
      */
-    protected function formatGradeInfo(?array $gradeInfo): ?array
+    protected function formatTotalGrade(?array $gradeInfo): ?array
     {
         if (!$gradeInfo) {
             return null;
@@ -101,11 +81,8 @@ class CurriculumBySemesterResource extends JsonResource
             'final_percentage' => $gradeInfo['final_percentage'],
             'final_letter_grade' => $gradeInfo['final_letter_grade'],
             'grade_points' => $gradeInfo['grade_points'],
-            'completion_date' => $gradeInfo['completion_date'],
             'grade_status' => $gradeInfo['grade_status'],
-            'is_passing' => $gradeInfo['is_passing'],
-            'grade_display' => $this->formatGradeDisplay($gradeInfo),
-            'performance_indicator' => $this->getPerformanceIndicator($gradeInfo),
+            'completion_status' => $gradeInfo['completion_status'] ?? null,
         ];
     }
 
@@ -118,17 +95,11 @@ class CurriculumBySemesterResource extends JsonResource
             return [
                 'id' => $registration['id'],
                 'status' => $registration['status'],
-                'status_display' => $this->getRegistrationStatusDisplay($registration['status']),
                 'registration_date' => $registration['registration_date'],
                 'semester' => [
                     'id' => $registration['semester']['id'],
                     'name' => $registration['semester']['name'],
                     'code' => $registration['semester']['code'],
-                ],
-                'status_indicators' => [
-                    'color' => $this->getRegistrationStatusColor($registration['status']),
-                    'icon' => $this->getRegistrationStatusIcon($registration['status']),
-                    'is_active' => in_array($registration['status'], ['pending', 'registered', 'confirmed']),
                 ],
             ];
         })->toArray();
