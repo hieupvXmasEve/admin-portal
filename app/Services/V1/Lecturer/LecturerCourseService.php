@@ -487,12 +487,18 @@ class LecturerCourseService
                 $q->where('course_offering_id', $courseOfferingId);
             })
             ->get();
-        $totalSessions = DB::table('class_sessions')
-            ->where('course_offering_id', $courseOfferingId)
-            ->where('actual_attendees', '>', 0)
-            ->count();
 
-        $attendedSessions = $attendances->whereIn('status', ['present', 'late'])->count();
+        // Count unique sessions the student has attendance records for
+        $uniqueSessionIds = $attendances->pluck('class_session_id')->unique();
+        $totalSessions = $uniqueSessionIds->count();
+
+        // Count unique sessions where student was present or late
+        $attendedSessionIds = $attendances
+            ->whereIn('status', ['present', 'late'])
+            ->pluck('class_session_id')
+            ->unique();
+        $attendedSessions = $attendedSessionIds->count();
+
         $percentage = $totalSessions > 0 ? round(($attendedSessions / $totalSessions) * 100, 1) : 0;
 
         $lastAttendance = $attendances->sortByDesc('created_at')->first();

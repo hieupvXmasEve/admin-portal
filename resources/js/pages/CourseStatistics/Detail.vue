@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, Calendar, CheckCircle, Clock, Download, User, Users, XCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
@@ -70,23 +70,21 @@ const filteredAttendanceGrid = computed(() => {
     if (statusFilter.value === 'all') {
         return props.attendance_grid;
     }
-    
+
     if (statusFilter.value === 'pass') {
-        return props.attendance_grid.filter(student => student.meets_attendance_requirement);
+        return props.attendance_grid.filter((student) => student.meets_attendance_requirement);
     }
-    
+
     if (statusFilter.value === 'fail') {
-        return props.attendance_grid.filter(student => !student.meets_attendance_requirement);
+        return props.attendance_grid.filter((student) => !student.meets_attendance_requirement);
     }
-    
+
     return props.attendance_grid;
 });
 
 const handleExport = () => {
     window.location.href = `/course-statistics/${props.course_offering.id}/export`;
 };
-
-
 
 const getStatusBadgeVariant = (status: string): 'success' | 'destructive' | 'warning' | 'info' | 'outline' => {
     switch (status) {
@@ -127,7 +125,7 @@ const getStatusLabel = (status: string) => {
             <div class="flex items-center gap-4">
                 <Link href="/course-statistics">
                     <Button variant="outline" size="sm">
-                        <ArrowLeft class="h-4 w-4 mr-2" />
+                        <ArrowLeft class="mr-2 h-4 w-4" />
                         Back
                     </Button>
                 </Link>
@@ -148,7 +146,7 @@ const getStatusLabel = (status: string) => {
                     <div class="flex items-center gap-3">
                         <Calendar class="h-8 w-8 text-blue-600" />
                         <div>
-                            <p class="text-sm text-muted-foreground">Semester</p>
+                            <p class="text-muted-foreground text-sm">Semester</p>
                             <p class="text-lg font-bold">{{ statistics.semester }}</p>
                         </div>
                     </div>
@@ -160,7 +158,7 @@ const getStatusLabel = (status: string) => {
                     <div class="flex items-center gap-3">
                         <User class="h-8 w-8 text-purple-600" />
                         <div>
-                            <p class="text-sm text-muted-foreground">Instructor</p>
+                            <p class="text-muted-foreground text-sm">Instructor</p>
                             <p class="text-lg font-bold">{{ statistics.instructor_name || 'N/A' }}</p>
                         </div>
                     </div>
@@ -172,7 +170,7 @@ const getStatusLabel = (status: string) => {
                     <div class="flex items-center gap-3">
                         <Users class="h-8 w-8 text-green-600" />
                         <div>
-                            <p class="text-sm text-muted-foreground">Total Students</p>
+                            <p class="text-muted-foreground text-sm">Total Students</p>
                             <p class="text-lg font-bold">{{ statistics.total_students }}</p>
                         </div>
                     </div>
@@ -184,7 +182,7 @@ const getStatusLabel = (status: string) => {
                     <div class="flex items-center gap-3">
                         <Clock class="h-8 w-8 text-orange-600" />
                         <div>
-                            <p class="text-sm text-muted-foreground">Total Sessions</p>
+                            <p class="text-muted-foreground text-sm">Total Sessions</p>
                             <p class="text-lg font-bold">{{ statistics.total_sessions }}</p>
                         </div>
                     </div>
@@ -196,9 +194,9 @@ const getStatusLabel = (status: string) => {
                     <div class="flex items-center gap-3">
                         <XCircle class="h-8 w-8 text-red-600" />
                         <div>
-                            <p class="text-sm text-muted-foreground">Absent Exceeded</p>
+                            <p class="text-muted-foreground text-sm">Absent Exceeded</p>
                             <p class="text-lg font-bold text-red-600">{{ statistics.students_absent_exceeded }}</p>
-                            <p class="text-xs text-muted-foreground">Max {{ statistics.allowed_absences }} absences allowed</p>
+                            <p class="text-muted-foreground text-xs">Max {{ statistics.allowed_absences }} absences allowed</p>
                         </div>
                     </div>
                 </CardContent>
@@ -242,7 +240,7 @@ const getStatusLabel = (status: string) => {
                 <div class="flex items-center justify-between">
                     <CardTitle>Filters</CardTitle>
                     <Button @click="handleExport" variant="outline">
-                        <Download class="h-4 w-4 mr-2" />
+                        <Download class="mr-2 h-4 w-4" />
                         Export to Excel
                     </Button>
                 </div>
@@ -257,12 +255,8 @@ const getStatusLabel = (status: string) => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Students ({{ attendance_grid.length }})</SelectItem>
-                                <SelectItem value="pass">
-                                    Pass ({{ attendance_grid.filter(s => s.meets_attendance_requirement).length }})
-                                </SelectItem>
-                                <SelectItem value="fail">
-                                    Fail ({{ attendance_grid.filter(s => !s.meets_attendance_requirement).length }})
-                                </SelectItem>
+                                <SelectItem value="pass"> Pass ({{ attendance_grid.filter((s) => s.meets_attendance_requirement).length }}) </SelectItem>
+                                <SelectItem value="fail"> Fail ({{ attendance_grid.filter((s) => !s.meets_attendance_requirement).length }}) </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -275,9 +269,7 @@ const getStatusLabel = (status: string) => {
             <CardHeader>
                 <CardTitle>
                     Attendance Grid
-                    <span class="text-sm font-normal text-muted-foreground ml-2">
-                        (Showing {{ filteredAttendanceGrid.length }} of {{ attendance_grid.length }} students)
-                    </span>
+                    <span class="text-muted-foreground ml-2 text-sm font-normal"> (Showing {{ filteredAttendanceGrid.length }} of {{ attendance_grid.length }} students) </span>
                 </CardTitle>
             </CardHeader>
             <CardContent class="p-0">
@@ -285,14 +277,14 @@ const getStatusLabel = (status: string) => {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead class="sticky left-0 z-10 bg-white dark:bg-gray-950 min-w-[200px]">Student</TableHead>
-                                <TableHead v-for="session in sessions" :key="session.id" class="text-center min-w-[80px]">
+                                <TableHead class="sticky left-0 z-10 min-w-[200px] bg-white dark:bg-gray-950">Student</TableHead>
+                                <TableHead v-for="session in sessions" :key="session.id" class="min-w-[80px] text-center">
                                     <div class="text-xs">
                                         <div class="font-bold">S{{ session.session_number }}</div>
                                         <div class="text-muted-foreground">{{ session.session_date }}</div>
                                     </div>
                                 </TableHead>
-                                <TableHead class="text-center sticky right-0 z-10 bg-white dark:bg-gray-950 min-w-[100px]">Summary</TableHead>
+                                <TableHead class="sticky right-0 z-10 min-w-[100px] bg-white text-center dark:bg-gray-950">Summary</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -300,7 +292,7 @@ const getStatusLabel = (status: string) => {
                                 <TableCell class="sticky left-0 z-10 bg-white dark:bg-gray-950">
                                     <div class="space-y-1">
                                         <div class="font-medium">{{ student.full_name }}</div>
-                                        <div class="text-xs text-muted-foreground">{{ student.student_id }}</div>
+                                        <div class="text-muted-foreground text-xs">{{ student.student_id }}</div>
                                         <Badge v-if="!student.meets_attendance_requirement" variant="destructive" class="text-xs"> Exceeded </Badge>
                                     </div>
                                 </TableCell>
@@ -310,10 +302,10 @@ const getStatusLabel = (status: string) => {
                                             {{ getStatusLabel(sessionData.status) }}
                                         </Badge>
                                     </div>
-                                    <div v-if="sessionData.check_in_time" class="text-xs text-muted-foreground mt-1">{{ sessionData.check_in_time }}</div>
-                                    <div v-if="sessionData.minutes_late" class="text-xs text-muted-foreground">+{{ sessionData.minutes_late }}m</div>
+                                    <div v-if="sessionData.check_in_time" class="text-muted-foreground mt-1 text-xs">{{ sessionData.check_in_time }}</div>
+                                    <div v-if="sessionData.minutes_late" class="text-muted-foreground text-xs">+{{ sessionData.minutes_late }}m</div>
                                 </TableCell>
-                                <TableCell class="text-center sticky right-0 z-10 bg-white dark:bg-gray-950">
+                                <TableCell class="sticky right-0 z-10 bg-white text-center dark:bg-gray-950">
                                     <div class="space-y-1 text-xs">
                                         <div class="flex items-center justify-center gap-1">
                                             <CheckCircle class="h-3 w-3 text-green-600" />
@@ -327,18 +319,10 @@ const getStatusLabel = (status: string) => {
                                             <Clock class="h-3 w-3 text-yellow-600" />
                                             <span>{{ student.total_late }}</span>
                                         </div>
-                                        <div class="font-bold" :class="Number(student.attendance_percentage) >= 80 ? 'text-green-600' : 'text-red-600'">
-                                            {{ Number(student.attendance_percentage).toFixed(1) }}%
-                                        </div>
-                                        <div v-if="student.absences_remaining === 0 && student.meets_attendance_requirement" class="text-orange-600 font-semibold">
-                                            ⚠ At Limit
-                                        </div>
-                                        <div v-else-if="!student.meets_attendance_requirement" class="text-red-600 font-semibold">
-                                            ✗ Failed
-                                        </div>
-                                        <div v-else class="text-green-600">
-                                            ✓ {{ student.absences_remaining }} left
-                                        </div>
+                                        <div class="font-bold" :class="Number(student.attendance_percentage) >= 80 ? 'text-green-600' : 'text-red-600'">{{ Number(student.attendance_percentage).toFixed(1) }}%</div>
+                                        <div v-if="student.absences_remaining === 0 && student.meets_attendance_requirement" class="font-semibold text-orange-600">⚠ At Limit</div>
+                                        <div v-else-if="!student.meets_attendance_requirement" class="font-semibold text-red-600">✗ Failed</div>
+                                        <div v-else class="text-green-600">✓ {{ student.absences_remaining }} left</div>
                                     </div>
                                 </TableCell>
                             </TableRow>

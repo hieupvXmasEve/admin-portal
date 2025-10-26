@@ -48,6 +48,7 @@ class CourseStatisticsService
             $query->where('course_offerings.semester_id', $semesterId);
         }
 
+        // Subquery to calculate allowed absences and count exceeded students properly
         $query
             ->select([
                 'course_offerings.id',
@@ -60,7 +61,8 @@ class CourseStatisticsService
                 'course_offerings.current_enrollment',
                 'course_offerings.delivery_mode',
                 DB::raw('COUNT(DISTINCT academic_records.student_id) as total_students'),
-                DB::raw('SUM(CASE WHEN academic_records.meets_attendance_requirement = 0 THEN 1 ELSE 0 END) as students_absent_exceeded'),
+                // NOTE: students_absent_exceeded will be recalculated in controller based on actual total_absences > allowed
+                DB::raw('0 as students_absent_exceeded'),
                 DB::raw('AVG(academic_records.attendance_percentage) as average_attendance'),
                 DB::raw('AVG(academic_records.final_percentage) as average_grade'),
                 DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "A+" THEN 1 END) as grade_a_plus'),
@@ -128,8 +130,15 @@ class CourseStatisticsService
     private function calculateGradeDistribution($academicRecords): array
     {
         $distribution = [
-            'A+' => 0, 'A' => 0, 'B+' => 0, 'B' => 0,
-            'C+' => 0, 'C' => 0, 'D+' => 0, 'D' => 0, 'F' => 0,
+            'A+' => 0,
+            'A' => 0,
+            'B+' => 0,
+            'B' => 0,
+            'C+' => 0,
+            'C' => 0,
+            'D+' => 0,
+            'D' => 0,
+            'F' => 0,
         ];
 
         foreach ($academicRecords as $record) {
@@ -244,7 +253,7 @@ class CourseStatisticsService
             'course_name' => $courseOffering->unit->name,
             'section_code' => $courseOffering->section_code,
             'semester' => $courseOffering->semester->name,
-            'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name.' '.$courseOffering->lecture->last_name) : null,
+            'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name . ' ' . $courseOffering->lecture->last_name) : null,
             'total_students' => $students->count(),
             'total_sessions' => $totalSessions,
             'allowed_absences' => $allowedAbsences,
@@ -391,7 +400,7 @@ class CourseStatisticsService
                 $componentScores = $studentScores->whereIn('assessment_component_detail_id', $detailIds);
 
                 // Check if details have weights defined
-                $detailsHaveWeights = $validDetails->filter(fn ($d) => $d->weight !== null && $d->weight > 0)->count() > 0;
+                $detailsHaveWeights = $validDetails->filter(fn($d) => $d->weight !== null && $d->weight > 0)->count() > 0;
 
                 // Calculate weighted sum based on detail weights
                 $totalWeightedScore = 0;
@@ -450,6 +459,7 @@ class CourseStatisticsService
             $academicRecord = $academicRecords->get($student->id);
 
             $scoresGrid[] = [
+                'id' => $student->id,
                 'student_id' => $student->student_id,
                 'full_name' => $student->full_name,
                 'email' => $student->email,
@@ -471,7 +481,7 @@ class CourseStatisticsService
             'course_name' => $courseOffering->unit->name,
             'section_code' => $courseOffering->section_code,
             'semester' => $courseOffering->semester->name,
-            'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name.' '.$courseOffering->lecture->last_name) : null,
+            'instructor_name' => $courseOffering->lecture ? trim($courseOffering->lecture->first_name . ' ' . $courseOffering->lecture->last_name) : null,
             'total_students' => $students->count(),
             'total_components' => $assessmentComponents->count(),
             'total_details' => count($assessmentDetails),

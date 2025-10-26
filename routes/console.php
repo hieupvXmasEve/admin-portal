@@ -9,11 +9,11 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Schedule automatic deactivation of expired semesters
-Schedule::command('semester:deactivate-expired')
-    ->daily()
-    ->at('00:01')
-    ->withoutOverlapping()
-    ->onOneServer();
+// Schedule::command('semester:deactivate-expired')
+//     ->daily()
+//     ->at('00:01')
+//     ->withoutOverlapping()
+//     ->onOneServer();
 
 // Schedule automatic update of class session statuses
 // Auto-creates attendance when sessions transition to 'in_progress'
@@ -47,6 +47,13 @@ Schedule::command('events:process-failed-gold-rewards')
 // Schedule academic records sync (create new + update existing with latest attendance)
 Schedule::command('academic-records:sync')
     ->dailyAt('03:00')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
+
+// Schedule attendance sync to academic records every 2 hours
+Schedule::command('attendance:sync-to-academic-records')
+    ->everyTwoHours()
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();

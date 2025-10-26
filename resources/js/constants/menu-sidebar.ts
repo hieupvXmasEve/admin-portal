@@ -239,6 +239,12 @@ export const mainNavItems: NavItem[] = [
                 icon: UserPlus,
                 requiredPermissions: ['view_course_registration'],
             },
+            {
+                title: 'Course Statistics',
+                href: '/course-statistics',
+                icon: BarChart3,
+                requiredPermissions: ['view_attendance'],
+            },
             // {
             //     title: 'Enrollment Summary',
             //     href: courseRoutes.enrollmentSummary(),
@@ -263,12 +269,6 @@ export const mainNavItems: NavItem[] = [
                 href: attendanceRoutes.attendance.index(),
                 icon: FileText,
                 requiredPermissions: ['view_attendance'], // Will be implemented later
-            },
-            {
-                title: 'Course Statistics',
-                href: '/course-statistics',
-                icon: BarChart3,
-                requiredPermissions: ['view_attendance'],
             },
         ],
     },

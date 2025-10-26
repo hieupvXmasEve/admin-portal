@@ -7,15 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApi } from '@/composables/useApiRequest';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import type { PaginatedResponse } from '@/types';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { AlertCircle, Award, CheckCircle2, Clock, ExternalLink, EyeOff, Link2, Link2Off, ListChecks, RefreshCw } from 'lucide-vue-next';
+import { AlertCircle, Award, BarChart3, CheckCircle2, Clock, ExternalLink, EyeOff, Link2, Link2Off, ListChecks, MoreHorizontal, RefreshCw } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -324,10 +325,10 @@ const openSyncAssignmentsDialog = async (mapping: CanvasCourseMapping) => {
         assignmentsSyncSummary.value = data.value;
 
         // Auto-select already synced groups
-        if (data.value?.groups) {
+        if (data.value && 'groups' in data.value && Array.isArray(data.value.groups)) {
             selectedGroups.value = data.value.groups.filter((g: any) => g.is_currently_synced).map((g: any) => g.id);
         }
-    } catch (error: any) {
+    } catch {
         toast.error('Failed to load sync summary');
         syncAssignmentsDialogOpen.value = false;
     }
@@ -410,7 +411,7 @@ const openSyncGradesDialog = async (mapping: CanvasCourseMapping) => {
         }
 
         gradesSyncSummary.value = data.value;
-    } catch (error: any) {
+    } catch {
         toast.error('Failed to load sync summary');
         syncGradesDialogOpen.value = false;
     }
@@ -437,8 +438,8 @@ const syncGrades = async () => {
             sync_results: data.value,
         };
 
-        toast.success(`Grades synced! ${data.value?.students_synced} students processed`);
-    } catch (error: any) {
+        toast.success(`Grades synced! ${data.value && 'students_synced' in data.value ? data.value.students_synced : 0} students processed`);
+    } catch {
         toast.error('Failed to sync grades');
     } finally {
         syncGradesLoading.value = false;
@@ -451,10 +452,17 @@ const closeSyncGradesDialog = () => {
     gradesSyncSummary.value = null;
 };
 
+const openCanvasUrl = (url: string) => {
+    window.open(url, '_blank');
+};
+
 const columns: ColumnDef<CanvasCourseMapping>[] = [
     {
         accessorKey: 'canvas_course_code',
         header: 'Canvas Code',
+        size: 150,
+        minSize: 150,
+        maxSize: 150,
         cell: ({ row }) => {
             const mapping = row.original;
             return h('div', { class: 'font-medium' }, mapping.canvas_course_code || 'N/A');
@@ -465,7 +473,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
         header: 'Canvas Course',
         cell: ({ row }) => {
             const mapping = row.original;
-            return h('div', { class: 'max-w-[300px]' }, [h('div', { class: 'font-medium truncate' }, mapping.canvas_course_name), h('div', { class: 'text-xs text-muted-foreground' }, `ID: ${mapping.canvas_course_id}`)]);
+            return h('div', { class: 'max-w-[300px]' }, [h('div', { class: 'font-medium truncate' }, mapping.canvas_course_name || ''), h('div', { class: 'text-xs text-muted-foreground' }, `ID: ${mapping.canvas_course_id}`)]);
         },
     },
     {
@@ -482,7 +490,7 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
         header: 'Mapped To',
         cell: ({ row }) => {
             const mapping = row.original;
-            if (!mapping.course_offering) {
+            if (!mapping.course_offering || !mapping.course_offering.id) {
                 return h('span', { class: 'text-muted-foreground text-sm' }, '—');
             }
             const offering = mapping.course_offering;
@@ -490,87 +498,41 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
 
             return h('div', {}, [
                 h(
-                    'a',
+                    Link,
                     {
                         href: courseUrl,
                         class: 'text-primary font-medium hover:underline transition-colors',
-                        target: '_blank',
                     },
-                    `${offering.course_code} - ${offering.course_title}`,
+                    () => `${offering.course_code || 'N/A'} - ${offering.course_title || 'N/A'}`,
                 ),
-                h('div', { class: 'text-xs text-muted-foreground' }, `Section ${offering.section_code}${offering.semester ? ' • ' + offering.semester.name : ''}`),
+                h('div', { class: 'text-xs text-muted-foreground' }, `Section ${offering.section_code || 'N/A'}${offering.semester?.name ? ' • ' + offering.semester.name : ''}`),
             ]);
+        },
+    },
+    {
+        accessorKey: 'statistics',
+        header: 'Statistics',
+        cell: ({ row }) => {
+            const mapping = row.original;
+            if (!mapping.course_offering || !mapping.course_offering.id || !mapping.is_mapped) {
+                return h('span', { class: 'text-muted-foreground text-sm' }, '—');
+            }
+            const statisticsUrl = `/course-statistics/${mapping.course_offering.id}/assessment-scores`;
+
+            return h(
+                Link,
+                {
+                    href: statisticsUrl,
+                    class: 'inline-flex items-center gap-2 text-primary font-medium hover:underline transition-colors',
+                },
+                () => [h(BarChart3, { class: 'h-4 w-4' }), 'View Stats'],
+            );
         },
     },
     {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => {
-            const mapping = row.original;
-            return h('div', { class: 'flex items-center gap-2' }, [
-                mapping.canvas_url &&
-                    h(
-                        'a',
-                        {
-                            href: mapping.canvas_url,
-                            target: '_blank',
-                            class: 'inline-flex items-center gap-1 text-sm text-primary hover:underline',
-                        },
-                        [h(ExternalLink, { class: 'h-3 w-3' }), 'View in Canvas'],
-                    ),
-                !mapping.is_ignored &&
-                    !mapping.is_mapped &&
-                    h(
-                        Button,
-                        {
-                            size: 'sm',
-                            variant: 'outline',
-                            onClick: () => openMappingDialog(mapping),
-                        },
-                        () => [h(Link2, { class: 'mr-1 h-3 w-3' }), 'Map'],
-                    ),
-                mapping.is_mapped &&
-                    h(
-                        Button,
-                        {
-                            size: 'sm',
-                            variant: 'outline',
-                            onClick: () => openSyncAssignmentsDialog(mapping),
-                        },
-                        () => [h(ListChecks, { class: 'mr-1 h-3 w-3' }), 'Sync Assignments'],
-                    ),
-                mapping.is_mapped &&
-                    h(
-                        Button,
-                        {
-                            size: 'sm',
-                            variant: 'outline',
-                            onClick: () => openSyncGradesDialog(mapping),
-                        },
-                        () => [h(Award, { class: 'mr-1 h-3 w-3' }), 'Sync Grades'],
-                    ),
-                mapping.is_mapped &&
-                    h(
-                        Button,
-                        {
-                            size: 'sm',
-                            variant: 'outline',
-                            onClick: () => unmapCourse(mapping),
-                        },
-                        () => [h(Link2Off, { class: 'mr-1 h-3 w-3' }), 'Unmap'],
-                    ),
-                !mapping.is_ignored &&
-                    h(
-                        Button,
-                        {
-                            size: 'sm',
-                            variant: 'ghost',
-                            onClick: () => ignoreCourse(mapping),
-                        },
-                        () => [h(EyeOff, { class: 'mr-1 h-3 w-3' }), 'Ignore'],
-                    ),
-            ]);
-        },
+        cell: () => null, // We'll use template slot instead
     },
 ];
 </script>
@@ -651,7 +613,61 @@ const columns: ColumnDef<CanvasCourseMapping>[] = [
         <!-- Data Table -->
         <Card>
             <CardContent class="pt-6">
-                <DataTable :columns="columns" :data="mappings.data" />
+                <DataTable :columns="columns" :data="mappings.data">
+                    <template #cell-actions="{ row }">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger as-child>
+                                <Button variant="ghost" size="sm" class="h-8 w-8 p-0">
+                                    <span class="sr-only">Open menu</span>
+                                    <MoreHorizontal class="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <!-- View in Canvas link -->
+                                <DropdownMenuItem v-if="row.original.canvas_url" @click="() => row.original.canvas_url && openCanvasUrl(row.original.canvas_url)" class="cursor-pointer">
+                                    <ExternalLink class="mr-2 h-4 w-4" />
+                                    View in Canvas
+                                </DropdownMenuItem>
+
+                                <!-- Separator if there's a Canvas link and other actions -->
+                                <DropdownMenuSeparator v-if="row.original.canvas_url && (row.original.is_mapped || !row.original.is_ignored)" />
+
+                                <!-- Map course action -->
+                                <DropdownMenuItem v-if="!row.original.is_ignored && !row.original.is_mapped" @click="openMappingDialog(row.original)" class="cursor-pointer">
+                                    <Link2 class="mr-2 h-4 w-4" />
+                                    Map Course
+                                </DropdownMenuItem>
+
+                                <!-- Sync actions for mapped courses -->
+                                <template v-if="row.original.is_mapped">
+                                    <DropdownMenuItem @click="openSyncAssignmentsDialog(row.original)" class="cursor-pointer">
+                                        <ListChecks class="mr-2 h-4 w-4" />
+                                        Sync Assignments
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem @click="openSyncGradesDialog(row.original)" class="cursor-pointer">
+                                        <Award class="mr-2 h-4 w-4" />
+                                        Sync Grades
+                                    </DropdownMenuItem>
+                                </template>
+
+                                <!-- Separator before destructive actions -->
+                                <DropdownMenuSeparator v-if="row.original.is_mapped || !row.original.is_ignored" />
+
+                                <!-- Unmap action for mapped courses -->
+                                <DropdownMenuItem v-if="row.original.is_mapped" @click="unmapCourse(row.original)" class="text-destructive focus:text-destructive cursor-pointer">
+                                    <Link2Off class="mr-2 h-4 w-4" />
+                                    Unmap Course
+                                </DropdownMenuItem>
+
+                                <!-- Ignore action for non-ignored courses -->
+                                <DropdownMenuItem v-if="!row.original.is_ignored" @click="ignoreCourse(row.original)" class="text-destructive focus:text-destructive cursor-pointer">
+                                    <EyeOff class="mr-2 h-4 w-4" />
+                                    Ignore Course
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </template>
+                </DataTable>
                 <div class="mt-4">
                     <DataPagination :pagination-data="mappings" @navigate="handlePageChange" @page-size-change="handlePageSizeChange" />
                 </div>

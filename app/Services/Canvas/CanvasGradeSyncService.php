@@ -437,22 +437,27 @@ class CanvasGradeSyncService
 
                 if ($existingRecord) {
                     // Update existing record
+                    $finalPercentage = round($canvasTotal, 2);
                     $existingRecord->update([
-                        'final_percentage' => round($canvasTotal, 2),
+                        'final_percentage' => $finalPercentage,
+                        'final_letter_grade' => $this->convertToLetterGrade($finalPercentage),
                     ]);
 
                     Log::info('Updated Canvas total grade in existing academic record', [
                         'student_id' => $student->id,
                         'academic_record_id' => $existingRecord->id,
                         'canvas_total' => $canvasTotal,
-                        'final_percentage' => round($canvasTotal, 2),
+                        'final_percentage' => $finalPercentage,
+                        'final_letter_grade' => $existingRecord->final_letter_grade,
                     ]);
                 } else {
                     // Try to create new record with all required fields
+                    $finalPercentage = round($canvasTotal, 2);
                     $academicRecordData = [
                         'student_id' => $student->id,
                         'course_offering_id' => $courseOffering->id,
-                        'final_percentage' => round($canvasTotal, 2),
+                        'final_percentage' => $finalPercentage,
+                        'final_letter_grade' => $this->convertToLetterGrade($finalPercentage),
                         'enrollment_date' => now()->toDateString(), // Required field - use current date or semester start
                     ];
 
@@ -711,6 +716,25 @@ class CanvasGradeSyncService
             'graded' => 'graded',
             'unsubmitted' => 'not_submitted',
             default => 'not_submitted',
+        };
+    }
+
+    /**
+     * Convert percentage score to letter grade based on AU grading scale
+     */
+    private function convertToLetterGrade(float $percentage): string
+    {
+        return match (true) {
+            $percentage >= 90 => 'A+',
+            $percentage >= 85 => 'A',
+            $percentage >= 80 => 'A-',
+            $percentage >= 75 => 'B+',
+            $percentage >= 70 => 'B',
+            $percentage >= 65 => 'B-',
+            $percentage >= 60 => 'C+',
+            $percentage >= 55 => 'C',
+            $percentage >= 50 => 'C-',
+            default => 'F',
         };
     }
 

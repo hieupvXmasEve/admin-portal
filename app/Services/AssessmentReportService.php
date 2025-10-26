@@ -1081,6 +1081,15 @@ class AssessmentReportService
             $scoresIndex[$score->student_id][$score->detail_id] = $score;
         }
 
+        // Get academic records for all students to retrieve final_percentage
+        $academicRecords = DB::table('academic_records')
+            ->where('course_offering_id', $courseOffering->id)
+            ->whereIn('student_id', $students->pluck('id'))
+            ->whereNull('deleted_at')
+            ->select('student_id', 'final_percentage', 'final_letter_grade')
+            ->get()
+            ->keyBy('student_id');
+
         // Build grade matrix with simplified statistics
         $gradeMatrix = [];
         $classStatistics = [
@@ -1104,8 +1113,6 @@ class AssessmentReportService
                 'missing_assessments' => 0,
             ];
 
-            $totalWeightedScore = 0;
-            $totalWeight = 0;
             $studentMissingCount = 0;
 
             foreach ($assessmentComponents as $component) {
@@ -1127,8 +1134,7 @@ class AssessmentReportService
                             'status' => 'graded',
                         ];
 
-                        // Use points_earned directly for calculations
-                        // Assuming points_earned is already a percentage or can be used as is
+                        // Use points_earned directly for component average calculation
                         $scoreValue = $score->points_earned;
 
                         // Calculate weighted score for this detail
@@ -1157,10 +1163,6 @@ class AssessmentReportService
                 if ($componentTotalWeight > 0) {
                     $componentAverage = round($componentWeightedScore / $componentTotalWeight, 2);
 
-                    // Add to total weighted score
-                    $totalWeightedScore += ($componentAverage * $component->weight);
-                    $totalWeight += $component->weight;
-
                     // Track for class statistics
                     if (! isset($classStatistics['component_averages'][$component->id])) {
                         $classStatistics['component_averages'][$component->id] = [];
@@ -1179,12 +1181,13 @@ class AssessmentReportService
                 ];
             }
 
-            // Calculate final percentage and letter grade
-            $finalPercentage = $totalWeight > 0 ? round($totalWeightedScore / $totalWeight, 2) : 0;
+            // Get final_percentage and letter_grade directly from academic_records
+            $academicRecord = $academicRecords->get($student->id);
+            $finalPercentage = $academicRecord?->final_percentage ?? 0;
+            $letterGrade = $academicRecord?->final_letter_grade ?? null;
 
-            $studentRow['weighted_total'] = round($totalWeightedScore, 2);
-            $studentRow['final_percentage'] = $finalPercentage;
-            $studentRow['letter_grade'] = $this->calculateLetterGrade($finalPercentage);
+            $studentRow['final_percentage'] = round((float) $finalPercentage, 2);
+            $studentRow['letter_grade'] = $letterGrade;
             $studentRow['missing_assessments'] = $studentMissingCount;
 
             // Track for class statistics

@@ -5,6 +5,7 @@ import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
@@ -12,7 +13,7 @@ import type { PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, Copy, Edit, Eye, MoreHorizontal, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
+import { BarChart3, Copy, Edit, Eye, MoreHorizontal, Plus, RefreshCw, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
 import { h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -55,6 +56,9 @@ const filters = ref({
 const selectedItems = ref<number[]>([]);
 const isLoading = ref(false);
 const statistics = ref<any>(null);
+const showStatusDialog = ref(false);
+const selectedCourse = ref<CourseOffering | null>(null);
+const selectedStatus = ref<string>('not_started');
 
 // Initialize the confirm dialog composable
 const confirmDialog = useGlobalConfirmDialog();
@@ -232,6 +236,46 @@ const duplicateCourseOffering = (courseOffering: CourseOffering) => {
                         },
                     );
                 });
+            },
+        },
+    );
+};
+
+const openStatusDialog = (courseOffering: CourseOffering) => {
+    selectedCourse.value = courseOffering;
+    selectedStatus.value = courseOffering.course_status || 'not_started';
+    showStatusDialog.value = true;
+};
+
+const closeStatusDialog = () => {
+    showStatusDialog.value = false;
+    selectedCourse.value = null;
+    selectedStatus.value = 'not_started';
+};
+
+const updateCourseStatus = () => {
+    if (!selectedCourse.value) return;
+
+    // Direct update for all statuses
+    router.patch(
+        `/course-offerings/${selectedCourse.value.id}/update-course-status`,
+        { course_status: selectedStatus.value },
+        {
+            onSuccess: (page) => {
+                // Check for flash messages from backend
+                if (page.props.flash?.error) {
+                    toast.error(page.props.flash.error as string);
+                    return;
+                }
+
+                const successMessage = (page.props.flash?.success as string) || 'Course status updated successfully';
+                toast.success(successMessage);
+                closeStatusDialog();
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                const errorMessage = Array.isArray(firstError) ? firstError[0] : (firstError as string) || 'Failed to update course status';
+                toast.error(errorMessage);
             },
         },
     );
@@ -457,6 +501,13 @@ const columns: ColumnDef<CourseOffering>[] = [
                     h(
                         DropdownMenuItem,
                         {
+                            onClick: () => openStatusDialog(course),
+                        },
+                        () => [h(RefreshCw, { class: 'mr-2 h-4 w-4' }), 'Change Status'],
+                    ),
+                    h(
+                        DropdownMenuItem,
+                        {
                             onClick: () => toggleStatus(course),
                         },
                         () => [course.enrollment_status === 'open' ? h(ToggleLeft, { class: 'mr-2 h-4 w-4' }) : h(ToggleRight, { class: 'mr-2 h-4 w-4' }), course.enrollment_status === 'open' ? 'Close Registration' : 'Open Registration'],
@@ -652,4 +703,59 @@ const columns: ColumnDef<CourseOffering>[] = [
 
     <!-- Pagination -->
     <DataPagination :pagination-data="courseOfferings" @navigate="handlePageChange" />
+
+    <!-- Change Status Dialog -->
+    <Dialog v-model:open="showStatusDialog">
+        <DialogContent class="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Change Course Status</DialogTitle>
+                <DialogDescription>
+                    <template v-if="selectedCourse">
+                        Update status for <strong>{{ selectedCourse.unit?.code }}</strong>
+                        <span v-if="selectedCourse.section_code"> - Section {{ selectedCourse.section_code }}</span>
+                    </template>
+                </DialogDescription>
+            </DialogHeader>
+            <div class="space-y-4 py-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">Select New Status</label>
+                    <Select v-model="selectedStatus">
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem v-for="option in courseStatusOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div v-if="selectedStatus === 'completed'" class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4 space-y-3">
+                    <div class="flex items-start gap-2">
+                        <svg class="w-5 h-5 text-yellow-800 dark:text-yellow-200 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div class="flex-1 space-y-2">
+                            <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+                                Marking as Completed will:
+                            </p>
+                            <ul class="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 ml-1">
+                                <li>• Finalize all student grades</li>
+                                <li>• Update course registrations to "completed" status</li>
+                                <li>• Process EGC level progression (if applicable)</li>
+                                <li>• <strong>Lock the course from further modifications</strong></li>
+                            </ul>
+                            <p class="text-sm font-semibold text-yellow-900 dark:text-yellow-100 pt-2 border-t border-yellow-300 dark:border-yellow-700">
+                                ⚠️ Once marked as completed, this action cannot be undone.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" @click="closeStatusDialog">Cancel</Button>
+                <Button @click="updateCourseStatus">Update Status</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </template>

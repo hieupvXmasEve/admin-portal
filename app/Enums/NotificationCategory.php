@@ -11,6 +11,7 @@ enum NotificationCategory: string
     case EVENT = 'event';
     case CLUB = 'club';
     case ADMINISTRATIVE = 'administrative';
+    case ADMIN = 'admin';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum NotificationCategory: string
             self::EVENT => 'Event',
             self::CLUB => 'Club',
             self::ADMINISTRATIVE => 'Administrative',
+            self::ADMIN => 'Admin Alert',
         };
     }
 
@@ -35,6 +37,7 @@ enum NotificationCategory: string
             self::EVENT => 'Event notifications',
             self::CLUB => 'Club notifications',
             self::ADMINISTRATIVE => 'Administrative notifications',
+            self::ADMIN => 'Important alerts for administrators requiring attention',
         };
     }
 
