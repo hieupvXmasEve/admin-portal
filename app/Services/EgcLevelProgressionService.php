@@ -78,11 +78,12 @@ class EgcLevelProgressionService
                 continue;
             }
 
-            // Check if passing based on final_percentage directly
-            // EGC courses: >= 70%, Other courses: >= 60%
-            // Cast to float to ensure type safety
-            $finalPercentage = (float) ($record->final_percentage ?? 0);
-            $isPassing = $finalPercentage >= $passingThreshold;
+            // Check if passing based on completion_status
+            // completion_status is already set by CourseCompletionService which checks:
+            // 1. Attendance requirement (>= 80%) - PRIORITY
+            // 2. Grade threshold (EGC: >= 70%, Others: >= 60%)
+            // If either fails, completion_status = 'failed'
+            $isPassing = $record->completion_status === 'completed';
 
             // Check if student's current level matches unit level
             $levelMatch = $student->gc_current_level === $unitLevel;

@@ -38,8 +38,9 @@ class CourseCompletionService
 
         // 5. Send notifications to students for non-EGC courses
         // (EGC courses send notifications in EgcLevelProgressionService)
+        $nonEgcResult = null;
         if (! $egcResult['processed']) {
-            $this->notifyStudentsNonEgcCompletion($courseOffering);
+            $nonEgcResult = $this->notifyStudentsNonEgcCompletion($courseOffering);
         }
 
         Log::info('Course Finalized', [
@@ -57,6 +58,7 @@ class CourseCompletionService
             'section_code' => $courseOffering->section_code,
             'total_students' => $courseOffering->current_enrollment,
             'egc_progression' => $egcResult,
+            'non_egc_result' => $nonEgcResult,
         ];
     }
 
@@ -77,7 +79,42 @@ class CourseCompletionService
         // Update each record individually to avoid SQL raw issues
         $records = AcademicRecord::where('course_offering_id', $courseOffering->id)->get();
 
+        $attendanceFailedCount = 0;
+        $gradeFailedCount = 0;
+        $passedCount = 0;
+
         foreach ($records as $record) {
+            // STEP 1: CHECK ATTENDANCE REQUIREMENT FIRST (PRIORITY)
+            // Student must attend >= 80% of classes (cannot be absent > 20%)
+            $meetsAttendanceRequirement = $record->meets_attendance_requirement ?? true;
+
+            // If student failed attendance requirement, automatic FAIL regardless of grade
+            if (! $meetsAttendanceRequirement) {
+                $attendancePercentage = (float) ($record->attendance_percentage ?? 0);
+
+                $record->update([
+                    'grade_status' => 'final',
+                    'grade_finalized_date' => now(),
+                    'grade_points' => 0.0, // F grade for attendance failure
+                    'completion_status' => 'failed',
+                    'credit_hours_earned' => 0,
+                    'affects_graduation_requirement' => true,
+                    'satisfies_prerequisite' => false,
+                    'administrative_notes' => ($record->administrative_notes ? $record->administrative_notes . "\n" : '')
+                        . "FAILED: Attendance requirement not met ({$attendancePercentage}% attendance, required >= 80%)",
+                ]);
+
+                $attendanceFailedCount++;
+                Log::warning('Student failed due to attendance', [
+                    'student_id' => $record->student_id,
+                    'course_offering_id' => $courseOffering->id,
+                    'attendance_percentage' => $attendancePercentage,
+                ]);
+
+                continue;
+            }
+
+            // STEP 2: CHECK GRADE (only if attendance requirement is met)
             // Cast to float to ensure type safety
             $finalPercentage = (float) ($record->final_percentage ?? 0);
 
@@ -86,6 +123,12 @@ class CourseCompletionService
 
             // Calculate grade points from final percentage
             $gradePoints = $this->calculateGradePoints($finalPercentage);
+
+            if ($isPassing) {
+                $passedCount++;
+            } else {
+                $gradeFailedCount++;
+            }
 
             $record->update([
                 'grade_status' => 'final',
@@ -103,6 +146,10 @@ class CourseCompletionService
             'records_count' => $records->count(),
             'course_type' => $courseOffering->unit->unit_type,
             'passing_threshold' => $passingThreshold,
+            'passed' => $passedCount,
+            'failed_attendance' => $attendanceFailedCount,
+            'failed_grade' => $gradeFailedCount,
+            'total_failed' => $attendanceFailedCount + $gradeFailedCount,
         ]);
     }
 
@@ -287,8 +334,9 @@ class CourseCompletionService
 
     /**
      * Send notifications to students for non-EGC course completion
+     * Returns array with pass/fail statistics
      */
-    private function notifyStudentsNonEgcCompletion(CourseOffering $courseOffering): void
+    private function notifyStudentsNonEgcCompletion(CourseOffering $courseOffering): array
     {
         $courseOffering->load('unit');
 
@@ -298,6 +346,8 @@ class CourseCompletionService
             ->get();
 
         $notifiedCount = 0;
+        $passedCount = 0;
+        $failedCount = 0;
 
         foreach ($records as $record) {
             $student = $record->student;
@@ -310,6 +360,12 @@ class CourseCompletionService
             $finalPercentage = (float) ($record->final_percentage ?? 0);
             $passingThreshold = 60; // Non-EGC courses use 60% threshold
             $isPassing = $finalPercentage >= $passingThreshold;
+
+            if ($isPassing) {
+                $passedCount++;
+            } else {
+                $failedCount++;
+            }
 
             // Create notification using custom method (compatible with custom Notification model)
             $this->createNotification(
@@ -335,7 +391,15 @@ class CourseCompletionService
             'unit_code' => $courseOffering->unit->code,
             'unit_name' => $courseOffering->unit->name,
             'total_notifications' => $notifiedCount,
+            'passed' => $passedCount,
+            'failed' => $failedCount,
         ]);
+
+        return [
+            'total_notified' => $notifiedCount,
+            'passed' => $passedCount,
+            'failed' => $failedCount,
+        ];
     }
 
     /**

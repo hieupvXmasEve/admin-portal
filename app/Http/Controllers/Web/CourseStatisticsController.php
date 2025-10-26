@@ -34,7 +34,7 @@ class CourseStatisticsController extends Controller
         foreach ($items as $item) {
             // Get total sessions for this course offering
             $totalSessions = $item->classSessions()->count();
-            $allowedAbsences = (int) ceil($totalSessions * 0.2);
+            $allowedAbsences = (int) floor($totalSessions * 0.2);
 
             // Recalculate students who exceeded based on actual absences count
             $studentsExceeded = $item->academicRecords()

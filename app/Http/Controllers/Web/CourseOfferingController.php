@@ -1636,6 +1636,7 @@ class CourseOfferingController extends Controller
                 $message = "Course '{$result['course_code']}' marked as completed successfully.";
 
                 if ($result['egc_progression']['processed']) {
+                    // EGC course message
                     $egc = $result['egc_progression'];
                     $message .= " | EGC: {$egc['total_students']} student(s) processed";
 
@@ -1649,6 +1650,19 @@ class CourseOfferingController extends Controller
 
                     if (count($egc['warnings']) > 0) {
                         $message .= ". ⚠️ ".count($egc['warnings']).' level mismatch warning(s) - check notifications';
+                    }
+                } elseif ($result['non_egc_result']) {
+                    // Non-EGC course message
+                    $nonEgc = $result['non_egc_result'];
+                    $totalStudents = $nonEgc['passed'] + $nonEgc['failed'];
+                    $message .= " | {$totalStudents} student(s) processed";
+
+                    if ($nonEgc['passed'] > 0) {
+                        $message .= ", {$nonEgc['passed']} passed";
+                    }
+
+                    if ($nonEgc['failed'] > 0) {
+                        $message .= ", {$nonEgc['failed']} failed";
                     }
                 }
 
