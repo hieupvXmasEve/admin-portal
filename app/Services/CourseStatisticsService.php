@@ -186,7 +186,7 @@ class CourseStatisticsService
 
         $sessions = $courseOffering->classSessions;
         $totalSessions = $sessions->count();
-        $allowedAbsences = (int) ceil($totalSessions * 0.2); // 20% allowed absences
+        $allowedAbsences = (int) floor($totalSessions * 0.2); // 20% allowed absences
 
         $attendanceGrid = [];
         foreach ($students as $student) {
