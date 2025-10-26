@@ -1592,4 +1592,107 @@ class CourseOfferingController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Update course status
+     */
+    public function updateCourseStatus(Request $request, CourseOffering $courseOffering): RedirectResponse
+    {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
+        // Check if course is already completed - cannot modify
+        if ($courseOffering->course_status === 'completed') {
+            return Redirect::back()
+                ->with('error', 'Cannot change status of a completed course.');
+        }
+
+        $request->validate([
+            'course_status' => ['required', 'in:not_started,in_progress,completed,cancelled'],
+        ]);
+
+        $oldStatus = $courseOffering->course_status ?? 'not_started';
+        $newStatus = $request->course_status;
+
+        // If marking as completed, run finalization process
+        if ($newStatus === 'completed') {
+            try {
+                DB::beginTransaction();
+
+                // Load necessary relationships
+                $courseOffering->load(['unit', 'semester']);
+
+                // Finalize course with all validations and EGC progression
+                $result = app(\App\Services\CourseCompletionService::class)->finalizeCourse($courseOffering);
+
+                // Update course offering status
+                $courseOffering->update(['course_status' => 'completed']);
+
+                DB::commit();
+
+                // Prepare success message with details
+                $message = "Course '{$result['course_code']}' marked as completed successfully.";
+
+                if ($result['egc_progression']['processed']) {
+                    $egc = $result['egc_progression'];
+                    $message .= " | EGC: {$egc['total_students']} student(s) processed";
+
+                    if (count($egc['progressed']) > 0) {
+                        $message .= ", ".count($egc['progressed']).' progressed to next level';
+                    }
+
+                    if (count($egc['failed_students']) > 0) {
+                        $message .= ", ".count($egc['failed_students']).' failed (level unchanged)';
+                    }
+
+                    if (count($egc['warnings']) > 0) {
+                        $message .= ". ⚠️ ".count($egc['warnings']).' level mismatch warning(s) - check notifications';
+                    }
+                }
+
+                Log::info('Course status updated to completed', [
+                    'course_offering_id' => $courseOffering->id,
+                    'course_code' => $courseOffering->course_code,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                    'egc_result' => $result['egc_progression'],
+                ]);
+
+                return Redirect::back()->with('success', $message);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error('Failed to complete course: '.$e->getMessage(), [
+                    'course_offering_id' => $courseOffering->id,
+                    'course_code' => $courseOffering->course_code,
+                ]);
+
+                // Return with error status for Inertia to trigger onError
+                return Redirect::back()
+                    ->with('error', 'Failed to complete course: '.$e->getMessage())
+                    ->withErrors(['course_status' => 'Failed to complete course: '.$e->getMessage()]);
+            }
+        } else {
+            // Simple status update for non-completed statuses
+            try {
+                $courseOffering->update(['course_status' => $newStatus]);
+
+                Log::info('Course status updated', [
+                    'course_offering_id' => $courseOffering->id,
+                    'course_code' => $courseOffering->course_code,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                ]);
+
+                return Redirect::back()
+                    ->with('success', "Course status updated to '{$newStatus}' successfully.");
+            } catch (\Exception $e) {
+                Log::error('Failed to update course status: '.$e->getMessage());
+
+                return Redirect::back()
+                    ->with('error', 'Failed to update course status: '.$e->getMessage());
+            }
+        }
+    }
 }

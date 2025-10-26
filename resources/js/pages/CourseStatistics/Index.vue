@@ -2,7 +2,6 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -107,11 +106,15 @@ const clearFilters = () => {
         sort: 'course_code',
         direction: 'asc',
     };
-    router.get('/course-statistics', {}, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['statistics', 'filters'],
-    });
+    router.get(
+        '/course-statistics',
+        {},
+        {
+            preserveState: true,
+            preserveScroll: true,
+            only: ['statistics', 'filters'],
+        },
+    );
 };
 
 const hasActiveFilters = computed(() => {
@@ -182,9 +185,9 @@ const handlePaginationNavigate = (url: string) => {
 
 const handlePageSizeChange = (pageSize: number) => {
     filters.value.per_page = pageSize;
-    
+
     const queryParams: Record<string, string | number> = { per_page: pageSize };
-    
+
     if (filters.value.semester_id && filters.value.semester_id !== 'all') {
         queryParams.semester_id = filters.value.semester_id;
     }
@@ -277,13 +280,13 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
                     </template>
 
                     <template #cell-course="{ row }">
-                        <div class="space-y-1 min-w-[200px]">
+                        <div class="min-w-[200px] space-y-1">
                             <div class="flex items-center gap-2">
-                                <BookOpen class="h-4 w-4 text-primary" />
+                                <BookOpen class="text-primary h-4 w-4" />
                                 <span class="font-mono font-semibold">{{ row.original.course_code }}</span>
                             </div>
                             <div class="text-sm text-gray-700">{{ row.original.course_name }}</div>
-                            <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                            <div class="text-muted-foreground flex items-center gap-2 text-xs">
                                 <span v-if="row.original.section_code">Section {{ row.original.section_code }}</span>
                                 <span v-if="row.original.credit_hours">• {{ row.original.credit_hours }} credits</span>
                             </div>
@@ -296,7 +299,7 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
                                 <Calendar class="h-4 w-4" />
                                 <span class="font-medium">{{ row.original.semester }}</span>
                             </div>
-                            <div class="text-xs text-muted-foreground">{{ row.original.semester_code }}</div>
+                            <div class="text-muted-foreground text-xs">{{ row.original.semester_code }}</div>
                         </div>
                     </template>
 
@@ -306,69 +309,35 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
 
                     <template #cell-students="{ row }">
                         <div class="space-y-1 text-center">
-                            <div class="flex items-center gap-1 justify-center">
+                            <div class="flex items-center justify-center gap-1">
                                 <Users class="h-4 w-4 text-blue-600" />
                                 <span class="font-bold text-blue-600">{{ row.original.total_students }}</span>
                             </div>
-                            <div class="text-xs text-muted-foreground">
-                                {{ row.original.current_enrollment }}/{{ row.original.max_capacity }} enrolled
-                            </div>
+                            <div class="text-muted-foreground text-xs">{{ row.original.current_enrollment }}/{{ row.original.max_capacity }} enrolled</div>
                         </div>
                     </template>
 
                     <template #cell-absent_exceeded="{ row }">
                         <div class="space-y-1 text-center">
-                            <div class="flex items-center gap-1 justify-center">
-                                <UserX
-                                    :class="[
-                                        'h-4 w-4',
-                                        row.original.students_absent_exceeded > 0
-                                            ? 'text-red-600'
-                                            : 'text-green-600',
-                                    ]"
-                                />
-                                <span
-                                    :class="[
-                                        'font-bold',
-                                        row.original.students_absent_exceeded > 0
-                                            ? 'text-red-600'
-                                            : 'text-green-600',
-                                    ]"
-                                >
+                            <div class="flex items-center justify-center gap-1">
+                                <UserX :class="['h-4 w-4', row.original.students_absent_exceeded > 0 ? 'text-red-600' : 'text-green-600']" />
+                                <span :class="['font-bold', row.original.students_absent_exceeded > 0 ? 'text-red-600' : 'text-green-600']">
                                     {{ row.original.students_absent_exceeded }}
                                 </span>
                             </div>
-                            <div class="text-xs text-muted-foreground">
-                                of {{ row.original.total_students }} students
-                            </div>
-                            <div class="text-xs text-muted-foreground">
-                                (Max {{ row.original.allowed_absences }} absences)
-                            </div>
+                            <div class="text-muted-foreground text-xs">of {{ row.original.total_students }} students</div>
+                            <div class="text-muted-foreground text-xs">(Max {{ row.original.allowed_absences }} absences)</div>
                         </div>
                     </template>
 
                     <template #cell-average_attendance="{ row }">
-                        <div
-                            :class="[
-                                'font-mono font-semibold text-center',
-                                row.original.average_attendance >= 85
-                                    ? 'text-green-600'
-                                    : row.original.average_attendance >= 70
-                                      ? 'text-yellow-600'
-                                      : 'text-red-600',
-                            ]"
-                        >
+                        <div :class="['text-center font-mono font-semibold', row.original.average_attendance >= 85 ? 'text-green-600' : row.original.average_attendance >= 70 ? 'text-yellow-600' : 'text-red-600']">
                             {{ row.original.average_attendance.toFixed(1) }}%
                         </div>
                     </template>
 
                     <template #cell-average_grade="{ row }">
-                        <div
-                            :class="[
-                                'font-mono font-semibold text-center',
-                                row.original.average_grade >= 80 ? 'text-green-600' : row.original.average_grade >= 60 ? 'text-yellow-600' : 'text-red-600',
-                            ]"
-                        >
+                        <div :class="['text-center font-mono font-semibold', row.original.average_grade >= 80 ? 'text-green-600' : row.original.average_grade >= 60 ? 'text-yellow-600' : 'text-red-600']">
                             {{ row.original.average_grade > 0 ? row.original.average_grade.toFixed(1) : 'N/A' }}
                         </div>
                     </template>
@@ -377,25 +346,18 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
                         <div class="flex items-center justify-center gap-1">
                             <TrendingUp v-if="row.original.pass_rate >= 70" :class="['h-4 w-4', row.original.pass_rate >= 90 ? 'text-green-600' : 'text-yellow-600']" />
                             <TrendingDown v-else class="h-4 w-4 text-red-600" />
-                            <span
-                                :class="[
-                                    'font-mono font-semibold',
-                                    row.original.pass_rate >= 90 ? 'text-green-600' : row.original.pass_rate >= 70 ? 'text-yellow-600' : 'text-red-600',
-                                ]"
-                            >
-                                {{ row.original.pass_rate.toFixed(1) }}%
-                            </span>
+                            <span :class="['font-mono font-semibold', row.original.pass_rate >= 90 ? 'text-green-600' : row.original.pass_rate >= 70 ? 'text-yellow-600' : 'text-red-600']"> {{ row.original.pass_rate.toFixed(1) }}% </span>
                         </div>
                     </template>
 
                     <template #cell-actions="{ row }">
                         <div class="flex items-center gap-2">
                             <Button variant="ghost" size="sm" @click="goToDetailPage(row.original.course_offering_id)">
-                                <Eye class="h-4 w-4 mr-2" />
+                                <Eye class="mr-2 h-4 w-4" />
                                 Attendance
                             </Button>
                             <Button variant="ghost" size="sm" @click="goToAssessmentScoresPage(row.original.course_offering_id)">
-                                <ClipboardList class="h-4 w-4 mr-2" />
+                                <ClipboardList class="mr-2 h-4 w-4" />
                                 Scores
                             </Button>
                         </div>

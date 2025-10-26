@@ -44,6 +44,7 @@ interface ComponentTotal {
 }
 
 interface StudentScore {
+    id: number;
     student_id: string;
     full_name: string;
     email: string;
@@ -378,7 +379,7 @@ const getGradeStatusLabel = (status: string): string => {
                         <span>2.5 (C+)</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <Badge variant="success">55–59</Badge>
+                        <Badge variant="destructive">55–59</Badge>
                         <span>2.25 (C)</span>
                     </div>
                     <div class="flex items-center gap-2">
@@ -499,7 +500,11 @@ const getGradeStatusLabel = (status: string): string => {
                             <TableRow v-for="student in filteredScoresGrid" :key="student.student_id">
                                 <TableCell class="sticky left-0 z-10 bg-white dark:bg-gray-950">
                                     <div class="space-y-1">
-                                        <div class="font-medium">{{ student.full_name }}</div>
+                                        <div class="font-medium">
+                                            <Link :href="`/students/${student.id}/academic-summary/scores`" class="text-primary hover:underline">
+                                                {{ student.full_name }}
+                                            </Link>
+                                        </div>
                                         <div class="text-muted-foreground text-xs">{{ student.student_id }}</div>
                                     </div>
                                 </TableCell>
