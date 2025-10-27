@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn, valueUpdater } from '@/lib/utils';
 import type { ColumnDef, ExpandedState, SortingState, VisibilityState } from '@tanstack/vue-table';
 import { FlexRender, getCoreRowModel, getExpandedRowModel, getSortedRowModel, useVueTable } from '@tanstack/vue-table';
-import { ChevronDown } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface DataTableProps<TData> {
@@ -15,6 +15,9 @@ interface DataTableProps<TData> {
     emptyMessage?: string;
     loading?: boolean;
     enableRowSelection?: boolean;
+    enableServerSorting?: boolean;
+    initialSort?: string;
+    initialDirection?: 'asc' | 'desc';
 }
 
 const props = withDefaults(defineProps<DataTableProps<TData>>(), {
@@ -22,20 +25,41 @@ const props = withDefaults(defineProps<DataTableProps<TData>>(), {
     emptyMessage: 'No results found.',
     loading: false,
     enableRowSelection: false,
+    enableServerSorting: false,
 });
 
-// Emits for selection events
+// Emits for selection and sorting events
 const emit = defineEmits<{
     'selection-change': [selectedRows: TData[]];
     'select-all': [isSelected: boolean];
+    'sort-change': [sort: string | null, direction: 'asc' | 'desc' | null];
 }>();
 
 // Table state
-const sorting = ref<SortingState>([]);
+const sorting = ref<SortingState>(
+    props.initialSort && props.initialDirection
+        ? [{ id: props.initialSort, desc: props.initialDirection === 'desc' }]
+        : []
+);
 const columnVisibility = ref<VisibilityState>({});
 const rowSelection = ref({});
 const expanded = ref<ExpandedState>({});
 const columnPinning = ref({ right: ['actions'] });
+
+// Handle sorting change
+const handleSortingChange = (updaterOrValue: any) => {
+    valueUpdater(updaterOrValue, sorting);
+    
+    // Emit sort change for server-side sorting
+    if (props.enableServerSorting) {
+        const currentSort = sorting.value[0];
+        if (currentSort) {
+            emit('sort-change', currentSort.id, currentSort.desc ? 'desc' : 'asc');
+        } else {
+            emit('sort-change', null, null);
+        }
+    }
+};
 
 // Table instance
 const table = useVueTable({
@@ -46,7 +70,7 @@ const table = useVueTable({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
-    onSortingChange: (updaterOrValue) => valueUpdater(updaterOrValue, sorting),
+    onSortingChange: handleSortingChange,
     onColumnVisibilityChange: (updaterOrValue) => valueUpdater(updaterOrValue, columnVisibility),
     onRowSelectionChange: (updaterOrValue) => {
         valueUpdater(updaterOrValue, rowSelection);
@@ -75,6 +99,7 @@ const table = useVueTable({
     enableRowSelection: props.enableRowSelection,
     manualFiltering: true,
     manualPagination: true,
+    manualSorting: props.enableServerSorting,
 });
 
 // Computed properties for selection info
@@ -139,7 +164,14 @@ defineExpose({
                             :data-pinned="header.column.getIsPinned()"
                             :class="cn({ 'bg-background/95 sticky': header.column.getIsPinned() }, header.column.getIsPinned() === 'left' ? 'left-0' : 'right-0')"
                         >
-                            <FlexRender v-if="!header.isPlaceholder" :render="header.column.columnDef.header" :props="header.getContext()" />
+                            <div v-if="!header.isPlaceholder" :class="cn('flex items-center', header.column.getCanSort() ? 'cursor-pointer select-none' : '')" @click="header.column.getCanSort() ? header.column.getToggleSortingHandler()?.($event) : undefined">
+                                <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
+                                <template v-if="header.column.getCanSort()">
+                                    <ArrowUp v-if="header.column.getIsSorted() === 'asc'" class="ml-2 h-4 w-4" />
+                                    <ArrowDown v-else-if="header.column.getIsSorted() === 'desc'" class="ml-2 h-4 w-4" />
+                                    <ArrowUpDown v-else class="ml-2 h-4 w-4 opacity-50" />
+                                </template>
+                            </div>
                         </TableHead>
                     </TableRow>
                 </TableHeader>

@@ -47,7 +47,6 @@ class StudentController extends Controller
             'search' => 'nullable|string|max:255',
             'program_id' => 'nullable|integer|exists:programs,id',
             'status' => 'nullable|string|in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending',
-            'course_offering_id' => 'nullable|integer|exists:course_offerings,id',
             'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
@@ -72,11 +71,6 @@ class StudentController extends Controller
             ->when($validated['status'] ?? null, function ($query, $status) {
                 $query->where('status', $status);
             })
-            ->when($validated['course_offering_id'] ?? null, function ($query, $courseOfferingId) {
-                $query->whereHas('courseRegistrations', function ($q) use ($courseOfferingId) {
-                    $q->where('course_offering_id', $courseOfferingId);
-                });
-            })
             ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
                 $direction = $validated['direction'] ?? 'asc';
                 $query->orderBy($sort, $direction);
@@ -88,17 +82,6 @@ class StudentController extends Controller
         // Get all programs since they are not campus-specific
         $programs = Program::orderBy('name')->get(['id', 'name']);
 
-        // Get current course offerings for the campus
-        $courseOfferings = \App\Models\CourseOffering::with('unit:id,code,name')
-            ->where('campus_id', $campusId)
-            ->where('is_active', true)
-            ->whereHas('semester', function ($query) {
-                $query->where('is_active', true);
-            })
-            ->orderBy('created_at', 'desc')
-            ->take(50) // Limit to recent offerings
-            ->get(['id', 'unit_id', 'section_code']);
-
         // Get statistics for current campus
         $statistics = $this->studentService->getStudentStatistics($campusId);
 
@@ -108,13 +91,11 @@ class StudentController extends Controller
                 'search' => $validated['search'] ?? null,
                 'program_id' => $validated['program_id'] ?? null,
                 'status' => $validated['status'] ?? null,
-                'course_offering_id' => $validated['course_offering_id'] ?? null,
                 'sort' => $validated['sort'] ?? null,
                 'direction' => $validated['direction'] ?? null,
                 'per_page' => $validated['per_page'] ?? 15,
             ],
             'programs' => $programs,
-            'courseOfferings' => $courseOfferings,
             'statistics' => $statistics,
             'current_campus_id' => $campusId,
         ]);
@@ -644,7 +625,6 @@ class StudentController extends Controller
             'search' => 'nullable|string|max:255',
             'program_id' => 'nullable|integer|exists:programs,id',
             'status' => 'nullable|string|in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending',
-            'course_offering_id' => 'nullable|integer|exists:course_offerings,id',
         ]);
 
         try {
@@ -669,12 +649,6 @@ class StudentController extends Controller
 
                 if (!empty($validated['status'])) {
                     $query->where('status', $validated['status']);
-                }
-
-                if (!empty($validated['course_offering_id'])) {
-                    $query->whereHas('courseRegistrations', function ($q) use ($validated) {
-                        $q->where('course_offering_id', $validated['course_offering_id']);
-                    });
                 }
             }
 
