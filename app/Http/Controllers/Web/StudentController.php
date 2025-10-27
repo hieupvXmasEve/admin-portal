@@ -47,7 +47,7 @@ class StudentController extends Controller
             'search' => 'nullable|string|max:255',
             'program_id' => 'nullable|integer|exists:programs,id',
             'status' => 'nullable|string|in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending',
-            'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at',
+            'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at,gc_starting_level,gc_current_level,gc_total_levels',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
             'page' => 'nullable|integer|min:1',

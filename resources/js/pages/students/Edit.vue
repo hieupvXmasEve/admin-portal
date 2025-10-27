@@ -26,40 +26,62 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
 // Form validation schema
 const formSchema = toTypedSchema(
-    z.object({
-        full_name: z.string().min(ValidationRules.student.firstName.minLength, 'First name is required').max(ValidationRules.student.firstName.maxLength, 'First name is too long'),
-        email: z.string().email('Invalid email format').max(ValidationRules.student.email.maxLength, 'Email is too long'),
-        phone: z.string().max(ValidationRules.student.phone.maxLength, 'Phone number is too long').optional(),
-        avatar_url: z.string().url('Invalid URL format').optional().or(z.literal('')),
-        date_of_birth: z.string().optional(),
-        gender: z.enum(['male', 'female', 'other']).optional(),
-        nationality: z.string().max(ValidationRules.student.nationality.maxLength, 'Nationality is too long').optional(),
-        national_id: z.string().max(ValidationRules.student.nationalId.maxLength, 'National ID is too long').optional(),
-        address: z.string().optional(),
-        cccd_address: z.string().max(ValidationRules.student.cccdAddress.maxLength, 'CCCD address is too long').optional(),
-        campus_id: z.string().min(1, 'Campus is required'),
-        program_id: z.string().min(1, 'Program is required'),
-        // specialization_id: z.string().optional(),
-        curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
-        admission_date: z.string().min(1, 'Admission date is required'),
-        expected_graduation_date: z.string().optional(),
-        emergency_contact_name: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
-        emergency_contact_phone: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
-        emergency_contact_email: z.string().optional(),
-        emergency_contact_relationship: z.string().max(100, 'Emergency contact relationship is too long').optional(),
-        emergency_contact_name_1: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
-        emergency_contact_phone_1: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
-        emergency_contact_email_1: z.string().optional(),
-        emergency_contact_relationship_1: z.string().max(100, 'Emergency contact relationship is too long').optional(),
-        high_school_name: z.string().max(ValidationRules.student.highSchoolName.maxLength, 'High school name is too long').optional(),
-        high_school_graduation_year: z.string().optional(),
-        entrance_exam_score: z.string().optional(),
-        admission_notes: z.string().optional(),
-        status: z.enum(['active', 'inactive', 'suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'deferred', 'dropout', 'dropout_transfer', 'pending']),
-    }),
+    z
+        .object({
+            full_name: z.string().min(ValidationRules.student.firstName.minLength, 'First name is required').max(ValidationRules.student.firstName.maxLength, 'First name is too long'),
+            email: z.string().email('Invalid email format').max(ValidationRules.student.email.maxLength, 'Email is too long'),
+            phone: z.string().max(ValidationRules.student.phone.maxLength, 'Phone number is too long').optional(),
+            avatar_url: z.string().url('Invalid URL format').optional().or(z.literal('')),
+            date_of_birth: z.string().optional(),
+            gender: z.enum(['male', 'female', 'other']).optional(),
+            nationality: z.string().max(ValidationRules.student.nationality.maxLength, 'Nationality is too long').optional(),
+            national_id: z.string().max(ValidationRules.student.nationalId.maxLength, 'National ID is too long').optional(),
+            address: z.string().optional(),
+            cccd_address: z.string().max(ValidationRules.student.cccdAddress.maxLength, 'CCCD address is too long').optional(),
+            campus_id: z.string().min(1, 'Campus is required'),
+            program_id: z.string().min(1, 'Program is required'),
+            // specialization_id: z.string().optional(),
+            curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
+            admission_date: z.string().min(1, 'Admission date is required'),
+            expected_graduation_date: z.string().optional(),
+            emergency_contact_name: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
+            emergency_contact_phone: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
+            emergency_contact_email: z.string().optional(),
+            emergency_contact_relationship: z.string().max(100, 'Emergency contact relationship is too long').optional(),
+            emergency_contact_name_1: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
+            emergency_contact_phone_1: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
+            emergency_contact_email_1: z.string().optional(),
+            emergency_contact_relationship_1: z.string().max(100, 'Emergency contact relationship is too long').optional(),
+            high_school_name: z.string().max(ValidationRules.student.highSchoolName.maxLength, 'High school name is too long').optional(),
+            high_school_graduation_year: z.string().optional(),
+            entrance_exam_score: z.string().optional(),
+            admission_notes: z.string().optional(),
+            status: z.enum(['active', 'inactive', 'suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'deferred', 'dropout', 'dropout_transfer', 'pending']),
+            gc_starting_level: z.string().optional(),
+            gc_current_level: z.string().optional(),
+            gc_total_levels: z.string().optional(),
+        })
+        .superRefine((data, ctx) => {
+            // Conditional validation for GC levels when status is intake_pre_uni_gc
+            if (data.status === 'intake_pre_uni_gc') {
+                if (!data.gc_starting_level) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: 'GC Starting Level is required for Intake Pre-Uni GC status',
+                        path: ['gc_starting_level'],
+                    });
+                }
+                if (!data.gc_current_level) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: 'GC Current Level is required for Intake Pre-Uni GC status',
+                        path: ['gc_current_level'],
+                    });
+                }
+            }
+        }),
 );
 
 const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
@@ -89,6 +111,9 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         entrance_exam_score: props.student.entrance_exam_score?.toString() || '',
         admission_notes: props.student.admission_notes || '',
         status: props.student.status,
+        gc_starting_level: props.student.gc_starting_level?.toString() || '',
+        gc_current_level: props.student.gc_current_level?.toString() || '',
+        gc_total_levels: props.student.gc_total_levels?.toString() || '',
     },
 });
 
@@ -172,6 +197,9 @@ const onSubmit = handleSubmit((formData) => {
         curriculum_version_id: parseInt(formData.curriculum_version_id),
         high_school_graduation_year: formData.high_school_graduation_year ? parseInt(formData.high_school_graduation_year) : null,
         entrance_exam_score: formData.entrance_exam_score ? parseFloat(formData.entrance_exam_score) : null,
+        gc_starting_level: formData.gc_starting_level ? parseInt(formData.gc_starting_level) : null,
+        gc_current_level: formData.gc_current_level ? parseInt(formData.gc_current_level) : null,
+        gc_total_levels: formData.gc_total_levels ? parseInt(formData.gc_total_levels) : null,
         // Remove empty strings
         phone: formData.phone || null,
         avatar_url: formData.avatar_url || null, // Use the form field value directly
@@ -273,13 +301,16 @@ const handleAvatarUploaded = (avatarData: any) => {
                     Personal Information
                 </CardTitle>
             </CardHeader>
-            <CardContent class="space-y-4">
+            <CardContent class="space-y-6">
                 <!-- Avatar Section -->
                 <div class="mb-6">
                     <StudentAvatar :student-id="student.id" :current-avatar="photoPreviewUrl || student.avatar_url" size="xl" @photo-selected="handlePhotoSelected" @avatar-uploaded="handleAvatarUploaded" />
                 </div>
 
-                <div class="grid grid-cols-1">
+                <!-- Basic Information -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-semibold text-gray-700">Basic Information</h3>
+
                     <FormField v-slot="{ componentField }" name="full_name">
                         <FormItem>
                             <FormLabel>Full Name *</FormLabel>
@@ -289,87 +320,92 @@ const handleAvatarUploaded = (avatarData: any) => {
                             <FormMessage />
                         </FormItem>
                     </FormField>
-                </div>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField v-slot="{ componentField }" name="email">
-                        <FormItem>
-                            <FormLabel class="flex items-center gap-2">
-                                <Mail class="h-4 w-4" />
-                                Email *
-                            </FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" type="email" placeholder="Enter email address" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField v-slot="{ componentField }" name="phone">
-                        <FormItem>
-                            <FormLabel class="flex items-center gap-2">
-                                <Phone class="h-4 w-4" />
-                                Phone
-                            </FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="Enter phone number" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-                </div>
-
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <FormField v-slot="{ componentField }" name="date_of_birth">
-                        <FormItem>
-                            <FormLabel>Date of Birth</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" type="date" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField v-slot="{ componentField }" name="gender">
-                        <FormItem>
-                            <FormLabel>Gender</FormLabel>
-                            <Select v-bind="componentField">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FormField v-slot="{ componentField }" name="email">
+                            <FormItem>
+                                <FormLabel class="flex items-center gap-2">
+                                    <Mail class="h-4 w-4" />
+                                    Email *
+                                </FormLabel>
                                 <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select gender" />
-                                    </SelectTrigger>
+                                    <Input v-bind="componentField" type="email" placeholder="Enter email address" />
                                 </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="male">Male</SelectItem>
-                                    <SelectItem value="female">Female</SelectItem>
-                                    <SelectItem value="other">Other</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                    <FormField v-slot="{ componentField }" name="nationality">
-                        <FormItem>
-                            <FormLabel>Nationality</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="Enter nationality" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                        <FormField v-slot="{ componentField }" name="phone">
+                            <FormItem>
+                                <FormLabel class="flex items-center gap-2">
+                                    <Phone class="h-4 w-4" />
+                                    Phone
+                                </FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter phone number" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FormField v-slot="{ componentField }" name="date_of_birth">
+                            <FormItem>
+                                <FormLabel>Date of Birth</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" type="date" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="gender">
+                            <FormItem>
+                                <FormLabel>Gender</FormLabel>
+                                <Select v-bind="componentField">
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select gender" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="male">Male</SelectItem>
+                                        <SelectItem value="female">Female</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField v-slot="{ componentField }" name="national_id">
-                        <FormItem>
-                            <FormLabel>National ID</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" placeholder="Enter national ID" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                <!-- Identity & Status -->
+                <div class="space-y-4 border-t pt-4">
+                    <h3 class="text-sm font-semibold text-gray-700">Identity & Status</h3>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FormField v-slot="{ componentField }" name="nationality">
+                            <FormItem>
+                                <FormLabel>Nationality</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter nationality" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="national_id">
+                            <FormItem>
+                                <FormLabel>National ID</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter national ID" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
 
                     <FormField v-slot="{ componentField }" name="status">
                         <FormItem>
@@ -398,25 +434,93 @@ const handleAvatarUploaded = (avatarData: any) => {
                     </FormField>
                 </div>
 
-                <FormField v-slot="{ componentField }" name="address">
-                    <FormItem>
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                            <Textarea v-bind="componentField" placeholder="Enter full address" />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                </FormField>
+                <!-- GC Level Information (only shown if has values or status is intake_pre_uni_gc) -->
+                <div v-if="values.status === 'intake_pre_uni_gc' || student.gc_starting_level || student.gc_current_level || student.gc_total_levels" class="space-y-4 border-t pt-4">
+                    <h3 class="text-sm font-semibold text-gray-700">GC Levels</h3>
 
-                <FormField v-slot="{ componentField }" name="cccd_address">
-                    <FormItem>
-                        <FormLabel>CCCD Address</FormLabel>
-                        <FormControl>
-                            <Textarea v-bind="componentField" placeholder="Enter CCCD address" />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                </FormField>
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <FormField v-slot="{ componentField }" name="gc_starting_level">
+                            <FormItem>
+                                <FormLabel>Starting Level {{ values.status === 'intake_pre_uni_gc' ? '*' : '' }}</FormLabel>
+                                <Select v-bind="componentField" :disabled="values.status !== 'intake_pre_uni_gc'">
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select level" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="0">Level 0</SelectItem>
+                                        <SelectItem value="1">Level 1</SelectItem>
+                                        <SelectItem value="2">Level 2</SelectItem>
+                                        <SelectItem value="3">Level 3</SelectItem>
+                                        <SelectItem value="4">Level 4</SelectItem>
+                                        <SelectItem value="5">Level 5</SelectItem>
+                                        <SelectItem value="6">Level 6</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="gc_current_level">
+                            <FormItem>
+                                <FormLabel>Current Level {{ values.status === 'intake_pre_uni_gc' ? '*' : '' }}</FormLabel>
+                                <Select v-bind="componentField" :disabled="values.status !== 'intake_pre_uni_gc'">
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select level" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="0">Level 0</SelectItem>
+                                        <SelectItem value="1">Level 1</SelectItem>
+                                        <SelectItem value="2">Level 2</SelectItem>
+                                        <SelectItem value="3">Level 3</SelectItem>
+                                        <SelectItem value="4">Level 4</SelectItem>
+                                        <SelectItem value="5">Level 5</SelectItem>
+                                        <SelectItem value="6">Level 6</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="gc_total_levels">
+                            <FormItem>
+                                <FormLabel>Total Levels</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Total levels" :disabled="true" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
+                </div>
+
+                <!-- Address Information -->
+                <div class="space-y-4 border-t pt-4">
+                    <h3 class="text-sm font-semibold text-gray-700">Address Information</h3>
+
+                    <FormField v-slot="{ componentField }" name="address">
+                        <FormItem>
+                            <FormLabel>Current Address</FormLabel>
+                            <FormControl>
+                                <Textarea v-bind="componentField" placeholder="Enter full address" rows="2" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="cccd_address">
+                        <FormItem>
+                            <FormLabel>CCCD Address</FormLabel>
+                            <FormControl>
+                                <Textarea v-bind="componentField" placeholder="Enter CCCD address" rows="2" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
             </CardContent>
         </Card>
 
@@ -545,8 +649,8 @@ const handleAvatarUploaded = (avatarData: any) => {
                 </CardTitle>
             </CardHeader>
             <CardContent class="">
-                <div class="space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="space-y-4 gap-2">
+                <div class="grid grid-cols-1 gap-4 space-y-4 md:grid-cols-2">
+                    <div class="gap-2 space-y-4">
                         <FormField v-slot="{ componentField }" name="emergency_contact_name">
                             <FormItem>
                                 <FormLabel>Contact Name</FormLabel>
@@ -577,7 +681,6 @@ const handleAvatarUploaded = (avatarData: any) => {
                             </FormItem>
                         </FormField>
 
-
                         <FormField v-slot="{ componentField }" name="emergency_contact_relationship">
                             <FormItem>
                                 <FormLabel>Relationship</FormLabel>
@@ -597,7 +700,7 @@ const handleAvatarUploaded = (avatarData: any) => {
                             </FormItem>
                         </FormField>
                     </div>
-                    <div class="space-y-4 gap-2">
+                    <div class="gap-2 space-y-4">
                         <FormField v-slot="{ componentField }" name="emergency_contact_name_1">
                             <FormItem>
                                 <FormLabel>Contact Name 2</FormLabel>
@@ -627,7 +730,6 @@ const handleAvatarUploaded = (avatarData: any) => {
                                 <FormMessage />
                             </FormItem>
                         </FormField>
-
 
                         <FormField v-slot="{ componentField }" name="emergency_contact_relationship_1">
                             <FormItem>

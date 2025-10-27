@@ -39,6 +39,17 @@ class UpdateStudentRequest extends FormRequest
             ];
         }
 
+        // Add GC level fields - nullable by default
+        $rules['gc_starting_level'] = ['nullable', 'integer', 'min:0', 'max:6'];
+        $rules['gc_current_level'] = ['nullable', 'integer', 'min:0', 'max:6'];
+        $rules['gc_total_levels'] = ['nullable', 'integer', 'min:0'];
+
+        // Conditional validation for GC levels when status is intake_pre_uni_gc
+        if ($this->input('status') === 'intake_pre_uni_gc') {
+            $rules['gc_starting_level'] = ['required', 'integer', 'min:0', 'max:6'];
+            $rules['gc_current_level'] = ['required', 'integer', 'min:0', 'max:6'];
+        }
+
         return $rules;
     }
 

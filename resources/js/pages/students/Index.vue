@@ -8,15 +8,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useGlobalConfirmDialog } from '@/composables';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
 import type { Program, Student } from '@/types/models';
 import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Download, Edit, Eye, FileSpreadsheet, LogIn, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
+import { Download, Edit, Eye, FileSpreadsheet, LogIn, RefreshCw, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -74,11 +73,6 @@ interface Props {
 
 const props = defineProps<Props>();
 
-// Global confirm dialog composable
-const confirmDialog = useGlobalConfirmDialog();
-
-// API composable
-
 // Student impersonation composable
 const { loginAsStudent } = useStudentImpersonation();
 
@@ -94,16 +88,7 @@ const isExporting = ref(false);
 const data = computed(() => props.students.data);
 
 // Use Inertia Filters composable
-const { 
-    filters, 
-    hasActiveFilters, 
-    clearFilters,
-    handleSearch,
-    handleSelectFilter,
-    handleSortChange,
-    handlePageSizeChange,
-    handlePaginationNavigate,
-} = useInertiaFilters<StudentFilters>({
+const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePageSizeChange, handlePaginationNavigate, currentSort, currentDirection } = useInertiaFilters<StudentFilters>({
     baseUrl: studentRoutes.list(),
     initialFilters: {
         search: props.filters.search || '',
@@ -113,6 +98,16 @@ const {
         sort: props.filters?.sort || null,
         direction: (props.filters?.direction as 'asc' | 'desc') || null,
         per_page: props.filters?.per_page || 15,
+        page: 1,
+    },
+    emptyFilters: {
+        search: '',
+        campus_id: 'all',
+        program_id: 'all',
+        status: 'all',
+        sort: null,
+        direction: null,
+        per_page: 15,
         page: 1,
     },
     defaultValues: {
@@ -210,7 +205,7 @@ const columns: ColumnDef<Student>[] = [
         cell: ({ row }) => {
             const student = row.original;
             // Only show for intake_pre_uni_gc students with gc_starting_level
-            if (student.status === 'intake_pre_uni_gc' && student.gc_starting_level !== null) {
+            if (student.gc_starting_level !== null) {
                 return h('div', { class: 'text-sm font-medium' }, student.gc_starting_level ? student.gc_starting_level : 'Foundation');
             }
             return h('span', { class: 'text-gray-400' }, '-');
@@ -219,12 +214,12 @@ const columns: ColumnDef<Student>[] = [
     {
         accessorKey: 'gc_current_level',
         header: 'GC Current',
-        enableSorting: false,
+        enableSorting: true,
         cell: ({ row }) => {
             const student = row.original;
             // Only show for intake_pre_uni_gc students with gc_starting_level
-            if (student.status === 'intake_pre_uni_gc' && student.gc_starting_level) {
-                return h('div', { class: 'text-sm font-medium' }, student.gc_current_level || '-');
+            if (student.gc_current_level !== null) {
+                return h('div', { class: 'text-sm font-medium' }, student.gc_current_level ? student.gc_current_level : 'Foundation');
             }
             return h('span', { class: 'text-gray-400' }, '-');
         },
@@ -236,7 +231,7 @@ const columns: ColumnDef<Student>[] = [
         cell: ({ row }) => {
             const student = row.original;
             // Only show for intake_pre_uni_gc students with gc_starting_level
-            if (student.status === 'intake_pre_uni_gc' && student.gc_starting_level) {
+            if (student.gc_starting_level !== null) {
                 return h('div', { class: 'text-sm font-medium' }, student.gc_total_levels?.toString() || '-');
             }
             return h('span', { class: 'text-gray-400' }, '-');
@@ -257,18 +252,6 @@ const viewStudent = (student: Student) => {
 
 const editStudent = (student: Student) => {
     router.visit(studentRoutes.edit(student.id));
-};
-
-const deleteStudent = (student: Student) => {
-    const deleteRoute = route('students.destroy', student.id);
-
-    confirmDialog.confirmDelete(student.full_name, 'student', () => {
-        router.delete(deleteRoute, {
-            onSuccess: () => {
-                console.log('Student deleted successfully');
-            },
-        });
-    });
 };
 
 // Export functions
@@ -376,9 +359,6 @@ const exportStudents = async () => {
                     <Download class="mr-2 h-4 w-4" />
                     Export
                 </Button>
-                <Link :href="studentRoutes.create()">
-                    <Button> <Plus class="mr-2 h-4 w-4" /> Add Student </Button>
-                </Link>
             </div>
         </div>
 
@@ -445,15 +425,7 @@ const exportStudents = async () => {
                     </div>
                 </div>
                 <div class="mt-4">
-                    <DataTable 
-                        :columns="columns" 
-                        :data="data" 
-                        :total="students.total" 
-                        enable-server-sorting
-                        :initial-sort="filters.sort || undefined"
-                        :initial-direction="filters.direction || undefined"
-                        @sort-change="handleSortChange"
-                    >
+                    <DataTable :columns="columns" :data="data" enable-server-sorting :initial-sort="currentSort" :initial-direction="currentDirection" @sort-change="handleSortChange">
                         <template #cell-actions="{ row }">
                             <div class="flex items-center space-x-1">
                                 <TooltipProvider>
@@ -480,14 +452,6 @@ const exportStudents = async () => {
                                             </Button>
                                         </TooltipTrigger>
                                         <TooltipContent> Login as Student </TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                        <TooltipTrigger as-child>
-                                            <Button variant="ghost" size="icon" @click="deleteStudent(row.original)">
-                                                <Trash2 class="h-4 w-4" />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent> Delete </TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
                             </div>

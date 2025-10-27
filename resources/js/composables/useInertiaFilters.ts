@@ -15,6 +15,13 @@ export interface InertiaFilterOptions<T = Record<string, any>> {
     initialFilters?: T;
 
     /**
+     * Empty filter values (for clear filters)
+     * If not provided, will construct from defaultValues
+     * @example { search: '', program_id: 'all', status: 'all', sort: null, direction: null }
+     */
+    emptyFilters?: T;
+
+    /**
      * Default values that should not appear in URL
      * @example { per_page: 15, direction: 'asc' }
      */
@@ -89,13 +96,16 @@ export interface InertiaFilterOptions<T = Record<string, any>> {
  * ```
  */
 export function useInertiaFilters<T extends Record<string, any>>(options: InertiaFilterOptions<T>) {
-    const { baseUrl, initialFilters = {} as T, defaultValues = {}, only = ['items', 'filters'], debounce = 400, autoSync = true, replace = true, transform } = options;
+    const { baseUrl, initialFilters = {} as T, emptyFilters, defaultValues = {}, only = ['items', 'filters'], debounce = 400, autoSync = true, replace = true, transform } = options;
 
     // Use reactive for auto-tracking
     const filters = reactive<T>({ ...initialFilters } as T);
 
     // Track if we're currently navigating to prevent loops
     const isNavigating = ref(false);
+
+    // Construct empty state from emptyFilters or defaultValues
+    const emptyState = emptyFilters || ({ ...defaultValues } as T);
 
     /**
      * Check if any filters are active (excluding defaults)
@@ -158,7 +168,9 @@ export function useInertiaFilters<T extends Record<string, any>>(options: Inerti
      * Navigate with current filters
      */
     const navigate = () => {
-        if (isNavigating.value) return;
+        if (isNavigating.value) {
+            return;
+        }
 
         isNavigating.value = true;
         const url = buildUrl(filters);
@@ -185,11 +197,13 @@ export function useInertiaFilters<T extends Record<string, any>>(options: Inerti
     };
 
     /**
-     * Clear all filters back to initial values
+     * Clear all filters back to empty state
      */
     const clearFilters = () => {
-        Object.assign(filters, initialFilters);
-        navigate();
+        Object.assign(filters, emptyState);
+        if (!isNavigating.value) {
+            navigate();
+        }
     };
 
     /**
@@ -216,10 +230,15 @@ export function useInertiaFilters<T extends Record<string, any>>(options: Inerti
 
     /**
      * Handle sorting from DataTable
+     * Note: Sorting navigates immediately (no debounce)
      */
     const handleSortChange = (sort: string | null, direction: 'asc' | 'desc' | null) => {
         filters.sort = sort as any;
         filters.direction = direction as any;
+        // Navigate immediately for sorting (bypass debounce)
+        if (!isNavigating.value) {
+            navigate();
+        }
     };
 
     /**
@@ -265,6 +284,10 @@ export function useInertiaFilters<T extends Record<string, any>>(options: Inerti
         );
     }
 
+    // Computed sort props for DataTable (optional convenience)
+    const currentSort = computed(() => (filters.sort as any) || undefined);
+    const currentDirection = computed(() => (filters.direction as any) || undefined);
+
     return {
         // State
         filters,
@@ -283,6 +306,10 @@ export function useInertiaFilters<T extends Record<string, any>>(options: Inerti
         // Pagination
         handlePaginationNavigate,
         handlePageSizeChange,
+
+        // Sorting (for DataTable)
+        currentSort,
+        currentDirection,
 
         // Utils
         buildUrl,
