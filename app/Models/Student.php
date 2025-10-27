@@ -83,10 +83,10 @@ class Student extends StudentAuditableModel
     ];
 
     protected $casts = [
-        'date_of_birth' => 'date',
-        'admission_date' => 'date',
-        'expected_graduation_date' => 'date',
-        'status_change_date' => 'date',
+        'date_of_birth' => 'date:Y-m-d',
+        'admission_date' => 'date:Y-m-d',
+        'expected_graduation_date' => 'date:Y-m-d',
+        'status_change_date' => 'date:Y-m-d',
         'entrance_exam_score' => 'decimal:2',
         'last_login_at' => 'datetime',
         'email_verified_at' => 'datetime',

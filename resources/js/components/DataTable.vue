@@ -6,7 +6,7 @@ import { cn, valueUpdater } from '@/lib/utils';
 import type { ColumnDef, ExpandedState, SortingState, VisibilityState } from '@tanstack/vue-table';
 import { FlexRender, getCoreRowModel, getExpandedRowModel, getSortedRowModel, useVueTable } from '@tanstack/vue-table';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 interface DataTableProps<TData> {
     data: TData[];
@@ -37,14 +37,50 @@ const emit = defineEmits<{
 
 // Table state
 const sorting = ref<SortingState>(
-    props.initialSort && props.initialDirection
-        ? [{ id: props.initialSort, desc: props.initialDirection === 'desc' }]
+    props.initialSort
+        ? [{ id: props.initialSort, desc: (props.initialDirection || 'asc') === 'desc' }]
         : []
 );
 const columnVisibility = ref<VisibilityState>({});
 const rowSelection = ref({});
 const expanded = ref<ExpandedState>({});
 const columnPinning = ref({ right: ['actions'] });
+
+// Watch for prop changes and update sorting state
+watch(
+    () => [props.initialSort, props.initialDirection] as const,
+    ([newSort, newDirection]) => {
+        console.log('[DataTable] Sort props changed:', { newSort, newDirection });
+        
+        // Update sorting state when props change
+        if (newSort) {
+            // Default to 'asc' if direction is missing
+            const direction = newDirection || 'asc';
+            
+            // Only update if different from current state
+            const currentSort = sorting.value[0];
+            const needsUpdate = !currentSort || 
+                               currentSort.id !== newSort || 
+                               (currentSort.desc ? 'desc' : 'asc') !== direction;
+            
+            if (needsUpdate) {
+                console.log('[DataTable] Updating sorting state to:', { id: newSort, desc: direction === 'desc' });
+                sorting.value = [{ id: newSort, desc: direction === 'desc' }];
+            } else {
+                console.log('[DataTable] Sort state already correct, skip update');
+            }
+        } else {
+            // Clear sorting when no sort prop
+            if (sorting.value.length > 0) {
+                console.log('[DataTable] Clearing sorting state');
+                sorting.value = [];
+            } else {
+                console.log('[DataTable] Sort already empty, skip clear');
+            }
+        }
+    },
+    { immediate: false } // Don't run on mount (already initialized above)
+);
 
 // Handle sorting change
 const handleSortingChange = (updaterOrValue: any) => {
