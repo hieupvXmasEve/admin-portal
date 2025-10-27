@@ -8,10 +8,8 @@ use App\Models\AcademicRecord;
 use App\Models\CourseOffering;
 use App\Models\Student;
 use App\Notifications\EgcCourseCompletedNotification;
-use App\Notifications\EgcLevelMismatchNotification;
 use App\Notifications\EgcProgramCompletedNotification;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
 
 class EgcLevelProgressionService
 {
@@ -102,9 +100,6 @@ class EgcLevelProgressionService
                 ];
 
                 $results['warnings'][] = $warningData;
-
-                // Send notification to admin about level mismatch
-                $this->notifyLevelMismatch($student, $courseOffering, $warningData);
 
                 Log::warning('EGC Level Mismatch - Student Passed', [
                     'student_id' => $student->student_id,
@@ -315,32 +310,6 @@ class EgcLevelProgressionService
                 ? "🎉 Student completed all {$totalLevels} EGC levels and transitioned to intake_course!"
                 : "Student progressed from Level {$oldLevel} to Level {$newLevel}",
         ];
-    }
-
-    /**
-     * Send notification about level mismatch to admin
-     */
-    private function notifyLevelMismatch(Student $student, CourseOffering $courseOffering, array $warningData): void
-    {
-        try {
-            // Get admin users who should be notified
-            $adminUsers = \App\Models\User::role(['super_admin', 'admin'])
-                ->where('campus_id', $student->campus_id)
-                ->get();
-
-            if ($adminUsers->isNotEmpty()) {
-                $notification = new EgcLevelMismatchNotification($student, $courseOffering, $warningData);
-                
-                foreach ($adminUsers as $admin) {
-                    $this->createNotification($admin, $notification);
-                }
-            }
-        } catch (\Exception $e) {
-            Log::error('Failed to send level mismatch notification', [
-                'student_id' => $student->student_id,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 
     /**

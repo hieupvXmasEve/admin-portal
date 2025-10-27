@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useGlobalConfirmDialog } from '@/composables';
+import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
-import type { CourseOffering, Program, Student } from '@/types/models';
+import type { Program, Student } from '@/types/models';
 import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -18,6 +19,17 @@ import type { ColumnDef } from '@tanstack/vue-table';
 import { Download, Edit, Eye, FileSpreadsheet, LogIn, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
+
+interface StudentFilters {
+    search: string;
+    campus_id: string;
+    program_id: string;
+    status: string;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+    per_page: number;
+    page: number;
+}
 
 interface Props {
     students: {
@@ -44,14 +56,12 @@ interface Props {
         campus_id?: number;
         program_id?: number;
         status?: string;
-        course_offering_id?: number;
         sort?: string;
         direction?: string;
         per_page?: number;
     };
     // campuses: Campus[];
     programs: Program[];
-    courseOfferings?: CourseOffering[];
     statistics: {
         total_students: number;
         active_students: number;
@@ -83,12 +93,38 @@ const isExporting = ref(false);
 // Reactive data
 const data = computed(() => props.students.data);
 
-const filters = ref({
-    search: props.filters.search || '',
-    campus_id: props.filters?.campus_id ? props.filters.campus_id.toString() : 'all',
-    program_id: props.filters?.program_id ? props.filters.program_id.toString() : 'all',
-    status: props.filters?.status || 'all',
-    course_offering_id: props.filters?.course_offering_id ? props.filters.course_offering_id.toString() : 'all',
+// Use Inertia Filters composable
+const { 
+    filters, 
+    hasActiveFilters, 
+    clearFilters,
+    handleSearch,
+    handleSelectFilter,
+    handleSortChange,
+    handlePageSizeChange,
+    handlePaginationNavigate,
+} = useInertiaFilters<StudentFilters>({
+    baseUrl: studentRoutes.list(),
+    initialFilters: {
+        search: props.filters.search || '',
+        campus_id: props.filters?.campus_id?.toString() || 'all',
+        program_id: props.filters?.program_id?.toString() || 'all',
+        status: props.filters?.status || 'all',
+        sort: props.filters?.sort || null,
+        direction: (props.filters?.direction as 'asc' | 'desc') || null,
+        per_page: props.filters?.per_page || 15,
+        page: 1,
+    },
+    defaultValues: {
+        campus_id: 'all',
+        program_id: 'all',
+        status: 'all',
+        per_page: 15,
+        direction: 'asc',
+        page: 1,
+    },
+    only: ['students', 'filters'],
+    debounce: 400,
 });
 
 // Column definitions with h function
@@ -168,41 +204,51 @@ const columns: ColumnDef<Student>[] = [
         },
     },
     {
+        accessorKey: 'gc_starting_level',
+        header: 'GC Starting',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const student = row.original;
+            // Only show for intake_pre_uni_gc students with gc_starting_level
+            if (student.status === 'intake_pre_uni_gc' && student.gc_starting_level !== null) {
+                return h('div', { class: 'text-sm font-medium' }, student.gc_starting_level ? student.gc_starting_level : 'Foundation');
+            }
+            return h('span', { class: 'text-gray-400' }, '-');
+        },
+    },
+    {
+        accessorKey: 'gc_current_level',
+        header: 'GC Current',
+        enableSorting: false,
+        cell: ({ row }) => {
+            const student = row.original;
+            // Only show for intake_pre_uni_gc students with gc_starting_level
+            if (student.status === 'intake_pre_uni_gc' && student.gc_starting_level) {
+                return h('div', { class: 'text-sm font-medium' }, student.gc_current_level || '-');
+            }
+            return h('span', { class: 'text-gray-400' }, '-');
+        },
+    },
+    {
+        accessorKey: 'gc_total_levels',
+        header: 'GC Total',
+        enableSorting: false,
+        cell: ({ row }) => {
+            const student = row.original;
+            // Only show for intake_pre_uni_gc students with gc_starting_level
+            if (student.status === 'intake_pre_uni_gc' && student.gc_starting_level) {
+                return h('div', { class: 'text-sm font-medium' }, student.gc_total_levels?.toString() || '-');
+            }
+            return h('span', { class: 'text-gray-400' }, '-');
+        },
+    },
+    {
         id: 'actions',
         header: 'Actions',
         enableHiding: false,
         enableSorting: false,
     },
 ];
-
-// Search handler for DebouncedInput
-const handleSearch = (value: string | number) => {
-    filters.value.search = String(value);
-    updateFilters();
-};
-
-const handleFilter = () => {
-    updateFilters();
-};
-
-const clearFilters = () => {
-    filters.value = {
-        search: '',
-        campus_id: 'all',
-        program_id: 'all',
-        status: 'all',
-        course_offering_id: 'all',
-    };
-    router.visit(studentRoutes.list(), {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['students', 'filters'],
-    });
-};
-
-const hasActiveFilters = computed(() => {
-    return filters.value.search || filters.value.campus_id !== 'all' || filters.value.program_id !== 'all' || filters.value.status !== 'all' || filters.value.course_offering_id !== 'all';
-});
 
 // View and edit functions
 const viewStudent = (student: Student) => {
@@ -222,72 +268,6 @@ const deleteStudent = (student: Student) => {
                 console.log('Student deleted successfully');
             },
         });
-    });
-};
-
-// Pagination handlers
-const handlePageChange = (url: string) => {
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['students'],
-    });
-};
-
-const handlePageSizeChange = (pageSize: number) => {
-    const params = {
-        ...getFilterParams(),
-        per_page: pageSize.toString(),
-    };
-
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-        if (value) searchParams.set(key, value);
-    });
-
-    const url = `${studentRoutes.list()}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['students', 'filters'],
-    });
-};
-
-const getFilterParams = () => {
-    return {
-        search: filters.value.search,
-        campus_id: filters.value.campus_id === 'all' ? '' : filters.value.campus_id,
-        program_id: filters.value.program_id === 'all' ? '' : filters.value.program_id,
-        status: filters.value.status === 'all' ? '' : filters.value.status,
-        course_offering_id: filters.value.course_offering_id === 'all' ? '' : filters.value.course_offering_id,
-    };
-};
-
-const updateFilters = () => {
-    const params = getFilterParams();
-
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-        if (value) searchParams.set(key, value);
-    });
-
-    const url = `${studentRoutes.list()}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['students', 'filters'],
-    });
-};
-
-const handlePaginationNavigate = (url: string) => {
-    console.log(url);
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['students'],
     });
 };
 
@@ -314,10 +294,9 @@ const exportStudents = async () => {
 
         // Add current filters if exporting filtered results
         if (exportForm.value.scope === 'filtered') {
-            if (filters.value.search) params.set('search', filters.value.search);
-            if (filters.value.program_id !== 'all') params.set('program_id', filters.value.program_id);
-            if (filters.value.status !== 'all') params.set('status', filters.value.status);
-            if (filters.value.course_offering_id !== 'all') params.set('course_offering_id', filters.value.course_offering_id);
+            if (filters.search) params.set('search', filters.search);
+            if (filters.program_id !== 'all') params.set('program_id', filters.program_id);
+            if (filters.status !== 'all') params.set('status', filters.status);
         }
 
         // Create download URL
@@ -429,19 +408,8 @@ const exportStudents = async () => {
             <CardContent class="p-4">
                 <div class="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex w-full items-center gap-2 md:w-auto">
-                        <DebouncedInput v-model="filters.search" placeholder="Search by name, email or student ID..." class="w-full md:w-64" @debounced="handleSearch" />
-                        <!-- <Select v-model="filters.campus_id" @update:model-value="handleFilter">
-                            <SelectTrigger class="w-full md:w-48">
-                                <SelectValue placeholder="Filter by campus..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Campuses</SelectItem>
-                                <SelectItem v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">
-                                    {{ campus.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select> -->
-                        <Select v-model="filters.program_id" @update:model-value="handleFilter">
+                        <DebouncedInput :model-value="filters.search" placeholder="Search by name, email or student ID..." class="w-full md:w-64" @update:model-value="handleSearch" />
+                        <Select v-model="filters.program_id" @update:model-value="(v) => handleSelectFilter('program_id', v)">
                             <SelectTrigger class="w-full md:w-48">
                                 <SelectValue placeholder="Filter by program..." />
                             </SelectTrigger>
@@ -452,7 +420,7 @@ const exportStudents = async () => {
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                        <Select v-model="filters.status" @update:model-value="handleFilter">
+                        <Select v-model="filters.status" @update:model-value="(v) => handleSelectFilter('status', v)">
                             <SelectTrigger class="w-full md:w-48">
                                 <SelectValue placeholder="Filter by status..." />
                             </SelectTrigger>
@@ -470,15 +438,6 @@ const exportStudents = async () => {
                                 <SelectItem value="pending">Pending</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Select v-if="courseOfferings && courseOfferings.length > 0" v-model="filters.course_offering_id" @update:model-value="handleFilter">
-                            <SelectTrigger class="w-full md:w-48">
-                                <SelectValue placeholder="Filter by course..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Courses</SelectItem>
-                                <SelectItem v-for="courseOffering in courseOfferings" :key="courseOffering.id" :value="courseOffering.id.toString()"> {{ courseOffering.unit?.code }} - {{ courseOffering.unit?.name }} </SelectItem>
-                            </SelectContent>
-                        </Select>
                         <Button v-if="hasActiveFilters" variant="ghost" @click="clearFilters">
                             <X class="mr-2 h-4 w-4" />
                             Clear
@@ -486,7 +445,15 @@ const exportStudents = async () => {
                     </div>
                 </div>
                 <div class="mt-4">
-                    <DataTable :columns="columns" :data="data" :total="students.total" @page-changed="handlePageChange">
+                    <DataTable 
+                        :columns="columns" 
+                        :data="data" 
+                        :total="students.total" 
+                        enable-server-sorting
+                        :initial-sort="filters.sort || undefined"
+                        :initial-direction="filters.direction || undefined"
+                        @sort-change="handleSortChange"
+                    >
                         <template #cell-actions="{ row }">
                             <div class="flex items-center space-x-1">
                                 <TooltipProvider>
@@ -599,9 +566,6 @@ const exportStudents = async () => {
                         <li v-if="exportForm.scope === 'filtered' && filters.search">• Search: "{{ filters.search }}"</li>
                         <li v-if="exportForm.scope === 'filtered' && filters.program_id !== 'all'">• Program: {{ programs.find((p) => p.id.toString() === filters.program_id)?.name || 'Unknown' }}</li>
                         <li v-if="exportForm.scope === 'filtered' && filters.status !== 'all'">• Status: {{ getStatusDisplayText(filters.status) }}</li>
-                        <li v-if="exportForm.scope === 'filtered' && filters.course_offering_id !== 'all' && courseOfferings">
-                            • Course: {{ courseOfferings.find((c) => c.id.toString() === filters.course_offering_id)?.unit?.code }} - {{ courseOfferings.find((c) => c.id.toString() === filters.course_offering_id)?.unit?.name }}
-                        </li>
                         <li v-if="exportForm.scope === 'all'">• All students from current campus will be exported</li>
                         <li>• Format: {{ exportForm.format === 'xlsx' ? 'Excel (.xlsx)' : 'CSV (.csv)' }}</li>
                     </ul>

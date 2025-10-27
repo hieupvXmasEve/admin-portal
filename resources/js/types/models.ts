@@ -270,6 +270,11 @@ export interface Student {
     display_name?: string;
     status_label?: string;
 
+    // gc level
+    gc_starting_level?: number;
+    gc_current_level?: number;
+    gc_total_levels?: number;
+
     // Timestamps
     created_at: string;
     updated_at: string;

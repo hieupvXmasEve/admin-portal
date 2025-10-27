@@ -19,6 +19,10 @@ export { useUploadConfig } from './useUploadConfig';
 // Utility composables
 export { useInitials } from './useInitials';
 
+// Filter composables
+export { useInertiaFilters, useTableFilters } from './useInertiaFilters';
+export type { InertiaFilterOptions } from './useInertiaFilters';
+
 // QR Scanner composables
 export { useQRScanner } from './useQRScanner';
 

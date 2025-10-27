@@ -1636,33 +1636,55 @@ class CourseOfferingController extends Controller
                 $message = "Course '{$result['course_code']}' marked as completed successfully.";
 
                 if ($result['egc_progression']['processed']) {
-                    // EGC course message
+                    // EGC course message with detailed breakdown
                     $egc = $result['egc_progression'];
-                    $message .= " | EGC: {$egc['total_students']} student(s) processed";
+                    $message .= "<br><br><strong>EGC Summary:</strong> {$egc['total_students']} student(s) processed";
 
+                    // Show progressed students
                     if (count($egc['progressed']) > 0) {
-                        $message .= ", ".count($egc['progressed']).' progressed to next level';
+                        $message .= "<br>✅ <strong>".count($egc['progressed'])." Progressed:</strong>";
+                        foreach (array_slice($egc['progressed'], 0, 5) as $prog) {
+                            $message .= "<br>&nbsp;&nbsp;• {$prog['student_id']} ({$prog['student_name']}): Level {$prog['from_level']} → {$prog['to_level']}";
+                        }
+                        if (count($egc['progressed']) > 5) {
+                            $message .= "<br>&nbsp;&nbsp;• +" . (count($egc['progressed']) - 5) . " more...";
+                        }
                     }
 
+                    // Show failed students with reasons
                     if (count($egc['failed_students']) > 0) {
-                        $message .= ", ".count($egc['failed_students']).' failed (level unchanged)';
+                        $message .= "<br>❌ <strong>".count($egc['failed_students'])." Failed:</strong>";
+                        foreach (array_slice($egc['failed_students'], 0, 5) as $fail) {
+                            $reason = $fail['action'];
+                            $message .= "<br>&nbsp;&nbsp;• {$fail['student_id']} ({$fail['student_name']}): Grade {$fail['grade']} - {$reason}";
+                        }
+                        if (count($egc['failed_students']) > 5) {
+                            $message .= "<br>&nbsp;&nbsp;• +" . (count($egc['failed_students']) - 5) . " more...";
+                        }
                     }
 
+                    // Show level mismatch warnings
                     if (count($egc['warnings']) > 0) {
-                        $message .= ". ⚠️ ".count($egc['warnings']).' level mismatch warning(s) - check notifications';
+                        $message .= "<br>⚠️ <strong>".count($egc['warnings'])." Level Mismatch:</strong>";
+                        foreach (array_slice($egc['warnings'], 0, 5) as $warn) {
+                            $message .= "<br>&nbsp;&nbsp;• {$warn['student_id']} ({$warn['student_name']}): Student at Level {$warn['student_level']}, passed Level {$warn['unit_level']} course - Grade recorded but NOT progressed";
+                        }
+                        if (count($egc['warnings']) > 5) {
+                            $message .= "<br>&nbsp;&nbsp;• +" . (count($egc['warnings']) - 5) . " more...";
+                        }
                     }
                 } elseif ($result['non_egc_result']) {
                     // Non-EGC course message
                     $nonEgc = $result['non_egc_result'];
                     $totalStudents = $nonEgc['passed'] + $nonEgc['failed'];
-                    $message .= " | {$totalStudents} student(s) processed";
+                    $message .= "<br><br><strong>Summary:</strong> {$totalStudents} student(s) processed";
 
                     if ($nonEgc['passed'] > 0) {
-                        $message .= ", {$nonEgc['passed']} passed";
+                        $message .= "<br>✅ {$nonEgc['passed']} passed";
                     }
 
                     if ($nonEgc['failed'] > 0) {
-                        $message .= ", {$nonEgc['failed']} failed";
+                        $message .= "<br>❌ {$nonEgc['failed']} failed";
                     }
                 }
 

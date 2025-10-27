@@ -76,8 +76,16 @@ class CourseCompletionService
         // Other courses: >= 60%
         $passingThreshold = $isEgcCourse ? 70 : 60;
 
-        // Update each record individually to avoid SQL raw issues
-        $records = AcademicRecord::where('course_offering_id', $courseOffering->id)->get();
+        // Get all registered student IDs to filter academic records
+        $registeredStudentIds = CourseRegistration::where('course_offering_id', $courseOffering->id)
+            ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
+            ->pluck('student_id')
+            ->toArray();
+
+        // Update each record individually (only for registered students)
+        $records = AcademicRecord::where('course_offering_id', $courseOffering->id)
+            ->whereIn('student_id', $registeredStudentIds)
+            ->get();
 
         $attendanceFailedCount = 0;
         $gradeFailedCount = 0;
@@ -213,33 +221,65 @@ class CourseCompletionService
      */
     private function validateAcademicRecordsExist(CourseOffering $courseOffering): void
     {
-        $registeredCount = CourseRegistration::where('course_offering_id', $courseOffering->id)
+        // Get all registered student IDs
+        $registeredStudentIds = CourseRegistration::where('course_offering_id', $courseOffering->id)
             ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
-            ->count();
+            ->pluck('student_id')
+            ->toArray();
 
-        $recordsCount = AcademicRecord::where('course_offering_id', $courseOffering->id)
-            ->count();
+        // Get student IDs that have academic records
+        $recordStudentIds = AcademicRecord::where('course_offering_id', $courseOffering->id)
+            ->pluck('student_id')
+            ->toArray();
 
-        if ($registeredCount !== $recordsCount) {
+        // Find students who are registered but don't have academic records
+        $missingRecordStudents = array_diff($registeredStudentIds, $recordStudentIds);
+
+        if (count($missingRecordStudents) > 0) {
+            $studentDetails = \App\Models\Student::whereIn('id', array_slice($missingRecordStudents, 0, 5))
+                ->pluck('student_id')
+                ->implode(', ');
+
             throw new \Exception(
-                "Cannot complete course: Missing academic records for some students. " .
-                    "Registered students: {$registeredCount}, Academic records: {$recordsCount}. " .
-                    "Please ensure all students have academic records before marking course as completed."
+                "Cannot complete course: " . count($missingRecordStudents) . " registered student(s) missing academic records. " .
+                    "Students: {$studentDetails}" .
+                    (count($missingRecordStudents) > 5 ? ' and others...' : '') .
+                    " Please ensure all registered students have academic records before marking course as completed."
             );
+        }
+
+        // Note: It's OK if there are academic records for non-registered students (orphaned records)
+        // These will be processed but won't affect the course completion
+        $orphanedRecords = array_diff($recordStudentIds, $registeredStudentIds);
+        if (count($orphanedRecords) > 0) {
+            Log::warning('Orphaned academic records found', [
+                'course_offering_id' => $courseOffering->id,
+                'orphaned_count' => count($orphanedRecords),
+                'orphaned_student_ids' => array_slice($orphanedRecords, 0, 5),
+            ]);
         }
     }
 
     /**
-     * Validate that all academic records have final grades
+     * Validate that all academic records (for registered students) have final grades
      */
     private function validateGradesExist(CourseOffering $courseOffering): void
     {
+        // Get all registered student IDs
+        $registeredStudentIds = CourseRegistration::where('course_offering_id', $courseOffering->id)
+            ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
+            ->pluck('student_id')
+            ->toArray();
+
+        // Check only academic records for registered students
         $missingGrades = AcademicRecord::where('course_offering_id', $courseOffering->id)
+            ->whereIn('student_id', $registeredStudentIds)
             ->whereNull('final_letter_grade')
             ->count();
 
         if ($missingGrades > 0) {
             $studentsWithoutGrades = AcademicRecord::where('course_offering_id', $courseOffering->id)
+                ->whereIn('student_id', $registeredStudentIds)
                 ->whereNull('final_letter_grade')
                 ->with('student')
                 ->get()
