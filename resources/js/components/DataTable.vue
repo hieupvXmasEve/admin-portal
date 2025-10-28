@@ -25,7 +25,7 @@ const props = withDefaults(defineProps<DataTableProps<TData>>(), {
     emptyMessage: 'No results found.',
     loading: false,
     enableRowSelection: false,
-    enableServerSorting: false,
+    enableServerSorting: true,
 });
 
 // Emits for selection and sorting events
@@ -36,11 +36,7 @@ const emit = defineEmits<{
 }>();
 
 // Table state
-const sorting = ref<SortingState>(
-    props.initialSort
-        ? [{ id: props.initialSort, desc: (props.initialDirection || 'asc') === 'desc' }]
-        : []
-);
+const sorting = ref<SortingState>(props.initialSort ? [{ id: props.initialSort, desc: (props.initialDirection || 'asc') === 'desc' }] : []);
 const columnVisibility = ref<VisibilityState>({});
 const rowSelection = ref({});
 const expanded = ref<ExpandedState>({});
@@ -51,18 +47,16 @@ watch(
     () => [props.initialSort, props.initialDirection] as const,
     ([newSort, newDirection]) => {
         console.log('[DataTable] Sort props changed:', { newSort, newDirection });
-        
+
         // Update sorting state when props change
         if (newSort) {
             // Default to 'asc' if direction is missing
             const direction = newDirection || 'asc';
-            
+
             // Only update if different from current state
             const currentSort = sorting.value[0];
-            const needsUpdate = !currentSort || 
-                               currentSort.id !== newSort || 
-                               (currentSort.desc ? 'desc' : 'asc') !== direction;
-            
+            const needsUpdate = !currentSort || currentSort.id !== newSort || (currentSort.desc ? 'desc' : 'asc') !== direction;
+
             if (needsUpdate) {
                 console.log('[DataTable] Updating sorting state to:', { id: newSort, desc: direction === 'desc' });
                 sorting.value = [{ id: newSort, desc: direction === 'desc' }];
@@ -79,13 +73,13 @@ watch(
             }
         }
     },
-    { immediate: false } // Don't run on mount (already initialized above)
+    { immediate: false }, // Don't run on mount (already initialized above)
 );
 
 // Handle sorting change
 const handleSortingChange = (updaterOrValue: any) => {
     valueUpdater(updaterOrValue, sorting);
-    
+
     // Emit sort change for server-side sorting
     if (props.enableServerSorting) {
         const currentSort = sorting.value[0];
@@ -200,7 +194,11 @@ defineExpose({
                             :data-pinned="header.column.getIsPinned()"
                             :class="cn({ 'bg-background/95 sticky': header.column.getIsPinned() }, header.column.getIsPinned() === 'left' ? 'left-0' : 'right-0')"
                         >
-                            <div v-if="!header.isPlaceholder" :class="cn('flex items-center', header.column.getCanSort() ? 'cursor-pointer select-none' : '')" @click="header.column.getCanSort() ? header.column.getToggleSortingHandler()?.($event) : undefined">
+                            <div
+                                v-if="!header.isPlaceholder"
+                                :class="cn('flex items-center', header.column.getCanSort() ? 'cursor-pointer select-none' : '')"
+                                @click="header.column.getCanSort() ? header.column.getToggleSortingHandler()?.($event) : undefined"
+                            >
                                 <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
                                 <template v-if="header.column.getCanSort()">
                                     <ArrowUp v-if="header.column.getIsSorted() === 'asc'" class="ml-2 h-4 w-4" />

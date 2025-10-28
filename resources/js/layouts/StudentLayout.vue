@@ -6,9 +6,9 @@ import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
 import type { Student } from '@/types/models';
 import { studentRoutes } from '@/utils/routes';
 import { Link, router } from '@inertiajs/vue3';
-import { route } from 'ziggy-js';
-import { ArrowLeft, BarChart3, BookOpen, Download, Edit, GraduationCap, LogIn, Target, User, Users, Wallet } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, Download, Edit, GraduationCap, LogIn, Target, User, Users, Wallet } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
 
 interface Props {
     student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email'>;
@@ -79,7 +79,7 @@ const tabs = [
                 <div>
                     <h1 class="text-2xl font-bold">Academic Summary</h1>
                     <div class="mt-1 flex items-center gap-2">
-                        <span class="text-muted-foreground">{{ student.full_name }}</span>
+                        <span class="text-muted-foreground">{{ student.full_name }} - {{ student.student_id }}</span>
                         <Badge :variant="getStatusBadgeVariant(student.status) as any">
                             {{ formatStatus(student.status) }}
                         </Badge>
