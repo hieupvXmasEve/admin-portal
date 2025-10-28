@@ -64,6 +64,14 @@ class StudentApplication extends AuditableModel
         'overall' => 'decimal:2',
         'is_international_applicant' => 'boolean',
         'status' => 'string',
+        'submitted_photo' => 'string',
+        'submitted_cccd' => 'string',
+        'submitted_ccta' => 'string',
+        'submitted_tn_translate' => 'string',
+        'submitted_hb_translate' => 'string',
+        'submitted_other' => 'string',
+        'submitted_insurance_card' => 'string',
+        'submitted_exemption_gc' => 'string',
     ];
 
     /**
@@ -311,7 +319,7 @@ class StudentApplication extends AuditableModel
         // Check if mapping data can be resolved
         \Log::info("Getting conversion mapping data for application {$this->id}");
         $mappingData = $this->getConversionMappingData();
-        
+
         \Log::info("Mapping data resolved for application {$this->id}", [
             'mapping_data' => $mappingData,
             'campus_id_resolved' => !empty($mappingData['campus_id']),
@@ -324,7 +332,7 @@ class StudentApplication extends AuditableModel
             !empty($mappingData['curriculum_version_id']);
 
         \Log::info("Application {$this->id} readiness result: " . ($isReady ? 'READY' : 'NOT READY'));
-        
+
         return $isReady;
     }
 

@@ -192,7 +192,7 @@ class StudentApplicationController extends Controller
         $studentApplication->update($request->validated());
 
         return redirect()
-            ->route('student-applications.show', $studentApplication)
+            ->route('student-applications.index', $studentApplication)
             ->with('success', 'Student application updated successfully.');
     }
 
