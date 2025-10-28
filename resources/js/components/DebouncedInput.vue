@@ -16,7 +16,7 @@ const emit = defineEmits<{
     (e: 'debounced', value: string | number): void;
 }>();
 
-const debounced = refDebounced(model, props.debounce ?? 500);
+const debounced = refDebounced(model, props.debounce ?? 300);
 
 // emit khi debounce xong
 watch(debounced, (value) => {
