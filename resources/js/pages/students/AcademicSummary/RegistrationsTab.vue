@@ -103,6 +103,12 @@ const columns: ColumnDef<CourseRegistrationRecord>[] = [
         cell: 'grade',
     },
     {
+        header: 'Pass/Fail',
+        id: 'pass_fail',
+        enableSorting: true,
+        cell: 'pass_fail',
+    },
+    {
         header: 'Credits',
         accessorKey: 'credit_hours',
         enableSorting: true,
@@ -358,8 +364,16 @@ onMounted(() => {
                         <Badge :variant="row.original.grade_badge_color">
                             {{ row.original.final_grade }}
                         </Badge>
-                        <p class="mt-1 text-xs text-gray-500">{{ row.original.grade_points }} pts</p>
+                        <p v-if="row.original.final_percentage" class="mt-1 text-xs text-gray-500">{{ row.original.final_percentage }}%</p>
+                        <p v-else-if="row.original.grade_points" class="mt-1 text-xs text-gray-500">{{ row.original.grade_points }} pts</p>
                     </div>
+                    <span v-else class="text-gray-400">-</span>
+                </template>
+
+                <template #cell-pass_fail="{ row }">
+                    <Badge v-if="row.original.pass_fail_status" :variant="row.original.pass_fail_badge_color">
+                        {{ row.original.pass_fail_status === 'pass' ? 'Pass' : 'Fail' }}
+                    </Badge>
                     <span v-else class="text-gray-400">-</span>
                 </template>
 
@@ -429,10 +443,19 @@ onMounted(() => {
                                 <Badge :variant="registration.grade_badge_color">
                                     {{ registration.final_grade }}
                                 </Badge>
-                                <p class="mt-1 text-gray-500">{{ registration.grade_points }} pts</p>
+                                <p v-if="registration.final_percentage" class="mt-1 text-gray-500">{{ registration.final_percentage }}%</p>
+                                <p v-else-if="registration.grade_points" class="mt-1 text-gray-500">{{ registration.grade_points }} pts</p>
                             </div>
                             <span v-else class="text-gray-400">Not graded</span>
                         </div>
+                    </div>
+
+                    <div v-if="registration.pass_fail_status" class="mt-3 flex items-center gap-2">
+                        <p class="text-sm font-medium text-gray-700">Result:</p>
+                        <Badge :variant="registration.pass_fail_badge_color">
+                            {{ registration.pass_fail_status === 'pass' ? 'Pass' : 'Fail' }}
+                        </Badge>
+                        <span v-if="registration.meets_attendance_requirement === false" class="text-xs text-orange-600">(Low Attendance)</span>
                     </div>
 
                     <div class="mt-3 flex items-center justify-between">
@@ -516,14 +539,44 @@ onMounted(() => {
                                 <Badge :variant="selectedRegistration.grade_badge_color">
                                     {{ selectedRegistration.final_grade }}
                                 </Badge>
-                                <span class="text-sm text-gray-500">{{ selectedRegistration.grade_points }} points</span>
+                                <span v-if="selectedRegistration.final_percentage" class="text-sm text-gray-500">{{ selectedRegistration.final_percentage }}%</span>
+                                <span v-else-if="selectedRegistration.grade_points" class="text-sm text-gray-500">{{ selectedRegistration.grade_points }} points</span>
                             </div>
                         </div>
                         <div>
-                            <Label class="text-sm font-medium">Grade Status</Label>
-                            <Badge :variant="selectedRegistration.is_passing_grade ? 'success' : 'destructive'">
-                                {{ selectedRegistration.is_passing_grade ? 'Passing' : 'Failing' }}
-                            </Badge>
+                            <Label class="text-sm font-medium">Result Status</Label>
+                            <div class="flex items-center gap-2">
+                                <Badge v-if="selectedRegistration.pass_fail_status" :variant="selectedRegistration.pass_fail_badge_color">
+                                    {{ selectedRegistration.pass_fail_status === 'pass' ? 'Pass' : 'Fail' }}
+                                </Badge>
+                                <Badge v-else :variant="selectedRegistration.is_passing_grade ? 'success' : 'destructive'">
+                                    {{ selectedRegistration.is_passing_grade ? 'Passing' : 'Failing' }}
+                                </Badge>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="selectedRegistration.meets_attendance_requirement !== null || selectedRegistration.grade_status" class="rounded-lg bg-blue-50 p-4">
+                        <h4 class="mb-2 font-medium text-blue-900">Academic Record Details</h4>
+                        <div class="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                            <div v-if="selectedRegistration.meets_attendance_requirement !== null">
+                                <Label class="text-sm font-medium">Attendance Requirement</Label>
+                                <Badge :variant="selectedRegistration.meets_attendance_requirement ? 'success' : 'destructive'">
+                                    {{ selectedRegistration.meets_attendance_requirement ? 'Met' : 'Not Met' }}
+                                </Badge>
+                            </div>
+                            <div v-if="selectedRegistration.grade_status">
+                                <Label class="text-sm font-medium">Grade Status</Label>
+                                <Badge :variant="selectedRegistration.grade_status === 'passing' ? 'success' : 'destructive'">
+                                    {{ selectedRegistration.grade_status }}
+                                </Badge>
+                            </div>
+                            <div v-if="selectedRegistration.completion_status">
+                                <Label class="text-sm font-medium">Completion Status</Label>
+                                <Badge :variant="selectedRegistration.completion_status === 'completed' ? 'success' : 'warning'">
+                                    {{ selectedRegistration.completion_status }}
+                                </Badge>
+                            </div>
                         </div>
                     </div>
 

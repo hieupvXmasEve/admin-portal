@@ -246,7 +246,19 @@ class StudentAcademicSummaryService
                 'courseOffering.unit:id,name,code,credit_points',
                 'courseOffering.semester:id,name,code,start_date,end_date',
                 'semester:id,name,code,start_date,end_date',
-            ]);
+            ])
+            ->leftJoin('academic_records', function ($join) use ($student) {
+                $join->on('course_registrations.course_offering_id', '=', 'academic_records.course_offering_id')
+                    ->where('academic_records.student_id', '=', $student->id);
+            })
+            ->select('course_registrations.*',
+                'academic_records.final_percentage',
+                'academic_records.final_letter_grade',
+                'academic_records.grade_points as academic_grade_points',
+                'academic_records.meets_attendance_requirement',
+                'academic_records.grade_status',
+                'academic_records.completion_status as academic_completion_status'
+            );
 
         // Apply filters
         if (!empty($filters['semester_id'])) {
@@ -303,6 +315,24 @@ class StudentAcademicSummaryService
             $semester = $registration->semester ?? $registration->courseOffering->semester;
             $unit = $registration->courseOffering->unit ?? null;
 
+            // Use academic_record data if available, otherwise fall back to course_registration data
+            $finalGrade = $registration->final_letter_grade ?? $registration->final_grade;
+            $gradePoints = $registration->academic_grade_points ?? $registration->grade_points;
+            $finalPercentage = $registration->final_percentage;
+            $meetsAttendance = $registration->meets_attendance_requirement;
+            $gradeStatus = $registration->grade_status;
+            $completionStatus = $registration->academic_completion_status;
+
+            // Determine Pass/Fail status based on academic_record
+            $passFailStatus = null;
+            if ($completionStatus === 'completed' && $gradeStatus === 'passing') {
+                $passFailStatus = 'pass';
+            } elseif ($completionStatus === 'completed' && $gradeStatus === 'failing') {
+                $passFailStatus = 'fail';
+            } elseif ($completionStatus === 'failed') {
+                $passFailStatus = 'fail';
+            }
+
             return [
                 'id' => $registration->id,
                 'course_name' => $unit->name ?? 'N/A',
@@ -317,8 +347,13 @@ class StudentAcademicSummaryService
                 'registration_status' => $registration->registration_status,
                 'registration_date' => $registration->registration_date,
                 'registration_method' => $registration->registration_method ?? 'N/A',
-                'final_grade' => $registration->final_grade,
-                'grade_points' => $registration->grade_points,
+                'final_grade' => $finalGrade,
+                'grade_points' => $gradePoints,
+                'final_percentage' => $finalPercentage,
+                'meets_attendance_requirement' => $meetsAttendance,
+                'grade_status' => $gradeStatus,
+                'completion_status' => $completionStatus,
+                'pass_fail_status' => $passFailStatus,
                 'credit_hours' => $registration->credit_hours,
                 'is_retake' => $registration->is_retake,
                 'attempt_number' => $registration->attempt_number,
@@ -329,8 +364,9 @@ class StudentAcademicSummaryService
                 'is_retake_paid' => $registration->is_retake_paid ?? 'no',
                 'notes' => $registration->notes,
                 'status_badge_color' => $this->getRegistrationStatusBadgeColor($registration->registration_status),
-                'grade_badge_color' => $this->getGradeBadgeColor($registration->final_grade),
-                'is_passing_grade' => $this->isPassingGrade($registration->final_grade),
+                'grade_badge_color' => $this->getGradeBadgeColor($finalGrade),
+                'pass_fail_badge_color' => $this->getPassFailBadgeColor($passFailStatus),
+                'is_passing_grade' => $this->isPassingGrade($finalGrade),
                 'formatted_registration_date' => $registration->registration_date ?
                     \Carbon\Carbon::parse($registration->registration_date)->format('M j, Y') : null,
                 'formatted_completion_date' => $registration->completion_date ?
@@ -429,6 +465,21 @@ class StudentAcademicSummaryService
             'enrolled', 'active', 'registered', 'confirmed' => 'primary',
             'dropped' => 'warning',
             'withdrawn' => 'destructive',
+            default => 'secondary',
+        };
+    }
+
+    /**
+     * Get badge color for Pass/Fail status
+     *
+     * @param string|null $status Pass/Fail status
+     * @return string CSS color class
+     */
+    private function getPassFailBadgeColor(?string $status): string
+    {
+        return match ($status) {
+            'pass' => 'success',
+            'fail' => 'destructive',
             default => 'secondary',
         };
     }

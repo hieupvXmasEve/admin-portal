@@ -42,7 +42,6 @@ interface Props {
     };
 }
 const props = defineProps<Props>();
-console.log(props.courseOfferings);
 const filters = ref({
     search: props.filters.search || '',
     semester_id: props.filters.semester_id || 'all',
@@ -493,6 +492,16 @@ const columns: ColumnDef<CourseOffering>[] = [
                 h(
                     DropdownMenuItem,
                     {
+                        onClick: () => {
+                            const statisticsUrl = `/course-statistics/${course.id}/assessment-scores`;
+                            router.visit(statisticsUrl);
+                        },
+                    },
+                    () => [h(BarChart3, { class: 'mr-2 h-4 w-4' }), 'View Statistics'],
+                ),
+                h(
+                    DropdownMenuItem,
+                    {
                         onClick: () => duplicateCourseOffering(course),
                     },
                     () => [h(Copy, { class: 'mr-2 h-4 w-4' }), 'Duplicate'],
@@ -500,9 +509,7 @@ const columns: ColumnDef<CourseOffering>[] = [
             ];
 
             if (canModify) {
-                menuItems.splice(
-                    1,
-                    0,
+                menuItems.push(
                     h(
                         DropdownMenuItem,
                         {

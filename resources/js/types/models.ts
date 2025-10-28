@@ -433,6 +433,11 @@ export interface CourseRegistrationRecord {
     registration_method: string;
     final_grade: string | null;
     grade_points: number | null;
+    final_percentage: number | null;
+    meets_attendance_requirement: boolean | null;
+    grade_status: string | null;
+    completion_status: string | null;
+    pass_fail_status: 'pass' | 'fail' | null;
     credit_hours: number;
     is_retake: boolean;
     attempt_number: number;
@@ -444,6 +449,7 @@ export interface CourseRegistrationRecord {
     notes: string | null;
     status_badge_color: BadgeVariants['variant'];
     grade_badge_color: BadgeVariants['variant'];
+    pass_fail_badge_color: BadgeVariants['variant'];
     is_passing_grade: boolean;
     formatted_registration_date: string | null;
     formatted_completion_date: string | null;
