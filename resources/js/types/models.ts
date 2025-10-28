@@ -1307,6 +1307,50 @@ export interface EmailTemplate {
     description?: string;
 }
 
+// Failed Students interfaces
+export interface FailedStudent {
+    id: number;
+    student_id: string;
+    student_name: string;
+    student_email: string;
+    program_name: string;
+    program_code: string;
+    campus_name: string;
+    unit_code: string;
+    unit_name: string;
+    course_offering_section: string;
+    lecturer_name: string;
+    final_percentage: number;
+    final_letter_grade: string;
+    attendance_percentage: number;
+    attempt_number: number;
+    is_repeat_course: boolean;
+    retake_eligible: boolean;
+    semester_name: string;
+    semester_code: string;
+}
+
+export interface FailedStudentsSummary {
+    total_failed_students: number;
+    total_failed_courses: number;
+    most_failed_units: Array<{ unit_code: string; unit_name: string; count: number }>;
+    average_attendance_of_failed: number;
+    retake_eligible_count: number;
+    by_attempt_distribution: { [key: string]: number };
+}
+
+export interface FailReasonDistribution {
+    low_grade: number;
+    poor_attendance: number;
+    both: number;
+}
+
+export interface FailedUnitDistribution {
+    unit_code: string;
+    unit_name: string;
+    count: number;
+}
+
 // API Response interfaces
 export interface ApiResponse {
     success: boolean;
