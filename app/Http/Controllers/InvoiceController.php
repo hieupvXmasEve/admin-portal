@@ -118,6 +118,7 @@ class InvoiceController extends Controller
         try {
             $result = $this->invoiceService->generateInvoicesForCycle($validated['billing_cycle_id']);
             $stats = $result['stats'];
+            $skippedDetails = $result['skipped_details'] ?? [];
 
             // Build success message
             $message = 'Invoice generation completed: ';
@@ -131,12 +132,23 @@ class InvoiceController extends Controller
                 $details[] = "{$stats['updated']} updated";
             }
 
+            if ($stats['skipped'] > 0) {
+                $details[] = "{$stats['skipped']} skipped";
+            }
+
             $message .= implode(', ', $details);
             $message .= " (Total: {$stats['total']})";
 
-            return redirect()->route('invoices.index', ['billing_cycle_id' => $validated['billing_cycle_id']])
+            $redirect = redirect()->route('invoices.index', ['billing_cycle_id' => $validated['billing_cycle_id']])
                 ->with('success', $message)
                 ->with('success_details', $stats);
+
+            // Add skipped details if any
+            if (!empty($skippedDetails)) {
+                $redirect->with('skipped_students', $skippedDetails);
+            }
+
+            return $redirect;
         } catch (\Exception $e) {
             return back()
                 ->withInput()
