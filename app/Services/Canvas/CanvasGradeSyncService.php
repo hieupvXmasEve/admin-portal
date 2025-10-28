@@ -55,9 +55,9 @@ class CanvasGradeSyncService
                 throw new \Exception('Course offering or syllabus not found');
             }
 
-            // Get local enrolled students (registered or confirmed)
+            // Get local enrolled students (registered, confirmed, or completed)
             $enrollments = CourseRegistration::where('course_offering_id', $courseOffering->id)
-                ->whereIn('registration_status', ['registered', 'confirmed'])
+                ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
                 ->with('student')
                 ->get();
 
