@@ -418,6 +418,7 @@ export interface StudentOverview {
 
 // Course Registration interfaces for Academic Summary
 export interface CourseRegistrationRecord {
+    course_offering_id: number;
     id: number;
     course_name: string;
     course_code: string;
@@ -693,6 +694,24 @@ export interface Enrollment {
     updated_at: string;
 }
 
+export interface AcademicRecord {
+    id: number;
+    student_id: number;
+    course_offering_id: number;
+    is_repeat_course: boolean;
+    attempt_number: number;
+    original_record_id?: number;
+    final_letter_grade?: string;
+    final_percentage?: number;
+    completion_status?: string;
+    original_record?: {
+        id: number;
+        final_letter_grade?: string;
+        final_percentage?: number;
+        completion_status?: string;
+    };
+}
+
 export interface CourseRegistration {
     id: number;
     student_id: number;
@@ -715,6 +734,7 @@ export interface CourseRegistration {
     student?: Student;
     course_offering?: CourseOffering;
     semester?: Semester;
+    academic_record?: AcademicRecord;
     created_at: string;
     updated_at: string;
 }
@@ -803,6 +823,9 @@ export interface CourseOffering {
     semester: Semester;
     campus?: Campus;
     courseRegistrations?: CourseRegistration[];
+    course_registrations?: CourseRegistration[];
+    academicRecords?: AcademicRecord[];
+    class_sessions?: ClassSession[];
     syllabus_template?: SyllabusTemplate;
     created_at: string;
     updated_at: string;

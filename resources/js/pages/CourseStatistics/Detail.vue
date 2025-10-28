@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, Calendar, CheckCircle, Clock, Download, User, Users, XCircle } from 'lucide-vue-next';
+import { ArrowLeft, BarChart3, Calendar, CheckCircle, Clock, Download, User, Users, XCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface Session {
@@ -137,6 +137,12 @@ const getStatusLabel = (status: string) => {
                     </p>
                 </div>
             </div>
+            <Link :href="`/course-statistics/${course_offering.id}/assessment-scores`">
+                <Button variant="outline" size="sm">
+                    <BarChart3 class="mr-2 h-4 w-4" />
+                    Assessment Scores
+                </Button>
+            </Link>
         </div>
 
         <!-- Statistics Cards -->

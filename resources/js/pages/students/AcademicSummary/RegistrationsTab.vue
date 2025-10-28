@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { BookOpen, CheckCircle, Clock, Eye, RotateCcw, X } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
@@ -276,9 +276,7 @@ onMounted(() => {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Academic Years</SelectItem>
-                            <SelectItem v-for="group in registrations.semester_groups" :key="group.academic_year" :value="group.academic_year">
-                                {{ group.academic_year }} ({{ group.total_registrations }} courses)
-                            </SelectItem>
+                            <SelectItem v-for="group in registrations.semester_groups" :key="group.academic_year" :value="group.academic_year"> {{ group.academic_year }} ({{ group.total_registrations }} courses) </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -292,9 +290,7 @@ onMounted(() => {
                         <SelectContent>
                             <SelectItem value="all">All Semesters</SelectItem>
                             <template v-for="group in registrations.semester_groups" :key="group.academic_year">
-                                <SelectItem v-for="semester in group.semesters" :key="semester.id" :value="semester.id.toString()">
-                                    {{ semester.name }} ({{ semester.academic_year }})
-                                </SelectItem>
+                                <SelectItem v-for="semester in group.semesters" :key="semester.id" :value="semester.id.toString()"> {{ semester.name }} ({{ semester.academic_year }}) </SelectItem>
                             </template>
                         </SelectContent>
                     </Select>
@@ -308,9 +304,7 @@ onMounted(() => {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem v-for="status in registrations.status_breakdown" :key="status.status" :value="status.status">
-                                {{ formatStatusName(status.status) }} ({{ status.count }})
-                            </SelectItem>
+                            <SelectItem v-for="status in registrations.status_breakdown" :key="status.status" :value="status.status"> {{ formatStatusName(status.status) }} ({{ status.count }}) </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -341,8 +335,13 @@ onMounted(() => {
             <DataTable :data="registrations.data" :columns="columns" :loading="loading">
                 <template #cell-course="{ row }">
                     <div>
-                        <p class="font-medium text-gray-900">{{ row.original.course_name }}</p>
-                        <p class="text-sm text-gray-500">{{ row.original.course_code }}</p>
+                        <Link :href="`/course-offerings/${row.original.course_offering_id}`" class="font-medium text-blue-600 hover:underline">
+                            {{ row.original.course_name }}
+                        </Link>
+                        <p class="text-sm text-gray-500">
+                            {{ row.original.course_code }}
+                            <span v-if="row.original.section_code && row.original.section_code !== 'N/A'"> — Section {{ row.original.section_code }}</span>
+                        </p>
                     </div>
                 </template>
 
@@ -379,9 +378,7 @@ onMounted(() => {
 
                 <template #cell-retake="{ row }">
                     <div class="flex items-center gap-2">
-                        <Badge v-if="row.original.is_retake" variant="outline" class="text-orange-600">
-                            Attempt {{ row.original.attempt_number }}
-                        </Badge>
+                        <Badge v-if="row.original.is_retake" variant="outline" class="text-orange-600"> Attempt {{ row.original.attempt_number }} </Badge>
                         <span v-else class="text-gray-400">-</span>
                     </div>
                 </template>
@@ -423,8 +420,15 @@ onMounted(() => {
                 <div v-for="registration in registrations.data" :key="registration.id" class="rounded-lg border bg-white p-4 shadow-sm">
                     <div class="mb-3 flex items-start justify-between">
                         <div class="flex-1">
-                            <h3 class="font-medium text-gray-900">{{ registration.course_name }}</h3>
-                            <p class="text-sm text-gray-500">{{ registration.course_code }}</p>
+                            <h3 class="font-medium text-blue-600">
+                                <Link :href="`/course-offerings/${registration.course_offering_id}`" class="hover:underline">
+                                    {{ registration.course_name }}
+                                </Link>
+                            </h3>
+                            <p class="text-sm text-gray-500">
+                                {{ registration.course_code }}
+                                <span v-if="registration.section_code && registration.section_code !== 'N/A'"> — Section {{ registration.section_code }}</span>
+                            </p>
                         </div>
                         <Badge :variant="registration.status_badge_color">
                             {{ formatStatusName(registration.registration_status) }}
@@ -461,9 +465,7 @@ onMounted(() => {
                     <div class="mt-3 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-sm text-gray-500">{{ registration.credit_hours }} credits</span>
-                            <Badge v-if="registration.is_retake" variant="outline" class="text-orange-600">
-                                Attempt {{ registration.attempt_number }}
-                            </Badge>
+                            <Badge v-if="registration.is_retake" variant="outline" class="text-orange-600"> Attempt {{ registration.attempt_number }} </Badge>
                         </div>
                         <Button variant="ghost" size="sm" @click="showDetails(registration)">
                             <Eye class="mr-2 h-4 w-4" />
