@@ -385,16 +385,3 @@ const filters = useTableFilters(
 ### 4. **Performance issues với search**
 **Nguyên nhân:** Không sử dụng debounce  
 **Giải pháp:** Sử dụng `updateFieldDebounced` cho text input
-
-## Kết luận
-
-`useFilters` composable cung cấp một solution hoàn chỉnh và đơn giản để quản lý filtering trong ứng dụng Vue.js + Inertia.js. Với API đơn giản nhưng mạnh mẽ, nó giúp developer tập trung vào logic business thay vì phải lo về URL manipulation và state management phức tạp.
-
-**Ưu điểm chính:**
-- 🎯 **Đơn giản**: API trực quan, dễ sử dụng
-- 🚀 **Mạnh mẽ**: Đầy đủ tính năng cần thiết 
-- 🔒 **Type Safe**: Hỗ trợ TypeScript hoàn chỉnh
-- 📈 **Performance**: Debouncing và optimized state management
-- 🔄 **Reliable**: Automatic error handling và fallbacks
-
-Sử dụng composable này sẽ giúp code của bạn cleaner, maintainable hơn và giảm đáng kể boilerplate code!

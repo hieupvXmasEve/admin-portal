@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import { useModuleNavigation } from '@/composables/useModuleNavigation';
 import type { PaginatedResponse } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
@@ -50,7 +51,7 @@ interface UnitsFilters {
     per_page?: number;
     page?: number;
     type?: string;
-    level?: number | null;
+    level?: string | null;
     credit_points?: number;
     has_prerequisites?: boolean;
     has_equivalents?: boolean;
@@ -68,14 +69,35 @@ const props = defineProps<{
 // Reactive data
 const data = computed(() => props.units.data);
 
-// Filter state - Initialize with props or defaults
-const filters = ref({
-    search: props.filters?.search || '',
-    sort: props.filters?.sort || '',
-    direction: props.filters?.direction || 'asc',
-    per_page: props.filters?.per_page || 15,
-    type: props.filters?.type || 'all',
-    level: props.filters?.level !== undefined && props.filters?.level !== null ? String(props.filters.level) : 'all',
+// Initialize filters with useInertiaFilters composable
+const {
+    filters,
+    hasActiveFilters,
+    clearFilters,
+    handleSearch,
+    handleSelectFilter,
+    handleSortChange,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    currentSort,
+    currentDirection,
+} = useInertiaFilters<UnitsFilters>({
+    baseUrl: '/units',
+    initialFilters: {
+        search: props.filters?.search || '',
+        sort: props.filters?.sort || '',
+        direction: props.filters?.direction || 'asc',
+        per_page: props.filters?.per_page || 15,
+        type: props.filters?.type || 'all',
+        level: props.filters?.level !== undefined && props.filters?.level !== null ? String(props.filters.level) : 'all',
+    },
+    defaultValues: {
+        per_page: 15,
+        direction: 'asc',
+        type: 'all',
+        level: 'all',
+    },
+    only: ['units', 'filters'],
 });
 
 // Module navigation với return param
@@ -128,47 +150,14 @@ const confirmDelete = () => {
     }
 };
 
-// Server-side filtering functions
-const applyFilters = () => {
-    const params = new URLSearchParams();
-
-    if (filters.value.search) params.set('search', filters.value.search);
-    if (filters.value.sort) params.set('sort', filters.value.sort);
-    if (filters.value.direction) params.set('direction', filters.value.direction);
-    if (filters.value.per_page) params.set('per_page', filters.value.per_page.toString());
-    if (filters.value.type && filters.value.type !== 'all') params.set('type', filters.value.type);
-    if (filters.value.level && filters.value.level !== 'all') params.set('level', filters.value.level.toString());
-
-    const url = `/units${params.toString() ? '?' + params.toString() : ''}`;
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['units', 'filters'],
-    });
-};
-
-// Search handler for DebouncedInput (debounced event)
-const handleSearch = (value: string | number) => {
-    filters.value.search = String(value);
-    applyFilters();
-};
-
-// Filter change handler
-const handleFilterChange = () => {
-    applyFilters();
-};
-
 // Type filter handler
 const handleTypeChange = (value: AcceptableValue) => {
-    filters.value.type = value ? String(value) : 'all';
-    applyFilters();
+    handleSelectFilter('type', value, 'all');
 };
 
-// Level filter handler  
+// Level filter handler
 const handleLevelChange = (value: AcceptableValue) => {
-    filters.value.level = value ? String(value) : 'all';
-    applyFilters();
+    handleSelectFilter('level', value, 'all');
 };
 
 // Unit type options
@@ -239,65 +228,6 @@ const confirmBulkDelete = async () => {
     }
 };
 
-const clearFilters = () => {
-    filters.value = {
-        search: '',
-        sort: '',
-        direction: 'asc',
-        per_page: 15,
-        type: 'all',
-        level: 'all',
-    };
-    router.visit('/units', {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['units', 'filters'],
-    });
-};
-
-const hasActiveFilters = computed(() => {
-    return filters.value.search || 
-           (filters.value.type && filters.value.type !== 'all') || 
-           (filters.value.level && filters.value.level !== 'all');
-});
-
-// Pagination handlers
-const handlePaginationNavigate = (url: string) => {
-    try {
-        let urlObj: URL;
-        if (url.startsWith('http')) {
-            urlObj = new URL(url);
-        } else {
-            urlObj = new URL(url, window.location.origin);
-        }
-        
-        const page = urlObj.searchParams.get('page');
-        
-        if (page && !isNaN(parseInt(page))) {
-            filters.value.per_page = parseInt(page);
-            applyFilters();
-        } else {
-            router.visit(url, {
-                preserveState: true,
-                preserveScroll: true,
-                only: ['units', 'filters'],
-            });
-        }
-    } catch (error) {
-        console.error('Error parsing pagination URL:', url, error);
-        router.visit(url, {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['units', 'filters'],
-        });
-    }
-};
-
-const handlePageSizeChange = (size: number) => {
-    filters.value.per_page = size;
-    applyFilters();
-};
-
 // Export functionality
 const isExporting = ref(false);
 
@@ -310,11 +240,11 @@ const exportToExcel = async () => {
         // Build export URL with current filters
         const params = new URLSearchParams();
 
-        if (filters.value.search) params.set('search', filters.value.search);
-        if (filters.value.sort) params.set('sort', filters.value.sort);
-        if (filters.value.direction) params.set('direction', filters.value.direction);
-        if (filters.value.type && filters.value.type !== 'all') params.set('type', filters.value.type);
-        if (filters.value.level && filters.value.level !== 'all') params.set('level', filters.value.level.toString());
+        if (filters.search) params.set('search', filters.search);
+        if (filters.sort) params.set('sort', filters.sort);
+        if (filters.direction) params.set('direction', filters.direction);
+        if (filters.type && filters.type !== 'all') params.set('type', filters.type);
+        if (filters.level && filters.level !== 'all') params.set('level', filters.level.toString());
 
         const exportUrl = `/units/export/excel/filtered${params.toString() ? '?' + params.toString() : ''}`;
 
@@ -415,7 +345,7 @@ const columns: ColumnDef<Unit>[] = [
         cell: ({ row }) => {
             const fee = row.original.base_fee;
             if (!fee) return h('span', { class: 'text-gray-400' }, '-');
-            
+
             // Format fee with K/M notation
             const formatFee = (value: number): string => {
                 if (value >= 1000000) {
@@ -425,7 +355,7 @@ const columns: ColumnDef<Unit>[] = [
                 }
                 return value.toLocaleString();
             };
-            
+
             return h('span', { class: 'text-sm font-medium text-green-600' }, formatFee(fee));
         },
     },
@@ -436,7 +366,7 @@ const columns: ColumnDef<Unit>[] = [
         cell: ({ row }) => {
             const fee = row.original.retake_fee;
             if (!fee) return h('span', { class: 'text-gray-400' }, '-');
-            
+
             // Format fee with K/M notation
             const formatFee = (value: number): string => {
                 if (value >= 1000000) {
@@ -446,7 +376,7 @@ const columns: ColumnDef<Unit>[] = [
                 }
                 return value.toLocaleString();
             };
-            
+
             return h('span', { class: 'text-sm font-medium text-orange-600' }, formatFee(fee));
         },
     },
@@ -557,7 +487,7 @@ const columns: ColumnDef<Unit>[] = [
     <!-- Filters Section -->
     <div class="bg-muted/20 flex flex-wrap items-center gap-4 rounded-lg border p-4">
         <div class="min-w-[200px] flex-1">
-            <DebouncedInput v-model="filters.search" placeholder="Search units..." @debounced="handleSearch" />
+            <DebouncedInput :model-value="filters.search" placeholder="Search units..." @debounced="handleSearch" />
         </div>
 
         <div class="min-w-[160px]">
@@ -593,7 +523,7 @@ const columns: ColumnDef<Unit>[] = [
     </div>
 
     <!-- Data Table -->
-    <DataTable :data="data" :columns="columns" :loading="false">
+    <DataTable :data="data" :columns="columns" :loading="false" :initial-sort="currentSort" :initial-direction="currentDirection" @sort-change="handleSortChange">
         <template #cell-actions="{ row }">
             <div class="flex items-center gap-2">
                 <TooltipProvider :delay-duration="0" ignore-non-keyboard-focus disable-hoverable-content>

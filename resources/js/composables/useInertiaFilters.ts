@@ -96,7 +96,7 @@ export interface InertiaFilterOptions<T = Record<string, any>> {
  * ```
  */
 export function useInertiaFilters<T extends Record<string, any>>(options: InertiaFilterOptions<T>) {
-    const { baseUrl, initialFilters = {} as T, emptyFilters, defaultValues = {}, only = ['items', 'filters'], debounce = 400, autoSync = true, replace = true, transform } = options;
+    const { baseUrl, initialFilters = {} as T, emptyFilters, defaultValues = {}, only = ['items', 'filters'], debounce = 300, autoSync = true, replace = true, transform } = options;
 
     // Use reactive for auto-tracking
     const filters = reactive<T>({ ...initialFilters } as T);

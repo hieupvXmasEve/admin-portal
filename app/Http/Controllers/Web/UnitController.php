@@ -32,7 +32,7 @@ class UnitController extends Controller
     {
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
-            'sort' => 'nullable|string|in:code,name,credit_points,level,created_at',
+            'sort' => 'nullable|string|in:code,name,credit_points,level,unit_type,base_fee,retake_fee,created_at',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
             'type' => 'nullable|string|in:general,egc,semi,ai,mkt,ba,cs,ee,me,fin',
@@ -52,11 +52,13 @@ class UnitController extends Controller
             ->when(isset($validated['level']), function ($query) use ($validated) {
                 $query->where('level', $validated['level']);
             })
-            ->when($validated['sort'] ?? null, callback: function ($query, $sort) use ($validated) {
+            ->when($validated['sort'] ?? null, function ($query, $sort) use ($validated) {
                 $direction = $validated['direction'] ?? 'asc';
                 $query->orderBy($sort, $direction);
+            }, function ($query) {
+                // Default sort when no sort specified
+                $query->orderBy('created_at', 'desc');
             })
-            ->orderBy('created_at', 'desc') // Sort by created_at in descending order by default
             ->withCount(['equivalentUnits', 'curriculumUnits', 'prerequisiteConditions', 'syllabusTemplates'])
             ->paginate($validated['per_page'] ?? 15)
             ->withQueryString();
