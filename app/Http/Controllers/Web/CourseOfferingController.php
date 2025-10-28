@@ -262,6 +262,10 @@ class CourseOfferingController extends Controller
                 $query->with('student')
                     ->orderBy('registration_date', 'desc');
             },
+            'academicRecords' => function ($query) {
+                $query->select(['id', 'student_id', 'course_offering_id', 'is_repeat_course', 'attempt_number', 'original_record_id'])
+                    ->with('originalRecord:id,final_letter_grade,final_percentage,completion_status');
+            },
             'classSessions' => function ($query) {
                 $query->with('room:id,name', 'lecture:id,first_name,last_name')
                     ->select(['id', 'course_offering_id', 'room_id', 'lecture_id', 'session_title', 'session_description', 'session_date', 'start_time', 'end_time', 'session_type', 'status', 'attendance_percentage'])

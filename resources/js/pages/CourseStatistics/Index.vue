@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { PaginatedResponse } from '@/types';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { BarChart3, BookOpen, Calendar, ClipboardList, Eye, TrendingDown, TrendingUp, Users, UserX } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -280,16 +280,16 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
                     </template>
 
                     <template #cell-course="{ row }">
-                        <div class="min-w-[200px] space-y-1">
+                        <Link :href="`/course-offerings/${row.original.course_offering_id}`" class="block text-blue-500 hover:opacity-80">
                             <div class="flex items-center gap-2">
                                 <BookOpen class="text-primary h-4 w-4" />
                                 <span class="font-mono font-semibold">{{ row.original.course_code }}</span>
                             </div>
-                            <div class="text-sm text-gray-700">{{ row.original.course_name }}</div>
-                            <div class="text-muted-foreground flex items-center gap-2 text-xs">
-                                <span v-if="row.original.section_code">Section {{ row.original.section_code }}</span>
-                                <span v-if="row.original.credit_hours">• {{ row.original.credit_hours }} credits</span>
-                            </div>
+                        </Link>
+                        <div class="text-sm text-gray-700">{{ row.original.course_name }}</div>
+                        <div class="text-muted-foreground flex items-center gap-2 text-xs">
+                            <span v-if="row.original.section_code">Section {{ row.original.section_code }}</span>
+                            <span v-if="row.original.credit_hours">• {{ row.original.credit_hours }} credits</span>
                         </div>
                     </template>
 

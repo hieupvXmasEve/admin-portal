@@ -251,7 +251,8 @@ class StudentAcademicSummaryService
                 $join->on('course_registrations.course_offering_id', '=', 'academic_records.course_offering_id')
                     ->where('academic_records.student_id', '=', $student->id);
             })
-            ->select('course_registrations.*',
+            ->select(
+                'course_registrations.*',
                 'academic_records.final_percentage',
                 'academic_records.final_letter_grade',
                 'academic_records.grade_points as academic_grade_points',
@@ -334,6 +335,7 @@ class StudentAcademicSummaryService
             }
 
             return [
+                'course_offering_id' => $registration->course_offering_id,
                 'id' => $registration->id,
                 'course_name' => $unit->name ?? 'N/A',
                 'course_code' => $unit->code ?? 'N/A',

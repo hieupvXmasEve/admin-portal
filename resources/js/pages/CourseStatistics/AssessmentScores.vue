@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatSubmissionTypes } from '@/utils/canvasGradeFormatter';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, BarChart3, BookOpen, Calendar, User, Users } from 'lucide-vue-next';
+import { ArrowLeft, BarChart3, BookOpen, Calendar, CheckCircle, User, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface AssessmentDetail {
@@ -277,6 +277,12 @@ const getGradeStatusLabel = (status: string): string => {
                     </p>
                 </div>
             </div>
+            <Link :href="`/course-statistics/${course_offering.id}`">
+                <Button variant="outline" size="sm">
+                    <CheckCircle class="mr-2 h-4 w-4" />
+                    Attendance
+                </Button>
+            </Link>
         </div>
 
         <!-- Statistics Cards -->

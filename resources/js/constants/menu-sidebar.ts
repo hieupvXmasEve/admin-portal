@@ -239,18 +239,6 @@ export const mainNavItems: NavItem[] = [
                 icon: UserPlus,
                 requiredPermissions: ['view_course_registration'],
             },
-            {
-                title: 'Course Statistics',
-                href: '/course-statistics',
-                icon: BarChart3,
-                requiredPermissions: ['view_attendance'],
-            },
-            // {
-            //     title: 'Enrollment Summary',
-            //     href: courseRoutes.enrollmentSummary(),
-            //     icon: BarChart3,
-            //     requiredPermissions: ['view_course_registration'], // Will be implemented later
-            // },
         ],
     },
     {
@@ -272,6 +260,44 @@ export const mainNavItems: NavItem[] = [
             },
         ],
     },
+    {
+        title: 'Reports & Analytics',
+        href: '#',
+        icon: BarChart3,
+        children: [
+            {
+                title: 'Course Statistics',
+                href: '/course-statistics',
+                icon: BarChart3,
+                requiredPermissions: ['view_attendance'],
+            },
+            // {
+            //     title: 'Student Statistics',
+            //     href: reportRoutes.studentStatistics(),
+            //     icon: Users,
+            //     requiredPermissions: ['view_report'], // Will be implemented later
+            // },
+            // {
+            //     title: 'Academic Performance Summary',
+            //     href: reportRoutes.performanceSummary(),
+            //     icon: TrendingUp,
+            //     requiredPermissions: ['view_report'], // Will be implemented later
+            // },
+            // {
+            //     title: 'Attendance Summary',
+            //     href: reportRoutes.attendanceSummary(),
+            //     icon: Clock,
+            //     requiredPermissions: ['view_report'], // Will be implemented later
+            // },
+            // {
+            //     title: 'GPA Distribution Charts',
+            //     href: reportRoutes.gpaDistribution(),
+            //     icon: PieChart,
+            //     requiredPermissions: ['view_report'], // Will be implemented later
+            // },
+        ],
+    },
+
     {
         title: 'Forms Queries & Feedback',
         href: '#',
@@ -402,37 +428,7 @@ export const mainNavItems: NavItem[] = [
     //         },
     //     ],
     // },
-    // {
-    //     title: 'Reports & Analytics',
-    //     href: '#',
-    //     icon: BarChart3,
-    //     children: [
-    //         {
-    //             title: 'Student Statistics',
-    //             href: reportRoutes.studentStatistics(),
-    //             icon: Users,
-    //             requiredPermissions: ['view_report'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Academic Performance Summary',
-    //             href: reportRoutes.performanceSummary(),
-    //             icon: TrendingUp,
-    //             requiredPermissions: ['view_report'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Attendance Summary',
-    //             href: reportRoutes.attendanceSummary(),
-    //             icon: Clock,
-    //             requiredPermissions: ['view_report'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'GPA Distribution Charts',
-    //             href: reportRoutes.gpaDistribution(),
-    //             icon: PieChart,
-    //             requiredPermissions: ['view_report'], // Will be implemented later
-    //         },
-    //     ],
-    // },
+
     // {
     //     title: 'Course Syllabus & Content',
     //     href: '#',

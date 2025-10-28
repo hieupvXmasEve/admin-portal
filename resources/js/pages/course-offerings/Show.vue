@@ -15,7 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
-import type { ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
+import type { AcademicRecord, ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { format } from 'date-fns';
@@ -27,6 +27,7 @@ interface Props {
     courseOffering: CourseOffering & {
         course_registrations: CourseRegistration[];
         class_sessions?: ClassSession[];
+        academic_records?: AcademicRecord[];
     };
     availableRooms: Room[];
     // canGenerateClassSessions: boolean;
@@ -336,6 +337,13 @@ const hasStartedSessions = computed(() => {
         (session) => session.status === 'in_progress' || session.status === 'completed'
     ) ?? false;
 });
+
+// Helper function to get academic record for a registration
+const getAcademicRecordForStudent = (studentId: number) => {
+    return props.courseOffering.academic_records?.find(
+        (record) => record.student_id === studentId
+    );
+};
 </script>
 
 <template>
@@ -788,6 +796,7 @@ const hasStartedSessions = computed(() => {
                                     <TableHead>Student Name</TableHead>
                                     <TableHead>Email</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead>Retake Info</TableHead>
                                     <TableHead>Registration Date</TableHead>
                                     <TableHead>Method</TableHead>
                                     <TableHead>Actions</TableHead>
@@ -812,6 +821,28 @@ const hasStartedSessions = computed(() => {
                                         <Badge :variant="getRegistrationStatusVariant(registration.registration_status)">
                                             {{ registration.registration_status.toUpperCase() }}
                                         </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <template v-if="registration.student">
+                                            <div v-if="getAcademicRecordForStudent(registration.student.id)" class="space-y-1">
+                                                <div v-if="getAcademicRecordForStudent(registration.student.id)?.is_repeat_course" class="flex items-center gap-2">
+                                                    <Badge variant="secondary" class="bg-orange-100 text-orange-800">
+                                                        Retake (Attempt #{{ getAcademicRecordForStudent(registration.student.id)?.attempt_number }})
+                                                    </Badge>
+                                                </div>
+                                                <div v-else class="text-muted-foreground text-sm">
+                                                    First Attempt
+                                                </div>
+                                                <div v-if="getAcademicRecordForStudent(registration.student.id)?.is_repeat_course && getAcademicRecordForStudent(registration.student.id)?.original_record" class="text-muted-foreground text-xs">
+                                                    Previous: {{ getAcademicRecordForStudent(registration.student.id)?.original_record?.final_letter_grade || 'N/A' }}
+                                                    <template v-if="getAcademicRecordForStudent(registration.student.id)?.original_record?.final_percentage">
+                                                        ({{ Number(getAcademicRecordForStudent(registration.student.id)?.original_record?.final_percentage).toFixed(2) }}%)
+                                                    </template>
+                                                    <template v-else>(N/A)</template>
+                                                </div>
+                                            </div>
+                                            <span v-else class="text-muted-foreground text-sm">N/A</span>
+                                        </template>
                                     </TableCell>
                                     <TableCell class="text-muted-foreground">
                                         {{ formatDateTime(registration.registration_date) }}
