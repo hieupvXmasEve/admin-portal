@@ -77,6 +77,8 @@ class InvoiceService
         $invoices = new Collection;
         $createdCount = 0;
         $updatedCount = 0;
+        $skippedCount = 0;
+        $skippedDetails = [];
 
         // Process each enrollment individually (avoid nested transactions)
         foreach ($enrollments as $enrollment) {
@@ -100,9 +102,9 @@ class InvoiceService
                     $invoices->push($invoice);
                     $createdCount++;
                 }
-            } catch (\Illuminate\Database\QueryException $e) {
+            } catch (\Exception $e) {
                 // Handle duplicate key error (unique constraint violation)
-                if ($e->getCode() === '23000') {
+                if ($e instanceof \Illuminate\Database\QueryException && $e->getCode() === '23000') {
                     // Fetch the existing invoice created by concurrent request
                     $existingInvoice = StudentInvoice::where('student_id', $enrollment->student_id)
                         ->where('billing_cycle_id', $cycle->id)
@@ -115,8 +117,14 @@ class InvoiceService
                         $updatedCount++;
                     }
                 } else {
-                    // Re-throw other exceptions
-                    throw $e;
+                    // Student skipped due to validation (no registrations, no tuition plan, etc.)
+                    $skippedCount++;
+                    $skippedDetails[] = [
+                        'student_id' => $enrollment->student->student_id ?? 'Unknown',
+                        'student_name' => $enrollment->student->full_name ?? 'Unknown',
+                        'reason' => $e->getMessage(),
+                    ];
+                    // Continue processing other students
                 }
             }
         }
@@ -126,8 +134,10 @@ class InvoiceService
             'stats' => [
                 'created' => $createdCount,
                 'updated' => $updatedCount,
+                'skipped' => $skippedCount,
                 'total' => $invoices->count(),
             ],
+            'skipped_details' => $skippedDetails,
         ];
     }
 
@@ -149,6 +159,13 @@ class InvoiceService
         }
 
         return DB::transaction(function () use ($student, $cycle) {
+            // Check if student should have an invoice based on their status
+            $shouldCreateInvoice = $this->shouldCreateInvoiceForStudent($student, $cycle->semester_id);
+            
+            if (!$shouldCreateInvoice['create']) {
+                throw new \Exception($shouldCreateInvoice['reason']);
+            }
+
             // Create the invoice
             $invoice = StudentInvoice::create([
                 'invoice_number' => $this->generateInvoiceNumber(),
@@ -163,11 +180,12 @@ class InvoiceService
                 'due_date' => $cycle->due_date,
             ]);
 
-            // Add tuition items from tuition plan
-            $this->addTuitionItems($invoice, $student, $cycle->semester_id);
-
-            // Add unit fees from course registrations
-            $this->addUnitFeeItems($invoice, $student, $cycle->semester_id);
+            // Add items based on student status
+            if ($student->status === 'intake_course') {
+                $this->addTuitionItems($invoice, $student, $cycle->semester_id);
+            } elseif ($student->status === 'intake_pre_uni_gc') {
+                $this->addUnitFeeItems($invoice, $student, $cycle->semester_id);
+            }
 
             // Apply scholarship discounts automatically (calculates subtotal internally)
             $this->applyScholarshipDiscount($invoice);
@@ -183,6 +201,69 @@ class InvoiceService
     }
 
     /**
+     * Check if an invoice should be created for a student.
+     * Returns array with 'create' (bool) and 'reason' (string) keys.
+     */
+    protected function shouldCreateInvoiceForStudent(Student $student, int $semesterId): array
+    {
+        // intake_course students: check tuition plan
+        if ($student->status === 'intake_course') {
+            if (!$student->curriculum_version_id || !$student->intake_semester_id) {
+                return [
+                    'create' => false,
+                    'reason' => "Student {$student->student_id} does not have curriculum_version or intake_semester set."
+                ];
+            }
+
+            $hasTuitionPlan = TuitionPlanTerm::whereHas('tuitionPlan', function ($query) use ($student) {
+                $query->where('curriculum_version_id', $student->curriculum_version_id)
+                    ->where('intake_semester_id', $student->intake_semester_id)
+                    ->where('is_active', true);
+            })
+                ->where('semester_id', $semesterId)
+                ->where('amount', '>', 0)
+                ->exists();
+
+            if (!$hasTuitionPlan) {
+                return [
+                    'create' => false,
+                    'reason' => "Student {$student->student_id} does not have a valid tuition plan for this semester."
+                ];
+            }
+
+            return ['create' => true, 'reason' => ''];
+        }
+
+        // intake_pre_uni_gc students: check course registrations
+        if ($student->status === 'intake_pre_uni_gc') {
+            $hasRegistrations = \App\Models\CourseRegistration::where('student_id', $student->id)
+                ->whereHas('courseOffering', function ($q) use ($semesterId) {
+                    $q->where('semester_id', $semesterId)
+                      ->whereHas('unit', function ($unitQuery) {
+                          $unitQuery->where('unit_type', 'egc');
+                      });
+                })
+                ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
+                ->exists();
+
+            if (!$hasRegistrations) {
+                return [
+                    'create' => false,
+                    'reason' => "Student {$student->student_id} has not registered for any EGC courses in this semester."
+                ];
+            }
+
+            return ['create' => true, 'reason' => ''];
+        }
+
+        // Other statuses: not eligible
+        return [
+            'create' => false,
+            'reason' => "Student {$student->student_id} with status '{$student->status}' is not eligible for invoice generation."
+        ];
+    }
+
+    /**
      * Add tuition items to an invoice based on the student's tuition plan.
      * Only applies to students with status = 'intake_course'.
      * Creates bill for ONE tuition term per semester (prevents duplicates).
@@ -190,10 +271,6 @@ class InvoiceService
      */
     protected function addTuitionItems(StudentInvoice $invoice, Student $student, int $semesterId): void
     {
-        // Only add tuition items for students with status = 'intake_course'
-        if ($student->status !== 'intake_course') {
-            return;
-        }
 
         if (! $student->curriculum_version_id || ! $student->intake_semester_id) {
             return;
@@ -236,66 +313,79 @@ class InvoiceService
     }
 
     /**
-     * Add unit fee items to an invoice for EGC students.
+     * Add unit fee items to an invoice based on course registrations.
      * Only applies to students with status = 'intake_pre_uni_gc'.
-     * Creates bill for ONE unit matching student's gc_current_level.
-     * Requires student to have both gc_starting_level and gc_current_level set.
+     * Creates invoice items for ALL EGC course registrations in the semester.
+     * Handles retakes properly by checking previous registrations.
      */
     protected function addUnitFeeItems(StudentInvoice $invoice, Student $student, int $semesterId): void
     {
-        // Only add unit fee items for students with status = 'intake_pre_uni_gc'
-        if ($student->status !== 'intake_pre_uni_gc') {
-            return;
+        // Find all EGC course registrations for this student in this semester
+        $registrations = \App\Models\CourseRegistration::where('student_id', $student->id)
+            ->whereHas('courseOffering', function ($q) use ($semesterId) {
+                $q->where('semester_id', $semesterId)
+                  ->whereHas('unit', function ($unitQuery) {
+                      $unitQuery->where('unit_type', 'egc');
+                  });
+            })
+            // Only active registrations (exclude completed)
+            ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
+            ->with('courseOffering.unit')
+            ->get();
+
+        foreach ($registrations as $registration) {
+            // Check if invoice_item already exists for this registration
+            $existingItem = InvoiceItem::where('reference_type', \App\Models\CourseRegistration::class)
+                ->where('reference_id', $registration->id)
+                ->exists();
+
+            if ($existingItem) {
+                continue; // Skip if already billed
+            }
+
+            $unit = $registration->courseOffering->unit;
+
+            // Detect if this is a retake by checking previous registrations for same unit
+            $isRetake = $this->isRetakeRegistration($student->id, $unit->id, $registration->id);
+
+            // Determine fee and type
+            $fee = $isRetake ? ($unit->retake_fee ?? 0) : ($unit->base_fee ?? 0);
+            $itemType = $isRetake ? 'retake' : 'egc';
+            $description = $isRetake 
+                ? "Retake Fee: {$unit->code} - {$unit->name}"
+                : "EGC Course Fee: {$unit->code} - {$unit->name}";
+
+            // Skip if no fee
+            if ($fee <= 0) {
+                continue;
+            }
+
+            // Create invoice item
+            InvoiceItem::create([
+                'invoice_id' => $invoice->id,
+                'item_type' => $itemType,
+                'description' => $description,
+                'quantity' => 1,
+                'unit_price' => $fee,
+                'total_price' => $fee,
+                'paid_amount' => 0,
+                'reference_id' => $registration->id,
+                'reference_type' => \App\Models\CourseRegistration::class,
+            ]);
         }
+    }
 
-        // Require both gc_starting_level and gc_current_level to be set
-        if (is_null($student->gc_starting_level) || is_null($student->gc_current_level)) {
-            return;
-        }
-
-        // Find ONE unit with type='egc' matching student's gc_current_level
-        // If multiple units exist, get the most recently created one
-        $unit = \App\Models\Unit::where('unit_type', 'egc')
-            ->where('level', $student->gc_current_level)
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        if (! $unit) {
-            return;
-        }
-
-        // Check if this unit already has an invoice item for this student in this semester
-        $existingItem = InvoiceItem::whereHas('invoice', function ($query) use ($student, $semesterId) {
-            $query->where('student_id', $student->id)
-                ->where('semester_id', $semesterId);
-        })
-            ->where('reference_type', \App\Models\Unit::class)
-            ->where('reference_id', $unit->id)
+    /**
+     * Check if a registration is a retake (student has previous registrations for same unit).
+     */
+    protected function isRetakeRegistration(int $studentId, int $unitId, int $currentRegistrationId): bool
+    {
+        return \App\Models\CourseRegistration::where('student_id', $studentId)
+            ->where('id', '<', $currentRegistrationId) // Previous registrations only
+            ->whereHas('courseOffering', function ($q) use ($unitId) {
+                $q->where('unit_id', $unitId);
+            })
             ->exists();
-
-        if ($existingItem) {
-            return; // Skip if already billed for this unit in this semester
-        }
-
-        // Use base_fee (not retake_fee for EGC)
-        $fee = $unit->base_fee;
-
-        // Skip if no fee is set
-        if (! $fee || $fee <= 0) {
-            return;
-        }
-
-        // Create invoice item
-        InvoiceItem::create([
-            'invoice_id' => $invoice->id,
-            'item_type' => 'egc',
-            'description' => $unit->name,
-            'quantity' => 1,
-            'unit_price' => $fee,
-            'total_price' => $fee,
-            'reference_id' => $unit->id,
-            'reference_type' => \App\Models\Unit::class,
-        ]);
     }
 
     /**
@@ -372,9 +462,11 @@ class InvoiceService
             $voucher = $redemption->voucher;
 
             // Skip if voucher is not active or expired
-            if (! $voucher->is_active ||
+            if (
+                ! $voucher->is_active ||
                 now()->lessThan($voucher->valid_from) ||
-                now()->greaterThan($voucher->valid_until)) {
+                now()->greaterThan($voucher->valid_until)
+            ) {
                 continue;
             }
 
@@ -529,9 +621,11 @@ class InvoiceService
 
         // Check if voucher is valid
         $now = now();
-        if (! $voucher->is_active ||
+        if (
+            ! $voucher->is_active ||
             $now->lessThan($voucher->valid_from) ||
-            $now->greaterThan($voucher->valid_until)) {
+            $now->greaterThan($voucher->valid_until)
+        ) {
             throw new \Exception('This voucher is not valid.');
         }
 

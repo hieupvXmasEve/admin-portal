@@ -18,6 +18,7 @@ use App\Models\Student;
 use App\Models\Unit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redirect;
@@ -1025,17 +1026,15 @@ class CourseOfferingController extends Controller
                         continue;
                     }
 
-                    // Check if academic record already exists (prevent race condition)
-                    $existingAcademicRecord = \App\Models\AcademicRecord::where('student_id', $student->id)
+                    // Check if academic record already exists and force delete any soft-deleted ones
+                    $existingAcademicRecord = \App\Models\AcademicRecord::withTrashed()
+                        ->where('student_id', $student->id)
                         ->where('course_offering_id', $courseOffering->id)
-                        ->exists();
+                        ->first();
 
                     if ($existingAcademicRecord) {
-                        $result['message'] = 'Academic record already exists for this course';
-                        $failureCount++;
-                        $results[] = $result;
-
-                        continue;
+                        // Force delete any existing record (including soft-deleted ones)
+                        $existingAcademicRecord->forceDelete();
                     }
 
                     // Check if already registered for another offering of the same unit that is still active (not completed/cancelled)
@@ -1168,10 +1167,10 @@ class CourseOfferingController extends Controller
                         'exception' => get_class($e),
                         'trace' => $e->getTraceAsString(),
                     ]);
-                    
+
                     // Parse error message for better user experience
                     $errorMessage = $this->parseRegistrationError($e);
-                    
+
                     $result['message'] = $errorMessage;
                     $failureCount++;
                 }
@@ -1188,7 +1187,7 @@ class CourseOfferingController extends Controller
                 'total_students' => count($studentIds),
                 'successful' => $successCount,
                 'failed' => $failureCount,
-                'admin_user_id' => auth()->id(),
+                'admin_user_id' => Auth::id(),
             ]);
 
             $message = "Registration completed. {$successCount} successful, {$failureCount} failed.";
@@ -1606,19 +1605,20 @@ class CourseOfferingController extends Controller
             $invoiceItems = \App\Models\InvoiceItem::where('reference_id', $registration->id)
                 ->where('reference_type', CourseRegistration::class)
                 ->get();
-            
+
             foreach ($invoiceItems as $item) {
                 $item->delete(); // Triggers model event → recalculateTotals()
             }
 
-            // Delete ALL academic records for this student + offering
+            // Force delete ALL academic records for this student + offering (including soft-deleted ones)
             // After removing unique constraints, there might be multiple records
-            $academicRecords = \App\Models\AcademicRecord::where('course_offering_id', $courseOffering->id)
+            $academicRecords = \App\Models\AcademicRecord::withTrashed()
+                ->where('course_offering_id', $courseOffering->id)
                 ->where('student_id', $studentDbId)
                 ->get();
-            
+
             foreach ($academicRecords as $record) {
-                $record->delete();
+                $record->forceDelete();
             }
 
             // Delete the course registration
@@ -2035,27 +2035,27 @@ class CourseOfferingController extends Controller
     private function parseRegistrationError(\Exception $e): string
     {
         $message = $e->getMessage();
-        
+
         // Duplicate academic record
         if (str_contains($message, 'unique_student_course_offering')) {
             return 'Student đã có academic record cho lớp này. Không thể đăng ký lại cùng 1 lớp.';
         }
-        
+
         // Duplicate course registration
         if (str_contains($message, 'Duplicate entry') && str_contains($message, 'course_registrations')) {
             return 'Student đã đăng ký lớp này rồi.';
         }
-        
+
         // Invoice creation failed
         if (str_contains($message, 'invoice') || str_contains($message, 'billing')) {
             return 'Không thể tạo hóa đơn học phí: ' . $message;
         }
-        
+
         // Foreign key constraint
         if (str_contains($message, 'foreign key constraint')) {
             return 'Lỗi ràng buộc dữ liệu: Vui lòng kiểm tra thông tin student/program/semester.';
         }
-        
+
         // Default: return original message
         return 'Đăng ký thất bại: ' . $message;
     }
