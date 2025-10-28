@@ -271,6 +271,12 @@ export const mainNavItems: NavItem[] = [
                 icon: BarChart3,
                 requiredPermissions: ['view_attendance'],
             },
+            {
+                title: 'Failed Students',
+                href: '/failed-students',
+                icon: ClipboardList,
+                requiredPermissions: ['view_attendance'],
+            },
             // {
             //     title: 'Student Statistics',
             //     href: reportRoutes.studentStatistics(),
