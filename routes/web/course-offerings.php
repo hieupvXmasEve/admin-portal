@@ -66,7 +66,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Student Registration Management
         // ============================================
         Route::post('/{courseOffering}/delete-student-registration', [CourseOfferingController::class, 'deleteStudentRegistration'])
-            ->middleware('can:edit_course_offering')
+            ->middleware('can:delete_student_registration')
             ->name('course-offerings.delete-student-registration');
     });
 
@@ -79,7 +79,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name(CourseOfferingRoutes::API_SEARCH_STUDENTS);
 
         Route::post('/{courseOffering}/bulk-register-students', [CourseOfferingController::class, 'bulkRegisterStudents'])
-            ->middleware('can:edit_course_offering')
+            ->middleware('can:add_student_registration')
             ->name(CourseOfferingRoutes::API_BULK_REGISTER_STUDENTS);
 
         Route::post('/{courseOffering}/bulk-update-status', [CourseOfferingController::class, 'bulkUpdateRegistrationStatus'])
