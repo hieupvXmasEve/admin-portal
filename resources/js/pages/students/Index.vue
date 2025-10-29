@@ -2,6 +2,7 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
+import ChangeStudentStatusDialog from '@/components/students/ChangeStudentStatusDialog.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,13 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
+import { usePermission } from '@/composables/usePermission';
 import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
 import type { Program, Student } from '@/types/models';
 import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Download, Edit, Eye, FileSpreadsheet, LogIn, RefreshCw, X } from 'lucide-vue-next';
+import { Download, Edit, Eye, FileSpreadsheet, LogIn, RefreshCw, RotateCw, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -73,8 +75,13 @@ interface Props {
 
 const props = defineProps<Props>();
 
-// Student impersonation composable
+// Composables
 const { loginAsStudent } = useStudentImpersonation();
+const { can } = usePermission();
+
+// Change Status Dialog state
+const showChangeDialog = ref(false);
+const selectedStudent = ref<Student | null>(null);
 
 // Export state
 const showExportDialog = ref(false);
@@ -252,6 +259,17 @@ const viewStudent = (student: Student) => {
 
 const editStudent = (student: Student) => {
     router.visit(studentRoutes.edit(student.id));
+};
+
+// Change status dialog functions
+const openChangeDialog = (student: Student) => {
+    selectedStudent.value = student;
+    showChangeDialog.value = true;
+};
+
+const closeChangeDialog = () => {
+    showChangeDialog.value = false;
+    selectedStudent.value = null;
 };
 
 // Export functions
@@ -445,6 +463,14 @@ const exportStudents = async () => {
                                         </TooltipTrigger>
                                         <TooltipContent> Edit </TooltipContent>
                                     </Tooltip>
+                                    <Tooltip v-if="can('change_student_status')">
+                                        <TooltipTrigger as-child>
+                                            <Button variant="ghost" size="icon" @click="openChangeDialog(row.original)">
+                                                <RotateCw class="h-4 w-4" />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent> Change Status/GC Level </TooltipContent>
+                                    </Tooltip>
                                     <Tooltip>
                                         <TooltipTrigger as-child>
                                             <Button variant="ghost" size="icon" @click="loginAsStudent(row.original)">
@@ -546,4 +572,7 @@ const exportStudents = async () => {
             </DialogFooter>
         </DialogContent>
     </Dialog>
+
+    <!-- Change Status/GC Level Dialog -->
+    <ChangeStudentStatusDialog v-if="selectedStudent" :open="showChangeDialog" :student="selectedStudent" @close="closeChangeDialog" @success="closeChangeDialog" />
 </template>

@@ -67,6 +67,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:edit_student')
         ->name(StudentRoutes::UPDATE_STATUS);
 
+    Route::post('students/{student}/change-status-gc-level', [StudentController::class, 'changeStatusAndGcLevel'])
+        ->middleware('can:edit_student')
+        ->name('students.change-status-gc-level');
+
     // Student Academic Summary routes
     Route::prefix('students/{student}/academic-summary')->group(function () {
 

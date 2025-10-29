@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
+import { usePermission } from '@/composables/usePermission';
 import type { AcademicRecord, ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -36,6 +37,7 @@ interface Props {
 const props = defineProps<Props>();
 const api = useApi();
 const { showConfirmDialog } = useGlobalConfirmDialog();
+const { can } = usePermission();
 // const showStatusModal = ref(false);
 const isGenerating = ref(false);
 
@@ -333,16 +335,12 @@ const getAddSessionButtonText = computed(() => {
 
 // Check if any session is in_progress or completed (course has started)
 const hasStartedSessions = computed(() => {
-    return props.courseOffering.class_sessions?.some(
-        (session) => session.status === 'in_progress' || session.status === 'completed'
-    ) ?? false;
+    return props.courseOffering.class_sessions?.some((session) => session.status === 'in_progress' || session.status === 'completed') ?? false;
 });
 
 // Helper function to get academic record for a registration
 const getAcademicRecordForStudent = (studentId: number) => {
-    return props.courseOffering.academic_records?.find(
-        (record) => record.student_id === studentId
-    );
+    return props.courseOffering.academic_records?.find((record) => record.student_id === studentId);
 };
 </script>
 
@@ -826,13 +824,9 @@ const getAcademicRecordForStudent = (studentId: number) => {
                                         <template v-if="registration.student">
                                             <div v-if="getAcademicRecordForStudent(registration.student.id)" class="space-y-1">
                                                 <div v-if="getAcademicRecordForStudent(registration.student.id)?.is_repeat_course" class="flex items-center gap-2">
-                                                    <Badge variant="secondary" class="bg-orange-100 text-orange-800">
-                                                        Retake (Attempt #{{ getAcademicRecordForStudent(registration.student.id)?.attempt_number }})
-                                                    </Badge>
+                                                    <Badge variant="secondary" class="bg-orange-100 text-orange-800"> Retake (Attempt #{{ getAcademicRecordForStudent(registration.student.id)?.attempt_number }}) </Badge>
                                                 </div>
-                                                <div v-else class="text-muted-foreground text-sm">
-                                                    First Attempt
-                                                </div>
+                                                <div v-else class="text-muted-foreground text-sm">First Attempt</div>
                                                 <div v-if="getAcademicRecordForStudent(registration.student.id)?.is_repeat_course && getAcademicRecordForStudent(registration.student.id)?.original_record" class="text-muted-foreground text-xs">
                                                     Previous: {{ getAcademicRecordForStudent(registration.student.id)?.original_record?.final_letter_grade || 'N/A' }}
                                                     <template v-if="getAcademicRecordForStudent(registration.student.id)?.original_record?.final_percentage">
@@ -851,7 +845,7 @@ const getAcademicRecordForStudent = (studentId: number) => {
                                         {{ registration.registration_method }}
                                     </TableCell>
                                     <TableCell>
-                                        <Button v-if="!hasStartedSessions" variant="ghost" size="sm" @click="deleteStudentRegistration(registration)" class="text-destructive hover:text-destructive hover:bg-destructive/10">
+                                        <Button v-if="can('delete_student_registration')" variant="ghost" size="sm" @click="deleteStudentRegistration(registration)" class="text-destructive hover:text-destructive hover:bg-destructive/10">
                                             <Trash2 class="h-4 w-4" />
                                         </Button>
                                     </TableCell>

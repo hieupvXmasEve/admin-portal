@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Constants\StudentRoutes;
+use App\Exports\StudentExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Student\ChangeStudentStatusRequest;
 use App\Http\Requests\Student\StoreStudentRequest;
 use App\Http\Requests\Student\UpdateStudentRequest;
 use App\Http\Resources\Student\StudentResource;
 use App\Models\Campus;
 use App\Models\CurriculumVersion;
 use App\Models\Program;
-use App\Models\Semester;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Services\StudentService;
@@ -24,7 +25,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Exports\StudentExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -37,7 +37,7 @@ class StudentController extends Controller
     public function index(Request $request): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
-        Log::info('Current campus ID: ' . $campusId);
+        Log::info('Current campus ID: '.$campusId);
         if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
@@ -319,7 +319,6 @@ class StudentController extends Controller
         }
     }
 
-
     /**
      * Get students by IDs (API endpoint)
      */
@@ -556,7 +555,7 @@ class StudentController extends Controller
 
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             return response()->json([
                 'success' => false,
                 'message' => 'No campus selected',
@@ -608,13 +607,14 @@ class StudentController extends Controller
     {
         $campusId = session()->get('current_campus_id');
 
-        if (!$campusId) {
+        if (! $campusId) {
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Please select a campus first',
                 ], 400);
             }
+
             return back()->withErrors(['error' => 'Please select a campus first']);
         }
 
@@ -634,7 +634,7 @@ class StudentController extends Controller
 
             // Apply filters if scope is filtered
             if ($validated['scope'] === 'filtered') {
-                if (!empty($validated['search'])) {
+                if (! empty($validated['search'])) {
                     $search = $validated['search'];
                     $query->where(function ($q) use ($search) {
                         $q->where('student_id', 'like', "%{$search}%")
@@ -643,11 +643,11 @@ class StudentController extends Controller
                     });
                 }
 
-                if (!empty($validated['program_id'])) {
+                if (! empty($validated['program_id'])) {
                     $query->where('program_id', $validated['program_id']);
                 }
 
-                if (!empty($validated['status'])) {
+                if (! empty($validated['status'])) {
                     $query->where('status', $validated['status']);
                 }
             }
@@ -686,10 +686,38 @@ class StudentController extends Controller
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Export failed: ' . $e->getMessage(),
+                    'message' => 'Export failed: '.$e->getMessage(),
                 ], 500);
             }
-            return back()->withErrors(['error' => 'Export failed: ' . $e->getMessage()]);
+
+            return back()->withErrors(['error' => 'Export failed: '.$e->getMessage()]);
+        }
+    }
+
+    /**
+     * Change student status and GC level
+     */
+    public function changeStatusAndGcLevel(ChangeStudentStatusRequest $request, Student $student): RedirectResponse
+    {
+        try {
+            $validated = $request->validated();
+            $reason = $validated['reason'];
+            unset($validated['reason']);
+
+            $updatedStudent = $this->studentService->changeStatusAndGcLevel(
+                $student,
+                $validated,
+                $reason
+            );
+
+            return back()->with('success', 'Student status and GC level updated successfully');
+        } catch (\Exception $e) {
+            Log::error('Failed to change student status/GC level', [
+                'student_id' => $student->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
 }

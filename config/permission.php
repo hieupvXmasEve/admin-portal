@@ -10,6 +10,9 @@ return [
             'delete_user' => 'delete_user',
             'import_user' => 'import_user',
             'export_user' => 'export_user',
+            // Change gc level
+            'change_gc_level' => 'change_gc_level',
+            'change_student_status' => 'change_student_status',
         ],
 
         // Campus Management
@@ -97,6 +100,9 @@ return [
             'create_course_offering' => 'create_course_offering',
             'edit_course_offering' => 'edit_course_offering',
             'delete_course_offering' => 'delete_course_offering',
+            'add_student_registration' => 'add_student_registration',
+            'delete_student_registration' => 'delete_student_registration',
+
         ],
         'course_registrations' => [
             'view_course_registration' => 'view_course_registration',
