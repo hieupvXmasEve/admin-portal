@@ -6,12 +6,14 @@ namespace App\Http\Controllers\Web;
 
 use App\Exports\FailedStudentsExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\OverridePassRequest;
 use App\Http\Resources\FailedStudentResource;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Unit;
 use App\Services\ExcelExportService;
 use App\Services\FailedStudentsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -132,5 +134,37 @@ class FailedStudentsController extends Controller
         );
 
         return $this->excelService->download($export, $filename);
+    }
+
+    public function overridePass(OverridePassRequest $request): JsonResponse
+    {
+        try {
+            $record = $this->service->overridePassStatus(
+                (int) $request->validated('academic_record_id'),
+                $request->validated('override_reason')
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pass status overridden successfully.',
+                'data' => new FailedStudentResource($record),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Exception $e) {
+            \Log::error('Failed to override pass status', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'academic_record_id' => $request->validated('academic_record_id'),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to override pass status. Please try again.',
+            ], 500);
+        }
     }
 }

@@ -104,7 +104,8 @@ class CourseCompletionService
                     'grade_status' => 'final',
                     'grade_finalized_date' => now(),
                     'grade_points' => 0.0, // F grade for attendance failure
-                    'completion_status' => 'failed',
+                    'completion_status' => 'complete',
+                    'is_passed' => false,
                     'credit_hours_earned' => 0,
                     'affects_graduation_requirement' => true,
                     'satisfies_prerequisite' => false,

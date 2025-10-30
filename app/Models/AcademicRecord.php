@@ -65,6 +65,9 @@ class AcademicRecord extends AuditableModel
         'grade_history',
         'last_grade_change_at',
         'last_changed_by_lecture_id',
+        'override_pass',
+        'is_passed',
+        'override_reason',
     ];
 
     /**
@@ -127,6 +130,8 @@ class AcademicRecord extends AuditableModel
             'is_repeat_course' => $this->is_repeat_course,
             'affects_graduation_requirement' => $this->affects_graduation_requirement,
             'excluded_from_gpa' => $this->excluded_from_gpa,
+            'override_pass' => $this->override_pass,
+            'override_reason' => $this->override_reason,
         ];
     }
 
@@ -161,6 +166,8 @@ class AcademicRecord extends AuditableModel
         'satisfies_prerequisite' => 'boolean',
         'grade_history' => 'array',
         'last_grade_change_at' => 'datetime',
+        'override_pass' => 'boolean',
+        'is_passed' => 'boolean',
     ];
 
     // Relationships
@@ -254,7 +261,8 @@ class AcademicRecord extends AuditableModel
 
     public function isPassed(): bool
     {
-        return $this->completion_status === 'completed' && $this->grade_points > 0;
+        // Consider override_pass flag or normal passing criteria
+        return $this->override_pass || ($this->completion_status === 'completed' && $this->grade_points > 0);
     }
 
     public function isFailed(): bool
@@ -280,5 +288,10 @@ class AcademicRecord extends AuditableModel
     public function getEarnedCreditHours(): float
     {
         return $this->isPassed() ? $this->credit_hours : 0.0;
+    }
+
+    public function isOverridden(): bool
+    {
+        return (bool) $this->override_pass;
     }
 }

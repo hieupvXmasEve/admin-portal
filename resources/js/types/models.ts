@@ -1318,6 +1318,8 @@ export interface FailedStudent {
     campus_name: string;
     unit_code: string;
     unit_name: string;
+    unit_type: string;
+    unit_level: number | null;
     course_offering_section: string;
     lecturer_name: string;
     final_percentage: number;
@@ -1325,9 +1327,12 @@ export interface FailedStudent {
     attendance_percentage: number;
     attempt_number: number;
     is_repeat_course: boolean;
-    retake_eligible: boolean;
     semester_name: string;
     semester_code: string;
+    override_pass: boolean;
+    override_reason: string | null;
+    is_passed: boolean;
+    student_gc_level: number | null;
 }
 
 export interface FailedStudentsSummary {

@@ -13,4 +13,8 @@ Route::middleware(['auth', 'verified', 'campus.selected'])->group(function () {
     Route::get('failed-students/export', [FailedStudentsController::class, 'export'])
         ->middleware('can:view_attendance')
         ->name('failed-students.export');
+
+    Route::post('failed-students/override-pass', [FailedStudentsController::class, 'overridePass'])
+        ->middleware('can:edit_attendance')
+        ->name('failed-students.override-pass');
 });
