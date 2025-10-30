@@ -7,12 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import type { FailReasonDistribution, FailedStudent, FailedStudentsSummary, FailedUnitDistribution, PaginatedResponse, Program, Semester, Unit } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { AlertTriangle, BookOpen, Download, TrendingDown, UserX, Users } from 'lucide-vue-next';
-import { computed, toValue } from 'vue';
+import { AlertTriangle, BookOpen, Download, ShieldCheck, TrendingDown, UserX, Users } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
+import OverridePassDialog from './OverridePassDialog.vue';
 
 interface FailedStudentFilters {
     semester_id: string;
@@ -72,35 +74,35 @@ const filterConfig = useInertiaFilters<FailedStudentFilters>({
     debounce: 400,
 });
 
-const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePageSizeChange, handlePaginationNavigate } = filterConfig;
+const { filters: activeFilters, hasActiveFilters, clearFilters, handleSearch, handleSortChange, handlePageSizeChange, handlePaginationNavigate } = filterConfig;
 
 // Get sort values directly from filters object (avoiding reactive proxy issues)
 const currentSort = computed(() => {
-    const sortValue = filters.sort;
+    const sortValue = activeFilters.sort;
     return sortValue ? String(sortValue) : undefined;
 });
 const currentDirection = computed(() => {
-    const dirValue = filters.direction;
-    return dirValue ? String(dirValue) as 'asc' | 'desc' : undefined;
+    const dirValue = activeFilters.direction;
+    return dirValue ? (String(dirValue) as 'asc' | 'desc') : undefined;
 });
 
 const handleExport = () => {
     const queryParams: Record<string, string | number> = {};
 
-    if (filters.semester_id) {
-        queryParams.semester_id = filters.semester_id;
+    if (activeFilters.semester_id) {
+        queryParams.semester_id = activeFilters.semester_id;
     }
-    if (filters.program_id && filters.program_id !== 'all') {
-        queryParams.program_id = filters.program_id;
+    if (activeFilters.program_id && activeFilters.program_id !== 'all') {
+        queryParams.program_id = activeFilters.program_id;
     }
-    if (filters.unit_id && filters.unit_id !== 'all') {
-        queryParams.unit_id = filters.unit_id;
+    if (activeFilters.unit_id && activeFilters.unit_id !== 'all') {
+        queryParams.unit_id = activeFilters.unit_id;
     }
-    if (filters.attempt_number && filters.attempt_number !== 'all') {
-        queryParams.attempt_number = filters.attempt_number;
+    if (activeFilters.attempt_number && activeFilters.attempt_number !== 'all') {
+        queryParams.attempt_number = activeFilters.attempt_number;
     }
-    if (filters.search) {
-        queryParams.search = filters.search;
+    if (activeFilters.search) {
+        queryParams.search = activeFilters.search;
     }
 
     const params = new URLSearchParams(queryParams as Record<string, string>);
@@ -165,8 +167,8 @@ const columns: ColumnDef<FailedStudent>[] = [
         enableSorting: true,
     },
     {
-        header: 'Retake Eligible',
-        id: 'retake',
+        header: 'Actions',
+        id: 'actions',
         enableSorting: false,
     },
 ];
@@ -177,14 +179,13 @@ const getAttemptBadgeVariant = (attemptNumber: number) => {
     return 'destructive';
 };
 
-const getFailReasonLabel = (student: FailedStudent) => {
-    const lowGrade = student.final_percentage < 50;
-    const poorAttendance = student.attendance_percentage < 80;
+const overrideDialogOpen = ref(false);
+const selectedStudent = ref<FailedStudent | null>(null);
 
-    if (lowGrade && poorAttendance) return 'Low Grade & Poor Attendance';
-    if (lowGrade) return 'Low Grade';
-    if (poorAttendance) return 'Poor Attendance';
-    return 'Failed';
+const openOverrideDialog = (student: FailedStudent) => {
+    console.log('student', student);
+    selectedStudent.value = student;
+    overrideDialogOpen.value = true;
 };
 </script>
 
@@ -284,7 +285,7 @@ const getFailReasonLabel = (student: FailedStudent) => {
                 <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <div class="space-y-2">
                         <Label for="semester">Semester *</Label>
-                        <Select v-model="filters.semester_id">
+                        <Select v-model="activeFilters.semester_id">
                             <SelectTrigger id="semester">
                                 <SelectValue placeholder="Select semester" />
                             </SelectTrigger>
@@ -298,7 +299,7 @@ const getFailReasonLabel = (student: FailedStudent) => {
 
                     <div class="space-y-2">
                         <Label for="program">Program</Label>
-                        <Select v-model="filters.program_id">
+                        <Select v-model="activeFilters.program_id">
                             <SelectTrigger id="program">
                                 <SelectValue placeholder="All Programs" />
                             </SelectTrigger>
@@ -313,7 +314,7 @@ const getFailReasonLabel = (student: FailedStudent) => {
 
                     <div class="space-y-2">
                         <Label for="unit">Unit</Label>
-                        <Select v-model="filters.unit_id">
+                        <Select v-model="activeFilters.unit_id">
                             <SelectTrigger id="unit">
                                 <SelectValue placeholder="All Units" />
                             </SelectTrigger>
@@ -326,7 +327,7 @@ const getFailReasonLabel = (student: FailedStudent) => {
 
                     <div class="space-y-2">
                         <Label for="attempt">Attempt Number</Label>
-                        <Select v-model="filters.attempt_number">
+                        <Select v-model="activeFilters.attempt_number">
                             <SelectTrigger id="attempt">
                                 <SelectValue placeholder="All Attempts" />
                             </SelectTrigger>
@@ -341,7 +342,7 @@ const getFailReasonLabel = (student: FailedStudent) => {
 
                     <div class="space-y-2">
                         <Label for="search">Search</Label>
-                        <DebouncedInput id="search" :model-value="filters.search" placeholder="Student ID or name..." @update:model-value="handleSearch" />
+                        <DebouncedInput id="search" :model-value="activeFilters.search" placeholder="Student ID or name..." @update:model-value="handleSearch" />
                     </div>
                 </div>
 
@@ -352,7 +353,7 @@ const getFailReasonLabel = (student: FailedStudent) => {
         </Card>
 
         <!-- No Semester Selected -->
-        <Card v-if="!filters.semester_id" class="border-orange-200 bg-orange-50">
+        <Card v-if="!activeFilters.semester_id" class="border-orange-200 bg-orange-50">
             <CardContent class="flex items-center gap-3 py-6">
                 <AlertTriangle class="h-6 w-6 text-orange-600" />
                 <p class="font-medium text-orange-800">Please select a semester to view failed students data.</p>
@@ -374,7 +375,23 @@ const getFailReasonLabel = (student: FailedStudent) => {
                     </template>
                     <template #cell-student_name="{ row }">
                         <div>
-                            <div class="font-medium">{{ row.original.student_name }}</div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium">{{ row.original.student_name }}</span>
+                                <TooltipProvider v-if="row.original.override_pass">
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <Badge variant="warning" class="flex items-center gap-1">
+                                                <AlertTriangle class="h-3 w-3" />
+                                                Override
+                                            </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent class="max-w-xs">
+                                            <p class="font-semibold">Override Reason:</p>
+                                            <p class="text-sm">{{ row.original.override_reason }}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
                             <div class="text-muted-foreground text-xs">{{ row.original.student_email }}</div>
                         </div>
                     </template>
@@ -412,9 +429,14 @@ const getFailReasonLabel = (student: FailedStudent) => {
                             {{ row.original.attempt_number === 1 ? 'st' : row.original.attempt_number === 2 ? 'nd' : 'rd+' }}
                         </Badge>
                     </template>
-                    <template #cell-retake="{ row }">
-                        <Badge :variant="row.original.retake_eligible ? 'default' : 'secondary'">
-                            {{ row.original.retake_eligible ? 'Yes' : 'No' }}
+                    <template #cell-actions="{ row }">
+                        <Button v-if="!row.original.override_pass" variant="outline" size="sm" @click="openOverrideDialog(row.original)">
+                            <ShieldCheck class="mr-2 h-4 w-4" />
+                            Override Pass
+                        </Button>
+                        <Badge v-else variant="secondary" class="flex items-center gap-1">
+                            <ShieldCheck class="h-3 w-3" />
+                            Overridden
                         </Badge>
                     </template>
                 </DataTable>
@@ -473,5 +495,8 @@ const getFailReasonLabel = (student: FailedStudent) => {
                 </CardContent>
             </Card>
         </div>
+
+        <!-- Override Pass Dialog -->
+        <OverridePassDialog v-model:open="overrideDialogOpen" :student="selectedStudent" @success="() => {}" />
     </div>
 </template>

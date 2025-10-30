@@ -21,6 +21,8 @@ class FailedStudentResource extends JsonResource
             'campus_name' => $this->campus?->name,
             'unit_code' => $this->unit?->code,
             'unit_name' => $this->unit?->name,
+            'unit_type' => $this->unit?->unit_type,
+            'unit_level' => $this->unit?->level,
             'course_offering_section' => $this->courseOffering?->section_code ?? 'N/A',
             'lecturer_name' => $this->courseOffering?->lecture
                 ? trim($this->courseOffering->lecture->first_name.' '.$this->courseOffering->lecture->last_name)
@@ -30,18 +32,12 @@ class FailedStudentResource extends JsonResource
             'attendance_percentage' => $this->attendance_percentage ? round((float) $this->attendance_percentage, 2) : 0.0,
             'attempt_number' => $this->attempt_number ?? 1,
             'is_repeat_course' => (bool) $this->is_repeat_course,
-            'retake_eligible' => $this->isRetakeEligible(),
             'semester_name' => $this->semester?->name,
             'semester_code' => $this->semester?->code,
+            'override_pass' => (bool) $this->override_pass,
+            'override_reason' => $this->override_reason,
+            'is_passed' => (bool) $this->is_passed,
+            'student_gc_level' => $this->student?->gc_current_level,
         ];
-    }
-
-    /**
-     * Determine if student is eligible for retake
-     * Typically eligible if attempt_number <= 2
-     */
-    private function isRetakeEligible(): bool
-    {
-        return ($this->attempt_number ?? 1) <= 2;
     }
 }

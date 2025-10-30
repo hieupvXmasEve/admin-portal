@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\AcademicRecord;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class FailedStudentsService
 {
@@ -27,19 +28,16 @@ class FailedStudentsService
 
         $query = AcademicRecord::query()
             ->with([
-                'student:id,student_id,full_name,email',
+                'student:id,student_id,full_name,email,gc_current_level',
                 'program:id,name,code',
                 'campus:id,name,code',
-                'unit:id,code,name,credit_points',
+                'unit:id,code,name,credit_points,unit_type,level',
                 'courseOffering:id,section_code,lecture_id',
                 'courseOffering.lecture:id,first_name,last_name,title',
                 'semester:id,name,code',
             ])
             ->where('academic_records.campus_id', $campusId)
-            ->where(function ($q) {
-                $q->where('academic_records.completion_status', 'failed')
-                    ->orWhere('academic_records.final_letter_grade', 'F');
-            });
+            ->where('academic_records.is_passed', false);
 
         // Apply filters
         if ($semesterId) {
@@ -100,10 +98,7 @@ class FailedStudentsService
         $query = AcademicRecord::query()
             ->where('academic_records.campus_id', $campusId)
             ->where('academic_records.semester_id', $semesterId)
-            ->where(function ($q) {
-                $q->where('academic_records.completion_status', 'failed')
-                    ->orWhere('academic_records.final_letter_grade', 'F');
-            });
+            ->where('academic_records.is_passed', false);
 
         if ($programId) {
             $query->where('academic_records.program_id', $programId);
@@ -119,10 +114,7 @@ class FailedStudentsService
             ->join('units', 'academic_records.unit_id', '=', 'units.id')
             ->where('academic_records.campus_id', $campusId)
             ->where('academic_records.semester_id', $semesterId)
-            ->where(function ($q) {
-                $q->where('academic_records.completion_status', 'failed')
-                    ->orWhere('academic_records.final_letter_grade', 'F');
-            })
+            ->where('academic_records.is_passed', false)
             ->when($programId, function ($q) use ($programId) {
                 $q->where('academic_records.program_id', $programId);
             })
@@ -176,10 +168,7 @@ class FailedStudentsService
         $query = AcademicRecord::query()
             ->where('academic_records.campus_id', $campusId)
             ->where('academic_records.semester_id', $semesterId)
-            ->where(function ($q) {
-                $q->where('academic_records.completion_status', 'failed')
-                    ->orWhere('academic_records.final_letter_grade', 'F');
-            });
+            ->where('academic_records.is_passed', false);
 
         if ($programId) {
             $query->where('academic_records.program_id', $programId);
@@ -219,10 +208,7 @@ class FailedStudentsService
             ->join('units', 'academic_records.unit_id', '=', 'units.id')
             ->where('academic_records.campus_id', $campusId)
             ->where('academic_records.semester_id', $semesterId)
-            ->where(function ($q) {
-                $q->where('academic_records.completion_status', 'failed')
-                    ->orWhere('academic_records.final_letter_grade', 'F');
-            })
+            ->where('academic_records.is_passed', false)
             ->when($programId, function ($q) use ($programId) {
                 $q->where('academic_records.program_id', $programId);
             })
@@ -238,5 +224,63 @@ class FailedStudentsService
                 ];
             })
             ->toArray();
+    }
+
+    /**
+     * Override pass status for a failed student with reason
+     */
+    public function overridePassStatus(int $academicRecordId, string $reason): AcademicRecord
+    {
+        $record = AcademicRecord::with(['student', 'unit'])->findOrFail($academicRecordId);
+
+        // Ensure it's a failed record
+        if ($record->is_passed) {
+            throw new \InvalidArgumentException('Can only override pass status for failed records.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $record->update([
+                'override_pass' => true,
+                'is_passed' => true,
+                'override_reason' => $reason,
+            ]);
+
+            // Check if this is an EGC unit and update student's GC level if applicable
+            if ($record->unit && $record->unit->unit_type === 'egc' && $record->student) {
+                $unitLevel = $record->unit->level;
+                $currentGcLevel = $record->student->gc_current_level;
+
+                // Only increment if unit level matches current GC level
+                if ($unitLevel !== null && $currentGcLevel !== null && $unitLevel === $currentGcLevel) {
+                    $record->student->update([
+                        'gc_current_level' => $currentGcLevel + 1,
+                    ]);
+
+                    Log::info('Student GC level incremented', [
+                        'student_id' => $record->student_id,
+                        'previous_level' => $currentGcLevel,
+                        'new_level' => $currentGcLevel + 1,
+                        'academic_record_id' => $record->id,
+                        'unit_code' => $record->unit->code,
+                    ]);
+                }
+            }
+
+            Log::info('Academic record override pass applied', [
+                'academic_record_id' => $record->id,
+                'student_id' => $record->student_id,
+                'unit_id' => $record->unit_id,
+                'reason' => $reason,
+            ]);
+
+            DB::commit();
+
+            return $record->fresh(['student', 'unit']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 }
