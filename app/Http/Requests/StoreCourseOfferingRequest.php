@@ -43,6 +43,7 @@ class StoreCourseOfferingRequest extends FormRequest
             'current_waitlist' => 0,
             'is_active' => true,
             'enrollment_status' => 'open',
+            'grading_type' => $this->input('grading_type', 'grade'),
         ]);
     }
 }
