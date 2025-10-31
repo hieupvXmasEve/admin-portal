@@ -39,6 +39,9 @@ Route::prefix('uploads')->group(function () {
 // require __DIR__.'/api/public.php';
 require __DIR__ . '/api/admin.php';
 
+// Module routes
+require __DIR__ . '/api/modules.php';
+
 // Versioned API routes
 Route::prefix('v1/student')->name('v1.student.')->group(function () {
     require __DIR__ . '/api/v1/student.php';

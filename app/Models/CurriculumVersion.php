@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CurriculumVersion extends AuditableModel
@@ -89,6 +90,33 @@ class CurriculumVersion extends AuditableModel
     public function enrollments(): HasMany
     {
         return $this->hasMany(Enrollment::class);
+    }
+
+    /**
+     * Get the curriculum modules for this version.
+     */
+    public function curriculumModules(): HasMany
+    {
+        return $this->hasMany(CurriculumModule::class);
+    }
+
+    /**
+     * Get modules through curriculum_modules pivot.
+     */
+    public function modules(): BelongsToMany
+    {
+        return $this->belongsToMany(Module::class, 'curriculum_modules')
+            ->withPivot('year_level', 'semester_number', 'is_required', 'group_name', 'order', 'note')
+            ->withTimestamps()
+            ->orderBy('curriculum_modules.order');
+    }
+
+    /**
+     * Check if this curriculum uses modular structure.
+     */
+    public function hasModularStructure(): bool
+    {
+        return $this->curriculumModules()->exists();
     }
 
     /**

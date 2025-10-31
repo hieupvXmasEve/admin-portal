@@ -10,6 +10,7 @@ use App\Http\Requests\DuplicateCurriculumVersionRequest;
 use App\Http\Requests\StoreCurriculumVersionRequest;
 use App\Http\Requests\UpdateCurriculumVersionRequest;
 use App\Models\CurriculumVersion;
+use App\Models\Module;
 use App\Models\Program;
 use App\Models\Semester;
 use App\Models\Specialization;
@@ -493,11 +494,42 @@ class CurriculumVersionController extends Controller
 
     /**
      * Display the specified curriculum version - redirects to overview tab.
+     * 
+     * Note: If Show.vue is accessed directly, use showWithModules() instead.
      */
     public function show(CurriculumVersion $curriculumVersion): RedirectResponse
     {
         // Redirect to the overview tab for the new tab-based layout
         return redirect()->route(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW, $curriculumVersion);
+    }
+
+    /**
+     * Display the curriculum version Show.vue page with modules support.
+     * This method loads curriculumVersion with curriculum_modules and availableModules.
+     * 
+     * TODO: Add route for this method if Show.vue needs direct access:
+     * Route::get('/{curriculum_version}/show-full', [CurriculumVersionController::class, 'showWithModules'])
+     */
+    public function showWithModules(CurriculumVersion $curriculumVersion): Response
+    {
+        $curriculumVersion->load([
+            'program:id,name,code',
+            'specialization:id,name,code',
+            'effectiveFromSemester:id,name,code',
+            'curriculumModules.module:id,campus_id,code,name,total_credits,grading_type',
+            'curriculumUnits.unit:id,code,name,credit_points',
+        ]);
+
+        $availableModules = Module::select('id', 'campus_id', 'code', 'name', 'total_credits', 'grading_type')
+            ->with('campus:id,name,code')
+            ->orderBy('code')
+            ->get();
+
+        return Inertia::render('curriculum-versions/Show', [
+            'curriculumVersion' => $curriculumVersion,
+            'availableModules' => $availableModules,
+            'units' => Unit::select('id', 'code', 'name', 'credit_points')->orderBy('code')->get(),
+        ]);
     }
 
     /**
@@ -692,6 +724,40 @@ class CurriculumVersionController extends Controller
                 'filters' => $request->only(['search', 'unit_scope', 'year_level', 'semester_number']),
             ],
             'units' => Unit::select('id', 'code', 'name', 'credit_points')->orderBy('code')->get(),
+        ]);
+    }
+
+    /**
+     * Summary Modules tab - Manage modular curriculum structure.
+     */
+    public function summaryModules(CurriculumVersion $curriculumVersion): Response
+    {
+        // Load curriculum version with modules
+        $curriculumVersion->load([
+            'program:id,name,code',
+            'specialization:id,name,code',
+            'effectiveFromSemester:id,name,code',
+            'curriculumModules.module.units',
+        ]);
+
+        // Get available modules for this campus
+        $availableModules = \App\Models\Module::select('id', 'campus_id', 'code', 'name', 'total_credits', 'grading_type')
+            ->with('campus:id,name,code')
+            ->orderBy('code')
+            ->get();
+
+        return Inertia::render('curriculum-versions/summary/Modules', [
+            'curriculumVersion' => [
+                'id' => $curriculumVersion->id,
+                'version_code' => $curriculumVersion->version_code,
+                'notes' => $curriculumVersion->notes,
+                'created_at' => $curriculumVersion->created_at,
+                'program' => $curriculumVersion->program,
+                'specialization' => $curriculumVersion->specialization,
+                'effective_from_semester' => $curriculumVersion->effectiveFromSemester,
+                'curriculum_modules' => $curriculumVersion->curriculumModules,
+            ],
+            'availableModules' => $availableModules,
         ]);
     }
 

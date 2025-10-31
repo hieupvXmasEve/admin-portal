@@ -34,6 +34,8 @@ class CurriculumRoutes
 
     public const VERSION_SUMMARY_UNITS = 'curriculum_versions.summary.units';
 
+    public const VERSION_SUMMARY_MODULES = 'curriculum_versions.summary.modules';
+
     public const VERSION_SUMMARY_STUDENTS = 'curriculum_versions.summary.students';
 
     public const VERSION_SUMMARY_DEPLOYMENTS = 'curriculum_versions.summary.deployments';

@@ -46,7 +46,7 @@ const formSchema = toTypedSchema(
     z.object({
         unit_id: z.number().int().positive('Unit ID is required'),
         lecture_id: z.string().optional(),
-        section_code: z.string().max(10, 'Section code too long').optional(),
+        section_code: z.string().max(40, 'Section code too long').optional(),
         syllabus_template_id: z.string().min(1, 'Syllabus template is required'),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(1000, 'Max capacity cannot exceed 1000'),
         waitlist_capacity: z.number().int().min(0, 'Waitlist capacity must be 0 or greater').max(100, 'Waitlist capacity cannot exceed 100'),
@@ -204,9 +204,7 @@ const enrollmentStatusOptions = [
                                     <p>
                                         <strong>{{ courseOffering.unit?.code }} - {{ courseOffering.unit?.name }}</strong>
                                     </p>
-                                    <p class="mt-1 text-xs" v-if="courseOffering.unit">
-                                        {{ courseOffering.unit.credit_points }} credits
-                                    </p>
+                                    <p class="mt-1 text-xs" v-if="courseOffering.unit">{{ courseOffering.unit.credit_points }} credits</p>
                                 </div>
                             </div>
                         </div>

@@ -23,6 +23,7 @@ import {
     Link2,
     Mail,
     MailPlus,
+    Package,
     Receipt,
     School,
     Settings,
@@ -107,6 +108,12 @@ export const mainNavItems: NavItem[] = [
                 href: curriculumRoutes.units.index(),
                 icon: BookMarked,
                 requiredPermissions: ['view_unit'],
+            },
+            {
+                title: 'Modules',
+                href: '/admin/modules',
+                icon: Package,
+                requiredPermissions: ['view_module'],
             },
             {
                 title: 'Syllabus Templates',

@@ -1,6 +1,7 @@
 <?php
 
 use App\Constants\CurriculumRoutes;
+use App\Http\Controllers\Web\CurriculumModuleController;
 use App\Http\Controllers\Web\CurriculumUnitController;
 use App\Http\Controllers\Web\CurriculumVersionController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/{curriculum_version}/units', [CurriculumVersionController::class, 'summaryUnits'])
             ->middleware('can:view_curriculum_version')
             ->name(CurriculumRoutes::VERSION_SUMMARY_UNITS);
+        Route::get('/{curriculum_version}/modules', [CurriculumVersionController::class, 'summaryModules'])
+            ->middleware('can:view_curriculum_version')
+            ->name(CurriculumRoutes::VERSION_SUMMARY_MODULES);
         Route::get('/{curriculum_version}/students', [CurriculumVersionController::class, 'summaryStudents'])
             ->middleware('can:view_curriculum_version')
             ->name(CurriculumRoutes::VERSION_SUMMARY_STUDENTS);
@@ -48,6 +52,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/{curriculum_version}/duplicate', [CurriculumVersionController::class, 'duplicate'])
             ->middleware('can:create_curriculum_version')
             ->name(CurriculumRoutes::VERSION_DUPLICATE);
+
+        // Curriculum Module Management
+        Route::post('/{curriculum_version}/modules/attach', [CurriculumModuleController::class, 'attach'])
+            ->middleware('can:edit_curriculum_version')
+            ->name('curriculum-versions.modules.attach');
+        Route::post('/{curriculum_version}/modules/detach', [CurriculumModuleController::class, 'detach'])
+            ->middleware('can:edit_curriculum_version')
+            ->name('curriculum-versions.modules.detach');
+        Route::put('/curriculum-modules/{curriculum_module}', [CurriculumModuleController::class, 'update'])
+            ->middleware('can:edit_curriculum_version')
+            ->name('curriculum-modules.update');
     });
 
     // Global management routes for curriculum versions

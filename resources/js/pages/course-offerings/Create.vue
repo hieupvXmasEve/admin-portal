@@ -65,7 +65,7 @@ const formSchema = toTypedSchema(
         unit_id: z.string().min(1, 'Unit is required'),
         syllabus_template_id: z.string().min(1, 'Syllabus template is required'),
         lecture_id: z.string().optional(),
-        section_code: z.string().max(10, 'Section code too long').optional(),
+        section_code: z.string().max(40, 'Section code too long').optional(),
         max_capacity: z.number().int().min(1, 'Max capacity must be at least 1').max(500, 'Max capacity cannot exceed 500'),
         waitlist_capacity: z.number().int().min(0, 'Waitlist capacity must be 0 or greater').max(100, 'Waitlist capacity cannot exceed 100').default(10),
         delivery_mode: z.enum(['in_person', 'online', 'hybrid', 'blended'], {
@@ -118,10 +118,7 @@ const searchTerm = ref('');
 const filteredUnits = computed(() => {
     if (!searchTerm.value) return props.units;
     const term = searchTerm.value.toLowerCase();
-    return props.units.filter((unit) => 
-        unit.code.toLowerCase().includes(term) || 
-        unit.name.toLowerCase().includes(term)
-    );
+    return props.units.filter((unit) => unit.code.toLowerCase().includes(term) || unit.name.toLowerCase().includes(term));
 });
 
 // Filter syllabus templates based on selected unit
@@ -295,8 +292,13 @@ const dayOptions = [
                             <FormLabel>Unit *</FormLabel>
                             <FormControl>
                                 <Combobox
-                                    :model-value="componentField.modelValue ? props.units.find(u => u.unit_id.toString() === componentField.modelValue) : undefined"
-                                    @update:model-value="(val) => { componentField['onUpdate:modelValue'](val?.unit_id.toString() ?? ''); searchTerm = ''; }"
+                                    :model-value="componentField.modelValue ? props.units.find((u) => u.unit_id.toString() === componentField.modelValue) : undefined"
+                                    @update:model-value="
+                                        (val) => {
+                                            componentField['onUpdate:modelValue'](val?.unit_id.toString() ?? '');
+                                            searchTerm = '';
+                                        }
+                                    "
                                     by="unit_id"
                                     v-model:search-term="searchTerm"
                                 >
@@ -310,15 +312,11 @@ const dayOptions = [
                                             </Button>
                                         </ComboboxTrigger>
                                     </ComboboxAnchor>
-                                    
+
                                     <ComboboxList class="w-[var(--reka-combobox-trigger-width)]">
                                         <!-- Search Input -->
                                         <div class="relative w-full items-center">
-                                            <ComboboxInput 
-                                                class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0" 
-                                                placeholder="Search units by code or name..."
-                                                @update:model-value="(value) => (searchTerm = value)"
-                                            />
+                                            <ComboboxInput class="h-10 rounded-none border-0 border-b pr-4 pl-10 focus-visible:ring-0" placeholder="Search units by code or name..." @update:model-value="(value) => (searchTerm = value)" />
                                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center px-3">
                                                 <Search class="text-muted-foreground size-4" />
                                             </span>
@@ -335,11 +333,7 @@ const dayOptions = [
 
                                             <!-- Unit list -->
                                             <ComboboxGroup v-if="filteredUnits.length > 0">
-                                                <ComboboxItem
-                                                    v-for="unit in filteredUnits"
-                                                    :key="unit.unit_id"
-                                                    :value="unit"
-                                                >
+                                                <ComboboxItem v-for="unit in filteredUnits" :key="unit.unit_id" :value="unit">
                                                     <div class="flex w-full items-center justify-between gap-3">
                                                         <div class="flex min-w-0 flex-1 flex-col">
                                                             <span class="truncate font-medium">{{ unit.code }}</span>
@@ -387,7 +381,9 @@ const dayOptions = [
                                 </Select>
                             </FormControl>
                             <FormMessage />
-                            <p v-if="selectedUnit && filteredSyllabusTemplates.length === 0" class="text-muted-foreground mt-1 text-sm">No syllabus templates found for {{ selectedUnit.code }}. Please create a template first before creating a course offering.</p>
+                            <p v-if="selectedUnit && filteredSyllabusTemplates.length === 0" class="text-muted-foreground mt-1 text-sm">
+                                No syllabus templates found for {{ selectedUnit.code }}. Please create a template first before creating a course offering.
+                            </p>
                         </FormItem>
                     </FormField>
 

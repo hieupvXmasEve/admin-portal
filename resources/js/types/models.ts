@@ -26,6 +26,19 @@ export interface Program {
     curriculum_versions?: CurriculumVersion[];
 }
 
+export interface CurriculumModule {
+    id: number;
+    curriculum_version_id: number;
+    module_id: number;
+    year_level: number | null;
+    semester_number: number | null;
+    is_required: boolean;
+    group_name: string | null;
+    order: number;
+    note: string | null;
+    module: Module;
+}
+
 export interface CurriculumVersion {
     id: number;
     program_id: number;
@@ -40,6 +53,7 @@ export interface CurriculumVersion {
     effective_from_semester?: Semester;
     curriculum_units_count?: number;
     curriculum_units?: CurriculumUnit[];
+    curriculum_modules?: CurriculumModule[];
 }
 
 export interface Semester {
@@ -61,6 +75,20 @@ export interface Unit {
     unit_type: string;
     created_at: string;
     updated_at: string;
+}
+
+export interface Module {
+    id: number;
+    campus_id: number;
+    code: string;
+    name: string;
+    description: string | null;
+    grading_type: 'grade' | 'pass_fail';
+    total_credits: number;
+    prerequisite_module_id: number | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
 }
 
 export interface UnitType {

@@ -7,7 +7,6 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import type { Room, SyllabusTemplate } from '@/types/models';
@@ -188,6 +187,12 @@ const getRoomTypeLabel = (type: string) => {
 const getRoomDisplayName = (room: Room) => {
     return room.building ? `${room.building} - ${room.name}` : room.name;
 };
+
+const isEndOptionDisabled = (dayKey: string, optionValue: string): boolean => {
+    const startTime: string | undefined = values.schedule?.[dayKey]?.startTime;
+    if (!startTime) return false;
+    return optionValue <= startTime;
+};
 </script>
 
 <template>
@@ -198,7 +203,7 @@ const getRoomDisplayName = (room: Room) => {
                 {{ isGenerating ? 'Generating...' : 'Generate Class Sessions' }}
             </Button>
         </DialogTrigger>
-        <DialogContent class="max-w-2xl">
+        <DialogContent class="flex max-h-[90vh] !max-w-4xl flex-col">
             <DialogHeader>
                 <DialogTitle>Generate Class Sessions</DialogTitle>
                 <DialogDescription>
@@ -206,22 +211,23 @@ const getRoomDisplayName = (room: Room) => {
                     <span v-if="syllabusTemplate?.total_sessions" class="font-medium">({{ syllabusTemplate.total_sessions }} sessions)</span>.
                 </DialogDescription>
             </DialogHeader>
-            <ScrollArea class="h-[500px] w-full rounded-md border p-2">
-                <form @submit="onSubmit" class="space-y-4 p-1">
-                    <!-- Start Date -->
-                    <FormField v-slot="{ componentField }" name="startDate">
-                        <FormItem>
-                            <FormLabel>Start Date</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" type="date" :min="semesterStart ? semesterStart.split('T')[0] || semesterStart : undefined" :max="semesterEnd ? semesterEnd.split('T')[0] || semesterEnd : undefined" class="w-full" />
-                            </FormControl>
-                            <p class="text-muted-foreground mt-1 text-xs">First day of classes within the semester</p>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
 
-                    <Separator />
+            <div class="flex-1 space-y-4 overflow-y-auto px-1">
+                <!-- Start Date -->
+                <FormField v-slot="{ componentField }" name="startDate">
+                    <FormItem>
+                        <FormLabel>Start Date</FormLabel>
+                        <FormControl>
+                            <Input v-bind="componentField" type="date" :min="semesterStart ? semesterStart.split('T')[0] || semesterStart : undefined" :max="semesterEnd ? semesterEnd.split('T')[0] || semesterEnd : undefined" class="w-full" />
+                        </FormControl>
+                        <p class="text-muted-foreground mt-1 text-xs">First day of classes within the semester</p>
+                        <FormMessage />
+                    </FormItem>
+                </FormField>
 
+                <Separator />
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <!-- Weekly Schedule -->
                     <div>
                         <div class="mb-4 flex items-center justify-between">
@@ -255,7 +261,7 @@ const getRoomDisplayName = (room: Room) => {
                                                     <FormItem>
                                                         <FormControl>
                                                             <Select v-bind="componentField" :disabled="!value.includes(day.key)">
-                                                                <SelectTrigger class="w-[120px]">
+                                                                <SelectTrigger class="">
                                                                     <SelectValue placeholder="Start time" />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
@@ -274,11 +280,11 @@ const getRoomDisplayName = (room: Room) => {
                                                     <FormItem>
                                                         <FormControl>
                                                             <Select v-bind="componentField" :disabled="!value.includes(day.key)">
-                                                                <SelectTrigger class="w-[120px]">
+                                                                <SelectTrigger class="">
                                                                     <SelectValue placeholder="End time" />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    <SelectItem v-for="option in timeOptions" :key="option.value" :value="option.value" :disabled="option.value <= values.schedule?.[day.key]?.startTime">
+                                                                    <SelectItem v-for="option in timeOptions" :key="option.value" :value="option.value" :disabled="isEndOptionDisabled(day.key, option.value)">
                                                                         {{ option.label }}
                                                                     </SelectItem>
                                                                 </SelectContent>
@@ -306,19 +312,17 @@ const getRoomDisplayName = (room: Room) => {
                         </FormField>
                     </div>
 
-                    <Separator />
-
                     <!-- Room Selection -->
-                    <div>
+                    <div class="flex flex-col">
                         <Label class="mb-2 block text-base">Select Room</Label>
                         <div class="mb-3">
                             <Input v-model="search" placeholder="Search rooms..." type="search" class="w-full" />
                         </div>
 
                         <FormField name="roomId">
-                            <FormItem>
+                            <FormItem class="flex-1">
                                 <FormControl>
-                                    <div class="h-80" v-bind="containerProps">
+                                    <div class="h-[500px] overflow-y-auto pr-2" v-bind="containerProps">
                                         <FormField v-slot="{ value, handleChange }" name="roomId">
                                             <FormItem>
                                                 <FormControl>
@@ -365,29 +369,28 @@ const getRoomDisplayName = (room: Room) => {
                                                 </FormControl>
                                             </FormItem>
                                         </FormField>
-
-                                        <div v-if="!availableRooms || availableRooms.length === 0" class="py-8 text-center">
-                                            <Users class="text-muted-foreground mx-auto h-12 w-12" />
-                                            <h3 class="mt-2 text-sm font-semibold text-gray-900">No available rooms</h3>
-                                            <p class="text-muted-foreground mt-1 text-sm">There are no bookable rooms available at the moment.</p>
-                                        </div>
+                                    </div>
+                                    <div v-if="!availableRooms || availableRooms.length === 0" class="py-8 text-center">
+                                        <Users class="text-muted-foreground mx-auto h-12 w-12" />
+                                        <h3 class="mt-2 text-sm font-semibold text-gray-900">No available rooms</h3>
+                                        <p class="text-muted-foreground mt-1 text-sm">There are no bookable rooms available at the moment.</p>
                                     </div>
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                         </FormField>
                     </div>
+                </div>
+            </div>
 
-                    <DialogFooter>
-                        <DialogClose as-child>
-                            <Button variant="outline">Cancel</Button>
-                        </DialogClose>
-                        <Button type="submit" :disabled="!values.roomId || !values.startDate || !hasSelectedDays || isGenerating">
-                            {{ isGenerating ? 'Generating...' : 'Generate Sessions' }}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </ScrollArea>
+            <DialogFooter class="mt-4">
+                <DialogClose as-child>
+                    <Button variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button @click="onSubmit" :disabled="!values.roomId || !values.startDate || !hasSelectedDays || isGenerating">
+                    {{ isGenerating ? 'Generating...' : 'Generate Sessions' }}
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 </template>

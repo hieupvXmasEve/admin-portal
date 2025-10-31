@@ -52,6 +52,11 @@ const tabs = [
         route: 'curriculum_versions.summary.units',
     },
     {
+        key: 'modules',
+        label: 'Modules',
+        route: 'curriculum_versions.summary.modules',
+    },
+    {
         key: 'students',
         label: 'Student Stats',
         route: 'curriculum_versions.summary.students',
@@ -133,7 +138,7 @@ const handleExport = () => {
             <!-- Tabs Navigation -->
             <div class="border-t pt-4">
                 <div class="bg-muted text-muted-foreground inline-flex h-9 w-full items-center justify-center rounded-lg p-[3px]">
-                    <div class="grid w-full grid-cols-2 gap-4 md:grid-cols-4">
+                    <div class="grid w-full grid-cols-2 gap-4 md:grid-cols-5">
                         <Link
                             v-for="tab in tabs"
                             :key="tab.key"
