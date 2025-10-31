@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ManageCurriculumModulesDialog from '@/components/curriculum/ManageCurriculumModulesDialog.vue';
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
@@ -14,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useApi, usePermissions } from '@/composables';
 import { createColumns } from '@/lib/table-utils';
-import type { CurriculumUnit, CurriculumVersion, Program, Semester, Specialization, Unit } from '@/types/models';
+import type { CurriculumUnit, CurriculumVersion, Module, Program, Semester, Specialization, Unit } from '@/types/models';
 import { ValidationRules } from '@/types/validation';
 import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
@@ -32,6 +33,7 @@ interface Props {
     specializations?: Specialization[];
     semesters?: Semester[];
     units?: Unit[];
+    availableModules?: Module[];
 }
 
 const props = defineProps<Props>();
@@ -45,6 +47,7 @@ const curriculumUnitToEdit = ref<CurriculumUnit | null>(null);
 const deleteDialogOpen = ref(false);
 const curriculumUnitToDelete = ref<CurriculumUnit | null>(null);
 const isDeleting = ref(false);
+const showManageModulesDialog = ref(false);
 
 // Filter states
 const filters = ref({
@@ -566,9 +569,10 @@ const getUnitScopeColor = (scope: string) => {
 
     <!-- Main Content Tabs -->
     <Tabs default-value="structure" class="w-full">
-        <TabsList class="grid w-full grid-cols-3">
+        <TabsList class="grid w-full grid-cols-4">
             <TabsTrigger value="structure">Academic Structure</TabsTrigger>
             <TabsTrigger value="units">Unit List</TabsTrigger>
+            <TabsTrigger value="modules">Modules</TabsTrigger>
             <TabsTrigger value="overview">Overview</TabsTrigger>
         </TabsList>
 
@@ -693,6 +697,53 @@ const getUnitScopeColor = (scope: string) => {
                         <DataTable :data="paginatedUnits.data" :columns="columns" :loading="false" :enable-row-selection="true" @selection-change="handleSelectionChange" class="border-0" />
                         <div class="border-t p-4" v-if="paginatedUnits.total > 10">
                             <DataPagination :pagination-data="paginationData" @navigate="handlePageChange" />
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Modules Tab -->
+        <TabsContent value="modules">
+            <Card>
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Module Structure</CardTitle>
+                            <p class="text-muted-foreground mt-1 text-sm">Manage modules for this curriculum (Finland campus modular system)</p>
+                        </div>
+                        <Button size="sm" @click="showManageModulesDialog = true" v-if="permission.can('edit_curriculum_version')">
+                            <Plus class="mr-2 h-4 w-4" />
+                            Manage Modules
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div v-if="curriculumVersion.curriculum_modules?.length === 0" class="py-8 text-center">
+                        <p class="text-muted-foreground text-sm">No modules assigned yet.</p>
+                        <Button variant="outline" size="sm" class="mt-4" @click="showManageModulesDialog = true" v-if="permission.can('edit_curriculum_version')">
+                            <Plus class="mr-2 h-4 w-4" />
+                            Add Modules
+                        </Button>
+                    </div>
+                    <div v-else class="space-y-4">
+                        <div v-for="cm in curriculumVersion.curriculum_modules" :key="cm.id" class="rounded-lg border p-4">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <h4 class="font-medium">{{ cm.module.code }} - {{ cm.module.name }}</h4>
+                                    <div class="text-muted-foreground mt-1 space-x-2 text-sm">
+                                        <span v-if="cm.year_level">Year {{ cm.year_level }}</span>
+                                        <span v-if="cm.semester_number">• Semester {{ cm.semester_number }}</span>
+                                        <span>• {{ cm.module.total_credits }} credits</span>
+                                    </div>
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <Badge :variant="cm.is_required ? 'default' : 'secondary'">
+                                            {{ cm.is_required ? 'Required' : 'Elective' }}
+                                        </Badge>
+                                        <Badge v-if="cm.group_name" variant="outline">{{ cm.group_name }}</Badge>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
@@ -1000,6 +1051,15 @@ const getUnitScopeColor = (scope: string) => {
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+
+    <!-- Manage Modules Dialog -->
+    <ManageCurriculumModulesDialog
+        v-model:open="showManageModulesDialog"
+        :curriculum-version-id="curriculumVersion.id"
+        :selected-modules="curriculumVersion.curriculum_modules || []"
+        :available-modules="props.availableModules || []"
+        @close="showManageModulesDialog = false"
+    />
 </template>
 
 <style scoped>

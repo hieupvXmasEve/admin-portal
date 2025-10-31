@@ -314,6 +314,12 @@ return [
             'generate_invoice' => 'generate_invoice',
             'pay_invoice' => 'pay_invoice',
         ],
+        'modules' => [
+            'view_module' => 'view_module',
+            'create_module' => 'create_module',
+            'edit_module' => 'edit_module',
+            'delete_module' => 'delete_module',
+        ],
     ],
 
     'actions' => [

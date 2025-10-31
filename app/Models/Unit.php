@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Unit extends AuditableModel
@@ -88,6 +89,17 @@ class Unit extends AuditableModel
     public function activeSyllabusTemplates(): HasMany
     {
         return $this->hasMany(SyllabusTemplate::class)->where('is_active', true);
+    }
+
+    /**
+     * Get the modules that this unit belongs to.
+     */
+    public function modules(): BelongsToMany
+    {
+        return $this->belongsToMany(Module::class, 'module_units')
+            ->withPivot('grading_type', 'weight', 'order')
+            ->withTimestamps()
+            ->orderBy('module_units.order');
     }
 
 

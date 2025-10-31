@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
 use App\Http\Controllers\Api\V1\Student\EventController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
+use App\Http\Controllers\Api\V1\Student\ModuleController;
 use App\Http\Controllers\Api\V1\Student\QueryTicketController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\ProfileController;
@@ -127,6 +128,14 @@ Route::middleware([
             Route::get('/assessments', [GradeController::class, 'assessments'])->name('assessments');
             Route::get('/assessment/{assessmentId}', [GradeController::class, 'assessmentDetail'])
                 ->name('assessment-detail');
+        });
+
+        // Module progress endpoints (Finland campus modular system)
+        Route::prefix('modules')->name('modules.')->group(function () {
+            Route::get('/', [ModuleController::class, 'index'])->name('index');
+            Route::get('/dashboard', [ModuleController::class, 'dashboard'])->name('dashboard');
+            Route::get('/roadmap', [ModuleController::class, 'roadmap'])->name('roadmap');
+            Route::get('/{module}', [ModuleController::class, 'show'])->name('show');
         });
 
         // Attendance endpoints
