@@ -40,10 +40,21 @@ class GradeService
 
             // Get curriculum unit IDs
             $curriculumUnitIds = [];
+            $moduleUnitIds = [];
+            
             if ($student->curriculumVersion) {
                 $curriculumUnitIds = $student->curriculumVersion
                     ->curriculumUnits()
                     ->pluck('unit_id')
+                    ->toArray();
+                
+                // Get all module unit IDs to exclude from EGC
+                $moduleUnitIds = $student->curriculumVersion
+                    ->curriculumModules()
+                    ->with('module.units')
+                    ->get()
+                    ->flatMap(fn($cm) => $cm->module->units->pluck('id'))
+                    ->unique()
                     ->toArray();
             }
 
@@ -52,8 +63,10 @@ class GradeService
                 in_array($r->unit_id, $curriculumUnitIds)
             );
 
+            // EGC = not in curriculum units AND not in module units
             $egcRecords = $academicRecords->filter(fn($r) => 
-                !in_array($r->unit_id, $curriculumUnitIds)
+                !in_array($r->unit_id, $curriculumUnitIds) &&
+                !in_array($r->unit_id, $moduleUnitIds)
             );
 
             $gradesBySemester = $this->buildGradesBySemester($student, $curriculumRecords);
