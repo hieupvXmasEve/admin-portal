@@ -17,7 +17,7 @@ class CurriculumRoutes
 
     public const VERSION_STORE = 'curriculum_versions.store';
 
-    public const VERSION_SHOW = 'curriculum_versions.show';
+    // public const VERSION_SHOW = 'curriculum_versions.show';
 
     public const VERSION_EDIT = 'curriculum_versions.edit';
 

@@ -645,15 +645,186 @@ class StudentAcademicSummaryService
             })
             ->values();
 
+        // Get module scores
+        $moduleScores = $this->getModuleScores($student);
+
         return [
-            'data' => $scores,
+            'standalone_units' => [
+                'data' => $scores,
+                'summary' => [
+                    'total_courses' => $scores->count(),
+                    'total_assessments' => $scores->sum('total_assessments'),
+                    'completed_assessments' => $scores->sum('completed_assessments'),
+                    'overall_average' => $scores->avg('course_average'),
+                ],
+            ],
+            'modules' => $moduleScores->isNotEmpty() ? [
+                'data' => $moduleScores,
+                'summary' => [
+                    'total_modules' => $moduleScores->count(),
+                    'completed_modules' => $moduleScores->where('status', 'passed')->count(),
+                    'in_progress_modules' => $moduleScores->where('status', 'in_progress')->count(),
+                    'failed_modules' => $moduleScores->where('status', 'failed')->count(),
+                    'average_grade' => $moduleScores->where('module_grade', '!=', null)->avg('module_grade'),
+                ],
+            ] : null,
             'summary' => [
                 'total_courses' => $scores->count(),
+                'total_modules' => $moduleScores->count(),
                 'total_assessments' => $scores->sum('total_assessments'),
                 'completed_assessments' => $scores->sum('completed_assessments'),
                 'overall_average' => $scores->avg('course_average'),
             ],
         ];
+    }
+
+    /**
+     * Get module scores with sub-unit details
+     *
+     * @param Student $student The student model
+     * @return \Illuminate\Support\Collection Module scores data
+     */
+    private function getModuleScores(Student $student): \Illuminate\Support\Collection
+    {
+        // Check if student has curriculum with modules
+        if (!$student->curriculumVersion) {
+            return collect([]);
+        }
+
+        // Get modules from student's curriculum
+        $curriculumModules = $student->curriculumVersion
+            ->curriculumModules()
+            ->with([
+                'module:id,code,name,total_credits,grading_type',
+                'module.units:id,code,name,credit_points'
+            ])
+            ->get();
+
+        if ($curriculumModules->isEmpty()) {
+            return collect([]);
+        }
+
+        // Calculate progress for each module
+        return $curriculumModules->map(function ($curriculumModule) use ($student) {
+            $module = $curriculumModule->module;
+            
+            // Get sub-unit IDs
+            $unitIds = $module->units->pluck('id')->toArray();
+            
+            // Get academic records for sub-units
+            $academicRecords = $student->academicRecords()
+                ->whereHas('courseOffering', function ($q) use ($unitIds) {
+                    $q->whereIn('unit_id', $unitIds);
+                })
+                ->with(['courseOffering:id,unit_id,grading_type', 'unit:id,code,name,credit_points'])
+                ->get();
+
+            // Separate graded vs pass/fail units
+            $gradedRecords = $academicRecords->filter(fn($r) =>
+                $r->courseOffering && $r->courseOffering->grading_type === 'grade'
+            );
+            $passfailRecords = $academicRecords->filter(fn($r) =>
+                $r->courseOffering && $r->courseOffering->grading_type === 'pass_fail'
+            );
+
+            // Calculate module grade (only from graded units)
+            $moduleGrade = null;
+            $usesWeights = false;
+            
+            if ($gradedRecords->isNotEmpty()) {
+                // Check if weights are defined
+                $firstUnit = $module->units->first();
+                $usesWeights = $firstUnit && $firstUnit->pivot->weight !== null;
+                
+                if ($usesWeights) {
+                    // Weighted average
+                    $totalWeight = 0;
+                    $weightedSum = 0;
+                    
+                    foreach ($gradedRecords as $record) {
+                        $unit = $module->units->find($record->unit_id);
+                        if ($unit && $unit->pivot->weight) {
+                            $weight = $unit->pivot->weight;
+                            $totalWeight += $weight;
+                            $weightedSum += ($record->final_percentage ?? 0) * $weight;
+                        }
+                    }
+                    
+                    if ($totalWeight > 0) {
+                        $moduleGrade = $weightedSum / $totalWeight;
+                    }
+                } else {
+                    // Simple average
+                    $moduleGrade = $gradedRecords->avg('final_percentage');
+                }
+            }
+
+            // Determine module status
+            $totalUnits = $module->units->count();
+            $completedRecords = $academicRecords->where('completion_status', 'completed');
+            $completedUnits = $completedRecords->count();
+            
+            $status = 'in_progress';
+            if ($completedUnits === $totalUnits && $totalUnits > 0) {
+                // All units completed - check if all passed
+                $allPassed = $completedRecords->every(function ($record) {
+                    return $record->final_letter_grade && 
+                           !in_array(strtoupper($record->final_letter_grade), ['F', 'FAIL']);
+                });
+                $status = $allPassed ? 'passed' : 'failed';
+            } elseif ($completedUnits > 0) {
+                $status = 'in_progress';
+            } else {
+                $status = 'not_started';
+            }
+
+            // Map sub-unit details
+            $subUnits = $module->units->map(function ($unit) use ($academicRecords) {
+                $record = $academicRecords->firstWhere('unit_id', $unit->id);
+                $gradingType = $record?->courseOffering?->grading_type ?? 'grade';
+                
+                return [
+                    'id' => $unit->id,
+                    'code' => $unit->code,
+                    'name' => $unit->name,
+                    'credits' => $unit->credit_points,
+                    'grading_type' => $gradingType,
+                    'weight' => $unit->pivot->weight,
+                    'order' => $unit->pivot->order ?? 0,
+                    'final_grade' => $record?->final_percentage,
+                    'letter_grade' => $record?->final_letter_grade,
+                    'status' => $record?->completion_status ?? 'not_enrolled',
+                    'is_passed' => $record && $record->final_letter_grade && 
+                                   !in_array(strtoupper($record->final_letter_grade), ['F', 'FAIL']),
+                    'included_in_average' => $gradingType === 'grade',
+                ];
+            })->sortBy('order')->values();
+
+            return [
+                'module_id' => $module->id,
+                'module_code' => $module->code,
+                'module_name' => $module->name,
+                'module_grade' => $moduleGrade,
+                'total_credits' => $module->total_credits,
+                'year_level' => $curriculumModule->year_level,
+                'semester_number' => $curriculumModule->semester_number,
+                'is_required' => $curriculumModule->is_required,
+                'group_name' => $curriculumModule->group_name,
+                'status' => $status,
+                'completion' => [
+                    'completed' => $completedUnits,
+                    'total' => $totalUnits,
+                    'percentage' => ($totalUnits > 0) ? round(($completedUnits / $totalUnits) * 100) : 0,
+                ],
+                'grading_info' => [
+                    'type' => $module->grading_type,
+                    'graded_units_count' => $gradedRecords->count(),
+                    'passfail_units_count' => $passfailRecords->count(),
+                    'uses_weights' => $usesWeights,
+                ],
+                'sub_units' => $subUnits,
+            ];
+        });
     }
 
     /**

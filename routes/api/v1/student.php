@@ -75,16 +75,16 @@ Route::middleware([
                 ->name('enrolled-courses');
 
             // Get courses available for registration (not yet enrolled)
-            Route::get('/available-for-registration', [CourseRegistrationController::class, 'availableForRegistration'])
-                ->name('available-for-registration');
+            // Route::get('/available-for-registration', [CourseRegistrationController::class, 'availableForRegistration'])
+            //     ->name('available-for-registration');
 
             // Keep backward compatibility for the current URL
             Route::get('/available', [CourseRegistrationController::class, 'enrolledCourses'])
                 ->name('available-courses');
 
             // Course detail - full schedule and grades for enrolled course
-            Route::get('/enrolled/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])
-                ->name('course-detail');
+            // Route::get('/enrolled/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])
+            //     ->name('course-detail');
 
             // Keep backward compatibility
             Route::get('/available/{courseOfferingId}', [CourseRegistrationController::class, 'courseDetail'])

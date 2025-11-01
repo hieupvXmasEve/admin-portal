@@ -24,7 +24,7 @@ class GradeService
             $query = $student->academicRecords()->with([
                 'unit',
                 'semester',
-                'courseOffering.lecturer',
+                'courseOffering.lecture',
             ]);
 
             if ($semesterId) {
@@ -38,11 +38,30 @@ class GradeService
                 ->orderBy('completion_date', 'desc')
                 ->get();
 
+            // Get curriculum unit IDs
+            $curriculumUnitIds = [];
+            if ($student->curriculumVersion) {
+                $curriculumUnitIds = $student->curriculumVersion
+                    ->curriculumUnits()
+                    ->pluck('unit_id')
+                    ->toArray();
+            }
+
+            // Separate curriculum vs EGC records
+            $curriculumRecords = $academicRecords->filter(fn($r) => 
+                in_array($r->unit_id, $curriculumUnitIds)
+            );
+
+            $egcRecords = $academicRecords->filter(fn($r) => 
+                !in_array($r->unit_id, $curriculumUnitIds)
+            );
+
+            $gradesBySemester = $this->buildGradesBySemester($student, $curriculumRecords);
+            
             return [
-                'grades_by_semester' => $this->groupGradesBySemester($academicRecords),
-                'overall_summary' => $this->calculateOverallSummary($academicRecords),
-                'grade_distribution' => $this->calculateGradeDistribution($academicRecords),
-                'performance_trends' => $this->calculatePerformanceTrends($student),
+                'grades_by_semester' => $gradesBySemester,
+                'egc_units' => $egcRecords->isNotEmpty() ? $this->buildEGCUnits($egcRecords) : [],
+                'overall_summary' => $this->buildSimpleSummary($student, $gradesBySemester, $egcRecords),
             ];
         });
     }
@@ -87,7 +106,7 @@ class GradeService
     {
         $academicRecord = $student->academicRecords()
             ->where('course_offering_id', $courseOfferingId)
-            ->with(['unit', 'semester', 'courseOffering.lecturer'])
+            ->with(['unit', 'semester', 'courseOffering.lecture'])
             ->first();
 
         if (! $academicRecord) {
@@ -109,7 +128,7 @@ class GradeService
                 'name' => $academicRecord->unit->name,
                 'credit_hours' => $academicRecord->credit_hours,
                 'semester' => $academicRecord->semester->name,
-                'lecturer' => $academicRecord->courseOffering->lecturer?->full_name,
+                'lecturer' => $academicRecord->courseOffering->lecture?->full_name ?? null,
             ],
             'final_grade' => [
                 'letter_grade' => $academicRecord->final_letter_grade,
@@ -160,7 +179,7 @@ class GradeService
             ->with([
                 'assessmentComponentDetail.assessmentComponent.assessmentType',
                 'courseOffering.unit',
-                'courseOffering.lecturer',
+                'courseOffering.lecture',
             ])
             ->firstOrFail();
 
@@ -179,7 +198,7 @@ class GradeService
             'course' => [
                 'code' => $assessment->courseOffering->unit->code,
                 'name' => $assessment->courseOffering->unit->name,
-                'lecturer' => $assessment->courseOffering->lecturer?->full_name,
+                'lecturer' => $assessment->courseOffering->lecture?->full_name ?? null,
             ],
             'score' => [
                 'achieved_score' => $assessment->achieved_score,
@@ -222,7 +241,7 @@ class GradeService
                         'grade_points' => $record->grade_points,
                         'completion_status' => $record->completion_status,
                         'completion_date' => $record->completion_date?->toDateString(),
-                        'lecturer' => $record->courseOffering->lecturer?->full_name,
+                        'lecturer' => $record->courseOffering->lecture?->full_name ?? null,
                     ];
                 })->values(),
                 'semester_summary' => [
@@ -298,6 +317,7 @@ class GradeService
                 'trend' => 'insufficient_data',
                 'direction' => 'unknown',
                 'improvement_rate' => 0,
+                'consistency' => 'insufficient_data',
             ];
         }
 
@@ -826,5 +846,330 @@ class GradeService
             $change < -5 => 'declining',
             default => 'stable',
         };
+    }
+
+    /**
+     * Build grades by semester with curriculum roadmap
+     */
+    protected function buildGradesBySemester(Student $student, Collection $curriculumRecords): array
+    {
+        if (!$student->curriculumVersion) {
+            return [];
+        }
+
+        // Get all curriculum units grouped by semester_number (relative semester in program)
+        $curriculumUnits = $student->curriculumVersion
+            ->curriculumUnits()
+            ->with(['semester', 'unit'])
+            ->get();
+        
+        $curriculumSemesters = $curriculumUnits->groupBy('semester_number');
+        
+        if ($curriculumSemesters->isEmpty()) {
+            return [];
+        }
+        
+        return $curriculumSemesters->map(function ($semesterUnits, $semesterNumber) use ($student, $curriculumRecords) {
+            $semester = $semesterUnits->first()->semester;
+            
+            // Get academic records for units in this logical semester
+            $unitIds = $semesterUnits->pluck('unit_id')->toArray();
+            $semesterRecords = $curriculumRecords->filter(fn($r) => in_array($r->unit_id, $unitIds));
+            
+            // Format all curriculum units (với hoặc không có điểm)
+            $allUnits = $semesterUnits->map(function ($cu) use ($semesterRecords) {
+                $record = $semesterRecords->firstWhere('unit_id', $cu->unit_id);
+                
+                return [
+                    'curriculum_unit_id' => $cu->id,
+                    'unit_id' => $cu->unit_id,
+                    'unit_code' => $cu->unit->code,
+                    'unit_name' => $cu->unit->name,
+                    'unit_scope' => $cu->unit_scope,
+                    'year_level' => $cu->year_level,
+                    'semester_number' => $cu->semester_number,
+                    'credit_hours' => $record?->credit_hours ?? $cu->unit->credit_points,
+                    'final_percentage' => $record?->final_percentage,
+                    'final_grade' => $record?->final_letter_grade,
+                    'numeric_grade' => $record?->final_numeric_grade,
+                    'grade_points' => $record?->grade_points,
+                    'completion_status' => $record?->completion_status ?? 'not_enrolled',
+                    'completion_date' => $record?->completion_date?->toDateString(),
+                    'is_passed' => $record?->is_passed ?? false,
+                    'override_pass' => $record?->override_pass ?? false,
+                    'override_reason' => $record?->override_reason,
+                    'course_offering_id' => $record?->course_offering_id,
+                    'lecturer' => $record?->courseOffering?->lecture?->full_name ?? null
+                ];
+            })->values();
+            
+            // Get modules for this semester using semester_number
+            $modulesData = $this->getModulesForSemester($student, $semesterNumber);
+            
+            return [
+                'semester' => [
+                    'id' => $semester->id,
+                    'name' => $semester->name,
+                    'code' => $semester->code,
+                    'semester_number' => $semesterNumber
+                ],
+                'curriculum_units' => $allUnits->toArray(),
+                'modules' => $modulesData,
+                'semester_summary' => $this->calculateSemesterSummary($semesterRecords)
+            ];
+        })->sortBy('semester.semester_number')->values()->toArray();
+    }
+
+    /**
+     * Build simple summary statistics (EGC units excluded - only prerequisite)
+     */
+    protected function buildSimpleSummary(Student $student, array $gradesBySemester, Collection $egcRecords): array
+    {
+        // Count all curriculum units (EGC excluded from statistics)
+        $allCurriculumUnits = collect($gradesBySemester)->flatMap(fn($s) => $s['curriculum_units']);
+        
+        // Count all modules
+        $allModules = collect($gradesBySemester)->flatMap(fn($s) => $s['modules'] ?? []);
+        
+        // Unit statistics (only curriculum units, EGC not included)
+        $totalUnits = $allCurriculumUnits->count();
+        $notEnrolledUnits = $allCurriculumUnits->where('completion_status', 'not_enrolled')->count();
+        $inProgressUnits = $allCurriculumUnits->where('completion_status', 'in_progress')->count();
+        $passedUnits = $allCurriculumUnits->where('is_passed', true)->count();
+        $failedUnits = $allCurriculumUnits->where('completion_status', 'completed')
+            ->where('is_passed', false)->count();
+        
+        // Module statistics
+        $totalModules = $allModules->count();
+        $notStartedModules = $allModules->where('status', 'not_started')->count();
+        $inProgressModules = $allModules->where('status', 'in_progress')->count();
+        $passedModules = $allModules->where('status', 'passed')->count();
+        $failedModules = $allModules->where('status', 'failed')->count();
+        
+        // Credits (only curriculum units, EGC excluded)
+        $totalCreditsAttempted = $allCurriculumUnits->sum('credit_hours');
+        $totalCreditsEarned = $allCurriculumUnits->where('is_passed', true)->sum('credit_hours');
+        
+        return [
+            'units' => [
+                'total' => $totalUnits,
+                'not_enrolled' => $notEnrolledUnits,
+                'in_progress' => $inProgressUnits,
+                'passed' => $passedUnits,
+                'failed' => $failedUnits
+            ],
+            'modules' => [
+                'total' => $totalModules,
+                'not_started' => $notStartedModules,
+                'in_progress' => $inProgressModules,
+                'passed' => $passedModules,
+                'failed' => $failedModules
+            ],
+            'credits' => [
+                'total_attempted' => $totalCreditsAttempted,
+                'total_earned' => $totalCreditsEarned
+            ]
+        ];
+    }
+
+    /**
+     * Get ALL modules for a specific semester from curriculum
+     */
+    protected function getModulesForSemester(Student $student, int $semesterNumber): array
+    {
+        if (!$student->curriculumVersion) {
+            return [];
+        }
+        
+        // Get ALL modules that belong to this semester from curriculum
+        $curriculumModules = $student->curriculumVersion
+            ->curriculumModules()
+            ->where('semester_number', $semesterNumber)
+            ->with(['module', 'module.units'])
+            ->get();
+        
+        if ($curriculumModules->isEmpty()) {
+            return [];
+        }
+        
+        return $curriculumModules->map(function ($curriculumModule) use ($student) {
+            $module = $curriculumModule->module;
+            
+            // Get ALL sub-units from module_units pivot
+            $moduleUnits = $module->units;
+            $moduleUnitIds = $moduleUnits->pluck('id')->toArray();
+            
+            // Get academic records for these units (nếu có)
+            $allModuleRecords = $student->academicRecords()
+                ->whereHas('courseOffering', function ($q) use ($moduleUnitIds) {
+                    $q->whereIn('unit_id', $moduleUnitIds);
+                })
+                ->with(['courseOffering', 'unit', 'semester'])
+                ->get();
+            
+            // Calculate module grade from completed graded units
+            $moduleGrade = $this->calculateModuleGrade($module, $allModuleRecords);
+            
+            // Format ALL sub-units (có điểm hoặc null)
+            $subUnits = $moduleUnits->map(function ($unit) use ($allModuleRecords) {
+                $record = $allModuleRecords->firstWhere('unit_id', $unit->id);
+                $gradingType = $record?->courseOffering?->grading_type ?? 'grade';
+                
+                return [
+                    'unit_id' => $unit->id,
+                    'code' => $unit->code,
+                    'name' => $unit->name,
+                    'credits' => $unit->credit_points,
+                    'final_percentage' => $record?->final_percentage,
+                    'final_grade' => $record?->final_letter_grade,
+                    'numeric_grade' => $record?->final_numeric_grade,
+                    'status' => $record?->completion_status ?? 'not_enrolled',
+                    'completion_date' => $record?->completion_date?->toDateString(),
+                    'is_passed' => $record?->is_passed ?? false,
+                    'override_pass' => $record?->override_pass ?? false,
+                    'override_reason' => $record?->override_reason,
+                    'course_offering_id' => $record?->course_offering_id,
+                    'grading_type' => $gradingType,
+                    'included_in_module_average' => $gradingType === 'grade',
+                    'weight' => $unit->pivot?->weight ?? null,
+                    'order' => $unit->pivot?->order ?? 0,
+                    'semester_taken' => $record?->semester?->name ?? null
+                ];
+            })->sortBy('order')->values()->toArray();
+            
+            // Overall completion stats
+            $totalUnits = $moduleUnits->count();
+            $completedUnits = $allModuleRecords->where('completion_status', 'completed')->count();
+            
+            return [
+                'module_id' => $module->id,
+                'module_code' => $module->code,
+                'module_name' => $module->name,
+                'module_grade' => $moduleGrade,
+                'total_credits' => $module->total_credits,
+                'year_level' => $curriculumModule->year_level,
+                'semester_number' => $curriculumModule->semester_number,
+                'is_required' => $curriculumModule->is_required,
+                'group_name' => $curriculumModule->group_name,
+                'sub_units' => $subUnits,
+                'completion' => [
+                    'completed_units' => $completedUnits,
+                    'total_units' => $totalUnits,
+                    'percentage' => $totalUnits > 0 ? round(($completedUnits / $totalUnits) * 100) : 0
+                ],
+                'status' => $this->determineModuleStatus($allModuleRecords, $totalUnits),
+                'grading_type' => $module->grading_type ?? 'grade'
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Calculate module grade from all enrolled units
+     */
+    protected function calculateModuleGrade($module, Collection $allModuleRecords): ?float
+    {
+        // Only calculate from graded units with completed status
+        $gradedRecords = $allModuleRecords->filter(fn($r) =>
+            $r->courseOffering && 
+            $r->courseOffering->grading_type === 'grade' &&
+            $r->completion_status === 'completed' &&
+            $r->final_percentage !== null
+        );
+        
+        if ($gradedRecords->isEmpty()) {
+            return null;
+        }
+        
+        // Check if weights are used
+        $firstUnit = $module->units->first();
+        $usesWeights = $firstUnit && isset($firstUnit->pivot->weight) && $firstUnit->pivot->weight !== null;
+        
+        if ($usesWeights) {
+            // Weighted average
+            $totalWeight = 0;
+            $weightedSum = 0;
+            
+            foreach ($gradedRecords as $record) {
+                $unit = $module->units->find($record->unit_id);
+                if ($unit && isset($unit->pivot->weight) && $unit->pivot->weight) {
+                    $weight = $unit->pivot->weight;
+                    $totalWeight += $weight;
+                    $weightedSum += $record->final_percentage * $weight;
+                }
+            }
+            
+            return $totalWeight > 0 ? round($weightedSum / $totalWeight, 2) : null;
+        }
+        
+        // Simple average
+        return round($gradedRecords->avg('final_percentage'), 2);
+    }
+
+    /**
+     * Build EGC units simple array
+     */
+    protected function buildEGCUnits(Collection $egcRecords): array
+    {
+        return $egcRecords->map(function ($record) {
+            return [
+                'id' => $record->id,
+                'unit_id' => $record->unit_id,
+                'unit_code' => $record->unit->code,
+                'unit_name' => $record->unit->name,
+                'credit_hours' => $record->credit_hours,
+                'final_percentage' => $record->final_percentage,
+                'final_grade' => $record->final_letter_grade,
+                'numeric_grade' => $record->final_numeric_grade,
+                'completion_status' => $record->completion_status,
+                'completion_date' => $record->completion_date?->toDateString(),
+                'is_passed' => $record->is_passed ?? false,
+                'override_pass' => $record->override_pass ?? false,
+                'override_reason' => $record->override_reason,
+                'course_offering_id' => $record->course_offering_id,
+                'semester' => $record->semester?->name,
+                'lecturer' => $record->courseOffering?->lecture?->full_name ?? null
+            ];
+        })->values()->toArray();
+    }
+
+    /**
+     * Determine module completion status
+     */
+    protected function determineModuleStatus(Collection $records, int $totalUnits): string
+    {
+        $completedCount = $records->where('completion_status', 'completed')->count();
+        
+        if ($completedCount === 0) {
+            return 'not_started';
+        }
+        
+        if ($completedCount < $totalUnits) {
+            return 'in_progress';
+        }
+        
+        // All completed - check if all passed
+        $completedRecords = $records->where('completion_status', 'completed');
+        $allPassed = $completedRecords->every(function ($record) {
+            return $record->final_letter_grade && 
+                   !in_array(strtoupper($record->final_letter_grade), ['F', 'FAIL', 'N']);
+        });
+        
+        return $allPassed ? 'passed' : 'failed';
+    }
+
+    /**
+     * Calculate semester summary from records
+     */
+    protected function calculateSemesterSummary(Collection $records): array
+    {
+        $completed = $records->where('completion_status', 'completed');
+        
+        return [
+            'total_units' => $records->count(),
+            'completed_units' => $completed->count(),
+            'total_credits' => $records->sum('credit_hours'),
+            'earned_credits' => $completed->sum('credit_hours_earned') ?? 0,
+            'semester_gpa' => $this->calculateSemesterGPA($records)
+        ];
     }
 }

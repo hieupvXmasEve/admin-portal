@@ -122,18 +122,6 @@ const onSubmit = handleSubmit((values) => {
     router.post('/curriculum-versions', submitData, {
         onSuccess: () => {
             toast.success('Curriculum version created successfully');
-
-            // Redirect based on source
-            if (sourceFromUrl === 'program-show') {
-                // Return to Programs Show page
-                router.visit(`/programs/${values.program_id}`);
-            } else if (sourceFromUrl === 'specialization-show' && values.specialization_id) {
-                // Return to Specializations Show page
-                router.visit(`/specializations/${values.specialization_id}`);
-            } else {
-                // Return to Curriculum Versions Index
-                router.visit('/curriculum-versions');
-            }
         },
         onError: () => toast.error('Failed to create curriculum version'),
     });
