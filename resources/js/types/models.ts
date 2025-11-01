@@ -571,10 +571,69 @@ export interface CourseScores {
     completed_assessments: number;
 }
 
+export interface SubUnitScore {
+    id: number;
+    code: string;
+    name: string;
+    credits: number;
+    grading_type: 'grade' | 'pass_fail';
+    weight: number | null;
+    order: number;
+    final_grade: number | null;
+    letter_grade: string | null;
+    status: string;
+    is_passed: boolean;
+    included_in_average: boolean;
+}
+
+export interface ModuleScore {
+    module_id: number;
+    module_code: string;
+    module_name: string;
+    module_grade: number | null;
+    total_credits: number;
+    year_level: number;
+    semester_number: number;
+    is_required: boolean;
+    group_name?: string | null;
+    status: 'passed' | 'failed' | 'in_progress' | 'not_started';
+    completion: {
+        completed: number;
+        total: number;
+        percentage: number;
+    };
+    grading_info: {
+        type: 'grade' | 'pass_fail';
+        graded_units_count: number;
+        passfail_units_count: number;
+        uses_weights: boolean;
+    };
+    sub_units: SubUnitScore[];
+}
+
 export interface ScoresData {
-    data: CourseScores[];
+    standalone_units: {
+        data: CourseScores[];
+        summary: {
+            total_courses: number;
+            total_assessments: number;
+            completed_assessments: number;
+            overall_average: number;
+        };
+    };
+    modules?: {
+        data: ModuleScore[];
+        summary: {
+            total_modules: number;
+            completed_modules: number;
+            in_progress_modules: number;
+            failed_modules: number;
+            average_grade: number;
+        };
+    } | null;
     summary: {
         total_courses: number;
+        total_modules: number;
         total_assessments: number;
         completed_assessments: number;
         overall_average: number;

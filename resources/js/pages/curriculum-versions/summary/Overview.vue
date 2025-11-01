@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CurriculumVersionSummaryLayout from '@/layouts/CurriculumVersionSummaryLayout.vue';
 
 import { Head } from '@inertiajs/vue3';
-import { Book, GraduationCap, Info, Target } from 'lucide-vue-next';
+import { Book, GraduationCap, Info, Package, Target } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Props {
@@ -34,6 +34,40 @@ interface Props {
         totalCreditPoints: number;
         byYearLevel: Record<string, number>;
         byUnitScope: Record<string, number>;
+        totalModules?: number;
+        totalModuleCredits?: number;
+        hasModules?: boolean;
+        roadmap?: Record<
+            number,
+            Record<
+                number,
+                {
+                    items: Array<{
+                        type: 'unit' | 'module';
+                        id: number;
+                        code: string;
+                        name: string;
+                        credits: number;
+                        year_level: number;
+                        semester_number: number;
+                        unit_scope?: string;
+                        is_required?: boolean;
+                        group_name?: string;
+                        grading_type?: string;
+                        note?: string;
+                        sub_units?: Array<{
+                            id: number;
+                            code: string;
+                            name: string;
+                            credits: number;
+                            weight?: number;
+                            order: number;
+                        }>;
+                    }>;
+                    total_credits: number;
+                }
+            >
+        >;
     };
     meta: {
         lastUpdatedAt: string;
@@ -101,23 +135,34 @@ const formatDate = (dateString: string): string => {
             <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <Card>
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Total Units</CardTitle>
+                        <CardTitle class="text-sm font-medium">Standalone Units</CardTitle>
                         <Book class="text-muted-foreground h-4 w-4" />
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold">{{ data.totalUnits }}</div>
-                        <p class="text-muted-foreground text-xs">Academic units</p>
+                        <p class="text-muted-foreground text-xs">{{ data.totalCreditPoints }} credits</p>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card v-if="data.hasModules">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle class="text-sm font-medium">Credit Points</CardTitle>
+                        <CardTitle class="text-sm font-medium">Modules</CardTitle>
+                        <Target class="h-4 w-4 text-blue-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold text-blue-600">{{ data.totalModules }}</div>
+                        <p class="text-muted-foreground text-xs">{{ data.totalModuleCredits }} credits</p>
+                    </CardContent>
+                </Card>
+
+                <Card v-else>
+                    <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle class="text-sm font-medium">Total Credits</CardTitle>
                         <Target class="h-4 w-4 text-blue-500" />
                     </CardHeader>
                     <CardContent>
                         <div class="text-2xl font-bold text-blue-600">{{ data.totalCreditPoints }}</div>
-                        <p class="text-muted-foreground text-xs">Total credits</p>
+                        <p class="text-muted-foreground text-xs">From all units</p>
                     </CardContent>
                 </Card>
 
@@ -263,6 +308,110 @@ const formatDate = (dateString: string): string => {
                     <div v-if="curriculumVersion.notes" class="mt-4 border-t pt-4">
                         <label class="text-sm font-medium text-gray-700">Notes</label>
                         <p class="mt-1 text-sm text-gray-900">{{ curriculumVersion.notes }}</p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <!-- Curriculum Roadmap -->
+            <Card v-if="data.roadmap && Object.keys(data.roadmap).length > 0">
+                <CardHeader>
+                    <CardTitle class="flex items-center gap-2">
+                        <GraduationCap class="h-5 w-5" />
+                        Curriculum Roadmap
+                    </CardTitle>
+                    <p class="text-sm text-gray-600">Visual overview of units and modules organized by semester</p>
+                </CardHeader>
+                <CardContent>
+                    <div class="space-y-8">
+                        <!-- Loop through years -->
+                        <div v-for="(semesters, year) in data.roadmap" :key="year" class="space-y-4">
+                            <div class="flex items-center gap-2">
+                                <div class="bg-primary rounded-full px-3 py-1 text-sm font-semibold text-white">
+                                    {{ year === 0 ? 'Common/Unassigned' : `Year ${year}` }}
+                                </div>
+                            </div>
+
+                            <!-- Loop through semesters in this year -->
+                            <div class="grid gap-4 md:grid-cols-3">
+                                <div v-for="(semesterData, semester) in semesters" :key="semester" class="space-y-3">
+                                    <!-- Semester header -->
+                                    <div class="border-primary flex items-center justify-between border-l-4 bg-gray-50 px-3 py-2">
+                                        <div>
+                                            <div class="font-semibold">
+                                                {{ semester === 0 ? 'Unassigned' : `Semester ${semester}` }}
+                                            </div>
+                                            <div class="text-xs text-gray-600">{{ semesterData.total_credits }} credits • {{ semesterData.items.length }} items</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Items in this semester -->
+                                    <div class="space-y-2">
+                                        <div
+                                            v-for="item in semesterData.items"
+                                            :key="`${item.type}-${item.id}`"
+                                            class="hover:bg-muted/50 group rounded-lg border p-3 transition-colors"
+                                            :class="{
+                                                'border-blue-200 bg-blue-50/50': item.type === 'module',
+                                                'border-gray-200': item.type === 'unit',
+                                            }"
+                                        >
+                                            <div class="flex items-start justify-between gap-2">
+                                                <div class="flex-1 space-y-1">
+                                                    <div class="flex items-center gap-2">
+                                                        <Package v-if="item.type === 'module'" class="h-3.5 w-3.5 text-blue-600" />
+                                                        <Book v-else class="h-3.5 w-3.5 text-gray-600" />
+                                                        <span class="text-sm font-medium">{{ item.code }}</span>
+                                                    </div>
+                                                    <div class="line-clamp-2 text-xs text-gray-700">{{ item.name }}</div>
+                                                </div>
+                                                <Badge variant="secondary" class="shrink-0 text-xs"> {{ item.credits }} CP </Badge>
+                                            </div>
+
+                                            <!-- Additional info -->
+                                            <div class="mt-2 flex flex-wrap gap-1">
+                                                <Badge v-if="item.type === 'module'" :variant="item.is_required ? 'default' : 'outline'" class="text-xs">
+                                                    {{ item.is_required ? 'Required' : 'Elective' }}
+                                                </Badge>
+                                                <Badge v-if="item.unit_scope" variant="outline" class="text-xs">
+                                                    {{ item.unit_scope }}
+                                                </Badge>
+                                                <Badge v-if="item.group_name" variant="outline" class="text-xs">
+                                                    {{ item.group_name }}
+                                                </Badge>
+                                            </div>
+
+                                            <!-- Sub-units for modules -->
+                                            <div v-if="item.type === 'module' && item.sub_units && item.sub_units.length > 0" class="mt-3 space-y-1 border-t pt-2">
+                                                <div class="text-xs font-medium text-gray-600 mb-1">
+                                                    Contains {{ item.sub_units.length }} unit(s):
+                                                </div>
+                                                <div class="space-y-1">
+                                                    <div
+                                                        v-for="subUnit in item.sub_units"
+                                                        :key="subUnit.id"
+                                                        class="flex items-center justify-between rounded bg-white/80 px-2 py-1 text-xs"
+                                                    >
+                                                        <div class="flex items-center gap-1.5">
+                                                            <Book class="h-3 w-3 text-gray-500" />
+                                                            <span class="font-medium text-gray-700">{{ subUnit.code }}</span>
+                                                            <span class="text-gray-600">{{ subUnit.name }}</span>
+                                                        </div>
+                                                        <div class="flex items-center gap-2">
+                                                            <span v-if="subUnit.weight" class="text-gray-500">{{ Math.round(subUnit.weight * 100) }}%</span>
+                                                            <span class="text-gray-600">{{ subUnit.credits }} CP</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div v-if="item.note" class="text-muted-foreground mt-2 text-xs italic">
+                                                {{ item.note }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

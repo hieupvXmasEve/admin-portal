@@ -38,10 +38,16 @@ class GradeController extends Controller
 
             return ApiResponse::success(
                 new GradeResource($grades),
+                [],
                 'Grades retrieved successfully'
             );
         } catch (\Exception $e) {
-            return ApiResponse::serverError('Failed to retrieve grades');
+            \Log::error('Failed to retrieve grades', [
+                'student_id' => $student->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return ApiResponse::serverError('Failed to retrieve grades: ' . $e->getMessage());
         }
     }
 

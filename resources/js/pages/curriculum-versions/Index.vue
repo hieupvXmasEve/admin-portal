@@ -238,7 +238,7 @@ const editCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
 };
 
 const viewCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
-    router.visit(`/curriculum-versions/${curriculumVersion.id}`);
+    router.visit(`/curriculum-versions/${curriculumVersion.id}/overview`);
 };
 
 const deleteCurriculumVersion = (curriculumVersion: CurriculumVersion) => {
@@ -892,23 +892,21 @@ const navigateToCreate = () => {
                     </FormField>
 
                     <FormField v-slot="{ componentField }" name="include_curriculum_units">
-                        <FormItem class="flex flex-row items-start space-x-3 space-y-0">
+                        <FormItem class="flex flex-row items-start space-y-0 space-x-3">
                             <FormControl>
                                 <Checkbox v-bind="componentField" />
                             </FormControl>
                             <div class="space-y-1 leading-none">
                                 <FormLabel>Include Curriculum Units</FormLabel>
-                                <p class="text-[0.8rem] text-muted-foreground">
-                                    Copy all {{ curriculumVersionToDuplicate.curriculum_units_count }} curriculum units from the original version to the duplicate.
-                                </p>
+                                <p class="text-muted-foreground text-[0.8rem]">Copy all {{ curriculumVersionToDuplicate.curriculum_units_count }} curriculum units from the original version to the duplicate.</p>
                             </div>
                         </FormItem>
                     </FormField>
 
                     <!-- Original Version Summary -->
-                    <div class="rounded-lg border bg-muted/50 p-4">
-                        <h4 class="font-medium mb-2">Original Version Details</h4>
-                        <div class="space-y-1 text-sm text-muted-foreground">
+                    <div class="bg-muted/50 rounded-lg border p-4">
+                        <h4 class="mb-2 font-medium">Original Version Details</h4>
+                        <div class="text-muted-foreground space-y-1 text-sm">
                             <div><strong>Program:</strong> {{ curriculumVersionToDuplicate.program?.name }} ({{ curriculumVersionToDuplicate.program?.code }})</div>
                             <div v-if="curriculumVersionToDuplicate.specialization"><strong>Specialization:</strong> {{ curriculumVersionToDuplicate.specialization.name }} ({{ curriculumVersionToDuplicate.specialization.code }})</div>
                             <div><strong>Effective From:</strong> {{ curriculumVersionToDuplicate.effective_from_semester?.name }}</div>

@@ -106,6 +106,7 @@ class CurriculumVersionController extends Controller
      */
     private function calculateOverviewStatistics(CurriculumVersion $curriculumVersion): array
     {
+        // Standalone units stats
         $unitsCount = $curriculumVersion->curriculumUnits()->count();
         $totalCreditPoints = $curriculumVersion->curriculumUnits()
             ->join('units', 'curriculum_units.unit_id', '=', 'units.id')
@@ -125,12 +126,118 @@ class CurriculumVersionController extends Controller
             ->pluck('count', 'unit_scope')
             ->toArray();
 
+        // Modules stats
+        $modulesCount = $curriculumVersion->curriculumModules()->count();
+        $totalModuleCredits = $curriculumVersion->curriculumModules()
+            ->join('modules', 'curriculum_modules.module_id', '=', 'modules.id')
+            ->sum('modules.total_credits');
+
+        // Build curriculum roadmap grouped by year and semester
+        $roadmap = $this->buildCurriculumRoadmap($curriculumVersion);
+
         return [
             'totalUnits' => $unitsCount,
             'totalCreditPoints' => $totalCreditPoints,
             'byYearLevel' => $byYearLevel,
             'byUnitScope' => $byUnitScope,
+            // Module stats
+            'totalModules' => $modulesCount,
+            'totalModuleCredits' => $totalModuleCredits,
+            'hasModules' => $modulesCount > 0,
+            // Roadmap
+            'roadmap' => $roadmap,
         ];
+    }
+
+    /**
+     * Build curriculum roadmap grouped by year and semester.
+     */
+    private function buildCurriculumRoadmap(CurriculumVersion $curriculumVersion): array
+    {
+        // Get all standalone units with their info
+        $units = $curriculumVersion->curriculumUnits()
+            ->with(['unit:id,code,name,credit_points'])
+            ->get()
+            ->map(function ($cu) {
+                return [
+                    'type' => 'unit',
+                    'id' => $cu->id,
+                    'code' => $cu->unit->code,
+                    'name' => $cu->unit->name,
+                    'credits' => $cu->unit->credit_points,
+                    'year_level' => $cu->year_level ?? 0,
+                    'semester_number' => $cu->semester_number ?? 0,
+                    'unit_scope' => $cu->unit_scope,
+                    'note' => $cu->note,
+                ];
+            });
+
+        // Get all modules with their info and sub-units
+        $modules = $curriculumVersion->curriculumModules()
+            ->with([
+                'module:id,code,name,total_credits,grading_type',
+                'module.units:id,code,name,credit_points' // Load sub-units
+            ])
+            ->get()
+            ->map(function ($cm) {
+                // Map sub-units with pivot data
+                $subUnits = $cm->module->units->map(function ($unit) {
+                    return [
+                        'id' => $unit->id,
+                        'code' => $unit->code,
+                        'name' => $unit->name,
+                        'credits' => $unit->credit_points,
+                        'weight' => $unit->pivot->weight ?? null,
+                        'order' => $unit->pivot->order ?? 0,
+                    ];
+                })->sortBy('order')->values()->toArray();
+
+                return [
+                    'type' => 'module',
+                    'id' => $cm->id,
+                    'code' => $cm->module->code,
+                    'name' => $cm->module->name,
+                    'credits' => $cm->module->total_credits,
+                    'year_level' => $cm->year_level ?? 0,
+                    'semester_number' => $cm->semester_number ?? 0,
+                    'is_required' => $cm->is_required,
+                    'group_name' => $cm->group_name,
+                    'grading_type' => $cm->module->grading_type,
+                    'note' => $cm->note,
+                    'sub_units' => $subUnits, // Add sub-units
+                ];
+            });
+
+        // Merge units and modules
+        $allItems = $units->concat($modules);
+
+        // Group by year and semester
+        $roadmap = [];
+        foreach ($allItems as $item) {
+            $year = $item['year_level'] ?: 0;
+            $semester = $item['semester_number'] ?: 0;
+
+            if (!isset($roadmap[$year])) {
+                $roadmap[$year] = [];
+            }
+            if (!isset($roadmap[$year][$semester])) {
+                $roadmap[$year][$semester] = [
+                    'items' => [],
+                    'total_credits' => 0,
+                ];
+            }
+
+            $roadmap[$year][$semester]['items'][] = $item;
+            $roadmap[$year][$semester]['total_credits'] += $item['credits'];
+        }
+
+        // Sort by year and semester
+        ksort($roadmap);
+        foreach ($roadmap as $year => &$semesters) {
+            ksort($semesters);
+        }
+
+        return $roadmap;
     }
 
     /**
@@ -488,19 +595,8 @@ class CurriculumVersionController extends Controller
     {
         $curriculumVersion = CurriculumVersion::create($request->validated());
 
-        return redirect()->route(CurriculumRoutes::VERSION_SHOW, $curriculumVersion)
+        return redirect()->route(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW, $curriculumVersion)
             ->with('success', 'Curriculum version created successfully');
-    }
-
-    /**
-     * Display the specified curriculum version - redirects to overview tab.
-     * 
-     * Note: If Show.vue is accessed directly, use showWithModules() instead.
-     */
-    public function show(CurriculumVersion $curriculumVersion): RedirectResponse
-    {
-        // Redirect to the overview tab for the new tab-based layout
-        return redirect()->route(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW, $curriculumVersion);
     }
 
     /**
@@ -609,7 +705,6 @@ class CurriculumVersionController extends Controller
 
             return redirect()->route(CurriculumRoutes::VERSION_SUMMARY_OVERVIEW, $duplicatedVersion)
                 ->with('success', "Curriculum version duplicated successfully as '{$duplicatedVersion->version_code}'");
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Curriculum version duplication failed: ' . $e->getMessage());
@@ -643,6 +738,7 @@ class CurriculumVersionController extends Controller
                 'program' => $curriculumVersion->program,
                 'specialization' => $curriculumVersion->specialization,
                 'effective_from_semester' => $curriculumVersion->effectiveFromSemester,
+                'has_modular_structure' => $stats['hasModules'],
             ],
             'data' => $stats,
             'meta' => [
@@ -705,6 +801,9 @@ class CurriculumVersionController extends Controller
         // Calculate units statistics
         $unitsStats = $this->calculateUnitsStatistics($curriculumVersion);
 
+        // Check if curriculum has modules
+        $modulesCount = $curriculumVersion->curriculumModules()->count();
+
         return Inertia::render('curriculum-versions/summary/Units', [
             'curriculumVersion' => [
                 'id' => $curriculumVersion->id,
@@ -714,11 +813,13 @@ class CurriculumVersionController extends Controller
                 'program' => $curriculumVersion->program,
                 'specialization' => $curriculumVersion->specialization,
                 'effective_from_semester' => $curriculumVersion->effectiveFromSemester,
-                'semester_id' => $curriculumVersion->semester_id
+                'semester_id' => $curriculumVersion->semester_id,
+                'has_modular_structure' => $modulesCount > 0,
             ],
             'data' => [
                 'units' => $units,
                 'stats' => $unitsStats,
+                'modulesCount' => $modulesCount,
             ],
             'meta' => [
                 'filters' => $request->only(['search', 'unit_scope', 'year_level', 'semester_number']),
@@ -746,6 +847,9 @@ class CurriculumVersionController extends Controller
             ->orderBy('code')
             ->get();
 
+        // Get standalone units count
+        $standaloneUnitsCount = $curriculumVersion->curriculumUnits()->count();
+
         return Inertia::render('curriculum-versions/summary/Modules', [
             'curriculumVersion' => [
                 'id' => $curriculumVersion->id,
@@ -756,6 +860,10 @@ class CurriculumVersionController extends Controller
                 'specialization' => $curriculumVersion->specialization,
                 'effective_from_semester' => $curriculumVersion->effectiveFromSemester,
                 'curriculum_modules' => $curriculumVersion->curriculumModules,
+                'has_standalone_units' => $standaloneUnitsCount > 0,
+            ],
+            'data' => [
+                'standaloneUnitsCount' => $standaloneUnitsCount,
             ],
             'availableModules' => $availableModules,
         ]);
@@ -904,16 +1012,16 @@ class CurriculumVersionController extends Controller
     {
         $validated = $request->validate([
             'program_id' => 'required|exists:programs,id',
-//            'specialization_id' => 'nullable|exists:specializations,id',
+            //            'specialization_id' => 'nullable|exists:specializations,id',
         ]);
 
         $query = CurriculumVersion::where('program_id', $validated['program_id']);
 
-//        if ($validated['specialization_id']) {
-//            $query->where('specialization_id', $validated['specialization_id']);
-//        } else {
-//            $query->whereNull('specialization_id');
-//        }
+        //        if ($validated['specialization_id']) {
+        //            $query->where('specialization_id', $validated['specialization_id']);
+        //        } else {
+        //            $query->whereNull('specialization_id');
+        //        }
 
         $versions = $query->orderBy('created_at', 'desc')
             ->get(['id', 'version_code'])

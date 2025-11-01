@@ -14,6 +14,7 @@ interface Props {
         version_code: string;
         notes?: string;
         created_at: string;
+        has_modular_structure?: boolean;
         program: {
             id: number;
             name: string;
@@ -32,46 +33,52 @@ interface Props {
     };
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const page = usePage<SharedData>();
 const permission = usePermissions();
 // Get current route name to determine active tab
 const currentRouteName = computed(() => (page.props as any).ziggy?.route);
 
-// Tab configuration with routes
-const tabs = [
-    {
-        key: 'overview',
-        label: 'Overview',
-        route: 'curriculum_versions.summary.overview',
-    },
-    {
-        key: 'units',
-        label: 'Unit List',
-        route: 'curriculum_versions.summary.units',
-    },
-    {
-        key: 'modules',
-        label: 'Modules',
-        route: 'curriculum_versions.summary.modules',
-    },
-    {
-        key: 'students',
-        label: 'Student Stats',
-        route: 'curriculum_versions.summary.students',
-    },
-    {
-        key: 'deployments',
-        label: 'Deployment Tracking',
-        route: 'curriculum_versions.summary.deployments',
-    },
-];
+// Tab configuration with routes - conditionally show Modules tab
+const tabs = computed(() => {
+    const allTabs = [
+        {
+            key: 'overview',
+            label: 'Overview',
+            route: 'curriculum_versions.summary.overview',
+        },
+        {
+            key: 'units',
+            label: 'Unit List',
+            route: 'curriculum_versions.summary.units',
+        },
+        {
+            key: 'modules',
+            label: 'Modules',
+            route: 'curriculum_versions.summary.modules',
+            description: 'Modular system (Finland)',
+        },
+        {
+            key: 'students',
+            label: 'Student Stats',
+            route: 'curriculum_versions.summary.students',
+        },
+        {
+            key: 'deployments',
+            label: 'Deployment Tracking',
+            route: 'curriculum_versions.summary.deployments',
+        },
+    ];
+
+    // Always show all tabs - the content will guide users on which to use
+    return allTabs;
+});
 
 // Determine active tab based on current route name
 const activeTab = computed(() => {
     const routeName = currentRouteName.value;
-    const tab = tabs.find((t) => t.route === routeName);
+    const tab = tabs.value.find((t) => t.route === routeName);
     return tab?.key || 'overview';
 });
 
@@ -152,6 +159,7 @@ const handleExport = () => {
                             }"
                             :data-state="activeTab === tab.key ? 'active' : 'inactive'"
                             data-slot="tabs-trigger"
+                            :title="tab.description"
                         >
                             {{ tab.label }}
                         </Link>

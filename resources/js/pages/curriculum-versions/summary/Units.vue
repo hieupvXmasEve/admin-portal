@@ -18,7 +18,7 @@ import { curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
-import { Book, ChevronsUpDown, Edit, GraduationCap, Plus, Target, Trash2 } from 'lucide-vue-next';
+import { Book, ChevronsUpDown, Edit, GraduationCap, Info, Plus, Target, Trash2 } from 'lucide-vue-next';
 import { Form } from 'vee-validate';
 import { computed, h, reactive, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
@@ -55,6 +55,7 @@ interface Props {
             byYearLevel: Record<string, { count: number; total_credits: number }>;
             byUnitScope: Record<string, number>;
         };
+        modulesCount?: number;
     };
     meta: {
         filters: {
@@ -427,6 +428,23 @@ const organizedUnits = computed(() => {
 
     <CurriculumVersionSummaryLayout :curriculum-version="curriculumVersion">
         <div class="space-y-6">
+            <!-- Module Info Banner -->
+            <Card v-if="data.modulesCount && data.modulesCount > 0" class="border-blue-200 bg-blue-50">
+                <CardContent class="py-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <Info class="h-4 w-4 text-blue-600" />
+                            <span class="text-sm">
+                                This curriculum also has <strong>{{ data.modulesCount }} module(s)</strong> containing structured unit groups (modular system for Finland campus).
+                            </span>
+                        </div>
+                        <Link :href="route('curriculum_versions.summary.modules', { curriculum_version: curriculumVersion.id })">
+                            <Button variant="outline" size="sm">View Modules</Button>
+                        </Link>
+                    </div>
+                </CardContent>
+            </Card>
+
             <!-- Statistics Cards -->
             <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <Card>

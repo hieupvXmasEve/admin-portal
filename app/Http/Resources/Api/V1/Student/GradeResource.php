@@ -15,10 +15,9 @@ class GradeResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'grades_by_semester' => $this->formatGradesBySemester($this->resource['grades_by_semester']),
-            'overall_summary' => $this->formatOverallSummary($this->resource['overall_summary']),
-            'grade_distribution' => $this->formatGradeDistribution($this->resource['grade_distribution']),
-            'performance_trends' => $this->formatPerformanceTrends($this->resource['performance_trends']),
+            'grades_by_semester' => $this->resource['grades_by_semester'] ?? [],
+            'egc_units' => $this->resource['egc_units'] ?? [],
+            'overall_summary' => $this->resource['overall_summary'] ?? [],
             'generated_at' => now()->toISOString(),
         ];
     }
@@ -345,7 +344,7 @@ class GradeResource extends JsonResource
     /**
      * Get credit load status
      */
-    protected function getCreditLoadStatus(int $credits): string
+    protected function getCreditLoadStatus(int|float $credits): string
     {
         return match (true) {
             $credits >= 18 => 'heavy',

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ModuleScoreCard from '@/components/student/ModuleScoreCard.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { CourseScores, ScoresData } from '@/types/models';
-import { BarChart3, BookOpen, ChevronDown, ChevronRight, Eye, Filter, Search, Target, TrendingUp, X } from 'lucide-vue-next';
+import { BarChart3, BookOpen, ChevronDown, ChevronRight, Eye, Filter, Package, Search, Target, TrendingUp, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface Props {
@@ -30,7 +31,7 @@ const showScoreDialog = ref(false);
 
 // Computed filtered data
 const filteredScores = computed(() => {
-    let filtered = props.scores.data;
+    let filtered = props.scores.standalone_units.data;
 
     // Search filter
     if (searchQuery.value) {
@@ -111,13 +112,13 @@ const hasActiveFilters = computed(() => {
 
 // Get unique semesters for filter dropdown
 const availableSemesters = computed(() => {
-    const semesters = new Set(props.scores.data.map((course) => course.semester));
+    const semesters = new Set(props.scores.standalone_units.data.map((course) => course.semester));
     return Array.from(semesters).sort();
 });
 
 // Get unique courses for filter dropdown
 const availableCourses = computed(() => {
-    const courses = new Set(props.scores.data.map((course) => course.course_code));
+    const courses = new Set(props.scores.standalone_units.data.map((course) => course.course_code));
     return Array.from(courses).sort();
 });
 
@@ -145,17 +146,29 @@ const openScoreDetails = (course: CourseScores) => {
         </div>
 
         <!-- Content -->
-        <div v-else>
+        <div v-else class="space-y-4">
             <!-- Summary Cards -->
-            <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <Card>
                     <CardContent class="p-4">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-muted-foreground text-sm">Total Courses</p>
+                                <p class="text-muted-foreground text-sm">Course Units</p>
                                 <p class="text-2xl font-bold">{{ scores.summary.total_courses }}</p>
                             </div>
                             <BookOpen class="h-8 w-8 text-blue-600" />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card v-if="scores.modules">
+                    <CardContent class="p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-muted-foreground text-sm">Modules</p>
+                                <p class="text-2xl font-bold">{{ scores.summary.total_modules }}</p>
+                            </div>
+                            <Package class="h-8 w-8 text-indigo-600" />
                         </div>
                     </CardContent>
                 </Card>
@@ -200,7 +213,7 @@ const openScoreDetails = (course: CourseScores) => {
             </div>
 
             <!-- Filters -->
-            <Card class="mb-6">
+            <Card>
                 <CardHeader>
                     <CardTitle class="flex items-center justify-between">
                         <span class="flex items-center gap-2">
@@ -248,13 +261,24 @@ const openScoreDetails = (course: CourseScores) => {
                         </Select>
 
                         <!-- Results Count -->
-                        <div class="text-muted-foreground flex items-center text-sm">{{ filteredScores.length }} of {{ scores.data.length }} courses</div>
+                        <div class="text-muted-foreground flex items-center text-sm">{{ filteredScores.length }} of {{ scores.standalone_units.data.length }} courses</div>
                     </div>
                 </CardContent>
             </Card>
 
-            <!-- Scores List -->
+            <!-- Modules Section -->
+            <div v-if="scores.modules && scores.modules.data.length > 0" class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-semibold">Modules</h2>
+                    <Badge variant="secondary">{{ scores.modules.data.length }} module(s)</Badge>
+                </div>
+
+                <ModuleScoreCard v-for="module in scores.modules.data" :key="module.module_id" :module="module" />
+            </div>
+
+            <!-- Standalone Units Section -->
             <div class="space-y-4">
+                <h2 class="text-xl font-semibold">Course Units</h2>
                 <div v-if="filteredScores.length === 0" class="py-12 text-center">
                     <Target class="text-muted-foreground mx-auto mb-4 h-12 w-12" />
                     <h3 class="mb-2 text-lg font-semibold">No Scores Found</h3>

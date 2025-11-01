@@ -73,15 +73,21 @@ class ModuleProgressService
             return $this->calculateWeightedAverage($gradedRecords, $subUnits);
         }
 
-        return round($gradedRecords->avg('final_percentage'), 2);
+        $average = $gradedRecords->avg('final_percentage');
+        
+        return $average !== null ? round($average, 2) : null;
     }
 
-    private function calculateWeightedAverage(Collection $gradedRecords, Collection $subUnits): float
+    private function calculateWeightedAverage(Collection $gradedRecords, Collection $subUnits): ?float
     {
         $totalWeight = 0;
         $weightedSum = 0;
 
         foreach ($gradedRecords as $record) {
+            if ($record->final_percentage === null) {
+                continue;
+            }
+
             $unit = $subUnits->firstWhere('id', $record->unit_id);
             $weight = $unit?->pivot->weight ?? 1;
 
@@ -90,7 +96,7 @@ class ModuleProgressService
         }
 
         if ($totalWeight == 0) {
-            return 0;
+            return null;
         }
 
         return round($weightedSum / $totalWeight, 2);

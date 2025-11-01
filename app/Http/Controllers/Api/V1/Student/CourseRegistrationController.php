@@ -177,7 +177,7 @@ class CourseRegistrationController extends Controller
             // Check if student is registered for this course
             $registration = $student->courseRegistrations()
                 ->where('course_offering_id', $courseOfferingId)
-                ->whereIn('registration_status', ['registered', 'confirmed'])
+                ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
                 ->first();
 
             if (!$registration) {
