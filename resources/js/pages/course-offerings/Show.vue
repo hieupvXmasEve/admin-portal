@@ -711,7 +711,7 @@ const getAcademicRecordForStudent = (studentId: number) => {
                                     </TableCell>
                                     <TableCell>
                                         <div class="flex items-center gap-2">
-                                            <Button v-if="session.status !== 'completed' && session.status !== 'in_progress'" variant="ghost" size="sm" @click="openQuickEdit(session)" title="Quick Edit">
+                                            <Button variant="ghost" size="sm" @click="openQuickEdit(session)" title="Quick Edit">
                                                 <Settings class="h-4 w-4" />
                                             </Button>
                                             <Link :href="classSessionRoutes.show(session.id)">
