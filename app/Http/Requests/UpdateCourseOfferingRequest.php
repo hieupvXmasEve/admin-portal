@@ -32,4 +32,14 @@ class UpdateCourseOfferingRequest extends FormRequest
     {
         return CourseOffering::validationMessages();
     }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'grading_type' => $this->input('grading_type', 'grade'),
+        ]);
+    }
 }
