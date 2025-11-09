@@ -204,7 +204,7 @@ class AdminScheduleService
             return (object) [
                 'id' => $session->id,
                 'title' => $session->session_title,
-                'unitCode' => $session->courseOffering->curriculumUnit->unit->code ?? 'N/A',
+                'unitCode' => $session->courseOffering->unit->code ?? 'N/A',
                 'section' => $session->courseOffering->section ?? 'A',
                 'lecturer' => $session->lecture->full_name ?? 'TBA',
                 'room' => $session->room->name ?? 'TBA',
