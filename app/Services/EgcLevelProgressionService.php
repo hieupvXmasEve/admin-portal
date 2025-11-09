@@ -190,7 +190,7 @@ class EgcLevelProgressionService
                         passed: false,
                         levelProgressed: false,
                         currentLevel: $student->gc_current_level,
-                        message: 'You did not pass this course. Your level remains at Level '.$student->gc_current_level
+                        message: 'You did not pass this course. Your level remains at Level ' . $student->gc_current_level
                     )
                 );
 
@@ -216,7 +216,7 @@ class EgcLevelProgressionService
         CourseOffering $courseOffering
     ): array {
         $oldLevel = $student->gc_current_level;
-        
+
         // IMPORTANT: Only progress if current level matches the unit level
         // This prevents duplicate progression if the course is accidentally marked as completed multiple times
         if ($oldLevel !== $currentUnitLevel) {
@@ -227,7 +227,7 @@ class EgcLevelProgressionService
                 'unit_code' => $courseOffering->unit->code,
                 'message' => 'Student already progressed beyond this level. No action taken.',
             ]);
-            
+
             return [
                 'student_id' => $student->student_id,
                 'student_name' => $student->full_name,
@@ -240,7 +240,7 @@ class EgcLevelProgressionService
                 'already_progressed' => true,
             ];
         }
-        
+
         $newLevel = $oldLevel + 1;
         $totalLevels = $student->gc_total_levels ?? 6; // Default 6 levels if not set
 
@@ -285,7 +285,7 @@ class EgcLevelProgressionService
 
         $record->update([
             'grade_history' => $gradeHistory,
-            'administrative_notes' => ($record->administrative_notes ? $record->administrative_notes."\n" : '').$progressionNote,
+            'administrative_notes' => ($record->administrative_notes ? $record->administrative_notes . "\n" : '') . $progressionNote,
         ]);
 
         Log::info('EGC Level Progressed', [
