@@ -89,6 +89,27 @@ class InvoiceService
                     ->first();
 
                 if ($existingInvoice) {
+                    // Check if student transitioned from GC to course in this semester
+                    $student = $enrollment->student;
+                    if (
+                        $student->gc_to_course_transition_semester &&
+                        $student->gc_to_course_transition_semester === $cycle->semester->name
+                    ) {
+                        // Check if tuition items already exist
+                        $hasTuitionItems = $existingInvoice->items()
+                            ->where('item_type', 'tuition')
+                            ->exists();
+
+                        if (! $hasTuitionItems) {
+                            // Add tuition items for transitioning student
+                            DB::transaction(function () use ($existingInvoice, $student, $cycle) {
+                                $this->addTuitionItems($existingInvoice, $student, $cycle->semester_id);
+                                $this->applyScholarshipDiscount($existingInvoice);
+                                $existingInvoice->recalculateTotals();
+                            });
+                        }
+                    }
+
                     // Invoice exists: apply any new pending discounts
                     $this->applyPendingDiscounts($existingInvoice);
                     $invoices->push($existingInvoice);
@@ -161,8 +182,8 @@ class InvoiceService
         return DB::transaction(function () use ($student, $cycle) {
             // Check if student should have an invoice based on their status
             $shouldCreateInvoice = $this->shouldCreateInvoiceForStudent($student, $cycle->semester_id);
-            
-            if (!$shouldCreateInvoice['create']) {
+
+            if (! $shouldCreateInvoice['create']) {
                 throw new \Exception($shouldCreateInvoice['reason']);
             }
 
@@ -208,10 +229,10 @@ class InvoiceService
     {
         // intake_course students: check tuition plan
         if ($student->status === 'intake_course') {
-            if (!$student->curriculum_version_id || !$student->intake_semester_id) {
+            if (! $student->curriculum_version_id || ! $student->intake_semester_id) {
                 return [
                     'create' => false,
-                    'reason' => "Student {$student->student_id} does not have curriculum_version or intake_semester set."
+                    'reason' => "Student {$student->student_id} does not have curriculum_version or intake_semester set.",
                 ];
             }
 
@@ -224,10 +245,10 @@ class InvoiceService
                 ->where('amount', '>', 0)
                 ->exists();
 
-            if (!$hasTuitionPlan) {
+            if (! $hasTuitionPlan) {
                 return [
                     'create' => false,
-                    'reason' => "Student {$student->student_id} does not have a valid tuition plan for this semester."
+                    'reason' => "Student {$student->student_id} does not have a valid tuition plan for this semester.",
                 ];
             }
 
@@ -239,17 +260,17 @@ class InvoiceService
             $hasRegistrations = \App\Models\CourseRegistration::where('student_id', $student->id)
                 ->whereHas('courseOffering', function ($q) use ($semesterId) {
                     $q->where('semester_id', $semesterId)
-                      ->whereHas('unit', function ($unitQuery) {
-                          $unitQuery->where('unit_type', 'egc');
-                      });
+                        ->whereHas('unit', function ($unitQuery) {
+                            $unitQuery->where('unit_type', 'egc');
+                        });
                 })
                 ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
                 ->exists();
 
-            if (!$hasRegistrations) {
+            if (! $hasRegistrations) {
                 return [
                     'create' => false,
-                    'reason' => "Student {$student->student_id} has not registered for any EGC courses in this semester."
+                    'reason' => "Student {$student->student_id} has not registered for any EGC courses in this semester.",
                 ];
             }
 
@@ -259,7 +280,7 @@ class InvoiceService
         // Other statuses: not eligible
         return [
             'create' => false,
-            'reason' => "Student {$student->student_id} with status '{$student->status}' is not eligible for invoice generation."
+            'reason' => "Student {$student->student_id} with status '{$student->status}' is not eligible for invoice generation.",
         ];
     }
 
@@ -324,9 +345,9 @@ class InvoiceService
         $registrations = \App\Models\CourseRegistration::where('student_id', $student->id)
             ->whereHas('courseOffering', function ($q) use ($semesterId) {
                 $q->where('semester_id', $semesterId)
-                  ->whereHas('unit', function ($unitQuery) {
-                      $unitQuery->where('unit_type', 'egc');
-                  });
+                    ->whereHas('unit', function ($unitQuery) {
+                        $unitQuery->where('unit_type', 'egc');
+                    });
             })
             // Only active registrations (exclude completed)
             ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
@@ -351,7 +372,7 @@ class InvoiceService
             // Determine fee and type
             $fee = $isRetake ? ($unit->retake_fee ?? 0) : ($unit->base_fee ?? 0);
             $itemType = $isRetake ? 'retake' : 'egc';
-            $description = $isRetake 
+            $description = $isRetake
                 ? "Retake Fee: {$unit->code} - {$unit->name}"
                 : "EGC Course Fee: {$unit->code} - {$unit->name}";
 
@@ -391,6 +412,7 @@ class InvoiceService
     /**
      * Apply scholarship discount to an invoice.
      * Only applies to students with status = 'intake_course'.
+     * Scholarship is calculated based on tuition items only, not the entire subtotal.
      */
     public function applyScholarshipDiscount(StudentInvoice $invoice): void
     {
@@ -418,11 +440,13 @@ class InvoiceService
             return;
         }
 
-        // Calculate subtotal from invoice items directly (always fresh)
-        $subtotal = $invoice->items()->sum('total_price');
+        // Calculate total from tuition items only (not entire subtotal)
+        $tuitionTotal = $invoice->items()
+            ->where('item_type', 'tuition')
+            ->sum('total_price');
 
-        // Calculate discount amount using fresh subtotal
-        $discountAmount = $this->calculateScholarshipDiscount($scholarship, $subtotal);
+        // Calculate discount amount based on tuition total only
+        $discountAmount = $this->calculateScholarshipDiscount($scholarship, $tuitionTotal);
 
         if ($discountAmount > 0) {
             // Check if discount already exists
@@ -535,15 +559,19 @@ class InvoiceService
 
     /**
      * Calculate scholarship discount amount.
+     * Applied to tuition total only, not the entire invoice subtotal.
+     *
+     * @param  float  $tuitionTotal  Total amount of tuition items
+     * @return float Calculated discount amount
      */
-    protected function calculateScholarshipDiscount(ScholarshipDefinition $scholarship, float $subtotal): float
+    protected function calculateScholarshipDiscount(ScholarshipDefinition $scholarship, float $tuitionTotal): float
     {
         if ($scholarship->type === 'percentage') {
-            return round(($subtotal * $scholarship->amount) / 100, 2);
+            return round(($tuitionTotal * $scholarship->amount) / 100, 2);
         }
 
         // Fixed amount
-        return min($scholarship->amount, $subtotal);
+        return min($scholarship->amount, $tuitionTotal);
     }
 
     /**
