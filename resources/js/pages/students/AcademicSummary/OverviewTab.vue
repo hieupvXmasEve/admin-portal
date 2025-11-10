@@ -331,6 +331,30 @@ const hasAcademicConcerns = computed(() => {
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Parent Login Information -->
+                            <div class="space-y-4 pt-4">
+                                <Separator />
+                                <div class="space-y-3">
+                                    <h4 class="text-sm font-semibold text-gray-700">Parent Login Information</h4>
+                                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div class="flex items-center gap-3">
+                                            <User class="text-muted-foreground h-4 w-4 flex-shrink-0" />
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-muted-foreground text-sm">Parent Name</p>
+                                                <p class="font-medium">{{ overview.student_info.parent_user?.name || 'N/A' }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <Mail class="text-muted-foreground h-4 w-4 flex-shrink-0" />
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-muted-foreground text-sm">Parent Email</p>
+                                                <p class="truncate font-medium">{{ overview.student_info.parent_user?.email || 'N/A' }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>

@@ -12,7 +12,7 @@ import { ValidationRules } from '@/types/validation';
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
-import { Building, GraduationCap, Mail, Phone, Save, User, X } from 'lucide-vue-next';
+import { Building, GraduationCap, Mail, Phone, Save, User, Users, X } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
@@ -23,6 +23,7 @@ interface Props {
     campuses: Campus[];
     programs: (Program & { specializations?: Specialization[] })[];
     curriculumVersions: CurriculumVersion[];
+    errors: Record<string, string[] | undefined>;
 }
 
 const props = defineProps<Props>();
@@ -62,6 +63,8 @@ const formSchema = toTypedSchema(
             gc_starting_level: z.string().optional(),
             gc_current_level: z.string().optional(),
             gc_total_levels: z.string().optional(),
+            parent_name: z.string().max(255, 'Parent name is too long').optional(),
+            parent_email: z.string().email('Invalid email format').max(255, 'Parent email is too long').optional(),
         })
         .superRefine((data, ctx) => {
             // Conditional validation for GC levels when status is intake_pre_uni_gc
@@ -114,6 +117,8 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         gc_starting_level: props.student.gc_starting_level?.toString() || '',
         gc_current_level: props.student.gc_current_level?.toString() || '',
         gc_total_levels: props.student.gc_total_levels?.toString() || '',
+        parent_name: props.student.parent_user?.name || '',
+        parent_email: props.student.parent_user?.email || '',
     },
 });
 
@@ -171,6 +176,16 @@ watch(
     },
 );
 
+watch(
+    () => props.errors,
+    (newErrors: Record<string, string[] | undefined>) => {
+        if (newErrors.parent_email) {
+            console.log('newErrors.parent_email', newErrors.parent_email);
+            toast.error(newErrors.parent_email || 'Failed to update student');
+        }
+    },
+);
+
 // Watch for specialization changes to fetch curriculum versions (same as Create.vue)
 // watch(
 //     () => values.specialization_id,
@@ -220,6 +235,8 @@ const onSubmit = handleSubmit((formData) => {
         emergency_contact_relationship_1: formData.emergency_contact_relationship_1 || null,
         high_school_name: formData.high_school_name || null,
         admission_notes: formData.admission_notes || null,
+        parent_name: formData.parent_name || null,
+        parent_email: formData.parent_email || null,
     };
     router.put(route('students.update', props.student.id), submitData, {
         onSuccess: () => {
@@ -750,6 +767,45 @@ const handleAvatarUploaded = (avatarData: any) => {
                             </FormItem>
                         </FormField>
                     </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Parent User Information -->
+        <Card>
+            <CardHeader>
+                <CardTitle class="flex items-center gap-2">
+                    <Users class="h-5 w-5" />
+                    Parent Login Information
+                </CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="parent_name">
+                        <FormItem>
+                            <FormLabel class="flex items-center gap-2">
+                                <User class="h-4 w-4" />
+                                Parent Name
+                            </FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" placeholder="Enter parent name" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="parent_email">
+                        <FormItem>
+                            <FormLabel class="flex items-center gap-2">
+                                <Mail class="h-4 w-4" />
+                                Parent Email
+                            </FormLabel>
+                            <FormControl>
+                                <Input v-bind="componentField" type="email" placeholder="Enter parent email" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
                 </div>
             </CardContent>
         </Card>
