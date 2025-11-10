@@ -303,6 +303,10 @@ export interface Student {
     gc_current_level?: number;
     gc_total_levels?: number;
 
+    // Parent user
+    parent_user_id?: number | null;
+    parent_user?: User | null;
+
     // Timestamps
     created_at: string;
     updated_at: string;
@@ -390,6 +394,11 @@ export interface StudentOverview {
             type?: 'percentage' | 'fixed_amount';
             awarded_at?: string;
         };
+        parent_user?: {
+            id: number;
+            name: string;
+            email: string;
+        } | null;
     };
     program_info: {
         campus?: {

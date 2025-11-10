@@ -37,7 +37,7 @@ class StudentController extends Controller
     public function index(Request $request): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
-        Log::info('Current campus ID: '.$campusId);
+        Log::info('Current campus ID: ' . $campusId);
         if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
@@ -221,7 +221,7 @@ class StudentController extends Controller
 
     public function edit(Student $student): Response
     {
-        $student->load(['campus', 'program', 'specialization']);
+        $student->load(['campus', 'program', 'specialization', 'parentUser']);
 
         $campuses = Campus::orderBy('name')->get(['id', 'name', 'code']);
         $programs = Program::with('specializations')->orderBy('name')->get();
@@ -686,11 +686,11 @@ class StudentController extends Controller
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Export failed: '.$e->getMessage(),
+                    'message' => 'Export failed: ' . $e->getMessage(),
                 ], 500);
             }
 
-            return back()->withErrors(['error' => 'Export failed: '.$e->getMessage()]);
+            return back()->withErrors(['error' => 'Export failed: ' . $e->getMessage()]);
         }
     }
 

@@ -13,6 +13,7 @@ use App\Models\Role;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\StudentChange;
+use App\Models\User;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -84,10 +85,71 @@ class StudentService
     public function updateStudent(Student $student, array $data): Student
     {
         return DB::transaction(function () use ($student, $data) {
+            // Extract parent user data if provided
+            $parentName = $data['parent_name'] ?? null;
+            $parentEmail = $data['parent_email'] ?? null;
+
+            // Remove parent user fields from student data
+            unset($data['parent_name'], $data['parent_email']);
+
+            // Handle parent user update/creation
+            // Rule: One user can only be parent of one student
+            if ($parentName !== null || $parentEmail !== null) {
+                if ($student->parent_user_id) {
+                    // Student has a parent user - update it
+                    $parentUser = $student->parentUser;
+                    if ($parentUser) {
+                        $updateData = [];
+
+                        // Update email if provided and different
+                        if ($parentEmail !== null && $parentEmail !== $parentUser->email) {
+                            $updateData['email'] = $parentEmail;
+                        }
+
+                        // Update name if provided
+                        if ($parentName !== null) {
+                            $updateData['name'] = $parentName;
+                        }
+
+                        // Apply updates if any
+                        if (!empty($updateData)) {
+                            $parentUser->update($updateData);
+                        }
+                    }
+                } elseif ($parentEmail !== null) {
+                    // Student doesn't have a parent user - find or create one
+                    $parentUser = User::where('email', $parentEmail)->first();
+
+                    if (!$parentUser) {
+                        // Create new parent user
+                        $parentUser = User::create([
+                            'name' => $parentName ?? 'Parent',
+                            'email' => $parentEmail,
+                            'status' => User::STATUS_ACTIVE,
+                        ]);
+                    } else {
+                        // Check if this user is already a parent of another student
+                        $existingStudent = Student::where('parent_user_id', $parentUser->id)->first();
+
+                        if ($existingStudent) {
+                            throw new \Exception('This email is already linked to another student as parent.');
+                        }
+
+                        // Update existing user if name is provided
+                        if ($parentName !== null) {
+                            $parentUser->update(['name' => $parentName]);
+                        }
+                    }
+
+                    // Link parent user to student
+                    $student->update(['parent_user_id' => $parentUser->id]);
+                }
+            }
+
             // Update student data
             $student->update($data);
 
-            return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion']);
+            return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion', 'parentUser']);
         });
     }
 
@@ -242,9 +304,9 @@ class StudentService
     {
         // Sinh mã student_id dựa trên campusCode và 6 số ngẫu nhiên từ thời gian hiện tại
         $prefix = strtoupper($campusCode);
-        $randomSix = substr(strval(mt_rand(100000, 999999).time()), 0, 6);
+        $randomSix = substr(strval(mt_rand(100000, 999999) . time()), 0, 6);
 
-        return $prefix.$randomSix;
+        return $prefix . $randomSix;
     }
 
     /**
@@ -345,7 +407,7 @@ class StudentService
             }
         } catch (\Exception $e) {
             // Silently skip if graduation requirements table doesn't exist yet
-            \Illuminate\Support\Facades\Log::info('Graduation requirements not available: '.$e->getMessage());
+            \Illuminate\Support\Facades\Log::info('Graduation requirements not available: ' . $e->getMessage());
         }
     }
 

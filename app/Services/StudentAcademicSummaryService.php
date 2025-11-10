@@ -171,6 +171,11 @@ class StudentAcademicSummaryService
                     'type' => $student->scholarshipAward->scholarshipDefinition?->type,
                     'awarded_at' => $student->scholarshipAward->awarded_at?->format('Y-m-d'),
                 ] : null,
+                'parent_user' => $student->parentUser ? [
+                    'id' => $student->parentUser->id,
+                    'name' => $student->parentUser->name,
+                    'email' => $student->parentUser->email,
+                ] : null,
 
             ],
             'program_info' => [
