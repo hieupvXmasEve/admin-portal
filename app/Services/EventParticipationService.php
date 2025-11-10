@@ -757,9 +757,9 @@ class EventParticipationService
      */
     public function searchStudentsForManualEvent(Event $event, string $studentIdsInput): array
     {
-        if (!$event->isManual()) {
-            throw new InvalidArgumentException('Can only search students for manual events');
-        }
+        // if (!$event->isManual()) {
+        //     throw new InvalidArgumentException('Can only search students for manual events');
+        // }
 
         $studentIds = preg_split('/\s+/', trim($studentIdsInput));
         $studentIds = array_filter($studentIds);
@@ -810,7 +810,7 @@ class EventParticipationService
             $eligibilityInfo['major_code'] = $student->specialization?->code ?? $student->program?->code ?? 'N/A';
 
             $participant = $event->getStudentParticipation($student->id);
-            if ($participant && $participant->isActive()) {
+            if ($participant && ($participant->isCompleted() || $participant->isCheckedIn())) {
                 $eligibilityInfo['is_already_registered'] = true;
                 $eligibilityInfo['eligibility_reasons'][] = 'Already registered for this event';
                 $results[] = $eligibilityInfo;
@@ -852,9 +852,9 @@ class EventParticipationService
         string $status = 'completed',
         ?User $addedBy = null
     ): array {
-        if (!$event->isManual()) {
-            throw new InvalidArgumentException('Can only add manual participants to manual events');
-        }
+        // if (!$event->isManual()) {
+        //     throw new InvalidArgumentException('Can only add manual participants to manual events');
+        // }
 
         $results = [
             'added' => [],
@@ -880,7 +880,7 @@ class EventParticipationService
 
                     // Check if student is already registered
                     $existingParticipation = $event->getStudentParticipation($student->id);
-                    if ($existingParticipation && $existingParticipation->isActive()) {
+                    if ($existingParticipation && $existingParticipation->isCompleted() && $existingParticipation->isCheckedIn()) {
                         $results['skipped'][] = [
                             'student_id' => $studentId,
                             'student_name' => $student->full_name,
@@ -1134,9 +1134,9 @@ class EventParticipationService
      */
     public function getManualEventStatistics(Event $event): array
     {
-        if (!$event->isManual()) {
-            return [];
-        }
+        // if (!$event->isManual()) {
+        //     return [];
+        // }
 
         $participants = $event->participants;
 
