@@ -267,9 +267,9 @@ class EventController extends Controller
             abort(403, 'You are not authorized to manage this event');
         }
 
-        if (! $event->isManual()) {
-            abort(403, 'Participant management is only available for manual events');
-        }
+        // if (! $event->isManual()) {
+        //     abort(403, 'Participant management is only available for manual events');
+        // }
 
         $filters = $request->only(['status', 'search', 'gold_awarded']);
 

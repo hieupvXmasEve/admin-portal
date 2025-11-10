@@ -71,9 +71,9 @@ class EventParticipantController extends Controller
             abort(403, 'You are not authorized to manage this event');
         }
 
-        if (!$event->isManual()) {
-            abort(403, 'Student selection is only available for manual events');
-        }
+        // if (!$event->isManual()) {
+        //     abort(403, 'Student selection is only available for manual events');
+        // }
 
         $validated = $request->validate([
             'student_ids' => ['required', 'string'],
@@ -102,9 +102,9 @@ class EventParticipantController extends Controller
             abort(403, 'You are not authorized to manage this event');
         }
 
-        if (!$event->isManual()) {
-            abort(403, 'Can only add participants to manual events');
-        }
+        // if (!$event->isManual()) {
+        //     abort(403, 'Can only add participants to manual events');
+        // }
 
         $request->validate([
             'student_ids' => 'required|array|min:1|max:100',
@@ -259,9 +259,9 @@ class EventParticipantController extends Controller
             abort(403, 'You are not authorized to manage this event');
         }
 
-        if (!$event->isManual()) {
-            abort(403, 'Statistics are only available for manual events');
-        }
+        // if (!$event->isManual()) {
+        //     abort(403, 'Statistics are only available for manual events');
+        // }
 
         $statistics = $this->participationService->getManualEventStatistics($event);
 

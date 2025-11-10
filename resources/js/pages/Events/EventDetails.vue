@@ -230,7 +230,7 @@ const completeEvent = () => {
                 <Link v-if="event.status === 'published' && !isPastEndTime" :href="route('events.scanner', event.id)">
                     <Button>Check-in</Button>
                 </Link>
-                <Link v-if="event.is_manual" :href="route('events.manage-participants', event.id)">
+                <Link :href="route('events.manage-participants', event.id)">
                     <Button variant="outline">Manage Participants</Button>
                 </Link>
             </div>
