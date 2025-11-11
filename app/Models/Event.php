@@ -228,7 +228,7 @@ class Event extends Model
             return 0;
         }
 
-        return ($this->getCheckedInCount() / $registered) * 100;
+        return round(($this->getCheckedInCount() / $registered) * 100, 2);
     }
 
     // Scopes

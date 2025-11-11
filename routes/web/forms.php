@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Student\FormController as StudentFormController;
 use App\Http\Controllers\FormReviewController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\QueryTicketController;
@@ -41,15 +40,15 @@ Route::middleware(['auth'])->group(function () {
         });
 
         // Review routes
-        Route::prefix('review')->name('review.')->group(function () {
-            Route::get('/', [FormReviewController::class, 'index'])->name('index');
-            Route::get('/{response}', [FormReviewController::class, 'show'])
-                ->middleware('can:review_form')
-                ->name('show');
-            Route::post('/{response}/review', [FormReviewController::class, 'review'])->name('submit');
-            // Route::post('/bulk-review', [FormReviewController::class, 'bulkReview'])->name('bulk');
+        // Route::prefix('review')->name('review.')->group(function () {
+        //     Route::get('/', [FormReviewController::class, 'index'])->name('index');
+        //     Route::get('/{response}', [FormReviewController::class, 'show'])
+        //         ->middleware('can:review_form')
+        //         ->name('show');
+        //     Route::post('/{response}/review', [FormReviewController::class, 'review'])->name('submit');
+        //     // Route::post('/bulk-review', [FormReviewController::class, 'bulkReview'])->name('bulk');
 
-        });
+        // });
         // Query ticket management
         Route::prefix('queries')->name('queries.')->middleware('can:review_form')->group(function () {
             Route::get('/', [QueryTicketController::class, 'index'])->name('index');
