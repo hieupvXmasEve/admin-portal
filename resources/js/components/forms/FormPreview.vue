@@ -161,8 +161,8 @@ const setRating = (questionCode: string, rating: number) => {
                     <div v-for="(question, questionIndex) in questions" :key="questionIndex" class="space-y-2">
                         <!-- Question Label -->
                         <Label>
-                            {{ question.text }}
-                            <span v-if="question.is_required" class="ml-1 text-red-500">*</span>
+                            <span v-html="question.text.replace(/\n/g, '<br>')"></span>
+                            <span v-if="question.is_required" class="text-red-500">*</span>
                         </Label>
                         <p v-if="question.help_text" class="text-muted-foreground text-sm">{{ question.help_text }}</p>
 

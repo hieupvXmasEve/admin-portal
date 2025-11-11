@@ -8,8 +8,10 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Form } from '@/types/forms';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Archive, ArrowLeft, Copy, Edit, MoreHorizontal, Settings, Trash2 } from 'lucide-vue-next';
+import { Archive, ArrowLeft, CheckCircle, Copy, Edit, MoreHorizontal, Settings, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
 
 interface Props {
     form: Form;
@@ -30,28 +32,7 @@ const currentTab = ref('overview');
 const showCloneModal = ref(false);
 
 // Computed
-const currentVersion = computed(() => props.form.current_version || props.form.versions?.[0]);
 const publishedVersion = computed(() => props.form.latest_published_version);
-const allQuestions = computed(() => {
-    const questions = [];
-
-    // Add questions from sections
-    if (currentVersion.value?.sections) {
-        currentVersion.value.sections.forEach((section) => {
-            if (section.questions) {
-                questions.push(...section.questions.map((q) => ({ ...q, section: section.title })));
-            }
-        });
-    }
-
-    // Add standalone questions
-    if (currentVersion.value?.questions) {
-        const standaloneQuestions = currentVersion.value.questions.filter((q) => !q.section_id);
-        questions.push(...standaloneQuestions.map((q) => ({ ...q, section: null })));
-    }
-
-    return questions.sort((a, b) => a.order_index - b.order_index);
-});
 
 // Computed for published version questions
 const publishedQuestions = computed(() => {
@@ -129,11 +110,68 @@ const handleAction = (action: string) => {
             break;
         case 'archive':
             if (confirm('Are you sure you want to archive this form?')) {
-                router.post(route('forms.admin.archive', props.form.id));
+                router.post(
+                    route('forms.admin.archive', props.form.id),
+                    {},
+                    {
+                        onSuccess: (page) => {
+                            const flash = (page.props as any).flash;
+                            if (flash?.success) {
+                                toast.success(flash.success);
+                            } else if (flash?.error) {
+                                toast.error(flash.error);
+                            }
+                        },
+                        onError: (errors) => {
+                            const errorMessages = Object.values(errors || {}) as string[];
+                            const errorMessage = errorMessages[0] || 'Failed to archive form';
+                            toast.error(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
+                        },
+                    },
+                );
             }
             break;
+        case 'activate':
+            router.post(
+                route('forms.admin.activate', props.form.id),
+                {},
+                {
+                    onSuccess: (page) => {
+                        const flash = (page.props as any).flash;
+                        if (flash?.success) {
+                            toast.success(flash.success);
+                        } else if (flash?.error) {
+                            toast.error(flash.error);
+                        }
+                    },
+                    onError: (errors) => {
+                        const errorMessages = Object.values(errors || {}) as string[];
+                        const errorMessage = errorMessages[0] || 'Failed to activate form';
+                        toast.error(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
+                    },
+                },
+            );
+            break;
         case 'restore':
-            router.post(route('forms.admin.restore', props.form.id));
+            router.post(
+                route('forms.admin.restore', props.form.id),
+                {},
+                {
+                    onSuccess: (page) => {
+                        const flash = (page.props as any).flash;
+                        if (flash?.success) {
+                            toast.success(flash.success);
+                        } else if (flash?.error) {
+                            toast.error(flash.error);
+                        }
+                    },
+                    onError: (errors) => {
+                        const errorMessages = Object.values(errors || {}) as string[];
+                        const errorMessage = errorMessages[0] || 'Failed to restore form';
+                        toast.error(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
+                    },
+                },
+            );
             break;
         case 'delete':
             if (confirm('Are you sure you want to delete this form? This action cannot be undone.')) {
@@ -170,6 +208,10 @@ const publishVersion = (versionId: number) => {
                 </div>
             </div>
             <div class="flex space-x-2">
+                <Button v-if="form.status !== 'active'" @click="handleAction('activate')">
+                    <CheckCircle class="mr-2 h-4 w-4" />
+                    Activate Form
+                </Button>
                 <Link :href="route('forms.admin.edit', form.id)">
                     <Button>
                         <Edit class="mr-2 h-4 w-4" />
@@ -574,7 +616,7 @@ const publishVersion = (versionId: number) => {
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-sm">Latest Version</span>
-                            <span class="text-muted-foreground text-sm">v{{ form.latest_version || 1 }}</span>
+                            <span class="text-muted-foreground text-sm">v{{ form?.latest_published_version?.version_no || 1 }}</span>
                         </div>
                     </CardContent>
                 </Card>

@@ -176,9 +176,9 @@ const moveQuestion = (questionIndex: number, direction: 'up' | 'down', sectionIn
                 <p class="text-muted-foreground text-sm">Build your form with sections and questions</p>
             </div>
             <div class="flex items-center space-x-2">
-<!--                <Button variant="outline" size="sm" @click="showSections = !showSections">-->
-<!--                    {{ showSections ? 'Use Simple Structure' : 'Use Sections' }}-->
-<!--                </Button>-->
+                <!--                <Button variant="outline" size="sm" @click="showSections = !showSections">-->
+                <!--                    {{ showSections ? 'Use Simple Structure' : 'Use Sections' }}-->
+                <!--                </Button>-->
                 <Button v-if="showSections" size="sm" @click="addSection">
                     <Plus class="mr-2 h-4 w-4" />
                     Add Section
@@ -365,7 +365,7 @@ const moveQuestion = (questionIndex: number, direction: 'up' | 'down', sectionIn
 
                 <div class="space-y-2">
                     <Label>Help Text (Optional)</Label>
-                    <Input v-model="question.help_text" placeholder="Additional help or instructions" />
+                    <Textarea v-model="question.help_text" placeholder="Additional help or instructions" />
                 </div>
 
                 <div class="flex items-center space-x-2">
