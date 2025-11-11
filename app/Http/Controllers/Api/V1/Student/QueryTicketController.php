@@ -71,6 +71,7 @@ class QueryTicketController extends Controller
                     'form.latestPublishedVersion.sections.questions.options',
                     'campus',
                     'answers.question',
+                    'answers.selectedOptions',
                     'answers.attachments',
                     'attachments',
                 ]);

@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Form } from '@/types/forms';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { Archive, ArrowLeft, Copy, Edit, Eye, MoreHorizontal, Settings, Trash2 } from 'lucide-vue-next';
+import { Archive, ArrowLeft, Copy, Edit, MoreHorizontal, Settings, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface Props {
@@ -317,12 +317,8 @@ const publishVersion = (versionId: number) => {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Form Structure</CardTitle>
-                                <CardDescription v-if="publishedVersion">
-                                    Published version: {{ publishedVersion.version_no }}
-                                </CardDescription>
-                                <CardDescription v-else class="text-amber-600">
-                                    No published version available
-                                </CardDescription>
+                                <CardDescription v-if="publishedVersion"> Published version: {{ publishedVersion.version_no }} </CardDescription>
+                                <CardDescription v-else class="text-amber-600"> No published version available </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div v-if="publishedVersion" class="space-y-6">
@@ -375,7 +371,7 @@ const publishVersion = (versionId: number) => {
                                         <p class="text-lg font-medium">No Published Version Available</p>
                                         <p class="text-sm">This form does not have a published version yet.</p>
                                     </div>
-                                    <div class="text-muted-foreground text-sm space-y-1">
+                                    <div class="text-muted-foreground space-y-1 text-sm">
                                         <p>To see the form structure, you need to publish a version first.</p>
                                         <p>Go to the <strong>Versions</strong> tab to publish a version.</p>
                                     </div>
@@ -535,7 +531,7 @@ const publishVersion = (versionId: number) => {
 
             <!-- Sidebar -->
             <div class="lg:col-span-1">
-                <Card>
+                <!-- <Card>
                     <CardHeader>
                         <CardTitle>Quick Actions</CardTitle>
                     </CardHeader>
@@ -557,7 +553,7 @@ const publishVersion = (versionId: number) => {
                             </Button>
                         </Link>
                     </CardContent>
-                </Card>
+                </Card> -->
 
                 <Card class="mt-4">
                     <CardHeader>

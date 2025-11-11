@@ -20,6 +20,7 @@ class OptionResource extends JsonResource
             'label' => $this->label,
             'order_index' => $this->order_index,
             'allows_free_text' => $this->allows_free_text,
+            'free_text' => $this->when(optional($this->pivot)->free_text !== null, optional($this->pivot)->free_text),
         ];
     }
 }

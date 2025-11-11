@@ -78,6 +78,7 @@ class QueryTicketController extends Controller
                     'campus',
                     'student',
                     'answers.question',
+                    'answers.selectedOptions',
                     'answers.attachments',
                     'attachments',
                 ]);

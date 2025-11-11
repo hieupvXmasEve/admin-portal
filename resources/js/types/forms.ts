@@ -75,6 +75,7 @@ export interface Option {
     label: string;
     order_index: number;
     allows_free_text: boolean;
+    free_text?: string;
 }
 
 export interface FormTarget {
@@ -145,6 +146,7 @@ export interface Answer {
     id: number;
     response_id: number;
     question_id: number;
+    question?: Question;
     answer_text?: string;
     answer_number?: number;
     answer_date?: string;

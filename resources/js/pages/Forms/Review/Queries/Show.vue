@@ -242,21 +242,53 @@ const backToList = () => {
         <Card>
             <CardHeader>
                 <CardTitle>Original Submission</CardTitle>
-                <CardDescription>{{ ticket.response?.form?.title }}</CardDescription>
+                <CardDescription>
+                    <div class="space-y-1">
+                        <div class="font-medium">{{ ticket.response?.form?.title }}</div>
+                        <div v-if="ticket.response?.form?.type" class="text-xs">
+                            Form Type: <span class="uppercase">{{ ticket.response.form.type }}</span>
+                        </div>
+                    </div>
+                </CardDescription>
             </CardHeader>
             <CardContent class="space-y-6">
-                <div v-for="answer in orderedAnswers" :key="answer.id" class="space-y-2">
-                    <div class="font-medium">Response #{{ answer.id }}</div>
-                    <p class="text-muted-foreground text-sm whitespace-pre-wrap">{{ answer.answer_text || answer.formatted_value || '—' }}</p>
-                    <div v-if="answer.attachments && answer.attachments.length" class="space-y-1">
-                        <div class="text-muted-foreground text-xs tracking-wide uppercase">Attachments</div>
-                        <ul class="space-y-1 text-sm">
-                            <li v-for="attachment in answer.attachments" :key="attachment.id">
-                                <a :href="attachment.download_url" class="text-primary hover:underline" target="_blank" rel="noopener">
-                                    {{ attachment.file_name }}
-                                </a>
-                            </li>
-                        </ul>
+                <div v-for="(answer, index) in orderedAnswers" :key="answer.id" class="space-y-3">
+                    <div v-if="index > 0" class="my-4">
+                        <Separator />
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="text-muted-foreground mb-1 text-xs tracking-wide uppercase">Question</div>
+                            <div class="text-sm font-medium" v-html="answer.question?.text.replace(/\n/g, '<br>') || `Question #${answer.question_id}`"></div>
+                            <div v-if="answer.question?.code" class="text-muted-foreground mt-1 text-xs">Code: {{ answer.question.code }}</div>
+                        </div>
+                        <div>
+                            <div class="text-muted-foreground mb-1 text-xs tracking-wide uppercase">Answer</div>
+                            <!-- <div v-if="answer.answer_text || answer.formatted_value" class="text-sm whitespace-pre-wrap">
+                                {{ answer.answer_text || answer.formatted_value }}
+                            </div> -->
+                            <div v-if="answer.selected_options && answer.selected_options.length" class="space-y-2">
+                                <ul class="space-y-2 text-sm">
+                                    <li v-for="option in answer.selected_options" :key="option.id" class="space-y-1">
+                                        <div class="font-medium">{{ option.label }}</div>
+                                        <div v-if="option.free_text" class="text-muted-foreground pl-4 italic">
+                                            {{ option.free_text }}
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div v-if="!answer.answer_text && !answer.formatted_value && (!answer.selected_options || !answer.selected_options.length)" class="text-muted-foreground text-sm italic">No answer provided</div>
+                        </div>
+                        <div v-if="answer.attachments && answer.attachments.length" class="space-y-1">
+                            <div class="text-muted-foreground text-xs tracking-wide uppercase">Attachments</div>
+                            <ul class="space-y-1 text-sm">
+                                <li v-for="attachment in answer.attachments" :key="attachment.id">
+                                    <a :href="attachment.download_url" class="text-primary hover:underline" target="_blank" rel="noopener">
+                                        {{ attachment.file_name }}
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
