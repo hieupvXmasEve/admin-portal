@@ -201,6 +201,9 @@ Route::middleware([
         // Form endpoints
         Route::prefix('forms')->name('forms.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'index'])->name('index');
+            Route::prefix('query')->name('query.')->group(function () {
+                Route::get('/last', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'last'])->name('last');
+            });
             Route::get('/{form}', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'show'])->name('show');
             Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
         });

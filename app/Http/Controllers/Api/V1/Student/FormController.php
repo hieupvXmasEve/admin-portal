@@ -61,6 +61,69 @@ class FormController extends Controller
     }
 
     /**
+     * Get the last available query form for authenticated student.
+     */
+    public function last(Request $request): JsonResponse
+    {
+        $request->validate([
+            'campus_id' => ['nullable', 'exists:campuses,id'],
+        ]);
+
+        // Get authenticated student
+        $student = $request->user();
+
+        if (!$student->isActive()) {
+            return ApiResponse::authorizationError('Student account is not active. Please contact administration.');
+        }
+
+        // Get student's campus (from request or student's default campus)
+        $campusId = $request->input('campus_id', $student->campus_id);
+        $campus = Campus::find($campusId);
+
+        if (!$campus) {
+            return ApiResponse::notFound('Campus not found');
+        }
+
+        // Get available forms filtered by type 'query' (default)
+        $forms = $this->formService->getAvailableFormsForStudent($student, $campus)
+            ->filter(function ($form) {
+                return $form->type === 'query';
+            });
+
+        // Sort by created_at descending and get the first one (latest)
+        $form = $forms->sortByDesc('created_at')->first();
+
+        if (!$form) {
+            return ApiResponse::success(
+                null,
+                [],
+                'No form found.'
+            );
+        }
+
+        // Load form with necessary relationships (same as show method)
+        $form->load([
+            'latestPublishedVersion.sections.questions.options',
+            'latestPublishedVersion.questions.options',
+            'targets' => function ($query) use ($campus) {
+                $query->where(function ($q) use ($campus) {
+                    $q->whereNull('campus_id')
+                        ->orWhere('campus_id', $campus->id);
+                });
+            },
+        ]);
+
+        // Check if student can still submit
+        $canSubmit = $this->formService->canStudentSubmitForm($student, $form, $campus);
+
+        return ApiResponse::success(
+            new FormDetailResource($form),
+            [],
+            'Last form retrieved successfully.'
+        );
+    }
+
+    /**
      * Display the specified form for student.
      */
     public function show(Form $form, Request $request): JsonResponse

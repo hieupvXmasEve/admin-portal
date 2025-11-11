@@ -197,9 +197,8 @@ if (props.form.current_version?.questions) {
             <!-- Main Content -->
             <div class="lg:col-span-3">
                 <Tabs v-model:default-value="currentTab" class="w-full">
-                    <TabsList class="grid w-full grid-cols-4">
+                    <TabsList class="grid w-full grid-cols-3">
                         <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                        <TabsTrigger value="questions">Questions</TabsTrigger>
                         <TabsTrigger value="visibility">Visibility</TabsTrigger>
                         <TabsTrigger value="targeting">Targeting</TabsTrigger>
                     </TabsList>
@@ -268,10 +267,6 @@ if (props.form.current_version?.questions) {
                                 </div>
                             </CardContent>
                         </Card>
-                    </TabsContent>
-
-                    <!-- Questions Tab -->
-                    <TabsContent value="questions" class="space-y-6">
                         <Card>
                             <CardHeader>
                                 <CardTitle class="flex items-center justify-between">

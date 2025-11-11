@@ -62,7 +62,7 @@ class FormService
 
         // If form has no targets, allow unlimited submissions
         $targetsCount = $form->targets()->count();
-        
+
         if ($targetsCount === 0) {
             // For forms without targets, allow unlimited submissions
             return true;
@@ -312,8 +312,14 @@ class FormService
 
             // If structure is being updated, create new version
             if (isset($data['sections']) || isset($data['questions'])) {
+                // Unpublish all existing versions to ensure only one version is published
+                $form->versions()
+                    ->where('is_published', true)
+                    ->update(['is_published' => false]);
+
+                // Create new version and publish it
                 $newVersion = $this->createFormVersion($form, [
-                    'is_published' => false,
+                    'is_published' => true,
                     'effective_from' => $data['effective_from'] ?? now(),
                     'effective_to' => $data['effective_to'] ?? null,
                 ]);
@@ -407,7 +413,7 @@ class FormService
         ]);
 
         // Apply filters
-        if (isset($filters['type']) && $filters['type'] !== 'all' ) {
+        if (isset($filters['type']) && $filters['type'] !== 'all') {
             $query->where('type', $filters['type']);
         }
 

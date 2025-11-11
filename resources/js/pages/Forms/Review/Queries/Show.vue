@@ -264,13 +264,13 @@ const backToList = () => {
                         </div>
                         <div>
                             <div class="text-muted-foreground mb-1 text-xs tracking-wide uppercase">Answer</div>
-                            <!-- <div v-if="answer.answer_text || answer.formatted_value" class="text-sm whitespace-pre-wrap">
+                            <div v-if="answer.answer_text || answer.formatted_value" class="text-sm whitespace-pre-wrap">
                                 {{ answer.answer_text || answer.formatted_value }}
-                            </div> -->
+                            </div>
                             <div v-if="answer.selected_options && answer.selected_options.length" class="space-y-2">
                                 <ul class="space-y-2 text-sm">
                                     <li v-for="option in answer.selected_options" :key="option.id" class="space-y-1">
-                                        <div class="font-medium">{{ option.label }}</div>
+                                        <!-- <div class="font-medium">{{ option.label }}</div> -->
                                         <div v-if="option.free_text" class="text-muted-foreground pl-4 italic">
                                             {{ option.free_text }}
                                         </div>

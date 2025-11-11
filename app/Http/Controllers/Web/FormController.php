@@ -181,35 +181,17 @@ class FormController extends Controller
      */
     public function clone(Request $request, Form $form)
     {
-        // Debug logging
-        \Log::info('Form clone request started', [
-            'form_id' => $form->id,
-            'request_data' => $request->all(),
-            'request_method' => $request->method(),
-            'request_headers' => $request->headers->all(),
-            'user_id' => auth()->id(),
-        ]);
-
         // Check if the request has the expected parameters
         $code = $request->input('new_code') ?: $request->input('code');
         $title = $request->input('new_title') ?: $request->input('title');
-        $description = $request->input('new_description');
-
-        \Log::info('Form clone parameters', [
-            'code' => $code,
-            'title' => $title,
-            'description' => $description,
-        ]);
 
         // Validate the parameters
-        $validatedData = $request->validate([
+        $request->validate([
             'code' => $code ? [] : ['required', 'string', 'max:100', 'unique:forms,code'],
             'title' => $title ? [] : ['required', 'string', 'max:255'],
             'new_code' => $code ? ['required', 'string', 'max:100', 'unique:forms,code'] : [],
             'new_title' => $title ? ['required', 'string', 'max:255'] : [],
         ]);
-
-        \Log::info('Form clone validation passed', ['validated_data' => $validatedData]);
 
         try {
             $clonedForm = $this->formService->cloneForm(
@@ -217,12 +199,6 @@ class FormController extends Controller
                 $code,
                 $title
             );
-
-            \Log::info('Form cloned successfully', [
-                'original_form_id' => $form->id,
-                'cloned_form_id' => $clonedForm->id,
-                'cloned_form_code' => $clonedForm->code,
-            ]);
 
             return redirect()
                 ->route('forms.admin.show', $clonedForm)
@@ -233,7 +209,7 @@ class FormController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return back()->withErrors(['error' => 'Failed to clone form: ' . $e->getMessage()]);
         }
     }
@@ -284,6 +260,19 @@ class FormController extends Controller
             return back()->with('success', 'Form restored successfully.');
         } catch (\Exception $e) {
             return back()->withErrors(['error' => 'Failed to restore form: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Activate the specified form.
+     */
+    public function activate(Form $form)
+    {
+        try {
+            $form->update(['status' => 'active']);
+            return back()->with('success', 'Form activated successfully.');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Failed to activate form: ' . $e->getMessage()]);
         }
     }
 

@@ -29,6 +29,7 @@ Route::middleware(['auth'])->group(function () {
 
             // Form actions
             Route::post('/{form}/clone', [FormController::class, 'clone'])->name('clone');
+            Route::post('/{form}/activate', [FormController::class, 'activate'])->name('activate');
             Route::post('/{form}/archive', [FormController::class, 'archive'])->name('archive');
             Route::post('/{form}/restore', [FormController::class, 'restore'])->name('restore');
 
