@@ -248,6 +248,82 @@ class EventParticipationService
     }
 
     /**
+     * Award gold reward to a participant with bonus amount.
+     */
+    public function awardGoldRewardWithBonus(EventParticipant $participant, float $bonusGoldAmount, ?string $description = null): bool
+    {
+        return DB::transaction(function () use ($participant, $bonusGoldAmount, $description) {
+            // Enhanced validation for gold reward eligibility
+            $this->validateGoldRewardEligibility($participant);
+
+            $event = $participant->event;
+            $student = $participant->student;
+            $baseGoldAmount = (float) $event->gold_reward_amount;
+            $totalGoldAmount = $baseGoldAmount + $bonusGoldAmount;
+
+            if ($totalGoldAmount <= 0) {
+                return false;
+            }
+
+            if ($bonusGoldAmount < 0) {
+                throw new InvalidArgumentException('Bonus gold amount cannot be negative');
+            }
+
+            try {
+                // Build notes with description appended if provided
+                $notes = "Gold reward for attending event: {$event->title}";
+                if ($bonusGoldAmount > 0) {
+                    $notes .= " (Base: {$baseGoldAmount}, Bonus: {$bonusGoldAmount})";
+                }
+                if ($description !== null && trim($description) !== '') {
+                    $notes .= '. ' . trim($description);
+                }
+
+                // Award total gold (base + bonus) through wallet service
+                $transaction = $this->GoldService->addGold(
+                    $student,
+                    $totalGoldAmount,
+                    GoldTransaction::SOURCE_EVENT,
+                    $event->id,
+                    $notes
+                );
+
+                // Update participant record
+                $participant->update([
+                    'gold_awarded' => true,
+                    'awarded_at' => now()
+                ]);
+
+                // Send reward notification with total amount
+                $this->notificationService->sendGoldRewardNotification($student, $totalGoldAmount, $event);
+
+                // Enhanced audit logging
+                $this->logGoldRewardAudit($participant, $transaction, 'awarded', [
+                    'base_amount' => $baseGoldAmount,
+                    'bonus_amount' => $bonusGoldAmount,
+                    'total_amount' => $totalGoldAmount,
+                    'description' => $description
+                ]);
+
+                return true;
+            } catch (\Exception $e) {
+                Log::error('Failed to award gold reward with bonus', [
+                    'participant_id' => $participant->id,
+                    'event_id' => $event->id,
+                    'student_id' => $student->id,
+                    'base_amount' => $baseGoldAmount,
+                    'bonus_amount' => $bonusGoldAmount,
+                    'total_amount' => $totalGoldAmount,
+                    'error' => $e->getMessage(),
+                    'stack_trace' => $e->getTraceAsString()
+                ]);
+
+                throw new InvalidArgumentException('Failed to award gold reward with bonus: ' . $e->getMessage());
+            }
+        });
+    }
+
+    /**
      * Validate if participant is eligible for gold reward.
      */
     private function validateGoldRewardEligibility(EventParticipant $participant): void
@@ -291,7 +367,7 @@ class EventParticipationService
     /**
      * Enhanced audit logging for gold rewards.
      */
-    private function logGoldRewardAudit(EventParticipant $participant, GoldTransaction $transaction, string $action): void
+    private function logGoldRewardAudit(EventParticipant $participant, GoldTransaction $transaction, string $action, array $metadata = []): void
     {
         $auditData = [
             'action' => $action,
@@ -308,6 +384,11 @@ class EventParticipationService
             'campus_id' => $participant->event->campus_id,
             'timestamp' => now()->toISOString()
         ];
+
+        // Merge additional metadata if provided
+        if (!empty($metadata)) {
+            $auditData = array_merge($auditData, $metadata);
+        }
 
         Log::info("Gold reward {$action}", $auditData);
 
@@ -850,7 +931,9 @@ class EventParticipationService
         Event $event,
         array $studentIds,
         string $status = 'completed',
-        ?User $addedBy = null
+        ?User $addedBy = null,
+        ?float $bonusGoldAmount = null,
+        ?string $description = null
     ): array {
         // if (!$event->isManual()) {
         //     throw new InvalidArgumentException('Can only add manual participants to manual events');
@@ -862,7 +945,7 @@ class EventParticipationService
             'errors' => []
         ];
 
-        return DB::transaction(function () use ($event, $studentIds, $status, $addedBy, $results) {
+        return DB::transaction(function () use ($event, $studentIds, $status, $addedBy, $bonusGoldAmount, $description, $results) {
             foreach ($studentIds as $studentId) {
                 try {
                     // Validate student exists and belongs to same campus
@@ -904,14 +987,23 @@ class EventParticipationService
 
                     // If status is completed, award gold immediately
                     if ($status === 'completed' && $event->gold_reward_amount > 0) {
-                        $this->awardGoldReward($participant);
+                        if ($bonusGoldAmount !== null && $bonusGoldAmount > 0) {
+                            $this->awardGoldRewardWithBonus($participant, $bonusGoldAmount, $description);
+                        } else {
+                            $this->awardGoldReward($participant);
+                        }
                     }
+
+                    $totalGold = $status === 'completed' && $event->gold_reward_amount > 0
+                        ? (float) $event->gold_reward_amount + ($bonusGoldAmount ?? 0)
+                        : null;
 
                     $results['added'][] = [
                         'student_id' => $studentId,
                         'student_name' => $student->full_name,
                         'status' => $status,
-                        'gold_awarded' => $status === 'completed' && $event->gold_reward_amount > 0
+                        'gold_awarded' => $status === 'completed' && $event->gold_reward_amount > 0,
+                        'total_gold_amount' => $totalGold
                     ];
 
                     // Log the manual addition
@@ -920,7 +1012,10 @@ class EventParticipationService
                         'student_id' => $student->id,
                         'status' => $status,
                         'added_by' => $addedBy?->id,
-                        'gold_awarded' => $status === 'completed' && $event->gold_reward_amount > 0
+                        'gold_awarded' => $status === 'completed' && $event->gold_reward_amount > 0,
+                        'bonus_gold_amount' => $bonusGoldAmount,
+                        'total_gold_amount' => $totalGold,
+                        'description' => $description
                     ]);
                 } catch (\Exception $e) {
                     $results['errors'][] = [
@@ -1290,9 +1385,10 @@ class EventParticipationService
                         "Gold reward for attending event: {$event->title}"
                     );
 
-                    // Update participant record
+                    // Update participant record with gold amount
                     $participant->update([
                         'gold_awarded' => true,
+                        'gold_amount' => $goldAmount,
                         'awarded_at' => now()
                     ]);
 

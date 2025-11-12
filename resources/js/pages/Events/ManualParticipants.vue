@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
 import type { StudentEligibilityInfo } from '@/types/models';
@@ -130,6 +131,8 @@ const showBulkUpdateDialog = ref(false);
 const showRemoveDialog = ref(false);
 const addStatus = ref('completed');
 const bulkUpdateStatus = ref('completed');
+const bonusGoldAmount = ref<number | null>(null);
+const description = ref<string>('');
 
 // Statistics
 const statistics = ref({
@@ -377,16 +380,41 @@ const addParticipants = async () => {
         return;
     }
 
+    // Validate bonus amount if status is completed_with_bonus
+    if (addStatus.value === 'completed_with_bonus') {
+        if (bonusGoldAmount.value === null || bonusGoldAmount.value < 0) {
+            toast.error('Please enter a valid bonus gold amount');
+            return;
+        }
+    }
+
     isAddingParticipants.value = true;
     try {
-        const response = await api.post(route('api.admin.events.manual-participants.add', props.event.id), {
+        const requestData: {
+            student_ids: number[];
+            status: string;
+            bonus_gold_amount?: number;
+            description?: string;
+        } = {
             student_ids: studentDatabaseIds,
-            status: addStatus.value,
-        });
+            status: addStatus.value === 'completed_with_bonus' ? 'completed' : addStatus.value,
+        };
+
+        if (addStatus.value === 'completed_with_bonus' && bonusGoldAmount.value !== null && bonusGoldAmount.value !== undefined) {
+            requestData.bonus_gold_amount = bonusGoldAmount.value;
+        }
+
+        if (addStatus.value === 'completed_with_bonus' && description.value.trim() !== '') {
+            requestData.description = description.value.trim();
+        }
+
+        const response = await api.post(route('api.admin.events.manual-participants.add', props.event.id), requestData);
 
         if (response.data?.value?.success) {
             const data = response.data.value.data;
             showAddDialog.value = false;
+            bonusGoldAmount.value = null;
+            description.value = '';
             toast.success(response.data.value.message || `Added ${data.added.length} participants`);
 
             await searchStudents(searchInput.value);
@@ -688,7 +716,7 @@ onMounted(() => {
                                                     v-if="student.exists && student.is_eligible && !student.is_already_registered"
                                                     :id="`student-${student.student_id}`"
                                                     :model-value="selectedStudentIds.has(student.student_id)"
-                                                    @update:model-value="(value: boolean) => toggleStudentSelection(student.student_id, value)"
+                                                    @update:model-value="(value: boolean | 'indeterminate') => toggleStudentSelection(student.student_id, value === true)"
                                                     :disabled="isAddingParticipants"
                                                 />
                                                 <div v-else class="h-4 w-4"></div>
@@ -818,7 +846,19 @@ onMounted(() => {
         </Tabs>
 
         <!-- Add Participants Dialog -->
-        <Dialog :open="showAddDialog" @update:open="showAddDialog = $event">
+        <Dialog
+            :open="showAddDialog"
+            @update:open="
+                (value) => {
+                    showAddDialog = value;
+                    if (!value) {
+                        bonusGoldAmount = null;
+                        description = '';
+                        addStatus = 'completed';
+                    }
+                }
+            "
+        >
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Add Participants</DialogTitle>
@@ -834,16 +874,46 @@ onMounted(() => {
                             <SelectContent>
                                 <SelectItem value="registered">Registered</SelectItem>
                                 <SelectItem value="completed">Completed (with gold reward)</SelectItem>
+                                <SelectItem value="completed_with_bonus">Completed (with gold + bonus)</SelectItem>
                             </SelectContent>
                         </Select>
                         <p class="mt-1 text-sm text-gray-500">
                             <span v-if="addStatus === 'completed'"> Students will be marked as completed and receive {{ event.gold_reward_amount }} gold immediately. </span>
+                            <span v-else-if="addStatus === 'completed_with_bonus'"> Students will be marked as completed and receive {{ event.gold_reward_amount }} gold plus bonus amount. </span>
                             <span v-else> Students will be registered but not receive gold until marked as completed. </span>
                         </p>
                     </div>
+                    <div v-if="addStatus === 'completed_with_bonus'">
+                        <Label for="bonus-gold">Bonus Gold Amount</Label>
+                        <Input
+                            id="bonus-gold"
+                            :model-value="bonusGoldAmount ?? undefined"
+                            @update:model-value="(value: string | number | undefined) => (bonusGoldAmount = value === undefined || value === '' ? null : Number(value))"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Enter bonus gold amount"
+                        />
+                        <p class="mt-1 text-sm text-gray-500">
+                            Total gold per student: {{ event.gold_reward_amount }} (base) + {{ bonusGoldAmount || 0 }} (bonus) = {{ (parseFloat(event.gold_reward_amount?.toString() || '0') + (bonusGoldAmount || 0)).toFixed(2) }}
+                        </p>
+                    </div>
+                    <div v-if="addStatus === 'completed_with_bonus'">
+                        <Label for="description">Description</Label>
+                        <Textarea id="description" v-model="description" placeholder="Enter description (optional)" :rows="3" />
+                        <p class="mt-1 text-sm text-gray-500">This description will be appended to the gold transaction notes.</p>
+                    </div>
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" @click="showAddDialog = false">Cancel</Button>
+                    <Button
+                        variant="outline"
+                        @click="
+                            showAddDialog = false;
+                            bonusGoldAmount = null;
+                            description = '';
+                        "
+                        >Cancel</Button
+                    >
                     <Button @click="addParticipants" :disabled="!canAddParticipants">
                         <Loader2 v-if="isAddingParticipants" class="mr-2 h-4 w-4 animate-spin" />
                         <span>Add Participants</span>

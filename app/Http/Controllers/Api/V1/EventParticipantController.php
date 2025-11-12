@@ -110,6 +110,8 @@ class EventParticipantController extends Controller
             'student_ids' => 'required|array|min:1|max:100',
             'student_ids.*' => 'required|integer|exists:students,id',
             'status' => 'required|in:registered,completed',
+            'bonus_gold_amount' => 'nullable|numeric|min:0|max:999999.99',
+            'description' => 'nullable|string|max:500',
         ]);
 
         try {
@@ -117,7 +119,9 @@ class EventParticipantController extends Controller
                 $event,
                 $request->student_ids,
                 $request->status,
-                $request->user()
+                $request->user(),
+                $request->bonus_gold_amount,
+                $request->description
             );
 
             return response()->json([
