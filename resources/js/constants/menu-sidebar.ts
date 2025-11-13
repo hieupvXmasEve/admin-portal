@@ -345,13 +345,13 @@ export const mainNavItems: NavItem[] = [
                 title: 'Survey List',
                 href: '/surveys',
                 icon: ClipboardCheck,
-                requiredPermissions: ['view_form'], // Will be implemented later
+                requiredPermissions: ['view_survey'], // Will be implemented later
             },
             {
                 title: 'Settings',
                 href: '/surveys/settings',
                 icon: Settings2,
-                requiredPermissions: ['view_form'], // Will be implemented later
+                requiredPermissions: ['edit_survey'], // Will be implemented later
             },
         ],
     },

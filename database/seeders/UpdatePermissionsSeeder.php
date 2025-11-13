@@ -11,22 +11,25 @@ class UpdatePermissionsSeeder extends Seeder
 {
     /**
      * Run the database seeds.
-     * This seeder updates the permissions table from the config file
+     * This seeder syncs the permissions table with the config file
      * and ensures the super_admin has all permissions.
      *
-     * This is non-destructive and can be run multiple times.
+     * This will create new, update existing, and DELETE orphaned permissions.
      */
     public function run(): void
     {
-        $this->command->info('🔄 Updating permissions from config...');
+        $this->command->info('🔄 Syncing permissions from config...');
 
         // Create or update permissions from the configuration file.
         $this->createOrUpdatePermissions();
 
+        // Delete permissions that exist in DB but not in config.
+        $this->deleteOrphanedPermissions();
+
         // Assign all available permissions to the Super Admin role.
         $this->assignAllPermissionsToSuperAdmin();
 
-        $this->command->info('✅ Permissions updated successfully!');
+        $this->command->info('✅ Permissions synced successfully!');
     }
 
     /**
@@ -61,6 +64,40 @@ class UpdatePermissionsSeeder extends Seeder
         } else {
             $this->command->info('✨ All permissions are already up-to-date.');
         }
+    }
+
+    /**
+     * Deletes permissions that exist in the database but not in the config file.
+     */
+    private function deleteOrphanedPermissions(): void
+    {
+        $permissionConfig = config('permission.access');
+        $configCodes = [];
+
+        foreach ($permissionConfig as $module => $actions) {
+            foreach ($actions as $actionName => $code) {
+                $configCodes[] = $code;
+            }
+        }
+
+        $orphanedPermissions = Permission::whereNotIn('code', $configCodes)->get();
+
+        if ($orphanedPermissions->isEmpty()) {
+            $this->command->info('✨ No orphaned permissions to delete.');
+
+            return;
+        }
+
+        $deletedCount = 0;
+        foreach ($orphanedPermissions as $permission) {
+            $this->command->line("  → Deleting orphaned permission: <comment>{$permission->code}</comment>");
+            // Detach from all roles first (removes entries from role_permissions pivot table)
+            $permission->roles()->detach();
+            $permission->delete();
+            $deletedCount++;
+        }
+
+        $this->command->info("🗑️  Deleted {$deletedCount} orphaned permissions.");
     }
 
     /**
