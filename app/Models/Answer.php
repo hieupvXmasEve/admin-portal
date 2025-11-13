@@ -23,7 +23,7 @@ class Answer extends Model
     ];
 
     protected $casts = [
-        'answer_number' => 'decimal:4',
+        'answer_number' => 'decimal:1',
         'answer_date' => 'date',
     ];
 

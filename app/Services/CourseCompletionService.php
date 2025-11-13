@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Log;
 class CourseCompletionService
 {
     public function __construct(
-        protected EgcLevelProgressionService $egcService
+        protected EgcLevelProgressionService $egcService,
+        protected CourseSurveyService $courseSurveyService
     ) {}
 
     /**
@@ -36,7 +37,10 @@ class CourseCompletionService
         // 4. Process EGC level progression if applicable
         $egcResult = $this->egcService->processEgcProgression($courseOffering);
 
-        // 5. Send notifications to students for non-EGC courses
+        // 5. Automatically attach survey to completed course
+        $this->courseSurveyService->attachSurveyToCompletedCourse($courseOffering);
+
+        // 6. Send notifications to students for non-EGC courses
         // (EGC courses send notifications in EgcLevelProgressionService)
         $nonEgcResult = null;
         if (! $egcResult['processed']) {

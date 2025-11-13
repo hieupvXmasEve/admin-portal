@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Eye, Plus, Save, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, Copy, Eye, Plus, Save, Star, Trash2 } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
+import { route } from 'ziggy-js';
+import type { QuestionType } from '@/types/forms';
 
 interface Props {
     roles: Array<{
@@ -36,7 +38,7 @@ interface Props {
     errors: Record<string, string>;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 // Form data
 const form = useForm({
     code: '',
@@ -50,11 +52,13 @@ const form = useForm({
     sections: [] as Array<{
         title: string;
         description?: string;
+        order_index: number;
         questions: Array<{
             code: string;
             text: string;
-            type: string;
+            type: QuestionType;
             is_required: boolean;
+            order_index: number;
             help_text?: string;
             validation_json?: any;
             visibility_condition_json?: any;
@@ -62,14 +66,16 @@ const form = useForm({
                 value: string;
                 label: string;
                 allows_free_text: boolean;
+                order_index: number;
             }>;
         }>;
     }>,
     questions: [] as Array<{
         code: string;
         text: string;
-        type: string;
+        type: QuestionType;
         is_required: boolean;
+        order_index: number;
         help_text?: string;
         validation_json?: any;
         visibility_condition_json?: any;
@@ -99,6 +105,7 @@ const form = useForm({
 const currentTab = ref('basic');
 const useAdvancedBuilder = ref(false);
 const showPreview = ref(false);
+const useSections = ref(false);
 
 // Computed
 const formTypeOptions = [
@@ -136,8 +143,9 @@ const addBasicQuestion = () => {
     form.questions.push({
         code: `q_${Date.now()}`,
         text: '',
-        type: 'short_text',
+        type: 'short_text' as QuestionType,
         is_required: false,
+        order_index: form.questions.length,
         options: [],
     });
 };
@@ -146,14 +154,39 @@ const removeQuestion = (index: number) => {
     form.questions.splice(index, 1);
 };
 
+const duplicateQuestion = (index: number) => {
+    const question = form.questions[index];
+    const duplicatedQuestion = {
+        ...question,
+        code: `q_${Date.now()}`,
+        order_index: index + 1,
+        options: question.options?.map((opt, optIdx) => ({
+            ...opt,
+            order_index: optIdx,
+        })),
+    };
+    form.questions.splice(index + 1, 0, duplicatedQuestion);
+    // Update order_index for all questions after insertion
+    form.questions.forEach((q, idx) => {
+        q.order_index = idx;
+    });
+};
+
 const addQuestionOption = (questionIndex: number) => {
     if (!form.questions[questionIndex].options) {
         form.questions[questionIndex].options = [];
     }
-    form.questions[questionIndex].options?.push({
+    const options = form.questions[questionIndex].options as Array<{
+        value: string;
+        label: string;
+        allows_free_text: boolean;
+        order_index: number;
+    }>;
+    options.push({
         value: `option_${Date.now()}`,
         label: '',
         allows_free_text: false,
+        order_index: options.length,
     });
 };
 
@@ -162,11 +195,112 @@ const removeQuestionOption = (questionIndex: number, optionIndex: number) => {
 };
 
 const questionNeedsOptions = (type: string) => {
-    return ['single_choice', 'multi_choice', 'likert', 'rating'].includes(type);
+    return ['single_choice', 'multi_choice', 'likert'].includes(type);
+};
+
+// Section management methods
+const addSection = () => {
+    form.sections.push({
+        title: '',
+        description: '',
+        order_index: form.sections.length,
+        questions: [],
+    });
+};
+
+const removeSection = (index: number) => {
+    form.sections.splice(index, 1);
+};
+
+const duplicateSection = (index: number) => {
+    const section = form.sections[index];
+    const duplicatedSection = {
+        ...section,
+        title: `${section.title} (Copy)`,
+        order_index: index + 1,
+        questions: section.questions.map((q, qIdx) => ({
+            ...q,
+            code: `q_${Date.now()}_${qIdx}`,
+            order_index: qIdx,
+            options: q.options?.map((opt, optIdx) => ({
+                ...opt,
+                order_index: optIdx,
+            })),
+        })),
+    };
+    form.sections.splice(index + 1, 0, duplicatedSection);
+    // Update order_index for all sections after insertion
+    form.sections.forEach((sec, idx) => {
+        sec.order_index = idx;
+    });
+};
+
+const addQuestionToSection = (sectionIndex: number) => {
+    if (!form.sections[sectionIndex].questions) {
+        form.sections[sectionIndex].questions = [];
+    }
+    form.sections[sectionIndex].questions.push({
+        code: `q_${Date.now()}`,
+        text: '',
+        type: 'short_text' as QuestionType,
+        is_required: false,
+        order_index: form.sections[sectionIndex].questions.length,
+        options: [],
+    });
+};
+
+const removeQuestionFromSection = (sectionIndex: number, questionIndex: number) => {
+    form.sections[sectionIndex].questions.splice(questionIndex, 1);
+};
+
+const duplicateQuestionInSection = (sectionIndex: number, questionIndex: number) => {
+    const question = form.sections[sectionIndex].questions[questionIndex];
+    const duplicatedQuestion = {
+        ...question,
+        code: `q_${Date.now()}`,
+        order_index: questionIndex + 1,
+        options: question.options?.map((opt, optIdx) => ({
+            ...opt,
+            order_index: optIdx,
+        })),
+    };
+    form.sections[sectionIndex].questions.splice(questionIndex + 1, 0, duplicatedQuestion);
+    // Update order_index for all questions in this section after insertion
+    form.sections[sectionIndex].questions.forEach((q, idx) => {
+        q.order_index = idx;
+    });
+};
+
+const addQuestionOptionToSection = (sectionIndex: number, questionIndex: number) => {
+    const question = form.sections[sectionIndex].questions[questionIndex];
+    if (!question.options) {
+        question.options = [];
+    }
+    question.options.push({
+        value: `option_${Date.now()}`,
+        label: '',
+        allows_free_text: false,
+        order_index: question.options.length,
+    });
+};
+
+const removeQuestionOptionFromSection = (sectionIndex: number, questionIndex: number, optionIndex: number) => {
+    form.sections[sectionIndex].questions[questionIndex].options?.splice(optionIndex, 1);
 };
 
 const submitForm = () => {
-    form.post(route('forms.admin.store'), {
+    // Prepare data: only send sections OR questions, not both
+    const submitData = { ...form.data() };
+    
+    if (useSections.value) {
+        // When using sections, clear questions array
+        submitData.questions = [];
+    } else {
+        // When not using sections, clear sections array
+        submitData.sections = [];
+    }
+    
+    form.transform(() => submitData).post(route('forms.admin.store'), {
         onSuccess: () => {
             // Success handled by redirect
         },
@@ -188,6 +322,32 @@ watch(
         }
     },
 );
+
+// Watch for section mode toggle
+watch(useSections, (newValue) => {
+    if (newValue) {
+        // Switching to sections mode: migrate existing questions to first section if any
+        if (form.questions.length > 0 && form.sections.length === 0) {
+            form.sections.push({
+                title: '',
+                description: '',
+                order_index: 0,
+                questions: form.questions.map((q, idx) => ({
+                    ...q,
+                    order_index: idx,
+                    options: q.options?.map((opt: any, optIdx: number) => ({
+                        ...opt,
+                        order_index: opt.order_index ?? optIdx,
+                    })),
+                })),
+            });
+            form.questions = [];
+        }
+    } else {
+        // Switching to simple mode: clear sections
+        form.sections = [];
+    }
+});
 </script>
 
 <template>
@@ -285,7 +445,15 @@ watch(
                                 </div>
 
                                 <div class="flex items-center space-x-2">
-                                    <Checkbox id="publish_immediately" :model-value="form.publish_immediately" @update:model-value="form.publish_immediately = $event" />
+                                    <Checkbox
+                                        id="publish_immediately"
+                                        :model-value="form.publish_immediately"
+                                        @update:model-value="
+                                            (value: boolean | 'indeterminate') => {
+                                                (form.publish_immediately as any) = value === true;
+                                            }
+                                        "
+                                    />
                                     <Label for="publish_immediately">Publish immediately</Label>
                                 </div>
                             </CardContent>
@@ -295,34 +463,197 @@ watch(
                             <CardHeader>
                                 <CardTitle class="flex items-center justify-between">
                                     Questions
-                                    <div class="flex space-x-2">
-                                        <!--                                        <Button variant="outline" size="sm" @click="useAdvancedBuilder = !useAdvancedBuilder"> {{ useAdvancedBuilder ? 'Simple' : 'Advanced' }} Builder </Button>-->
-                                        <Button size="sm" @click="addBasicQuestion">
-                                            <Plus class="mr-2 h-4 w-4" />
-                                            Add Question
-                                        </Button>
+                                    <div class="flex items-center space-x-4">
+                                        <div class="flex items-center space-x-2">
+                                            <Checkbox
+                                                id="use_sections"
+                                                :model-value="useSections"
+                                                @update:model-value="
+                                                    (value) => {
+                                                        useSections = Boolean(value);
+                                                    }
+                                                "
+                                            />
+                                            <Label for="use_sections" class="text-sm font-normal">Use Sections</Label>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <Button v-if="useSections" size="sm" @click="addSection">
+                                                <Plus class="mr-2 h-4 w-4" />
+                                                Add Section
+                                            </Button>
+                                            <Button v-else size="sm" @click="addBasicQuestion">
+                                                <Plus class="mr-2 h-4 w-4" />
+                                                Add Question
+                                            </Button>
+                                        </div>
                                     </div>
                                 </CardTitle>
                                 <CardDescription> Build your form questions and structure </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <!-- Advanced Form Builder Component -->
-                                <FormBuilder v-if="useAdvancedBuilder" v-model:sections="form.sections" v-model:questions="form.questions" :question-types="questionTypes" />
+                                <FormBuilder v-if="useAdvancedBuilder" v-model:sections="form.sections as any" v-model:questions="form.questions as any" :question-types="questionTypes" />
+
+                                <!-- Section-based Question Builder -->
+                                <div v-else-if="useSections" class="space-y-6">
+                                    <div v-if="form.sections.length === 0" class="text-center py-8 text-muted-foreground">
+                                        <p>No sections yet. Click "Add Section" to get started.</p>
+                                    </div>
+                                    <div v-for="(section, sectionIndex) in form.sections" :key="sectionIndex" class="space-y-4 rounded-lg border p-4">
+                                        <!-- Section Header -->
+                                        <div class="flex items-center justify-between border-b pb-3">
+                                            <h4 class="font-semibold text-lg">Section {{ sectionIndex + 1 }}</h4>
+                                            <div class="flex items-center space-x-2">
+                                                <Button variant="ghost" size="sm" @click="duplicateSection(sectionIndex)">
+                                                    <Copy class="mr-2 h-4 w-4" />
+                                                    Duplicate
+                                                </Button>
+                                                <Button variant="ghost" size="sm" @click="removeSection(sectionIndex)">
+                                                    <Trash2 class="mr-2 h-4 w-4" />
+                                                    Remove Section
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Section Details -->
+                                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <div class="space-y-2">
+                                                <Label>Section Title *</Label>
+                                                <Input v-model="section.title" placeholder="Enter section title" />
+                                                <p v-if="(form.errors as Record<string, string>)[`sections.${sectionIndex}.title`]" class="text-destructive text-sm">
+                                                    {{ (form.errors as Record<string, string>)[`sections.${sectionIndex}.title`] }}
+                                                </p>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <Label>Section Description</Label>
+                                                <Input v-model="section.description" placeholder="Optional description" />
+                                            </div>
+                                        </div>
+
+                                        <!-- Section Questions -->
+                                        <div class="space-y-4">
+                                            <div class="flex items-center justify-between">
+                                                <Label class="text-base font-medium">Questions in this section</Label>
+                                                <Button variant="outline" size="sm" @click="addQuestionToSection(sectionIndex)">
+                                                    <Plus class="mr-2 h-4 w-4" />
+                                                    Add Question
+                                                </Button>
+                                            </div>
+
+                                            <div v-if="section.questions.length === 0" class="text-center py-4 text-muted-foreground text-sm">
+                                                No questions in this section yet.
+                                            </div>
+
+                                            <div v-for="(question, questionIndex) in section.questions" :key="questionIndex" class="bg-muted/50 space-y-4 rounded-lg p-4">
+                                                <div class="flex items-center justify-between">
+                                                    <h5 class="font-medium">Question {{ questionIndex + 1 }}</h5>
+                                                    <div class="flex items-center space-x-2">
+                                                        <Button variant="ghost" size="sm" @click="duplicateQuestionInSection(sectionIndex, questionIndex)">
+                                                            <Copy class="h-4 w-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="sm" @click="removeQuestionFromSection(sectionIndex, questionIndex)">
+                                                            <Trash2 class="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                    <div class="space-y-2">
+                                                        <Label>Question Code</Label>
+                                                        <Input v-model="question.code" disabled placeholder="Question code" />
+                                                    </div>
+                                                    <div class="space-y-2">
+                                                        <Label>Question Type</Label>
+                                                        <Select v-model:model-value="question.type">
+                                                            <SelectTrigger>
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem v-for="(label, value) in questionTypes" :key="value" :value="value">
+                                                                    {{ label }}
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+
+                                                <div class="space-y-2">
+                                                    <Label>Question Text *</Label>
+                                                    <Textarea v-model="question.text" placeholder="Enter your question" rows="2" />
+                                                    <p v-if="(form.errors as Record<string, string>)[`sections.${sectionIndex}.questions.${questionIndex}.text`]" class="text-destructive text-sm">
+                                                        {{ (form.errors as Record<string, string>)[`sections.${sectionIndex}.questions.${questionIndex}.text`] }}
+                                                    </p>
+                                                </div>
+
+                                                <div class="space-y-2">
+                                                    <Label>Help Text (Optional)</Label>
+                                                    <Input v-model="question.help_text" placeholder="Additional help or instructions" />
+                                                </div>
+
+                                                <div class="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        :id="`section_${sectionIndex}_required_${questionIndex}`"
+                                                        :model-value="question.is_required"
+                                                        @update:model-value="
+                                                            (value) => {
+                                                                question.is_required = Boolean(value);
+                                                            }
+                                                        "
+                                                    />
+                                                    <Label :for="`section_${sectionIndex}_required_${questionIndex}`">Required</Label>
+                                                </div>
+
+                                                <!-- Rating preview -->
+                                                <div v-if="question.type === 'rating'" class="space-y-2">
+                                                    <Label>Preview</Label>
+                                                    <div class="flex items-center space-x-1">
+                                                        <Star v-for="i in 5" :key="i" class="h-6 w-6 fill-yellow-400 text-yellow-400" />
+                                                    </div>
+                                                    <p class="text-muted-foreground text-sm">5-star rating scale</p>
+                                                </div>
+
+                                                <!-- Options for choice questions -->
+                                                <div v-if="questionNeedsOptions(question.type)" class="space-y-2">
+                                                    <div class="flex items-center justify-between">
+                                                        <Label>Options</Label>
+                                                        <Button variant="outline" size="sm" @click="addQuestionOptionToSection(sectionIndex, questionIndex)">
+                                                            <Plus class="mr-2 h-4 w-4" />
+                                                            Add Option
+                                                        </Button>
+                                                    </div>
+
+                                                    <div v-for="(option, optionIndex) in question.options" :key="optionIndex" class="flex items-center space-x-2">
+                                                        <Input v-model="option.value" placeholder="Option value" class="flex-1" />
+                                                        <Input v-model="option.label" placeholder="Option label" class="flex-1" />
+                                                        <Button variant="ghost" size="sm" @click="removeQuestionOptionFromSection(sectionIndex, questionIndex, optionIndex)">
+                                                            <Trash2 class="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
                                 <!-- Simple Question Builder -->
                                 <div v-else class="space-y-4">
                                     <div v-for="(question, questionIndex) in form.questions" :key="questionIndex" class="space-y-4 rounded-lg border p-4">
                                         <div class="flex items-center justify-between">
                                             <h4 class="font-medium">Question {{ questionIndex + 1 }}</h4>
-                                            <Button variant="ghost" size="sm" @click="removeQuestion(questionIndex)">
-                                                <Trash2 class="h-4 w-4" />
-                                            </Button>
+                                            <div class="flex items-center space-x-2">
+                                                <Button variant="ghost" size="sm" @click="duplicateQuestion(questionIndex)">
+                                                    <Copy class="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="sm" @click="removeQuestion(questionIndex)">
+                                                    <Trash2 class="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
 
                                         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                                             <div class="space-y-2">
                                                 <Label>Question Code</Label>
-                                                <Input v-model="question.code" placeholder="Question code" />
+                                                <Input v-model="question.code" disabled placeholder="Question code" />
                                             </div>
 
                                             <div class="space-y-2">
@@ -351,8 +682,25 @@ watch(
                                         </div>
 
                                         <div class="flex items-center space-x-2">
-                                            <Checkbox :id="`required_${questionIndex}`" :model-value="question.is_required" @update:model-value="question.is_required = $event" />
+                                            <Checkbox
+                                                :id="`required_${questionIndex}`"
+                                                :model-value="question.is_required"
+                                                @update:model-value="
+                                                    (value) => {
+                                                        question.is_required = Boolean(value);
+                                                    }
+                                                "
+                                            />
                                             <Label :for="`required_${questionIndex}`">Required</Label>
+                                        </div>
+
+                                        <!-- Rating preview -->
+                                        <div v-if="question.type === 'rating'" class="space-y-2">
+                                            <Label>Preview</Label>
+                                            <div class="flex items-center space-x-1">
+                                                <Star v-for="i in 5" :key="i" class="h-6 w-6 fill-yellow-400 text-yellow-400" />
+                                            </div>
+                                            <p class="text-muted-foreground text-sm">5-star rating scale</p>
                                         </div>
 
                                         <!-- Options for choice questions -->
@@ -430,6 +778,13 @@ watch(
         </div>
 
         <!-- Preview Modal -->
-        <FormPreviewModal v-model:open="showPreview" :title="form.title || 'Untitled Form'" :description="form.description" :type="form.type" :sections="form.sections" :questions="form.questions" />
+        <FormPreviewModal
+            v-model:open="showPreview"
+            :title="form.title || 'Untitled Form'"
+            :description="form.description"
+            :type="form.type"
+            :sections="form.sections as any"
+            :questions="form.questions as any"
+        />
     </div>
 </template>

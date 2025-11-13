@@ -5,6 +5,7 @@ import TargetingSettings from '@/components/forms/TargetingSettings.vue';
 import VisibilitySettings from '@/components/forms/VisibilitySettings.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,8 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import type { Form } from '@/types/forms';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { ArrowLeft, Eye, Save } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { ArrowLeft, Copy, Eye, Plus, Save, Star, Trash2 } from 'lucide-vue-next';
+import { ref, watch } from 'vue';
+import { route } from 'ziggy-js';
+import type { QuestionType } from '@/types/forms';
 
 interface Props {
     form: Form;
@@ -45,17 +48,67 @@ const editForm = useForm({
     status: props.form.status,
     effective_from: '',
     effective_to: '',
-    sections: props.form.versions?.[props.form.versions.length - 1]?.sections || [],
-    questions: props.form.versions?.[props.form.versions.length - 1]?.questions?.filter((q) => !q.section_id) || [],
-    visibility_roles: props.form.visibility_roles?.map((role) => role.id) || [],
-    result_visibility: props.form.result_visibility || [],
-    targets: props.form.targets || [],
+    sections: [] as Array<{
+        title: string;
+        description?: string;
+        order_index: number;
+        questions: Array<{
+            code: string;
+            text: string;
+            type: QuestionType;
+            is_required: boolean;
+            order_index: number;
+            help_text?: string;
+            validation_json?: any;
+            visibility_condition_json?: any;
+            options?: Array<{
+                value: string;
+                label: string;
+                allows_free_text: boolean;
+                order_index: number;
+            }>;
+        }>;
+    }>,
+    questions: [] as Array<{
+        code: string;
+        text: string;
+        type: QuestionType;
+        is_required: boolean;
+        order_index: number;
+        help_text?: string;
+        validation_json?: any;
+        visibility_condition_json?: any;
+        options?: Array<{
+            value: string;
+            label: string;
+            allows_free_text: boolean;
+            order_index: number;
+        }>;
+    }>,
+    visibility_roles: [] as number[],
+    result_visibility: [] as Array<{
+        role_id: number;
+        visibility_level: string;
+        min_aggregation_threshold?: number;
+    }>,
+    targets: [] as Array<{
+        campus_id?: number;
+        scope_type: string;
+        scope_id?: number;
+        start_at: string;
+        end_at?: string;
+        submission_limit_per_user: number;
+    }>,
 });
+
+// Get the latest version (first one in versions array, or use current_version if available)
+const latestVersion = props.form.current_version || (props.form.versions && props.form.versions.length > 0 ? props.form.versions[props.form.versions.length - 1] : null);
 
 // Local state
 const currentTab = ref('basic');
-// const useAdvancedBuilder = ref((props.form.versions?.[props.form.versions.length - 1]?.sections?.length || 0) > 0);
+const useAdvancedBuilder = ref(false);
 const showPreview = ref(false);
+const useSections = ref((latestVersion?.sections?.length || 0) > 0);
 
 // Computed
 const formTypeOptions = [
@@ -71,8 +124,168 @@ const statusOptions = [
 ];
 
 // Methods
+const questionNeedsOptions = (type: string) => {
+    return ['single_choice', 'multi_choice', 'likert'].includes(type);
+};
+
+const addBasicQuestion = () => {
+    editForm.questions.push({
+        code: `q_${Date.now()}`,
+        text: '',
+        type: 'short_text' as QuestionType,
+        is_required: false,
+        order_index: editForm.questions.length,
+        options: [],
+    });
+};
+
+const removeQuestion = (index: number) => {
+    editForm.questions.splice(index, 1);
+};
+
+const duplicateQuestion = (index: number) => {
+    const question = editForm.questions[index];
+    const duplicatedQuestion = {
+        ...question,
+        code: `q_${Date.now()}`,
+        order_index: index + 1,
+        options: question.options?.map((opt, optIdx) => ({
+            ...opt,
+            order_index: optIdx,
+        })),
+    };
+    editForm.questions.splice(index + 1, 0, duplicatedQuestion);
+    // Update order_index for all questions after insertion
+    editForm.questions.forEach((q, idx) => {
+        q.order_index = idx;
+    });
+};
+
+const addQuestionOption = (questionIndex: number) => {
+    if (!editForm.questions[questionIndex].options) {
+        editForm.questions[questionIndex].options = [];
+    }
+    const options = editForm.questions[questionIndex].options as Array<{
+        value: string;
+        label: string;
+        allows_free_text: boolean;
+        order_index: number;
+    }>;
+    options.push({
+        value: `option_${Date.now()}`,
+        label: '',
+        allows_free_text: false,
+        order_index: options.length,
+    });
+};
+
+const removeQuestionOption = (questionIndex: number, optionIndex: number) => {
+    editForm.questions[questionIndex].options?.splice(optionIndex, 1);
+};
+
+// Section management methods
+const addSection = () => {
+    editForm.sections.push({
+        title: '',
+        description: '',
+        order_index: editForm.sections.length,
+        questions: [],
+    });
+};
+
+const removeSection = (index: number) => {
+    editForm.sections.splice(index, 1);
+};
+
+const duplicateSection = (index: number) => {
+    const section = editForm.sections[index];
+    const duplicatedSection = {
+        ...section,
+        title: `${section.title} (Copy)`,
+        order_index: index + 1,
+        questions: section.questions.map((q, qIdx) => ({
+            ...q,
+            code: `q_${Date.now()}_${qIdx}`,
+            order_index: qIdx,
+            options: q.options?.map((opt, optIdx) => ({
+                ...opt,
+                order_index: optIdx,
+            })),
+        })),
+    };
+    editForm.sections.splice(index + 1, 0, duplicatedSection);
+    // Update order_index for all sections after insertion
+    editForm.sections.forEach((sec, idx) => {
+        sec.order_index = idx;
+    });
+};
+
+const addQuestionToSection = (sectionIndex: number) => {
+    if (!editForm.sections[sectionIndex].questions) {
+        editForm.sections[sectionIndex].questions = [];
+    }
+    editForm.sections[sectionIndex].questions.push({
+        code: `q_${Date.now()}`,
+        text: '',
+        type: 'short_text' as QuestionType,
+        is_required: false,
+        order_index: editForm.sections[sectionIndex].questions.length,
+        options: [],
+    });
+};
+
+const removeQuestionFromSection = (sectionIndex: number, questionIndex: number) => {
+    editForm.sections[sectionIndex].questions.splice(questionIndex, 1);
+};
+
+const duplicateQuestionInSection = (sectionIndex: number, questionIndex: number) => {
+    const question = editForm.sections[sectionIndex].questions[questionIndex];
+    const duplicatedQuestion = {
+        ...question,
+        code: `q_${Date.now()}`,
+        order_index: questionIndex + 1,
+        options: question.options?.map((opt, optIdx) => ({
+            ...opt,
+            order_index: optIdx,
+        })),
+    };
+    editForm.sections[sectionIndex].questions.splice(questionIndex + 1, 0, duplicatedQuestion);
+    // Update order_index for all questions in this section after insertion
+    editForm.sections[sectionIndex].questions.forEach((q, idx) => {
+        q.order_index = idx;
+    });
+};
+
+const addQuestionOptionToSection = (sectionIndex: number, questionIndex: number) => {
+    const question = editForm.sections[sectionIndex].questions[questionIndex];
+    if (!question.options) {
+        question.options = [];
+    }
+    question.options.push({
+        value: `option_${Date.now()}`,
+        label: '',
+        allows_free_text: false,
+        order_index: question.options.length,
+    });
+};
+
+const removeQuestionOptionFromSection = (sectionIndex: number, questionIndex: number, optionIndex: number) => {
+    editForm.sections[sectionIndex].questions[questionIndex].options?.splice(optionIndex, 1);
+};
+
 const submitForm = () => {
-    editForm.put(route('forms.admin.update', props.form.id), {
+    // Prepare data: only send sections OR questions, not both
+    const submitData = { ...editForm.data() };
+    
+    if (useSections.value) {
+        // When using sections, clear questions array
+        submitData.questions = [];
+    } else {
+        // When not using sections, clear sections array
+        submitData.sections = [];
+    }
+    
+    editForm.transform(() => submitData).put(route('forms.admin.update', props.form.id), {
         onSuccess: () => {
             // Success handled by redirect
         },
@@ -86,19 +299,43 @@ const previewForm = () => {
     showPreview.value = true;
 };
 
-// Transform form sections to include questions for advanced builder
-if (props.form.current_version?.sections) {
-    editForm.sections = props.form.current_version.sections.map((section) => ({
-        id: section.id,
+// Watch for section mode toggle
+watch(useSections, (newValue) => {
+    if (newValue) {
+        // Switching to sections mode: migrate existing questions to first section if any
+        if (editForm.questions.length > 0 && editForm.sections.length === 0) {
+            editForm.sections.push({
+                title: '',
+                description: '',
+                order_index: 0,
+                questions: editForm.questions.map((q, idx) => ({
+                    ...q,
+                    order_index: idx,
+                    options: q.options?.map((opt: any, optIdx: number) => ({
+                        ...opt,
+                        order_index: opt.order_index ?? optIdx,
+                    })),
+                })),
+            });
+            editForm.questions = [];
+        }
+    } else {
+        // Switching to simple mode: clear sections
+        editForm.sections = [];
+    }
+});
+
+// Transform form sections to include questions
+if (latestVersion?.sections) {
+    editForm.sections = latestVersion.sections.map((section) => ({
         title: section.title,
-        description: section.description,
+        description: section.description || '',
         order_index: section.order_index,
         questions:
             section.questions?.map((question) => ({
-                id: question.id,
                 code: question.code,
                 text: question.text,
-                type: question.type,
+                type: question.type as QuestionType,
                 is_required: question.is_required,
                 help_text: question.help_text,
                 order_index: question.order_index,
@@ -106,7 +343,6 @@ if (props.form.current_version?.sections) {
                 visibility_condition_json: question.visibility_condition_json,
                 options:
                     question.options?.map((option) => ({
-                        id: option.id,
                         value: option.value,
                         label: option.label,
                         order_index: option.order_index,
@@ -116,15 +352,14 @@ if (props.form.current_version?.sections) {
     }));
 }
 
-// Transform standalone questions
-if (props.form.current_version?.questions) {
-    editForm.questions = props.form.current_version.questions
+// Transform standalone questions (questions without section_id)
+if (latestVersion?.questions) {
+    editForm.questions = latestVersion.questions
         .filter((q) => !q.section_id)
         .map((question) => ({
-            id: question.id,
             code: question.code,
             text: question.text,
-            type: question.type,
+            type: question.type as QuestionType,
             is_required: question.is_required,
             help_text: question.help_text,
             order_index: question.order_index,
@@ -132,7 +367,6 @@ if (props.form.current_version?.questions) {
             visibility_condition_json: question.visibility_condition_json,
             options:
                 question.options?.map((option) => ({
-                    id: option.id,
                     value: option.value,
                     label: option.label,
                     order_index: option.order_index,
@@ -140,6 +374,11 @@ if (props.form.current_version?.questions) {
                 })) || [],
         }));
 }
+
+// Set visibility roles and other data
+editForm.visibility_roles = props.form.visibility_roles?.map((role) => role.id) || [];
+editForm.result_visibility = props.form.result_visibility || [];
+editForm.targets = props.form.targets || [];
 </script>
 
 <template>
@@ -271,15 +510,266 @@ if (props.form.current_version?.questions) {
                             <CardHeader>
                                 <CardTitle class="flex items-center justify-between">
                                     Questions
-                                    <!--                                    <div class="flex space-x-2">-->
-                                    <!--                                        <Button variant="outline" size="sm" @click="useAdvancedBuilder = !useAdvancedBuilder"> {{ useAdvancedBuilder ? 'Simple' : 'Advanced' }} Builder </Button>-->
-                                    <!--                                    </div>-->
+                                    <div class="flex items-center space-x-4">
+                                        <div class="flex items-center space-x-2">
+                                            <Checkbox
+                                                id="use_sections"
+                                                :model-value="useSections"
+                                                @update:model-value="
+                                                    (value) => {
+                                                        useSections = Boolean(value);
+                                                    }
+                                                "
+                                            />
+                                            <Label for="use_sections" class="text-sm font-normal">Use Sections</Label>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <Button v-if="useSections" size="sm" @click="addSection">
+                                                <Plus class="mr-2 h-4 w-4" />
+                                                Add Section
+                                            </Button>
+                                            <Button v-else size="sm" @click="addBasicQuestion">
+                                                <Plus class="mr-2 h-4 w-4" />
+                                                Add Question
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </CardTitle>
-                                <CardDescription>Modify your form questions and structure</CardDescription>
+                                <CardDescription> Modify your form questions and structure </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <!-- Advanced Form Builder Component -->
-                                <FormBuilder v-model:sections="editForm.sections" v-model:questions="editForm.questions" :question-types="questionTypes" />
+                                <FormBuilder v-if="useAdvancedBuilder" v-model:sections="editForm.sections as any" v-model:questions="editForm.questions as any" :question-types="questionTypes" />
+
+                                <!-- Section-based Question Builder -->
+                                <div v-else-if="useSections" class="space-y-6">
+                                    <div v-if="editForm.sections.length === 0" class="text-center py-8 text-muted-foreground">
+                                        <p>No sections yet. Click "Add Section" to get started.</p>
+                                    </div>
+                                    <div v-for="(section, sectionIndex) in editForm.sections" :key="sectionIndex" class="space-y-4 rounded-lg border p-4">
+                                        <!-- Section Header -->
+                                        <div class="flex items-center justify-between border-b pb-3">
+                                            <h4 class="font-semibold text-lg">Section {{ sectionIndex + 1 }}</h4>
+                                            <div class="flex items-center space-x-2">
+                                                <Button variant="ghost" size="sm" @click="duplicateSection(sectionIndex)">
+                                                    <Copy class="mr-2 h-4 w-4" />
+                                                    Duplicate
+                                                </Button>
+                                                <Button variant="ghost" size="sm" @click="removeSection(sectionIndex)">
+                                                    <Trash2 class="mr-2 h-4 w-4" />
+                                                    Remove Section
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Section Details -->
+                                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <div class="space-y-2">
+                                                <Label>Section Title *</Label>
+                                                <Input v-model="section.title" placeholder="Enter section title" />
+                                                <p v-if="(editForm.errors as Record<string, string>)[`sections.${sectionIndex}.title`]" class="text-destructive text-sm">
+                                                    {{ (editForm.errors as Record<string, string>)[`sections.${sectionIndex}.title`] }}
+                                                </p>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <Label>Section Description</Label>
+                                                <Input v-model="section.description" placeholder="Optional description" />
+                                            </div>
+                                        </div>
+
+                                        <!-- Section Questions -->
+                                        <div class="space-y-4">
+                                            <div class="flex items-center justify-between">
+                                                <Label class="text-base font-medium">Questions in this section</Label>
+                                                <Button variant="outline" size="sm" @click="addQuestionToSection(sectionIndex)">
+                                                    <Plus class="mr-2 h-4 w-4" />
+                                                    Add Question
+                                                </Button>
+                                            </div>
+
+                                            <div v-if="section.questions.length === 0" class="text-center py-4 text-muted-foreground text-sm">
+                                                No questions in this section yet.
+                                            </div>
+
+                                            <div v-for="(question, questionIndex) in section.questions" :key="questionIndex" class="bg-muted/50 space-y-4 rounded-lg p-4">
+                                                <div class="flex items-center justify-between">
+                                                    <h5 class="font-medium">Question {{ questionIndex + 1 }}</h5>
+                                                    <div class="flex items-center space-x-2">
+                                                        <Button variant="ghost" size="sm" @click="duplicateQuestionInSection(sectionIndex, questionIndex)">
+                                                            <Copy class="h-4 w-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="sm" @click="removeQuestionFromSection(sectionIndex, questionIndex)">
+                                                            <Trash2 class="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                    <div class="space-y-2">
+                                                        <Label>Question Code</Label>
+                                                        <Input v-model="question.code" disabled placeholder="Question code" />
+                                                    </div>
+                                                    <div class="space-y-2">
+                                                        <Label>Question Type</Label>
+                                                        <Select v-model:model-value="question.type">
+                                                            <SelectTrigger>
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem v-for="(label, value) in questionTypes" :key="value" :value="value">
+                                                                    {{ label }}
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+
+                                                <div class="space-y-2">
+                                                    <Label>Question Text *</Label>
+                                                    <Textarea v-model="question.text" placeholder="Enter your question" rows="2" />
+                                                    <p v-if="(editForm.errors as Record<string, string>)[`sections.${sectionIndex}.questions.${questionIndex}.text`]" class="text-destructive text-sm">
+                                                        {{ (editForm.errors as Record<string, string>)[`sections.${sectionIndex}.questions.${questionIndex}.text`] }}
+                                                    </p>
+                                                </div>
+
+                                                <div class="space-y-2">
+                                                    <Label>Help Text (Optional)</Label>
+                                                    <Input v-model="question.help_text" placeholder="Additional help or instructions" />
+                                                </div>
+
+                                                <div class="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        :id="`section_${sectionIndex}_required_${questionIndex}`"
+                                                        :model-value="question.is_required"
+                                                        @update:model-value="
+                                                            (value) => {
+                                                                question.is_required = Boolean(value);
+                                                            }
+                                                        "
+                                                    />
+                                                    <Label :for="`section_${sectionIndex}_required_${questionIndex}`">Required</Label>
+                                                </div>
+
+                                                <!-- Rating preview -->
+                                                <div v-if="question.type === 'rating'" class="space-y-2">
+                                                    <Label>Preview</Label>
+                                                    <div class="flex items-center space-x-1">
+                                                        <Star v-for="i in 5" :key="i" class="h-6 w-6 fill-yellow-400 text-yellow-400" />
+                                                    </div>
+                                                    <p class="text-muted-foreground text-sm">5-star rating scale</p>
+                                                </div>
+
+                                                <!-- Options for choice questions -->
+                                                <div v-if="questionNeedsOptions(question.type)" class="space-y-2">
+                                                    <div class="flex items-center justify-between">
+                                                        <Label>Options</Label>
+                                                        <Button variant="outline" size="sm" @click="addQuestionOptionToSection(sectionIndex, questionIndex)">
+                                                            <Plus class="mr-2 h-4 w-4" />
+                                                            Add Option
+                                                        </Button>
+                                                    </div>
+
+                                                    <div v-for="(option, optionIndex) in question.options" :key="optionIndex" class="flex items-center space-x-2">
+                                                        <Input v-model="option.value" placeholder="Option value" class="flex-1" />
+                                                        <Input v-model="option.label" placeholder="Option label" class="flex-1" />
+                                                        <Button variant="ghost" size="sm" @click="removeQuestionOptionFromSection(sectionIndex, questionIndex, optionIndex)">
+                                                            <Trash2 class="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Simple Question Builder -->
+                                <div v-else class="space-y-4">
+                                    <div v-for="(question, questionIndex) in editForm.questions" :key="questionIndex" class="space-y-4 rounded-lg border p-4">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="font-medium">Question {{ questionIndex + 1 }}</h4>
+                                            <div class="flex items-center space-x-2">
+                                                <Button variant="ghost" size="sm" @click="duplicateQuestion(questionIndex)">
+                                                    <Copy class="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="sm" @click="removeQuestion(questionIndex)">
+                                                    <Trash2 class="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <div class="space-y-2">
+                                                <Label>Question Code</Label>
+                                                <Input v-model="question.code" disabled placeholder="Question code" />
+                                            </div>
+
+                                            <div class="space-y-2">
+                                                <Label>Question Type</Label>
+                                                <Select v-model:model-value="question.type">
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem v-for="(label, value) in questionTypes" :key="value" :value="value">
+                                                            {{ label }}
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            <Label>Question Text *</Label>
+                                            <Textarea v-model="question.text" placeholder="Enter your question" rows="2" />
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            <Label>Help Text (Optional)</Label>
+                                            <Input v-model="question.help_text" placeholder="Additional help or instructions" />
+                                        </div>
+
+                                        <div class="flex items-center space-x-2">
+                                            <Checkbox
+                                                :id="`required_${questionIndex}`"
+                                                :model-value="question.is_required"
+                                                @update:model-value="
+                                                    (value) => {
+                                                        question.is_required = Boolean(value);
+                                                    }
+                                                "
+                                            />
+                                            <Label :for="`required_${questionIndex}`">Required</Label>
+                                        </div>
+
+                                        <!-- Rating preview -->
+                                        <div v-if="question.type === 'rating'" class="space-y-2">
+                                            <Label>Preview</Label>
+                                            <div class="flex items-center space-x-1">
+                                                <Star v-for="i in 5" :key="i" class="h-6 w-6 fill-yellow-400 text-yellow-400" />
+                                            </div>
+                                            <p class="text-muted-foreground text-sm">5-star rating scale</p>
+                                        </div>
+
+                                        <!-- Options for choice questions -->
+                                        <div v-if="questionNeedsOptions(question.type)" class="space-y-2">
+                                            <div class="flex items-center justify-between">
+                                                <Label>Options</Label>
+                                                <Button variant="outline" size="sm" @click="addQuestionOption(questionIndex)">
+                                                    <Plus class="mr-2 h-4 w-4" />
+                                                    Add Option
+                                                </Button>
+                                            </div>
+
+                                            <div v-for="(option, optionIndex) in question.options" :key="optionIndex" class="flex items-center space-x-2">
+                                                <Input v-model="option.value" placeholder="Option value" class="flex-1" />
+                                                <Input v-model="option.label" placeholder="Option label" class="flex-1" />
+                                                <Button variant="ghost" size="sm" @click="removeQuestionOption(questionIndex, optionIndex)">
+                                                    <Trash2 class="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -361,6 +851,13 @@ if (props.form.current_version?.questions) {
         </div>
 
         <!-- Preview Modal -->
-        <FormPreviewModal v-model:open="showPreview" :title="editForm.title || form.title" :description="editForm.description" :type="form.type" :sections="editForm.sections" :questions="editForm.questions" />
+        <FormPreviewModal
+            v-model:open="showPreview"
+            :title="editForm.title || form.title"
+            :description="editForm.description"
+            :type="form.type"
+            :sections="editForm.sections as any"
+            :questions="editForm.questions as any"
+        />
     </div>
 </template>

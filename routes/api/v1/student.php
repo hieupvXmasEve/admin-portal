@@ -208,6 +208,15 @@ Route::middleware([
             Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
         });
 
+        // Survey endpoints
+        Route::prefix('surveys')->name('surveys.')->group(function () {
+            Route::get('/pending', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'pending'])->name('pending');
+            Route::get('/completed', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'completed'])->name('completed');
+            Route::get('/{survey}', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'show'])->name('show');
+            Route::post('/{survey}/submit', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'submit'])->name('submit');
+            Route::get('/{survey}/responses', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'responses'])->name('responses');
+        });
+
         // Query ticket endpoints
         Route::prefix('queries')->name('queries.')->group(function () {
             Route::get('/', [QueryTicketController::class, 'index'])->name('index');

@@ -1785,9 +1785,19 @@ class CourseOfferingController extends Controller
 
                     // Show level mismatch warnings
                     if (count($egc['warnings']) > 0) {
-                        $message .= "<br>⚠️ <strong>" . count($egc['warnings']) . " Level Mismatch:</strong>";
+                        $message .= "<br>⚠️ <strong>" . count($egc['warnings']) . " Warnings:</strong>";
                         foreach (array_slice($egc['warnings'], 0, 5) as $warn) {
-                            $message .= "<br>&nbsp;&nbsp;• {$warn['student_id']} ({$warn['student_name']}): Student at Level {$warn['student_level']}, passed Level {$warn['unit_level']} course - Grade recorded but NOT progressed";
+                            $studentLevel = $warn['student_level'] ?? 'N/A';
+                            $unitLevel = $warn['unit_level'] ?? 'N/A';
+                            
+                            // Check if this is a level mismatch warning or status warning
+                            if (isset($warn['reason']) && strpos($warn['reason'], 'Level mismatch') !== false) {
+                                $message .= "<br>&nbsp;&nbsp;• {$warn['student_id']} ({$warn['student_name']}): Student at Level {$studentLevel}, passed Level {$unitLevel} course - Grade recorded but NOT progressed";
+                            } elseif (isset($warn['reason'])) {
+                                $message .= "<br>&nbsp;&nbsp;• {$warn['student_id']} ({$warn['student_name']}): {$warn['reason']}";
+                            } else {
+                                $message .= "<br>&nbsp;&nbsp;• {$warn['student_id']} ({$warn['student_name']}): " . ($warn['reason'] ?? 'Warning');
+                            }
                         }
                         if (count($egc['warnings']) > 5) {
                             $message .= "<br>&nbsp;&nbsp;• +" . (count($egc['warnings']) - 5) . " more...";

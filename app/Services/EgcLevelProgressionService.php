@@ -71,6 +71,9 @@ class EgcLevelProgressionService
                 $results['warnings'][] = [
                     'student_id' => $student->student_id,
                     'student_name' => $student->full_name,
+                    'student_level' => $student->gc_current_level ?? null,
+                    'unit_level' => $unitLevel,
+                    'unit_code' => $courseOffering->unit->code,
                     'reason' => "Student status is '{$student->status}', expected 'intake_pre_uni_gc'",
                 ];
                 continue;
@@ -84,18 +87,19 @@ class EgcLevelProgressionService
             $isPassing = $record->completion_status === 'completed';
 
             // Check if student's current level matches unit level
-            $levelMatch = $student->gc_current_level === $unitLevel;
+            $studentLevel = $student->gc_current_level ?? null;
+            $levelMatch = $studentLevel === $unitLevel;
 
             if (! $levelMatch && $isPassing) {
                 // Level mismatch warning
                 $warningData = [
                     'student_id' => $student->student_id,
                     'student_name' => $student->full_name,
-                    'student_level' => $student->gc_current_level,
+                    'student_level' => $studentLevel,
                     'unit_level' => $unitLevel,
                     'unit_code' => $courseOffering->unit->code,
                     'final_grade' => $record->final_letter_grade,
-                    'reason' => "Level mismatch: Student at level {$student->gc_current_level} passed level {$unitLevel} unit",
+                    'reason' => "Level mismatch: Student at level " . ($studentLevel ?? 'N/A') . " passed level {$unitLevel} unit",
                     'action' => 'Grade recorded but level NOT progressed',
                 ];
 
@@ -103,7 +107,7 @@ class EgcLevelProgressionService
 
                 Log::warning('EGC Level Mismatch - Student Passed', [
                     'student_id' => $student->student_id,
-                    'student_level' => $student->gc_current_level,
+                    'student_level' => $studentLevel,
                     'unit_level' => $unitLevel,
                     'unit_code' => $courseOffering->unit->code,
                     'final_grade' => $record->final_letter_grade,
@@ -118,7 +122,7 @@ class EgcLevelProgressionService
                         grade: $record->final_letter_grade,
                         passed: true,
                         levelProgressed: false,
-                        currentLevel: $student->gc_current_level,
+                        currentLevel: $studentLevel,
                         message: 'You passed but level mismatch detected. Please contact academic office.'
                     )
                 );
@@ -172,11 +176,12 @@ class EgcLevelProgressionService
                 }
             } else {
                 // Student failed - keep level the same
+                $currentLevel = $student->gc_current_level ?? null;
                 $results['failed_students'][] = [
                     'student_id' => $student->student_id,
                     'student_name' => $student->full_name,
                     'grade' => $record->final_letter_grade,
-                    'current_level' => $student->gc_current_level,
+                    'current_level' => $currentLevel,
                     'action' => 'Level unchanged (failed course)',
                 ];
 
@@ -189,8 +194,8 @@ class EgcLevelProgressionService
                         grade: $record->final_letter_grade,
                         passed: false,
                         levelProgressed: false,
-                        currentLevel: $student->gc_current_level,
-                        message: 'You did not pass this course. Your level remains at Level ' . $student->gc_current_level
+                        currentLevel: $currentLevel,
+                        message: 'You did not pass this course. Your level remains at Level ' . ($currentLevel ?? 'N/A')
                     )
                 );
 
@@ -198,7 +203,7 @@ class EgcLevelProgressionService
                     'student_id' => $student->student_id,
                     'unit_code' => $courseOffering->unit->code,
                     'grade' => $record->final_letter_grade,
-                    'level' => $student->gc_current_level,
+                    'level' => $currentLevel,
                 ]);
             }
         }
