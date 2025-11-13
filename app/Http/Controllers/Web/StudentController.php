@@ -478,7 +478,7 @@ class StudentController extends Controller
             });
         }
 
-        $limit = $validated['limit'] ?? 20;
+        $limit = $validated['limit'] ?? 5;
         $students = $query->orderBy('full_name')
             ->limit($limit)
             ->get();
@@ -493,6 +493,7 @@ class StudentController extends Controller
                         'student_id' => $student->student_id,
                         'full_name' => $student->full_name,
                         'email' => $student->email,
+                        'avatar_url' => $student->avatar_url,
                         'status' => $student->status,
                         'program' => $student->program ? [
                             'id' => $student->program->id,
