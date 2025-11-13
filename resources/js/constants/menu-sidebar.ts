@@ -336,6 +336,25 @@ export const mainNavItems: NavItem[] = [
             // },
         ],
     },
+    {
+        title: 'Course Survey',
+        href: '#',
+        icon: ClipboardCheck,
+        children: [
+            {
+                title: 'Survey List',
+                href: '/surveys',
+                icon: ClipboardCheck,
+                requiredPermissions: ['view_form'], // Will be implemented later
+            },
+            {
+                title: 'Settings',
+                href: '/surveys/settings',
+                icon: Settings2,
+                requiredPermissions: ['view_form'], // Will be implemented later
+            },
+        ],
+    },
     // {
     //     title: 'Assessments & Grading',
     //     href: '#',

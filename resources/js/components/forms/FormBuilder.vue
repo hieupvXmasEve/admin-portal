@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { FormBuilderOption, FormBuilderQuestion, FormBuilderSection } from '@/types/forms';
-import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-vue-next';
+import { ChevronDown, ChevronUp, GripVertical, Plus, Star, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface Props {
@@ -120,7 +120,7 @@ const removeQuestionOption = (question: FormBuilderQuestion, optionIndex: number
 };
 
 const questionNeedsOptions = (type: string) => {
-    return ['single_choice', 'multi_choice', 'likert', 'rating'].includes(type);
+    return ['single_choice', 'multi_choice', 'likert'].includes(type);
 };
 
 const moveSection = (sectionIndex: number, direction: 'up' | 'down') => {
@@ -286,8 +286,25 @@ const moveQuestion = (questionIndex: number, direction: 'up' | 'down', sectionIn
                         </div>
 
                         <div class="flex items-center space-x-2">
-                            <Checkbox :id="`section_${sectionIndex}_required_${questionIndex}`" :model-value="question.is_required" @update:model-value="question.is_required = $event" />
+                            <Checkbox
+                                :id="`section_${sectionIndex}_required_${questionIndex}`"
+                                :model-value="question.is_required"
+                                @update:model-value="
+                                    (value) => {
+                                        question.is_required = Boolean(value);
+                                    }
+                                "
+                            />
                             <Label :for="`section_${sectionIndex}_required_${questionIndex}`"> Required </Label>
+                        </div>
+
+                        <!-- Rating preview -->
+                        <div v-if="question.type === 'rating'" class="space-y-2">
+                            <Label>Preview</Label>
+                            <div class="flex items-center space-x-1">
+                                <Star v-for="i in 5" :key="i" class="h-6 w-6 fill-yellow-400 text-yellow-400" />
+                            </div>
+                            <p class="text-muted-foreground text-sm">5-star rating scale</p>
                         </div>
 
                         <!-- Options for choice questions -->
@@ -303,7 +320,15 @@ const moveQuestion = (questionIndex: number, direction: 'up' | 'down', sectionIn
                             <div v-for="(option, optionIndex) in question.options" :key="optionIndex" class="flex items-center space-x-2">
                                 <Input v-model="option.value" placeholder="Option value" class="flex-1" />
                                 <Input v-model="option.label" placeholder="Option label" class="flex-1" />
-                                <Checkbox :id="`option_${optionIndex}_free_text`" :model-value="option.allows_free_text" @update:model-value="option.allows_free_text = $event" />
+                                <Checkbox
+                                    :id="`option_${optionIndex}_free_text`"
+                                    :model-value="option.allows_free_text"
+                                    @update:model-value="
+                                        (value) => {
+                                            option.allows_free_text = Boolean(value);
+                                        }
+                                    "
+                                />
                                 <Label :for="`option_${optionIndex}_free_text`" class="text-sm"> Allow "Other" </Label>
                                 <Button variant="ghost" size="sm" @click="removeQuestionOption(question, optionIndex)">
                                     <Trash2 class="h-4 w-4" />
@@ -369,8 +394,25 @@ const moveQuestion = (questionIndex: number, direction: 'up' | 'down', sectionIn
                 </div>
 
                 <div class="flex items-center space-x-2">
-                    <Checkbox :id="`required_${questionIndex}`" :model-value="question.is_required" @update:model-value="question.is_required = $event" />
+                    <Checkbox
+                        :id="`required_${questionIndex}`"
+                        :model-value="question.is_required"
+                        @update:model-value="
+                            (value) => {
+                                question.is_required = Boolean(value);
+                            }
+                        "
+                    />
                     <Label :for="`required_${questionIndex}`">Required</Label>
+                </div>
+
+                <!-- Rating preview -->
+                <div v-if="question.type === 'rating'" class="space-y-2">
+                    <Label>Preview</Label>
+                    <div class="flex items-center space-x-1">
+                        <Star v-for="i in 5" :key="i" class="h-6 w-6 fill-yellow-400 text-yellow-400" />
+                    </div>
+                    <p class="text-muted-foreground text-sm">5-star rating scale</p>
                 </div>
 
                 <!-- Options for choice questions -->
@@ -386,7 +428,15 @@ const moveQuestion = (questionIndex: number, direction: 'up' | 'down', sectionIn
                     <div v-for="(option, optionIndex) in question.options" :key="optionIndex" class="flex items-center space-x-2">
                         <Input v-model="option.value" placeholder="Option value" class="flex-1" />
                         <Input v-model="option.label" placeholder="Option label" class="flex-1" />
-                        <Checkbox :id="`simple_option_${optionIndex}_free_text`" :model-value="option.allows_free_text" @update:model-value="option.allows_free_text = $event" />
+                        <Checkbox
+                            :id="`simple_option_${optionIndex}_free_text`"
+                            :model-value="option.allows_free_text"
+                            @update:model-value="
+                                (value) => {
+                                    option.allows_free_text = Boolean(value);
+                                }
+                            "
+                        />
                         <Label :for="`simple_option_${optionIndex}_free_text`" class="text-sm"> Allow "Other" </Label>
                         <Button variant="ghost" size="sm" @click="removeQuestionOption(question, optionIndex)">
                             <Trash2 class="h-4 w-4" />

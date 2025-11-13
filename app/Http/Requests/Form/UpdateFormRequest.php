@@ -148,16 +148,16 @@ class UpdateFormRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            $this->validateQuestionCodes();
-            $this->validateChoiceQuestions();
-            $this->validateResultVisibilityThresholds();
+            $this->validateQuestionCodes($validator);
+            $this->validateChoiceQuestions($validator);
+            $this->validateResultVisibilityThresholds($validator);
         });
     }
 
     /**
      * Validate that question codes are unique within the form.
      */
-    protected function validateQuestionCodes(): void
+    protected function validateQuestionCodes($validator): void
     {
         $codes = [];
 
@@ -166,7 +166,7 @@ class UpdateFormRequest extends FormRequest
             foreach ($this->input('questions', []) as $index => $question) {
                 if (isset($question['code'])) {
                     if (in_array($question['code'], $codes)) {
-                        $this->errors()->add("questions.{$index}.code", 'Question codes must be unique within the form');
+                        $validator->errors()->add("questions.{$index}.code", 'Question codes must be unique within the form');
                     }
                     $codes[] = $question['code'];
                 }
@@ -180,7 +180,7 @@ class UpdateFormRequest extends FormRequest
                     foreach ($section['questions'] as $questionIndex => $question) {
                         if (isset($question['code'])) {
                             if (in_array($question['code'], $codes)) {
-                                $this->errors()->add("sections.{$sectionIndex}.questions.{$questionIndex}.code", 'Question codes must be unique within the form');
+                                $validator->errors()->add("sections.{$sectionIndex}.questions.{$questionIndex}.code", 'Question codes must be unique within the form');
                             }
                             $codes[] = $question['code'];
                         }
@@ -193,16 +193,17 @@ class UpdateFormRequest extends FormRequest
     /**
      * Validate that choice questions have options.
      */
-    protected function validateChoiceQuestions(): void
+    protected function validateChoiceQuestions($validator): void
     {
-        $choiceTypes = ['single_choice', 'multi_choice', 'likert', 'rating'];
+        // Rating doesn't need options as it uses a fixed 5-star scale
+        $choiceTypes = ['single_choice', 'multi_choice', 'likert'];
 
         // Validate root questions
         if ($this->has('questions')) {
             foreach ($this->input('questions', []) as $index => $question) {
                 if (in_array($question['type'] ?? '', $choiceTypes)) {
                     if (empty($question['options'])) {
-                        $this->errors()->add("questions.{$index}.options", 'Choice questions must have at least one option');
+                        $validator->errors()->add("questions.{$index}.options", 'Choice questions must have at least one option');
                     }
                 }
             }
@@ -215,7 +216,7 @@ class UpdateFormRequest extends FormRequest
                     foreach ($section['questions'] as $questionIndex => $question) {
                         if (in_array($question['type'] ?? '', $choiceTypes)) {
                             if (empty($question['options'])) {
-                                $this->errors()->add("sections.{$sectionIndex}.questions.{$questionIndex}.options", 'Choice questions must have at least one option');
+                                $validator->errors()->add("sections.{$sectionIndex}.questions.{$questionIndex}.options", 'Choice questions must have at least one option');
                             }
                         }
                     }
@@ -227,13 +228,13 @@ class UpdateFormRequest extends FormRequest
     /**
      * Validate aggregated visibility has threshold.
      */
-    protected function validateResultVisibilityThresholds(): void
+    protected function validateResultVisibilityThresholds($validator): void
     {
         if ($this->has('result_visibility')) {
             foreach ($this->input('result_visibility', []) as $index => $visibility) {
                 if (($visibility['visibility_level'] ?? '') === 'aggregated') {
                     if (empty($visibility['min_aggregation_threshold'])) {
-                        $this->errors()->add("result_visibility.{$index}.min_aggregation_threshold", 'Aggregated visibility requires a minimum threshold');
+                        $validator->errors()->add("result_visibility.{$index}.min_aggregation_threshold", 'Aggregated visibility requires a minimum threshold');
                     }
                 }
             }
