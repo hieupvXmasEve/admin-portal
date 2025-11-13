@@ -320,6 +320,13 @@ return [
             'edit_module' => 'edit_module',
             'delete_module' => 'delete_module',
         ],
+        'surveys' => [
+            'view_survey' => 'view_survey',
+            'create_survey' => 'create_survey',
+            'edit_survey' => 'edit_survey',
+            'delete_survey' => 'delete_survey',
+            'view_survey_analytics' => 'view_survey_analytics',
+        ],
     ],
 
     'actions' => [
