@@ -120,6 +120,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->middleware('can:view_course_offering');
             Route::post('/generate', [\App\Http\Controllers\Api\ClassSessionController::class, 'generate'])
                 ->middleware('can:edit_course_offering');
+            Route::post('/bulk-update', [CourseOfferingController::class, 'bulkUpdateClassSessions'])
+                ->middleware('can:edit_course_offering');
             Route::delete('/', [\App\Http\Controllers\Api\ClassSessionController::class, 'destroy'])
                 ->middleware('can:edit_course_offering');
         });

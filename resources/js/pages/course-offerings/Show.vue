@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import AddClassSessionModal from '@/components/AddClassSessionModal.vue';
+import BulkEditClassSessionModal from '@/components/BulkEditClassSessionModal.vue';
+import DataTable from '@/components/DataTable.vue';
 import QuickEditClassSessionModal from '@/components/QuickEditClassSessionModal.vue';
 import RoomSelectionModal from '@/components/RoomSelectionModal.vue';
 import StudentSearchModal from '@/components/StudentSearchModal.vue';
@@ -16,12 +18,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useApi } from '@/composables/useApiRequest';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { usePermission } from '@/composables/usePermission';
+import { createSelectionColumn } from '@/lib/table-utils';
 import type { AcademicRecord, ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
+import { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
-import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, ExternalLink, Eye, MapPin, Settings, Trash2, UserCheck, Users } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, Edit2, ExternalLink, Eye, MapPin, Settings, Trash2, UserCheck, Users } from 'lucide-vue-next';
+import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
 interface Props {
@@ -174,6 +178,10 @@ const roomSearch = ref('');
 // Quick edit modal state
 const quickEditOpen = ref(false);
 const selectedSession = ref<ClassSession | null>(null);
+
+// Bulk edit modal state
+const bulkEditOpen = ref(false);
+const selectedSessions = ref<ClassSession[]>([]);
 
 // Add class session modal state
 const addSessionOpen = ref(false);
@@ -341,6 +349,137 @@ const hasStartedSessions = computed(() => {
 // Helper function to get academic record for a registration
 const getAcademicRecordForStudent = (studentId: number) => {
     return props.courseOffering.academic_records?.find((record) => record.student_id === studentId);
+};
+
+// Class sessions table columns
+const classSessionColumns: ColumnDef<ClassSession>[] = [
+    createSelectionColumn<ClassSession>(),
+    {
+        header: 'Session',
+        id: 'session',
+        enableSorting: false,
+        cell: ({ row }) => {
+            const session = row.original;
+            return h('div', { class: 'flex items-center gap-2' }, [
+                h(getSessionTypeIcon(session.session_type), { class: 'h-4 w-4' }),
+                h('div', [h('p', { class: 'font-medium' }, session.session_title), session.session_description && h('p', { class: 'text-muted-foreground text-sm' }, session.session_description)]),
+            ]);
+        },
+    },
+    {
+        header: 'Date',
+        id: 'session_date',
+        enableSorting: false,
+        cell: ({ row }) => formatDate(row.original.session_date),
+    },
+    {
+        header: 'Time',
+        id: 'time',
+        enableSorting: false,
+        cell: ({ row }) => {
+            const session = row.original;
+            return `${session.start_time} - ${session.end_time}`;
+        },
+    },
+    {
+        header: 'Room',
+        id: 'room',
+        enableSorting: false,
+        cell: ({ row }) => row.original?.room?.name || 'N/A',
+    },
+    {
+        header: 'Lecturer',
+        id: 'lecturer',
+        enableSorting: false,
+        cell: ({ row }) => row.original.lecture?.display_name.toUpperCase() || 'N/A',
+    },
+    {
+        header: 'Status',
+        id: 'status',
+        enableSorting: false,
+        cell: ({ row }) => {
+            const session = row.original;
+            return h(Badge, { variant: getSessionStatusVariant(session.status) }, () => session.status.toUpperCase());
+        },
+    },
+    {
+        header: 'Attendance',
+        id: 'attendance',
+        enableSorting: false,
+        cell: ({ row }) => {
+            const session = row.original;
+            return h('div', { class: 'text-sm font-medium' }, formatAttendancePercentage(session.attendance_percentage));
+        },
+    },
+    {
+        header: 'Actions',
+        id: 'actions',
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => {
+            const session = row.original;
+            const actions = [
+                h(
+                    Button,
+                    {
+                        variant: 'ghost',
+                        size: 'sm',
+                        onClick: () => openQuickEdit(session),
+                        title: 'Quick Edit',
+                    },
+                    () => h(Settings, { class: 'h-4 w-4' }),
+                ),
+                h(Link, { href: classSessionRoutes.show(session.id) }, () =>
+                    h(
+                        Button,
+                        {
+                            variant: 'ghost',
+                            size: 'sm',
+                            title: 'View Details',
+                        },
+                        () => h(Eye, { class: 'h-4 w-4' }),
+                    ),
+                ),
+            ];
+
+            if (session.status !== 'completed' && session.status !== 'in_progress') {
+                actions.push(
+                    h(
+                        Button,
+                        {
+                            variant: 'ghost',
+                            size: 'sm',
+                            onClick: () => deleteClassSession(session),
+                            title: 'Delete Session',
+                            class: 'text-destructive hover:text-destructive hover:bg-destructive/10',
+                        },
+                        () => h(Trash2, { class: 'h-4 w-4' }),
+                    ),
+                );
+            }
+
+            return h('div', { class: 'flex items-center gap-2' }, actions);
+        },
+    },
+];
+
+// Handle selection change
+const handleSelectionChange = (sessions: ClassSession[]) => {
+    selectedSessions.value = sessions;
+};
+
+// Handle bulk edit success
+const handleBulkEditSuccess = () => {
+    router.reload({ only: ['courseOffering'] });
+};
+
+// Open bulk edit modal
+const openBulkEdit = () => {
+    if (selectedSessions.value.length === 0) {
+        toast.error('Please select at least one session');
+        return;
+    }
+    bulkEditOpen.value = true;
 };
 </script>
 
@@ -622,7 +761,14 @@ const getAcademicRecordForStudent = (studentId: number) => {
                         <!-- Change Room action -->
                         <div class="flex items-center justify-between">
                             <div class="text-muted-foreground text-sm">{{ courseOffering.class_sessions.length }} session(s)</div>
+                            <!-- Action buttons -->
                             <div class="flex items-center gap-2">
+                                <!-- Bulk Edit Button (shown when sessions are selected) -->
+                                <Button v-if="selectedSessions.length > 0" size="sm" variant="default" @click="openBulkEdit">
+                                    <Edit2 class="mr-2 h-4 w-4" />
+                                    Bulk Edit ({{ selectedSessions.length }})
+                                </Button>
+                                <!-- Change room button -->
                                 <Dialog v-model:open="changeRoomOpen">
                                     <DialogTrigger as-child>
                                         <Button size="sm" variant="outline">Change Room</Button>
@@ -665,75 +811,14 @@ const getAcademicRecordForStudent = (studentId: number) => {
                             </div>
                         </div>
 
-                        <Table class="h-20 overflow-y-auto">
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Session</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Time</TableHead>
-                                    <TableHead>Room</TableHead>
-                                    <TableHead>Lecturer</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Attendance</TableHead>
-                                    <TableHead class="w-32">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody class="h-20 overflow-y-auto">
-                                <TableRow v-for="session in courseOffering.class_sessions || []" :key="session.id">
-                                    <TableCell>
-                                        <div class="flex items-center gap-2">
-                                            <component :is="getSessionTypeIcon(session.session_type)" class="h-4 w-4" />
-                                            <div>
-                                                <p class="font-medium">{{ session.session_title }}</p>
-                                                <p v-if="session.session_description" class="text-muted-foreground text-sm">
-                                                    {{ session.session_description }}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        {{ formatDate(session.session_date) }}
-                                    </TableCell>
-                                    <TableCell> {{ session.start_time }} - {{ session.end_time }}</TableCell>
-                                    <TableCell> {{ session?.room?.name }}</TableCell>
-                                    <TableCell>
-                                        {{ session.lecture?.display_name.toUpperCase() }}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge :variant="getSessionStatusVariant(session.status)">
-                                            {{ session.status.toUpperCase() }}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div class="text-sm font-medium">
-                                            {{ formatAttendancePercentage(session.attendance_percentage) }}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div class="flex items-center gap-2">
-                                            <Button variant="ghost" size="sm" @click="openQuickEdit(session)" title="Quick Edit">
-                                                <Settings class="h-4 w-4" />
-                                            </Button>
-                                            <Link :href="classSessionRoutes.show(session.id)">
-                                                <Button variant="ghost" size="sm" title="View Details">
-                                                    <Eye class="h-4 w-4" />
-                                                </Button>
-                                            </Link>
-                                            <Button
-                                                v-if="session.status !== 'completed' && session.status !== 'in_progress'"
-                                                variant="ghost"
-                                                size="sm"
-                                                @click="deleteClassSession(session)"
-                                                title="Delete Session"
-                                                class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                            >
-                                                <Trash2 class="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
+                        <DataTable
+                            :data="courseOffering.class_sessions || []"
+                            :columns="classSessionColumns"
+                            :enable-row-selection="true"
+                            :enable-server-sorting="false"
+                            empty-message="No class sessions found."
+                            @selection-change="handleSelectionChange"
+                        />
                         <!-- Add Class Session Button -->
                         <div class="flex items-center justify-center gap-2">
                             <Button @click="openAddSessionModal" :disabled="!canAddSession" :variant="canAddSession ? 'default' : 'outline'">
@@ -863,6 +948,9 @@ const getAcademicRecordForStudent = (studentId: number) => {
 
     <!-- Add Class Session Modal -->
     <AddClassSessionModal :open="addSessionOpen" :course-offering-id="courseOffering.id" :campus_id="courseOffering.campus_id" @update:open="addSessionOpen = $event" @session-created="handleSessionCreated" />
+
+    <!-- Bulk Edit Class Session Modal -->
+    <BulkEditClassSessionModal :open="bulkEditOpen" :selected-sessions="selectedSessions" :campus_id="courseOffering.campus_id" @update:open="bulkEditOpen = $event" @sessions-updated="handleBulkEditSuccess" />
 
     <!-- Registration Status Management Modal -->
     <!--    <RegistrationStatusModal-->

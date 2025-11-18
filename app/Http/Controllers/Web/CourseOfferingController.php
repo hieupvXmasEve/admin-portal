@@ -582,6 +582,114 @@ class CourseOfferingController extends Controller
     }
 
     /**
+     * Bulk update class sessions for a course offering
+     * Only allows updating: start_time, end_time, lecture_id, room_id
+     */
+    public function bulkUpdateClassSessions(Request $request, CourseOffering $courseOffering)
+    {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'session_ids' => ['required', 'array', 'min:1'],
+            'session_ids.*' => ['required', 'integer', 'exists:class_sessions,id'],
+            'start_time' => ['nullable', 'date_format:H:i'],
+            'end_time' => ['nullable', 'date_format:H:i', 'after:start_time'],
+            'lecture_id' => ['nullable', 'integer', 'exists:lectures,id'],
+            'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
+        ]);
+
+        // Verify all sessions belong to this course offering
+        $sessionIds = $validated['session_ids'];
+        $sessions = ClassSession::whereIn('id', $sessionIds)
+            ->where('course_offering_id', $courseOffering->id)
+            ->get();
+
+        if ($sessions->count() !== count($sessionIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Some sessions do not belong to this course offering.',
+            ], 422);
+        }
+
+        // // Check if any session is completed or in_progress - cannot update those
+        // $completedOrInProgress = $sessions->whereIn('status', ['completed', 'in_progress']);
+        // if ($completedOrInProgress->isNotEmpty()) {
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => 'Cannot update completed or in-progress sessions.',
+        //     ], 422);
+        // }
+
+        try {
+            DB::beginTransaction();
+
+            // Build update data - only include provided fields
+            $updateData = [];
+            if (isset($validated['start_time'])) {
+                $updateData['start_time'] = $validated['start_time'];
+            }
+            if (isset($validated['end_time'])) {
+                $updateData['end_time'] = $validated['end_time'];
+            }
+            if (isset($validated['lecture_id'])) {
+                $updateData['lecture_id'] = $validated['lecture_id'];
+            }
+            if (isset($validated['room_id'])) {
+                $updateData['room_id'] = $validated['room_id'];
+            }
+
+            // Calculate duration if times are being updated
+            if (isset($updateData['start_time']) && isset($updateData['end_time'])) {
+                $start = \Carbon\Carbon::createFromFormat('H:i', $updateData['start_time']);
+                $end = \Carbon\Carbon::createFromFormat('H:i', $updateData['end_time']);
+                $updateData['duration_minutes'] = $start->diffInMinutes($end);
+            } elseif (isset($updateData['start_time']) || isset($updateData['end_time'])) {
+                // If only one time is updated, we need to recalculate from existing values
+                foreach ($sessions as $session) {
+                    $sessionStart = isset($updateData['start_time']) ? $updateData['start_time'] : $session->start_time;
+                    $sessionEnd = isset($updateData['end_time']) ? $updateData['end_time'] : $session->end_time;
+                    $start = \Carbon\Carbon::createFromFormat('H:i', $sessionStart);
+                    $end = \Carbon\Carbon::createFromFormat('H:i', $sessionEnd);
+                    $session->update(array_merge($updateData, ['duration_minutes' => $start->diffInMinutes($end)]));
+                }
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => "Successfully updated {$sessions->count()} class session(s).",
+                    'data' => [
+                        'updated_count' => $sessions->count(),
+                    ],
+                ]);
+            }
+
+            // Update all sessions
+            ClassSession::whereIn('id', $sessionIds)->update($updateData);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully updated {$sessions->count()} class session(s).",
+                'data' => [
+                    'updated_count' => $sessions->count(),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to bulk update class sessions: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update class sessions: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Change the room for all existing class sessions of this course offering.
      * Validates that the selected room is available on the configured schedule days
      * and within the time range (schedule_time_start to schedule_time_end).
@@ -1789,7 +1897,7 @@ class CourseOfferingController extends Controller
                         foreach (array_slice($egc['warnings'], 0, 5) as $warn) {
                             $studentLevel = $warn['student_level'] ?? 'N/A';
                             $unitLevel = $warn['unit_level'] ?? 'N/A';
-                            
+
                             // Check if this is a level mismatch warning or status warning
                             if (isset($warn['reason']) && strpos($warn['reason'], 'Level mismatch') !== false) {
                                 $message .= "<br>&nbsp;&nbsp;• {$warn['student_id']} ({$warn['student_name']}): Student at Level {$studentLevel}, passed Level {$unitLevel} course - Grade recorded but NOT progressed";
