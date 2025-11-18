@@ -597,7 +597,19 @@ class CourseOfferingController extends Controller
             'session_ids' => ['required', 'array', 'min:1'],
             'session_ids.*' => ['required', 'integer', 'exists:class_sessions,id'],
             'start_time' => ['nullable', 'date_format:H:i'],
-            'end_time' => ['nullable', 'date_format:H:i', 'after:start_time'],
+            'end_time' => [
+                'nullable',
+                'date_format:H:i',
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($value && $request->start_time) {
+                        $start = \Carbon\Carbon::createFromFormat('H:i', $request->start_time);
+                        $end = \Carbon\Carbon::createFromFormat('H:i', $value);
+                        if ($end->lte($start)) {
+                            $fail('The end time must be after start time.');
+                        }
+                    }
+                },
+            ],
             'lecture_id' => ['nullable', 'integer', 'exists:lectures,id'],
             'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
         ]);
@@ -628,12 +640,15 @@ class CourseOfferingController extends Controller
             DB::beginTransaction();
 
             // Build update data - only include provided fields
+            // Note: For TIME columns, we need to ensure proper format for mass update
             $updateData = [];
             if (isset($validated['start_time'])) {
-                $updateData['start_time'] = $validated['start_time'];
+                // Format time string properly for MySQL TIME column (H:i:s format)
+                $updateData['start_time'] = $validated['start_time'] . ':00';
             }
             if (isset($validated['end_time'])) {
-                $updateData['end_time'] = $validated['end_time'];
+                // Format time string properly for MySQL TIME column (H:i:s format)
+                $updateData['end_time'] = $validated['end_time'] . ':00';
             }
             if (isset($validated['lecture_id'])) {
                 $updateData['lecture_id'] = $validated['lecture_id'];
@@ -645,19 +660,29 @@ class CourseOfferingController extends Controller
             // Calculate duration if times are being updated
             if (isset($updateData['start_time']) && isset($updateData['end_time'])) {
                 // Both times provided - calculate duration once
-                $start = \Carbon\Carbon::createFromFormat('H:i', $updateData['start_time']);
-                $end = \Carbon\Carbon::createFromFormat('H:i', $updateData['end_time']);
+                $start = \Carbon\Carbon::createFromFormat('H:i:s', $updateData['start_time']);
+                $end = \Carbon\Carbon::createFromFormat('H:i:s', $updateData['end_time']);
                 $updateData['duration_minutes'] = $start->diffInMinutes($end);
+
+                // Update all sessions using mass update (better performance)
+                ClassSession::whereIn('id', $sessionIds)->update($updateData);
             } elseif (isset($updateData['start_time']) || isset($updateData['end_time'])) {
                 // Only one time provided - need to update individually to recalculate duration
                 // This is because each session may have different existing time values
                 foreach ($sessions as $session) {
                     $sessionUpdateData = $updateData;
-                    $sessionStart = isset($updateData['start_time']) ? $updateData['start_time'] : $session->start_time->format('H:i');
-                    $sessionEnd = isset($updateData['end_time']) ? $updateData['end_time'] : $session->end_time->format('H:i');
-                    $start = \Carbon\Carbon::createFromFormat('H:i', $sessionStart);
-                    $end = \Carbon\Carbon::createFromFormat('H:i', $sessionEnd);
-                    $sessionUpdateData['duration_minutes'] = $start->diffInMinutes($end);
+                    $sessionStart = isset($updateData['start_time'])
+                        ? $updateData['start_time']
+                        : ($session->start_time ? $session->start_time->format('H:i:s') : null);
+                    $sessionEnd = isset($updateData['end_time'])
+                        ? $updateData['end_time']
+                        : ($session->end_time ? $session->end_time->format('H:i:s') : null);
+
+                    if ($sessionStart && $sessionEnd) {
+                        $start = \Carbon\Carbon::createFromFormat('H:i:s', $sessionStart);
+                        $end = \Carbon\Carbon::createFromFormat('H:i:s', $sessionEnd);
+                        $sessionUpdateData['duration_minutes'] = $start->diffInMinutes($end);
+                    }
 
                     // Use mass update per session to avoid triggering individual events
                     ClassSession::where('id', $session->id)->update($sessionUpdateData);
