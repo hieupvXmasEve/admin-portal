@@ -18,6 +18,7 @@ use App\Models\Student;
 use App\Models\Unit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\CampusLogContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -643,33 +644,33 @@ class CourseOfferingController extends Controller
 
             // Calculate duration if times are being updated
             if (isset($updateData['start_time']) && isset($updateData['end_time'])) {
+                // Both times provided - calculate duration once
                 $start = \Carbon\Carbon::createFromFormat('H:i', $updateData['start_time']);
                 $end = \Carbon\Carbon::createFromFormat('H:i', $updateData['end_time']);
                 $updateData['duration_minutes'] = $start->diffInMinutes($end);
             } elseif (isset($updateData['start_time']) || isset($updateData['end_time'])) {
-                // If only one time is updated, we need to recalculate from existing values
+                // Only one time provided - need to update individually to recalculate duration
+                // This is because each session may have different existing time values
                 foreach ($sessions as $session) {
-                    $sessionStart = isset($updateData['start_time']) ? $updateData['start_time'] : $session->start_time;
-                    $sessionEnd = isset($updateData['end_time']) ? $updateData['end_time'] : $session->end_time;
+                    $sessionUpdateData = $updateData;
+                    $sessionStart = isset($updateData['start_time']) ? $updateData['start_time'] : $session->start_time->format('H:i');
+                    $sessionEnd = isset($updateData['end_time']) ? $updateData['end_time'] : $session->end_time->format('H:i');
                     $start = \Carbon\Carbon::createFromFormat('H:i', $sessionStart);
                     $end = \Carbon\Carbon::createFromFormat('H:i', $sessionEnd);
-                    $session->update(array_merge($updateData, ['duration_minutes' => $start->diffInMinutes($end)]));
-                }
-                DB::commit();
+                    $sessionUpdateData['duration_minutes'] = $start->diffInMinutes($end);
 
-                return response()->json([
-                    'success' => true,
-                    'message' => "Successfully updated {$sessions->count()} class session(s).",
-                    'data' => [
-                        'updated_count' => $sessions->count(),
-                    ],
-                ]);
+                    // Use mass update per session to avoid triggering individual events
+                    ClassSession::where('id', $session->id)->update($sessionUpdateData);
+                }
+            } else {
+                // No time updates - can use mass update for all sessions
+                ClassSession::whereIn('id', $sessionIds)->update($updateData);
             }
 
-            // Update all sessions
-            ClassSession::whereIn('id', $sessionIds)->update($updateData);
-
             DB::commit();
+
+            // Log bulk update activity (single log entry for the entire operation)
+            $this->logBulkUpdateActivity($courseOffering, $sessions, $updateData);
 
             return response()->json([
                 'success' => true,
@@ -687,6 +688,38 @@ class CourseOfferingController extends Controller
                 'message' => 'Failed to update class sessions: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Log bulk update activity for class sessions
+     */
+    private function logBulkUpdateActivity(CourseOffering $courseOffering, $sessions, array $updateData): void
+    {
+        $sessionCount = $sessions->count();
+        $sessionIds = $sessions->pluck('id')->toArray();
+        $changedFields = array_keys($updateData);
+
+        // Get campus-aware log name
+        $logName = CampusLogContext::getLogName('ClassSession', $courseOffering->campus_id);
+
+        // Build properties
+        $properties = CampusLogContext::enhanceLogProperties([
+            'operation' => 'bulk_update',
+            'session_count' => $sessionCount,
+            'session_ids' => $sessionIds,
+            'changed_fields' => $changedFields,
+            'update_data' => $updateData,
+            'course_offering_id' => $courseOffering->id,
+            'course_code' => $courseOffering->course_code,
+        ], $courseOffering->campus_id);
+
+        // Log the activity
+        activity($logName)
+            ->performedOn($courseOffering)
+            ->causedBy(Auth::user())
+            ->withProperties($properties)
+            ->event('bulk_updated')
+            ->log("Bulk updated {$sessionCount} class session(s) for course offering {$courseOffering->course_code}");
     }
 
     /**
