@@ -505,7 +505,7 @@ const handlePageSizeChange = (pageSize: number) => {
 
     <!-- Activity Details Dialog -->
     <Dialog v-model:open="showActivityDialog">
-        <DialogContent class="max-h-[90vh] max-w-6xl">
+        <DialogContent class="max-h-[90vh] !max-w-7xl">
             <DialogHeader>
                 <DialogTitle>Activity Log Details</DialogTitle>
             </DialogHeader>
