@@ -46,6 +46,9 @@ class LectureRoutes
 
     public const EXPORT_EXCEL_FILTERED = 'lectures.export.excel.filtered';
 
+    // Teaching Hours Report
+    public const TEACHING_HOURS = 'lectures.teaching-hours';
+
     // Route Prefixes
     public const WEB_PREFIX = 'lectures.';
 

@@ -58,6 +58,11 @@ Route::middleware('auth')->group(function () {
         ->middleware('can:create_lecturer')
         ->name(LectureRoutes::STORE);
 
+    // Teaching Hours Report
+    Route::get('lectures/teaching-hours', [LectureController::class, 'teachingHours'])
+        ->middleware('can:view_lecturer')
+        ->name(LectureRoutes::TEACHING_HOURS);
+
     Route::get('lectures/{lecture}', [LectureController::class, 'show'])
         ->middleware('can:view_lecturer')
         ->name(LectureRoutes::SHOW);

@@ -9,9 +9,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Lecture\StoreLectureRequest;
 use App\Http\Requests\Lecture\UpdateLectureRequest;
 use App\Models\Campus;
+use App\Models\ClassSession;
 use App\Models\Lecture;
+use App\Models\Semester;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -318,6 +321,129 @@ class LectureController extends Controller
         return response()->json([
             'success' => true,
             'data' => $stats,
+        ]);
+    }
+
+    /**
+     * Display teaching hours report for lecturers
+     */
+    public function teachingHours(Request $request): Response
+    {
+        $currentCampusId = session('current_campus_id');
+
+        // Validate request parameters
+        $validated = $request->validate([
+            'semester_id' => 'nullable|string',
+            'search' => 'nullable|string|max:255',
+            'date_from' => 'nullable|date|after_or_equal:2025-01-01',
+            'date_to' => 'nullable|date|before_or_equal:today',
+            'sort' => 'nullable|string|in:name,hours',
+            'direction' => 'nullable|string|in:asc,desc',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        // Set default date_from to 2025-01-01 if not provided
+        $dateFrom = $validated['date_from'] ?? '2025-01-01';
+        $dateTo = $validated['date_to'] ?? now()->format('Y-m-d');
+
+        // Ensure date_to is end of day (23:59:59)
+        $dateToEndOfDay = \Carbon\Carbon::parse($dateTo)->endOfDay();
+
+        // Build base query with joins
+        $query = ClassSession::query()
+            ->select([
+                'lectures.id as lecture_id',
+                'lectures.first_name',
+                'lectures.last_name',
+                'lectures.email',
+                DB::raw('COUNT(class_sessions.id) as session_count'),
+                DB::raw('SUM(COALESCE(class_sessions.duration_minutes, 
+                    TIME_TO_SEC(TIMEDIFF(class_sessions.end_time, class_sessions.start_time)) / 60
+                )) as total_minutes'),
+            ])
+            ->join('lectures', 'class_sessions.lecture_id', '=', 'lectures.id')
+            ->join('course_offerings', 'class_sessions.course_offering_id', '=', 'course_offerings.id')
+            ->where('lectures.campus_id', $currentCampusId)
+            ->whereNotNull('class_sessions.lecture_id')
+            ->where('class_sessions.session_date', '>=', $dateFrom)
+            ->where('class_sessions.session_date', '<=', $dateToEndOfDay->format('Y-m-d'))
+            ->groupBy('lectures.id', 'lectures.first_name', 'lectures.last_name', 'lectures.email');
+
+        // Apply semester filter (skip if 'all' or empty)
+        if ($request->filled('semester_id') && $validated['semester_id'] !== 'all') {
+            $query->where('course_offerings.semester_id', $validated['semester_id']);
+        }
+
+        // Apply search filter (name or email)
+        if ($request->filled('search')) {
+            $search = $validated['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('lectures.first_name', 'like', "%{$search}%")
+                    ->orWhere('lectures.last_name', 'like', "%{$search}%")
+                    ->orWhere('lectures.email', 'like', "%{$search}%")
+                    ->orWhereRaw("CONCAT(lectures.first_name, ' ', lectures.last_name) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        // Apply sorting
+        $sort = $validated['sort'] ?? 'name';
+        $direction = $validated['direction'] ?? 'asc';
+
+        if ($sort === 'name') {
+            $query->orderBy('lectures.last_name', $direction)
+                ->orderBy('lectures.first_name', $direction);
+        } elseif ($sort === 'hours') {
+            $query->orderBy('total_minutes', $direction);
+        }
+
+        // Get per_page or default to 15
+        $perPage = $validated['per_page'] ?? 15;
+
+        // Execute query and paginate
+        $results = $query->paginate($perPage)->withQueryString();
+
+        // Transform results to include total_hours
+        $lecturers = $results->getCollection()->map(function ($item) {
+            $totalMinutes = (int) $item->total_minutes;
+            $totalHours = round($totalMinutes / 60, 2);
+
+            return [
+                'lecture_id' => $item->lecture_id,
+                'lecture_name' => trim($item->first_name . ' ' . $item->last_name),
+                'lecture_email' => $item->email,
+                'total_hours' => $totalHours,
+                'total_minutes' => $totalMinutes,
+                'session_count' => (int) $item->session_count,
+            ];
+        });
+
+        // Replace collection with transformed data
+        $results->setCollection($lecturers);
+
+        // Get semesters for filter dropdown
+        $semesters = Semester::select('id', 'name', 'code', 'start_date', 'end_date')
+            ->orderBy('start_date', 'desc')
+            ->get()
+            ->map(function ($semester) {
+                return [
+                    'id' => $semester->id,
+                    'name' => $semester->name,
+                    'code' => $semester->code,
+                ];
+            });
+
+        return Inertia::render('lectures/TeachingHours', [
+            'lecturers' => $results,
+            'filters' => [
+                'semester_id' => $validated['semester_id'] ?? 'all',
+                'search' => $validated['search'] ?? '',
+                'date_from' => $validated['date_from'] ?? '2025-01-01',
+                'date_to' => $validated['date_to'] ?? now()->format('Y-m-d'),
+                'sort' => $validated['sort'] ?? 'name',
+                'direction' => $validated['direction'] ?? 'asc',
+                'per_page' => $validated['per_page'] ?? 15,
+            ],
+            'semesters' => $semesters,
         ]);
     }
 }

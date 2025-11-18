@@ -208,6 +208,12 @@ export const mainNavItems: NavItem[] = [
                 icon: Users,
                 requiredPermissions: ['view_lecturer'], // Will be implemented later
             },
+            {
+                title: 'Lecturer Hours',
+                href: lecturerRoutes.teachingHours(),
+                icon: Clock,
+                requiredPermissions: ['view_lecturer'], // Will be implemented later
+            },
             // {
             //     title: 'Lecturer Timetable',
             //     href: lecturerRoutes.index(), // Placeholder
