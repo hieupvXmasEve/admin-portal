@@ -25,6 +25,9 @@ export const LECTURE_ROUTE_NAMES = {
     EXPORT_EXCEL: 'lectures.export.excel',
     EXPORT_EXCEL_FILTERED: 'lectures.export.excel.filtered',
 
+    // Teaching Hours Report
+    TEACHING_HOURS: 'lectures.teaching-hours',
+
     // API Routes
     API_SEARCH: 'api.lectures.search',
     API_STATISTICS: 'api.lectures.statistics',

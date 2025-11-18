@@ -56,8 +56,18 @@ class ActivityLogController extends Controller
                     ->orWhere('log_name', 'like', '%'.$filters['search'].'%')
                     ->orWhereJsonContains('properties->campus_name', $filters['search'])
                     ->orWhereJsonContains('properties->user_name', $filters['search'])
-                    ->orWhereHas('causer', function ($q) use ($filters) {
+                    // Search by causer type with correct column names
+                    ->orWhereMorphRelation('causer', \App\Models\User::class, function ($q) use ($filters) {
                         $q->where('name', 'like', '%'.$filters['search'].'%');
+                    })
+                    ->orWhereMorphRelation('causer', \App\Models\Student::class, function ($q) use ($filters) {
+                        $q->where('full_name', 'like', '%'.$filters['search'].'%');
+                    })
+                    ->orWhereMorphRelation('causer', \App\Models\Lecture::class, function ($q) use ($filters) {
+                        $q->where(function ($nameQuery) use ($filters) {
+                            $nameQuery->where('first_name', 'like', '%'.$filters['search'].'%')
+                                ->orWhere('last_name', 'like', '%'.$filters['search'].'%');
+                        });
                     });
             });
         }

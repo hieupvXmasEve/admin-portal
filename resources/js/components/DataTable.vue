@@ -46,8 +46,6 @@ const columnPinning = ref({ right: ['actions'] });
 watch(
     () => [props.initialSort, props.initialDirection] as const,
     ([newSort, newDirection]) => {
-        console.log('[DataTable] Sort props changed:', { newSort, newDirection });
-
         // Update sorting state when props change
         if (newSort) {
             // Default to 'asc' if direction is missing
@@ -58,18 +56,12 @@ watch(
             const needsUpdate = !currentSort || currentSort.id !== newSort || (currentSort.desc ? 'desc' : 'asc') !== direction;
 
             if (needsUpdate) {
-                console.log('[DataTable] Updating sorting state to:', { id: newSort, desc: direction === 'desc' });
                 sorting.value = [{ id: newSort, desc: direction === 'desc' }];
-            } else {
-                console.log('[DataTable] Sort state already correct, skip update');
             }
         } else {
             // Clear sorting when no sort prop
             if (sorting.value.length > 0) {
-                console.log('[DataTable] Clearing sorting state');
                 sorting.value = [];
-            } else {
-                console.log('[DataTable] Sort already empty, skip clear');
             }
         }
     },
