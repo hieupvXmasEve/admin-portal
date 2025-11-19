@@ -995,28 +995,6 @@ const updateBulkStatus = async () => {
     }
 };
 
-const deleteApplication = (application: StudentApplication) => {
-    if (application.student) {
-        toast.error('Cannot delete application that has been converted to a student.');
-        return;
-    }
-
-    if (confirm(`Are you sure you want to delete ${application.full_name}'s application? This action cannot be undone.`)) {
-        router.delete(`/student-applications/${application.id}`, {
-            preserveState: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success(`${application.full_name}'s application has been deleted.`);
-            },
-            onError: (errors) => {
-                console.error('Delete errors:', errors);
-                const errorMessage = Object.values(errors).flat().join(', ') || 'Failed to delete application.';
-                toast.error(errorMessage);
-            },
-        });
-    }
-};
-
 const clearFilters = () => {
     overallFilterOperator.value = 'all';
     overallFilterValue.value = undefined;

@@ -9,10 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useApi } from '@/composables/useApiRequest';
@@ -20,6 +16,7 @@ import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { usePermission } from '@/composables/usePermission';
 import { createSelectionColumn } from '@/lib/table-utils';
 import type { AcademicRecord, ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
+import { formatDateTimeToShort } from '@/utils/date';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
@@ -44,7 +41,12 @@ const { showConfirmDialog } = useGlobalConfirmDialog();
 const { can } = usePermission();
 // const showStatusModal = ref(false);
 const isGenerating = ref(false);
-
+const isAllClassSessionsCompleted = computed(() => {
+    return props.courseOffering.class_sessions?.every((session) => session.status === 'completed') ?? true;
+});
+const isStartedCourse = computed(() => {
+    return props.courseOffering.class_sessions?.some((session) => session.status === 'in_progress' || session.status === 'completed') ?? false;
+});
 const getStatusVariant = (status: string) => {
     switch (status) {
         case 'open':
@@ -95,12 +97,6 @@ const formatDate = (dateString: string | null | undefined): string => {
     //format short day - mm/dd/yyyy
     return format(dateString, 'EEEE, MM/dd/yyyy');
 };
-
-const formatDateTime = (dateString: string | null | undefined): string => {
-    if (!dateString) return 'N/A';
-    return format(dateString, 'EEEE, MM/dd/yyyy');
-};
-
 const formatAttendancePercentage = (percentage: number | string | null | undefined): string => {
     if (percentage === null || percentage === undefined || percentage === '') return '0.00%';
     const numPercentage = typeof percentage === 'string' ? parseFloat(percentage) : percentage;
@@ -169,12 +165,6 @@ const getSessionStatusVariant = (status: string) => {
 const editCourseOffering = () => {
     router.visit(`/course-offerings/${props.courseOffering.id}/edit`);
 };
-
-// Change Room modal state
-const changeRoomOpen = ref(false);
-const selectedRoomId = ref<number | null>(null);
-const roomSearch = ref('');
-
 // Quick edit modal state
 const quickEditOpen = ref(false);
 const selectedSession = ref<ClassSession | null>(null);
@@ -185,35 +175,6 @@ const selectedSessions = ref<ClassSession[]>([]);
 
 // Add class session modal state
 const addSessionOpen = ref(false);
-const filteredRooms = computed(() => {
-    const q = roomSearch.value.toLowerCase().trim();
-    if (!q) return props.availableRooms || [];
-    return (props.availableRooms || []).filter((r) => [r.name, r.code, (r.building as any)?.name].filter(Boolean).join(' ').toLowerCase().includes(q));
-});
-
-const submitChangeRoom = () => {
-    if (!selectedRoomId.value) return;
-    router.post(
-        `/api/course-offerings/${props.courseOffering.id}/change-room`,
-        { room_id: selectedRoomId.value },
-        {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const flash: any = (page as any)?.props?.flash || {};
-                if (flash.success) toast.success(flash.success);
-                else if (flash.error) toast.error(flash.error);
-                else toast.success('Room updated for all class sessions');
-                changeRoomOpen.value = false;
-                router.reload({ only: ['courseOffering'] });
-            },
-            onError: (errors) => {
-                // Try to surface first validation error; otherwise generic
-                const messages = Object.values(errors || {}) as string[];
-                toast.error(messages[0] || 'Failed to update room. Please ensure the room is available.');
-            },
-        },
-    );
-};
 
 // Student addition success handler
 const handleStudentAddSuccess = () => {
@@ -341,11 +302,6 @@ const getAddSessionButtonText = computed(() => {
     return `Session Limit Reached (${currentCount}/${maxSessions})`;
 });
 
-// Check if any session is in_progress or completed (course has started)
-const hasStartedSessions = computed(() => {
-    return props.courseOffering.class_sessions?.some((session) => session.status === 'in_progress' || session.status === 'completed') ?? false;
-});
-
 // Helper function to get academic record for a registration
 const getAcademicRecordForStudent = (studentId: number) => {
     return props.courseOffering.academic_records?.find((record) => record.student_id === studentId);
@@ -416,50 +372,6 @@ const classSessionColumns: ColumnDef<ClassSession>[] = [
         id: 'actions',
         enableSorting: false,
         enableHiding: false,
-        cell: ({ row }) => {
-            const session = row.original;
-            const actions = [
-                h(
-                    Button,
-                    {
-                        variant: 'ghost',
-                        size: 'sm',
-                        onClick: () => openQuickEdit(session),
-                        title: 'Quick Edit',
-                    },
-                    () => h(Settings, { class: 'h-4 w-4' }),
-                ),
-                h(Link, { href: classSessionRoutes.show(session.id) }, () =>
-                    h(
-                        Button,
-                        {
-                            variant: 'ghost',
-                            size: 'sm',
-                            title: 'View Details',
-                        },
-                        () => h(Eye, { class: 'h-4 w-4' }),
-                    ),
-                ),
-            ];
-
-            if (session.status !== 'completed' && session.status !== 'in_progress') {
-                actions.push(
-                    h(
-                        Button,
-                        {
-                            variant: 'ghost',
-                            size: 'sm',
-                            onClick: () => deleteClassSession(session),
-                            title: 'Delete Session',
-                            class: 'text-destructive hover:text-destructive hover:bg-destructive/10',
-                        },
-                        () => h(Trash2, { class: 'h-4 w-4' }),
-                    ),
-                );
-            }
-
-            return h('div', { class: 'flex items-center gap-2' }, actions);
-        },
     },
 ];
 
@@ -768,57 +680,45 @@ const openBulkEdit = () => {
                                     <Edit2 class="mr-2 h-4 w-4" />
                                     Bulk Edit ({{ selectedSessions.length }})
                                 </Button>
-                                <!-- Change room button -->
-                                <Dialog v-model:open="changeRoomOpen">
-                                    <DialogTrigger as-child>
-                                        <Button size="sm" variant="outline">Change Room</Button>
-                                    </DialogTrigger>
-                                    <DialogContent class="max-w-2xl">
-                                        <DialogHeader>
-                                            <DialogTitle>Select Room</DialogTitle>
-                                            <DialogDescription> Choose an active room to apply to all class sessions. Availability will be validated against the schedule. </DialogDescription>
-                                        </DialogHeader>
-                                        <div class="space-y-3">
-                                            <div>
-                                                <Label class="text-xs">Search</Label>
-                                                <Input v-model="roomSearch" placeholder="Search by name, code, building" type="search" />
-                                            </div>
-                                            <div class="max-h-80 overflow-auto rounded border">
-                                                <RadioGroup v-model="selectedRoomId" class="flex flex-col divide-y">
-                                                    <div v-for="room in filteredRooms" :key="room.id" class="hover:bg-accent/40 flex items-center justify-between gap-3 px-3 py-2">
-                                                        <div class="flex items-center gap-3">
-                                                            <RadioGroupItem :id="`room-${room.id}`" :value="room.id" />
-                                                            <Label :for="`room-${room.id}`" class="cursor-pointer">
-                                                                <div class="font-medium">
-                                                                    {{ room.name }} <span class="text-muted-foreground">({{ room.code }})</span>
-                                                                </div>
-                                                                <div class="text-muted-foreground text-xs">{{ room.building?.name || room.building }} • Capacity: {{ room.capacity }} • {{ room.type?.replace('_', ' ') }}</div>
-                                                            </Label>
-                                                        </div>
-                                                    </div>
-                                                    <div v-if="filteredRooms.length === 0" class="text-muted-foreground p-4 text-center text-sm">No rooms found</div>
-                                                </RadioGroup>
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <DialogClose as-child>
-                                                <Button variant="outline">Cancel</Button>
-                                            </DialogClose>
-                                            <Button :disabled="!selectedRoomId" @click="submitChangeRoom">Apply to All Sessions</Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
                             </div>
                         </div>
 
                         <DataTable
                             :data="courseOffering.class_sessions || []"
                             :columns="classSessionColumns"
-                            :enable-row-selection="true"
+                            :enable-row-selection="!isAllClassSessionsCompleted"
                             :enable-server-sorting="false"
                             empty-message="No class sessions found."
                             @selection-change="handleSelectionChange"
-                        />
+                        >
+                            <template #cell-actions="{ row }">
+                                <div class="flex items-center gap-2">
+                                    <Button v-if="row.original.status !== 'completed' && row.original.status !== 'in_progress'" variant="ghost" size="sm" title="Quick Edit" @click="openQuickEdit(row.original)">
+                                        <Settings class="h-4 w-4" />
+                                    </Button>
+                                    <Link :href="classSessionRoutes.show(row.original.id)">
+                                        <Button variant="ghost" size="sm" title="View Details">
+                                            <Eye class="h-4 w-4" />
+                                        </Button>
+                                    </Link>
+                                    <Button
+                                        v-if="row.original.status !== 'completed' && row.original.status !== 'in_progress'"
+                                        variant="ghost"
+                                        size="sm"
+                                        title="Delete Session"
+                                        class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        @click="deleteClassSession(row.original)"
+                                    >
+                                        <Trash2 class="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </template>
+                            <template #cell-status="{ row }">
+                                <Badge :variant="getSessionStatusVariant(row.original.status)">
+                                    {{ row.original.status.toUpperCase() }}
+                                </Badge>
+                            </template>
+                        </DataTable>
                         <!-- Add Class Session Button -->
                         <div class="flex items-center justify-center gap-2">
                             <Button @click="openAddSessionModal" :disabled="!canAddSession" :variant="canAddSession ? 'default' : 'outline'">
@@ -924,13 +824,19 @@ const openBulkEdit = () => {
                                         </template>
                                     </TableCell>
                                     <TableCell class="text-muted-foreground">
-                                        {{ formatDateTime(registration.registration_date) }}
+                                        {{ formatDateTimeToShort(registration.registration_date) }}
                                     </TableCell>
                                     <TableCell class="text-muted-foreground">
                                         {{ registration.registration_method }}
                                     </TableCell>
                                     <TableCell>
-                                        <Button v-if="can('delete_student_registration')" variant="ghost" size="sm" @click="deleteStudentRegistration(registration)" class="text-destructive hover:text-destructive hover:bg-destructive/10">
+                                        <Button
+                                            v-if="can('delete_student_registration') && !isStartedCourse"
+                                            variant="ghost"
+                                            size="sm"
+                                            @click="deleteStudentRegistration(registration)"
+                                            class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        >
                                             <Trash2 class="h-4 w-4" />
                                         </Button>
                                     </TableCell>

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useApi } from '@/composables/useApiRequest';
 import { createColumns } from '@/lib/table-utils';
 import type { Attendance, ClassSession, Student } from '@/types/models';
-import { formatDate } from '@/utils/date';
+import { formatDate, formatDateTimeToFull } from '@/utils/date';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -265,7 +265,7 @@ const baseColumns = computed<ColumnDef<Attendance>[]>(() => {
             enableSorting: false,
             cell: ({ row }) => {
                 const attendance = row.original;
-                return h('div', { class: 'text-sm text-muted-foreground' }, new Date(attendance.created_at).toLocaleString());
+                return h('div', { class: 'text-sm text-muted-foreground' }, formatDateTimeToFull(attendance.created_at));
             },
         },
     ];
@@ -284,9 +284,11 @@ const baseColumns = computed<ColumnDef<Attendance>[]>(() => {
     return cols;
 });
 
-const columns = computed(() => createColumns(baseColumns.value, {
-    enableSelection: true,
-}));
+const columns = computed(() =>
+    createColumns(baseColumns.value, {
+        enableSelection: true,
+    }),
+);
 
 // Helper functions
 const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
