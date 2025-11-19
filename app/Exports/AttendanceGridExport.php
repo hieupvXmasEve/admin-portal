@@ -43,7 +43,7 @@ class AttendanceGridExport implements FromArray, WithHeadings, WithStyles, WithT
         $rows[] = ['Allowed Absences:', $this->statistics['allowed_absences'].' (20% of sessions)'];
         $rows[] = ['Students Exceeded:', $this->statistics['students_absent_exceeded']];
         $rows[] = []; // Empty row separator
-        
+
         // Add attendance table headings
         $rows[] = $this->getAttendanceTableHeadings();
 
@@ -70,7 +70,7 @@ class AttendanceGridExport implements FromArray, WithHeadings, WithStyles, WithT
             $row[] = $student['total_absences'].'/'.$student['allowed_absences']; // Show X/Y format
             $row[] = $student['total_late'];
             $row[] = number_format((float) $student['attendance_percentage'], 1).'%';
-            
+
             // Determine status with absences remaining info
             if (! $student['meets_attendance_requirement']) {
                 $row[] = 'Failed';
@@ -154,14 +154,18 @@ class AttendanceGridExport implements FromArray, WithHeadings, WithStyles, WithT
         ]);
 
         // Auto-size columns
-        foreach (range('A', $sheet->getHighestColumn()) as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
+        $highestColumn = $sheet->getHighestColumn();
+        $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
+
+        for ($col = 1; $col <= $highestColumnIndex; $col++) {
+            $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+            $sheet->getColumnDimension($columnLetter)->setAutoSize(true);
         }
 
         // Highlight students who exceeded absence limit
         $firstDataRow = $headerRowNumber + 1;
         $lastDataRow = $firstDataRow + count($this->attendanceGrid) - 1;
-        
+
         for ($row = $firstDataRow; $row <= $lastDataRow; $row++) {
             $studentIndex = $row - $firstDataRow;
             if (isset($this->attendanceGrid[$studentIndex]) && ! $this->attendanceGrid[$studentIndex]['meets_attendance_requirement']) {
