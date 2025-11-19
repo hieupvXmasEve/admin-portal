@@ -16,7 +16,7 @@ import { createColumns } from '@/lib/table-utils';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
-import { AlertCircle, CheckCircle2, ChevronDown, Clock, Download, Edit, Eye, FileSpreadsheet, Filter, RefreshCw, Trash2, Users, XCircle } from 'lucide-vue-next';
+import { AlertCircle, CheckCircle2, ChevronDown, Clock, Download, Edit, Eye, FileSpreadsheet, Filter, RefreshCw, Users, XCircle } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
@@ -721,15 +721,6 @@ const baseSuggestedCoursesColumns: ColumnDef<StudentApplication>[] = [
                                   ]
                                 : []),
                             h(DropdownMenuSeparator, {}),
-                            h(
-                                DropdownMenuItem,
-                                {
-                                    onClick: () => deleteApplication(application),
-                                    class: 'text-red-600',
-                                    disabled: !!application.student,
-                                },
-                                () => [h(Trash2, { class: 'mr-2 h-4 w-4' }), 'Delete'],
-                            ),
                         ]),
                     ],
                 },
