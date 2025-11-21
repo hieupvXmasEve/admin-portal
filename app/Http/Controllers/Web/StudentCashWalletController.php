@@ -152,7 +152,7 @@ class StudentCashWalletController extends Controller
                 $request->validated('description')
             );
 
-            return redirect()->back()->with('success', 'Deposit processed successfully. Transaction ID: '.$transaction->id);
+            return redirect()->back()->with('success', 'Deposit processed successfully. Transaction ID: ' . $transaction->id);
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
         }
@@ -177,7 +177,7 @@ class StudentCashWalletController extends Controller
 
             $type = $request->amount > 0 ? 'credit' : 'debit';
 
-            return redirect()->back()->with('success', "Balance {$type} adjustment processed successfully. Transaction ID: ".$transaction->id);
+            return redirect()->back()->with('success', "Balance {$type} adjustment processed successfully. Transaction ID: " . $transaction->id);
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
         }
@@ -428,12 +428,21 @@ class StudentCashWalletController extends Controller
             try {
                 DB::transaction(function () use ($worksheet, $batchStart, $batchEnd, &$results) {
                     for ($row = $batchStart; $row <= $batchEnd; $row++) {
-                        $results['total_rows']++;
-
                         try {
-                            $studentId = trim($worksheet->getCell("A{$row}")->getCalculatedValue());
-                            $amount = $worksheet->getCell("B{$row}")->getCalculatedValue();
-                            $description = trim($worksheet->getCell("C{$row}")->getCalculatedValue());
+                            $studentIdValue = $worksheet->getCell("A{$row}")->getCalculatedValue();
+                            $amountValue = $worksheet->getCell("B{$row}")->getCalculatedValue();
+                            $descriptionValue = $worksheet->getCell("C{$row}")->getCalculatedValue();
+
+                            // Skip empty rows
+                            if (empty($studentIdValue) && (empty($amountValue) || $amountValue === null)) {
+                                continue;
+                            }
+
+                            $results['total_rows']++;
+
+                            $studentId = trim((string) ($studentIdValue ?? ''));
+                            $amount = $amountValue;
+                            $description = trim((string) ($descriptionValue ?? ''));
 
                             // Validate required fields
                             if (empty($studentId)) {
