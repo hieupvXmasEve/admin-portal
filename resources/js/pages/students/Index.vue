@@ -7,17 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import { usePermission } from '@/composables/usePermission';
 import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
 import type { Program, Student } from '@/types/models';
-import { getStudentStatusBadgeClass, getStudentStatusLabel } from '@/types/student';
+import { getStudentStatusBadgeClass, getStudentStatusDescription, getStudentStatusLabel, STUDENT_STATUS_DESCRIPTIONS, STUDENT_STATUS_LABELS, StudentStatus } from '@/types/student';
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Download, Edit, Eye, FileSpreadsheet, LogIn, RefreshCw, RotateCw, X } from 'lucide-vue-next';
+import { CircleHelp, Download, Edit, Eye, FileSpreadsheet, LogIn, RefreshCw, RotateCw, X } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -283,6 +284,19 @@ const closeExportDialog = () => {
 
 const getStatusDisplayText = (status: string) => getStudentStatusLabel(status);
 
+// Status list for help section
+const statusList = computed(() => {
+    return Object.values(StudentStatus).map((status) => ({
+        value: status,
+        label: STUDENT_STATUS_LABELS[status],
+        description: STUDENT_STATUS_DESCRIPTIONS[status],
+        badgeClass: getStudentStatusBadgeClass(status),
+    }));
+});
+
+// Popover state for help icon
+const helpPopoverOpen = ref(false);
+
 const exportStudents = async () => {
     isExporting.value = true;
 
@@ -373,6 +387,26 @@ const exportStudents = async () => {
                 <p class="text-sm text-gray-500">Manage all students in the system</p>
             </div>
             <div class="flex items-center space-x-2">
+                <Popover v-model:open="helpPopoverOpen">
+                    <PopoverTrigger as-child>
+                        <Button variant="ghost" size="icon" class="h-9 w-9" @mouseenter="helpPopoverOpen = true" @mouseleave="helpPopoverOpen = false">
+                            <CircleHelp class="h-4 w-4" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent class="max-h-[500px] w-96 overflow-y-auto p-4" side="bottom" align="end" @mouseenter="helpPopoverOpen = true" @mouseleave="helpPopoverOpen = false">
+                        <div class="space-y-3">
+                            <h4 class="text-sm font-semibold">Giải thích các trạng thái sinh viên</h4>
+                            <div class="space-y-2">
+                                <div v-for="status in statusList" :key="status.value" class="flex items-start gap-2 rounded-md border bg-gray-50 p-2">
+                                    <span :class="`inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.badgeClass}`">
+                                        {{ status.label }}
+                                    </span>
+                                    <p class="text-sm text-gray-600">{{ status.description }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
                 <Button @click="openExportDialog()" variant="outline" class="border-gray-300">
                     <Download class="mr-2 h-4 w-4" />
                     Export
@@ -444,6 +478,20 @@ const exportStudents = async () => {
                 </div>
                 <div class="mt-4">
                     <DataTable :columns="columns" :data="data" enable-server-sorting :initial-sort="currentSort" :initial-direction="currentDirection" @sort-change="handleSortChange">
+                        <template #cell-status="{ row }">
+                            <TooltipProvider :delay-duration="0">
+                                <Tooltip>
+                                    <TooltipTrigger as-child>
+                                        <span :class="`inline-flex cursor-help items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStudentStatusBadgeClass(row.original.status as string)}`">
+                                            {{ getStudentStatusLabel(row.original.status as string) }}
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent class="max-w-xs">
+                                        <p>{{ getStudentStatusDescription(row.original.status as string) }}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </template>
                         <template #cell-actions="{ row }">
                             <div class="flex items-center space-x-1">
                                 <TooltipProvider>
