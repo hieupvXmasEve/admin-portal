@@ -672,6 +672,16 @@ editForm.targets = props.form.targets || [];
                                                     <div v-for="(option, optionIndex) in question.options" :key="optionIndex" class="flex items-center space-x-2">
                                                         <Input v-model="option.value" placeholder="Option value" class="flex-1" />
                                                         <Input v-model="option.label" placeholder="Option label" class="flex-1" />
+                                                        <Checkbox
+                                                            :id="`section_${sectionIndex}_option_${optionIndex}_free_text`"
+                                                            :model-value="option.allows_free_text"
+                                                            @update:model-value="
+                                                                (value) => {
+                                                                    option.allows_free_text = Boolean(value);
+                                                                }
+                                                            "
+                                                        />
+                                                        <Label :for="`section_${sectionIndex}_option_${optionIndex}_free_text`" class="text-sm"> Allow "Other" </Label>
                                                         <Button variant="ghost" size="sm" @click="removeQuestionOptionFromSection(sectionIndex, questionIndex, optionIndex)">
                                                             <Trash2 class="h-4 w-4" />
                                                         </Button>
@@ -763,6 +773,16 @@ editForm.targets = props.form.targets || [];
                                             <div v-for="(option, optionIndex) in question.options" :key="optionIndex" class="flex items-center space-x-2">
                                                 <Input v-model="option.value" placeholder="Option value" class="flex-1" />
                                                 <Input v-model="option.label" placeholder="Option label" class="flex-1" />
+                                                <Checkbox
+                                                    :id="`simple_option_${optionIndex}_free_text`"
+                                                    :model-value="option.allows_free_text"
+                                                    @update:model-value="
+                                                        (value) => {
+                                                            option.allows_free_text = Boolean(value);
+                                                        }
+                                                    "
+                                                />
+                                                <Label :for="`simple_option_${optionIndex}_free_text`" class="text-sm"> Allow "Other" </Label>
                                                 <Button variant="ghost" size="sm" @click="removeQuestionOption(questionIndex, optionIndex)">
                                                     <Trash2 class="h-4 w-4" />
                                                 </Button>
