@@ -63,12 +63,10 @@ class QueryTicketService
             $query->where('status', $filters['status']);
         }
 
-        if (!empty($filters['topic_id'])) {
-            if ($filters['topic_id'] === 'custom') {
-                $query->whereNull('topic_id')->whereNotNull('custom_topic_text');
-            } else {
-                $query->where('topic_id', $filters['topic_id']);
-            }
+        if (!empty($filters['question_id'])) {
+            $query->whereHas('response.answers', function ($answersQuery) use ($filters) {
+                $answersQuery->where('question_id', $filters['question_id']);
+            });
         }
 
         return $query

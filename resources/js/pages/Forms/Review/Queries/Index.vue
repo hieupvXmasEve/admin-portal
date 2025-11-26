@@ -14,9 +14,10 @@ import { format } from 'date-fns';
 import { computed, reactive } from 'vue';
 import { route } from 'ziggy-js';
 
-interface TopicOption {
-    id: number | string;
-    title: string;
+interface QuestionOption {
+    id: number;
+    text: string;
+    code: string;
 }
 
 interface PaginationSummary {
@@ -33,7 +34,7 @@ interface PaginationSummary {
 
 interface Filters {
     status?: string | null;
-    topic_id?: string | number | null;
+    question_id?: string | number | null;
     per_page?: number;
 }
 
@@ -42,14 +43,14 @@ interface Props {
     pagination: PaginationSummary;
     filters: Filters;
     statusOptions: string[];
-    topics: TopicOption[];
+    questions: QuestionOption[];
 }
 
 const props = defineProps<Props>();
 
 const filterState = reactive({
     status: props.filters.status ?? '',
-    topic: props.filters.topic_id ? String(props.filters.topic_id) : '',
+    question: props.filters.question_id ? String(props.filters.question_id) : '',
     per_page: props.filters.per_page ?? props.pagination.per_page ?? 25,
 });
 
@@ -67,7 +68,7 @@ const columns: ColumnDef<QueryTicket>[] = [
     {
         id: 'content',
         header: 'Question',
-        accessorFn: (row) => row.response?.content_preview ?? '',
+        accessorFn: (row) => row.response?.form?.title ?? '—',
     },
     {
         id: 'campus',
@@ -116,8 +117,8 @@ const applyFilters = () => {
         query.status = filterState.status;
     }
 
-    if (filterState.topic && filterState.topic !== 'all') {
-        query.topic_id = filterState.topic;
+    if (filterState.question && filterState.question !== 'all') {
+        query.question_id = filterState.question;
     }
 
     query.per_page = filterState.per_page;
@@ -130,7 +131,7 @@ const applyFilters = () => {
 
 const clearFilters = () => {
     filterState.status = '';
-    filterState.topic = '';
+    filterState.question = '';
     applyFilters();
 };
 
@@ -195,15 +196,15 @@ const tickets = computed(() => props.tickets ?? []);
                     </div>
 
                     <div class="space-y-2">
-                        <Label for="topic-filter">Topic</Label>
-                        <Select id="topic-filter" v-model="filterState.topic" @update:model-value="applyFilters">
+                        <Label for="question-filter">Question</Label>
+                        <Select id="question-filter" v-model="filterState.question" @update:model-value="applyFilters">
                             <SelectTrigger>
-                                <SelectValue placeholder="All topics" />
+                                <SelectValue placeholder="All questions" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All topics</SelectItem>
-                                <SelectItem v-for="topic in props.topics" :key="topic.id" :value="String(topic.id)">
-                                    {{ topic.title }}
+                                <SelectItem value="all">All questions</SelectItem>
+                                <SelectItem v-for="question in props.questions" :key="question.id" :value="String(question.id)">
+                                    {{ question.text }}
                                 </SelectItem>
                             </SelectContent>
                         </Select>
@@ -230,7 +231,7 @@ const tickets = computed(() => props.tickets ?? []);
                     </template>
 
                     <template #cell-content="{ row }">
-                        <span class="text-muted-foreground text-sm">{{ row.original.response?.content_preview || '—' }}</span>
+                        <div class="text-muted-foreground max-w-96 truncate text-sm">{{ row.original.response?.form?.title || '—' }}</div>
                     </template>
 
                     <template #cell-campus="{ row }">

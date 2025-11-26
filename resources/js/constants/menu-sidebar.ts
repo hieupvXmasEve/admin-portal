@@ -330,9 +330,15 @@ export const mainNavItems: NavItem[] = [
             },
             {
                 title: 'Queries',
-                href: '/forms/queries',
+                href: '/forms/queries/list',
                 icon: ClipboardCheck,
                 requiredPermissions: ['review_form'], // Will be implemented later
+            },
+            {
+                title: 'Settings',
+                href: '/forms/queries/settings',
+                icon: Settings2,
+                requiredPermissions: ['view_form'],
             },
             // {
             //     title: 'Analytics',

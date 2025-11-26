@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\QueryTicketResource;
 use App\Models\Campus;
+use App\Models\Form;
 use App\Models\QueryTicket;
-use App\Models\QueryTopic;
 use App\Services\QueryTicketService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +26,7 @@ class QueryTicketController extends Controller
         $perPage = (int) $request->input('per_page', 25);
         $perPage = min(max($perPage, 10), 100);
 
-        $filters = $request->only(['status', 'topic_id']);
+        $filters = $request->only(['status', 'question_id']);
 
         $tickets = $this->queryTicketService->getTicketsForCampus($user, $campus, $filters, $perPage);
 
@@ -41,30 +41,42 @@ class QueryTicketController extends Controller
             'prev_page_url' => $tickets->previousPageUrl(),
             'next_page_url' => $tickets->nextPageUrl(),
             'per_page' => $tickets->perPage(),
-            'links' => $tickets->toArray()['links'] ?? [],
+            'links' => $tickets->linkCollection()->toArray(), // @phpstan-ignore-line
         ];
 
-        $topics = QueryTopic::active()
-            ->ordered()
-            ->get(['id', 'title'])
-            ->map(fn($topic) => ['id' => $topic->id, 'title' => $topic->title])
-            ->values();
+        // Get questions from active query forms
+        $questions = collect();
+        $queryForms = Form::where('type', 'query')
+            ->where('status', 'active')
+            ->get();
 
-        $topics->push([
-            'id' => 'custom',
-            'title' => 'Other / Custom',
-        ]);
+        foreach ($queryForms as $form) {
+            $version = $form->latestPublishedVersion;
+            if ($version) {
+                $formQuestions = $version->questions()
+                    ->select(['id', 'code', 'text'])
+                    ->orderBy('order_index')
+                    ->get();
+                $questions = $questions->merge($formQuestions);
+            }
+        }
+
+        $questions = $questions->unique('id')->map(fn($question) => [
+            'id' => $question->id,
+            'text' => $question->text,
+            'code' => $question->code,
+        ])->values();
 
         return Inertia::render('Forms/Review/Queries/Index', [
             'tickets' => $ticketsData,
             'pagination' => $pagination,
             'filters' => [
                 'status' => $filters['status'] ?? null,
-                'topic_id' => $filters['topic_id'] ?? null,
+                'question_id' => $filters['question_id'] ?? null,
                 'per_page' => $tickets->perPage(),
             ],
             'statusOptions' => QueryTicket::STATUSES,
-            'topics' => $topics,
+            'questions' => $questions,
         ]);
     }
 
