@@ -184,6 +184,12 @@ class CourseOffering extends AuditableModel
         return $this->belongsTo(Campus::class);
     }
 
+    // Form Survey
+    public function formSurveys(): HasMany
+    {
+        return $this->hasMany(FormSurvey::class, 'course_offering_id');
+    }
+
     // Computed Properties / Accessors
     public function getCourseCodeAttribute(): ?string
     {
