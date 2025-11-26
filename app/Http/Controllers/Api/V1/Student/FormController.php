@@ -15,6 +15,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\FormService;
 use App\Services\ResponseService;
+use App\Services\SystemConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,7 +24,8 @@ class FormController extends Controller
 {
     public function __construct(
         protected FormService $formService,
-        protected ResponseService $responseService
+        protected ResponseService $responseService,
+        protected SystemConfigService $systemConfigService
     ) {}
 
     /**
@@ -57,6 +59,85 @@ class FormController extends Controller
             FormResource::collection($forms),
             [],
             "Get available forms for authenticated student."
+        );
+    }
+
+    /**
+     * Get active query forms for authenticated student.
+     */
+    public function active(Request $request): JsonResponse
+    {
+        $request->validate([
+            'campus_id' => ['nullable', 'exists:campuses,id'],
+        ]);
+
+        // Get authenticated student
+        $student = $request->user();
+
+        if (!$student->isActive()) {
+            return ApiResponse::authorizationError('Student account is not active. Please contact administration.');
+        }
+
+        // Get student's campus (from request or student's default campus)
+        $campusId = $request->input('campus_id', $student->campus_id);
+        $campus = Campus::find($campusId);
+
+        if (!$campus) {
+            return ApiResponse::notFound('Campus not found');
+        }
+
+        // Get active query form IDs from config
+        $config = $this->systemConfigService->getConfig();
+        $activeFormIds = $config['active_query_forms'] ?? [];
+
+        if (empty($activeFormIds)) {
+            return ApiResponse::success(
+                [],
+                [],
+                'No active query forms configured.'
+            );
+        }
+
+        // Get available forms filtered by type 'query'
+        $availableForms = $this->formService->getAvailableFormsForStudent($student, $campus)
+            ->filter(function ($form) {
+                return $form->type === 'query';
+            });
+
+        // Filter by active form IDs and maintain order
+        $forms = collect($activeFormIds)
+            ->map(function ($formId) use ($availableForms) {
+                return $availableForms->firstWhere('id', $formId);
+            })
+            ->filter()
+            ->values();
+
+        if ($forms->isEmpty()) {
+            return ApiResponse::success(
+                [],
+                [],
+                'No active query forms available for this student.'
+            );
+        }
+
+        // Load forms with necessary relationships
+        $forms->each(function ($form) use ($campus) {
+            $form->load([
+                'latestPublishedVersion.sections.questions.options',
+                'latestPublishedVersion.questions.options',
+                'targets' => function ($query) use ($campus) {
+                    $query->where(function ($q) use ($campus) {
+                        $q->whereNull('campus_id')
+                            ->orWhere('campus_id', $campus->id);
+                    });
+                },
+            ]);
+        });
+
+        return ApiResponse::success(
+            FormDetailResource::collection($forms),
+            [],
+            'Active query forms retrieved successfully.'
         );
     }
 

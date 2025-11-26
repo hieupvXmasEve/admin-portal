@@ -3,6 +3,7 @@
 use App\Http\Controllers\FormReviewController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\QueryTicketController;
+use App\Http\Controllers\Web\QuerySettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -50,14 +51,24 @@ Route::middleware(['auth'])->group(function () {
         //     // Route::post('/bulk-review', [FormReviewController::class, 'bulkReview'])->name('bulk');
 
         // });
+
+
+        // Query form settings
+        Route::prefix('queries')->name('queries.')->group(function () {
+            Route::get('/settings', [QuerySettingsController::class, 'index'])
+                ->middleware('can:view_form')
+                ->name('settings.index');
+            Route::post('/settings', [QuerySettingsController::class, 'update'])
+                ->middleware('can:edit_form')
+                ->name('settings.update');
+        });
         // Query ticket management
         Route::prefix('queries')->name('queries.')->middleware('can:review_form')->group(function () {
-            Route::get('/', [QueryTicketController::class, 'index'])->name('index');
+            Route::get('/list', [QueryTicketController::class, 'index'])->name('index');
             Route::get('/{ticket}', [QueryTicketController::class, 'show'])->name('show');
             Route::post('/{ticket}/replies', [QueryTicketController::class, 'storeReply'])->name('replies.store');
             Route::post('/{ticket}/status', [QueryTicketController::class, 'updateStatus'])->name('status.update');
         });
-
         // Analytics routes
         Route::prefix('analytics')->name('analytics.')->group(function () {
             Route::get('/{form}', [FormReviewController::class, 'analytics'])->name('show');
@@ -65,15 +76,3 @@ Route::middleware(['auth'])->group(function () {
         });
     });
 });
-
-// Student form routes (authenticated students only)
-//Route::middleware(['auth:student'])->prefix('student')->name('student.')->group(function () {
-//    Route::prefix('forms')->name('forms.')->group(function () {
-//        Route::get('/', [StudentFormController::class, 'index'])->name('index');
-//        Route::get('/history', [StudentFormController::class, 'history'])->name('history');
-//        Route::get('/{form}', [StudentFormController::class, 'show'])->name('show');
-//        Route::post('/{form}/submit', [StudentFormController::class, 'submit'])->name('submit');
-//        Route::get('/response/{response}/confirmation', [StudentFormController::class, 'confirmation'])->name('confirmation');
-//        Route::get('/response/{response}', [StudentFormController::class, 'viewResponse'])->name('view-response');
-//    });
-//});
