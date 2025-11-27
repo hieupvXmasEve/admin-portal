@@ -2,6 +2,7 @@ import '../css/app.css';
 import '../css/tiptap.css';
 
 import { createInertiaApp } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import { createPinia } from 'pinia';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
@@ -9,6 +10,7 @@ import GlobalConfirmDialog from './components/GlobalConfirmDialog.vue';
 import { initializeTheme } from './composables/useAppearance';
 import { vCan, vCanAny } from './directives/permission';
 import AppLayout from './layouts/AppLayout.vue';
+import { toast } from 'vue-sonner';
 
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
@@ -24,6 +26,29 @@ declare module 'vite/client' {
 }
 
 const appName = import.meta.env.VITE_APP_NAME || 'Swinx';
+
+// Auto-handle flash messages globally using Inertia router events
+// This automatically displays toast notifications when flash messages are present
+// No need for watch or onMounted in components - handled here at app level
+router.on('navigate', (event) => {
+    // Access flash messages from the page props after navigation
+    const flash = (event.detail.page.props as any)?.flash;
+    
+    if (flash) {
+        if (flash.success) {
+            toast.success(flash.success);
+        }
+        if (flash.error) {
+            toast.error(flash.error);
+        }
+        if (flash.warning) {
+            toast.warning(flash.warning);
+        }
+        if (flash.info) {
+            toast.info(flash.info);
+        }
+    }
+});
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,

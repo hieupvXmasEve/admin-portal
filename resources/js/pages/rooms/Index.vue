@@ -5,11 +5,11 @@ import DebouncedInput from '@/components/DebouncedInput.vue';
 import Icon from '@/components/Icon.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useGlobalConfirmDialog } from '@/composables';
+import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import { getRoomStatusOptions, getRoomTypeOptions } from '@/schemas/room';
 import type { PaginatedResponse } from '@/types';
 import type { Building, Room } from '@/types/models';
@@ -18,22 +18,27 @@ import { Head, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { useDebounceFn } from '@vueuse/core';
 import { Building2, Plus, Users, X } from 'lucide-vue-next';
-import { computed, h, ref } from 'vue';
+import { computed, h } from 'vue';
 import { toast } from 'vue-sonner';
+
+interface RoomFilters {
+    search: string;
+    type: string;
+    status: string;
+    building_id: string;
+    floor: string;
+    is_bookable?: boolean;
+    requires_approval?: boolean;
+    min_capacity: string;
+    max_capacity: string;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+    per_page: number;
+}
 
 const props = defineProps<{
     rooms: PaginatedResponse<Room>;
-    filters?: {
-        search?: string;
-        type?: string;
-        status?: string;
-        building_id?: string;
-        floor?: string;
-        is_bookable?: boolean;
-        requires_approval?: boolean;
-        min_capacity?: number;
-        max_capacity?: number;
-    };
+    filters?: Partial<RoomFilters>;
     statistics?: {
         total: number;
         available: number;
@@ -58,20 +63,54 @@ const confirmDialog = useGlobalConfirmDialog();
 // Reactive data
 const data = computed(() => props.rooms.data);
 
-// Filter state - Initialize with props or defaults
-const filters = ref({
-    search: props.filters?.search || '',
-    type: props.filters?.type || '',
-    status: props.filters?.status || '',
-    building_id: props.filters?.building_id || '',
-    floor: props.filters?.floor || '',
-    is_bookable: props.filters?.is_bookable,
-    requires_approval: props.filters?.requires_approval,
-    min_capacity: props.filters?.min_capacity?.toString() || '',
-    max_capacity: props.filters?.max_capacity?.toString() || '',
-    sort: '',
-    direction: 'asc',
-    per_page: 15,
+// Use useInertiaFilters composable
+const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange, currentSort, currentDirection } = useInertiaFilters<RoomFilters>({
+    baseUrl: systemRoutes.rooms.index(),
+    initialFilters: {
+        search: props.filters?.search || '',
+        type: props.filters?.type || 'all',
+        status: props.filters?.status || 'all',
+        building_id: props.filters?.building_id || 'all',
+        floor: props.filters?.floor || 'all',
+        is_bookable: props.filters?.is_bookable,
+        requires_approval: props.filters?.requires_approval,
+        min_capacity: props.filters?.min_capacity?.toString() || '',
+        max_capacity: props.filters?.max_capacity?.toString() || '',
+        sort: props.filters?.sort || null,
+        direction: (props.filters?.direction as 'asc' | 'desc') || null,
+        per_page: props.filters?.per_page || 15,
+    },
+    defaultValues: {
+        per_page: 15,
+        direction: 'asc',
+        type: 'all',
+        status: 'all',
+        building_id: 'all',
+        floor: 'all',
+    },
+    only: ['rooms', 'filters'],
+    debounce: 400,
+    transform: (filters) => {
+        // Transform capacity strings to numbers for server
+        const transformed: Record<string, any> = { ...filters };
+        if (transformed.min_capacity && transformed.min_capacity !== '') {
+            transformed.min_capacity = parseInt(transformed.min_capacity as string, 10);
+        } else {
+            delete transformed.min_capacity;
+        }
+        if (transformed.max_capacity && transformed.max_capacity !== '') {
+            transformed.max_capacity = parseInt(transformed.max_capacity as string, 10);
+        } else {
+            delete transformed.max_capacity;
+        }
+        // Remove empty string values
+        Object.keys(transformed).forEach((key) => {
+            if (transformed[key] === '' || transformed[key] === 'all' || transformed[key] === null) {
+                delete transformed[key];
+            }
+        });
+        return transformed;
+    },
 });
 
 // Room type and status options - Use props if available, fallback to schema
@@ -81,15 +120,15 @@ const roomStatusOptions = props.room_statuses || getRoomStatusOptions();
 // Get unique buildings and floors from props, fallback to data calculation
 const buildingOptions = computed(() => {
     if (props.buildings) {
-        return props?.buildings ? props.buildings.map((building) => ({
-            value: building.id,
+        return props.buildings.map((building) => ({
+            value: building.id.toString(),
             label: building.name,
-        })) : [];
+        }));
     }
 
     const buildings = new Set<string>();
     data.value.forEach((room) => {
-        if (room.building) buildings.add(room.building);
+        if (room.building?.name) buildings.add(room.building.name);
     });
     return Array.from(buildings)
         .sort()
@@ -119,127 +158,30 @@ const floorOptions = computed(() => {
         }));
 });
 
-// Server-side filtering functions
-const applyFilters = (newFilters: typeof filters.value) => {
-    const params = new URLSearchParams();
-    // Add filters to URL params
-    if (newFilters.search) params.set('search', newFilters.search);
-    if (newFilters.type) params.set('type', newFilters.type);
-    if (newFilters.status) params.set('status', newFilters.status);
-    if (newFilters.building_id) params.set('building_id', newFilters.building_id);
-    if (newFilters.floor) params.set('floor', newFilters.floor);
-    if (newFilters.is_bookable !== undefined && newFilters.is_bookable !== null) params.set('is_bookable', newFilters.is_bookable.toString());
-    if (newFilters.requires_approval !== undefined && newFilters.requires_approval !== null) params.set('requires_approval', newFilters.requires_approval.toString());
-    if (newFilters.min_capacity) params.set('min_capacity', newFilters.min_capacity);
-    if (newFilters.max_capacity) params.set('max_capacity', newFilters.max_capacity);
-    if (newFilters.sort) params.set('sort', newFilters.sort);
-    if (newFilters.direction) params.set('direction', newFilters.direction);
-    if (newFilters.per_page) params.set('per_page', newFilters.per_page.toString());
-
-    const url = `${systemRoutes.rooms.index()}${params.toString() ? '?' + params.toString() : ''}`;
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['rooms', 'filters'],
-    });
-};
-
-// Search handler for DebouncedInput
-const handleSearch = (value: string | number) => {
-    filters.value.search = String(value);
-    applyFilters(filters.value);
-};
-
-// Debounced filter functions
-const debouncedApplyFilters = useDebounceFn((newFilters) => {
-    applyFilters(newFilters);
+// Debounced handlers for capacity filters (to avoid too many requests)
+const debouncedApplyFilters = useDebounceFn(() => {
+    // Filters will auto-sync via useInertiaFilters watchDebounced
 }, 500);
 
-const updateSearchFilter = (value: string | number) => {
-    filters.value.search = String(value);
-    debouncedApplyFilters(filters.value);
-};
-
-const updateTypeFilter = (value: any) => {
-    const stringValue = String(value);
-    filters.value.type = stringValue === 'all' || value === null ? '' : stringValue;
-    applyFilters(filters.value);
-};
-
-const updateStatusFilter = (value: any) => {
-    const stringValue = String(value);
-    filters.value.status = stringValue === 'all' || value === null ? '' : stringValue;
-    applyFilters(filters.value);
-};
-
-const updateBuildingFilter = (value: any) => {
-    const stringValue = String(value);
-    filters.value.building_id = stringValue === 'all' || value === null ? '' : stringValue;
-    applyFilters(filters.value);
-};
-
-const updateFloorFilter = (value: any) => {
-    const stringValue = String(value);
-    filters.value.floor = stringValue === 'all' || value === null ? '' : stringValue;
-    applyFilters(filters.value);
-};
-
-const updateBookableFilter = (value: boolean) => {
-    filters.value.is_bookable = value;
-    applyFilters(filters.value);
-};
-
-const updateApprovalFilter = (value: boolean) => {
-    filters.value.requires_approval = value;
-    applyFilters(filters.value);
-};
-
 const updateMinCapacityFilter = (value: string | number) => {
-    filters.value.min_capacity = String(value);
-    debouncedApplyFilters(filters.value);
+    filters.min_capacity = String(value);
+    debouncedApplyFilters();
 };
 
 const updateMaxCapacityFilter = (value: string | number) => {
-    filters.value.max_capacity = String(value);
-    debouncedApplyFilters(filters.value);
+    filters.max_capacity = String(value);
+    debouncedApplyFilters();
 };
 
-const clearFilters = () => {
-    filters.value = {
-        search: '',
-        type: '',
-        status: '',
-        building: '',
-        floor: '',
-        is_bookable: undefined,
-        requires_approval: undefined,
-        min_capacity: '',
-        max_capacity: '',
-        sort: '',
-        direction: 'asc',
-        per_page: 15,
-    };
-    router.visit(systemRoutes.rooms.index(), {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['rooms', 'filters'],
-    });
-};
-
-const hasActiveFilters = computed(() => {
-    return (
-        filters.value.search ||
-        filters.value.type ||
-        filters.value.status ||
-        filters.value.building ||
-        filters.value.floor ||
-        (filters.value.is_bookable !== undefined && filters.value.is_bookable !== null) ||
-        (filters.value.requires_approval !== undefined && filters.value.requires_approval !== null) ||
-        filters.value.min_capacity ||
-        filters.value.max_capacity
-    );
-});
+// Note: updateBookableFilter and updateApprovalFilter are commented out in template
+// Uncomment if needed:
+// const updateBookableFilter = (value: boolean) => {
+//     filters.is_bookable = value;
+// };
+//
+// const updateApprovalFilter = (value: boolean) => {
+//     filters.requires_approval = value;
+// };
 
 // Helper functions
 const getRoomTypeLabel = (type: string) => {
@@ -274,10 +216,6 @@ const editRoom = (roomId: number) => {
     router.visit(systemRoutes.rooms.edit(roomId));
 };
 
-const viewRoom = (roomId: number) => {
-    router.visit(systemRoutes.rooms.show(roomId));
-};
-
 const deleteRoom = (room: Room) => {
     confirmDialog.confirmDelete(room.name, 'room', () => {
         router.delete(systemRoutes.rooms.destroy(room.id), {
@@ -285,12 +223,12 @@ const deleteRoom = (room: Room) => {
             preserveScroll: true,
             only: ['rooms', 'statistics'],
             onSuccess: () => {
-                toast.success("Room deleted successfully")
+                toast.success('Room deleted successfully');
                 console.log('Room deleted successfully');
             },
             onError: () => {
-                toast.error("Room deleted errorfully");
-            }
+                toast.error('Room deleted errorfully');
+            },
         });
     });
 };
@@ -311,7 +249,7 @@ const columns: ColumnDef<Room>[] = [
     },
     {
         header: 'Room',
-        id: 'info',
+        id: 'name',
         accessorKey: 'name',
         enableSorting: true,
         cell: ({ row }) => {
@@ -421,19 +359,7 @@ const columns: ColumnDef<Room>[] = [
     },
 ];
 
-// Pagination navigation
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['rooms'],
-    });
-};
-
-const handlePageSizeChange = (pageSize: number) => {
-    filters.value.per_page = pageSize;
-    applyFilters(filters.value);
-};
+// handlePaginationNavigate and handlePageSizeChange are now provided by useInertiaFilters
 </script>
 
 <template>
@@ -469,126 +395,101 @@ const handlePageSizeChange = (pageSize: number) => {
     </div>
 
     <!-- Filters Section -->
-    <div class="flex flex-wrap items-center gap-4 rounded-lg border p-4">
-        <div class="min-w-[200px] flex-1">
-            <DebouncedInput placeholder="Search rooms..." v-model="filters.search" @debounced="handleSearch" />
+    <div class="space-y-4 rounded-lg border p-4">
+        <!-- Search and Clear -->
+        <div class="flex flex-wrap items-center gap-4">
+            <div class="min-w-[200px] flex-1">
+                <DebouncedInput placeholder="Search rooms..." :model-value="filters.search" @update:model-value="handleSearch" />
+            </div>
+
+            <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
+                <X class="mr-2 h-4 w-4" />
+                Clear Filters
+            </Button>
         </div>
 
-        <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
-            <X class="mr-2 h-4 w-4" />
-            Clear Filters
-        </Button>
+        <!-- Row 1: Type and Status Filters -->
+        <div class="flex flex-wrap items-center gap-4">
+            <!-- Type Filter -->
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Type</Label>
+                <Select :model-value="filters.type || 'all'" @update:model-value="(v) => handleSelectFilter('type', v, 'all')">
+                    <SelectTrigger class="w-48">
+                        <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem v-for="option in roomTypeOptions" :key="option.value" :value="option.value">
+                            {{ option.label }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Status</Label>
+                <Select :model-value="filters.status || 'all'" @update:model-value="(v) => handleSelectFilter('status', v, 'all')">
+                    <SelectTrigger class="w-48">
+                        <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem v-for="option in roomStatusOptions" :key="option.value" :value="option.value">
+                            {{ option.label }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <!-- Building Filter -->
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Building</Label>
+                <Select :model-value="filters.building_id || 'all'" @update:model-value="(v) => handleSelectFilter('building_id', v, 'all')">
+                    <SelectTrigger class="w-48">
+                        <SelectValue placeholder="All Buildings" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Buildings</SelectItem>
+                        <SelectItem v-for="option in buildingOptions" :key="option.value" :value="option.value">
+                            {{ option.label }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <!-- Floor Filter -->
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Floor</Label>
+                <Select :model-value="filters.floor || 'all'" @update:model-value="(v) => handleSelectFilter('floor', v, 'all')">
+                    <SelectTrigger class="w-32">
+                        <SelectValue placeholder="All Floors" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Floors</SelectItem>
+                        <SelectItem v-for="option in floorOptions" :key="option.value" :value="option.value">
+                            {{ option.label }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <!-- Capacity Range -->
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Min Capacity</Label>
+                <Input :model-value="filters.min_capacity" @update:model-value="updateMinCapacityFilter" placeholder="Min" type="number" class="w-24" />
+            </div>
+
+            <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs">Max Capacity</Label>
+                <Input :model-value="filters.max_capacity" @update:model-value="updateMaxCapacityFilter" placeholder="Max" type="number" class="w-24" />
+            </div>
+        </div>
     </div>
 
-    <!-- Advanced Filters Section (collapsible) -->
-    <details class="group">
-        <summary class="hover:bg-muted/50 cursor-pointer rounded-lg border p-4 select-none">
-            <span class="font-medium">Advanced Filters</span>
-            <span class="text-muted-foreground ml-2 text-sm">Type, Status, Location, Capacity</span>
-        </summary>
-
-        <div class="mt-4 space-y-4 rounded-lg border p-4">
-            <!-- Row 1: Type and Status Filters -->
-            <div class="flex flex-wrap items-center gap-2">
-                <!-- Type Filter -->
-                <div class="flex flex-col gap-1">
-                    <Label class="text-muted-foreground text-xs">Type</Label>
-                    <Select :model-value="filters.type || 'all'" @update:model-value="updateTypeFilter">
-                        <SelectTrigger class="w-48">
-                            <SelectValue placeholder="All Types" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem v-for="option in roomTypeOptions" :key="option.value" :value="option.value">
-                                {{ option.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <!-- Status Filter -->
-                <div class="flex flex-col gap-1">
-                    <Label class="text-muted-foreground text-xs">Status</Label>
-                    <Select :model-value="filters.status || 'all'" @update:model-value="updateStatusFilter">
-                        <SelectTrigger class="w-48">
-                            <SelectValue placeholder="All Statuses" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem v-for="option in roomStatusOptions" :key="option.value" :value="option.value">
-                                {{ option.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-
-            <!-- Row 2: Location and Capacity Filters -->
-            <div class="flex flex-wrap items-center gap-2">
-                <!-- Building Filter -->
-                <div class="flex flex-col gap-1">
-                    <Label class="text-muted-foreground text-xs">Building</Label>
-                    <Select :model-value="filters.building_id || 'all'" @update:model-value="updateBuildingFilter">
-                        <SelectTrigger class="w-48">
-                            <SelectValue placeholder="All Buildings" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Buildings</SelectItem>
-                            <SelectItem v-for="option in buildingOptions" :key="option.value" :value="option.value.toString()">
-                                {{ option.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <!-- Floor Filter -->
-                <div class="flex flex-col gap-1">
-                    <Label class="text-muted-foreground text-xs">Floor</Label>
-                    <Select :model-value="filters.floor || 'all'" @update:model-value="updateFloorFilter">
-                        <SelectTrigger class="w-32">
-                            <SelectValue placeholder="All Floors" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Floors</SelectItem>
-                            <SelectItem v-for="option in floorOptions" :key="option.value" :value="option.value">
-                                {{ option.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <!-- Capacity Range -->
-                <div class="flex flex-col gap-1">
-                    <Label class="text-muted-foreground text-xs">Min Capacity</Label>
-                    <Input :model-value="filters.min_capacity" @update:model-value="updateMinCapacityFilter" placeholder="Min" type="number" class="w-24" />
-                </div>
-
-                <div class="flex flex-col gap-1">
-                    <Label class="text-muted-foreground text-xs">Max Capacity</Label>
-                    <Input :model-value="filters.max_capacity" @update:model-value="updateMaxCapacityFilter" placeholder="Max" type="number" class="w-24" />
-                </div>
-            </div>
-
-            <!-- Row 3: Boolean Filters -->
-            <!--            <div class="flex flex-wrap items-center gap-4">-->
-            <!--                &lt;!&ndash; Bookable Filter &ndash;&gt;-->
-            <!--                <div class="flex items-center space-x-2">-->
-            <!--                    <Checkbox id="bookable" :checked="filters.is_bookable === true" @update:checked="(checked: unknown) => updateBookableFilter(checked as boolean)" />-->
-            <!--                    <Label for="bookable" class="text-sm font-medium">Bookable Only</Label>-->
-            <!--                </div>-->
-
-            <!--                &lt;!&ndash; Requires Approval Filter &ndash;&gt;-->
-            <!--                <div class="flex items-center space-x-2">-->
-            <!--                    <Checkbox id="approval" :checked="filters.requires_approval === true" @update:checked="(checked: unknown) => updateApprovalFilter(checked as boolean)" />-->
-            <!--                    <Label for="approval" class="text-sm font-medium">Requires Approval</Label>-->
-            <!--                </div>-->
-            <!--            </div>-->
-        </div>
-    </details>
-
     <!-- Data Table -->
-    <DataTable :data="data" :columns="columns" :show-column-toggle="false">
-        <template #cell-info="{ row }">
+    <DataTable :data="data" :columns="columns" :show-column-toggle="false" enable-server-sorting :initial-sort="currentSort" :initial-direction="currentDirection" @sort-change="handleSortChange">
+        <template #cell-name="{ row }">
             <div class="font-medium">
                 <div class="font-semibold">{{ row.original.name }}</div>
                 <div class="text-muted-foreground text-sm">{{ row.original.code }}</div>

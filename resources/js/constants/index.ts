@@ -9,6 +9,7 @@ export * from './lecture-routes';
 export * from './program-routes';
 export * from './role-routes';
 export * from './room-routes';
+export * from './room-booking-routes';
 export * from './semester-routes';
 export * from './settings-routes';
 export * from './specialization-routes';

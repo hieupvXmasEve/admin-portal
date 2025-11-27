@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Room extends AuditableModel
@@ -86,6 +87,14 @@ class Room extends AuditableModel
     public function building(): BelongsTo
     {
         return $this->belongsTo(Building::class);
+    }
+
+    /**
+     * Get all bookings for this room.
+     */
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(RoomBooking::class);
     }
 
     /**

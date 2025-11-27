@@ -46,6 +46,43 @@ export const mainNavItems: NavItem[] = [
         // requiredPermissions: ['view_dashboard'],
     },
     {
+        title: 'Room Management',
+        href: '#',
+        icon: DoorOpen,
+        children: [
+            {
+                title: 'Rooms',
+                href: systemRoutes.rooms.index(),
+                icon: DoorOpen,
+                requiredPermissions: ['view_room'],
+            },
+            {
+                title: 'Bookings',
+                href: systemRoutes.roomBookings.index(),
+                icon: CalendarIcon,
+                requiredPermissions: ['view_room_booking'],
+            },
+            {
+                title: 'My Bookings',
+                href: systemRoutes.roomBookings.myBookings(),
+                icon: Calendar,
+                requiredPermissions: ['create_room_booking'],
+            },
+            {
+                title: 'Pending Approvals',
+                href: systemRoutes.roomBookings.pending(),
+                icon: Clock,
+                requiredPermissions: ['approve_room_booking'],
+            },
+            {
+                title: 'Calendar',
+                href: systemRoutes.roomBookings.calendar(),
+                icon: CalendarIcon,
+                requiredPermissions: ['view_room_booking'],
+            },
+        ],
+    },
+    {
         title: 'System Management',
         href: '#',
         icon: Settings,
@@ -67,12 +104,6 @@ export const mainNavItems: NavItem[] = [
                 href: systemRoutes.campuses.index(),
                 icon: Building2,
                 requiredPermissions: ['view_campus'], // Will be implemented later
-            },
-            {
-                title: 'Room Management',
-                href: systemRoutes.rooms.index(),
-                icon: DoorOpen,
-                requiredPermissions: ['view_room'],
             },
         ],
     },
