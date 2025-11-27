@@ -89,6 +89,14 @@ return [
             'edit_room' => 'edit_room',
             'delete_room' => 'delete_room',
         ],
+        'room_bookings' => [
+            'view_room_booking' => 'view_room_booking',
+            'create_room_booking' => 'create_room_booking',
+            'edit_room_booking' => 'edit_room_booking',
+            'delete_room_booking' => 'delete_room_booking',
+            'approve_room_booking' => 'approve_room_booking',
+            'manage_room_bookings' => 'manage_room_bookings',
+        ],
         'courses' => [
             'view_course' => 'view_course',
             'create_course' => 'create_course',

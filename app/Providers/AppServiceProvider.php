@@ -2,10 +2,15 @@
 
 namespace App\Providers;
 
+use App\Models\Lecture;
+use App\Models\RoomBooking;
+use App\Models\Student;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +29,22 @@ class AppServiceProvider extends ServiceProvider
     {
         umask(0002);
         $this->configureRateLimiting();
+        $this->configureMorphMap();
+    }
+
+    /**
+     * Configure polymorphic relationship type mapping.
+     * Using morphMap() instead of enforceMorphMap() to only map specific types
+     * without requiring all models to be mapped.
+     */
+    protected function configureMorphMap(): void
+    {
+        Relation::morphMap([
+            RoomBooking::BOOKED_BY_USER => User::class,
+            RoomBooking::BOOKED_BY_STUDENT => Student::class,
+            RoomBooking::BOOKED_BY_LECTURER => User::class, // Lecturer is typically a User with lecturer role
+            RoomBooking::BOOKED_BY_LECTURE => Lecture::class,
+        ]);
     }
 
     /**

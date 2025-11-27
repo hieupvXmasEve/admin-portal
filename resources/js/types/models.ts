@@ -1363,6 +1363,90 @@ export interface RoomFormData {
     booking_notes?: string;
 }
 
+// Room Booking interfaces
+export type RoomBookingType = 'class' | 'exam' | 'meeting' | 'event' | 'maintenance' | 'personal_study' | 'workshop' | 'other';
+export type RoomBookingStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'completed';
+export type RoomBookingPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type RoomBookingRecurrenceType = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+
+export interface RoomBooking {
+    id: number;
+    room_id: number;
+    booked_by_type: string;
+    booked_by_id: number;
+    approved_by_type?: string;
+    approved_by_id?: number;
+    title: string;
+    description?: string;
+    booking_date: string;
+    start_time: string;
+    end_time: string;
+    booking_type: RoomBookingType;
+    status: RoomBookingStatus;
+    priority: RoomBookingPriority;
+    is_recurring: boolean;
+    recurrence_type?: RoomBookingRecurrenceType;
+    recurrence_end_date?: string;
+    recurrence_days?: string[];
+    parent_booking_id?: number;
+    required_equipment?: string[];
+    setup_requirements?: string[];
+    special_requirements?: string;
+    contact_person?: string;
+    contact_phone?: string;
+    contact_email?: string;
+    send_reminders: boolean;
+    rejection_reason?: string;
+    admin_notes?: string;
+    approved_at?: string;
+    cancelled_at?: string;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
+    // Relations
+    room?: Room;
+    booked_by?: User | Student | Lecture;
+    approved_by?: User;
+    actions?: RoomBookingAction[];
+    booker_name?: string;
+}
+
+export interface RoomBookingAction {
+    id: number;
+    room_booking_id: number;
+    action_type: 'created' | 'updated' | 'approved' | 'rejected' | 'cancelled' | 'completed';
+    action_by_type: string;
+    action_by_id: number;
+    note?: string;
+    old_values?: Record<string, unknown>;
+    new_values?: Record<string, unknown>;
+    created_at: string;
+    updated_at: string;
+    // Relations
+    room_booking?: RoomBooking;
+    action_by?: User | Student | Lecture;
+    actor_name?: string;
+    action_label?: string;
+}
+
+export interface RoomBookingFormData {
+    room_id: number;
+    title: string;
+    description?: string;
+    booking_date: string;
+    start_time: string;
+    end_time: string;
+    booking_type: RoomBookingType;
+    priority?: RoomBookingPriority;
+    contact_person?: string;
+    contact_phone?: string;
+    contact_email?: string;
+    required_equipment?: string[];
+    setup_requirements?: string[];
+    special_requirements?: string;
+    send_reminders?: boolean;
+}
+
 // Email Log interfaces
 export interface EmailLog {
     id: number;

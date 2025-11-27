@@ -37,8 +37,8 @@ class RoomController extends Controller
     {
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
-            'type' => 'nullable|string|in:'.implode(',', Room::getTypes()),
-            'status' => 'nullable|string|in:'.implode(',', Room::getStatuses()),
+            'type' => 'nullable|string|in:' . implode(',', Room::getTypes()),
+            'status' => 'nullable|string|in:' . implode(',', Room::getStatuses()),
             'building_id' => 'nullable|integer|exists:buildings,id',
             'floor' => 'nullable|string|max:255',
             'is_bookable' => 'nullable|boolean',
@@ -116,7 +116,7 @@ class RoomController extends Controller
         // Default ordering
         $query->orderBy('created_at', 'desc');
 
-        $rooms = $query->paginate($validated['per_page'] ?? 15)
+        $rooms = $query->paginate((int) ($validated['per_page'] ?? 15))
             ->withQueryString();
         //   ->through(fn ($room) => new RoomResource($room));
 
@@ -354,11 +354,11 @@ class RoomController extends Controller
             'campus_id' => 'nullable|exists:campuses,id',
             'status' => 'nullable|string|in:available,occupied,maintenance,reserved',
             'is_bookable' => 'nullable|string|in:true,false,1,0',
-            'type' => 'nullable|string|in:'.implode(',', Room::getTypes()),
+            'type' => 'nullable|string|in:' . implode(',', Room::getTypes()),
             'search' => 'nullable|string|max:255',
             'limit' => 'nullable|integer|min:1|max:100',
         ]);
-        
+
         // Convert string boolean values to actual booleans
         $isBookable = isset($validated['is_bookable']) ? filter_var($validated['is_bookable'], FILTER_VALIDATE_BOOLEAN) : null;
 
@@ -374,7 +374,7 @@ class RoomController extends Controller
         if ($isBookable !== null) {
             $query->where('is_bookable', $isBookable);
         }
-        
+
         if (isset($validated['type'])) {
             $query->ofType($validated['type']);
         }

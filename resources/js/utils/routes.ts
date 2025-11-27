@@ -9,6 +9,7 @@ import {
     PROGRAM_ROUTE_NAMES,
     ROLE_ROUTE_NAMES,
     ROOM_ROUTE_NAMES,
+    ROOM_BOOKING_ROUTE_NAMES,
     SEMESTER_ROUTE_NAMES,
     SETTINGS_ROUTE_NAMES,
     SPECIALIZATION_ROUTE_NAMES,
@@ -117,6 +118,17 @@ export const systemRoutes = {
         edit: (id: number) => route('events.edit', { event: id }),
         show: (id: number) => route('events.show', { event: id }),
         reports: () => route('events.reports'),
+    },
+    // Room Booking Routes
+    roomBookings: {
+        index: () => route(ROOM_BOOKING_ROUTE_NAMES.INDEX),
+        create: () => route(ROOM_BOOKING_ROUTE_NAMES.CREATE),
+        show: (id: number) => route(ROOM_BOOKING_ROUTE_NAMES.SHOW, { roomBooking: id }),
+        edit: (id: number) => route(ROOM_BOOKING_ROUTE_NAMES.EDIT, { roomBooking: id }),
+        myBookings: () => route(ROOM_BOOKING_ROUTE_NAMES.MY_BOOKINGS),
+        pending: () => route(ROOM_BOOKING_ROUTE_NAMES.PENDING),
+        calendar: () => route(ROOM_BOOKING_ROUTE_NAMES.CALENDAR),
+        logs: () => route(ROOM_BOOKING_ROUTE_NAMES.LOGS),
     },
 } as const;
 

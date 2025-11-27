@@ -108,3 +108,4 @@ require __DIR__ . '/web/invoices.php';
 require __DIR__ . '/web/wallets.php';
 require __DIR__ . '/web/vouchers.php';
 require __DIR__ . '/web/surveys.php';
+require __DIR__ . '/web/room-bookings.php';
