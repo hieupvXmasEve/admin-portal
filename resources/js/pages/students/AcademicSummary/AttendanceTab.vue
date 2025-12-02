@@ -24,6 +24,7 @@ import {
     XCircle,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import DialogDescription from '@/components/ui/dialog/DialogDescription.vue';
 
 interface Props {
     attendance: AttendanceData;
@@ -40,6 +41,7 @@ const selectedSemester = ref<string>('');
 const selectedStatus = ref<string>('');
 const expandedUnits = ref<Set<number>>(new Set());
 const selectedAttendanceDetails = ref<UnitAttendance | null>(null);
+const isDetailsOpen = ref(false);
 
 // Computed filtered data
 const filteredAttendance = computed(() => {
@@ -161,6 +163,7 @@ const unitsAtRisk = computed(() => {
 
 const openAttendanceDetails = (unit: UnitAttendance) => {
     selectedAttendanceDetails.value = unit;
+    isDetailsOpen.value = true;
 };
 </script>
 
@@ -375,92 +378,15 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                                     />
                                     {{ expandedUnits.has(unit.unit_id) ? 'Collapse' : 'Expand' }}
                                 </Button>
-                                <Dialog>
-                                    <DialogTrigger as-child>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            @click="openAttendanceDetails(unit)"
-                                            class="flex items-center gap-2"
-                                        >
-                                            <Eye class="h-4 w-4" />
-                                            Details
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent class="max-w-4xl max-h-[80vh] overflow-y-auto">
-                                        <DialogHeader>
-                                            <DialogTitle>
-                                                {{ unit.unit_name }} - Attendance Details
-                                            </DialogTitle>
-                                        </DialogHeader>
-                                        <div v-if="selectedAttendanceDetails" class="space-y-4">
-                                            <!-- Unit Info -->
-                                            <div class="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                                                <div>
-                                                    <p class="text-sm text-muted-foreground">Unit Code</p>
-                                                    <p class="font-medium">{{ selectedAttendanceDetails.unit_code }}</p>
-                                                </div>
-                                                <div>
-                                                    <p class="text-sm text-muted-foreground">Semester</p>
-                                                    <p class="font-medium">{{ selectedAttendanceDetails.semester }}</p>
-                                                </div>
-                                                <div>
-                                                    <p class="text-sm text-muted-foreground">Total Sessions</p>
-                                                    <p class="font-medium">{{ selectedAttendanceDetails.total_sessions }}</p>
-                                                </div>
-                                                <div>
-                                                    <p class="text-sm text-muted-foreground">Attendance Rate</p>
-                                                    <p
-                                                        class="font-medium text-lg"
-                                                        :class="getAttendanceStatusColor(selectedAttendanceDetails.attendance_status)"
-                                                    >
-                                                        {{ selectedAttendanceDetails.attendance_percentage.toFixed(1) }}%
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <!-- Session Details -->
-                                            <div class="space-y-3">
-                                                <h4 class="font-semibold">Session Details</h4>
-                                                <div class="space-y-2 max-h-96 overflow-y-auto">
-                                                    <div
-                                                        v-for="session in selectedAttendanceDetails.sessions"
-                                                        :key="`${session.session_date}-${session.start_time}`"
-                                                        class="flex items-center justify-between p-3 border rounded-lg"
-                                                    >
-                                                        <div class="flex-1">
-                                                            <p class="font-medium">{{ formatDate(session.session_date) }}</p>
-                                                            <p class="text-sm text-muted-foreground">
-                                                                {{ formatTime(session.start_time) }} - {{ formatTime(session.end_time) }}
-                                                            </p>
-                                                        </div>
-                                                        <div class="flex items-center gap-3">
-                                                            <div v-if="session.check_in_time" class="text-right text-sm">
-                                                                <p class="text-muted-foreground">Check-in</p>
-                                                                <p class="font-medium">{{ formatTime(session.check_in_time) }}</p>
-                                                                <p v-if="session.minutes_late && session.minutes_late > 0" class="text-red-600">
-                                                                    {{ session.minutes_late }} min late
-                                                                </p>
-                                                            </div>
-                                                            <div class="flex items-center gap-2">
-                                                                <component
-                                                                    :is="getSessionStatusIcon(session.status)"
-                                                                    :class="getSessionStatusColor(session.status)"
-                                                                    class="h-5 w-5"
-                                                                />
-                                                                <Badge :variant="session.status === 'present' ? 'default' :
-                                                                                session.status === 'late' ? 'outline' :
-                                                                                session.status === 'excused' ? 'secondary' : 'destructive'">
-                                                                    {{ formatStatus(session.status) }}
-                                                                </Badge>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </DialogContent>
-                                </Dialog>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    @click="openAttendanceDetails(unit)"
+                                    class="flex items-center gap-2"
+                                >
+                                    <Eye class="h-4 w-4" />
+                                    Details
+                                </Button>
                             </div>
                         </div>
                     </CardHeader>
@@ -564,4 +490,81 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
             </div>
         </div>
     </div>
+
+    <Dialog v-model:open="isDetailsOpen">
+        <DialogContent class="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+                <DialogTitle>
+                    {{ selectedAttendanceDetails?.unit_name }} - Attendance Details
+                </DialogTitle>
+                <DialogDescription />
+            </DialogHeader>
+            <div v-if="selectedAttendanceDetails" class="space-y-4">
+                <!-- Unit Info -->
+                <div class="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                    <div>
+                        <p class="text-sm text-muted-foreground">Unit Code</p>
+                        <p class="font-medium">{{ selectedAttendanceDetails.unit_code }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-muted-foreground">Semester</p>
+                        <p class="font-medium">{{ selectedAttendanceDetails.semester }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-muted-foreground">Total Sessions</p>
+                        <p class="font-medium">{{ selectedAttendanceDetails.total_sessions }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-muted-foreground">Attendance Rate</p>
+                        <p
+                            class="font-medium text-lg"
+                            :class="getAttendanceStatusColor(selectedAttendanceDetails.attendance_status)"
+                        >
+                            {{ selectedAttendanceDetails.attendance_percentage.toFixed(1) }}%
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Session Details -->
+                <div class="space-y-3">
+                    <h4 class="font-semibold">Session Details</h4>
+                    <div class="space-y-2 max-h-96 overflow-y-auto">
+                        <div
+                            v-for="session in selectedAttendanceDetails.sessions"
+                            :key="`${session.session_date}-${session.start_time}`"
+                            class="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                            <div class="flex-1">
+                                <p class="font-medium">{{ formatDate(session.session_date) }}</p>
+                                <p class="text-sm text-muted-foreground">
+                                    {{ formatTime(session.start_time) }} - {{ formatTime(session.end_time) }}
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div v-if="session.check_in_time" class="text-right text-sm">
+                                    <p class="text-muted-foreground">Check-in</p>
+                                    <p class="font-medium">{{ formatTime(session.check_in_time) }}</p>
+                                    <p v-if="session.minutes_late && session.minutes_late > 0" class="text-red-600">
+                                        {{ session.minutes_late }} min late
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <component
+                                        :is="getSessionStatusIcon(session.status)"
+                                        :class="getSessionStatusColor(session.status)"
+                                        class="h-5 w-5"
+                                    />
+                                    <Badge :variant="session.status === 'present' ? 'default' :
+                                                    session.status === 'late' ? 'outline' :
+                                                    session.status === 'excused' ? 'secondary' : 'destructive'">
+                                        {{ formatStatus(session.status) }}
+                                    </Badge>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </DialogContent>
+    </Dialog>
 </template>
