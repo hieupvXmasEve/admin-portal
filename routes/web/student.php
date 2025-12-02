@@ -111,6 +111,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_student_summary')
             ->name('students.academic-summary.wallet');
 
+        Route::get('/tuition-plan', [StudentAcademicSummaryController::class, 'tuitionPlan'])
+            ->middleware('can:view_student_summary')
+            ->name('students.academic-summary.tuition-plan');
+
         Route::get('/filter-by-semester', [StudentAcademicSummaryController::class, 'filterBySemester'])
             ->middleware('can:view_student_summary')
             ->name(StudentRoutes::ACADEMIC_SUMMARY_FILTER_BY_SEMESTER);

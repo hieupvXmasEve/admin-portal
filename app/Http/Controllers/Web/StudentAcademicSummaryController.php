@@ -44,6 +44,7 @@ class StudentAcademicSummaryController extends Controller
             'graduation',
             'gold',
             'wallet',
+            'tuitionPlan',
         ]);
     }
 
@@ -232,6 +233,222 @@ class StudentAcademicSummaryController extends Controller
                 'summary' => $walletData['data'] ?? $walletData,
                 'recent_transactions' => $recentTransactionsData['data'] ?? $recentTransactionsData,
                 'stats' => $transactionStatsData['data'] ?? $transactionStatsData,
+            ],
+        ]);
+    }
+
+    /**
+     * Display the tuition plan tab for academic summary
+     *
+     * @param  Student  $student  The student to display tuition plan for
+     * @return Response Inertia response with tuition plan data
+     */
+    public function tuitionPlan(Student $student): Response
+    {
+        $this->authorize('view_student_summary', $student);
+
+        // Get tuition plan for the student
+        $tuitionPlan = \App\Models\TuitionPlan::where('curriculum_version_id', $student->curriculum_version_id)
+            ->where('intake_semester_id', $student->intake_semester_id)
+            ->where('is_active', true)
+            ->with([
+                'curriculumVersion:id,version_code,program_id,specialization_id',
+                'curriculumVersion.program:id,name,code',
+                'curriculumVersion.specialization:id,name,code',
+                'intakeSemester:id,code,name,start_date,end_date',
+                'terms' => function ($query) {
+                    $query->with('semester:id,code,name,start_date,end_date')
+                        ->orderBy('term_number');
+                },
+            ])
+            ->first();
+
+        // Get student scholarship award if exists
+        $scholarshipAward = \App\Models\StudentScholarshipAward::where('student_id', $student->id)
+            ->with(['scholarshipDefinition:id,code,name,description,type,amount,valid_from,valid_until,is_active'])
+            ->first();
+
+        // Format scholarship award data if exists
+        $scholarshipAwardData = null;
+        if ($scholarshipAward) {
+            $scholarshipAwardData = [
+                'id' => $scholarshipAward->id,
+                'scholarship_code' => $scholarshipAward->scholarship_code,
+                'awarded_at' => $scholarshipAward->awarded_at instanceof \Carbon\Carbon
+                    ? $scholarshipAward->awarded_at->format('Y-m-d')
+                    : ($scholarshipAward->awarded_at ? \Carbon\Carbon::parse($scholarshipAward->awarded_at)->format('Y-m-d') : null),
+                'formatted_awarded_at' => $scholarshipAward->awarded_at instanceof \Carbon\Carbon
+                    ? $scholarshipAward->awarded_at->format('d/m/Y')
+                    : ($scholarshipAward->awarded_at ? \Carbon\Carbon::parse($scholarshipAward->awarded_at)->format('d/m/Y') : null),
+                'notes' => $scholarshipAward->notes,
+                'scholarship' => $scholarshipAward->scholarshipDefinition ? [
+                    'id' => $scholarshipAward->scholarshipDefinition->id,
+                    'code' => $scholarshipAward->scholarshipDefinition->code,
+                    'name' => $scholarshipAward->scholarshipDefinition->name,
+                    'description' => $scholarshipAward->scholarshipDefinition->description,
+                    'type' => $scholarshipAward->scholarshipDefinition->type,
+                    'amount' => $scholarshipAward->scholarshipDefinition->amount,
+                    'valid_from' => $scholarshipAward->scholarshipDefinition->valid_from ? (\Carbon\Carbon::parse($scholarshipAward->scholarshipDefinition->valid_from)->format('Y-m-d')) : null,
+                    'valid_until' => $scholarshipAward->scholarshipDefinition->valid_until ? (\Carbon\Carbon::parse($scholarshipAward->scholarshipDefinition->valid_until)->format('Y-m-d')) : null,
+                    'formatted_valid_from' => $scholarshipAward->scholarshipDefinition->valid_from ? (\Carbon\Carbon::parse($scholarshipAward->scholarshipDefinition->valid_from)->format('d/m/Y')) : null,
+                    'formatted_valid_until' => $scholarshipAward->scholarshipDefinition->valid_until ? (\Carbon\Carbon::parse($scholarshipAward->scholarshipDefinition->valid_until)->format('d/m/Y')) : null,
+                    'is_active' => $scholarshipAward->scholarshipDefinition->is_active,
+                    'is_valid' => $scholarshipAward->scholarshipDefinition->isValid(),
+                ] : null,
+            ];
+        }
+
+        if (!$tuitionPlan) {
+            return Inertia::render('students/AcademicSummary/TuitionPlan', [
+                'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+                'tuitionPlan' => null,
+                'scholarshipAward' => $scholarshipAwardData,
+            ]);
+        }
+
+        // Get all invoice items that reference tuition plan terms for this student
+        // Also load invoice with discounts to calculate voucher discounts
+        $invoiceItems = \App\Models\InvoiceItem::whereHas('invoice', function ($query) use ($student) {
+            $query->where('student_id', $student->id);
+        })
+            ->where('reference_type', \App\Models\TuitionPlanTerm::class)
+            ->whereIn('reference_id', $tuitionPlan->terms->pluck('id'))
+            ->with([
+                'invoice' => function ($query) {
+                    $query->select('id', 'invoice_number', 'semester_id', 'due_date', 'status', 'subtotal', 'discount_total', 'total_amount', 'paid_amount')
+                        ->with(['discounts' => function ($q) {
+                            $q->select('id', 'invoice_id', 'discount_type', 'discount_source', 'description', 'amount', 'reference_id')
+                                ->with('voucher:id,code,name,discount_type,discount_value');
+                        }]);
+                },
+            ])
+            ->get();
+
+        // Group invoice items by term_id and calculate payment status with discounts
+        $termPayments = [];
+        foreach ($invoiceItems as $item) {
+            $termId = $item->reference_id;
+            $invoice = $item->invoice;
+
+            // Calculate discount allocated to this item
+            // Discount is allocated proportionally based on item's share of invoice subtotal
+            $itemDiscount = 0;
+            if ($invoice->subtotal > 0 && $invoice->discount_total > 0) {
+                $itemRatio = $item->total_price / $invoice->subtotal;
+                $itemDiscount = $invoice->discount_total * $itemRatio;
+            }
+
+            // Actual amount after discount
+            $itemAmountAfterDiscount = max(0, $item->total_price - $itemDiscount);
+
+            if (!isset($termPayments[$termId])) {
+                $termPayments[$termId] = [
+                    'total_amount' => 0,
+                    'discount_amount' => 0,
+                    'amount_after_discount' => 0,
+                    'paid_amount' => 0,
+                    'invoices' => [],
+                ];
+            }
+
+            $termPayments[$termId]['total_amount'] += $item->total_price;
+            $termPayments[$termId]['discount_amount'] += $itemDiscount;
+            $termPayments[$termId]['amount_after_discount'] += $itemAmountAfterDiscount;
+            $termPayments[$termId]['paid_amount'] += $item->paid_amount;
+
+            // Collect voucher discounts for this invoice
+            $voucherDiscounts = $invoice->discounts
+                ->where('discount_type', 'voucher')
+                ->map(function ($discount) {
+                    return [
+                        'code' => $discount->discount_source,
+                        'name' => $discount->description,
+                        'amount' => $discount->amount,
+                        'voucher' => $discount->voucher ? [
+                            'code' => $discount->voucher->code,
+                            'name' => $discount->voucher->name,
+                            'discount_type' => $discount->voucher->discount_type,
+                            'discount_value' => $discount->voucher->discount_value,
+                        ] : null,
+                    ];
+                })
+                ->values()
+                ->toArray();
+
+            $termPayments[$termId]['invoices'][] = [
+                'invoice_number' => $invoice->invoice_number,
+                'semester_id' => $invoice->semester_id,
+                'due_date' => $invoice->due_date?->format('Y-m-d'),
+                'status' => $invoice->status,
+                'item_total' => $item->total_price,
+                'item_discount' => $itemDiscount,
+                'item_amount_after_discount' => $itemAmountAfterDiscount,
+                'item_paid' => $item->paid_amount,
+                'voucher_discounts' => $voucherDiscounts,
+            ];
+        }
+
+        // Map terms with payment status (using amount after discount for comparison)
+        $termsWithPayment = $tuitionPlan->terms->map(function ($term) use ($termPayments) {
+            $payment = $termPayments[$term->id] ?? null;
+            $paidAmount = $payment ? $payment['paid_amount'] : 0;
+            $originalAmount = $term->amount;
+
+            // If there's an invoice, use amount after discount; otherwise use original amount
+            $amountAfterDiscount = $payment ? $payment['amount_after_discount'] : $originalAmount;
+            $discountAmount = $payment ? $payment['discount_amount'] : 0;
+
+            // Compare paid amount with amount after discount
+            $isPaid = $paidAmount >= $amountAfterDiscount && $amountAfterDiscount > 0;
+            $isPartiallyPaid = $paidAmount > 0 && $paidAmount < $amountAfterDiscount;
+            $isOverdue = !$isPaid && $term->due_date && $term->due_date->isPast();
+
+            // Remaining amount is based on amount after discount
+            $remainingAmount = max(0, $amountAfterDiscount - $paidAmount);
+
+            return [
+                'id' => $term->id,
+                'term_number' => $term->term_number,
+                'amount' => $originalAmount,
+                'discount_amount' => $discountAmount,
+                'amount_after_discount' => $amountAfterDiscount,
+                'due_date' => $term->due_date?->format('Y-m-d'),
+                'formatted_due_date' => $term->due_date?->format('d/m/Y'),
+                'semester' => $term->semester,
+                'paid_amount' => $paidAmount,
+                'remaining_amount' => $remainingAmount,
+                'payment_status' => $isPaid ? 'paid' : ($isPartiallyPaid ? 'partial' : ($isOverdue ? 'overdue' : 'unpaid')),
+                'invoices' => $payment['invoices'] ?? [],
+            ];
+        });
+
+        return Inertia::render('students/AcademicSummary/TuitionPlan', [
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'scholarshipAward' => $scholarshipAwardData,
+            'tuitionPlan' => [
+                'id' => $tuitionPlan->id,
+                'total_amount' => $tuitionPlan->total_amount,
+                'currency' => $tuitionPlan->currency,
+                'is_active' => $tuitionPlan->is_active,
+                'curriculum_version' => $tuitionPlan->curriculumVersion ? [
+                    'id' => $tuitionPlan->curriculumVersion->id,
+                    'version_code' => $tuitionPlan->curriculumVersion->version_code,
+                    'program' => $tuitionPlan->curriculumVersion->program,
+                    'specialization' => $tuitionPlan->curriculumVersion->specialization,
+                ] : null,
+                'intake_semester' => $tuitionPlan->intakeSemester,
+                'terms' => $termsWithPayment,
+                'summary' => [
+                    'total_amount' => $tuitionPlan->total_amount,
+                    'total_discount' => $termsWithPayment->sum('discount_amount'),
+                    'total_after_discount' => $termsWithPayment->sum('amount_after_discount'),
+                    'total_paid' => $termsWithPayment->sum('paid_amount'),
+                    'total_remaining' => $termsWithPayment->sum('remaining_amount'),
+                    'paid_count' => $termsWithPayment->filter(fn($t) => $t['payment_status'] === 'paid')->count(),
+                    'partial_count' => $termsWithPayment->filter(fn($t) => $t['payment_status'] === 'partial')->count(),
+                    'unpaid_count' => $termsWithPayment->filter(fn($t) => $t['payment_status'] === 'unpaid')->count(),
+                    'overdue_count' => $termsWithPayment->filter(fn($t) => $t['payment_status'] === 'overdue')->count(),
+                ],
             ],
         ]);
     }

@@ -6,7 +6,7 @@ import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
 import type { Student } from '@/types/models';
 import { studentRoutes } from '@/utils/routes';
 import { Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, Download, Edit, GraduationCap, LogIn, Target, User, Users, Wallet } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, Download, Edit, GraduationCap, LogIn, Target, User, Users, Wallet, Receipt } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
@@ -62,6 +62,7 @@ const tabs = [
     { key: 'attendance', label: 'Attendance', icon: Users, route: 'students.academic-summary.attendance' },
     // { key: 'gpa', label: 'GPA', icon: BarChart3, route: 'students.academic-summary.gpa' },
     { key: 'graduation', label: 'Graduation', icon: GraduationCap, route: 'students.academic-summary.graduation' },
+    { key: 'tuition-plan', label: 'Tuition Plan', icon: Receipt, route: 'students.academic-summary.tuition-plan' },
     { key: 'gold', label: 'Gold', icon: Wallet, route: 'students.academic-summary.gold' },
     { key: 'wallet', label: 'Cash wallet', icon: Wallet, route: 'students.academic-summary.wallet' },
 ];
@@ -106,7 +107,7 @@ const tabs = [
         <!-- Main Content -->
         <Card>
             <CardHeader class="pb-0">
-                <nav class="grid w-full grid-cols-7 gap-2">
+                <nav class="grid w-full grid-cols-8 gap-2">
                     <Link
                         v-for="tab in tabs"
                         :key="tab.key"
@@ -132,11 +133,11 @@ const tabs = [
 <style scoped>
 /* Custom styles for better mobile responsiveness */
 @media (max-width: 640px) {
-    .grid-cols-7 {
+    .grid-cols-8 {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .grid-cols-7 > :nth-child(n + 4) {
+    .grid-cols-8 > :nth-child(n + 4) {
         grid-column: span 1;
         margin-top: 0.5rem;
     }
