@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\ClassSession;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 
 class UpdateClassSessionStatuses extends Command
 {
@@ -62,12 +60,10 @@ class UpdateClassSessionStatuses extends Command
                 $expectedStatus = $session->getExpectedStatus();
 
                 $statusNeedsUpdate = $currentStatus !== $expectedStatus;
-                $attendanceNeedsCreation = $session->status === 'in_progress' 
-                    && $session->attendances()->count() === 0;
 
-                if (!$statusNeedsUpdate && !$attendanceNeedsCreation && !$isForce) {
+                if (!$statusNeedsUpdate && !$isForce) {
                     if ($isVerbose) {
-                        $this->line("Session {$session->id}: Status '{$currentStatus}' is correct, attendance exists");
+                        $this->line("Session {$session->id}: Status '{$currentStatus}' is correct");
                     }
                     continue;
                 }
@@ -77,26 +73,14 @@ class UpdateClassSessionStatuses extends Command
                     if ($statusNeedsUpdate) {
                         $this->line("Session {$session->id} ({$sessionInfo}): {$currentStatus} → {$expectedStatus}");
                     }
-                    if ($attendanceNeedsCreation) {
-                        $this->line("Session {$session->id} ({$sessionInfo}): Creating missing attendance");
-                    }
                 }
 
-                if (!$isDryRun) {
-                    if ($statusNeedsUpdate) {
-                        $updated = $session->updateStatusIfNeeded();
-                        if ($updated) {
-                            $updatedCount++;
-                        }
-                    }
-                    
-                    // Create attendance if missing for in_progress sessions
-                    if ($attendanceNeedsCreation) {
-                        $session->createDefaultAttendance();
+                if (!$isDryRun && $statusNeedsUpdate) {
+                    $updated = $session->updateStatusIfNeeded();
+                    if ($updated) {
                         $updatedCount++;
                     }
                 }
-
             } catch (\Exception $e) {
                 $errors[] = "Session {$session->id}: {$e->getMessage()}";
                 if ($isVerbose) {
