@@ -310,15 +310,17 @@ class RoomBooking extends AuditableModel
     {
         // Try multiple ways to get the booker
         $booker = null;
-        
-        // Method 1: Try getRelation (polymorphic relationships are stored with the morph key)
-        $booker = $this->getRelation('booked_by');
-        
-        // Method 2: Try getRelationValue (alternative method)
-        if (!$booker) {
+
+        // Method 1: Try getRelationValue (safer - checks if loaded first)
+        if ($this->relationLoaded('bookedBy')) {
             $booker = $this->getRelationValue('bookedBy');
         }
-        
+
+        // Method 2: Try getRelation (polymorphic relationships are stored with the morph key)
+        if (!$booker && $this->relationLoaded('booked_by')) {
+            $booker = $this->getRelation('booked_by');
+        }
+
         // Method 3: Try direct access (will lazy load if not loaded)
         if (!$booker && $this->booked_by_type && $this->booked_by_id) {
             try {
@@ -328,7 +330,7 @@ class RoomBooking extends AuditableModel
                 return 'Unknown';
             }
         }
-        
+
         if (!$booker) {
             return 'Unknown';
         }
@@ -396,4 +398,3 @@ class RoomBooking extends AuditableModel
         return $properties;
     }
 }
-
