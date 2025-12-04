@@ -430,9 +430,9 @@ class ClassSession extends AuditableModel
             $this->save();
 
             // Automatically create attendance when status changes to in_progress
-            if ($expectedStatus === 'in_progress' && $oldStatus !== 'in_progress') {
-                $this->createDefaultAttendance();
-            }
+            // if ($expectedStatus === 'in_progress' && $oldStatus !== 'in_progress') {
+            //     $this->createDefaultAttendance();
+            // }
 
             return true;
         }
