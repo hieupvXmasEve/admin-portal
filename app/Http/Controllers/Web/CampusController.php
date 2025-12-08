@@ -39,7 +39,7 @@ class CampusController extends Controller
         ]);
 
         $page = (int) $request->query('page', 1);
-        $cacheKey = 'campuses:index:'.md5(json_encode([
+        $cacheKey = 'campuses:index:' . md5(json_encode([
             'page' => $page,
             'per_page' => $validated['per_page'] ?? 15,
             'search' => $validated['search'] ?? null,
@@ -85,8 +85,11 @@ class CampusController extends Controller
     {
         $this->campusService->createCampus($request->validated());
 
-        // Invalidate campus caches after creation
+        // Invalidate all campus caches after creation
         Cache::tags(['campuses'])->flush();
+        Cache::tags(['campuses.index'])->flush();
+        Cache::tags(['campuses.show'])->flush();
+        Cache::tags(['campuses.api'])->flush();
 
         return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus created successfully.');
     }
@@ -105,7 +108,7 @@ class CampusController extends Controller
         ]);
 
         $page = (int) $request->query('page', 1);
-        $cacheKey = 'campuses:show:'.md5(json_encode([
+        $cacheKey = 'campuses:show:' . md5(json_encode([
             'campus_id' => $campus->id,
             'page' => $page,
             'per_page' => $validated['per_page'] ?? 15,
@@ -162,8 +165,11 @@ class CampusController extends Controller
     {
         $this->campusService->updateCampus($campus, $request->validated());
 
-        // Invalidate campus caches after update
+        // Invalidate all campus caches after update
         Cache::tags(['campuses'])->flush();
+        Cache::tags(['campuses.index'])->flush();
+        Cache::tags(['campuses.show'])->flush();
+        Cache::tags(['campuses.api'])->flush();
 
         return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus updated successfully.');
     }
@@ -175,8 +181,11 @@ class CampusController extends Controller
     {
         $this->campusService->deleteCampus($campus);
 
-        // Invalidate campus caches after deletion
+        // Invalidate all campus caches after deletion
         Cache::tags(['campuses'])->flush();
+        Cache::tags(['campuses.index'])->flush();
+        Cache::tags(['campuses.show'])->flush();
+        Cache::tags(['campuses.api'])->flush();
 
         return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus deleted successfully.');
     }
@@ -187,7 +196,7 @@ class CampusController extends Controller
     public function api(Request $request)
     {
         $search = (string) ($request->search ?? '');
-        $cacheKey = 'campuses:api:'.md5(json_encode([
+        $cacheKey = 'campuses:api:' . md5(json_encode([
             'search' => $search,
             'limit' => 50,
         ]));
