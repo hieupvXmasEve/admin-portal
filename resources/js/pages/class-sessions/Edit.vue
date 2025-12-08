@@ -129,7 +129,7 @@ const onSubmit = handleSubmit((formValues) => {
     router.put(`/class-sessions/${props.session.id}`, data, {
         onSuccess: () => {
             toast.success('Class session updated successfully');
-            router.visit('/class-sessions');
+            navigateToShow();
         },
         onError: (errors) => {
             toast.error('Failed to update class session');

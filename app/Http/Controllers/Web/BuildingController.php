@@ -13,6 +13,7 @@ use App\Models\Campus;
 use App\Services\BuildingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -98,6 +99,9 @@ class BuildingController extends Controller
         $validatedData['campus_id'] = $campus->id;
         $this->buildingService->createBuilding($validatedData);
 
+        // Invalidate campus show cache since buildings list changed
+        Cache::tags(['campuses', 'campuses.show'])->flush();
+
         return redirect()->route(CampusRoutes::SHOW, $campus)->with('success', 'Building created successfully.');
     }
 
@@ -151,6 +155,9 @@ class BuildingController extends Controller
 
         $this->buildingService->updateBuilding($building, $request->validated());
 
+        // Invalidate campus show cache since buildings list changed
+        Cache::tags(['campuses', 'campuses.show'])->flush();
+
         return redirect()->route(CampusRoutes::SHOW, $campus)->with('success', 'Building updated successfully.');
     }
 
@@ -164,6 +171,9 @@ class BuildingController extends Controller
         }
 
         $this->buildingService->deleteBuilding($building);
+
+        // Invalidate campus show cache since buildings list changed
+        Cache::tags(['campuses', 'campuses.show'])->flush();
 
         return redirect()->route(CampusRoutes::SHOW, $campus)->with('success', 'Building deleted successfully.');
     }
