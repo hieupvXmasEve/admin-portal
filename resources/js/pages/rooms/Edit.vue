@@ -7,8 +7,8 @@ import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
 import { ArrowLeft, Building2 } from 'lucide-vue-next';
-import { computed } from 'vue';
 import { useForm } from 'vee-validate';
+import { computed } from 'vue';
 import { toast } from 'vue-sonner';
 
 // Accept backend-provided props
@@ -37,16 +37,19 @@ const toHMS = (val?: string | null) => {
 };
 
 // Vee-validate form bound to AutoForm (so we can control initial values)
+// Note: building_id needs to be string for select component, schema will transform to number during validation
 const { handleSubmit, meta, isSubmitting } = useForm({
     validationSchema: toTypedSchema(roomFormSchema),
     initialValues: {
         name: props.room.name ?? '',
         code: props.room.code ?? '',
-        building_id: String(props.room.building_id ?? ''),
+        // Use string for select component compatibility, schema will transform to number during validation
+        // Room always has building_id (6 in this case), convert to string to match select options format
+        building_id: props.room.building_id != null ? String(props.room.building_id) : props.buildings?.[0]?.id != null ? String(props.buildings[0].id) : '',
         floor: props.room.floor ?? '',
-        type: props.room.type ?? (props.room_types?.[0]?.value ?? 'classroom'),
+        type: props.room.type ?? props.room_types?.[0]?.value ?? 'classroom',
         capacity: props.room.capacity ?? 30,
-        status: props.room.status ?? (props.room_statuses?.[0]?.value ?? 'available'),
+        status: props.room.status ?? props.room_statuses?.[0]?.value ?? 'available',
         is_bookable: Boolean(props.room.is_bookable),
         requires_approval: Boolean(props.room.requires_approval),
         available_from: toHM(props.room.available_from),
@@ -202,7 +205,7 @@ const hasChanges = computed(() => meta.value.dirty);
             <CardDescription> Update the details for this room. </CardDescription>
         </CardHeader>
         <CardContent class="space-y-6">
-            <AutoForm class="w-full space-y-6" :schema="roomFormSchema" :field-config="fieldConfig" :form="{ handleSubmit, meta, isSubmitting } as any" @submit="onSubmit">
+            <AutoForm class="w-full space-y-6" :schema="roomFormSchema" :field-config="fieldConfig as any" :form="{ handleSubmit, meta, isSubmitting } as any" @submit="onSubmit">
                 <div class="flex items-center justify-end gap-4">
                     <Button type="button" variant="outline" @click="goBack"> Cancel </Button>
                     <Button type="submit" :disabled="isSubmitting || !isFormValid || !hasChanges" class="min-w-[120px]">

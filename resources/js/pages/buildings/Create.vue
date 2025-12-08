@@ -3,7 +3,7 @@ import type { Campus } from '@/types/models';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
-import { ArrowLeft, Building, Hash, Library, List, School, Text } from 'lucide-vue-next';
+import { ArrowLeft, Building, Hash, MapPin, School, Text } from 'lucide-vue-next';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -24,8 +24,8 @@ const createBuildingSchema = toTypedSchema(
         name: z.string().min(1, 'Building name is required').max(255),
         code: z.string().min(1, 'Building code is required').max(20),
         campus_id: z.string().min(1, 'Please select a campus.'),
-        type: z.string().min(1, 'Please select a building type.'),
         description: z.string().max(1000, 'Description must not exceed 1000 characters').optional().nullable(),
+        address: z.string().max(1000, 'Address must not exceed 1000 characters').optional().nullable(),
     }),
 );
 
@@ -34,8 +34,8 @@ const inertiaForm = useForm({
     name: '',
     code: '',
     campus_id: String(props.campus.id),
-    type: '',
     description: '',
+    address: '',
 });
 
 const onSubmit = (values: any) => {
@@ -84,12 +84,7 @@ const goBack = () => {
                 <CardDescription> Enter the details for the new building. All fields marked with * are required. </CardDescription>
             </CardHeader>
             <CardContent>
-                <Form
-                    :validation-schema="createBuildingSchema"
-                    :initial-values="{ campus_id: String(props.campus.id) }"
-                    @submit="onSubmit"
-                    class="space-y-6"
-                >
+                <Form :validation-schema="createBuildingSchema" :initial-values="{ campus_id: String(props.campus.id) }" @submit="onSubmit" class="space-y-6">
                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                         <!-- Building Name -->
                         <FormField v-slot="{ componentField }" name="name">
@@ -113,67 +108,35 @@ const goBack = () => {
                                     Building Code *
                                 </FormLabel>
                                 <FormControl>
-                                    <Input
-                                        v-bind="componentField"
-                                        placeholder="e.g., FPT-HANOI-01"
-                                        class="font-mono"
-                                        :disabled="inertiaForm.processing"
-                                    />
+                                    <Input v-bind="componentField" placeholder="e.g., FPT-HANOI-01" class="font-mono" :disabled="inertiaForm.processing" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                         </FormField>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        <!-- Campus Selection -->
-                        <FormField v-slot="{ componentField }" name="campus_id">
-                            <FormItem>
-                                <FormLabel class="flex items-center gap-2">
-                                    <School class="h-4 w-4" />
-                                    Campus *
-                                </FormLabel>
-                                <Select v-bind="componentField">
-                                    <FormControl>
-                                        <SelectTrigger :disabled="true">
-                                            <SelectValue placeholder="Select a campus" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem :value="String(props.campus.id)">
-                                            {{ props.campus.name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <!-- Building Type -->
-                        <FormField v-slot="{ componentField }" name="type">
-                            <FormItem>
-                                <FormLabel class="flex items-center gap-2">
-                                    <List class="h-4 w-4" />
-                                    Building Type *
-                                </FormLabel>
-                                <Select v-bind="componentField">
-                                    <FormControl>
-                                        <SelectTrigger :disabled="inertiaForm.processing">
-                                            <SelectValue placeholder="Select building type" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="academic"><Library class="mr-2 h-4 w-4" />Academic</SelectItem>
-                                        <SelectItem value="administrative"><Building class="mr-2 h-4 w-4" />Administrative</SelectItem>
-                                        <SelectItem value="dormitory"><School class="mr-2 h-4 w-4" />Dormitory</SelectItem>
-                                        <SelectItem value="library"><Library class="mr-2 h-4 w-4" />Library</SelectItem>
-                                        <SelectItem value="other"><Building class="mr-2 h-4 w-4" />Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-                    </div>
+                    <!-- Campus Selection -->
+                    <FormField v-slot="{ componentField }" name="campus_id">
+                        <FormItem>
+                            <FormLabel class="flex items-center gap-2">
+                                <School class="h-4 w-4" />
+                                Campus *
+                            </FormLabel>
+                            <Select v-bind="componentField">
+                                <FormControl>
+                                    <SelectTrigger :disabled="true">
+                                        <SelectValue placeholder="Select a campus" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem :value="String(props.campus.id)">
+                                        {{ props.campus.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
 
                     <!-- Building Description -->
                     <FormField v-slot="{ componentField }" name="description">
@@ -183,14 +146,23 @@ const goBack = () => {
                                 Description
                             </FormLabel>
                             <FormControl>
-                                <Textarea
-                                    v-bind="componentField"
-                                    placeholder="Enter a brief description of the building (optional)..."
-                                    rows="3"
-                                    :disabled="inertiaForm.processing"
-                                />
+                                <Textarea v-bind="componentField" placeholder="Enter a brief description of the building (optional)..." rows="3" :disabled="inertiaForm.processing" />
                             </FormControl>
                             <FormDescription> A short summary of the building's purpose or features. </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <!-- Building Address -->
+                    <FormField v-slot="{ componentField }" name="address">
+                        <FormItem>
+                            <FormLabel class="flex items-center gap-2">
+                                <MapPin class="h-4 w-4" />
+                                Address
+                            </FormLabel>
+                            <FormControl>
+                                <Textarea v-bind="componentField" placeholder="Enter the building address (optional)..." rows="3" :disabled="inertiaForm.processing" />
+                            </FormControl>
                             <FormMessage />
                         </FormItem>
                     </FormField>
