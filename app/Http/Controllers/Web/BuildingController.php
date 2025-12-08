@@ -102,7 +102,7 @@ class BuildingController extends Controller
         // Invalidate campus show cache since buildings list changed
         Cache::tags(['campuses', 'campuses.show'])->flush();
 
-        return redirect()->route(CampusRoutes::SHOW, $campus)->with('success', 'Building created successfully.');
+        return redirect()->route(CampusRoutes::SHOW, ['campus' => $campus, 'tab' => 'buildings'])->with('success', 'Building created successfully.');
     }
 
     /**
@@ -138,9 +138,13 @@ class BuildingController extends Controller
 
         $building->load(['campus']);
 
+        // Get all campuses for dropdown selection
+        $campuses = Campus::orderBy('name')->get(['id', 'name']);
+
         return Inertia::render('buildings/Edit', [
             'building' => $building,
             'campus' => $campus,
+            'campuses' => $campuses,
         ]);
     }
 
@@ -158,7 +162,7 @@ class BuildingController extends Controller
         // Invalidate campus show cache since buildings list changed
         Cache::tags(['campuses', 'campuses.show'])->flush();
 
-        return redirect()->route(CampusRoutes::SHOW, $campus)->with('success', 'Building updated successfully.');
+        return redirect()->route(CampusRoutes::SHOW, ['campus' => $campus, 'tab' => 'buildings'])->with('success', 'Building updated successfully.');
     }
 
     /**
@@ -175,7 +179,7 @@ class BuildingController extends Controller
         // Invalidate campus show cache since buildings list changed
         Cache::tags(['campuses', 'campuses.show'])->flush();
 
-        return redirect()->route(CampusRoutes::SHOW, $campus)->with('success', 'Building deleted successfully.');
+        return redirect()->route(CampusRoutes::SHOW, ['campus' => $campus, 'tab' => 'buildings'])->with('success', 'Building deleted successfully.');
     }
 
     /**

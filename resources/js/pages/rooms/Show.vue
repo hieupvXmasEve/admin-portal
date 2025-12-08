@@ -1,30 +1,17 @@
 <script setup lang="ts">
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { getRoomTypeOptions, getRoomStatusOptions } from '@/schemas/room';
+import { getRoomStatusOptions, getRoomTypeOptions } from '@/schemas/room';
 import type { Room } from '@/types/models';
 import { systemRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
-import { 
-    ArrowLeft, 
-    Building2, 
-    Users, 
-    MapPin, 
-    Clock, 
-    Settings, 
-    Info, 
-    Edit, 
-    Trash2,
-    CheckCircle,
-    XCircle,
-    Calendar
-} from 'lucide-vue-next';
+import { ArrowLeft, Building2, Calendar, CheckCircle, Clock, Edit, Info, MapPin, Settings, Trash2, Users, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 const props = defineProps<{
-    room: Room;
+    room: Room | { data: Room };
     stats?: {
         total_bookings: number;
         active_bookings: number;
@@ -33,40 +20,51 @@ const props = defineProps<{
     };
 }>();
 
+// Extract room data (handle both direct Room object and wrapped { data: Room } structure)
+const roomData = computed(() => {
+    return 'data' in props.room ? props.room.data : props.room;
+});
+
 // Helper functions
 const getRoomTypeLabel = (type: string) => {
-    const option = getRoomTypeOptions().find(opt => opt.value === type);
+    const option = getRoomTypeOptions().find((opt) => opt.value === type);
     return option?.label || type;
 };
 
 const getRoomStatusLabel = (status: string) => {
-    const option = getRoomStatusOptions().find(opt => opt.value === status);
+    const option = getRoomStatusOptions().find((opt) => opt.value === status);
     return option?.label || status;
 };
 
 const getStatusBadgeVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
     switch (status) {
-        case 'available': return 'default';
-        case 'occupied': return 'secondary';
-        case 'maintenance': return 'outline';
-        case 'out_of_service': return 'destructive';
-        case 'reserved': return 'secondary';
-        default: return 'outline';
+        case 'available':
+            return 'default';
+        case 'occupied':
+            return 'secondary';
+        case 'maintenance':
+            return 'outline';
+        case 'out_of_service':
+            return 'destructive';
+        case 'reserved':
+            return 'secondary';
+        default:
+            return 'outline';
     }
 };
 
 const formatTime = (time: string | null) => {
     if (!time) return 'Not specified';
-    
+
     try {
         // Parse time and format to HH:MM
         const [hours, minutes] = time.split(':');
         const date = new Date();
         date.setHours(parseInt(hours, 10), parseInt(minutes, 10));
-        return date.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
+        return date.toLocaleTimeString('en-US', {
+            hour: '2-digit',
             minute: '2-digit',
-            hour12: false 
+            hour12: false,
         });
     } catch {
         return time;
@@ -75,7 +73,7 @@ const formatTime = (time: string | null) => {
 
 const formatBlockedDays = (days: string[]) => {
     if (!days || days.length === 0) return 'None';
-    
+
     return days.join(', ');
 };
 
@@ -85,12 +83,22 @@ const goBack = () => {
 };
 
 const editRoom = () => {
-    router.visit(systemRoutes.rooms.edit(props.room.id));
+    const id = roomData.value.id;
+    if (!id) {
+        console.error('Room ID is missing', roomData.value);
+        return;
+    }
+    const roomId = Number(id);
+    if (isNaN(roomId) || roomId <= 0) {
+        console.error('Invalid room ID', id);
+        return;
+    }
+    router.visit(systemRoutes.rooms.edit(roomId));
 };
 
 const deleteRoom = () => {
-    if (confirm(`Are you sure you want to delete room "${props.room.name}"?`)) {
-        router.delete(systemRoutes.rooms.destroy(props.room.id), {
+    if (confirm(`Are you sure you want to delete room "${roomData.value.name}"?`)) {
+        router.delete(systemRoutes.rooms.destroy(roomData.value.id), {
             onSuccess: () => {
                 router.visit(systemRoutes.rooms.index());
             },
@@ -100,25 +108,21 @@ const deleteRoom = () => {
 
 // Computed properties
 const roomDisplayName = computed(() => {
-    return props.room.building ? `${props.room.building} - ${props.room.name}` : props.room.name;
+    return roomData.value.building ? `${roomData.value.building.name} - ${roomData.value.name}` : roomData.value.name;
 });
 
 const hasAvailabilityRestrictions = computed(() => {
-    return props.room.available_from || 
-           props.room.available_until || 
-           (props.room.blocked_days && props.room.blocked_days.length > 0);
+    return roomData.value.available_from || roomData.value.available_until || (roomData.value.blocked_days && roomData.value.blocked_days.length > 0);
 });
 
 const hasAdditionalInfo = computed(() => {
-    return props.room.description || 
-           props.room.usage_guidelines || 
-           props.room.booking_notes;
+    return roomData.value.description || roomData.value.usage_guidelines || roomData.value.booking_notes;
 });
 </script>
 
 <template>
-    <Head :title="`Room Details - ${room.name}`" />
-    
+    <Head :title="`Room Details - ${roomData.name}`" />
+
     <!-- Header -->
     <div class="flex items-center gap-4">
         <Button variant="ghost" size="icon" @click="goBack" class="h-8 w-8">
@@ -126,7 +130,7 @@ const hasAdditionalInfo = computed(() => {
         </Button>
         <div class="flex-1">
             <h1 class="text-2xl font-semibold">{{ roomDisplayName }}</h1>
-            <p class="text-muted-foreground">Room Code: {{ room.code }}</p>
+            <p class="text-muted-foreground">Room Code: {{ roomData.code }}</p>
         </div>
         <div class="flex items-center gap-2">
             <Button variant="outline" @click="editRoom" class="flex items-center gap-2">
@@ -142,7 +146,7 @@ const hasAdditionalInfo = computed(() => {
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <!-- Main Information (2/3 width) -->
-        <div class="lg:col-span-2 space-y-6">
+        <div class="space-y-6 lg:col-span-2">
             <!-- Basic Information Card -->
             <Card>
                 <CardHeader>
@@ -154,33 +158,33 @@ const hasAdditionalInfo = computed(() => {
                 <CardContent class="space-y-4">
                     <div class="grid grid-cols-2 gap-6">
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Room Name</p>
-                            <p class="text-base">{{ room.name }}</p>
+                            <p class="text-muted-foreground text-sm font-medium">Room Name</p>
+                            <p class="text-base">{{ roomData.name }}</p>
                         </div>
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Room Code</p>
-                            <p class="text-base font-mono">{{ room.code }}</p>
+                            <p class="text-muted-foreground text-sm font-medium">Room Code</p>
+                            <p class="font-mono text-base">{{ roomData.code }}</p>
                         </div>
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Building</p>
-                            <p class="text-base flex items-center gap-1">
-                                <MapPin class="h-4 w-4 text-muted-foreground" />
-                                {{ room.building }}
+                            <p class="text-muted-foreground text-sm font-medium">Building</p>
+                            <p class="flex items-center gap-1 text-base">
+                                <MapPin class="text-muted-foreground h-4 w-4" />
+                                {{ roomData.building?.name || 'N/A' }}
                             </p>
                         </div>
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Floor</p>
-                            <p class="text-base">{{ room.floor }}</p>
+                            <p class="text-muted-foreground text-sm font-medium">Floor</p>
+                            <p class="text-base">{{ roomData.floor }}</p>
                         </div>
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Type</p>
-                            <p class="text-base">{{ getRoomTypeLabel(room.type) }}</p>
+                            <p class="text-muted-foreground text-sm font-medium">Type</p>
+                            <p class="text-base">{{ getRoomTypeLabel(roomData.type) }}</p>
                         </div>
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Capacity</p>
-                            <p class="text-base flex items-center gap-1">
-                                <Users class="h-4 w-4 text-muted-foreground" />
-                                {{ room.capacity }} people
+                            <p class="text-muted-foreground text-sm font-medium">Capacity</p>
+                            <p class="flex items-center gap-1 text-base">
+                                <Users class="text-muted-foreground h-4 w-4" />
+                                {{ roomData.capacity }} people
                             </p>
                         </div>
                     </div>
@@ -198,23 +202,23 @@ const hasAdditionalInfo = computed(() => {
                 <CardContent class="space-y-4">
                     <div class="grid grid-cols-2 gap-6">
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Status</p>
-                            <Badge :variant="getStatusBadgeVariant(room.status)">
-                                {{ getRoomStatusLabel(room.status) }}
+                            <p class="text-muted-foreground text-sm font-medium">Status</p>
+                            <Badge :variant="getStatusBadgeVariant(roomData.status)">
+                                {{ getRoomStatusLabel(roomData.status) }}
                             </Badge>
                         </div>
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Booking Settings</p>
+                            <p class="text-muted-foreground text-sm font-medium">Booking Settings</p>
                             <div class="flex items-center gap-3">
                                 <div class="flex items-center gap-1">
-                                    <CheckCircle v-if="room.is_bookable" class="h-4 w-4 text-green-500" />
+                                    <CheckCircle v-if="roomData.is_bookable" class="h-4 w-4 text-green-500" />
                                     <XCircle v-else class="h-4 w-4 text-red-500" />
-                                    <span class="text-sm">{{ room.is_bookable ? 'Bookable' : 'Not Bookable' }}</span>
+                                    <span class="text-sm">{{ roomData.is_bookable ? 'Bookable' : 'Not Bookable' }}</span>
                                 </div>
-                                <div v-if="room.is_bookable" class="flex items-center gap-1">
-                                    <CheckCircle v-if="room.requires_approval" class="h-4 w-4 text-orange-500" />
+                                <div v-if="roomData.is_bookable" class="flex items-center gap-1">
+                                    <CheckCircle v-if="roomData.requires_approval" class="h-4 w-4 text-orange-500" />
                                     <XCircle v-else class="h-4 w-4 text-green-500" />
-                                    <span class="text-sm">{{ room.requires_approval ? 'Needs Approval' : 'Auto Approve' }}</span>
+                                    <span class="text-sm">{{ roomData.requires_approval ? 'Needs Approval' : 'Auto Approve' }}</span>
                                 </div>
                             </div>
                         </div>
@@ -233,20 +237,20 @@ const hasAdditionalInfo = computed(() => {
                 <CardContent class="space-y-4">
                     <div class="grid grid-cols-2 gap-6">
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Available From</p>
-                            <p class="text-base">{{ formatTime(room.available_from) }}</p>
+                            <p class="text-muted-foreground text-sm font-medium">Available From</p>
+                            <p class="text-base">{{ formatTime(roomData.available_from) }}</p>
                         </div>
                         <div class="space-y-1">
-                            <p class="text-sm font-medium text-muted-foreground">Available Until</p>
-                            <p class="text-base">{{ formatTime(room.available_until) }}</p>
+                            <p class="text-muted-foreground text-sm font-medium">Available Until</p>
+                            <p class="text-base">{{ formatTime(roomData.available_until) }}</p>
                         </div>
                     </div>
-                    
-                    <div v-if="room.blocked_days && room.blocked_days.length > 0" class="space-y-1">
-                        <p class="text-sm font-medium text-muted-foreground">Blocked Days</p>
+
+                    <div v-if="roomData.blocked_days && roomData.blocked_days.length > 0" class="space-y-1">
+                        <p class="text-muted-foreground text-sm font-medium">Blocked Days</p>
                         <div class="flex items-center gap-1">
-                            <Calendar class="h-4 w-4 text-muted-foreground" />
-                            <p class="text-base">{{ formatBlockedDays(room.blocked_days) }}</p>
+                            <Calendar class="text-muted-foreground h-4 w-4" />
+                            <p class="text-base">{{ formatBlockedDays(roomData.blocked_days) }}</p>
                         </div>
                     </div>
                 </CardContent>
@@ -261,23 +265,23 @@ const hasAdditionalInfo = computed(() => {
                     </CardTitle>
                 </CardHeader>
                 <CardContent class="space-y-4">
-                    <div v-if="room.description" class="space-y-2">
-                        <p class="text-sm font-medium text-muted-foreground">Description</p>
-                        <p class="text-base leading-relaxed">{{ room.description }}</p>
+                    <div v-if="roomData.description" class="space-y-2">
+                        <p class="text-muted-foreground text-sm font-medium">Description</p>
+                        <p class="text-base leading-relaxed">{{ roomData.description }}</p>
                     </div>
 
-                    <Separator v-if="room.description && (room.usage_guidelines || room.booking_notes)" />
+                    <Separator v-if="roomData.description && (roomData.usage_guidelines || roomData.booking_notes)" />
 
-                    <div v-if="room.usage_guidelines" class="space-y-2">
-                        <p class="text-sm font-medium text-muted-foreground">Usage Guidelines</p>
-                        <p class="text-base leading-relaxed">{{ room.usage_guidelines }}</p>
+                    <div v-if="roomData.usage_guidelines" class="space-y-2">
+                        <p class="text-muted-foreground text-sm font-medium">Usage Guidelines</p>
+                        <p class="text-base leading-relaxed">{{ roomData.usage_guidelines }}</p>
                     </div>
 
-                    <Separator v-if="room.usage_guidelines && room.booking_notes" />
+                    <Separator v-if="roomData.usage_guidelines && roomData.booking_notes" />
 
-                    <div v-if="room.booking_notes" class="space-y-2">
-                        <p class="text-sm font-medium text-muted-foreground">Booking Notes</p>
-                        <p class="text-base leading-relaxed">{{ room.booking_notes }}</p>
+                    <div v-if="roomData.booking_notes" class="space-y-2">
+                        <p class="text-muted-foreground text-sm font-medium">Booking Notes</p>
+                        <p class="text-base leading-relaxed">{{ roomData.booking_notes }}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -289,72 +293,37 @@ const hasAdditionalInfo = computed(() => {
             <Card v-if="stats">
                 <CardHeader>
                     <CardTitle class="text-lg">Usage Statistics</CardTitle>
-                    <CardDescription>
-                        Room booking and utilization data
-                    </CardDescription>
+                    <CardDescription> Room booking and utilization data </CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
                     <div class="space-y-3">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-muted-foreground">Total Bookings</span>
+                        <div class="flex items-center justify-between">
+                            <span class="text-muted-foreground text-sm">Total Bookings</span>
                             <span class="font-semibold">{{ stats.total_bookings }}</span>
                         </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-muted-foreground">Active Bookings</span>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-muted-foreground text-sm">Active Bookings</span>
                             <Badge variant="secondary">{{ stats.active_bookings }}</Badge>
                         </div>
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-muted-foreground">Upcoming</span>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-muted-foreground text-sm">Upcoming</span>
                             <Badge variant="outline">{{ stats.upcoming_bookings }}</Badge>
                         </div>
-                        
+
                         <Separator />
-                        
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-muted-foreground">Utilization Rate</span>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-muted-foreground text-sm">Utilization Rate</span>
                             <div class="text-right">
                                 <p class="font-semibold">{{ stats.utilization_rate }}%</p>
-                                <div class="w-20 h-2 bg-muted rounded-full mt-1">
-                                    <div 
-                                        class="h-2 bg-primary rounded-full" 
-                                        :style="{ width: `${Math.min(stats.utilization_rate, 100)}%` }"
-                                    ></div>
+                                <div class="bg-muted mt-1 h-2 w-20 rounded-full">
+                                    <div class="bg-primary h-2 rounded-full" :style="{ width: `${Math.min(stats.utilization_rate, 100)}%` }"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
-
-            <!-- Quick Actions Card -->
-            <Card>
-                <CardHeader>
-                    <CardTitle class="text-lg">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent class="space-y-3">
-                    <Button @click="editRoom" class="w-full justify-start" variant="outline">
-                        <Edit class="mr-2 h-4 w-4" />
-                        Edit Room Details
-                    </Button>
-                    
-                    <Button class="w-full justify-start" variant="outline" disabled>
-                        <Calendar class="mr-2 h-4 w-4" />
-                        View Bookings
-                    </Button>
-                    
-                    <Button class="w-full justify-start" variant="outline" disabled>
-                        <Clock class="mr-2 h-4 w-4" />
-                        Room Schedule
-                    </Button>
-                    
-                    <Separator />
-                    
-                    <Button @click="deleteRoom" class="w-full justify-start" variant="destructive">
-                        <Trash2 class="mr-2 h-4 w-4" />
-                        Delete Room
-                    </Button>
                 </CardContent>
             </Card>
 
@@ -367,36 +336,36 @@ const hasAdditionalInfo = computed(() => {
                     <div class="flex items-center justify-between">
                         <span class="text-sm">Bookable</span>
                         <div class="flex items-center gap-1">
-                            <CheckCircle v-if="room.is_bookable" class="h-4 w-4 text-green-500" />
+                            <CheckCircle v-if="roomData.is_bookable" class="h-4 w-4 text-green-500" />
                             <XCircle v-else class="h-4 w-4 text-red-500" />
-                            <span class="text-sm">{{ room.is_bookable ? 'Yes' : 'No' }}</span>
+                            <span class="text-sm">{{ roomData.is_bookable ? 'Yes' : 'No' }}</span>
                         </div>
                     </div>
-                    
+
                     <div class="flex items-center justify-between">
                         <span class="text-sm">Requires Approval</span>
                         <div class="flex items-center gap-1">
-                            <CheckCircle v-if="room.requires_approval" class="h-4 w-4 text-orange-500" />
+                            <CheckCircle v-if="roomData.requires_approval" class="h-4 w-4 text-orange-500" />
                             <XCircle v-else class="h-4 w-4 text-green-500" />
-                            <span class="text-sm">{{ room.requires_approval ? 'Yes' : 'No' }}</span>
+                            <span class="text-sm">{{ roomData.requires_approval ? 'Yes' : 'No' }}</span>
                         </div>
                     </div>
-                    
+
                     <div class="flex items-center justify-between">
                         <span class="text-sm">Time Restrictions</span>
                         <div class="flex items-center gap-1">
-                            <CheckCircle v-if="room.available_from || room.available_until" class="h-4 w-4 text-orange-500" />
+                            <CheckCircle v-if="roomData.available_from || roomData.available_until" class="h-4 w-4 text-orange-500" />
                             <XCircle v-else class="h-4 w-4 text-green-500" />
-                            <span class="text-sm">{{ (room.available_from || room.available_until) ? 'Yes' : 'None' }}</span>
+                            <span class="text-sm">{{ roomData.available_from || roomData.available_until ? 'Yes' : 'None' }}</span>
                         </div>
                     </div>
-                    
+
                     <div class="flex items-center justify-between">
                         <span class="text-sm">Blocked Days</span>
                         <div class="flex items-center gap-1">
-                            <CheckCircle v-if="room.blocked_days && room.blocked_days.length > 0" class="h-4 w-4 text-orange-500" />
+                            <CheckCircle v-if="roomData.blocked_days && roomData.blocked_days.length > 0" class="h-4 w-4 text-orange-500" />
                             <XCircle v-else class="h-4 w-4 text-green-500" />
-                            <span class="text-sm">{{ (room.blocked_days && room.blocked_days.length > 0) ? room.blocked_days.length : 'None' }}</span>
+                            <span class="text-sm">{{ roomData.blocked_days && roomData.blocked_days.length > 0 ? roomData.blocked_days.length : 'None' }}</span>
                         </div>
                     </div>
                 </CardContent>
