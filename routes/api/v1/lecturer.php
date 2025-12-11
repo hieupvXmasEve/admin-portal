@@ -35,6 +35,7 @@ Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('/refresh', [AuthController::class, 'refresh'])
         //        ->middleware(['lecturer.api.rate:lecturer-auth'])
         ->name('refresh');
+    Route::get('/check-science', [AuthController::class, 'checkScience'])->name('check-science');
 });
 
 // Protected lecturer API routes
