@@ -57,7 +57,7 @@ const goBack = () => {
         </div>
         <Button variant="outline" size="sm" @click="goBack" class="gap-2">
             <ArrowLeft class="h-4 w-4" />
-            Back to Campuses
+            Back
         </Button>
     </div>
 

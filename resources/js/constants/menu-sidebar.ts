@@ -46,6 +46,31 @@ export const mainNavItems: NavItem[] = [
         // requiredPermissions: ['view_dashboard'],
     },
     {
+        title: 'System Management',
+        href: '#',
+        icon: Settings,
+        children: [
+            {
+                title: 'Users',
+                href: systemRoutes.users.index(),
+                icon: Users,
+                requiredPermissions: ['view_user'],
+            },
+            {
+                title: 'Roles & Permissions',
+                href: systemRoutes.roles.index(),
+                icon: ShieldCheck,
+                requiredPermissions: ['view_role'],
+            },
+            {
+                title: 'Campuses & Departments',
+                href: systemRoutes.campuses.index(),
+                icon: Building2,
+                requiredPermissions: ['view_campus'], // Will be implemented later
+            },
+        ],
+    },
+    {
         title: 'Room Management',
         href: '#',
         icon: DoorOpen,
@@ -79,31 +104,6 @@ export const mainNavItems: NavItem[] = [
                 href: systemRoutes.roomBookings.calendar(),
                 icon: CalendarIcon,
                 requiredPermissions: ['view_room_booking'],
-            },
-        ],
-    },
-    {
-        title: 'System Management',
-        href: '#',
-        icon: Settings,
-        children: [
-            {
-                title: 'Users',
-                href: systemRoutes.users.index(),
-                icon: Users,
-                requiredPermissions: ['view_user'],
-            },
-            {
-                title: 'Roles & Permissions',
-                href: systemRoutes.roles.index(),
-                icon: ShieldCheck,
-                requiredPermissions: ['view_role'],
-            },
-            {
-                title: 'Campuses & Departments',
-                href: systemRoutes.campuses.index(),
-                icon: Building2,
-                requiredPermissions: ['view_campus'], // Will be implemented later
             },
         ],
     },
