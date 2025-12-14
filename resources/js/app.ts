@@ -27,29 +27,6 @@ declare module 'vite/client' {
 
 const appName = import.meta.env.VITE_APP_NAME || 'Swinx';
 
-// Auto-handle flash messages globally using Inertia router events
-// This automatically displays toast notifications when flash messages are present
-// No need for watch or onMounted in components - handled here at app level
-router.on('navigate', (event) => {
-    // Access flash messages from the page props after navigation
-    const flash = (event.detail.page.props as any)?.flash;
-    
-    if (flash) {
-        if (flash.success) {
-            toast.success(flash.success);
-        }
-        if (flash.error) {
-            toast.error(flash.error);
-        }
-        if (flash.warning) {
-            toast.warning(flash.warning);
-        }
-        if (flash.info) {
-            toast.info(flash.info);
-        }
-    }
-});
-
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: (name) => {

@@ -34,6 +34,7 @@ class SelectCampus extends Controller
             // Lưu campus vào session
             Session::put('current_campus_id', $campusId);
 
+            /** @var \App\Models\User $user */
             // Lấy tất cả permission code từ User model
             $user = Auth::user();
             $permissions = $user->getAllPermissions($campusId);

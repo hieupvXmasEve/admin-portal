@@ -149,6 +149,9 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
         });
         // Student cash wallet here
     });
+    
+    // API for Web Modals
+    require __DIR__ . '/admin/buildings.php';
 });
 
 // Admin API routes (for external use)

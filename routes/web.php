@@ -4,7 +4,6 @@ use App\Http\Controllers\Api\ElectiveController;
 use App\Http\Controllers\Web\CurriculumVersionController;
 use App\Http\Controllers\Web\SelectCampus;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -71,6 +70,10 @@ Route::get('/health', function () {
         'version' => '1.0.0',
     ]);
 });
+// Review code and optimize
+require __DIR__ . '/web/campuses.php';
+
+require __DIR__ . '/web/rooms.php';
 require __DIR__ . '/web/settings.php';
 require __DIR__ . '/web/auth.php';
 require __DIR__ . '/web/user.php';
@@ -82,8 +85,6 @@ require __DIR__ . '/web/specializations.php';
 require __DIR__ . '/web/curriculum.php';
 require __DIR__ . '/web/course-offerings.php';
 require __DIR__ . '/web/course-registrations.php';
-require __DIR__ . '/web/campuses.php';
-require __DIR__ . '/web/rooms.php';
 require __DIR__ . '/web/lectures.php';
 require __DIR__ . '/web/student.php';
 require __DIR__ . '/web/class-sessions.php';

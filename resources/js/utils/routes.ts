@@ -61,11 +61,9 @@ export const systemRoutes = {
         edit: (id: number) => route(CAMPUS_ROUTE_NAMES.EDIT, { campus: id }),
         show: (id: number) => route(CAMPUS_ROUTE_NAMES.SHOW, { campus: id }),
         buildings: {
-            create: (campusId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_CREATE, { campus: campusId }),
-            store: (campusId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_STORE, { campus: campusId }),
-            edit: (campusId: number, buildingId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_EDIT, { campus: campusId, building: buildingId }),
-            update: (campusId: number, buildingId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_UPDATE, { campus: campusId, building: buildingId }),
-            destroy: (campusId: number, buildingId: number) => route(CAMPUS_ROUTE_NAMES.BUILDINGS_DESTROY, { campus: campusId, building: buildingId }),
+            store: (campusId: number) => route('api.admin.campuses.buildings.store', { campus: campusId }),
+            update: (campusId: number, buildingId: number) => route('api.admin.campuses.buildings.update', { campus: campusId, building: buildingId }),
+            destroy: (campusId: number, buildingId: number) => route('api.admin.campuses.buildings.destroy', { campus: campusId, building: buildingId }),
         },
     },
     // Room Management Routes

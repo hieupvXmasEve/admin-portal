@@ -4,29 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
-use App\Constants\CampusRoutes;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Building\StoreBuildingRequest;
-use App\Http\Requests\Building\UpdateBuildingRequest;
 use App\Models\Building;
 use App\Models\Campus;
-use App\Services\BuildingService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class BuildingController extends Controller
 {
-    public function __construct(protected BuildingService $buildingService)
-    {
-        $this->middleware('can:view_building')->only(['index', 'show']);
-        $this->middleware('can:create_building')->only(['create', 'store']);
-        $this->middleware('can:edit_building')->only(['edit', 'update']);
-        $this->middleware('can:delete_building')->only(['destroy']);
-    }
-
     /**
      * Display a listing of buildings
      */
@@ -81,31 +67,6 @@ class BuildingController extends Controller
     }
 
     /**
-     * Show the form for creating a new building for a specific campus
-     */
-    public function create(Campus $campus): Response
-    {
-        return Inertia::render('buildings/Create', [
-            'campus' => $campus,
-        ]);
-    }
-
-    /**
-     * Store a newly created building for a specific campus
-     */
-    public function store(StoreBuildingRequest $request, Campus $campus): RedirectResponse
-    {
-        $validatedData = $request->validated();
-        $validatedData['campus_id'] = $campus->id;
-        $this->buildingService->createBuilding($validatedData);
-
-        // Invalidate campus show cache since buildings list changed
-        Cache::tags(['campuses', 'campuses.show'])->flush();
-
-        return redirect()->route(CampusRoutes::SHOW, ['campus' => $campus, 'tab' => 'buildings'])->with('success', 'Building created successfully.');
-    }
-
-    /**
      * Display the specified building
      */
     public function show(Building $building): Response
@@ -124,62 +85,6 @@ class BuildingController extends Controller
             'building' => $building,
             'statistics' => $statistics,
         ]);
-    }
-
-    /**
-     * Show the form for editing the specified building within a campus
-     */
-    public function edit(Campus $campus, Building $building): Response
-    {
-        // Ensure the building belongs to the campus
-        if ($building->campus_id !== $campus->id) {
-            abort(404);
-        }
-
-        $building->load(['campus']);
-
-        // Get all campuses for dropdown selection
-        $campuses = Campus::orderBy('name')->get(['id', 'name']);
-
-        return Inertia::render('buildings/Edit', [
-            'building' => $building,
-            'campus' => $campus,
-            'campuses' => $campuses,
-        ]);
-    }
-
-    /**
-     * Update the specified building within a campus
-     */
-    public function update(UpdateBuildingRequest $request, Campus $campus, Building $building): RedirectResponse
-    {
-        if ($building->campus_id !== $campus->id) {
-            abort(404);
-        }
-
-        $this->buildingService->updateBuilding($building, $request->validated());
-
-        // Invalidate campus show cache since buildings list changed
-        Cache::tags(['campuses', 'campuses.show'])->flush();
-
-        return redirect()->route(CampusRoutes::SHOW, ['campus' => $campus, 'tab' => 'buildings'])->with('success', 'Building updated successfully.');
-    }
-
-    /**
-     * Remove the specified building from a campus
-     */
-    public function destroy(Campus $campus, Building $building): RedirectResponse
-    {
-        if ($building->campus_id !== $campus->id) {
-            abort(404);
-        }
-
-        $this->buildingService->deleteBuilding($building);
-
-        // Invalidate campus show cache since buildings list changed
-        Cache::tags(['campuses', 'campuses.show'])->flush();
-
-        return redirect()->route(CampusRoutes::SHOW, ['campus' => $campus, 'tab' => 'buildings'])->with('success', 'Building deleted successfully.');
     }
 
     /**
