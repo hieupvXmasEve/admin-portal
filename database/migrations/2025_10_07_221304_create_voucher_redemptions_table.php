@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('voucher_id')->constrained('voucher_definitions')->onDelete('cascade');
             $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
-            $table->foreignId('billing_cycle_id')->nullable()->constrained('billing_cycles')->nullOnDelete();
+            // Foreign key for billing_cycle_id will be added in a later migration after billing_cycles table exists
+            $table->unsignedBigInteger('billing_cycle_id')->nullable();
             $table->unsignedBigInteger('invoice_id')->nullable();
             $table->enum('status', ['pending', 'redeemed', 'expired', 'cancelled'])->default('pending');
             $table->timestamp('redeemed_at')->nullable();
@@ -28,12 +29,7 @@ return new class extends Migration
             $table->index('status');
         });
 
-        // Add foreign key constraint only if student_invoices table exists
-        if (Schema::hasTable('student_invoices')) {
-            Schema::table('voucher_redemptions', function (Blueprint $table) {
-                $table->foreign('invoice_id')->references('id')->on('student_invoices')->onDelete('set null');
-            });
-        }
+        // Foreign key for invoice_id will be added in a later migration
     }
 
     /**

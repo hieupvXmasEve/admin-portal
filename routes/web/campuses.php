@@ -33,11 +33,4 @@ Route::middleware('auth')->group(function () {
     Route::delete('campuses/{campus}', [CampusController::class, 'destroy'])
         ->middleware('can:delete_campus')
         ->name(CampusRoutes::DESTROY);
-
-
-
-    // API routes for dropdown/select usage
-    Route::get('api/campuses', [CampusController::class, 'api'])
-        ->middleware('can:view_campus')
-        ->name(CampusRoutes::API_CAMPUSES);
 });

@@ -26,26 +26,9 @@ return new class extends Migration
             $table->index(['start_date', 'end_date']);
         });
 
-        // Update voucher_redemptions table to add billing_cycle_id and status
-        if (Schema::hasTable('voucher_redemptions')) {
-            Schema::table('voucher_redemptions', function (Blueprint $table) {
-                // Make redeemed_at nullable
-                $table->timestamp('redeemed_at')->nullable()->change();
-
-                $table->foreignId('billing_cycle_id')
-                    ->nullable()
-                    ->after('student_id')
-                    ->constrained('billing_cycles')
-                    ->nullOnDelete();
-
-                $table->enum('status', ['pending', 'redeemed', 'expired', 'cancelled'])
-                    ->default('pending')
-                    ->after('invoice_id');
-
-                $table->index('billing_cycle_id');
-                $table->index('status');
-            });
-        }
+        // Note: Foreign key for billing_cycle_id in voucher_redemptions will be added
+        // in migration 2025_10_08_113436_add_foreign_keys_to_voucher_redemptions.php
+        // after this migration completes
     }
 
     /**

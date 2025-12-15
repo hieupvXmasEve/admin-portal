@@ -36,9 +36,6 @@ class CampusRoutes
 
     public const BUILDINGS_DESTROY = 'campuses.buildings.destroy';
 
-    // Campus API Routes
-    public const API_CAMPUSES = 'api.campuses';
-
     // Route Prefixes
     public const WEB_PREFIX = 'campuses.';
 
