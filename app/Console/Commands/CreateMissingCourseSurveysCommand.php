@@ -78,6 +78,9 @@ class CreateMissingCourseSurveysCommand extends Command
     {
         $query = CourseOffering::query()
             ->whereDoesntHave('formSurveys')
+            ->whereHas('unit', function ($q) {
+                $q->where('unit_type', '!=', 'egc');
+            })
             ->with(['unit', 'semester']);
 
         // Filter by specific course offering ID
