@@ -47,6 +47,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:edit_course_offering')
             ->name(CourseOfferingRoutes::UPDATE_COURSE_STATUS);
 
+        Route::post('/{courseOffering}/survey', [CourseOfferingController::class, 'createSurvey'])
+            ->middleware('can:edit_course_offering')
+            ->name('course-offerings.create-survey');
+
         // ============================================
         // Split & Duplicate Operations
         // ============================================

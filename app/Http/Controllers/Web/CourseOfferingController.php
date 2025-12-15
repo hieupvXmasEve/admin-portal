@@ -27,15 +27,19 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use App\Services\SystemConfigService;
+use App\Models\Form;
+use App\Models\FormSurvey;
+use App\Models\FormVersion;
+
+use App\Services\CourseSurveyService;
+
 class CourseOfferingController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('can:view_course_offering')->only(['index', 'show']);
-        $this->middleware('can:create_course_offering')->only(['create', 'store']);
-        // $this->middleware('can:edit_course_offering')->only(['edit', 'update']);
-        // $this->middleware('can:delete_course_offering')->only(['destroy']);
-        // $this->middleware('can:manage_course_offering')->only(['bulkDelete', 'toggleStatus', 'showSplit', 'performSplit']);
+    public function __construct(
+        protected SystemConfigService $systemConfigService,
+        protected CourseSurveyService $courseSurveyService
+    ) {
     }
 
     /**
@@ -43,7 +47,7 @@ class CourseOfferingController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = CourseOffering::with(['semester', 'lecture', 'unit'])
+        $query = CourseOffering::with(['semester', 'lecture', 'unit', 'formSurveys'])
             ->join('units', 'course_offerings.unit_id', '=', 'units.id')
             ->where('course_offerings.campus_id', app('campus')->id)
             ->whereNotNull('units.id')
@@ -143,12 +147,27 @@ class CourseOfferingController extends Controller
             $filters['semester_id'] = $defaultSemesterId;
         }
 
+        // Check if survey feature is enabled and get default form
+        $config = $this->systemConfigService->getConfig();
+        $surveyEnabled = $config['survey_enabled'] ?? false;
+        $defaultSurveyFormId = $config['default_course_survey'] ?? null;
+        $defaultSurveyForm = null;
+
+        if ($surveyEnabled && $defaultSurveyFormId) {
+            $defaultSurveyForm = Form::find($defaultSurveyFormId);
+        }
+
         return Inertia::render('course-offerings/Index', [
             'courseOfferings' => $courseOfferings,
             'filters' => $filters,
             'semesters' => $semesters,
             'unitLevels' => $unitLevels,
             'unitTypes' => $unitTypes,
+            'surveyConfig' => [
+                'enabled' => $surveyEnabled,
+                'defaultFormId' => $defaultSurveyFormId,
+                'defaultFormTitle' => $defaultSurveyForm?->title,
+            ],
             'enrollmentStatusOptions' => [
                 ['value' => 'open', 'label' => 'Open'],
                 ['value' => 'closed', 'label' => 'Closed'],
@@ -168,6 +187,45 @@ class CourseOfferingController extends Controller
                 ['value' => 'blended', 'label' => 'Blended'],
             ],
         ]);
+    }
+
+    /**
+     * Create a survey for the course offering
+     */
+    public function createSurvey(Request $request, CourseOffering $courseOffering): RedirectResponse
+    {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
+        $config = $this->systemConfigService->getConfig();
+        $surveyEnabled = $config['survey_enabled'] ?? false;
+        $defaultSurveyFormId = $config['default_course_survey'] ?? null;
+
+        if (!$surveyEnabled || !$defaultSurveyFormId) {
+            return Redirect::back()->with('error', 'Survey feature is not enabled or no default survey form is configured.');
+        }
+
+        // Check if survey already exists
+        if ($courseOffering->formSurveys()->exists()) {
+            return Redirect::back()->with('error', 'A survey has already been created for this course offering.');
+        }
+
+        // Attempt to create survey using service
+        // This will create the form survey AND assign it to all current students
+        $success = $this->courseSurveyService->attachSurveyToCompletedCourse($courseOffering);
+
+        if ($success) {
+            return Redirect::back()->with('success', 'Survey created and assigned to students successfully.');
+        }
+
+        // Handle specific failure cases based on service logic
+        if ($courseOffering->unit && $courseOffering->unit->unit_type === 'egc') {
+            return Redirect::back()->with('error', 'Surveys cannot be created for EGC units.');
+        }
+
+        return Redirect::back()->with('error', 'Failed to create survey. Please ensure the default survey form is active and has a published version.');
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Student;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use App\Services\SystemConfigService;
 use App\Models\Student;
 use App\Models\StudentFormSurvey;
 use App\Models\FormSurvey;
@@ -17,7 +18,8 @@ use Illuminate\Support\Facades\DB;
 class SurveyController extends Controller
 {
     public function __construct(
-        protected ResponseService $responseService
+        protected ResponseService $responseService,
+        protected SystemConfigService $systemConfigService
     ) {}
 
     /**
@@ -25,6 +27,16 @@ class SurveyController extends Controller
      */
     public function pending(Request $request): JsonResponse
     {
+        // Check if survey feature is enabled
+        $config = $this->systemConfigService->getConfig();
+        if (empty($config['survey_enabled'])) {
+             return ApiResponse::success(
+                [],
+                [],
+                'Survey feature is disabled.'
+            );
+        }
+
         // Get authenticated student
         $student = Auth::guard('student')->user();
 
