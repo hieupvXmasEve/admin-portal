@@ -9,20 +9,43 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('upload_records', function (Blueprint $table) {
-            if (!Schema::hasColumn('upload_records', 'response_id')) {
-                $table->foreignId('response_id')->nullable()->after('student_id')->constrained('responses')->nullOnDelete();
+            // Add foreign key constraints for existing columns
+            // Columns were created in create_upload_records_table migration without foreign keys
+            // to avoid dependency issues during migration
+
+            if (Schema::hasColumn('upload_records', 'student_id')) {
+                $table->foreign('student_id')
+                    ->references('id')
+                    ->on('students')
+                    ->onDelete('set null');
             }
 
-            if (!Schema::hasColumn('upload_records', 'answer_id')) {
-                $table->foreignId('answer_id')->nullable()->after('response_id')->constrained('answers')->nullOnDelete();
+            if (Schema::hasColumn('upload_records', 'response_id')) {
+                $table->foreign('response_id')
+                    ->references('id')
+                    ->on('responses')
+                    ->onDelete('set null');
             }
 
-            if (!Schema::hasColumn('upload_records', 'ticket_id')) {
-                $table->foreignId('ticket_id')->nullable()->after('answer_id')->constrained('queries_tickets')->nullOnDelete();
+            if (Schema::hasColumn('upload_records', 'answer_id')) {
+                $table->foreign('answer_id')
+                    ->references('id')
+                    ->on('answers')
+                    ->onDelete('set null');
             }
 
-            if (!Schema::hasColumn('upload_records', 'reply_id')) {
-                $table->foreignId('reply_id')->nullable()->after('ticket_id')->constrained('query_replies')->nullOnDelete();
+            if (Schema::hasColumn('upload_records', 'ticket_id')) {
+                $table->foreign('ticket_id')
+                    ->references('id')
+                    ->on('queries_tickets')
+                    ->onDelete('set null');
+            }
+
+            if (Schema::hasColumn('upload_records', 'reply_id')) {
+                $table->foreign('reply_id')
+                    ->references('id')
+                    ->on('query_replies')
+                    ->onDelete('set null');
             }
         });
     }

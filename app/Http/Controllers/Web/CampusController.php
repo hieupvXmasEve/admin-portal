@@ -114,17 +114,4 @@ class CampusController extends Controller
 
         return redirect()->route(CampusRoutes::INDEX)->with('success', 'Campus deleted successfully.');
     }
-
-    /**
-     * Get campuses for API/dropdown usage
-     */
-    public function api(Request $request, \App\Actions\Campus\GetCampusDropdownAction $action)
-    {
-        $campuses = $action->execute($request->string('search')->toString());
-
-        return response()->json([
-            'success' => true,
-            'data' => $campuses,
-        ]);
-    }
 }

@@ -23,11 +23,13 @@ return new class extends Migration
             $table->text('url')->nullable(); // Public URL if applicable
             $table->string('hash')->nullable()->index(); // File hash for deduplication
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
-            $table->foreignId('student_id')->nullable()->constrained()->onDelete('set null');
-            $table->foreignId('response_id')->nullable()->constrained('responses')->onDelete('set null');
-            $table->foreignId('answer_id')->nullable()->constrained('answers')->onDelete('set null');
-            $table->foreignId('ticket_id')->nullable()->constrained('queries_tickets')->onDelete('set null');
-            $table->foreignId('reply_id')->nullable()->constrained('query_replies')->onDelete('set null');
+            // Foreign keys for student_id, response_id, answer_id, ticket_id, reply_id 
+            // will be added in later migrations after the referenced tables exist
+            $table->unsignedBigInteger('student_id')->nullable();
+            $table->unsignedBigInteger('response_id')->nullable();
+            $table->unsignedBigInteger('answer_id')->nullable();
+            $table->unsignedBigInteger('ticket_id')->nullable();
+            $table->unsignedBigInteger('reply_id')->nullable();
             $table->json('metadata')->nullable(); // Additional metadata (dimensions, etc.)
             $table->timestamp('expires_at')->nullable(); // For temporary uploads
             $table->timestamps();

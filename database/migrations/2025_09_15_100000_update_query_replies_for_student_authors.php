@@ -16,6 +16,15 @@ return new class extends Migration
             $table->dropForeign(['author_user_id']);
         });
 
+        // Drop foreign key for author_student_id if it exists (created in create_query_replies_table)
+        try {
+            Schema::table('query_replies', function (Blueprint $table) {
+                $table->dropForeign(['author_student_id']);
+            });
+        } catch (\Exception $e) {
+            // Foreign key might not exist, ignore
+        }
+
         DB::statement('ALTER TABLE query_replies MODIFY author_user_id BIGINT UNSIGNED NULL');
 
         Schema::table('query_replies', function (Blueprint $table) {
@@ -24,10 +33,10 @@ return new class extends Migration
                 ->on('users')
                 ->nullOnDelete();
 
-            $table->foreignId('author_student_id')
-                ->nullable()
-                ->after('author_user_id')
-                ->constrained('students')
+            // Re-add foreign key for author_student_id (column already exists from create_query_replies_table)
+            $table->foreign('author_student_id')
+                ->references('id')
+                ->on('students')
                 ->nullOnDelete();
         });
     }
