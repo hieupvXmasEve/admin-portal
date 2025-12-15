@@ -1,5 +1,6 @@
 import { BadgeVariants } from '@/components/ui/badge';
 import { EmergencyContactStatus } from '@/types/student';
+import { Form } from './forms';
 
 export interface Specialization {
     id: number;
@@ -935,6 +936,7 @@ export interface CourseOffering {
     additional_fees: number;
     drop_deadline?: string;
     withdrawal_deadline?: string;
+    form_surveys?: Form[];
 }
 
 export enum ClassSessionStatus {

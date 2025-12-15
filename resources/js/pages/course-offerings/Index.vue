@@ -40,6 +40,11 @@ interface Props {
         warning?: string;
         info?: string;
     };
+    surveyConfig?: {
+        enabled: boolean;
+        defaultFormId: number | null;
+        defaultFormTitle: string | null;
+    };
 }
 const props = defineProps<Props>();
 const filters = ref({
@@ -231,6 +236,47 @@ const duplicateCourseOffering = (courseOffering: CourseOffering) => {
                             onError: () => {
                                 toast.error('Failed to duplicate course offering');
                                 reject(new Error('Failed to duplicate course offering'));
+                            },
+                        },
+                    );
+                });
+            },
+        },
+    );
+};
+
+const createSurvey = (courseOffering: CourseOffering) => {
+    // Check if survey enabled
+    if (!props.surveyConfig?.enabled) {
+        toast.error('Survey feature is not enabled');
+        return;
+    }
+
+    if (!props.surveyConfig?.defaultFormId) {
+        toast.error('No default survey form configured');
+        return;
+    }
+
+    confirmDialog.showConfirmDialog(
+        {
+            title: 'Create Survey',
+            message: `Create a survey for ${courseOffering.unit?.code} using " ${props.surveyConfig.defaultFormTitle}"?`,
+            confirmText: 'Create Survey',
+        },
+        {
+            onConfirm: () => {
+                return new Promise((resolve, reject) => {
+                    router.post(
+                        `/course-offerings/${courseOffering.id}/survey`,
+                        {},
+                        {
+                            onSuccess: () => {
+                                toast.success('Survey created successfully');
+                                resolve();
+                            },
+                            onError: (errors) => {
+                                toast.error('Failed to create survey');
+                                reject(new Error('Failed to create survey'));
                             },
                         },
                     );
@@ -433,6 +479,43 @@ const columns: ColumnDef<CourseOffering>[] = [
         cell: ({ row }) => {
             const semester = row.original.semester;
             return semester ? h('div', {}, [h('div', { class: 'font-medium' }, semester.name), h('div', { class: 'text-sm text-muted-foreground' }, semester.code)]) : 'N/A';
+        },
+    },
+    {
+        id: 'survey',
+        header: 'Survey',
+        cell: ({ row }) => {
+            const course = row.original;
+
+             // Don't show survey column for EGC units
+            if (course.unit?.unit_type === 'egc') {
+                return h('span', { class: 'text-xs text-muted-foreground' }, '-');
+            }
+
+            const hasSurvey = course.form_surveys && course.form_surveys.length > 0;
+            const surveyEnabled = props.surveyConfig?.enabled && props.surveyConfig?.defaultFormId;
+
+            if (hasSurvey) {
+                return h(Badge, { variant: 'outline', class: 'bg-green-50 text-green-700 border-green-200' }, () => 'Created');
+            }
+
+            if (!surveyEnabled) {
+                 return h('span', { class: 'text-xs text-muted-foreground' }, 'Not Configured');
+            }
+
+            return h(
+                Button,
+                {
+                    variant: 'outline',
+                    size: 'sm',
+                    class: 'h-7 text-xs',
+                    onClick: (e: Event) => {
+                        e.stopPropagation(); // Prevent row click
+                        createSurvey(course);
+                    },
+                },
+                () => 'Create Survey'
+            );
         },
     },
     {
