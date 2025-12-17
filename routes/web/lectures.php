@@ -63,6 +63,10 @@ Route::middleware('auth')->group(function () {
         ->middleware('can:view_lecturer')
         ->name(LectureRoutes::TEACHING_HOURS);
 
+    Route::get('lectures/teaching-hours/{lecture}', [LectureController::class, 'showTeachingHours'])
+        ->middleware('can:view_lecturer')
+        ->name(LectureRoutes::TEACHING_HOURS_DETAILS);
+
     Route::get('lectures/{lecture}', [LectureController::class, 'show'])
         ->middleware('can:view_lecturer')
         ->name(LectureRoutes::SHOW);

@@ -7,9 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useInertiaFilters } from '@/composables/useInertiaFilters';
-import type { PaginatedResponse } from '@/types';
-import { Head } from '@inertiajs/vue3';
+import { useInertiaFilters } from '@/composables';
+import { PaginatedResponse } from '@/types';
+import { Head, Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
 import { Clock, X } from 'lucide-vue-next';
 import { computed, h } from 'vue';
@@ -82,6 +82,10 @@ const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilte
         sort: 'name',
     },
     only: ['lecturers', 'filters'],
+    transform: (filters) => ({
+        ...filters,
+        per_page: Number(filters.per_page),
+    }),
 });
 
 // Computed sort values for DataTable (unwrap computed refs)
@@ -132,7 +136,14 @@ const columns: ColumnDef<LecturerTeachingHours>[] = [
         accessorKey: 'lecture_name',
         enableSorting: true,
         cell: ({ row }) => {
-            return h('span', { class: 'font-medium' }, row.original.lecture_name);
+            return h(
+                Link,
+                {
+                    href: `/lectures/teaching-hours/${row.original.lecture_id}`,
+                    class: 'font-medium hover:underline text-primary',
+                },
+                () => row.original.lecture_name,
+            );
         },
     },
     {
