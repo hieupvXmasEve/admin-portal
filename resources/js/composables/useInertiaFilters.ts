@@ -154,7 +154,7 @@ export function useInertiaFilters<T extends Record<string, any>>(options: Inerti
 
             // Handle arrays
             if (Array.isArray(value)) {
-                value.forEach((v) => params.append(key, String(v)));
+                value.forEach((v) => params.append(key.endsWith('[]') ? key : `${key}[]`, String(v)));
             } else {
                 params.set(key, String(value));
             }
