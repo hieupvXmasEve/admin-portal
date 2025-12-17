@@ -29,6 +29,7 @@ interface FormSurvey {
         id: number;
         course_code: string;
         course_title: string;
+        section_code: string;
         semester: {
             id: number;
             code: string;
@@ -134,6 +135,11 @@ const columns: ColumnDef<FormSurvey>[] = [
         accessorKey: 'course_offering.course_title',
         header: 'Course Title',
         cell: ({ row }) => row.original.course_offering.course_title,
+    },
+    {
+        accessorKey: 'course_offering.section_code',
+        header: 'Section Code',
+        cell: ({ row }) => row.original.course_offering.section_code,
     },
     {
         accessorKey: 'form.title',
