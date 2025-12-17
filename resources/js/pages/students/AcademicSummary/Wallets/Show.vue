@@ -6,7 +6,7 @@ import { Head } from '@inertiajs/vue3';
 import WalletTab from '../WalletTab.vue';
 
 interface Props {
-    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email'>;
+    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email' | 'intake'>;
     wallet: StudentCashWallet;
     transactions: PaginatedTransactions;
     stats: WalletStats;

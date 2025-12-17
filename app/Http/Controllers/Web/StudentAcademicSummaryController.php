@@ -102,7 +102,7 @@ class StudentAcademicSummaryController extends Controller
         $overviewData = $this->academicSummaryService->getOverviewData($student);
 
         return Inertia::render('students/AcademicSummary/Overview', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
             'overview' => $overviewData,
         ]);
     }
@@ -127,7 +127,7 @@ class StudentAcademicSummaryController extends Controller
         $registrationsData = $this->academicSummaryService->getRegistrationsData($student);
 
         return Inertia::render('students/AcademicSummary/Registrations', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
             'registrations' => $registrationsData,
         ]);
     }
@@ -145,7 +145,7 @@ class StudentAcademicSummaryController extends Controller
         $scoresData = $this->academicSummaryService->getScoresData($student);
 
         return Inertia::render('students/AcademicSummary/Scores', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
             'scores' => $scoresData,
         ]);
     }
@@ -163,7 +163,7 @@ class StudentAcademicSummaryController extends Controller
         $attendanceData = $this->academicSummaryService->getAttendanceData($student);
 
         return Inertia::render('students/AcademicSummary/Attendance', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
             'attendance' => $attendanceData,
         ]);
     }
@@ -181,7 +181,7 @@ class StudentAcademicSummaryController extends Controller
         $gpaData = $this->academicSummaryService->getGpaData($student);
 
         return Inertia::render('students/AcademicSummary/Gpa', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
             'gpa' => $gpaData,
         ]);
     }
@@ -199,7 +199,7 @@ class StudentAcademicSummaryController extends Controller
         $graduationData = $this->academicSummaryService->getGraduationData($student);
 
         return Inertia::render('students/AcademicSummary/Graduation', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
             'graduation' => $graduationData,
         ]);
     }
@@ -228,7 +228,7 @@ class StudentAcademicSummaryController extends Controller
         $transactionStatsData = $transactionStats->getData(true);
 
         return Inertia::render('students/AcademicSummary/Gold', [
-            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email']),
+            'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
             'gold' => [
                 'summary' => $walletData['data'] ?? $walletData,
                 'recent_transactions' => $recentTransactionsData['data'] ?? $recentTransactionsData,

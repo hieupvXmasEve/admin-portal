@@ -33,7 +33,10 @@ return new class extends Migration
             if (
                 strpos($e->getMessage(), 'Duplicate key name') === false &&
                 strpos($e->getMessage(), 'already exists') === false &&
-                strpos($e->getMessage(), 'Duplicate foreign key') === false
+                strpos($e->getMessage(), 'Duplicate foreign key') === false &&
+                // MariaDB specific duplicate key error
+                strpos($e->getMessage(), 'errno: 121') === false &&
+                strpos($e->getMessage(), 'Duplicate key on write or update') === false
             ) {
                 throw $e;
             }
