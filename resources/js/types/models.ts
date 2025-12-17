@@ -256,6 +256,7 @@ export enum StudentStatus {
 export interface Student {
     id: number;
     student_id: string;
+    intake: number;
     full_name: string;
     email: string;
     phone: string;

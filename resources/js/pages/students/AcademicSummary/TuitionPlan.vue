@@ -27,7 +27,7 @@ interface ScholarshipAward {
 }
 
 interface Props {
-    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email'>;
+    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email' | 'intake'>;
     tuitionPlan: TuitionPlanData | null;
     scholarshipAward: ScholarshipAward | null;
 }
@@ -109,4 +109,3 @@ defineProps<Props>();
         </StudentLayout>
     </div>
 </template>
-

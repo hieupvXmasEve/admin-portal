@@ -207,6 +207,17 @@ const columns: ColumnDef<Student>[] = [
         },
     },
     {
+        accessorKey: 'intake',
+        header: 'Intake',
+        enableSorting: true,
+        cell: ({ row }) => {
+            const student = row.original;
+            console.log(student);
+            // Show intake as K0, K1, K2, etc.
+            return h('div', { class: 'font-medium' }, `K${student.intake}`);
+        },
+    },
+    {
         accessorKey: 'gc_starting_level',
         header: 'GC Starting',
         enableSorting: true,

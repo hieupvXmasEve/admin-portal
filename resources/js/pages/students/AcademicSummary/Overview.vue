@@ -5,7 +5,7 @@ import { Head } from '@inertiajs/vue3';
 import OverviewTab from '../AcademicSummary/OverviewTab.vue';
 
 interface Props {
-    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email'>;
+    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email' | 'intake'>;
     overview: StudentOverview;
 }
 

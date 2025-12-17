@@ -5,7 +5,7 @@ import { Head } from '@inertiajs/vue3';
 import AttendanceTab from '../AcademicSummary/AttendanceTab.vue';
 
 interface Props {
-    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email'>;
+    student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email' | 'intake'>;
     attendance: AttendanceData;
 }
 

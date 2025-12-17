@@ -50,6 +50,7 @@ class Student extends StudentAuditableModel
         'specialization_id',
         'curriculum_version_id',
         'intake_semester_id',
+        'intake',
         'intake_mode',
         'intake_gc',
         'intake_course',
@@ -93,6 +94,7 @@ class Student extends StudentAuditableModel
         'entrance_exam_score' => 'decimal:2',
         'last_login_at' => 'datetime',
         'email_verified_at' => 'datetime',
+        'intake' => 'integer',
     ];
 
     // Validation Rules
