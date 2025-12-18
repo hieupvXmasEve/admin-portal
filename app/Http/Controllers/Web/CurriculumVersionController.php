@@ -909,39 +909,59 @@ class CurriculumVersionController extends Controller
     }
 
     /**
-     * Summary Deployments tab - Track course offerings and deployment status.
+     * Summary Roadmap tab
      */
-    public function summaryDeployments(Request $request, CurriculumVersion $curriculumVersion): Response
+    public function summaryRoadmap(Request $request, CurriculumVersion $curriculumVersion): Response
     {
-        $request->validate([
-            'semester_id' => 'nullable|exists:semesters,id',
-            'unit_scope' => 'nullable|string|in:program,common,specialization_specific,cross_program',
-            'page' => 'nullable|integer|min:1',
-            'per_page' => 'nullable|integer|min:5|max:50',
-        ]);
-
+       
         // Load minimal curriculum version data
         $curriculumVersion->load([
             'program:id,name,code',
             'specialization:id,name,code',
             'effectiveFromSemester:id,name,code',
+            'curriculumUnits' => function ($query) {
+                $query->orderBy('year_level')
+                    ->orderBy('semester_number')
+                    ->orderBy('id');
+            },
+            'curriculumUnits.unit:id,code,name,credit_points',
+            'curriculumUnits.unit.prerequisiteGroups.conditions.requiredUnit:id,code',
         ]);
 
-        // Calculate deployment statistics
-        $deploymentStats = $this->calculateDeploymentStatistics($curriculumVersion, $request);
-
-        return Inertia::render('curriculum-versions/summary/Deployments', [
+        return Inertia::render('curriculum-versions/summary/Roadmap', [
             'curriculumVersion' => [
                 'id' => $curriculumVersion->id,
                 'version_code' => $curriculumVersion->version_code,
                 'program' => $curriculumVersion->program,
                 'specialization' => $curriculumVersion->specialization,
                 'effective_from_semester' => $curriculumVersion->effectiveFromSemester,
-            ],
-            'data' => $deploymentStats,
-            'meta' => [
-                'filters' => $request->only(['semester_id', 'unit_scope']),
-                'currentSemester' => Semester::where('is_active', true)->first(),
+                'curriculum_units' => $curriculumVersion->curriculumUnits->map(function ($cu) {
+                    return [
+                        'id' => $cu->id,
+                        'unit_id' => $cu->unit_id,
+                        'semester_number' => $cu->semester_number,
+                        'year_level' => $cu->year_level,
+                        'unit' => $cu->unit ? [
+                            'id' => $cu->unit->id,
+                            'code' => $cu->unit->code,
+                            'name' => $cu->unit->name,
+                            'credit_points' => $cu->unit->credit_points,
+                            'prerequisite_groups' => $cu->unit->prerequisiteGroups->map(function ($group) {
+                                return [
+                                    'logic_operator' => $group->logic_operator,
+                                    'conditions' => $group->conditions->map(function ($condition) {
+                                        return [
+                                            'type' => $condition->type,
+                                            'required_unit_id' => $condition->required_unit_id,
+                                            // We only strictly need the ID to map the line, but code helps debugging
+                                            'required_unit_code' => $condition->requiredUnit?->code,
+                                        ];
+                                    }),
+                                ];
+                            }),
+                        ] : null,
+                    ];
+                }),
             ],
         ]);
     }

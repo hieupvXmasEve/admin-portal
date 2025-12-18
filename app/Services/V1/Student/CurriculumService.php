@@ -141,21 +141,74 @@ class CurriculumService
     /**
      * Get academic roadmap
      */
+    /**
+     * Get academic roadmap with student progress
+     */
     public function getAcademicRoadmap(Student $student): array
     {
         $cacheKey = "curriculum:roadmap:student:{$student->id}";
 
         return Cache::remember($cacheKey, 1800, function () use ($student) {
-            $curriculumUnits = $this->getCurriculumUnits($student);
-            $completedUnits = $this->getCompletedUnits($student);
-            $currentEnrollments = $this->getCurrentEnrollments($student);
+            $curriculumVersion = $student->curriculumVersion;
+
+            if (! $curriculumVersion) {
+                return [];
+            }
+
+            // Eager load necessary data for roadmap visualization
+            $curriculumVersion->load([
+                'program:id,name,code',
+                'specialization:id,name,code',
+                'effectiveFromSemester:id,name,code',
+                'curriculumUnits' => function ($query) {
+                    $query->orderBy('year_level')
+                        ->orderBy('semester_number')
+                        ->orderBy('id');
+                },
+                'curriculumUnits.unit:id,code,name,credit_points',
+                'curriculumUnits.unit.prerequisiteGroups.conditions.requiredUnit:id,code',
+            ]);
+
+            // Get passed unit IDs based on academic records
+            $passedUnitIds = $student->academicRecords()
+                ->where('completion_status', 'completed')
+                ->pluck('unit_id')
+                ->unique();
 
             return [
-                'roadmap_overview' => $this->generateRoadmapOverview($student),
-                'semester_plan' => $this->generateSemesterPlan($student, $curriculumUnits, $completedUnits),
-                'recommended_sequence' => $this->getRecommendedSequence($student),
-                'alternative_pathways' => $this->getAlternativePathways($student),
-                'graduation_timeline' => $this->calculateGraduationTimeline($student, $curriculumUnits, $completedUnits),
+                'id' => $curriculumVersion->id,
+                'version_code' => $curriculumVersion->version_code,
+                'program' => $curriculumVersion->program,
+                'specialization' => $curriculumVersion->specialization,
+                'effective_from_semester' => $curriculumVersion->effectiveFromSemester,
+                'curriculum_units' => $curriculumVersion->curriculumUnits->map(function ($cu) use ($passedUnitIds) {
+                    return [
+                        'id' => $cu->id,
+                        'unit_id' => $cu->unit_id,
+                        'semester_number' => $cu->semester_number,
+                        'year_level' => $cu->year_level,
+                        // Determine status based on passed units
+                        'status' => $passedUnitIds->contains($cu->unit_id) ? 'completed' : 'pending',
+                        'unit' => $cu->unit ? [
+                            'id' => $cu->unit->id,
+                            'code' => $cu->unit->code,
+                            'name' => $cu->unit->name,
+                            'credit_points' => $cu->unit->credit_points,
+                            'prerequisite_groups' => $cu->unit->prerequisiteGroups->map(function ($group) {
+                                return [
+                                    'logic_operator' => $group->logic_operator,
+                                    'conditions' => $group->conditions->map(function ($condition) {
+                                        return [
+                                            'type' => $condition->type,
+                                            'required_unit_id' => $condition->required_unit_id,
+                                            'required_unit_code' => $condition->requiredUnit?->code,
+                                        ];
+                                    }),
+                                ];
+                            }),
+                        ] : null,
+                    ];
+                }),
             ];
         });
     }

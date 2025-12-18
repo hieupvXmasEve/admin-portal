@@ -19,7 +19,7 @@ export const CURRICULUM_ROUTE_NAMES = {
     VERSION_SUMMARY_OVERVIEW: 'curriculum_versions.summary.overview',
     VERSION_SUMMARY_UNITS: 'curriculum_versions.summary.units',
     VERSION_SUMMARY_STUDENTS: 'curriculum_versions.summary.students',
-    VERSION_SUMMARY_DEPLOYMENTS: 'curriculum_versions.summary.deployments',
+    VERSION_SUMMARY_ROADMAP: 'curriculum_versions.summary.roadmap',
 
     // Unit
     UNIT_INDEX: 'curriculum_unit.index',
