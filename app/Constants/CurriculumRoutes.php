@@ -38,7 +38,7 @@ class CurriculumRoutes
 
     public const VERSION_SUMMARY_STUDENTS = 'curriculum_versions.summary.students';
 
-    public const VERSION_SUMMARY_DEPLOYMENTS = 'curriculum_versions.summary.deployments';
+    public const VERSION_SUMMARY_ROADMAP = 'curriculum_versions.summary.roadmap';
 
     // Curriculum Unit Routes
     public const UNIT_INDEX = 'curriculum_unit.index';

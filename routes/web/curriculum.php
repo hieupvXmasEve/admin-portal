@@ -37,9 +37,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/{curriculum_version}/students', [CurriculumVersionController::class, 'summaryStudents'])
             ->middleware('can:view_curriculum_version')
             ->name(CurriculumRoutes::VERSION_SUMMARY_STUDENTS);
-        Route::get('/{curriculum_version}/deployments', [CurriculumVersionController::class, 'summaryDeployments'])
+        Route::get('/{curriculum_version}/roadmap', [CurriculumVersionController::class, 'summaryRoadmap'])
             ->middleware('can:view_curriculum_version')
-            ->name(CurriculumRoutes::VERSION_SUMMARY_DEPLOYMENTS);
+            ->name(CurriculumRoutes::VERSION_SUMMARY_ROADMAP);
         Route::get('/{curriculum_version}/edit', [CurriculumVersionController::class, 'edit'])
             ->middleware('can:edit_curriculum_version')
             ->name(CurriculumRoutes::VERSION_EDIT);

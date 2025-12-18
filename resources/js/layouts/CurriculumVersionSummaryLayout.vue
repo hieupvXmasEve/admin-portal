@@ -65,9 +65,9 @@ const tabs = computed(() => {
             route: 'curriculum_versions.summary.students',
         },
         {
-            key: 'deployments',
-            label: 'Deployment Tracking',
-            route: 'curriculum_versions.summary.deployments',
+            key: 'roadmap',
+            label: 'Roadmap',
+            route: 'curriculum_versions.summary.roadmap',
         },
     ];
 

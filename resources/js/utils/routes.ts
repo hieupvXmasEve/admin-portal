@@ -207,7 +207,7 @@ export const curriculumRoutes = {
             overview: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SUMMARY_OVERVIEW, { curriculum_version: id }),
             units: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SUMMARY_UNITS, { curriculum_version: id }),
             students: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SUMMARY_STUDENTS, { curriculum_version: id }),
-            deployments: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SUMMARY_DEPLOYMENTS, { curriculum_version: id }),
+            roadmap: (id: number) => route(CURRICULUM_ROUTE_NAMES.VERSION_SUMMARY_ROADMAP, { curriculum_version: id }),
         },
     },
     units: {
