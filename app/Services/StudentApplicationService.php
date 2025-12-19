@@ -420,6 +420,7 @@ class StudentApplicationService
             'high_school_graduation_year' => null,
             // 'entrance_exam_score' => $application->overall, // Use overall English score if available
             'admission_notes' => $this->generateAdmissionNotes($application),
+            'intake' => 0
         ];
 
         // Handle date of birth conversion
