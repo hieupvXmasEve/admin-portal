@@ -9,25 +9,32 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
+import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import type { PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
 import { BarChart3, Copy, Edit, Eye, MoreHorizontal, Plus, RefreshCw, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
-import { h, ref } from 'vue';
+import { h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
+
+interface CourseOfferingFilters {
+    search: string;
+    semester_id: string;
+    enrollment_status: string;
+    course_status: string;
+    delivery_mode: string;
+    unit_level: string;
+    unit_type: string;
+    page: number;
+    per_page: number;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
+}
 
 interface Props {
     courseOfferings: PaginatedResponse<CourseOffering>;
-    filters: {
-        search?: string;
-        semester_id?: string;
-        enrollment_status?: string;
-        course_status?: string;
-        delivery_mode?: string;
-        unit_level?: string;
-        unit_type?: string;
-    };
+    filters: CourseOfferingFilters;
     semesters: Semester[];
     unitLevels: { value: string; label: string }[];
     unitTypes: { value: string; label: string }[];
@@ -47,14 +54,35 @@ interface Props {
     };
 }
 const props = defineProps<Props>();
-const filters = ref({
-    search: props.filters.search || '',
-    semester_id: props.filters.semester_id || 'all',
-    enrollment_status: props.filters.enrollment_status || 'all',
-    course_status: props.filters.course_status || 'all',
-    delivery_mode: props.filters.delivery_mode || 'all',
-    unit_level: props.filters.unit_level || 'all',
-    unit_type: props.filters.unit_type || 'all',
+
+const {
+    filters,
+    handleSearch,
+    handleSelectFilter,
+    handleSortChange,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+} = useInertiaFilters<CourseOfferingFilters>({
+    baseUrl: '/course-offerings',
+    initialFilters: {
+        ...props.filters,
+        search: props.filters.search || '',
+    },
+    only: ['courseOfferings', 'filters'],
+    defaultValues: {
+        search: '',
+        semester_id: '',
+        enrollment_status: 'all',
+        course_status: 'all',
+        delivery_mode: 'all',
+        unit_level: 'all',
+        unit_type: 'all',
+        page: 1,
+        per_page: 15,
+        sort: 'units.code',
+        direction: 'asc',
+    },
+    debounce: 300,
 });
 
 const selectedItems = ref<number[]>([]);
@@ -70,7 +98,7 @@ const confirmDialog = useGlobalConfirmDialog();
 // Load statistics
 const loadStatistics = async () => {
     try {
-        const semesterId = filters.value.semester_id === 'all' ? '' : filters.value.semester_id;
+        const semesterId = filters.semester_id === 'all' ? '' : filters.semester_id;
         const response = await fetch(`/api/course-offerings/statistics?semester_id=${semesterId}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -94,78 +122,14 @@ const loadStatistics = async () => {
     }
 };
 
-// Load statistics on mount and when semester changes
+watch(() => filters.semester_id, () => {
+    loadStatistics();
+});
+
+// Load statistics on mount
 loadStatistics();
 
-const updateFilters = () => {
-    const filterParams = {
-        search: filters.value.search || undefined,
-        semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
-        enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
-        course_status: filters.value.course_status === 'all' ? undefined : filters.value.course_status,
-        delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
-        unit_level: filters.value.unit_level === 'all' ? undefined : filters.value.unit_level,
-        unit_type: filters.value.unit_type === 'all' ? undefined : filters.value.unit_type,
-    };
-
-    router.get('/course-offerings', filterParams, {
-        preserveState: true,
-        preserveScroll: true,
-        onFinish: () => loadStatistics(),
-    });
-};
-
-const handleSearch = (value: string | number) => {
-    filters.value.search = String(value);
-    updateFilters();
-};
-
-const handlePageChange = (pageOrUrl: string) => {
-    // If it's a full URL, extract the page number from it
-    if (pageOrUrl.includes('http') || pageOrUrl.includes('?')) {
-        try {
-            const url = new URL(pageOrUrl, window.location.origin);
-            const page = url.searchParams.get('page') || '1';
-
-            const filterParams = {
-                search: filters.value.search || undefined,
-                semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
-                enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
-                course_status: filters.value.course_status === 'all' ? undefined : filters.value.course_status,
-                delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
-                unit_level: filters.value.unit_level === 'all' ? undefined : filters.value.unit_level,
-                unit_type: filters.value.unit_type === 'all' ? undefined : filters.value.unit_type,
-                page: page,
-            };
-
-            router.get('/course-offerings', filterParams, {
-                preserveState: true,
-                preserveScroll: true,
-                onFinish: () => loadStatistics(),
-            });
-        } catch (error) {
-            console.error('Error parsing URL:', error);
-        }
-    } else {
-        // If it's just a page number, construct the request with current filters
-        const filterParams = {
-            search: filters.value.search || undefined,
-            semester_id: filters.value.semester_id === 'all' ? undefined : filters.value.semester_id,
-            enrollment_status: filters.value.enrollment_status === 'all' ? undefined : filters.value.enrollment_status,
-            course_status: filters.value.course_status === 'all' ? undefined : filters.value.course_status,
-            delivery_mode: filters.value.delivery_mode === 'all' ? undefined : filters.value.delivery_mode,
-            unit_level: filters.value.unit_level === 'all' ? undefined : filters.value.unit_level,
-            unit_type: filters.value.unit_type === 'all' ? undefined : filters.value.unit_type,
-            page: pageOrUrl,
-        };
-
-        router.get('/course-offerings', filterParams, {
-            preserveState: true,
-            preserveScroll: true,
-            onFinish: () => loadStatistics(),
-        });
-    }
-};
+// Old filter handlers removed in favor of useInertiaFilters
 
 const toggleStatus = (courseOffering: CourseOffering) => {
     router.patch(
@@ -192,12 +156,12 @@ const deleteCourseOffering = (courseOffering: CourseOffering) => {
             router.delete(`/course-offerings/${courseOffering.id}`, {
                 onSuccess: (page) => {
                     // Check if there's a flash error message (indicates deletion failed)
-                    if (page.props.flash?.error) {
-                        toast.error(page.props.flash.error as string);
-                        reject(new Error(page.props.flash.error as string));
+                    if ((page.props as any).flash?.error) {
+                        toast.error((page.props as any).flash.error as string);
+                        reject(new Error((page.props as any).flash.error as string));
                     } else {
                         // Show success message from flash or default
-                        const successMessage = (page.props.flash?.success as string) || 'Course offering deleted successfully';
+                        const successMessage = ((page.props as any).flash?.success as string) || 'Course offering deleted successfully';
                         toast.success(successMessage);
                         resolve();
                     }
@@ -308,12 +272,12 @@ const updateCourseStatus = () => {
         {
             onSuccess: (page) => {
                 // Check for flash messages from backend
-                if (page.props.flash?.error) {
-                    toast.error(page.props.flash.error as string);
+                if ((page.props as any).flash?.error) {
+                    toast.error((page.props as any).flash.error as string);
                     return;
                 }
 
-                const successMessage = (page.props.flash?.success as string) || 'Course status updated successfully';
+                const successMessage = ((page.props as any).flash?.success as string) || 'Course status updated successfully';
 
                 // Render HTML in toast for detailed messages with proper styling
                 toast(
@@ -357,12 +321,12 @@ const bulkDelete = () => {
                         data: { ids: selectedItems.value },
                         onSuccess: (page) => {
                             // Check if there's a flash error message (indicates deletion failed)
-                            if (page.props.flash?.error) {
-                                toast.error(page.props.flash.error as string);
-                                reject(new Error(page.props.flash.error as string));
+                            if ((page.props as any).flash?.error) {
+                                toast.error((page.props as any).flash.error as string);
+                                reject(new Error((page.props as any).flash.error as string));
                             } else {
                                 // Show success message from flash or default
-                                const successMessage = (page.props.flash?.success as string) || 'Course offerings deleted successfully';
+                                const successMessage = ((page.props as any).flash?.success as string) || 'Course offerings deleted successfully';
                                 toast.success(successMessage);
                                 selectedItems.value = [];
                                 resolve();
@@ -706,12 +670,12 @@ const columns: ColumnDef<CourseOffering>[] = [
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Search</label>
-                    <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search courses..." :debounce="300" />
+                    <DebouncedInput v-model="filters.search" @update:model-value="handleSearch" placeholder="Search courses..." :debounce="300" />
                 </div>
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Semester</label>
-                    <Select v-model="filters.semester_id" @update:model-value="updateFilters">
+                    <Select v-model="filters.semester_id">
                         <SelectTrigger>
                             <SelectValue placeholder="All Semesters" />
                         </SelectTrigger>
@@ -726,7 +690,7 @@ const columns: ColumnDef<CourseOffering>[] = [
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Level</label>
-                    <Select v-model="filters.unit_level" @update:model-value="updateFilters">
+                    <Select v-model="filters.unit_level">
                         <SelectTrigger>
                             <SelectValue placeholder="All Levels" />
                         </SelectTrigger>
@@ -741,7 +705,7 @@ const columns: ColumnDef<CourseOffering>[] = [
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Unit Type</label>
-                    <Select v-model="filters.unit_type" @update:model-value="updateFilters">
+                    <Select v-model="filters.unit_type">
                         <SelectTrigger>
                             <SelectValue placeholder="All Types" />
                         </SelectTrigger>
@@ -756,7 +720,7 @@ const columns: ColumnDef<CourseOffering>[] = [
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Course Status</label>
-                    <Select v-model="filters.course_status" @update:model-value="updateFilters">
+                    <Select v-model="filters.course_status">
                         <SelectTrigger>
                             <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
@@ -771,7 +735,7 @@ const columns: ColumnDef<CourseOffering>[] = [
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Delivery Mode</label>
-                    <Select v-model="filters.delivery_mode" @update:model-value="updateFilters">
+                    <Select v-model="filters.delivery_mode">
                         <SelectTrigger>
                             <SelectValue placeholder="All Modes" />
                         </SelectTrigger>
@@ -804,7 +768,7 @@ const columns: ColumnDef<CourseOffering>[] = [
     </Card>
 
     <!-- Pagination -->
-    <DataPagination :pagination-data="courseOfferings" @navigate="handlePageChange" />
+    <DataPagination :pagination-data="courseOfferings" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 
     <!-- Change Status Dialog -->
     <Dialog v-model:open="showStatusDialog">

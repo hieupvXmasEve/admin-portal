@@ -47,16 +47,31 @@ class CourseOfferingController extends Controller
      */
     public function index(Request $request): Response
     {
+        // 1. Validate the request
+        $validated = $request->validate([
+            'search' => 'nullable|string|max:255',
+            'semester_id' => 'nullable|string', // 'all' or ID
+            'enrollment_status' => 'nullable|string|in:all,open,closed,waitlist_only,cancelled',
+            'course_status' => 'nullable|string|in:all,not_started,in_progress,completed,cancelled',
+            'delivery_mode' => 'nullable|string|in:all,in_person,online,hybrid,blended',
+            'unit_level' => 'nullable|string', // 'all' or numeric level
+            'unit_type' => 'nullable|string',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
+            'sort' => 'nullable|string',
+            'direction' => 'nullable|string|in:asc,desc',
+        ]);
+
         $query = CourseOffering::with(['semester', 'lecture', 'unit', 'formSurveys'])
             ->join('units', 'course_offerings.unit_id', '=', 'units.id')
             ->where('course_offerings.campus_id', app('campus')->id)
             ->whereNotNull('units.id')
-            ->select('course_offerings.*')
-            ->orderBy('units.code');
+            ->select('course_offerings.*');
 
-        // Apply filters
-        if ($request->filled('search')) {
-            $search = $request->search;
+        // 2. Apply filters
+        // Search
+        if (! empty($validated['search'])) {
+            $search = $validated['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('course_offerings.section_code', 'like', "%{$search}%")
                     ->orWhere('course_offerings.location', 'like', "%{$search}%")
@@ -65,57 +80,77 @@ class CourseOfferingController extends Controller
             });
         }
 
-        // Default to current semester if no semester filter is provided
+        // Semester
+        // Default to current semester if no semester filter is provided (null)
+        // If 'all' is explicitly provided, show all history
+        $semesterId = $validated['semester_id'] ?? null;
         $defaultSemesterId = null;
-        if (! $request->filled('semester_id') || $request->semester_id === 'all') {
+
+        if ($semesterId === 'all') {
+            // Show all - no filter
+        } elseif ($semesterId) {
+            // Specific semester selected
+            $query->where('course_offerings.semester_id', $semesterId);
+        } else {
+            // No filter provided - default to current active
             $currentSemester = Semester::getActiveSemester();
             if ($currentSemester) {
                 $defaultSemesterId = $currentSemester->id;
                 $query->where('course_offerings.semester_id', $currentSemester->id);
             }
-        } elseif ($request->semester_id !== 'all') {
-            $query->where('course_offerings.semester_id', $request->semester_id);
         }
 
-        if ($request->filled('enrollment_status') && $request->enrollment_status !== 'all') {
-            $query->where('course_offerings.enrollment_status', $request->enrollment_status);
+        // Enrollment Status
+        if (! empty($validated['enrollment_status']) && $validated['enrollment_status'] !== 'all') {
+            $query->where('course_offerings.enrollment_status', $validated['enrollment_status']);
         }
 
-        if ($request->filled('course_status') && $request->course_status !== 'all') {
-            $query->where('course_offerings.course_status', $request->course_status);
+        // Course Status
+        if (! empty($validated['course_status']) && $validated['course_status'] !== 'all') {
+            $query->where('course_offerings.course_status', $validated['course_status']);
         }
 
-        if ($request->filled('delivery_mode') && $request->delivery_mode !== 'all') {
-            $query->where('course_offerings.delivery_mode', $request->delivery_mode);
+        // Delivery Mode
+        if (! empty($validated['delivery_mode']) && $validated['delivery_mode'] !== 'all') {
+            $query->where('course_offerings.delivery_mode', $validated['delivery_mode']);
         }
 
-        // Add unit level filter
-        if ($request->filled('unit_level') && $request->unit_level !== 'all') {
-            $query->where('units.level', $request->unit_level);
+        // Unit Level
+        if (! empty($validated['unit_level']) && $validated['unit_level'] !== 'all') {
+            $query->where('units.level', $validated['unit_level']);
         }
 
-        // Add unit type filter
-        if ($request->filled('unit_type') && $request->unit_type !== 'all') {
-            $query->where('units.unit_type', $request->unit_type);
+        // Unit Type
+        if (! empty($validated['unit_type']) && $validated['unit_type'] !== 'all') {
+            $query->where('units.unit_type', $validated['unit_type']);
         }
 
-        $courseOfferings = $query->paginate(15)->withQueryString();
+        // Sorting
+        $sort = $validated['sort'] ?? 'units.code';
+        $direction = $validated['direction'] ?? 'asc';
 
-        // Get filter options
+        // Handle specific sort columns if necessary, otherwise trust the column name (be careful with joins)
+        if ($sort === 'units.code') {
+            $query->orderBy('units.code', $direction);
+        } else {
+            $query->orderBy($sort, $direction);
+        }
+
+        // Pagination
+        $perPage = $validated['per_page'] ?? 15;
+        $courseOfferings = $query->paginate($perPage)->withQueryString();
+
+        // 3. Prepare options
         $semesters = Semester::orderBy('start_date', 'desc')->get(['id', 'name', 'code']);
 
-        // Get unique unit levels for filter options
         $unitLevels = Unit::select('level')
             ->whereNotNull('level')
             ->distinct()
             ->orderBy('level')
             ->pluck('level')
-            ->map(function ($level) {
-                return ['value' => $level, 'label' => "Level {$level}"];
-            })
+            ->map(fn ($level) => ['value' => (string) $level, 'label' => "Level {$level}"])
             ->toArray();
 
-        // Get unique unit types for filter options
         $unitTypes = Unit::select('unit_type')
             ->whereNotNull('unit_type')
             ->distinct()
@@ -139,27 +174,28 @@ class CourseOfferingController extends Controller
             })
             ->toArray();
 
-        // Set default filters
-        $filters = $request->only(['search', 'semester_id', 'enrollment_status', 'course_status', 'delivery_mode', 'unit_level', 'unit_type']);
-
-        // Only set default semester if no semester filter is provided
-        if (! $request->filled('semester_id') && $defaultSemesterId) {
-            $filters['semester_id'] = $defaultSemesterId;
-        }
-
-        // Check if survey feature is enabled and get default form
+        // Survey Config
         $config = $this->systemConfigService->getConfig();
         $surveyEnabled = $config['survey_enabled'] ?? false;
         $defaultSurveyFormId = $config['default_course_survey'] ?? null;
-        $defaultSurveyForm = null;
+        $defaultSurveyForm = ($surveyEnabled && $defaultSurveyFormId) ? Form::find($defaultSurveyFormId) : null;
 
-        if ($surveyEnabled && $defaultSurveyFormId) {
-            $defaultSurveyForm = Form::find($defaultSurveyFormId);
-        }
-
+        // 4. Return to Inertia
         return Inertia::render('course-offerings/Index', [
             'courseOfferings' => $courseOfferings,
-            'filters' => $filters,
+            'filters' => [
+                'search' => $validated['search'] ?? '',
+                'semester_id' => $defaultSemesterId ? (string) $defaultSemesterId : ($semesterId ?? ''),
+                'enrollment_status' => $validated['enrollment_status'] ?? 'all',
+                'course_status' => $validated['course_status'] ?? 'all',
+                'delivery_mode' => $validated['delivery_mode'] ?? 'all',
+                'unit_level' => $validated['unit_level'] ?? 'all',
+                'unit_type' => $validated['unit_type'] ?? 'all',
+                'page' => $validated['page'] ?? 1,
+                'per_page' => $validated['per_page'] ?? 15,
+                'sort' => $validated['sort'] ?? null,
+                'direction' => $validated['direction'] ?? null,
+            ],
             'semesters' => $semesters,
             'unitLevels' => $unitLevels,
             'unitTypes' => $unitTypes,
