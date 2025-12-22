@@ -18,52 +18,52 @@ class GradeService
      */
     public function getStudentGrades(Student $student, ?int $semesterId = null, array $filters = []): array
     {
-        $cacheKey = "grades:student:{$student->id}:semester:".($semesterId ?? 'all').':'.md5(serialize($filters));
+        // $cacheKey = "grades:student:{$student->id}:semester:".($semesterId ?? 'all').':'.md5(serialize($filters));
 
-        return Cache::remember($cacheKey, 600, function () use ($student, $semesterId, $filters) {
-            $query = $student->academicRecords()->with([
-                'unit',
-                'semester',
-                'courseOffering.lecture',
-            ]);
+        // return Cache::remember($cacheKey, 600, function () use ($student, $semesterId, $filters) {
+        $query = $student->academicRecords()->with([
+            'unit',
+            'semester',
+            'courseOffering.lecture',
+        ]);
 
-            if ($semesterId) {
-                $query->where('semester_id', $semesterId);
-            }
+        if ($semesterId) {
+            $query->where('semester_id', $semesterId);
+        }
 
-            // Apply filters
-            $this->applyGradeFilters($query, $filters);
+        // Apply filters
+        $this->applyGradeFilters($query, $filters);
 
-            $academicRecords = $query->orderBy('semester_id', 'desc')
-                ->orderBy('completion_date', 'desc')
-                ->get();
+        $academicRecords = $query->orderBy('semester_id', 'desc')
+            ->orderBy('completion_date', 'desc')
+            ->get();
 
-            // Get curriculum unit IDs
-            $curriculumUnitIds = [];
+        // Get curriculum unit IDs
+        $curriculumUnitIds = [];
 
-            if ($student->curriculumVersion) {
-                $curriculumUnitIds = $student->curriculumVersion
-                    ->curriculumUnits()
-                    ->pluck('unit_id')
-                    ->toArray();
-            }
+        if ($student->curriculumVersion) {
+            $curriculumUnitIds = $student->curriculumVersion
+                ->curriculumUnits()
+                ->pluck('unit_id')
+                ->toArray();
+        }
 
-            // Separate curriculum vs EGC records
-            $curriculumRecords = $academicRecords->filter(fn ($r) => in_array($r->unit_id, $curriculumUnitIds)
-            );
+        // Separate curriculum vs EGC records
+        $curriculumRecords = $academicRecords->filter(fn ($r) => in_array($r->unit_id, $curriculumUnitIds)
+        );
 
-            // EGC = only units with unit_type = 'egc'
-            $egcRecords = $academicRecords->filter(fn ($r) => $r->unit->unit_type === 'egc'
-            );
+        // EGC = only units with unit_type = 'egc'
+        $egcRecords = $academicRecords->filter(fn ($r) => $r->unit->unit_type === 'egc'
+        );
 
-            $gradesBySemester = $this->buildGradesBySemester($student, $curriculumRecords);
+        $gradesBySemester = $this->buildGradesBySemester($student, $curriculumRecords);
 
-            return [
-                'grades_by_semester' => $gradesBySemester,
-                'egc_units' => $egcRecords->isNotEmpty() ? $this->buildEGCUnits($egcRecords) : [],
-                'overall_summary' => $this->buildSimpleSummary($student, $gradesBySemester, $egcRecords),
-            ];
-        });
+        return [
+            'grades_by_semester' => $gradesBySemester,
+            'egc_units' => $egcRecords->isNotEmpty() ? $this->buildEGCUnits($egcRecords) : [],
+            'overall_summary' => $this->buildSimpleSummary($student, $gradesBySemester, $egcRecords),
+        ];
+        // });
     }
 
     /**
@@ -1117,6 +1117,7 @@ class GradeService
                 'unit_name' => $record->unit->name,
                 'unit_type' => $record->unit->unit_type,
                 'credit_hours' => $record->credit_hours,
+                'credit_points' => $record->unit->credit_points,
                 'final_percentage' => $record->final_percentage,
                 'final_grade' => $record->final_letter_grade,
                 'numeric_grade' => $record->final_numeric_grade,
