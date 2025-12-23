@@ -89,10 +89,10 @@ class CanvasGradeSyncService
                 $sisLoginId = $canvasStudent['login_id'] ?? null;
 
                 if ($sisUserId) {
-                    $canvasStudentMap[$sisUserId] = $canvasStudent;
+                    $canvasStudentMap[strtoupper(trim((string) $sisUserId))] = $canvasStudent;
                 }
                 if ($sisLoginId && ! isset($canvasStudentMap[$sisLoginId])) {
-                    $canvasStudentMap[$sisLoginId] = $canvasStudent;
+                    $canvasStudentMap[strtoupper(trim((string) $sisLoginId))] = $canvasStudent;
                 }
             }
 
@@ -104,7 +104,7 @@ class CanvasGradeSyncService
 
             Log::info('Local students sample', [
                 'total_enrollments' => $enrollments->count(),
-                'first_3_students' => $enrollments->take(3)->map(fn ($e) => [
+                'first_3_students' => $enrollments->take(3)->map(fn($e) => [
                     'student_id' => $e->student->student_id,
                     'full_name' => $e->student->full_name ?? 'N/A',
                     'id' => $e->student->id,
@@ -135,7 +135,7 @@ class CanvasGradeSyncService
                 'components_count' => $canvasComponents->count(),
                 'total_assignment_ids' => count($assignmentIds),
                 'assignment_ids' => $assignmentIds,
-                'components_details' => $canvasComponents->map(fn ($c) => [
+                'components_details' => $canvasComponents->map(fn($c) => [
                     'id' => $c->id,
                     'name' => $c->component_name,
                     'canvas_group_id' => $c->canvas_assignment_group_id,
@@ -205,7 +205,7 @@ class CanvasGradeSyncService
                 }
                 $student = $enrollment->student;
                 // Use student_id column (e.g., "AUS15189") to match with Canvas SIS User ID
-                $studentId = (string) $student->student_id;
+                $studentId = strtoupper(trim((string) $student->student_id));
 
                 Log::debug('Processing student', [
                     'student_id' => $student->id,
@@ -216,7 +216,6 @@ class CanvasGradeSyncService
 
                 // Try to find Canvas student by matching student_id with SIS User ID or SIS Login ID
                 $canvasStudent = $canvasStudentMap[$studentId] ?? null;
-
                 if (! $canvasStudent) {
                     Log::warning('Student not found in Canvas', [
                         'student_id' => $student->id,
