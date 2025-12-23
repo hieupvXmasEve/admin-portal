@@ -70,12 +70,12 @@ class GenerateClassSessionsRequest extends FormRequest
         };
 
         // Enforce semester window if available
-        if ($after) {
-            $rules['start_date'][] = 'after_or_equal:' . $after;
-        }
-        if ($before) {
-            $rules['start_date'][] = 'before_or_equal:' . $before;
-        }
+        // if ($after) {
+        //     $rules['start_date'][] = 'after_or_equal:' . $after;
+        // }
+        // if ($before) {
+        //     $rules['start_date'][] = 'before_or_equal:' . $before;
+        // }
 
         return $rules;
     }

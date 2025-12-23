@@ -218,7 +218,7 @@ const isEndOptionDisabled = (dayKey: string, optionValue: string): boolean => {
                     <FormItem>
                         <FormLabel>Start Date</FormLabel>
                         <FormControl>
-                            <Input v-bind="componentField" type="date" :min="semesterStart ? semesterStart.split('T')[0] || semesterStart : undefined" :max="semesterEnd ? semesterEnd.split('T')[0] || semesterEnd : undefined" class="w-full" />
+                            <Input v-bind="componentField" type="date" class="w-full" />
                         </FormControl>
                         <p class="text-muted-foreground mt-1 text-xs">First day of classes within the semester</p>
                         <FormMessage />
