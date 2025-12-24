@@ -184,10 +184,10 @@ class CourseOffering extends AuditableModel
         return $this->belongsTo(Campus::class);
     }
 
-    // Form Survey
-    public function formSurveys(): HasMany
+    // Form Target
+    public function formTargets(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
-        return $this->hasMany(FormSurvey::class, 'course_offering_id');
+        return $this->morphMany(FormTarget::class, 'scope');
     }
 
     // Computed Properties / Accessors
@@ -434,9 +434,15 @@ class CourseOffering extends AuditableModel
         return $this->course_status === 'cancelled';
     }
 
+    const STATUS_IN_PROGRESS = 'in_progress';
+    const STATUS_COMPLETED = 'completed';
+    const STATUS_CANCELLED = 'cancelled';
+
+    const LOG_LEVEL_COMPREHENSIVE = 'comprehensive';
+
     public function canModify(): bool
     {
-        return ! in_array($this->course_status, ['completed', 'cancelled']);
+        return ! in_array($this->course_status, [self::STATUS_COMPLETED, self::STATUS_CANCELLED]);
     }
 
     public function incrementEnrollment(): void

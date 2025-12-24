@@ -47,11 +47,7 @@ interface Props {
         warning?: string;
         info?: string;
     };
-    surveyConfig?: {
-        enabled: boolean;
-        defaultFormId: number | null;
-        defaultFormTitle: string | null;
-    };
+    surveyForms: { id: number; title: string, code: string }[];
 }
 const props = defineProps<Props>();
 
@@ -91,6 +87,8 @@ const statistics = ref<any>(null);
 const showStatusDialog = ref(false);
 const selectedCourse = ref<CourseOffering | null>(null);
 const selectedStatus = ref<string>('not_started');
+const showSurveyDialog = ref(false);
+const selectedFormId = ref<string>('');
 
 // Initialize the confirm dialog composable
 const confirmDialog = useGlobalConfirmDialog();
@@ -209,42 +207,40 @@ const duplicateCourseOffering = (courseOffering: CourseOffering) => {
     );
 };
 
-const createSurvey = (courseOffering: CourseOffering) => {
-    // Check if survey enabled
-    if (!props.surveyConfig?.enabled) {
-        toast.error('Survey feature is not enabled');
+const openSurveyDialog = (courseOffering: CourseOffering) => {
+    selectedCourse.value = courseOffering;
+    // Auto select if only one form available
+    if (props.surveyForms.length === 1) {
+        selectedFormId.value = props.surveyForms[0].id.toString();
+    } else {
+        selectedFormId.value = '';
+    }
+    showSurveyDialog.value = true;
+};
+
+const closeSurveyDialog = () => {
+    showSurveyDialog.value = false;
+    selectedCourse.value = null;
+    selectedFormId.value = '';
+};
+
+const handleCreateSurvey = () => {
+    if (!selectedCourse.value || !selectedFormId.value) {
+        toast.error('Please select a survey form');
         return;
     }
 
-    if (!props.surveyConfig?.defaultFormId) {
-        toast.error('No default survey form configured');
-        return;
-    }
-
-    confirmDialog.showConfirmDialog(
+    router.post(
+        `/course-offerings/${selectedCourse.value.id}/survey`,
+        { form_id: selectedFormId.value },
         {
-            title: 'Create Survey',
-            message: `Create a survey for ${courseOffering.unit?.code} using " ${props.surveyConfig.defaultFormTitle}"?`,
-            confirmText: 'Create Survey',
-        },
-        {
-            onConfirm: () => {
-                return new Promise((resolve, reject) => {
-                    router.post(
-                        `/course-offerings/${courseOffering.id}/survey`,
-                        {},
-                        {
-                            onSuccess: () => {
-                                toast.success('Survey created successfully');
-                                resolve();
-                            },
-                            onError: (errors) => {
-                                toast.error('Failed to create survey');
-                                reject(new Error('Failed to create survey'));
-                            },
-                        },
-                    );
-                });
+            onSuccess: () => {
+                toast.success('Survey created and assigned successfully');
+                closeSurveyDialog();
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                toast.error(Array.isArray(firstError) ? firstError[0] : (firstError as string) || 'Failed to create survey');
             },
         },
     );
@@ -456,15 +452,14 @@ const columns: ColumnDef<CourseOffering>[] = [
                 return h('span', { class: 'text-xs text-muted-foreground' }, '-');
             }
 
-            const hasSurvey = course.form_surveys && course.form_surveys.length > 0;
-            const surveyEnabled = props.surveyConfig?.enabled && props.surveyConfig?.defaultFormId;
+            const hasSurvey = course.form_targets && course.form_targets.length > 0;
 
             if (hasSurvey) {
                 return h(Badge, { variant: 'outline', class: 'bg-green-50 text-green-700 border-green-200' }, () => 'Created');
             }
 
-            if (!surveyEnabled) {
-                 return h('span', { class: 'text-xs text-muted-foreground' }, 'Not Configured');
+            if (!props.surveyForms || props.surveyForms.length === 0) {
+                 return h('span', { class: 'text-xs text-muted-foreground' }, 'No Forms');
             }
 
             return h(
@@ -475,7 +470,7 @@ const columns: ColumnDef<CourseOffering>[] = [
                     class: 'h-7 text-xs',
                     onClick: (e: Event) => {
                         e.stopPropagation(); // Prevent row click
-                        createSurvey(course);
+                        openSurveyDialog(course);
                     },
                 },
                 () => 'Create Survey'
@@ -817,6 +812,49 @@ const columns: ColumnDef<CourseOffering>[] = [
             <DialogFooter>
                 <Button variant="outline" @click="closeStatusDialog">Cancel</Button>
                 <Button @click="updateCourseStatus">Update Status</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <!-- Create Survey Dialog -->
+    <Dialog v-model:open="showSurveyDialog">
+        <DialogContent class="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Create Course Survey</DialogTitle>
+                <DialogDescription>
+                    <template v-if="selectedCourse">
+                        Select a survey form for <strong>{{ selectedCourse.unit?.code }}</strong>
+                        <span v-if="selectedCourse.section_code"> - Section {{ selectedCourse.section_code }}</span>
+                    </template>
+                </DialogDescription>
+            </DialogHeader>
+            <div class="space-y-4 py-4 min-w-0 overflow-hidden">
+                <div class="space-y-2 min-w-0 overflow-hidden">
+                    <label class="text-sm font-medium">Select Survey Form</label>
+                    <div class="grid w-full min-w-0 grid-cols-1 overflow-hidden">
+                        <Select v-model="selectedFormId">
+                            <SelectTrigger class="w-full min-w-0 overflow-hidden">
+                                <SelectValue placeholder="Select a form" class="truncate block text-left" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="form in surveyForms" :key="form.id" :value="form.id.toString()">
+                                    <span class="truncate block max-w-[280px]" :title="`${form.title} (${form.code})`">
+                                        {{ form.title }} ({{ form.code }})
+                                    </span>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div class="space-y-3 rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                    <p class="text-sm text-blue-800 dark:text-blue-200">
+                        This will create a survey target for this course and automatically assign it to all enrolled students.
+                    </p>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" @click="closeSurveyDialog">Cancel</Button>
+                <Button :disabled="!selectedFormId" @click="handleCreateSurvey">Create Survey</Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>

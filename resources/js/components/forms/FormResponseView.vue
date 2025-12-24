@@ -25,8 +25,8 @@ interface Props {
     title: string;
     description?: string;
     type: 'feedback' | 'survey' | 'query';
-    sections: FormBuilderSection[];
-    questions: FormBuilderQuestion[];
+    sections: FormBuilderSection[] | [];
+    questions: FormBuilderQuestion[] | [];
     answers: Answer[];
 }
 

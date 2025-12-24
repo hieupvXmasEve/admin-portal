@@ -257,6 +257,22 @@ class Student extends StudentAuditableModel
     }
 
     /**
+     * Get the student's settings.
+     */
+    public function settings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StudentSetting::class);
+    }
+
+    /**
+     * Get the student's form assignments.
+     */
+    public function formAssignments(): HasMany
+    {
+        return $this->hasMany(StudentFormAssignment::class);
+    }
+
+    /**
      * Get the student's cash wallet.
      */
     public function cashWallet(): \Illuminate\Database\Eloquent\Relations\HasOne

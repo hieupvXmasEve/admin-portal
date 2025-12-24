@@ -44,6 +44,9 @@ class AppServiceProvider extends ServiceProvider
             RoomBooking::BOOKED_BY_STUDENT => Student::class,
             RoomBooking::BOOKED_BY_LECTURER => User::class, // Lecturer is typically a User with lecturer role
             RoomBooking::BOOKED_BY_LECTURE => Lecture::class,
+            'course' => \App\Models\CourseOffering::class,
+            'semester' => \App\Models\Semester::class,
+            'department' => \App\Models\Department::class,
         ]);
     }
 

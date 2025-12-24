@@ -3,6 +3,8 @@
 use App\Http\Controllers\FormReviewController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\QueryTicketController;
+use App\Http\Controllers\Web\Admin\FormTargetController;
+use App\Http\Controllers\Web\Admin\QueryController;
 use App\Http\Controllers\Web\QuerySettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +22,36 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('forms')->name('forms.')->group(function () {
         // Admin form management
         Route::prefix('admin')->name('admin.')->group(function () {
+             // Form Runs Management
+            Route::prefix('runs')->name('runs.')->group(function () {
+                Route::get('/', [FormTargetController::class, 'index'])->name('index');
+                Route::get('/create', [FormTargetController::class, 'create'])->name('create');
+                Route::post('/', [FormTargetController::class, 'store'])->name('store');
+                Route::post('/{target}/activate', [FormTargetController::class, 'activate'])->name('activate');
+                Route::post('/{target}/close', [FormTargetController::class, 'close'])->name('close');
+            });
+
+            // Staff Query Inbox (New)
+            Route::prefix('inbox')->name('inbox.')->group(function () {
+                Route::get('/', [QueryController::class, 'index'])->name('index');
+                Route::get('/{response}', [QueryController::class, 'show'])->name('show');
+                Route::post('/{response}/assign', [QueryController::class, 'assign'])->name('assign');
+                Route::post('/{response}/reply', [QueryController::class, 'reply'])->name('reply');
+                Route::post('/{response}/status', [QueryController::class, 'updateStatus'])->name('status.update');
+            });
+            // Staff survey inbox
+            Route::prefix('results')->name('results.')->group(function () {
+                // List survey results
+                Route::get('/', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'index'])->name('index');
+                // Aggregate survey results
+                Route::get('/{target}/aggregate', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'aggregate'])
+                    ->name('aggregate')
+                    ->middleware('can:view_survey_results_aggregate');
+                // Raw survey results
+                Route::get('/{target}/raw', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'raw'])
+                    ->name('raw')
+                    ->middleware('can:view_survey_results_raw');
+            });
             Route::get('/', [FormController::class, 'index'])->name('index');
             Route::get('/create', [FormController::class, 'create'])->name('create');
             Route::post('/', [FormController::class, 'store'])->name('store');

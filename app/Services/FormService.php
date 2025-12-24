@@ -23,27 +23,60 @@ class FormService
 
         // Get forms that are:
         // 1. Active
-        // 2. Either have no targets (always visible) OR have targets for student's campus
-        // 3. Within the time window (if targets exist)
+        // 2. Have at least one eligible target for this student
         $forms = Form::active()
-            ->with(['latestPublishedVersion.questions.options', 'targets', 'visibilityRoles'])
-            ->where(function ($query) use ($campusId, $now) {
-                // Forms without any targets are always visible
-                $query->whereDoesntHave('targets')
-                    // OR forms with targets that match the student's campus and time window
-                    ->orWhereHas('targets', function ($targetQuery) use ($campusId, $now) {
-                        $targetQuery->where(function ($q) use ($campusId) {
-                            $q->whereNull('campus_id')
-                                ->orWhere('campus_id', $campusId);
-                        })
-                            ->where('start_at', '<=', $now)
-                            ->where(function ($q) use ($now) {
-                                $q->whereNull('end_at')
-                                    ->orWhere('end_at', '>=', $now);
+            ->with(['latestPublishedVersion.questions.options', 'visibilityRoles'])
+            ->whereHas('targets', function ($targetQuery) use ($campusId, $now, $student) {
+                $targetQuery->where('status', 'active')
+                    ->where(function ($q) use ($campusId) {
+                        $q->whereNull('campus_id')
+                            ->orWhere('campus_id', $campusId);
+                    })
+                    ->where('start_at', '<=', $now)
+                    ->where(function ($q) use ($now) {
+                        $q->whereNull('end_at')
+                            ->orWhere('end_at', '>=', $now);
+                    })
+                    ->where(function ($q) use ($student) {
+                        // For students, query forms ignore scope eligibility (scope is for admin/mandatory logic)
+                        $q->whereHas('form', function ($f) {
+                                $f->where('type', 'query');
+                            })
+                            // Scope eligibility logic for other form types (e.g. surveys)
+                            ->orWhere('scope_type', 'global')
+                            ->orWhere(function ($sub) use ($student) {
+                                $sub->where('scope_type', 'semester')
+                                    ->whereIn('scope_id', function ($registrations) use ($student) {
+                                        $registrations->select('course_offerings.semester_id')
+                                            ->from('course_offerings')
+                                            ->join('course_registrations', 'course_offerings.id', '=', 'course_registrations.course_offering_id')
+                                            ->where('course_registrations.student_id', $student->id);
+                                    });
+                            })
+                            ->orWhere(function ($sub) use ($student) {
+                                $sub->where('scope_type', 'course')
+                                    ->whereIn('scope_id', function ($registrations) use ($student) {
+                                        $registrations->select('course_offering_id')
+                                            ->from('course_registrations')
+                                            ->where('student_id', $student->id);
+                                    });
+                            })
+                            ->orWhere(function ($sub) use ($student) {
+                                $sub->where('scope_type', 'department');
+                                // Note: Student/Program to Department mapping is not currently in schema.
+                                // Following GenerateStudentAssignmentsAction's fallback behavior.
+                            })
+                            ->orWhereHas('assignments', function ($asgn) use ($student) {
+                                $asgn->where('student_id', $student->id);
                             });
                     });
             })
             ->get();
+
+        // Load filtered targets for the student
+        $forms->each(function ($form) use ($student, $campusId, $now) {
+            $form->setRelation('targets', $this->getEligibleTargetsForForm($form, $student, $campusId, $now));
+        });
 
         // Filter forms based on submission limits, enrollment, etc.
         return $forms->filter(function ($form) use ($student, $campus) {
@@ -60,25 +93,13 @@ class FormService
         $now = now();
         $campusId = $campus ? $campus->id : $student->campus_id;
 
-        // If form has no targets, allow unlimited submissions
-        $targetsCount = $form->targets()->count();
-
-        if ($targetsCount === 0) {
-            // For forms without targets, allow unlimited submissions
-            return true;
+        // Filter only ACTIVE and ELIGIBLE targets
+        $targets = $this->getEligibleTargetsForForm($form, $student, $campusId, $now);
+        
+        // If there are no matching active targets for this student, they cannot submit
+        if ($targets->isEmpty()) {
+            return false;
         }
-
-        // Filter only targets that apply to this student's campus and are open
-        $targets = $form->targets()
-            ->where(function ($query) use ($campusId) {
-                $query->whereNull('campus_id')
-                    ->orWhere('campus_id', $campusId);
-            })
-            ->where('start_at', '<=', $now)
-            ->where(function ($query) use ($now) {
-                $query->whereNull('end_at')->orWhere('end_at', '>=', $now);
-            })
-            ->get();
 
         foreach ($targets as $target) {
             // Count responses already submitted by this student for this exact scope
@@ -89,13 +110,75 @@ class FormService
                 ->where('target_scope_id', $target->scope_id)
                 ->count();
 
-            if ($submissionCount < $target->submission_limit_per_user) {
+            if (is_null($target->submission_limit_per_user) || $submissionCount < $target->submission_limit_per_user) {
                 return true;
             }
         }
 
         return false;
     }
+
+    /**
+     * Get eligible targets for a form and student.
+     */
+    public function getEligibleTargetsForForm(Form $form, Student $student, $campusId, ?Carbon $now = null): Collection
+    {
+        return $this->getEligibleTargetsQueryForForm($form, $student, $campusId, $now)->get();
+    }
+
+    /**
+     * Get the query for eligible targets for a form and student.
+     */
+    public function getEligibleTargetsQueryForForm(Form $form, Student $student, $campusId, ?Carbon $now = null)
+    {
+        $now = $now ?: now();
+
+        $query = $form->targets()
+            ->where('status', 'active')
+            ->where(function ($query) use ($campusId) {
+                $query->whereNull('campus_id')
+                    ->orWhere('campus_id', $campusId);
+            })
+            ->where('start_at', '<=', $now)
+            ->where(function ($query) use ($now) {
+                $query->whereNull('end_at')->orWhere('end_at', '>=', $now);
+            });
+
+        // For students, query forms ignore scope eligibility (scope is for admin/mandatory logic)
+        if ($form->type === 'query') {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($student) {
+            $q->where('scope_type', 'global')
+                ->orWhere(function ($sub) use ($student) {
+                    $sub->where('scope_type', 'semester')
+                        ->whereIn('scope_id', function ($registrations) use ($student) {
+                            $registrations->select('course_offerings.semester_id')
+                                ->from('course_offerings')
+                                ->join('course_registrations', 'course_offerings.id', '=', 'course_registrations.course_offering_id')
+                                ->where('course_registrations.student_id', $student->id);
+                        });
+                })
+                ->orWhere(function ($sub) use ($student) {
+                    $sub->where('scope_type', 'course')
+                        ->whereIn('scope_id', function ($registrations) use ($student) {
+                            $registrations->select('course_offering_id')
+                                ->from('course_registrations')
+                                ->where('student_id', $student->id);
+                        });
+                })
+                ->orWhere(function ($sub) use ($student) {
+                    $sub->where('scope_type', 'department');
+                    // Note: Student/Program to Department mapping is not currently in schema.
+                    // Following GenerateStudentAssignmentsAction's fallback behavior.
+                })
+                ->orWhereHas('assignments', function ($asgn) use ($student) {
+                    $asgn->where('student_id', $student->id);
+                });
+        });
+    }
+
 
 
     /**
@@ -164,6 +247,13 @@ class FormService
             if ($latestVersion) {
                 $data['form_version_id'] = $latestVersion->id;
             }
+        }
+
+        if (isset($data['status'])) {
+            $data['status'] = $data['status'] ?? 'active';
+        }
+        if (isset($data['is_mandatory'])) {
+            $data['is_mandatory'] = $data['is_mandatory'] ?? false;
         }
 
         return $form->targets()->create($data);
