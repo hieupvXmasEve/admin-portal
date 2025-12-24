@@ -7,6 +7,7 @@ use App\Http\Requests\Form\SubmitFormRequest;
 use App\Http\Resources\FormResource;
 use App\Http\Resources\FormDetailResource;
 use App\Http\Resources\FormResponseResource;
+use App\Http\Resources\StudentFormAssignmentResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Campus;
 use App\Models\Form;
@@ -63,144 +64,47 @@ class FormController extends Controller
     }
 
     /**
-     * Get active query forms for authenticated student.
+     * Get query forms that have active targets (Runs) for the student.
      */
-    public function active(Request $request): JsonResponse
+    public function queryRuns(Request $request): JsonResponse
     {
         $request->validate([
             'campus_id' => ['nullable', 'exists:campuses,id'],
         ]);
 
-        // Get authenticated student
         $student = $request->user();
-
         if (!$student->isActive()) {
-            return ApiResponse::authorizationError('Student account is not active. Please contact administration.');
+            return ApiResponse::authorizationError('Student account is not active.');
         }
 
-        // Get student's campus (from request or student's default campus)
         $campusId = $request->input('campus_id', $student->campus_id);
-        $campus = Campus::find($campusId);
 
-        if (!$campus) {
-            return ApiResponse::notFound('Campus not found');
-        }
-
-        // Get active query form IDs from config
-        $config = $this->systemConfigService->getConfig();
-        $activeFormIds = $config['active_query_forms'] ?? [];
-
-        if (empty($activeFormIds)) {
-            return ApiResponse::success(
-                [],
-                [],
-                'No active query forms configured.'
-            );
-        }
-
-        // Get available forms filtered by type 'query'
-        $availableForms = $this->formService->getAvailableFormsForStudent($student, $campus)
+        // Get available forms of type 'query'
+        // We use FormService to reuse the eligibility logic (time window, campus, etc.)
+        $forms = $this->formService->getAvailableFormsForStudent($student, Campus::find($campusId))
             ->filter(function ($form) {
                 return $form->type === 'query';
-            });
-
-        // Filter by active form IDs and maintain order
-        $forms = collect($activeFormIds)
-            ->map(function ($formId) use ($availableForms) {
-                return $availableForms->firstWhere('id', $formId);
             })
-            ->filter()
             ->values();
 
-        if ($forms->isEmpty()) {
-            return ApiResponse::success(
-                [],
-                [],
-                'No active query forms available for this student.'
-            );
-        }
-
-        // Load forms with necessary relationships
-        $forms->each(function ($form) use ($campus) {
+        // Load detailed relationships for the UI
+        $forms->each(function ($form) use ($student, $campusId) {
             $form->load([
                 'latestPublishedVersion.sections.questions.options',
                 'latestPublishedVersion.questions.options',
-                'targets' => function ($query) use ($campus) {
-                    $query->where(function ($q) use ($campus) {
-                        $q->whereNull('campus_id')
-                            ->orWhere('campus_id', $campus->id);
-                    });
-                },
             ]);
+
+            // Targets are already loaded and filtered by FormService::getAvailableFormsForStudent
+            // but we ensure they are present just in case
+            if (!$form->relationLoaded('targets')) {
+                 $form->setRelation('targets', $this->formService->getEligibleTargetsForForm($form, $student, $campusId));
+            }
         });
 
         return ApiResponse::success(
             FormDetailResource::collection($forms),
             [],
-            'Active query forms retrieved successfully.'
-        );
-    }
-
-    /**
-     * Get the last available query form for authenticated student.
-     */
-    public function last(Request $request): JsonResponse
-    {
-        $request->validate([
-            'campus_id' => ['nullable', 'exists:campuses,id'],
-        ]);
-
-        // Get authenticated student
-        $student = $request->user();
-
-        if (!$student->isActive()) {
-            return ApiResponse::authorizationError('Student account is not active. Please contact administration.');
-        }
-
-        // Get student's campus (from request or student's default campus)
-        $campusId = $request->input('campus_id', $student->campus_id);
-        $campus = Campus::find($campusId);
-
-        if (!$campus) {
-            return ApiResponse::notFound('Campus not found');
-        }
-
-        // Get available forms filtered by type 'query' (default)
-        $forms = $this->formService->getAvailableFormsForStudent($student, $campus)
-            ->filter(function ($form) {
-                return $form->type === 'query';
-            });
-
-        // Sort by created_at descending and get the first one (latest)
-        $form = $forms->sortByDesc('created_at')->first();
-
-        if (!$form) {
-            return ApiResponse::success(
-                null,
-                [],
-                'No form found.'
-            );
-        }
-
-        // Load form with necessary relationships (same as show method)
-        $form->load([
-            'latestPublishedVersion.sections.questions.options',
-            'latestPublishedVersion.questions.options',
-            'targets' => function ($query) use ($campus) {
-                $query->where(function ($q) use ($campus) {
-                    $q->whereNull('campus_id')
-                        ->orWhere('campus_id', $campus->id);
-                });
-            },
-        ]);
-
-        // Check if student can still submit
-        $canSubmit = $this->formService->canStudentSubmitForm($student, $form, $campus);
-
-        return ApiResponse::success(
-            new FormDetailResource($form),
-            [],
-            'Last form retrieved successfully.'
+            'Query forms with active runs retrieved successfully.'
         );
     }
 
@@ -213,55 +117,34 @@ class FormController extends Controller
             'campus_id' => ['nullable', 'exists:campuses,id'],
         ]);
 
-        // Get authenticated student
-        $student = Auth::guard('student')->user();
-
-        // If not authenticated as student, check if parent user is accessing
-        if (!$student) {
-            /** @var User|null $user */
-            $user = Auth::user();
-            if ($user && $request->has('campus_id')) {
-                $student = $user->children()->where('campus_id', $request->input('campus_id'))->first();
-            }
+        $student = $request->user();
+        if (!$student->isActive()) {
+            return ApiResponse::authorizationError('Student account is not active.');
         }
 
-        if (!$student) {
-            return response()->json([
-                'message' => 'Student not found',
-            ], 404);
-        }
-
-        // Get student's campus
         $campusId = $request->input('campus_id', $student->campus_id);
         $campus = Campus::find($campusId);
 
         if (!$campus) {
-            return response()->json([
-                'message' => 'Campus not found',
-            ], 404);
+             return ApiResponse::notFound('Campus not found.');
         }
 
-        // Check if student can access this form
+        // Check if student can access this form (incorporating type-specific eligibility logic)
         $availableForms = $this->formService->getAvailableFormsForStudent($student, $campus);
         $canAccess = $availableForms->contains('id', $form->id);
 
         if (!$canAccess) {
-            return response()->json([
-                'message' => 'Form not available or access denied',
-            ], 403);
+            return ApiResponse::authorizationError('Form not available or access denied.');
         }
 
-        // Load form with necessary relationships
+        // Load form with detailed relationships
         $form->load([
             'latestPublishedVersion.sections.questions.options',
             'latestPublishedVersion.questions.options',
-            'targets' => function ($query) use ($campus) {
-                $query->where(function ($q) use ($campus) {
-                    $q->whereNull('campus_id')
-                        ->orWhere('campus_id', $campus->id);
-                });
-            },
         ]);
+
+        // Targets are filtered by FormService
+        $form->setRelation('targets', $this->formService->getEligibleTargetsForForm($form, $student, $campusId));
 
         // Check if student can still submit
         $canSubmit = $this->formService->canStudentSubmitForm($student, $form, $campus);
@@ -272,51 +155,65 @@ class FormController extends Controller
     }
 
     /**
+     * Get mandatory pending forms.
+     */
+    public function pending(Request $request, \App\Actions\Form\CheckPortalGateAction $checkGateAction): JsonResponse
+    {
+        $student = $request->user();
+        if (!$student) return ApiResponse::authenticationError();
+
+        $result = $checkGateAction->execute($student);
+        
+        return ApiResponse::success(
+            StudentFormAssignmentResource::collection($result['mandatory_assignments']),
+            [],
+            'Pending mandatory forms retrieved.'
+        );
+    }
+
+    /**
      * Submit a form response.
      */
-    public function submit(SubmitFormRequest $request, Form $form): JsonResponse
+    public function submit(SubmitFormRequest $request, Form $form, \App\Actions\Form\SubmitResponseAction $action): JsonResponse
     {
         // Get authenticated student
-        $student = Auth::guard('student')->user();
-
-        // If not authenticated as student, check if parent user is accessing
-        if (!$student) {
-            /** @var User|null $user */
-            $user = Auth::user();
-            if ($user && $request->has('campus_id')) {
-                $student = $user->children()->where('campus_id', $request->input('campus_id'))->first();
-            }
-        }
-
-        if (!$student) {
-            return ApiResponse::notFound('Student not found');
-        }
+        $student = $request->user();
+        if (!$student) return ApiResponse::notFound('Student not found');
 
         // Get campus
         $campus = Campus::find($request->input('campus_id', $student->campus_id));
-        if (!$campus) {
-            return ApiResponse::notFound('Campus not found');
+        if (!$campus) return ApiResponse::notFound('Campus not found');
+
+        // Identify the target among eligible ones
+        $targetQuery = $this->formService->getEligibleTargetsQueryForForm($form, $student, $campus->id);
+
+        // If target scope is provided, use it to find the specific target
+        $scopeType = $request->input('target_scope_type');
+        $scopeId = $request->input('target_scope_id');
+
+        if ($scopeType && $scopeId) {
+            $targetQuery->where('scope_type', $scopeType)
+                ->where('scope_id', $scopeId);
         }
 
-        // Check if student can submit this form
+        $target = $targetQuery->first();
+
+        if (!$target) {
+            return ApiResponse::businessLogicError('No active target found for this form on your campus.');
+        }
+
+        // Additional check using FormService just in case logic differs
         if (!$this->formService->canStudentSubmitForm($student, $form, $campus)) {
-            return ApiResponse::businessLogicError('You cannot submit this form. Either submission limit exceeded or form not available.');
-        }
-
-        // Get latest published version
-        $version = $form->latestPublishedVersion;
-        if (!$version) {
-            return ApiResponse::businessLogicError('No published version available for this form');
+             return ApiResponse::businessLogicError('Submission limit exceeded or form not available.');
         }
 
         try {
-            $response = $this->responseService->submitResponse(
+            $response = $action->execute(
                 $student,
-                $form,
-                $version,
-                $campus,
+                $target,
                 $request->validated()
             );
+            
             return ApiResponse::success(
                 new FormDetailResource($response),
                 [],
@@ -326,10 +223,7 @@ class FormController extends Controller
         } catch (\Exception $e) {
             return ApiResponse::error(
                 'Failed to submit form',
-                [
-
-                    'error' => $e->getMessage(),
-                ],
+                ['error' => $e->getMessage()],
                 500
             );
         }

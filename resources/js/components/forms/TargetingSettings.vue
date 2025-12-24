@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,12 +10,14 @@ import { Calendar, Plus, Trash2 } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Target {
-    campus_id?: number;
+    campus_id?: number | 'all';
     scope_type: string;
-    scope_id?: number;
+    scope_id?: string | number; // Changed to allow string for flexible IDs
     start_at: string;
     end_at?: string;
     submission_limit_per_user: number;
+    status: 'active' | 'inactive';
+    is_mandatory: boolean;
 }
 
 interface Props {
@@ -42,6 +45,8 @@ const addTarget = () => {
         scope_type: 'global',
         start_at: new Date().toISOString().slice(0, 16), // Format for datetime-local input
         submission_limit_per_user: 1,
+        status: 'active',
+        is_mandatory: false,
     };
     localTargets.value.push(newTarget);
 };
@@ -50,12 +55,13 @@ const removeTarget = (index: number) => {
     localTargets.value.splice(index, 1);
 };
 
-const getCampusName = (campusId?: number) => {
-    if (!campusId) return 'All Campuses';
+const getCampusName = (campusId?: number | 'all') => {
+    if (!campusId || campusId === 'all') return 'All Campuses';
     return props.campuses.find((campus) => campus.id === campusId)?.name || 'Unknown Campus';
 };
 
 const formatDateTime = (dateString: string) => {
+    if (!dateString) return '';
     return new Date(dateString).toLocaleString();
 };
 
@@ -63,6 +69,8 @@ const getScopeDescription = (scopeType: string) => {
     switch (scopeType) {
         case 'global':
             return 'Available to all users across all contexts';
+        case 'department':
+            return 'Available to users belonging to a specific department';
         case 'course':
             return 'Available to users in a specific course';
         case 'section':
@@ -75,7 +83,7 @@ const getScopeDescription = (scopeType: string) => {
 };
 
 const needsScopeId = (scopeType: string) => {
-    return ['course', 'section', 'class_session'].includes(scopeType);
+    return ['course', 'section', 'class_session', 'department'].includes(scopeType);
 };
 </script>
 
@@ -96,16 +104,30 @@ const needsScopeId = (scopeType: string) => {
                 <div v-for="(target, index) in localTargets" :key="index" class="space-y-4 rounded-lg border p-4">
                     <div class="flex items-center justify-between">
                         <h4 class="font-medium">Target {{ index + 1 }}</h4>
-                        <Button variant="ghost" size="sm" @click="removeTarget(index)">
-                            <Trash2 class="h-4 w-4" />
-                        </Button>
+                        <div class="flex items-center space-x-2">
+                             <div class="flex items-center space-x-2 mr-4">
+                                <Label :for="`target_${index}_status`" class="text-sm">Status:</Label>
+                                <Select v-model:model-value="target.status">
+                                    <SelectTrigger class="w-[120px] h-8">
+                                        <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="active">Active</SelectItem>
+                                        <SelectItem value="inactive">Inactive</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Button variant="ghost" size="sm" @click="removeTarget(index)">
+                                <Trash2 class="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <!-- Campus Selection -->
                         <div class="space-y-2">
                             <Label>Campus</Label>
-                            <Select v-model:model-value="target.campus_id">
+                            <Select v-model:model-value="target.campus_id as any">
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select campus" />
                                 </SelectTrigger>
@@ -136,9 +158,9 @@ const needsScopeId = (scopeType: string) => {
 
                     <!-- Scope ID (if needed) -->
                     <div v-if="needsScopeId(target.scope_type)" class="space-y-2">
-                        <Label>Scope ID</Label>
-                        <Input v-model.number="target.scope_id" type="number" placeholder="Enter the specific ID for this scope" />
-                        <p class="text-muted-foreground text-sm">Enter the ID of the specific {{ target.scope_type }} where this form should be available</p>
+                        <Label>Scope ID / Code</Label>
+                        <Input v-model="target.scope_id" placeholder="Enter the specific ID or Code for this scope" />
+                        <p class="text-muted-foreground text-sm">Enter the ID (or Code for departments) of the specific {{ target.scope_type }} target.</p>
                     </div>
 
                     <!-- Time Range -->
@@ -160,23 +182,35 @@ const needsScopeId = (scopeType: string) => {
                         </div>
                     </div>
 
-                    <!-- Submission Limit -->
-                    <div class="space-y-2">
-                        <Label>Submission Limit per User</Label>
-                        <Input v-model.number="target.submission_limit_per_user" type="number" min="1" placeholder="e.g., 1" />
-                        <p class="text-muted-foreground text-sm">Maximum number of times each user can submit this form</p>
+                    <!-- Submission Limit & Mandatory -->
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div class="space-y-2">
+                            <Label>Submission Limit per User</Label>
+                            <Input v-model.number="target.submission_limit_per_user" type="number" min="1" placeholder="e.g., 1" />
+                            <p class="text-muted-foreground text-sm">Max submissions per user</p>
+                        </div>
+                         <div class="flex items-center space-x-2 pt-8">
+                            <Checkbox
+                                :id="`target_${index}_mandatory`"
+                                :model-value="target.is_mandatory"
+                                @update:model-value="(value) => target.is_mandatory = Boolean(value)"
+                            />
+                            <Label :for="`target_${index}_mandatory`">Is Mandatory?</Label>
+                        </div>
                     </div>
 
                     <!-- Target Summary -->
                     <div class="bg-muted/50 rounded-lg p-3">
                         <h5 class="mb-2 font-medium">Target Summary</h5>
                         <div class="space-y-1 text-sm">
+                            <p><strong>Status:</strong> <span :class="target.status === 'active' ? 'text-green-600' : 'text-red-600'">{{ target.status }}</span></p>
                             <p><strong>Campus:</strong> {{ getCampusName(target.campus_id) }}</p>
                             <p><strong>Scope:</strong> {{ scopeTypes[target.scope_type] || target.scope_type }}</p>
                             <p v-if="target.scope_id"><strong>Scope ID:</strong> {{ target.scope_id }}</p>
                             <p><strong>Available from:</strong> {{ formatDateTime(target.start_at) }}</p>
                             <p v-if="target.end_at"><strong>Available until:</strong> {{ formatDateTime(target.end_at) }}</p>
                             <p><strong>Submission limit:</strong> {{ target.submission_limit_per_user }} per user</p>
+                            <p><strong>Mandatory:</strong> {{ target.is_mandatory ? 'Yes' : 'No' }}</p>
                         </div>
                         <div class="mt-2 border-t pt-2">
                             <p class="text-muted-foreground text-sm">
@@ -204,6 +238,7 @@ const needsScopeId = (scopeType: string) => {
                         <h5 class="mb-2 font-medium">Scope Types</h5>
                         <div class="space-y-2 text-sm">
                             <div><strong>Global:</strong> Form is available to all users system-wide</div>
+                             <div><strong>Department:</strong> Form is available to all users in a department</div>
                             <div><strong>Course:</strong> Form is available to users enrolled in a specific course</div>
                             <div><strong>Section:</strong> Form is available to users in a specific course section</div>
                             <div><strong>Class Session:</strong> Form is available during/after a specific class session</div>
@@ -214,9 +249,8 @@ const needsScopeId = (scopeType: string) => {
                         <h5 class="mb-2 font-medium">Best Practices</h5>
                         <ul class="text-muted-foreground space-y-1 text-sm">
                             <li>• Use Global scope for campus-wide feedback forms</li>
+                            <li>• Use Department scope for departmental queries</li>
                             <li>• Use Course scope for course evaluation surveys</li>
-                            <li>• Use Section scope for section-specific feedback</li>
-                            <li>• Use Class Session scope for post-class surveys</li>
                             <li>• Set reasonable submission limits to prevent spam</li>
                             <li>• Always set end dates for time-sensitive forms</li>
                         </ul>

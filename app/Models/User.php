@@ -57,6 +57,14 @@ class User extends UserAuditableModel
         'status' => self::STATUS_ACTIVE,
     ];
 
+    /**
+     * Get the department for the user.
+     */
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
     public function getInitialsAttribute()
     {
         return Str::of($this->name)

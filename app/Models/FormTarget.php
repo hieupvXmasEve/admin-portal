@@ -19,12 +19,17 @@ class FormTarget extends Model
         'start_at',
         'end_at',
         'submission_limit_per_user',
+        'semester_id',
+        'status',
+        'is_mandatory',
     ];
 
     protected $casts = [
         'start_at' => 'datetime',
         'end_at' => 'datetime',
         'scope_type' => 'string',
+        'is_mandatory' => 'boolean',
+        'semester_id' => 'string', // Assuming string based on migration
     ];
 
     /**
@@ -46,9 +51,30 @@ class FormTarget extends Model
     /**
      * Get the campus for the target.
      */
+    public function semester(): BelongsTo
+    {
+        return $this->belongsTo(Semester::class);
+    }
+
     public function campus(): BelongsTo
     {
         return $this->belongsTo(Campus::class);
+    }
+
+    /**
+     * Get the actual target object (Course, Semester, Department, etc.)
+     */
+    public function scope(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo('scope', 'scope_type', 'scope_id');
+    }
+
+    /**
+     * Get the student assignments for this target.
+     */
+    public function assignments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(StudentFormAssignment::class, 'form_target_id');
     }
 
     /**
@@ -56,7 +82,22 @@ class FormTarget extends Model
      */
     public function isActive(): bool
     {
+        if ($this->status !== 'active') {
+            return false;
+        }
+
         $now = now();
         return $this->start_at <= $now && (!$this->end_at || $this->end_at >= $now);
+    }
+
+
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active')
+            ->where('start_at', '<=', now())
+            ->where(function ($q) {
+                $q->whereNull('end_at')->orWhere('end_at', '>=', now());
+            });
     }
 }

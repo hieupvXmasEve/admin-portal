@@ -18,6 +18,7 @@ import {
     FileText,
     FormInput,
     GraduationCap,
+    Inbox,
     Layers,
     LayoutDashboard,
     Link2,
@@ -349,55 +350,100 @@ export const mainNavItems: NavItem[] = [
     },
 
     {
-        title: 'Forms Queries & Feedback',
+        title: 'Forms Engine',
         href: '#',
         icon: FormInput,
         children: [
             {
-                title: 'Form Management',
+                title: 'Forms Library',
                 href: '/forms/admin',
-                icon: FormInput,
-                requiredPermissions: ['view_form'], // Will be implemented later
+                icon: BookOpen,
+                requiredPermissions: ['view_form'],
+            },
+            {
+                title: 'Runs',
+                href: '#',
+                icon: Layers,
+                children: [
+                    {
+                        title: 'Runs List',
+                        href: '/forms/admin/runs',
+                        icon: ClipboardList,
+                        requiredPermissions: ['view_form'],
+                    },
+                    {
+                        title: 'Create Run',
+                        href: '/forms/admin/runs/create',
+                        icon: FormInput,
+                        requiredPermissions: ['view_form'],
+                    },
+                ],
+            },
+            {
+                title: 'Surveys',
+                href: '#',
+                icon: BarChart3,
+                children: [
+                    // {
+                    //     title: 'Mandatory Gate',
+                    //     href: '/forms/admin/gate',
+                    //     icon: ShieldCheck,
+                    //     requiredPermissions: ['view_form'],
+                    // },
+                    {
+                        title: 'Survey Results',
+                        href: '/forms/admin/results',
+                        icon: BarChart3,
+                        requiredPermissions: ['view_survey_results_aggregate'],
+                    },
+                ],
             },
             {
                 title: 'Queries',
-                href: '/forms/queries/list',
+                href: '#',
                 icon: ClipboardCheck,
-                requiredPermissions: ['review_form'], // Will be implemented later
-            },
-            {
-                title: 'Settings',
-                href: '/forms/queries/settings',
-                icon: Settings2,
-                requiredPermissions: ['view_form'],
+                children: [
+                    {
+                        title: 'Staff Inbox',
+                        href: '/forms/admin/inbox',
+                        icon: Inbox,
+                        requiredPermissions: ['review_form'],
+                    },
+                    // {
+                    //     title: 'All Queries',
+                    //     href: '/forms/queries/list',
+                    //     icon: ClipboardCheck,
+                    //     requiredPermissions: ['review_form'],
+                    // },
+                ],
             },
             // {
-            //     title: 'Analytics',
-            //     href: '/forms/analytics',
-            //     icon: BarChart3,
-            //     requiredPermissions: ['view_form_analytics'], // Will be implemented later
+            //     title: 'Settings',
+            //     href: '/forms/queries/settings',
+            //     icon: Settings2,
+            //     requiredPermissions: ['view_form'],
             // },
         ],
     },
-    {
-        title: 'Course Survey',
-        href: '#',
-        icon: ClipboardCheck,
-        children: [
-            {
-                title: 'Survey List',
-                href: '/surveys',
-                icon: ClipboardCheck,
-                requiredPermissions: ['view_survey'], // Will be implemented later
-            },
-            {
-                title: 'Settings',
-                href: '/surveys/settings',
-                icon: Settings2,
-                requiredPermissions: ['edit_survey'], // Will be implemented later
-            },
-        ],
-    },
+    // {
+    //     title: 'Course Survey',
+    //     href: '#',
+    //     icon: ClipboardCheck,
+    //     children: [
+    //         {
+    //             title: 'Survey List',
+    //             href: '/surveys',
+    //             icon: ClipboardCheck,
+    //             requiredPermissions: ['view_survey'], // Will be implemented later
+    //         },
+    //         {
+    //             title: 'Settings',
+    //             href: '/surveys/settings',
+    //             icon: Settings2,
+    //             requiredPermissions: ['edit_survey'], // Will be implemented later
+    //         },
+    //     ],
+    // },
     // {
     //     title: 'Assessments & Grading',
     //     href: '#',

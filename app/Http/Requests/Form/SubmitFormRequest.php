@@ -22,7 +22,7 @@ class SubmitFormRequest extends FormRequest
     {
         return [
             'campus_id' => ['nullable', 'exists:campuses,id'],
-            'target_scope_type' => ['required', 'string', 'in:global,course,section,class_session'],
+            'target_scope_type' => ['required', 'string', 'in:global,course,section,class_session,department,semester'],
             'target_scope_id' => ['nullable', 'integer'],
             'anonymized' => ['boolean'],
             'origin' => ['nullable', 'string', 'in:web,mobile,api'],
@@ -65,7 +65,7 @@ class SubmitFormRequest extends FormRequest
             'query.topic_id.exists' => 'Invalid query topic selected.',
             'query.custom_topic_text.max' => 'Custom topic text cannot exceed 255 characters.',
             'query.priority.in' => 'Priority must be low, normal, or high.',
-            'target_scope_type.in' => 'Invalid scope type. Must be global, course, section, or class_session.',
+            'target_scope_type.in' => 'Invalid scope type. Must be global, course, section, class_session, department, or semester.',
             'campus_id.exists' => 'Invalid campus selected.',
         ];
     }
@@ -90,7 +90,7 @@ class SubmitFormRequest extends FormRequest
     {
         $validator->after(function ($validator) {
             // Validate that if scope_type is not global, scope_id is required
-            if (in_array($this->input('target_scope_type'), ['course', 'section', 'class_session'])) {
+            if (in_array($this->input('target_scope_type'), ['course', 'section', 'class_session', 'department', 'semester'])) {
                 if (empty($this->input('target_scope_id'))) {
                     $validator->errors()->add('target_scope_id', 'Scope ID is required when scope type is not global.');
                 }

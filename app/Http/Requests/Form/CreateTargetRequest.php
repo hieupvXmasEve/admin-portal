@@ -5,6 +5,8 @@ namespace App\Http\Requests\Form;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+use Illuminate\Support\Facades\Auth;
+
 class CreateTargetRequest extends FormRequest
 {
     /**
@@ -12,7 +14,7 @@ class CreateTargetRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return auth()->check() && auth()->user()->hasRole('admin');
+        return Auth::check() && Auth::user()->hasRole('admin');
     }
 
     /**
@@ -26,12 +28,14 @@ class CreateTargetRequest extends FormRequest
             'scope_type' => [
                 'required',
                 'string',
-                Rule::in(['section', 'class_session', 'course', 'global'])
+                Rule::in(['section', 'class_session', 'course', 'global', 'department'])
             ],
-            'scope_id' => ['nullable', 'integer'],
+            'scope_id' => ['nullable', 'string'], // Departments usually use string codes or ints, safer to allow string
             'start_at' => ['required', 'date'],
             'end_at' => ['nullable', 'date', 'after:start_at'],
             'submission_limit_per_user' => ['required', 'integer', 'min:1'],
+            'status' => ['nullable', 'string', 'in:active,inactive'],
+            'is_mandatory' => ['nullable', 'boolean'],
         ];
     }
 

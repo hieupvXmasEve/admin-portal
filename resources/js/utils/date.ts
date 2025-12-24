@@ -9,7 +9,7 @@ export const formatTime = (time: string) => {
 };
 
 export const formatDateTime = (datetime: string) => {
-    return format(new Date(datetime), 'dd/MM/yyyy HH:mm');
+    return format(new Date(datetime), 'HH:mm dd/MM/yyyy');
 };
 // format date to 01 Jun 2025
 export const formatDateToShort = (date: string) => {
@@ -17,7 +17,7 @@ export const formatDateToShort = (date: string) => {
 };
 // time "2025-10-06T04:00:00.000000Z". format to DD/MM/YYYY HH:mm
 export const formatDateTimeToShort = (date: string) => {
-    return format(new Date(date), 'dd/MM/yyyy HH:mm');
+    return format(new Date(date), 'HH:mm dd/MM/yyyy');
 };
 
 // format date to full date and time

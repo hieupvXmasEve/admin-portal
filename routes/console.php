@@ -44,7 +44,7 @@ Schedule::command('events:process-failed-gold-rewards')
     ->onOneServer()
     ->runInBackground();
 
-// Schedule academic records sync (create new + update existing with latest attendance)
+// Sync academic records from Canvas for all mapped courses
 Schedule::command('academic-records:sync')
     ->dailyAt('03:00')
     ->withoutOverlapping()

@@ -103,18 +103,24 @@ class CourseCompletionService
             // If student failed attendance requirement, automatic FAIL regardless of grade
             if (! $meetsAttendanceRequirement) {
                 $attendancePercentage = (float) ($record->attendance_percentage ?? 0);
+                $attendanceNote = "FAILED: Attendance requirement not met ({$attendancePercentage}% attendance, required >= 80%)";
+
+                // Ensure we don't duplicate the note
+                $newNotes = $record->administrative_notes;
+                if (! $newNotes || ! str_contains($newNotes, "FAILED: Attendance requirement not met")) {
+                    $newNotes = ($newNotes ? $newNotes . "\n" : '') . $attendanceNote;
+                }
 
                 $record->update([
                     'grade_status' => 'final',
                     'grade_finalized_date' => now(),
                     'grade_points' => 0.0, // F grade for attendance failure
-                    'completion_status' => 'complete',
+                    'completion_status' => 'failed',
                     'is_passed' => false,
                     'credit_hours_earned' => 0,
                     'affects_graduation_requirement' => true,
                     'satisfies_prerequisite' => false,
-                    'administrative_notes' => ($record->administrative_notes ? $record->administrative_notes . "\n" : '')
-                        . "FAILED: Attendance requirement not met ({$attendancePercentage}% attendance, required >= 80%)",
+                    'administrative_notes' => $newNotes,
                 ]);
 
                 $attendanceFailedCount++;
@@ -143,15 +149,24 @@ class CourseCompletionService
                 $gradeFailedCount++;
             }
 
+            // If student previously failed attendance but now meets it (after a re-run),
+            // we should remove the failure note to avoid confusion.
+            $cleanNotes = $record->administrative_notes;
+            if ($cleanNotes && str_contains($cleanNotes, "FAILED: Attendance requirement not met")) {
+                $cleanNotes = preg_replace('/^FAILED: Attendance requirement not met.*$/m', '', $cleanNotes);
+                $cleanNotes = trim($cleanNotes);
+            }
+
             $record->update([
                 'grade_status' => 'final',
                 'grade_finalized_date' => now(),
                 'grade_points' => $gradePoints,
-                'completion_status' => 'completed',
+                'completion_status' => $isPassing ? 'completed' : 'failed',
                 'is_passed' => $isPassing,
                 'credit_hours_earned' => $isPassing ? $record->credit_hours : 0,
                 'affects_graduation_requirement' => true,
                 'satisfies_prerequisite' => $isPassing,
+                'administrative_notes' => $cleanNotes ?: null,
             ]);
         }
 
@@ -402,10 +417,8 @@ class CourseCompletionService
                 continue;
             }
 
-            // Determine if passing based on final percentage
-            $finalPercentage = (float) ($record->final_percentage ?? 0);
-            $passingThreshold = 60; // Non-EGC courses use 60% threshold
-            $isPassing = $finalPercentage >= $passingThreshold;
+            // Use the finalized pass/fail status from the record
+            $isPassing = (bool) ($record->is_passed ?? false);
 
             if ($isPassing) {
                 $passedCount++;
@@ -420,7 +433,7 @@ class CourseCompletionService
                     courseCode: $courseOffering->unit->code,
                     courseName: $courseOffering->unit->name,
                     grade: $record->final_letter_grade,
-                    finalPercentage: $finalPercentage,
+                    finalPercentage: (float) ($record->final_percentage ?? 0),
                     creditPoints: (float) ($record->unit->credit_points ?? 0),
                     passed: $isPassing,
                     message: $isPassing

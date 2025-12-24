@@ -198,32 +198,41 @@ Route::middleware([
             Route::get('/current-semester', [CalendarController::class, 'currentSemester'])->name('current-semester');
         });
 
+        // Context & Settings
+        Route::get('/context', [\App\Http\Controllers\Api\V1\Student\StudentContextController::class, 'index'])->name('context');
+        Route::post('/settings', [\App\Http\Controllers\Api\V1\Student\StudentContextController::class, 'updateSettings'])->name('settings.update');
+
         // Form endpoints
         Route::prefix('forms')->name('forms.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'index'])->name('index');
             Route::prefix('query')->name('query.')->group(function () {
-                Route::get('/last', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'last'])->name('last');
-                Route::get('/active', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'active'])->name('active');
+                Route::get('/runs', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'queryRuns'])->name('runs');
+                Route::get('/{form}', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'show'])->name('show');
+                Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
             });
-            Route::get('/{form}', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'show'])->name('show');
-            Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
+            Route::prefix('surveys')->name('surveys.')->group(function () {
+                Route::get('/pending', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'pending'])->name('pending');
+                Route::get('/{form}', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'show'])->name('show');
+                Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
+            });
         });
-
-        // Survey endpoints
-        Route::prefix('surveys')->name('surveys.')->group(function () {
-            Route::get('/pending', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'pending'])->name('pending');
-            Route::get('/completed', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'completed'])->name('completed');
-            Route::get('/{survey}', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'show'])->name('show');
-            Route::post('/{survey}/submit', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'submit'])->name('submit');
-            Route::get('/{survey}/responses', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'responses'])->name('responses');
-        });
-
-        // Query ticket endpoints
+         // Query ticket endpoints
         Route::prefix('queries')->name('queries.')->group(function () {
             Route::get('/', [QueryTicketController::class, 'index'])->name('index');
             Route::get('/{ticket}', [QueryTicketController::class, 'show'])->name('show');
             Route::post('/{ticket}/replies', [QueryTicketController::class, 'storeReply'])->name('replies.store');
         });
+
+        // Survey endpoints
+        // Route::prefix('surveys')->name('surveys.')->group(function () {
+        //     Route::get('/pending', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'pending'])->name('pending');
+        //     Route::get('/completed', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'completed'])->name('completed');
+        //     Route::get('/{survey}', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'show'])->name('show');
+        //     Route::post('/{survey}/submit', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'submit'])->name('submit');
+        //     Route::get('/{survey}/responses', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'responses'])->name('responses');
+        // });
+
+       
 
         // Student-controlled uploads
         Route::prefix('uploads')->name('uploads.')->group(function () {

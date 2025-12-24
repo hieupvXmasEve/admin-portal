@@ -276,7 +276,9 @@ return [
             'edit_form' => 'edit_form',
             'create_form' => 'create_form',
             'review_form' => 'review_form',
-            'view_form_analytics' => 'view_form_analytics'
+            'view_form_analytics' => 'view_form_analytics',
+            'view_survey_results_aggregate' => 'view_survey_results_aggregate',
+            'view_survey_results_raw' => 'view_survey_results_raw'
         ],
 
         // Student Wallet Management

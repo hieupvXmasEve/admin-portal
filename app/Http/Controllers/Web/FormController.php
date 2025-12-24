@@ -14,6 +14,7 @@ use App\Models\Campus;
 use App\Models\QueryTopic;
 use App\Services\FormService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class FormController extends Controller
@@ -315,6 +316,7 @@ class FormController extends Controller
     {
         return [
             'global' => 'Global',
+            'department' => 'Department',
             'course' => 'Course',
             'section' => 'Section',
             'class_session' => 'Class Session',

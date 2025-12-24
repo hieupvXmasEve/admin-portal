@@ -18,6 +18,13 @@ class UploadRecord extends Model
     use HasFactory;
 
     /**
+     * The attributes that should be appended to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = ['url', 'public_url'];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -103,15 +110,24 @@ class UploadRecord extends Model
     }
 
     /**
+     * Get the URL for the uploaded file.
+     * This overrides the database column if you want to provide a fallback.
+     */
+    public function getUrlAttribute(?string $value): string
+    {
+        if ($value) {
+            return $value;
+        }
+
+        return app(\App\Services\UploadUrlService::class)->generateUrl($this);
+    }
+
+    /**
      * Get the public URL for the uploaded file.
      */
     public function getPublicUrlAttribute(): string
     {
-        if ($this->url) {
-            return $this->url;
-        }
-
-        return Storage::disk($this->disk)->url($this->path);
+        return app(\App\Services\UploadUrlService::class)->generatePublicUrl($this);
     }
 
     /**

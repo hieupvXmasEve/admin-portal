@@ -26,6 +26,8 @@ class FormResponse extends Model
         'submitted_by_student_id',
         'anonymized',
         'status',
+        'query_status',
+        'assigned_to_user_id',
         'reviewed_by_user_id',
         'reviewed_at',
         'review_notes',
@@ -74,12 +76,17 @@ class FormResponse extends Model
         return $this->belongsTo(Student::class, 'submitted_by_student_id');
     }
 
-    /**
-     * Get the user who reviewed the response.
-     */
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by_user_id');
+    }
+
+    /**
+     * Get the user assigned to this response (for queries).
+     */
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 
     /**

@@ -1,6 +1,6 @@
 import { BadgeVariants } from '@/components/ui/badge';
 import { EmergencyContactStatus } from '@/types/student';
-import { Form } from './forms';
+import { FormTarget } from './forms';
 
 export interface Specialization {
     id: number;
@@ -897,7 +897,6 @@ export interface CourseOffering {
     curriculum_unit_id: number;
     campus_id: number;
     unit_id: number;
-    unit: Unit;
     lecture_id?: number;
     section_code?: string;
     max_capacity: number;
@@ -916,10 +915,12 @@ export interface CourseOffering {
     registration_end_date?: string;
     special_requirements?: string;
     notes?: string;
-    curriculum_unit: CurriculumUnit;
+    unit?: Unit;
     lecture?: Lecture;
-    semester: Semester;
+    semester?: Semester;
     campus?: Campus;
+    form_targets?: FormTarget[];
+    registrations?: CourseRegistration[];
     courseRegistrations?: CourseRegistration[];
     course_registrations?: CourseRegistration[];
     academicRecords?: AcademicRecord[];
@@ -937,7 +938,6 @@ export interface CourseOffering {
     additional_fees: number;
     drop_deadline?: string;
     withdrawal_deadline?: string;
-    form_surveys?: Form[];
 }
 
 export enum ClassSessionStatus {

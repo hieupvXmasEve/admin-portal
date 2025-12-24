@@ -89,7 +89,13 @@ export interface FormTarget {
     start_at: string;
     end_at?: string;
     submission_limit_per_user: number;
+    is_mandatory: boolean;
+    status: 'draft' | 'active' | 'closed';
     is_active?: boolean;
+    // Relationships
+    form?: Form;
+    semester?: import('./models').Semester;
+    form_version?: FormVersion;
 }
 
 export type ScopeType = 'section' | 'class_session' | 'course' | 'global';

@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             InitialSeederRunner::class,
+            DepartmentSeeder::class,
             //            CreateActiveStudentsSeeder::class,
 
             // Step 2: Enroll students to program
