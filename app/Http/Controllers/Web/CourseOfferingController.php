@@ -258,7 +258,7 @@ class CourseOfferingController extends Controller
                 'scope_id' => $courseOffering->id,
                 'semester_id' => $courseOffering->semester_id,
                 'start_at' => $startAt,
-                'end_at' => $endAt,
+                'end_at' => null,
                 'status' => 'active',
                 'is_mandatory' => true,
                 'submission_limit_per_user' => 1,

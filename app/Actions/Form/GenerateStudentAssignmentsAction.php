@@ -52,7 +52,7 @@ class GenerateStudentAssignmentsAction
     protected function getCourseStudents($offeringId)
     {
         return CourseRegistration::where('course_offering_id', $offeringId)
-            ->whereIn('registration_status', ['pending', 'registered', 'confirmed'])
+            ->whereIn('registration_status', ['pending', 'registered', 'confirmed', 'completed', 'failed'])
             ->pluck('student_id');
     }
 
