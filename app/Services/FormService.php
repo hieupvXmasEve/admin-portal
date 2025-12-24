@@ -61,11 +61,6 @@ class FormService
                                             ->where('student_id', $student->id);
                                     });
                             })
-                            ->orWhere(function ($sub) use ($student) {
-                                $sub->where('scope_type', 'department');
-                                // Note: Student/Program to Department mapping is not currently in schema.
-                                // Following GenerateStudentAssignmentsAction's fallback behavior.
-                            })
                             ->orWhereHas('assignments', function ($asgn) use ($student) {
                                 $asgn->where('student_id', $student->id);
                             });
@@ -167,11 +162,6 @@ class FormService
                                 ->from('course_registrations')
                                 ->where('student_id', $student->id);
                         });
-                })
-                ->orWhere(function ($sub) use ($student) {
-                    $sub->where('scope_type', 'department');
-                    // Note: Student/Program to Department mapping is not currently in schema.
-                    // Following GenerateStudentAssignmentsAction's fallback behavior.
                 })
                 ->orWhereHas('assignments', function ($asgn) use ($student) {
                     $asgn->where('student_id', $student->id);

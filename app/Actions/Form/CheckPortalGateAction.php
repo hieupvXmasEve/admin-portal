@@ -36,9 +36,36 @@ class CheckPortalGateAction
             ])
             ->get();
 
+        // Self-healing/Double-check: Filter out assignments that have already been fulfilled
+        // but whose status hasn't been updated (dirty data or alternate target fulfillment)
+        $filteredAssignments = $mandatoryAssignments->filter(function ($assignment) use ($student) {
+            $target = $assignment->formTarget;
+            
+            // Check if there's any submitted response for this form and scope by this student
+            $hasSubmitted = \App\Models\FormResponse::where('submitted_by_student_id', $student->id)
+                ->where('form_id', $target->form_id)
+                ->where('target_scope_type', $target->scope_type)
+                ->where('target_scope_id', $target->scope_id)
+                ->where('status', 'submitted')
+                ->exists();
+
+            if ($hasSubmitted) {
+                // Background update for data consistency
+                $assignment->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                    // We don't necessarily have the precise response_id here without another query, 
+                    // but marking completed is enough for the gate.
+                ]);
+                return false;
+            }
+
+            return true;
+        });
+
         return [
-            'blocked' => $mandatoryAssignments->isNotEmpty(),
-            'mandatory_assignments' => $mandatoryAssignments,
+            'blocked' => $filteredAssignments->isNotEmpty(),
+            'mandatory_assignments' => $filteredAssignments->values(),
         ];
     }
 }

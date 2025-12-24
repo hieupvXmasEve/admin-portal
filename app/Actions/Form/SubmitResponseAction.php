@@ -86,6 +86,7 @@ class SubmitResponseAction
             }
 
             // 5. Update Assignment Status
+            // Update the specific assignment for this target
             $assignment = StudentFormAssignment::where('student_id', $student->id)
                 ->where('form_target_id', $target->id)
                 ->first();
@@ -106,6 +107,22 @@ class SubmitResponseAction
                     'completed_at' => now(),
                 ]);
             }
+
+            // Also search and mark as completed any other PENDING assignments for the SAME form and scope
+            // This handles cases where multiple targets might overlap or correctly fulfill the same requirement
+            StudentFormAssignment::where('student_id', $student->id)
+                ->where('status', 'not_started')
+                ->where('form_target_id', '!=', $target->id)
+                ->whereHas('formTarget', function ($q) use ($target) {
+                    $q->where('form_id', $target->form_id)
+                      ->where('scope_type', $target->scope_type)
+                      ->where('scope_id', $target->scope_id);
+                })
+                ->update([
+                    'status' => 'completed',
+                    'response_id' => $response->id,
+                    'completed_at' => now(),
+                ]);
 
             if ($target->form && $target->form->type === 'query') {
                 \App\Models\QueryTicket::create([
