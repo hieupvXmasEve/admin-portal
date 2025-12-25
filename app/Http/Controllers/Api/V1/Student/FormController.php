@@ -191,9 +191,11 @@ class FormController extends Controller
         $scopeType = $request->input('target_scope_type');
         $scopeId = $request->input('target_scope_id');
 
-        if ($scopeType && $scopeId) {
-            $targetQuery->where('scope_type', $scopeType)
-                ->where('scope_id', $scopeId);
+        if ($scopeType) {
+            $targetQuery->where('scope_type', $scopeType);
+            if ($scopeId) {
+                $targetQuery->where('scope_id', $scopeId);
+            }
         }
 
         $target = $targetQuery->first();

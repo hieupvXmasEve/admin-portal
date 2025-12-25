@@ -78,6 +78,14 @@ class QueryTicket extends Model
     }
 
     /**
+     * Get the assignment audit history for this ticket.
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(QueryAssignment::class, 'query_ticket_id');
+    }
+
+    /**
      * Close the ticket.
      */
     public function close(): void

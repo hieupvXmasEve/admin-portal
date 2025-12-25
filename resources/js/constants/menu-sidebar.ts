@@ -64,10 +64,16 @@ export const mainNavItems: NavItem[] = [
                 requiredPermissions: ['view_role'],
             },
             {
-                title: 'Campuses & Departments',
+                title: 'Campuses',
                 href: systemRoutes.campuses.index(),
                 icon: Building2,
-                requiredPermissions: ['view_campus'], // Will be implemented later
+                requiredPermissions: ['view_campus'],
+            },
+            {
+                title: 'Departments',
+                href: systemRoutes.departments.index(),
+                icon: Layers,
+                requiredPermissions: ['manage_departments'],
             },
         ],
     },

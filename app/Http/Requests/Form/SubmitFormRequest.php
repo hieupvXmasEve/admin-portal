@@ -89,8 +89,12 @@ class SubmitFormRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            // Validate that if scope_type is not global, scope_id is required
-            if (in_array($this->input('target_scope_type'), ['course', 'section', 'class_session', 'department', 'semester'])) {
+            // Get the form from the route
+            $form = $this->route('form');
+            $isQueryForm = ($form instanceof \App\Models\Form && $form->type === 'query');
+
+            // Validate that if scope_type is not global, scope_id is required (unless it's a query form)
+            if (!$isQueryForm && in_array($this->input('target_scope_type'), ['course', 'section', 'class_session', 'department', 'semester'])) {
                 if (empty($this->input('target_scope_id'))) {
                     $validator->errors()->add('target_scope_id', 'Scope ID is required when scope type is not global.');
                 }

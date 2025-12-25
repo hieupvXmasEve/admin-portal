@@ -5,11 +5,12 @@ import {
     COURSE_OFFERING_ROUTE_NAMES,
     COURSE_REGISTRATION_ROUTE_NAMES,
     CURRICULUM_ROUTE_NAMES,
+    DEPARTMENT_ROUTE_NAMES,
     LECTURE_ROUTE_NAMES,
     PROGRAM_ROUTE_NAMES,
     ROLE_ROUTE_NAMES,
-    ROOM_ROUTE_NAMES,
     ROOM_BOOKING_ROUTE_NAMES,
+    ROOM_ROUTE_NAMES,
     SEMESTER_ROUTE_NAMES,
     SETTINGS_ROUTE_NAMES,
     SPECIALIZATION_ROUTE_NAMES,
@@ -64,6 +65,13 @@ export const systemRoutes = {
             store: (campusId: number) => route('api.admin.campuses.buildings.store', { campus: campusId }),
             update: (campusId: number, buildingId: number) => route('api.admin.campuses.buildings.update', { campus: campusId, building: buildingId }),
             destroy: (campusId: number, buildingId: number) => route('api.admin.campuses.buildings.destroy', { campus: campusId, building: buildingId }),
+        },
+    },
+    // Department Management Routes
+    departments: {
+        index: () => route(DEPARTMENT_ROUTE_NAMES.INDEX),
+        members: {
+            index: (departmentId: number) => route(DEPARTMENT_ROUTE_NAMES.MEMBERS_INDEX, { department: departmentId }),
         },
     },
     // Room Management Routes

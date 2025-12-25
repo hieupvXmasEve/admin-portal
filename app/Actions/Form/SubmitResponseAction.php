@@ -54,11 +54,13 @@ class SubmitResponseAction
             $response = FormResponse::create([
                 'form_id' => $target->form_id,
                 'form_version_id' => $target->form_version_id,
+                'form_target_id' => $target->id,
                 'campus_id' => $student->campus_id,
                 'submitted_by_student_id' => $student->id,
                 'target_scope_type' => $target->scope_type,
                 'target_scope_id' => $target->scope_id,
                 'status' => 'submitted',
+                'query_status' => $target->form->type === 'query' ? 'open' : null,
                 'submitted_at' => now(),
             ]);
 
@@ -125,10 +127,13 @@ class SubmitResponseAction
                 ]);
 
             if ($target->form && $target->form->type === 'query') {
+                $queryData = $data['query'] ?? [];
                 \App\Models\QueryTicket::create([
                     'response_id' => $response->id,
+                    'topic_id' => $queryData['topic_id'] ?? null,
+                    'custom_topic_text' => $queryData['custom_topic_text'] ?? null,
                     'status' => 'open',
-                    'priority' => 'normal',
+                    'priority' => $queryData['priority'] ?? 'normal',
                 ]);
             }
 

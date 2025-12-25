@@ -20,6 +20,7 @@ class FormResponse extends Model
     protected $fillable = [
         'form_id',
         'form_version_id',
+        'form_target_id',
         'campus_id',
         'target_scope_type',
         'target_scope_id',
@@ -58,6 +59,11 @@ class FormResponse extends Model
     public function formVersion(): BelongsTo
     {
         return $this->belongsTo(FormVersion::class);
+    }
+
+    public function formTarget(): BelongsTo
+    {
+        return $this->belongsTo(FormTarget::class);
     }
 
     /**
@@ -111,6 +117,14 @@ class FormResponse extends Model
     public function queryTicket(): HasOne
     {
         return $this->hasOne(QueryTicket::class, 'response_id');
+    }
+
+    /**
+     * Get the assignment audit history for this response.
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(QueryAssignment::class, 'response_id');
     }
 
     /**
