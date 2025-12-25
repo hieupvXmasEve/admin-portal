@@ -20,6 +20,7 @@ class FormTargetController extends Controller
         $this->authorize('view_form');
 
         $query = FormTarget::query()
+            ->forCurrentCampus()
             ->with(['form', 'formVersion', 'campus'])
             ->latest('start_at');
 
@@ -62,6 +63,10 @@ class FormTargetController extends Controller
             'end_at' => 'nullable|date|after:start_at',
             'is_mandatory' => 'boolean',
         ]);
+
+        if ($campusId = session('current_campus_id')) {
+            $validated['campus_id'] = $campusId;
+        }
 
         // Additional validation
         if ($validated['scope_type'] === 'semester') {

@@ -100,4 +100,16 @@ class FormTarget extends Model
                 $q->whereNull('end_at')->orWhere('end_at', '>=', now());
             });
     }
+
+    public function scopeForCurrentCampus($query)
+    {
+        if ($campusId = session('current_campus_id')) {
+            return $query->where(function ($q) use ($campusId) {
+                $q->where('campus_id', $campusId)
+                    ->orWhereNull('campus_id');
+            });
+        }
+
+        return $query;
+    }
 }
