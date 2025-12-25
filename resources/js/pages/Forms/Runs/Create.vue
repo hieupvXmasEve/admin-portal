@@ -16,7 +16,7 @@ import { useApi } from '@/composables/useApiRequest';
 import { toast } from 'vue-sonner';
 
 interface Props {
-    forms: { id: number; title: string }[];
+    forms: { id: number; title: string; type: string }[];
     semesters: { id: string; name: string }[];
     departments: { id: number; name: string }[];
 }
@@ -101,7 +101,10 @@ const onSubmit = handleSubmit(async (formValues) => {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem v-for="f in forms" :key="f.id" :value="f.id.toString()">
-                                {{ f.title }}
+                                <div class="flex items-center justify-between w-full gap-2">
+                                    <span>{{ f.title }}</span>
+                                    <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{{ f.type }}</span>
+                                </div>
                             </SelectItem>
                         </SelectContent>
                     </Select>

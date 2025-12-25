@@ -21,7 +21,17 @@ class FormTargetController extends Controller
 
         $query = FormTarget::query()
             ->forCurrentCampus()
-            ->with(['form', 'formVersion', 'campus'])
+            ->with([
+                'form', 
+                'formVersion', 
+                'campus', 
+                'semester',
+                'scope' => function ($morphTo) {
+                    $morphTo->morphWith([
+                        \App\Models\CourseOffering::class => ['unit'],
+                    ]);
+                }
+            ])
             ->latest('start_at');
 
         if ($request->filled('scope_type') && $request->input('scope_type') !== 'all') {
@@ -44,7 +54,7 @@ class FormTargetController extends Controller
     {
         $this->authorize('edit_form');
         return Inertia::render('Forms/Runs/Create', [
-            'forms' => Form::select('id', 'title')->get(),
+            'forms' => Form::select('id', 'title', 'type')->get(),
             'semesters' => Semester::latest()->take(5)->get(), // For context
             'departments' => Department::all(), // For department context
         ]);

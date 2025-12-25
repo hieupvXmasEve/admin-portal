@@ -23,6 +23,7 @@ interface FormRun {
     end_at?: string;
     status: string; // draft, active, closed
     is_mandatory: boolean;
+    scope?: any;
 }
 
 interface Props {
@@ -95,14 +96,32 @@ const columns: ColumnDef<FormRun>[] = [
         accessorKey: 'scope_type',
         header: 'Context',
         cell: ({ row }) => {
-            const scope = row.original.scope_type;
+            const run = row.original;
+            const scopeType = run.scope_type;
+            const scopeData = run.scope;
+            
             let detail = '';
-            if (scope === 'semester' && row.original.semester_id) detail = ` (${row.original.semester_id})`; // or lookup name if loaded
-            if (scope === 'course') detail = ` (ID: ${row.original.scope_id})`;
-            if (scope === 'department') detail = ` (Dept ID: ${row.original.scope_id})`; 
-            if (row.original.semester_id && scope === 'department') detail += ` [${row.original.semester_id}]`;
+            
+            if (scopeType === 'semester') {
+                detail = scopeData?.name || run.semester?.name || run.scope_id || '';
+            } else if (scopeType === 'course') {
+                const unitCode = scopeData?.unit?.code || '';
+                const unitName = scopeData?.unit?.name || '';
+                const section = scopeData?.section_code || '';
+                detail = unitCode ? `${unitCode} - ${unitName} [${section}]` : `ID: ${run.scope_id}`;
+            } else if (scopeType === 'department') {
+                detail = scopeData?.name || `ID: ${run.scope_id}`;
+                if (run.semester?.name) {
+                    detail += ` (${run.semester.name})`;
+                }
+            } else if (scopeType === 'global') {
+                detail = 'All Campus';
+            }
 
-            return h('div', { class: 'capitalize' }, scope + detail);
+            return h('div', { class: 'flex flex-col' }, [
+                h('span', { class: 'capitalize font-medium text-xs text-muted-foreground' }, scopeType),
+                h('span', { class: 'text-sm' }, detail)
+            ]);
         }
     },
     {
