@@ -48,6 +48,7 @@ Form Engine được thiết kế theo hướng **Template & Instance**.
 - **`query_topics`**: Danh mục chủ đề (ví dụ: Học vụ, Tài chính).
 - **`queries_tickets`**: Nếu form là loại `query`, hệ thống sẽ tự động tạo một Ticket tương ứng để theo dõi tiến độ trao đổi.
 - **`queries_replies`**: Các tin nhắn trao đổi qua lại giữa Student và Staff trên Ticket. Các tin nhắn này có thể đính kèm file (UploadRecord).
+- **`query_assignments`**: Lưu trữ lịch sử điều phối / giao việc cho từng Ticket. Giúp theo dõi ai đã giao cho ai, vào lúc nào và có ghi chú (audit trail) gì không.
 
 ---
 
@@ -75,9 +76,13 @@ Form Engine được thiết kế theo hướng **Template & Instance**.
 ### Bước 4: Xử lý và Phân quyền (Admin/Staff)
 
 1. Admin/Staff vào Inbox để xem các Response.
-2. **Assignment:** Giao cho nhân viên xử lý thông qua `assigned_to_user_id`.
-3. **Trao đổi & Theo dõi (Query Ticketing):** Staff và Student có thể chat qua lại trong Ticket.
-4. **Phản hồi kèm file:** Khi Staff trả lời (Reply), họ có thể đính kèm tài liệu giải thích. File này cũng được lưu vào `upload_records` (link qua `reply_id`).
+    - **Phân quyền truy cập (Visibility Logic)**:
+        - **Super Admin / Admin / view_all_queries**: Thấy toàn bộ Ticket trong Campus.
+        - **Department Head**: Thấy toàn bộ Ticket thuộc Department của mình.
+        - **Department Staff**: Chỉ thấy các Ticket được giao cho mình (assigned) HOẶC Ticket chưa ai nhận (unassigned) trong Department của mình.
+2. **Assignment (Điều phối)**: Giao cho nhân viên xử lý. Hành động này được ghi lại vào bảng `query_assignments`.
+3. **Trao đổi & Theo dõi (Query Ticketing)**: Staff và Student có thể chat qua lại trong Ticket.
+4. **Phản hồi kèm file**: Khi Staff trả lời (Reply), họ có thể đính kèm tài liệu giải thích. File này cũng được lưu vào `upload_records` (link qua `reply_id`).
 
 ---
 
@@ -101,3 +106,5 @@ Form Engine được thiết kế theo hướng **Template & Instance**.
     - `status`: Là trạng thái kỹ thuật (submitted, approved, rejected).
     - `query_status`: Là trạng thái nghiệp vụ (open, pending, answered, closed).
 5. **Form Target (Runs)** là chìa khóa để điều khiển form xuất hiện ở đâu. Nếu sinh viên không thấy form, hãy kiểm tra bản ghi tương ứng trong bảng này đầu tiên.
+6. **Lịch sử điều phối**: Khi thay đổi `assigned_to_user_id`, luôn sử dụng `AssignQueryAction` để đảm bảo bản ghi audit được lưu vào `query_assignments`.
+7. **Quyền hạn nâng cao**: Quyền `view_all_queries` cho phép người dùng xem Inbox của tất cả phòng ban mà không cần là thành viên của phòng ban đó.

@@ -8,7 +8,7 @@ export const STUDENT_ROUTE_NAMES = {
     INDEX: 'students.index',
     CREATE: 'students.create',
     STORE: 'students.store',
-    // SHOW: 'students.show',
+    SHOW: 'students.show',
     EDIT: 'students.edit',
     UPDATE: 'students.update',
     DESTROY: 'students.destroy',

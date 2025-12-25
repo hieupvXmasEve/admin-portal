@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatDateTime } from '@/utils/date';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Inbox, MessageSquare, Filter, Search, ChevronRight } from 'lucide-vue-next';
+import { Inbox, MessageSquare, Filter, Search, ChevronRight, Building } from 'lucide-vue-next';
 import { h, ref } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -21,18 +21,27 @@ interface Ticket {
     created_at: string;
 }
 
+interface Department {
+    id: number;
+    name: string;
+    code: string;
+}
+
 interface Props {
     tickets: { data: Ticket[]; links: any[]; meta?: any };
-    filters: { status?: string; };
+    filters: { status?: string; department_id?: string | number };
     statusOptions: string[];
+    departments: Department[];
 }
 
 const props = defineProps<Props>();
 const selectedStatus = ref(props.filters.status || 'all');
+const selectedDept = ref(props.filters.department_id ? String(props.filters.department_id) : 'all');
 
-const applyFilter = () => {
+const applyFilters = () => {
     router.get(route('forms.admin.inbox.index'), {
-        status: selectedStatus.value === 'all' ? undefined : selectedStatus.value
+        status: selectedStatus.value === 'all' ? undefined : selectedStatus.value,
+        department_id: selectedDept.value === 'all' ? undefined : selectedDept.value
     }, { preserveState: true });
 };
 
@@ -121,18 +130,42 @@ const columns: ColumnDef<Ticket>[] = [
         <!-- Toolbar / Filters -->
         <Card class="bg-muted/30 border-none shadow-none">
             <CardContent class="p-4 flex flex-col sm:flex-row items-center gap-4">
-                <div class="flex items-center gap-2 flex-1 w-full">
-                    <Filter class="h-4 w-4 text-muted-foreground" />
-                    <span class="text-sm font-medium mr-2">Status:</span>
-                    <Select v-model="selectedStatus" @update:model-value="applyFilter">
-                        <SelectTrigger class="w-full sm:w-[180px] h-9 bg-background">
-                            <SelectValue placeholder="All Statuses" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Requests</SelectItem>
-                            <SelectItem v-for="opt in statusOptions" :key="opt" :value="opt" class="capitalize">{{ opt }}</SelectItem>
-                        </SelectContent>
-                    </Select>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 w-full">
+                    <div class="flex items-center gap-2">
+                        <Filter class="h-4 w-4 text-muted-foreground" />
+                        <span class="text-sm font-medium mr-2">Status:</span>
+                        <Select v-model="selectedStatus" @update:model-value="applyFilters">
+                            <SelectTrigger class="w-[160px] h-9 bg-background">
+                                <SelectValue placeholder="All Statuses" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Statuses</SelectItem>
+                                <template v-for="opt in statusOptions" :key="opt">
+                                    <SelectItem v-if="opt" :value="opt" class="capitalize">
+                                        {{ opt }}
+                                    </SelectItem>
+                                </template>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div v-if="departments && departments.length > 0" class="flex items-center gap-2">
+                        <Building class="h-4 w-4 text-muted-foreground" />
+                        <span class="text-sm font-medium mr-2">Department:</span>
+                        <Select v-model="selectedDept" @update:model-value="applyFilters">
+                            <SelectTrigger class="w-[200px] h-9 bg-background">
+                                <SelectValue placeholder="All Departments" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">My View (Default)</SelectItem>
+                                <template v-for="dept in departments" :key="dept.id">
+                                    <SelectItem v-if="dept.id" :value="String(dept.id)">
+                                        {{ dept.name }} ({{ dept.code }})
+                                    </SelectItem>
+                                </template>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
                 <div class="text-xs text-muted-foreground italic hidden md:block">
                     Total: {{ tickets.data.length }} items showing

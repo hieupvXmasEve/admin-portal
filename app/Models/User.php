@@ -26,6 +26,7 @@ class User extends UserAuditableModel
         'phone',
         'address',
         'status',
+        'department_id',
     ];
 
     /**
@@ -63,6 +64,28 @@ class User extends UserAuditableModel
     public function department()
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function memberships()
+    {
+        return $this->hasMany(DepartmentMembership::class);
+    }
+
+    public function isDepartmentHead(int $departmentId): bool
+    {
+        return $this->memberships()
+            ->where('department_id', $departmentId)
+            ->where('department_role', 'head')
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    public function isDepartmentMember(int $departmentId): bool
+    {
+        return $this->memberships()
+            ->where('department_id', $departmentId)
+            ->where('is_active', true)
+            ->exists();
     }
 
     public function getInitialsAttribute()

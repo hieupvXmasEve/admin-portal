@@ -291,7 +291,7 @@ const columns: ColumnDef<StudentAssignment>[] = [
 
         <!-- Response Detail Dialog -->
         <Dialog v-model:open="showResponseDialog">
-            <DialogContent class="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogContent class="!max-w-5xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Survey Response Details</DialogTitle>
                     <DialogDescription v-if="selectedAssignment">

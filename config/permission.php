@@ -29,6 +29,13 @@ return [
             'edit_building' => 'edit_building',
             'delete_building' => 'delete_building',
         ],
+        // Department Management
+        'departments' => [
+            'manage_departments' => 'manage_departments',
+            // 'create_department' => 'create_department',
+            // 'edit_department' => 'edit_department',
+            // 'delete_department' => 'delete_department',
+        ],
 
         // Role & Permission Management
         'roles' => [
@@ -208,6 +215,7 @@ return [
         'queries' => [
             'view_queries' => 'view_queries',
             'detail_queries' => 'detail_queries',
+            'view_all_queries' => 'view_all_queries',
         ],
 
         // Lecturer Management

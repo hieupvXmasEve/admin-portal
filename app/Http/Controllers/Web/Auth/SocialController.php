@@ -14,7 +14,8 @@ class SocialController extends Controller
 {
     public function redirect(Request $request)
     {
-        return Socialite::driver('google')->with(['hd' => 'fpt.edu.vn'])->redirect();
+        // return Socialite::driver('google')->with(['hd' => 'fpt.edu.vn'])->redirect();
+        return Socialite::driver('google')->redirect();
     }
 
     public function callback(Request $request)
@@ -24,12 +25,12 @@ class SocialController extends Controller
             $user = User::where('email', $user_social->getEmail())->first();
             // Check if user is from fp.edu.vn
             $domain = Str::after($user_social->getEmail(), '@');
-            if ($domain !== 'fpt.edu.vn') {
-                return redirect()->route('login', [
-                    'error' => 'Email is not from @fpt.edu.vn',
-                    'email' => $user_social->email,
-                ]);
-            }
+            // if ($domain !== 'fpt.edu.vn') {
+            //     return redirect()->route('login', [
+            //         'error' => 'Email is not from @fpt.edu.vn',
+            //         'email' => $user_social->email,
+            //     ]);
+            // }
             if ($user) {
                 Auth::login($user);
                 $request->session()->put('email', $user->email);

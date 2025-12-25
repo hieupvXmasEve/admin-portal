@@ -1,11 +1,9 @@
 <?php
 
-use App\Http\Controllers\FormReviewController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\QueryTicketController;
 use App\Http\Controllers\Web\Admin\FormTargetController;
 use App\Http\Controllers\Web\Admin\QueryController;
-use App\Http\Controllers\Web\QuerySettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -73,38 +71,12 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{form}/targets', [FormController::class, 'createTarget'])->name('targets.store');
         });
 
-        // Review routes
-        // Route::prefix('review')->name('review.')->group(function () {
-        //     Route::get('/', [FormReviewController::class, 'index'])->name('index');
-        //     Route::get('/{response}', [FormReviewController::class, 'show'])
-        //         ->middleware('can:review_form')
-        //         ->name('show');
-        //     Route::post('/{response}/review', [FormReviewController::class, 'review'])->name('submit');
-        //     // Route::post('/bulk-review', [FormReviewController::class, 'bulkReview'])->name('bulk');
-
-        // });
-
-
-        // Query form settings
-        Route::prefix('queries')->name('queries.')->group(function () {
-            Route::get('/settings', [QuerySettingsController::class, 'index'])
-                ->middleware('can:view_form')
-                ->name('settings.index');
-            Route::post('/settings', [QuerySettingsController::class, 'update'])
-                ->middleware('can:edit_form')
-                ->name('settings.update');
-        });
         // Query ticket management
         Route::prefix('queries')->name('queries.')->middleware('can:review_form')->group(function () {
             Route::get('/list', [QueryTicketController::class, 'index'])->name('index');
             Route::get('/{ticket}', [QueryTicketController::class, 'show'])->name('show');
             Route::post('/{ticket}/replies', [QueryTicketController::class, 'storeReply'])->name('replies.store');
             Route::post('/{ticket}/status', [QueryTicketController::class, 'updateStatus'])->name('status.update');
-        });
-        // Analytics routes
-        Route::prefix('analytics')->name('analytics.')->group(function () {
-            Route::get('/{form}', [FormReviewController::class, 'analytics'])->name('show');
-            Route::get('/{form}/export', [FormReviewController::class, 'export'])->name('export');
         });
     });
 });
