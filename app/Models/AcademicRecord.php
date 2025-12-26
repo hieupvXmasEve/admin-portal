@@ -294,4 +294,40 @@ class AcademicRecord extends AuditableModel
     {
         return (bool) $this->override_pass;
     }
+
+    /**
+     * Calculate grade points from final percentage using a continuous formula on a 4.0 scale.
+     * This avoids rigid "steps" and provides a more precise representation of the score.
+     */
+    public static function calculateGradePoints(float $percentage): float
+    {
+        // Map percentage to 4.0 scale:
+        // A common accurate formula for continuous GPA is (Percentage / 100) * 4
+        // However, many systems cap 4.0 at 90% or 95%. 
+        // We will use min(4.0, (percentage / 25)) if we want 100% = 4.0 linear
+        // Or min(4.0, round(($percentage * 4) / 100, 2)) for a direct ratio.
+        
+        $gpa = ($percentage * 4) / 100;
+
+        return round(max(0, min(4.0, $gpa)), 2);
+    }
+
+    /**
+     * Convert percentage to letter grade
+     */
+    public static function calculateLetterGrade(float $percentage): string
+    {
+        return match (true) {
+            $percentage >= 90 => 'A+',
+            $percentage >= 85 => 'A',
+            $percentage >= 80 => 'A-',
+            $percentage >= 75 => 'B+',
+            $percentage >= 70 => 'B',
+            $percentage >= 65 => 'B-',
+            $percentage >= 60 => 'C+',
+            $percentage >= 55 => 'C',
+            $percentage >= 50 => 'C-',
+            default => 'F',
+        };
+    }
 }

@@ -57,3 +57,9 @@ Schedule::command('attendance:sync-to-academic-records')
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();
+// Schedule manual grade aggregation daily
+Schedule::command('academic-records:aggregate-manual')
+    ->dailyAt('04:00')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
