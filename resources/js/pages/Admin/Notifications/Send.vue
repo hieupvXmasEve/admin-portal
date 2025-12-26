@@ -1,33 +1,31 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
-import { useForm } from 'vee-validate';
-import * as z from 'zod';
 import { toTypedSchema } from '@vee-validate/zod';
-import { route } from 'ziggy-js';
 import {
-    Send,
-    Search,
-    User,
-    X,
-    Loader2,
-    AlertCircle,
-    Info,
-    ExternalLink,
+    Check,
     Clock,
-    Check
+    Info,
+    Loader2,
+    Search,
+    Send,
+    User,
+    X
 } from 'lucide-vue-next';
+import { useForm } from 'vee-validate';
+import { ref } from 'vue';
 import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
+import * as z from 'zod';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import { useApi } from '@/composables/useApiRequest';
 import { NOTIFICATION_ROUTE_NAMES } from '@/constants/notification-routes';
 
@@ -36,10 +34,10 @@ interface Program {
     name: string;
 }
 
-interface Student {
+interface Recipient {
     id: number;
-    full_name: string;
-    student_id: string;
+    name: string;
+    code?: string;
     email: string;
 }
 
@@ -55,59 +53,74 @@ const api = useApi();
 // --- Selection State ---
 const search = ref('');
 const programId = ref('all');
-const students = ref<Student[]>([]);
-const selectedStudents = ref<Student[]>([]);
+const notifiableType = ref<'student' | 'user' | 'lecturer'>('student');
+const recipients = ref<Recipient[]>([]);
+const selectedRecipients = ref<Recipient[]>([]);
 const isSearching = ref(false);
 
-const searchStudents = async () => {
-    if (!search.value && programId.value === 'all') {
-        students.value = [];
+const recipientTypes = [
+    { value: 'student', label: 'Student' },
+    { value: 'user', label: 'Staff/User' },
+    { value: 'lecturer', label: 'Lecturer' },
+];
+
+const searchTargets = async () => {
+    if (!search.value && programId.value === 'all' && notifiableType.value === 'student') {
+        recipients.value = [];
         return;
     }
 
     isSearching.value = true;
     try {
-        const { data: apiData } = await api.get<Student[]>(route(NOTIFICATION_ROUTE_NAMES.SEARCH_STUDENTS), {
+        const { data: apiData } = await api.get<Recipient[]>(route(NOTIFICATION_ROUTE_NAMES.SEARCH_TARGETS), {
             search: search.value,
-            program_id: programId.value === 'all' ? null : programId.value
+            type: notifiableType.value,
+            program_id: notifiableType.value === 'student' && programId.value !== 'all' ? programId.value : null
         });
 
         if (apiData.value?.success && apiData.value?.data) {
-            students.value = apiData.value.data.filter(
-                (s: Student) => !selectedStudents.value.some(sel => sel.id === s.id)
+            recipients.value = apiData.value.data.filter(
+                (r: Recipient) => !selectedRecipients.value.some(sel => sel.id === r.id)
             );
         }
     } catch (error) {
-        toast.error('Failed to search students');
+        toast.error('Failed to search recipients');
     } finally {
         isSearching.value = false;
     }
 };
 
-const toggleStudent = (student: Student) => {
-    const index = selectedStudents.value.findIndex(s => s.id === student.id);
+const handleRecipientTypeChange = () => {
+    recipients.value = [];
+    selectedRecipients.value = [];
+    search.value = '';
+    programId.value = 'all';
+};
+
+const toggleRecipient = (recipient: Recipient) => {
+    const index = selectedRecipients.value.findIndex(r => r.id === recipient.id);
     if (index === -1) {
-        selectedStudents.value.push(student);
-        students.value = students.value.filter(s => s.id !== student.id);
+        selectedRecipients.value.push(recipient);
+        recipients.value = recipients.value.filter(r => r.id !== recipient.id);
     } else {
-        selectedStudents.value.splice(index, 1);
-        if (search.value || programId.value !== 'all') {
-            students.value.push(student);
+        selectedRecipients.value.splice(index, 1);
+        if (search.value || (notifiableType.value === 'student' && programId.value !== 'all')) {
+            recipients.value.push(recipient);
         }
     }
 };
 
 const removeSelected = (id: number) => {
-    selectedStudents.value = selectedStudents.value.filter(s => s.id !== id);
+    selectedRecipients.value = selectedRecipients.value.filter(r => r.id !== id);
 };
 
 const addAllVisible = () => {
-    students.value.forEach(s => {
-        if (!selectedStudents.value.some(sel => sel.id === s.id)) {
-            selectedStudents.value.push(s);
+    recipients.value.forEach(r => {
+        if (!selectedRecipients.value.some(sel => sel.id === r.id)) {
+            selectedRecipients.value.push(r);
         }
     });
-    students.value = [];
+    recipients.value = [];
 };
 
 // --- Form State ---
@@ -116,7 +129,31 @@ const formSchema = toTypedSchema(z.object({
     title: z.string().min(1, 'Title is required').max(255),
     message: z.string().min(1, 'Message is required'),
     is_important: z.boolean().default(false),
-    action_url: z.string().url('Invalid URL').optional().or(z.literal('')),
+    action_url: z.string().optional().or(z.literal('')).refine((val) => {
+        // Nếu không có giá trị (undefined hoặc rỗng), bỏ qua validate này
+        if (!val) return true;
+
+        // 1. Kiểm tra nếu bắt đầu bằng '/' (Path nội bộ)
+        if (val.startsWith('/')) {
+            // Regex kiểm tra định dạng path đơn giản (không chứa khoảng trắng)
+            return /^\/[^\s]*$/.test(val);
+        }
+
+        // 2. Kiểm tra nếu bắt đầu bằng 'h' (Có thể là http/https)
+        if (val.startsWith('h')) {
+            try {
+                new URL(val); // Sử dụng constructor URL chuẩn của JS để check
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        // Nếu có nhập nhưng không bắt đầu bằng / hoặc h
+        return false;
+    }, {
+        message: "URL phải bắt đầu bằng '/' hoặc là một liên kết (http/https) hợp lệ"
+    }),
     action_text: z.string().max(50).optional().or(z.literal('')),
 }));
 
@@ -140,23 +177,24 @@ const [actionUrl] = defineField('action_url');
 const [actionText] = defineField('action_text');
 
 const onSubmit = handleSubmit(async (values) => {
-    if (selectedStudents.value.length === 0) {
+    if (selectedRecipients.value.length === 0) {
         toast.error('Please select at least one recipient');
         return;
     }
 
     const payload = {
         ...values,
-        student_ids: selectedStudents.value.map(s => s.id)
+        notifiable_type: notifiableType.value,
+        notifiable_ids: selectedRecipients.value.map(r => r.id)
     };
 
     try {
         const { data: apiData } = await api.post(route(NOTIFICATION_ROUTE_NAMES.STORE), payload);
 
         if (apiData.value?.success) {
-            toast.success(`Notification sent to ${selectedStudents.value.length} students`);
+            toast.success(`Notification sent to ${selectedRecipients.value.length} recipients`);
             resetForm();
-            selectedStudents.value = [];
+            selectedRecipients.value = [];
             router.visit(route(NOTIFICATION_ROUTE_NAMES.INDEX));
         } else {
             toast.error(apiData.value?.message || 'Failed to send notification');
@@ -190,12 +228,26 @@ const onSubmit = handleSubmit(async (values) => {
             <Card class="lg:col-span-1">
                 <CardHeader>
                     <CardTitle>Recipients</CardTitle>
-                    <CardDescription>Search and select students to receive this notification.</CardDescription>
+                    <CardDescription>Search and select recipients to receive this notification.</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
                     <div class="space-y-2">
-                        <Label>Program</Label>
-                        <Select v-model="programId" @update:model-value="searchStudents">
+                        <Label>Send to</Label>
+                        <Select v-model="notifiableType" @update:model-value="handleRecipientTypeChange">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="type in recipientTypes" :key="type.value" :value="type.value">
+                                    {{ type.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div v-if="notifiableType === 'student'" class="space-y-2">
+                        <Label>Program filter</Label>
+                        <Select v-model="programId" @update:model-value="searchTargets">
                             <SelectTrigger>
                                 <SelectValue placeholder="All Programs" />
                             </SelectTrigger>
@@ -209,11 +261,11 @@ const onSubmit = handleSubmit(async (values) => {
                     </div>
 
                     <div class="space-y-2">
-                        <Label>Search Student</Label>
+                        <Label>Search {{ notifiableType === 'student' ? 'Student' : (notifiableType === 'user' ? 'Staff'
+                            : 'Lecturer') }}</Label>
                         <div class="flex gap-2">
-                            <Input v-model="search" placeholder="Name, code or email..."
-                                @keyup.enter="searchStudents" />
-                            <Button size="icon" @click="searchStudents" :disabled="isSearching">
+                            <Input v-model="search" placeholder="Name, code or email..." @keyup.enter="searchTargets" />
+                            <Button size="icon" @click="searchTargets" :disabled="isSearching">
                                 <Search v-if="!isSearching" class="h-4 w-4" />
                                 <Loader2 v-else class="h-4 w-4 animate-spin" />
                             </Button>
@@ -221,20 +273,21 @@ const onSubmit = handleSubmit(async (values) => {
                     </div>
 
                     <!-- Search Results -->
-                    <div v-if="students.length > 0" class="space-y-2 pt-2">
+                    <div v-if="recipients.length > 0" class="space-y-2 pt-2">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-medium text-gray-500">{{ students.length }} results found</span>
+                            <span class="text-xs font-medium text-gray-500">{{ recipients.length }} results found</span>
                             <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="addAllVisible">Add
                                 All</Button>
                         </div>
                         <ScrollArea class="h-[200px] rounded-md border p-2">
                             <div class="space-y-1">
-                                <div v-for="s in students" :key="s.id"
+                                <div v-for="r in recipients" :key="r.id"
                                     class="flex cursor-pointer items-center justify-between rounded-md p-2 hover:bg-gray-100"
-                                    @click="toggleStudent(s)">
+                                    @click="toggleRecipient(r)">
                                     <div class="flex flex-col">
-                                        <span class="text-sm font-medium">{{ s.full_name }}</span>
-                                        <span class="text-xs text-gray-500">{{ s.student_id }}</span>
+                                        <span class="text-sm font-medium">{{ r.name }}</span>
+                                        <span v-if="r.code" class="text-xs text-gray-500">{{ r.code }}</span>
+                                        <span v-else class="text-xs text-gray-400">{{ r.email }}</span>
                                     </div>
                                     <Check class="h-4 w-4 text-transparent hover:text-gray-400" />
                                 </div>
@@ -242,20 +295,20 @@ const onSubmit = handleSubmit(async (values) => {
                         </ScrollArea>
                     </div>
 
-                    <!-- Selected Students -->
+                    <!-- Selected Recipients -->
                     <div class="space-y-2 pt-4 border-t">
                         <Label class="flex items-center justify-between">
                             Selected
-                            <Badge variant="secondary">{{ selectedStudents.length }}</Badge>
+                            <Badge variant="secondary">{{ selectedRecipients.length }}</Badge>
                         </Label>
-                        <ScrollArea v-if="selectedStudents.length > 0"
+                        <ScrollArea v-if="selectedRecipients.length > 0"
                             class="h-[250px] rounded-md border p-2 bg-gray-50/50">
                             <div class="flex flex-wrap gap-1">
-                                <Badge v-for="s in selectedStudents" :key="s.id" variant="outline" class="bg-white">
-                                    {{ s.full_name }}
+                                <Badge v-for="r in selectedRecipients" :key="r.id" variant="outline" class="bg-white">
+                                    {{ r.name }}
                                     <span
                                         class="ml-1 cursor-pointer hover:text-red-500 p-0.5 rounded-full hover:bg-red-50 transition-colors"
-                                        @click.stop="removeSelected(s.id)">
+                                        @click.stop="removeSelected(r.id)">
                                         <X class="h-3 w-3" />
                                     </span>
                                 </Badge>
@@ -314,7 +367,7 @@ const onSubmit = handleSubmit(async (values) => {
 
                         <div class="space-y-2">
                             <Label for="action_url">Action Link (Optional)</Label>
-                            <Input id="action_url" v-model="actionUrl" placeholder="https://..."
+                            <Input id="action_url" v-model="actionUrl" placeholder="route (e.g. /user/123)"
                                 :class="{ 'border-destructive': errors.action_url }" />
                             <p v-if="errors.action_url" class="text-xs text-destructive">{{ errors.action_url }}</p>
                         </div>
@@ -329,7 +382,7 @@ const onSubmit = handleSubmit(async (values) => {
                         <div class="md:col-span-2 bg-blue-50 border border-blue-100 rounded-md p-3 flex gap-3">
                             <Info class="h-5 w-5 text-blue-500 shrink-0" />
                             <div class="text-xs text-blue-700 leading-relaxed">
-                                This notification will be delivered instantly to the student's portal if they are
+                                This notification will be delivered instantly to the recipient's portal if they are
                                 online, and stored in their inbox database for later viewing.
                             </div>
                         </div>
@@ -338,7 +391,7 @@ const onSubmit = handleSubmit(async (values) => {
                         <Button type="submit" :disabled="isSubmitting" class="w-full md:w-auto">
                             <Loader2 v-if="isSubmitting" class="mr-2 h-4 w-4 animate-spin" />
                             <Send v-else class="mr-2 h-4 w-4" />
-                            Send to {{ selectedStudents.length }} Recipient(s)
+                            Send to {{ selectedRecipients.length }} Recipient(s)
                         </Button>
                     </CardFooter>
                 </form>

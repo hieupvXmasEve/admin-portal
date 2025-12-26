@@ -24,8 +24,9 @@ class SendManualNotificationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'student_ids' => ['required', 'array', 'min:1'],
-            'student_ids.*' => ['exists:students,id'],
+            'notifiable_type' => ['required', 'string', 'in:student,user,lecturer'],
+            'notifiable_ids' => ['required', 'array', 'min:1'],
+            'notifiable_ids.*' => ['integer'],
             'title' => ['required', 'string', 'max:255'],
             'message' => ['required', 'string'],
             'category' => ['required', new Enum(NotificationCategory::class)],

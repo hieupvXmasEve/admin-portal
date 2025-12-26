@@ -1,43 +1,50 @@
-import Echo from 'laravel-echo';
+import { configureEcho } from '@laravel/echo-vue';
+import Pusher from 'pusher-js';
 
 /**
- * Realtime Echo Instance Factory
+ * Configure Laravel Echo (Singleton via @laravel/echo-vue)
  *
  * Rules:
  * - No vendor lock-in (Ably, Pusher, etc. are interchangeable)
  * - Broadcaster is ENV-driven (VITE_BROADCASTER)
- * - Abstraction layer ensures components don't care about the driver
+ * - Supports Ably via Pusher compatibility mode
  */
-export async function createEcho() {
+export function setupEcho(): void {
     const broadcaster = import.meta.env.VITE_BROADCASTER || 'null';
+    const key = import.meta.env.VITE_BROADCAST_KEY;
 
-    // Handle dummy/null broadcaster
-    if (broadcaster === 'null' || !import.meta.env.VITE_BROADCAST_KEY) {
-        return null;
+    if (broadcaster === 'null' || !key) {
+        return;
     }
 
     const config: any = {
-        broadcaster: broadcaster,
-        key: import.meta.env.VITE_BROADCAST_KEY,
+        broadcaster: broadcaster === 'ably' ? 'pusher' : broadcaster,
+        key: broadcaster === 'ably' && key.includes(':') ? key.split(':')[0] : key,
+        cluster: import.meta.env.VITE_PUSH_CLUSTER || 'mt1',
         forceTLS: true,
     };
 
-    // Driver-specific initialization (Infra only)
-    if (broadcaster === 'ably') {
-        const Ably = await import('ably');
-        (window as any).Ably = Ably;
-    } else if (broadcaster === 'pusher') {
-        const Pusher = await import('pusher-js');
-        (window as any).Pusher = Pusher.default;
+    try {
+        // Driver-specific initialization
+        if (broadcaster === 'ably' || broadcaster === 'pusher') {
+            (window as any).Pusher = Pusher;
 
-        if (import.meta.env.VITE_SOCKET_HOST) {
-            config.wsHost = import.meta.env.VITE_SOCKET_HOST;
-            config.wsPort = import.meta.env.VITE_SOCKET_PORT || 443;
-            config.wssPort = import.meta.env.VITE_SOCKET_PORT || 443;
-            config.disableStats = true;
-            config.enabledTransports = ['ws', 'wss'];
+            if (broadcaster === 'ably') {
+                config.wsHost = 'realtime-pusher.ably.io';
+                config.wsPort = 443;
+                config.disableStats = true;
+                config.encrypted = true;
+            } else if (import.meta.env.VITE_SOCKET_HOST) {
+                config.wsHost = import.meta.env.VITE_SOCKET_HOST;
+                config.wsPort = import.meta.env.VITE_SOCKET_PORT || 443;
+                config.wssPort = import.meta.env.VITE_SOCKET_PORT || 443;
+                config.disableStats = true;
+                config.enabledTransports = ['ws', 'wss'];
+            }
         }
-    }
 
-    return new Echo(config);
+        configureEcho(config);
+    } catch (error) {
+        console.error('Failed to initialize Laravel Echo:', error);
+    }
 }

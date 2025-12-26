@@ -18,7 +18,8 @@ class SendManualNotificationAction
     public function execute(array $data): void
     {
         DB::transaction(function () use ($data) {
-            $studentIds = $data['student_ids'];
+            $notifiableIds = $data['notifiable_ids'];
+            $notifiableType = $data['notifiable_type'];
             $title = $data['title'];
             $message = $data['message'];
             $category = $data['category'] ?? NotificationCategory::SYSTEM->value;
@@ -27,10 +28,17 @@ class SendManualNotificationAction
             $actionUrl = $data['action_url'] ?? null;
             $actionText = $data['action_text'] ?? null;
 
-            foreach ($studentIds as $studentId) {
-                $student = Student::find($studentId);
-                if ($student) {
-                    $student->notifications()->create([
+            $modelClass = match ($notifiableType) {
+                'student' => \App\Models\Student::class,
+                'user' => \App\Models\User::class,
+                'lecturer' => \App\Models\Lecture::class,
+                default => throw new \InvalidArgumentException("Invalid notifiable type: {$notifiableType}"),
+            };
+
+            foreach ($notifiableIds as $id) {
+                $notifiable = $modelClass::find($id);
+                if ($notifiable) {
+                    $notifiable->notifications()->create([
                         'type' => $type,
                         'category' => $category,
                         'title' => $title,

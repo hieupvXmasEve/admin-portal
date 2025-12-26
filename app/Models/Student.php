@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Traits\HasNotifications;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,7 +16,9 @@ use Illuminate\Support\Facades\Cache;
 
 class Student extends StudentAuditableModel
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, HasNotifications, Notifiable {
+        HasNotifications::notifications insteadof Notifiable;
+    }
 
     /**
      * Statuses that are blocked from active operations (e.g., login)
@@ -296,13 +299,6 @@ class Student extends StudentAuditableModel
         return $this->hasMany(GoldTransaction::class);
     }
 
-    /**
-     * Get all notifications for this student.
-     */
-    public function notifications(): \Illuminate\Database\Eloquent\Relations\MorphMany
-    {
-        return $this->morphMany(Notification::class, 'notifiable');
-    }
 
     /**
      * Get the student's club memberships.

@@ -1,55 +1,41 @@
-import { onMounted, onUnmounted, ref } from 'vue';
+import { useEcho } from '@laravel/echo-vue';
+import { BellIcon } from 'lucide-vue-next';
+import { h, ref } from 'vue';
 import { toast } from 'vue-sonner';
-import { createEcho } from '../lib/echo';
 
 /**
  * Composable for Realtime Notifications
  *
  * Rules:
- * - Uses Laravel Echo (Rule 4.1)
+ * - Uses Laravel Echo via @laravel/echo-vue (Rule 4.1)
  * - Uses standard Listening Syntax (Rule 4.3)
- * - Abstracted initialization (Rule 4.2)
  */
 export function useRealtimeNotifications(notifiableId: number | string | undefined) {
-    const echo = ref<any>(null);
     const notifications = ref<any[]>([]);
 
-    const connect = async () => {
-        if (!notifiableId) return;
+    if (!notifiableId) {
+        return { notifications };
+    }
 
-        echo.value = await createEcho();
+    // Automatically connects and listens
+    useEcho(`notifications.${notifiableId}`, '.NotificationCreated', (data: any) => {
+        notifications.value.unshift(data);
 
-        if (!echo.value) return;
-
-        // Listen for user-specific notifications
-        // Rule 4.3: Standard Echo API only
-        echo.value.private(`notifications.${notifiableId}`).listen('.NotificationCreated', (data: any) => {
-            notifications.value.unshift(data);
-
-            // Visual feedback (Rule 3 in Design Aesthetics)
-            toast(data.title, {
-                description: data.message,
-                action: data.data?.action_url
-                    ? {
-                          label: data.data?.action_text || 'View',
-                          onClick: () => (window.location.href = data.data.action_url),
-                      }
-                    : undefined,
-            });
+        // Visual feedback (Rule 3 in Design Aesthetics)
+        toast('New Notification', {
+            description: 'You have a new notification from the system.',
+            position: 'top-right',
+            duration: 5000,
+            icon: h(BellIcon, { style: 'color: #3b82f6; width: 20px; height: 20px' }),
+            classes: {
+                toast: 'my-custom-toast',
+                title: 'my-toast-title',
+                description: 'my-toast-description',
+            },
         });
-    };
-
-    const disconnect = () => {
-        if (echo.value && notifiableId) {
-            echo.value.leave(`notifications.${notifiableId}`);
-        }
-    };
-
-    onMounted(connect);
-    onUnmounted(disconnect);
+    });
 
     return {
         notifications,
-        echo,
     };
 }
