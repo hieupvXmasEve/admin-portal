@@ -10,6 +10,7 @@ use App\Models\Program;
 use App\Models\Student;
 use App\Enums\NotificationCategory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,25 +25,25 @@ class NotificationController extends Controller
 
         $notifications = Notification::query()
             ->with(['notifiable'])
-            ->when($request->search, function ($query, $search) {
+            ->when($request->input('search'), function ($query, $search) {
                 $query->where('title', 'like', "%{$search}%")
                     ->orWhere('message', 'like', "%{$search}%");
             })
-            ->when($request->category, function ($query, $category) {
+            ->when($request->input('category'), function ($query, $category) {
                 $query->where('category', $category);
             })
-            ->orderBy($request->sort ?? 'created_at', $request->direction ?? 'desc')
-            ->paginate($request->per_page ?? 15)
+            ->orderBy($request->input('sort', 'created_at'), $request->input('direction', 'desc'))
+            ->paginate($request->input('per_page', 15))
             ->withQueryString();
 
         return Inertia::render('Admin/Notifications/Index', [
             'notifications' => $notifications,
             'filters' => [
-                'search' => $request->search,
-                'category' => $request->category,
-                'sort' => $request->sort,
-                'direction' => $request->direction,
-                'per_page' => $request->per_page,
+                'search' => $request->input('search'),
+                'category' => $request->input('category'),
+                'sort' => $request->input('sort'),
+                'direction' => $request->input('direction'),
+                'per_page' => $request->input('per_page'),
             ],
             'categories' => NotificationCategory::options(),
         ]);
@@ -55,7 +56,7 @@ class NotificationController extends Controller
     {
         $this->authorize('send_manual_notification');
 
-        $programs = Program::select('id', 'name')->get();
+        $programs = Program::query()->select('id', 'name')->get();
 
         return Inertia::render('Admin/Notifications/Send', [
             'categories' => NotificationCategory::options(),
@@ -76,27 +77,65 @@ class NotificationController extends Controller
     }
 
     /**
-     * API to search students for the notification form.
+     * API to search recipients for the notification form.
      */
-    public function searchStudents(Request $request)
+    public function searchTargets(Request $request)
     {
         $this->authorize('send_manual_notification');
 
-        $students = Student::query()
-            ->active()
-            ->when($request->search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('full_name', 'like', "%{$search}%")
-                        ->orWhere('student_id', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
-                });
-            })
-            ->when($request->program_id, function ($query, $programId) {
-                $query->where('program_id', $programId);
-            })
-            ->limit(20)
-            ->get(['id', 'full_name', 'student_id', 'email']);
+        $type = $request->input('type', 'student');
+        $search = $request->input('search');
 
-        return \App\Http\Responses\ApiResponse::success($students);
+        switch ($type) {
+            case 'student':
+                $results = Student::query()
+                    ->active()
+                    ->when($search, function ($query, $search) {
+                        $query->where(function ($q) use ($search) {
+                            $q->where('full_name', 'like', "%{$search}%")
+                                ->orWhere('student_id', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
+                    })
+                    ->when($request->input('program_id'), function ($query, $programId) {
+                        $query->where('program_id', $programId);
+                    })
+                    ->limit(20)
+                    ->get(['id', 'full_name as name', 'student_id as code', 'email']);
+                break;
+
+            case 'user':
+                $results = \App\Models\User::query()
+                    ->where('status', 'active')
+                    ->when($search, function ($query, $search) {
+                        $query->where(function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
+                    })
+                    ->limit(20)
+                    ->get(['id', 'name', 'email']);
+                break;
+
+            case 'lecturer':
+                $results = \App\Models\Lecture::query()
+                    ->active()
+                    ->when($search, function ($query, $search) {
+                        $query->where(function ($q) use ($search) {
+                            $q->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%")
+                                ->orWhere('employee_id', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
+                    })
+                    ->limit(20)
+                    ->get(['id', DB::raw("CONCAT(first_name, ' ', last_name) as name"), 'employee_id as code', 'email']);
+                break;
+
+            default:
+                return \App\Http\Responses\ApiResponse::businessLogicError('Invalid target type');
+        }
+
+        return \App\Http\Responses\ApiResponse::success($results);
     }
 }

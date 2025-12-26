@@ -2,7 +2,6 @@ import '../css/app.css';
 import '../css/tiptap.css';
 
 import { createInertiaApp } from '@inertiajs/vue3';
-import { router } from '@inertiajs/vue3';
 import { createPinia } from 'pinia';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
@@ -10,7 +9,7 @@ import GlobalConfirmDialog from './components/GlobalConfirmDialog.vue';
 import { initializeTheme } from './composables/useAppearance';
 import { vCan, vCanAny } from './directives/permission';
 import AppLayout from './layouts/AppLayout.vue';
-import { toast } from 'vue-sonner';
+import { setupEcho } from './lib/echo';
 
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
@@ -44,6 +43,7 @@ createInertiaApp({
         const pinia = createPinia();
 
         initializeTheme();
+        setupEcho();
 
         app.use(plugin).use(ZiggyVue).use(pinia).directive('can', vCan).directive('can-any', vCanAny).mount(el);
     },

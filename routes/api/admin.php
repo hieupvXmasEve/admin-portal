@@ -181,3 +181,7 @@ Route::middleware(['web'])->prefix('dashboard')->name('api.admin.dashboard.')->g
     // Additional dashboard endpoints
     Route::get('/recent-activities', [\App\Http\Controllers\Web\DashboardController::class, 'recentActivities'])->name('recent-activities');
 });
+
+Route::middleware(['web'])->prefix('admin')->name('api.admin.')->group(function(){
+    require __DIR__ . '/admin/notification.php';
+});

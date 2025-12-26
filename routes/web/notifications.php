@@ -8,6 +8,6 @@ Route::middleware(['auth', 'verified'])->prefix('admin/notifications')->name('ad
     Route::get('/send', [NotificationController::class, 'sendForm'])->name('send-form');
     Route::post('/send', [NotificationController::class, 'send'])->name('send');
     
-    // API for student search in the send form
-    Route::get('/search-students', [NotificationController::class, 'searchStudents'])->name('search-students');
+    // API for target search in the send form
+    Route::get('/search-targets', [NotificationController::class, 'searchTargets'])->name('search-targets');
 });

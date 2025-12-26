@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Traits\HasNotifications;
 use App\Traits\LazyPermissions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
@@ -11,8 +12,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends UserAuditableModel
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, LazyPermissions, Notifiable;
+    use HasApiTokens, HasFactory, HasNotifications, LazyPermissions, Notifiable {
+        HasNotifications::notifications insteadof Notifiable;
+    }
 
     /**
      * The attributes that are mass assignable.

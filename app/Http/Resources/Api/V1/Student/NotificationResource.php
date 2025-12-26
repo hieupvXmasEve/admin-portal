@@ -42,7 +42,7 @@ class NotificationResource extends JsonResource
 //                'expires_at' => $this->expires_at?->toISOString(),
 
 //            ],
-//            'data' => $this->data ?? [],
+            'data' => $this->data ?? [],
 //            'channels' => $this->channels ?? [],
 //            'display' => [
 //                'icon' => $this->getNotificationIcon($this->category->value, $this->type),

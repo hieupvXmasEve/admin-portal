@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Traits\HasNotifications;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,8 +17,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Lecture extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\LectureFactory> */
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, HasNotifications, Notifiable, SoftDeletes {
+        HasNotifications::notifications insteadof Notifiable;
+    }
 
     protected $guard = 'lecturer';
 
