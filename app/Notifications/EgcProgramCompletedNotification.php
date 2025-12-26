@@ -41,7 +41,7 @@ class EgcProgramCompletedNotification extends Notification implements ShouldQueu
                 'action_text' => 'View Course Offerings',
             ],
             'is_important' => true,
-            'channels' => ['database'],
+            'channels' => ['database', 'broadcast'],
         ];
     }
 

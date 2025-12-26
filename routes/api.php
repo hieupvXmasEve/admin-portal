@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\SystemConfigController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,6 +16,9 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+
+// Broadcasting routes for API-based authentication (Laravel Echo)
+Broadcast::routes(['middleware' => ['auth:sanctum', 'student.api.auth']]);
 
 // System configuration endpoints
 Route::get('/system-config', [SystemConfigController::class, 'index'])->name('api.system-config.index');

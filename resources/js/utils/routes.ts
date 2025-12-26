@@ -7,6 +7,7 @@ import {
     CURRICULUM_ROUTE_NAMES,
     DEPARTMENT_ROUTE_NAMES,
     LECTURE_ROUTE_NAMES,
+    NOTIFICATION_ROUTE_NAMES,
     PROGRAM_ROUTE_NAMES,
     ROLE_ROUTE_NAMES,
     ROOM_BOOKING_ROUTE_NAMES,
@@ -135,6 +136,12 @@ export const systemRoutes = {
         pending: () => route(ROOM_BOOKING_ROUTE_NAMES.PENDING),
         calendar: () => route(ROOM_BOOKING_ROUTE_NAMES.CALENDAR),
         logs: () => route(ROOM_BOOKING_ROUTE_NAMES.LOGS),
+    },
+    notifications: {
+        index: () => route(NOTIFICATION_ROUTE_NAMES.INDEX),
+        send: () => route(NOTIFICATION_ROUTE_NAMES.SEND),
+        store: () => route(NOTIFICATION_ROUTE_NAMES.STORE),
+        searchStudents: () => route(NOTIFICATION_ROUTE_NAMES.SEARCH_STUDENTS),
     },
 } as const;
 

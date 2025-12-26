@@ -2,6 +2,7 @@ import type { NavItem } from '@/types';
 import {
     Award,
     BarChart3,
+    Bell,
     BookMarked,
     BookOpen,
     Building2,
@@ -716,6 +717,25 @@ export const mainNavItems: NavItem[] = [
                 href: systemRoutes.emailConfiguration.emailHistory(),
                 icon: Clock,
                 requiredPermissions: ['view_email_log'],
+            },
+        ],
+    },
+    {
+        title: 'Notification Management',
+        href: '#',
+        icon: Bell,
+        children: [
+            {
+                title: 'Send Notification',
+                href: systemRoutes.notifications.send(),
+                icon: MailPlus,
+                requiredPermissions: ['send_manual_notification'],
+            },
+            {
+                title: 'History',
+                href: systemRoutes.notifications.index(),
+                icon: Clock,
+                requiredPermissions: ['view_any_notification'],
             },
         ],
     },

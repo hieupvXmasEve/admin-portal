@@ -190,7 +190,7 @@ class SendWelcomeStudents extends Command
     {
         try {
             // Check if student already has a welcome notification (idempotency)
-            $existingNotification = Notification::where('notifiable_type', Student::class)
+            $existingNotification = Notification::where('notifiable_type', 'student')
                 ->where('notifiable_id', $student->id)
                 ->where('title', "Welcome to {$university}!")
                 ->where('category', NotificationCategory::SYSTEM)
@@ -203,8 +203,8 @@ class SendWelcomeStudents extends Command
             $university = ucwords($university);
             // Create welcome notification
             Notification::create([
-                'type' => Student::class,
-                'notifiable_type' => Student::class,
+                'type' => 'student',
+                'notifiable_type' => 'student',
                 'notifiable_id' => $student->id,
                 'category' => NotificationCategory::SYSTEM,
                 'title' => "Welcome to {$university}!",

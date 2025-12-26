@@ -65,7 +65,7 @@ class CourseCompletedNotification extends Notification implements ShouldQueue
                 'action_text' => 'View Academic Records',
             ],
             'is_important' => !$this->passed, // Only failed courses are marked important
-            'channels' => ['database'],
+            'channels' => ['database', 'broadcast'],
         ];
     }
 

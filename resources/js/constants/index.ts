@@ -7,6 +7,7 @@ export * from './course-registration-routes';
 export * from './curriculum-routes';
 export * from './department-routes';
 export * from './lecture-routes';
+export * from './notification-routes';
 export * from './program-routes';
 export * from './role-routes';
 export * from './room-booking-routes';

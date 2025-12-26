@@ -58,7 +58,7 @@ class EgcLevelMismatchNotification extends Notification implements ShouldQueue
                 ],
             ],
             'is_important' => true,
-            'channels' => ['database'],
+            'channels' => ['database', 'broadcast'],
         ];
     }
 

@@ -39,6 +39,7 @@ class ProfileResource extends JsonResource
         $status = (string)($personalInfo['status'] ?? '');
 
         return [
+            'id' => $personalInfo['id'],
             'student_id' => $personalInfo['student_id'],
             'first_name' => $personalInfo['first_name'],
             'last_name' => $personalInfo['last_name'],
