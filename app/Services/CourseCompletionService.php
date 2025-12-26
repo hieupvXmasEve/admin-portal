@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\AcademicRecord;
+use App\Models\AssessmentComponent;
+use App\Models\AssessmentComponentDetailScore;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Notification;
@@ -26,6 +28,12 @@ class CourseCompletionService
     {
         // 1. Validate prerequisites
         $this->validateAcademicRecordsExist($courseOffering);
+
+        // 1.5 Aggregate manual grades if not Canvas synced
+        if (! $courseOffering->is_canvas_synced) {
+            $this->aggregateManualGrades($courseOffering);
+        }
+
         $this->validateGradesExist($courseOffering);
 
         // 2. Finalize academic records
@@ -114,6 +122,7 @@ class CourseCompletionService
                 $record->update([
                     'grade_status' => 'final',
                     'grade_finalized_date' => now(),
+                    'final_letter_grade' => 'F', // Override letter grade to F for attendance failure
                     'grade_points' => 0.0, // F grade for attendance failure
                     'completion_status' => 'failed',
                     'is_passed' => false,
@@ -141,7 +150,8 @@ class CourseCompletionService
             $isPassing = $finalPercentage >= $passingThreshold;
 
             // Calculate grade points from final percentage
-            $gradePoints = $this->calculateGradePoints($finalPercentage);
+            $gradePoints = AcademicRecord::calculateGradePoints($finalPercentage);
+            $finalLetterGrade = AcademicRecord::calculateLetterGrade($finalPercentage);
 
             if ($isPassing) {
                 $passedCount++;
@@ -160,6 +170,7 @@ class CourseCompletionService
             $record->update([
                 'grade_status' => 'final',
                 'grade_finalized_date' => now(),
+                'final_letter_grade' => $finalLetterGrade,
                 'grade_points' => $gradePoints,
                 'completion_status' => $isPassing ? 'completed' : 'failed',
                 'is_passed' => $isPassing,
@@ -183,33 +194,90 @@ class CourseCompletionService
     }
 
     /**
-     * Calculate grade points from final percentage
+     * Aggregate and calculate scores for manually graded course offerings.
+     * This sums up all assessment component scores to update AcademicRecords.
      */
-    private function calculateGradePoints(float $percentage): float
+    public function aggregateManualGrades(CourseOffering $courseOffering): void
     {
-        if ($percentage >= 90) {
-            return 4.0; // A+, A
-        } elseif ($percentage >= 85) {
-            return 3.7; // A-
-        } elseif ($percentage >= 80) {
-            return 3.3; // B+
-        } elseif ($percentage >= 75) {
-            return 3.0; // B
-        } elseif ($percentage >= 70) {
-            return 2.7; // B-
-        } elseif ($percentage >= 65) {
-            return 2.3; // C+
-        } elseif ($percentage >= 60) {
-            return 2.0; // C
-        } elseif ($percentage >= 55) {
-            return 1.7; // C-
-        } elseif ($percentage >= 50) {
-            return 1.3; // D+
-        } elseif ($percentage >= 45) {
-            return 1.0; // D
-        } else {
-            return 0.0; // F
+        $syllabus = $courseOffering->syllabusTemplate;
+        if (! $syllabus) {
+            return;
         }
+
+        // Get all assessment components with their details
+        $components = AssessmentComponent::where('syllabus_template_id', $syllabus->id)
+            ->with('details')
+            ->get();
+
+        // Get all registered students
+        $registeredStudentIds = CourseRegistration::where('course_offering_id', $courseOffering->id)
+            ->whereIn('registration_status', ['registered', 'confirmed', 'completed'])
+            ->pluck('student_id')
+            ->toArray();
+
+        // Get all entered scores for these students in this course offering
+        $allScores = AssessmentComponentDetailScore::where('course_offering_id', $courseOffering->id)
+            ->whereIn('student_id', $registeredStudentIds)
+            ->where('score_excluded', false)
+            ->whereIn('score_status', ['final', 'provisional', 'draft'])
+            ->get()
+            ->groupBy('student_id');
+
+        // Identify which details have been graded for at least one student in this course
+        $gradedDetailIds = $allScores->flatten()->pluck('assessment_component_detail_id')->unique()->toArray();
+
+        foreach ($registeredStudentIds as $studentId) {
+            $studentScores = $allScores->get($studentId) ?? collect();
+
+            $totalWeightedScore = 0;
+            $totalWeight = 0;
+
+            foreach ($components as $component) {
+                $componentWeightedScore = 0;
+                $componentWeight = 0;
+                $hasComponentScores = false;
+
+                foreach ($component->details as $detail) {
+                    $score = $studentScores->where('assessment_component_detail_id', $detail->id)->first();
+                    
+                    if ($score && $score->percentage_score !== null) {
+                        $componentWeightedScore += ($score->percentage_score * $detail->weight);
+                        $componentWeight += $detail->weight;
+                        $hasComponentScores = true;
+                    } elseif (in_array($detail->id, $gradedDetailIds)) {
+                        // Student lacks a score, but the detail has been graded for at least one other student.
+                        // We treat this as a 0 score for the student.
+                        $componentWeightedScore += (0 * $detail->weight);
+                        $componentWeight += $detail->weight;
+                        $hasComponentScores = true;
+                    }
+                }
+
+                if ($hasComponentScores && $componentWeight > 0) {
+                    // Calculate component percentage (average of its details)
+                    $componentAverage = $componentWeightedScore / $componentWeight;
+                    // Apply component weight to overall score
+                    $totalWeightedScore += ($componentAverage * $component->weight);
+                    $totalWeight += $component->weight;
+                }
+            }
+
+            // Calculate final percentage (assuming syllabus total weight is 100 or using weighted average)
+            $finalPercentage = $totalWeight > 0 ? round($totalWeightedScore / $totalWeight, 2) : 0;
+
+            // Update or create academic record with aggregated results
+            AcademicRecord::where('course_offering_id', $courseOffering->id)
+                ->where('student_id', $studentId)
+                ->update([
+                    'final_percentage' => $finalPercentage,
+                    'final_letter_grade' => AcademicRecord::calculateLetterGrade($finalPercentage),
+                ]);
+        }
+
+        Log::info('Aggregated manual grades for course offering', [
+            'course_offering_id' => $courseOffering->id,
+            'students_count' => count($registeredStudentIds),
+        ]);
     }
 
     /**
