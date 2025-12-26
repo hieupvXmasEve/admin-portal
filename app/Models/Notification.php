@@ -13,6 +13,18 @@ class Notification extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected static function booted()
+    {
+        static::created(function ($notification) {
+            // Check if broadcast channel is requested
+            $channels = $notification->channels ?? [];
+            if (is_array($channels) && in_array('broadcast', $channels)) {
+                // Trigger realtime broadcast
+                broadcast(new \App\Events\NotificationBroadcast($notification));
+            }
+        });
+    }
+
     protected $fillable = [
         'type',
         'notifiable_type',
@@ -59,7 +71,11 @@ class Notification extends Model
 
     public function scopeUnread(Builder $query): Builder
     {
-        return $query->whereNull('read_at');
+        // don't take event expired but get expired is null
+        return $query->whereNull('read_at')->where(function ($query) {
+            $query->whereNull('expires_at')
+                ->orWhere('expires_at', '>', now());
+        });
     }
 
     public function scopeRead(Builder $query): Builder
@@ -96,7 +112,7 @@ class Notification extends Model
 
     public function scopeForNotifiable(Builder $query, Model $model): Builder
     {
-        return $query->where('notifiable_type', $model::class)
+        return $query->where('notifiable_type', $model->getMorphClass())
             ->where('notifiable_id', $model->getKey());
     }
 

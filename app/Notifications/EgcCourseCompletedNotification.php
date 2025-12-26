@@ -55,7 +55,7 @@ class EgcCourseCompletedNotification extends Notification implements ShouldQueue
                 'action_text' => 'View Academic Records',
             ],
             'is_important' => true,
-            'channels' => ['database'],
+            'channels' => ['database', 'broadcast'],
         ];
     }
 

@@ -138,6 +138,7 @@ class ProfileService
         $lastName = $nameParts[1] ?? '';
 
         return [
+            'id' => $student->id,
             'student_id' => $student->student_id,
             'first_name' => $firstName,
             'last_name' => $lastName,

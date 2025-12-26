@@ -539,7 +539,7 @@ class CourseCompletionService
 
         Notification::create([
             'type' => get_class($notification),
-            'notifiable_type' => get_class($notifiable),
+            'notifiable_type' => $notifiable->getMorphClass(),
             'notifiable_id' => $notifiable->id,
             'category' => $data['category'],
             'title' => $data['title'],

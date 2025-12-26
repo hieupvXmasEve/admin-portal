@@ -345,6 +345,10 @@ return [
             'delete_survey' => 'delete_survey',
             'view_survey_analytics' => 'view_survey_analytics',
         ],
+        'notifications' => [
+            'send_manual_notification' => 'send_manual_notification',
+            'view_any_notification' => 'view_any_notification',
+        ],
     ],
 
     'actions' => [

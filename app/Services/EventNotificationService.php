@@ -485,7 +485,7 @@ class EventNotificationService
     ): Notification {
         return Notification::create([
             'type' => 'event',
-            'notifiable_type' => $notifiable::class,
+            'notifiable_type' => $notifiable->getMorphClass(),
             'notifiable_id' => $notifiable->getKey(),
             'category' => NotificationCategory::EVENT,
             'title' => $title,
