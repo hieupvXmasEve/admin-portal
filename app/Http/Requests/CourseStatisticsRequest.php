@@ -19,7 +19,7 @@ class CourseStatisticsRequest extends FormRequest
             'semester_id' => ['nullable', 'exists:semesters,id'],
             'search' => ['nullable', 'string', 'max:255'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
-            'sort' => ['nullable', 'string', 'in:course_code,course_name,semester,total_students,average_attendance,average_grade'],
+            'sort' => ['nullable', 'string', 'in:unit_code,unit_name,total_students,average_attendance,average_grade'],
             'direction' => ['nullable', 'string', 'in:asc,desc'],
         ];
     }

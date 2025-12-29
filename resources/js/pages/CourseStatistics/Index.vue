@@ -6,167 +6,103 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import type { PaginatedResponse } from '@/types';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, BookOpen, Calendar, ClipboardList, Download, Eye, TrendingDown, TrendingUp, Users, UserX } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { BarChart3, BookOpen, Eye, TrendingDown, TrendingUp, Users } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { route } from 'ziggy-js';
 
-interface CourseStatistic {
+interface UnitStatistic {
     id: number;
-    course_offering_id: number;
-    course_code: string;
-    course_name: string;
+    unit_code: string;
+    unit_name: string;
     credit_hours: number;
-    semester: string;
-    semester_code: string;
-    section_code: string;
-    instructor_name: string;
-    delivery_mode: string;
+    offerings_count: number;
     total_students: number;
-    students_absent_exceeded: number;
-    absent_exceeded_percentage: number;
     average_attendance: number;
     average_grade: number;
-    grade_distribution: {
-        'A+': number;
-        A: number;
-        'B+': number;
-        B: number;
-        'C+': number;
-        C: number;
-        'D+': number;
-        D: number;
-        F: number;
-    };
     pass_rate: number;
-    max_capacity: number;
-    current_enrollment: number;
-    total_sessions: number;
-    allowed_absences: number;
 }
 
-interface Props {
-    statistics: PaginatedResponse<CourseStatistic>;
+interface UnitFilters {
+    semester_id: string;
+    search: string;
+    per_page: number;
+    sort: string;
+    direction: 'asc' | 'desc';
+}
+
+const props = defineProps<{
+    statistics: PaginatedResponse<UnitStatistic>;
     semesters: Array<{ id: number; name: string; code: string }>;
-    filters: {
-        semester_id?: number;
-        search?: string;
-        per_page?: number;
-        sort?: string;
-        direction?: string;
-    };
-}
+    filters: Partial<UnitFilters>;
+}>();
 
-const props = defineProps<Props>();
-
-const data = computed(() => props.statistics.data);
-
-const filters = ref({
-    semester_id: props.filters.semester_id || 'all',
-    search: props.filters.search || '',
-    per_page: props.filters.per_page || 15,
-    sort: props.filters.sort || 'course_code',
-    direction: props.filters.direction || 'asc',
-});
-
-const applyFilters = (newFilters: typeof filters.value) => {
-    const queryParams: Record<string, string | number> = {};
-
-    if (newFilters.semester_id && newFilters.semester_id !== 'all') {
-        queryParams.semester_id = newFilters.semester_id;
-    }
-    if (newFilters.search) {
-        queryParams.search = newFilters.search;
-    }
-    if (newFilters.sort) {
-        queryParams.sort = newFilters.sort;
-    }
-    if (newFilters.direction) {
-        queryParams.direction = newFilters.direction;
-    }
-
-    router.get('/course-statistics', queryParams, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['statistics', 'filters'],
-    });
-};
-
-const handleSearch = (value: string | number) => {
-    filters.value.search = String(value);
-    applyFilters(filters.value);
-};
-
-const clearFilters = () => {
-    filters.value = {
-        semester_id: 'all',
-        search: '',
-        per_page: 15,
-        sort: 'course_code',
+const {
+    filters,
+    hasActiveFilters,
+    clearFilters,
+    handleSearch,
+    handleSelectFilter,
+    handleSortChange,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    currentSort,
+    currentDirection,
+} = useInertiaFilters<UnitFilters>({
+    baseUrl: route('course-statistics.index'),
+    initialFilters: {
+        semester_id: String(props.filters?.semester_id || ''),
+        search: props.filters?.search || '',
+        sort: props.filters?.sort || 'unit_code',
+        direction: (props.filters?.direction as 'asc' | 'desc') || 'asc',
+        per_page: props.filters?.per_page || 15,
+    },
+    defaultValues: {
+        sort: 'unit_code',
         direction: 'asc',
-    };
-    router.get(
-        '/course-statistics',
-        {},
-        {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['statistics', 'filters'],
-        },
-    );
-};
-
-const hasActiveFilters = computed(() => {
-    return filters.value.search || (filters.value.semester_id && filters.value.semester_id !== 'all');
+        per_page: 15,
+    },
+    only: ['statistics', 'filters'],
 });
 
-const columns: ColumnDef<CourseStatistic>[] = [
+const columns: ColumnDef<UnitStatistic>[] = [
     {
         header: 'No',
         id: 'no',
         enableSorting: false,
-        enableHiding: false,
     },
     {
-        header: 'Course',
-        id: 'course',
-        enableSorting: false,
+        header: 'Unit',
+        accessorKey: 'unit_code',
+        id: 'unit',
     },
     {
-        header: 'Semester',
-        id: 'semester',
-        enableSorting: false,
-    },
-    {
-        header: 'Instructor',
-        id: 'instructor',
-        enableSorting: false,
+        header: 'Offerings',
+        accessorKey: 'offerings_count',
+        id: 'offerings_count',
     },
     {
         header: 'Students',
-        id: 'students',
-        enableSorting: false,
-    },
-    {
-        header: 'Absent Exceeded',
-        id: 'absent_exceeded',
-        enableSorting: false,
+        accessorKey: 'total_students',
+        id: 'total_students',
     },
     {
         header: 'Avg Attendance',
+        accessorKey: 'average_attendance',
         id: 'average_attendance',
-        enableSorting: false,
     },
     {
         header: 'Avg Grade',
+        accessorKey: 'average_grade',
         id: 'average_grade',
-        enableSorting: false,
     },
     {
         header: 'Pass Rate',
+        accessorKey: 'pass_rate',
         id: 'pass_rate',
-        enableSorting: false,
     },
     {
         header: 'Actions',
@@ -175,50 +111,7 @@ const columns: ColumnDef<CourseStatistic>[] = [
     },
 ];
 
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['statistics'],
-    });
-};
-
-const handlePageSizeChange = (pageSize: number) => {
-    filters.value.per_page = pageSize;
-
-    const queryParams: Record<string, string | number> = { per_page: pageSize };
-
-    if (filters.value.semester_id && filters.value.semester_id !== 'all') {
-        queryParams.semester_id = filters.value.semester_id;
-    }
-    if (filters.value.search) {
-        queryParams.search = filters.value.search;
-    }
-    if (filters.value.sort) {
-        queryParams.sort = filters.value.sort;
-    }
-    if (filters.value.direction) {
-        queryParams.direction = filters.value.direction;
-    }
-
-    router.get('/course-statistics', queryParams, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['statistics', 'filters'],
-    });
-};
-
-const goToDetailPage = (courseOfferingId: number) => {
-    router.visit(`/course-statistics/${courseOfferingId}`);
-};
-
-const goToAssessmentScoresPage = (courseOfferingId: number) => {
-    router.visit(`/course-statistics/${courseOfferingId}/assessment-scores`);
-};
-
-const exportStatistics = (courseOfferingId: number) => {
-    window.location.href = `/course-statistics/${courseOfferingId}/export-combined`;
-};
+const statsData = computed(() => props.statistics.data);
 </script>
 
 <template>
@@ -229,8 +122,9 @@ const exportStatistics = (courseOfferingId: number) => {
         <div class="flex items-center justify-between">
             <div>
                 <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Course Statistics</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">View attendance and grade statistics for each
-                    course offering</p>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    View aggregated statistics for each unit
+                </p>
             </div>
         </div>
 
@@ -245,17 +139,12 @@ const exportStatistics = (courseOfferingId: number) => {
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div class="space-y-2">
                         <Label>Semester</Label>
-                        <Select :model-value="String(filters.semester_id)" @update:model-value="
-                            (value) => {
-                                filters.semester_id = value === 'all' ? 'all' : Number(value);
-                                applyFilters(filters);
-                            }
-                        ">
+                        <Select :model-value="String(filters.semester_id)"
+                            @update:model-value="(v) => handleSelectFilter('semester_id', v)">
                             <SelectTrigger>
-                                <SelectValue placeholder="All semesters" />
+                                <SelectValue placeholder="Select semester" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All semesters</SelectItem>
                                 <SelectItem v-for="semester in semesters" :key="semester.id"
                                     :value="String(semester.id)">
                                     {{ semester.name }}
@@ -266,13 +155,14 @@ const exportStatistics = (courseOfferingId: number) => {
 
                     <div class="space-y-2">
                         <Label>Search</Label>
-                        <DebouncedInput :model-value="filters.search" placeholder="Course code or name..."
+                        <DebouncedInput :model-value="filters.search" placeholder="Unit code or name..."
                             @update:model-value="handleSearch" />
                     </div>
 
                     <div class="flex items-end space-y-2">
-                        <Button v-if="hasActiveFilters" variant="outline" @click="clearFilters" class="w-full"> Clear
-                            Filters </Button>
+                        <Button v-if="hasActiveFilters" variant="outline" class="w-full" @click="clearFilters">
+                            Clear Filters
+                        </Button>
                     </div>
                 </div>
             </CardContent>
@@ -280,106 +170,98 @@ const exportStatistics = (courseOfferingId: number) => {
 
         <Card>
             <CardContent class="p-0">
-                <DataTable :columns="columns" :data="data">
+                <DataTable :columns="columns" :data="statsData" :initial-sort="currentSort"
+                    :initial-direction="currentDirection" enable-server-sorting @sort-change="handleSortChange">
                     <template #cell-no="{ row }">
                         {{ (statistics.current_page - 1) * statistics.per_page + row.index + 1 }}
                     </template>
 
-                    <template #cell-course="{ row }">
-                        <Link :href="`/course-offerings/${row.original.course_offering_id}`"
-                            class="block text-blue-500 hover:opacity-80">
-                            <div class="flex items-center gap-2">
-                                <BookOpen class="text-primary h-4 w-4" />
-                                <span class="font-mono font-semibold">{{ row.original.course_code }}</span>
+                    <template #cell-unit="{ row }">
+                        <div>
+                            <Link
+                                :href="route('course-statistics.units.show', { unitId: row.original.id, semester_id: filters.semester_id })"
+                                class="block text-blue-500 hover:opacity-80">
+                                <div class="flex items-center gap-2">
+                                    <BookOpen class="text-primary h-4 w-4" />
+                                    <span class="font-mono font-semibold">{{ row.original.unit_code }}</span>
+                                </div>
+                            </Link>
+                            <div class="text-sm text-gray-700 dark:text-gray-300">
+                                {{ row.original.unit_name }}
                             </div>
-                        </Link>
-                        <div class="text-sm text-gray-700">{{ row.original.course_name }}</div>
-                        <div class="text-muted-foreground flex items-center gap-2 text-xs">
-                            <span v-if="row.original.section_code">Section {{ row.original.section_code }}</span>
-                            <span v-if="row.original.credit_hours">• {{ row.original.credit_hours }} credits</span>
-                        </div>
-                    </template>
-
-                    <template #cell-semester="{ row }">
-                        <div class="space-y-1">
-                            <div class="flex items-center gap-2">
-                                <Calendar class="h-4 w-4" />
-                                <span class="font-medium">{{ row.original.semester }}</span>
-                            </div>
-                            <div class="text-muted-foreground text-xs">{{ row.original.semester_code }}</div>
-                        </div>
-                    </template>
-
-                    <template #cell-instructor="{ row }">
-                        <div class="text-sm">{{ row.original.instructor_name || 'Not assigned' }}</div>
-                    </template>
-
-                    <template #cell-students="{ row }">
-                        <div class="space-y-1 text-center">
-                            <div class="flex items-center justify-center gap-1">
-                                <Users class="h-4 w-4 text-blue-600" />
-                                <span class="font-bold text-blue-600">{{ row.original.total_students }}</span>
-                            </div>
-                            <div class="text-muted-foreground text-xs">{{ row.original.current_enrollment }}/{{
-                                row.original.max_capacity }} enrolled</div>
-                        </div>
-                    </template>
-
-                    <template #cell-absent_exceeded="{ row }">
-                        <div class="space-y-1 text-center">
-                            <div class="flex items-center justify-center gap-1">
-                                <UserX
-                                    :class="['h-4 w-4', row.original.students_absent_exceeded > 0 ? 'text-red-600' : 'text-green-600']" />
-                                <span
-                                    :class="['font-bold', row.original.students_absent_exceeded > 0 ? 'text-red-600' : 'text-green-600']">
-                                    {{ row.original.students_absent_exceeded }}
+                            <div class="text-muted-foreground flex items-center gap-2 text-xs">
+                                <span v-if="row.original.credit_hours">
+                                    • {{ row.original.credit_hours }} credits
                                 </span>
                             </div>
-                            <div class="text-muted-foreground text-xs">of {{ row.original.total_students }} students
-                            </div>
-                            <div class="text-muted-foreground text-xs">(Max {{ row.original.allowed_absences }}
-                                absences)</div>
+                        </div>
+                    </template>
+
+                    <template #cell-offerings_count="{ row }">
+                        <div class="text-center font-medium">{{ row.original.offerings_count }}</div>
+                    </template>
+
+                    <template #cell-total_students="{ row }">
+                        <div class="flex items-center justify-center gap-1">
+                            <Users class="h-4 w-4 text-blue-600" />
+                            <span class="font-bold text-blue-600">{{ row.original.total_students }}</span>
                         </div>
                     </template>
 
                     <template #cell-average_attendance="{ row }">
-                        <div
-                            :class="['text-center font-mono font-semibold', row.original.average_attendance >= 85 ? 'text-green-600' : row.original.average_attendance >= 70 ? 'text-yellow-600' : 'text-red-600']">
+                        <div :class="[
+                            'text-center font-mono font-semibold',
+                            row.original.average_attendance >= 85
+                                ? 'text-green-600'
+                                : row.original.average_attendance >= 70
+                                    ? 'text-yellow-600'
+                                    : 'text-red-600',
+                        ]">
                             {{ row.original.average_attendance.toFixed(1) }}%
                         </div>
                     </template>
 
                     <template #cell-average_grade="{ row }">
-                        <div
-                            :class="['text-center font-mono font-semibold', row.original.average_grade >= 80 ? 'text-green-600' : row.original.average_grade >= 60 ? 'text-yellow-600' : 'text-red-600']">
+                        <div :class="[
+                            'text-center font-mono font-semibold',
+                            row.original.average_grade >= 80
+                                ? 'text-green-600'
+                                : row.original.average_grade >= 60
+                                    ? 'text-yellow-600'
+                                    : 'text-red-600',
+                        ]">
                             {{ row.original.average_grade > 0 ? row.original.average_grade.toFixed(1) : 'N/A' }}
                         </div>
                     </template>
 
                     <template #cell-pass_rate="{ row }">
                         <div class="flex items-center justify-center gap-1">
-                            <TrendingUp v-if="row.original.pass_rate >= 70"
-                                :class="['h-4 w-4', row.original.pass_rate >= 90 ? 'text-green-600' : 'text-yellow-600']" />
+                            <TrendingUp v-if="row.original.pass_rate >= 70" :class="[
+                                'h-4 w-4',
+                                row.original.pass_rate >= 90 ? 'text-green-600' : 'text-yellow-600',
+                            ]" />
                             <TrendingDown v-else class="h-4 w-4 text-red-600" />
-                            <span
-                                :class="['font-mono font-semibold', row.original.pass_rate >= 90 ? 'text-green-600' : row.original.pass_rate >= 70 ? 'text-yellow-600' : 'text-red-600']">
-                                {{ row.original.pass_rate.toFixed(1) }}% </span>
+                            <span :class="[
+                                'font-mono font-semibold',
+                                row.original.pass_rate >= 90
+                                    ? 'text-green-600'
+                                    : row.original.pass_rate >= 70
+                                        ? 'text-yellow-600'
+                                        : 'text-red-600',
+                            ]">
+                                {{ row.original.pass_rate.toFixed(1) }}%
+                            </span>
                         </div>
                     </template>
 
                     <template #cell-actions="{ row }">
-                        <div class="flex items-center ">
-                            <Button variant="ghost" size="sm" @click="goToDetailPage(row.original.course_offering_id)">
-                                <Eye class="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm"
-                                @click="goToAssessmentScoresPage(row.original.course_offering_id)">
-                                <ClipboardList class="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm"
-                                @click="exportStatistics(row.original.course_offering_id)">
-                                <Download class="h-4 w-4" />
-                            </Button>
+                        <div class="flex items-center justify-center">
+                            <Link
+                                :href="route('course-statistics.units.show', { unitId: row.original.id, semester_id: filters.semester_id })">
+                                <Button variant="ghost" size="sm">
+                                    <Eye class="h-4 w-4" />
+                                </Button>
+                            </Link>
                         </div>
                     </template>
                 </DataTable>
