@@ -8,7 +8,7 @@ import BarChart from '@/components/ui/chart/BarChart.vue';
 import DoughnutChart from '@/components/ui/chart/DoughnutChart.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, BarChart3, BookOpen, Calendar, Eye, PieChart, Users } from 'lucide-vue-next';
+import { ArrowLeft, BarChart3, BookOpen, Calendar, ClipboardList, Download, Eye, PieChart, Users } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { route } from 'ziggy-js';
 
@@ -56,20 +56,21 @@ const applyFilters = () => {
 };
 
 // Chart Data Preparations
-const GRADE_COLORS: Record<string, string> = {
-    'A+': '#10b981', // Green
-    'A': '#22c55e',  // Green
-    'A-': '#4ade80', // Green
-    'B+': '#84cc16', // Lime
-    'B': '#eab308',  // Yellow
-    'B-': '#facc15', // Yellow
-    'C+': '#f97316', // Orange
-    'C': '#fb923c',  // Orange
-    'C-': '#fdba74', // Orange
-    'D+': '#ef4444', // Red
-    'D': '#f87171',  // Light Red
-    'F': '#b91c1c',  // Dark Red
-    'N/A': '#94a3b8', // Gray
+// Chart Metadata for Grades
+const GRADE_METADATA: Record<string, { color: string; range: string }> = {
+    'A+': { color: '#10b981', range: '90-100' },
+    'A': { color: '#22c55e', range: '85-89' },
+    'A-': { color: '#4ade80', range: '80-84' },
+    'B+': { color: '#84cc16', range: '75-79' },
+    'B': { color: '#eab308', range: '70-74' },
+    'B-': { color: '#facc15', range: '65-69' },
+    'C+': { color: '#f97316', range: '60-64' },
+    'C': { color: '#fb923c', range: '55-59' },
+    'C-': { color: '#fdba74', range: '50-54' },
+    'D+': { color: '#ef4444', range: '45-49' },
+    'D': { color: '#f87171', range: '40-44' },
+    'F': { color: '#b91c1c', range: '0-39' },
+    'N/A': { color: '#94a3b8', range: '' },
 };
 
 const PASS_FAIL_COLORS: Record<string, string> = {
@@ -83,21 +84,38 @@ const ATTENDANCE_COLORS: Record<string, string> = {
 };
 
 const gradeChartData = computed(() => {
-    const labels = props.data.grade_distribution.map(item => item.final_letter_grade || 'N/A');
-    const data = props.data.grade_distribution.map(item => item.total);
-    const backgroundColors = labels.map(label => GRADE_COLORS[label] || '#3b82f6');
+    const grades = props.data.grade_distribution;
+    const labels = grades.map(item => item.final_letter_grade);
+
+    // Create one dataset per grade to show in legend with count
+    const datasets = grades.map((item, index) => {
+        const grade = item.final_letter_grade || 'N/A';
+        const meta = GRADE_METADATA[grade] || { color: '#3b82f6', range: '' };
+
+        // Data array with 0s except at the correct index for this grade
+        const dataArr = new Array(grades.length).fill(0);
+        dataArr[index] = item.total;
+
+        return {
+            label: `${grade}${meta.range ? ' (' + meta.range + ')' : ''}: ${item.total} pts`,
+            backgroundColor: meta.color,
+            data: dataArr,
+            stack: 'stack1',
+        };
+    });
 
     return {
         labels,
-        datasets: [
-            {
-                label: 'Number of Students',
-                backgroundColor: backgroundColors,
-                data,
-            },
-        ],
+        datasets,
     };
 });
+
+const gradeChartOptions = {
+    scales: {
+        x: { stacked: true },
+        y: { stacked: true }
+    }
+};
 
 const passFailChartData = computed(() => {
     const labels = props.data.pass_fail.map(item => item.label);
@@ -135,22 +153,27 @@ const columns: ColumnDef<any>[] = [
     {
         header: 'Section',
         accessorKey: 'section',
+        enableSorting: false,
     },
     {
         header: 'Semester',
         accessorKey: 'semester',
+        enableSorting: false,
     },
     {
         header: 'Lecturer',
         accessorKey: 'lecturer',
+        enableSorting: false
     },
     {
         header: 'Enrollment',
         accessorKey: 'enrollment',
+        enableSorting: false
     },
     {
         header: 'Pass Rate',
         id: 'pass_rate',
+        enableSorting: false
     },
     {
         header: 'Actions',
@@ -160,6 +183,15 @@ const columns: ColumnDef<any>[] = [
 
 const goToOfferingDetail = (id: number) => {
     router.visit(`/course-statistics/${id}`);
+};
+
+
+const goToAssessmentScoresPage = (courseOfferingId: number) => {
+    router.visit(`/course-statistics/${courseOfferingId}/assessment-scores`);
+};
+
+const exportStatistics = (courseOfferingId: number) => {
+    window.location.href = `/course-statistics/${courseOfferingId}/export-combined`;
 };
 </script>
 
@@ -227,7 +259,7 @@ const goToOfferingDetail = (id: number) => {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <BarChart :data="gradeChartData" height="350px" />
+                    <BarChart :data="gradeChartData" :options="gradeChartOptions" height="350px" />
                 </CardContent>
             </Card>
 
@@ -278,6 +310,12 @@ const goToOfferingDetail = (id: number) => {
                         <template #cell-actions="{ row }">
                             <Button variant="ghost" size="sm" @click="goToOfferingDetail(row.original.id)">
                                 <Eye class="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" @click="goToAssessmentScoresPage(row.original.id)">
+                                <ClipboardList class="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" @click="exportStatistics(row.original.id)">
+                                <Download class="h-4 w-4" />
                             </Button>
                         </template>
                     </DataTable>

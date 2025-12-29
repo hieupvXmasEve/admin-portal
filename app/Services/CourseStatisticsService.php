@@ -511,10 +511,18 @@ class CourseStatisticsService
                 $percentage = (float) $record->final_percentage;
                 $studentData['grade_points'] = \App\Models\AcademicRecord::calculateGradePoints($percentage);
                 $studentData['letter_grade'] = \App\Models\AcademicRecord::calculateLetterGrade($percentage);
+                $studentData['grade_status'] = $record->grade_status;
+                $studentData['is_passed'] = $record->is_passed;
+                $studentData['override_pass'] = $record->override_pass;
+                $studentData['override_reason'] = $record->override_reason ?? null;
             } else {
                 $studentData['final_percentage'] = 0;
                 $studentData['grade_points'] = 0;
                 $studentData['letter_grade'] = 'F';
+                $studentData['grade_status'] = 'not_graded';
+                $studentData['is_passed'] = null;
+                $studentData['override_pass'] = null;
+                $studentData['override_reason'] = null;
             }
         }
 

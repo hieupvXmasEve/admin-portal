@@ -51,9 +51,12 @@ class CourseOfferingStatisticsExport implements FromArray, WithHeadings, WithSty
             'Status',
             'Final %',
             'Grade Point',
-            'Letter Grade'
+            'Letter Grade',
+            'Pass/Fail Status',
+            'Override',
+            'Override Reason'
         ];
-
+        \Log::info($this->attendanceGrid);
         foreach ($this->attendanceGrid as $student) {
             $attendanceStatus = '';
             if (! $student['meets_attendance_requirement']) {
@@ -74,7 +77,10 @@ class CourseOfferingStatisticsExport implements FromArray, WithHeadings, WithSty
                 $attendanceStatus,
                 $student['final_percentage'] . '%',
                 $student['grade_points'],
-                $student['letter_grade']
+                $student['letter_grade'],
+                ($student['grade_status'] !== 'final' && $student['override_pass'] === null) ? '-' : ($student['is_passed'] ? 'PASS' : 'FAIL'),
+                $student['override_pass'] && $student['override_reason'] ? 'Pass' : '-',
+                $student['override_reason'] ?? '-'
             ];
         }
 
@@ -105,7 +111,7 @@ class CourseOfferingStatisticsExport implements FromArray, WithHeadings, WithSty
         $headerRowNumber = 12;
 
         // Style table headers
-        $sheet->getStyle("A{$headerRowNumber}:J{$headerRowNumber}")->applyFromArray([
+        $sheet->getStyle("A{$headerRowNumber}:M{$headerRowNumber}")->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
@@ -118,7 +124,7 @@ class CourseOfferingStatisticsExport implements FromArray, WithHeadings, WithSty
         ]);
 
         // Auto-size columns
-        foreach (range('A', 'J') as $column) {
+        foreach (range('A', 'M') as $column) {
             $sheet->getColumnDimension($column)->setAutoSize(true);
         }
 
@@ -129,7 +135,7 @@ class CourseOfferingStatisticsExport implements FromArray, WithHeadings, WithSty
         for ($row = $firstDataRow; $row <= $lastDataRow; $row++) {
             $studentIndex = $row - $firstDataRow;
             if (isset($this->attendanceGrid[$studentIndex]) && ! $this->attendanceGrid[$studentIndex]['meets_attendance_requirement']) {
-                $sheet->getStyle("A{$row}:J{$row}")->applyFromArray([
+                $sheet->getStyle("A{$row}:M{$row}")->applyFromArray([
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
                         'startColor' => ['rgb' => 'FEE2E2'],
