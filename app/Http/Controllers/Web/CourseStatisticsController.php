@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Exports\AttendanceGridExport;
+use App\Exports\CourseOfferingStatisticsExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CourseStatisticsRequest;
 use App\Http\Resources\CourseStatisticsResource;
@@ -100,5 +101,21 @@ class CourseStatisticsController extends Controller
         $data = $this->service->getAssessmentScoresGrid($courseOffering->id);
 
         return Inertia::render('CourseStatistics/AssessmentScores', $data);
+    }
+
+    public function exportCombined(CourseOffering $courseOffering): BinaryFileResponse
+    {
+        $data = $this->service->getCombinedStatisticsGrid($courseOffering->id);
+
+        $export = new CourseOfferingStatisticsExport(
+            $data['attendance_grid'],
+            $data['statistics']
+        );
+
+        $filename = $this->excelService->generateFilenameWithTimestamp(
+            "statistics_{$data['statistics']['course_code']}_{$data['statistics']['section_code']}"
+        );
+
+        return $this->excelService->download($export, $filename);
     }
 }

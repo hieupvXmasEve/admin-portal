@@ -511,4 +511,45 @@ class CourseStatisticsService
             'scores_grid' => $scoresGrid,
         ];
     }
+
+    public function getCombinedStatisticsGrid(int $courseOfferingId): array
+    {
+        $attendanceData = $this->getAttendanceGrid($courseOfferingId);
+
+        // Enhance attendance_grid with academic record attributes
+        $attendanceGrid = $attendanceData['attendance_grid'];
+
+        $academicRecords = \App\Models\AcademicRecord::where('course_offering_id', $courseOfferingId)
+            ->get()
+            ->keyBy('student_id');
+
+        // Get student mappings to link student_id (string) to record student_id (int)
+        $students = \App\Models\Student::whereIn('student_id', collect($attendanceGrid)->pluck('student_id'))
+            ->get()
+            ->keyBy('student_id');
+
+        foreach ($attendanceGrid as &$studentData) {
+            $studentIdStr = $studentData['student_id'];
+            $studentModel = $students->get($studentIdStr);
+
+            if ($studentModel && $academicRecords->has($studentModel->id)) {
+                $record = $academicRecords->get($studentModel->id);
+                $studentData['final_percentage'] = $record->final_percentage;
+
+                // Use model static methods for calculation as requested
+                $percentage = (float) $record->final_percentage;
+                $studentData['grade_points'] = \App\Models\AcademicRecord::calculateGradePoints($percentage);
+                $studentData['letter_grade'] = \App\Models\AcademicRecord::calculateLetterGrade($percentage);
+            } else {
+                $studentData['final_percentage'] = 0;
+                $studentData['grade_points'] = 0;
+                $studentData['letter_grade'] = 'F';
+            }
+        }
+
+        return [
+            'statistics' => $attendanceData['statistics'],
+            'attendance_grid' => $attendanceGrid,
+        ];
+    }
 }
