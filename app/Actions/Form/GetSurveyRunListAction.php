@@ -68,14 +68,18 @@ class GetSurveyRunListAction
         } elseif (!$isAdmin) {
             // Restrict results to user's departments
             $query->where(function ($q) use ($userDeptIds, $userDeptCodes) {
-                // Match department-scoped surveys
+                // 1. Match department-scoped surveys
                 $q->where(function ($sq) use ($userDeptIds) {
                     $sq->where('form_targets.scope_type', 'department')
                         ->whereIn('form_targets.scope_id', $userDeptIds);
                 });
 
-                // Match course-scoped surveys via instructor's department
-                if (!empty($userDeptCodes)) {
+                // 2. Match course-scoped surveys
+                // If user is in ACAD department, they can see ALL course-scoped surveys
+                if (in_array('ACAD', $userDeptCodes)) {
+                    $q->orWhere('form_targets.scope_type', 'course');
+                } elseif (!empty($userDeptCodes)) {
+                    // Otherwise, match course-scoped surveys via instructor's department
                     $q->orWhere(function ($sq) use ($userDeptCodes) {
                         $sq->where('form_targets.scope_type', 'course')
                             ->whereIn('lectures.department', $userDeptCodes);
@@ -96,7 +100,10 @@ class GetSurveyRunListAction
                         ->where('form_targets.scope_id', $deptId);
                 });
 
-                if ($targetDeptCode) {
+                if ($targetDeptCode === 'ACAD') {
+                    // Selecting ACAD department shows all course-based surveys
+                    $q->orWhere('form_targets.scope_type', 'course');
+                } elseif ($targetDeptCode) {
                     $q->orWhere(function ($sq) use ($targetDeptCode) {
                         $sq->where('form_targets.scope_type', 'course')
                             ->where('lectures.department', $targetDeptCode);
