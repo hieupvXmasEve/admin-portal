@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CourseStatisticsRequest;
 use App\Http\Resources\CourseStatisticsResource;
 use App\Models\CourseOffering;
+use App\Http\Resources\UnitStatisticsResource;
 use App\Models\Semester;
 use App\Services\CourseStatisticsService;
 use App\Services\ExcelExportService;
@@ -26,48 +27,43 @@ class CourseStatisticsController extends Controller
 
     public function index(CourseStatisticsRequest $request): Response
     {
-        $filters = $request->validated();
+        $validated = $request->validated();
 
-        $statistics = $this->service->getStatistics($filters);
-
-        // Post-process each item to recalculate students_absent_exceeded
-        $items = $statistics->items();
-        foreach ($items as $item) {
-            // Get total sessions for this course offering
-            $totalSessions = $item->classSessions()->count();
-            $allowedAbsences = (int) floor($totalSessions * 0.2);
-
-            // Recalculate students who exceeded based on actual absences count
-            $studentsExceeded = $item->academicRecords()
-                ->where('total_absences', '>', $allowedAbsences)
-                ->count();
-
-            $item->students_absent_exceeded = $studentsExceeded;
-            $item->total_sessions = $totalSessions;
-            $item->allowed_absences = $allowedAbsences;
+        // Default to current active semester if not provided
+        if (! isset($validated['semester_id'])) {
+            $activeSemester = Semester::getActiveSemester();
+            if ($activeSemester) {
+                $validated['semester_id'] = $activeSemester->id;
+            }
         }
+
+        $statistics = $this->service->getStatistics($validated);
 
         $semesters = Semester::where('is_archived', false)
             ->orderBy('start_date', 'desc')
             ->get(['id', 'name', 'code']);
 
-        $paginatedData = [
-            'data' => CourseStatisticsResource::collection($items)->resolve(),
-            'current_page' => $statistics->currentPage(),
-            'last_page' => $statistics->lastPage(),
-            'per_page' => $statistics->perPage(),
-            'total' => $statistics->total(),
-            'from' => $statistics->firstItem(),
-            'to' => $statistics->lastItem(),
-            'prev_page_url' => $statistics->previousPageUrl(),
-            'next_page_url' => $statistics->nextPageUrl(),
-            'links' => $statistics->linkCollection()->toArray(),
-        ];
-
         return Inertia::render('CourseStatistics/Index', [
-            'statistics' => $paginatedData,
+            'statistics' => [
+                'data' => UnitStatisticsResource::collection($statistics->items())->resolve(),
+                'current_page' => $statistics->currentPage(),
+                'last_page' => $statistics->lastPage(),
+                'per_page' => $statistics->perPage(),
+                'total' => $statistics->total(),
+                'from' => $statistics->firstItem(),
+                'to' => $statistics->lastItem(),
+                'prev_page_url' => $statistics->previousPageUrl(),
+                'next_page_url' => $statistics->nextPageUrl(),
+                'links' => $statistics->linkCollection()->toArray(),
+            ],
             'semesters' => $semesters,
-            'filters' => $filters,
+            'filters' => [
+                'semester_id' => $validated['semester_id'] ?? null,
+                'search' => $validated['search'] ?? null,
+                'per_page' => $validated['per_page'] ?? (int) $statistics->perPage(),
+                'sort' => $validated['sort'] ?? 'unit_code',
+                'direction' => $validated['direction'] ?? 'asc',
+            ],
         ]);
     }
 

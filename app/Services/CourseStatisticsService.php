@@ -16,81 +16,52 @@ class CourseStatisticsService
         $perPage = $filters['per_page'] ?? 15;
         $search = $filters['search'] ?? null;
         $semesterId = $filters['semester_id'] ?? null;
-        $sortBy = $filters['sort'] ?? 'course_code';
+        $sortBy = $filters['sort'] ?? 'unit_code';
         $direction = $filters['direction'] ?? 'asc';
 
         $query = CourseOffering::query()
-            ->with([
-                'semester:id,name,code',
-                'unit:id,code,name,credit_points',
-                'lecture:id,first_name,last_name',
-                'classSessions:id,course_offering_id',
-                'academicRecords:id,course_offering_id,student_id,total_absences',
-            ])
+            ->leftJoin('units', 'course_offerings.unit_id', '=', 'units.id')
+            ->leftJoin('academic_records', 'course_offerings.id', '=', 'academic_records.course_offering_id')
             ->where('course_offerings.campus_id', $campusId)
             ->where('course_offerings.is_active', true);
-
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('unit', function ($unitQuery) use ($search) {
-                    $unitQuery->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%");
-                })
-                    ->orWhere('course_offerings.section_code', 'like', "%{$search}%");
-            });
-        }
-
-        $query->leftJoin('units', 'course_offerings.unit_id', '=', 'units.id')
-            ->leftJoin('semesters', 'course_offerings.semester_id', '=', 'semesters.id')
-            ->leftJoin('academic_records', 'course_offerings.id', '=', 'academic_records.course_offering_id');
 
         if ($semesterId) {
             $query->where('course_offerings.semester_id', $semesterId);
         }
 
-        // Subquery to calculate allowed absences and count exceeded students properly
-        $query
-            ->select([
-                'course_offerings.id',
-                'course_offerings.semester_id',
-                'course_offerings.unit_id',
-                'course_offerings.lecture_id',
-                'course_offerings.campus_id',
-                'course_offerings.section_code',
-                'course_offerings.max_capacity',
-                'course_offerings.current_enrollment',
-                'course_offerings.delivery_mode',
-                DB::raw('COUNT(DISTINCT academic_records.student_id) as total_students'),
-                // NOTE: students_absent_exceeded will be recalculated in controller based on actual total_absences > allowed
-                DB::raw('0 as students_absent_exceeded'),
-                DB::raw('AVG(academic_records.attendance_percentage) as average_attendance'),
-                DB::raw('AVG(academic_records.final_percentage) as average_grade'),
-                DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "A+" THEN 1 END) as grade_a_plus'),
-                DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "A" THEN 1 END) as grade_a'),
-                DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "B+" THEN 1 END) as grade_b_plus'),
-                DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "B" THEN 1 END) as grade_b'),
-                DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "C+" THEN 1 END) as grade_c_plus'),
-                DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "C" THEN 1 END) as grade_c'),
-                DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "D+" THEN 1 END) as grade_d_plus'),
-                DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "D" THEN 1 END) as grade_d'),
-                DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "F" THEN 1 END) as grade_f'),
-                DB::raw('SUM(CASE WHEN academic_records.completion_status = "completed" AND academic_records.grade_points > 0 THEN 1 ELSE 0 END) as students_passed'),
-            ])
-            ->groupBy(
-                'course_offerings.id',
-                'course_offerings.semester_id',
-                'course_offerings.unit_id',
-                'course_offerings.lecture_id',
-                'course_offerings.campus_id',
-                'course_offerings.section_code',
-                'course_offerings.max_capacity',
-                'course_offerings.current_enrollment',
-                'course_offerings.delivery_mode'
-            );
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('units.code', 'like', "%{$search}%")
+                    ->orWhere('units.name', 'like', "%{$search}%");
+            });
+        }
+
+        $query->select([
+            'units.id',
+            'units.code as unit_code',
+            'units.name as unit_name',
+            'units.credit_points as credit_hours',
+            DB::raw('COUNT(DISTINCT academic_records.student_id) as total_students'),
+            DB::raw('AVG(academic_records.attendance_percentage) as average_attendance'),
+            DB::raw('AVG(academic_records.final_percentage) as average_grade'),
+            DB::raw('SUM(CASE WHEN academic_records.completion_status = "completed" AND academic_records.grade_points > 0 THEN 1 ELSE 0 END) as students_passed'),
+            DB::raw('COUNT(DISTINCT course_offerings.id) as offerings_count'),
+            // Sum grade distribution counts
+            DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "A+" THEN 1 END) as grade_a_plus'),
+            DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "A" THEN 1 END) as grade_a'),
+            DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "B+" THEN 1 END) as grade_b_plus'),
+            DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "B" THEN 1 END) as grade_b'),
+            DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "C+" THEN 1 END) as grade_c_plus'),
+            DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "C" THEN 1 END) as grade_c'),
+            DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "D+" THEN 1 END) as grade_d_plus'),
+            DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "D" THEN 1 END) as grade_d'),
+            DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "F" THEN 1 END) as grade_f'),
+        ])
+        ->groupBy('units.id', 'units.code', 'units.name', 'units.credit_points');
 
         $sortColumn = match ($sortBy) {
-            'course_name' => 'units.name',
-            'semester' => 'semesters.name',
+            'unit_code' => 'units.code',
+            'unit_name' => 'units.name',
             'total_students' => 'total_students',
             'average_attendance' => 'average_attendance',
             'average_grade' => 'average_grade',
