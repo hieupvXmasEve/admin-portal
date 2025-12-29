@@ -9,8 +9,10 @@ use App\Http\Controllers\Controller;
 use App\Models\FormTarget;
 use App\Models\Semester;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\Department;
 
 class SurveyResultController extends Controller
 {
@@ -22,11 +24,21 @@ class SurveyResultController extends Controller
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
             'semester_id' => 'nullable|string',
+            'department_id' => 'nullable|string',
             'status' => 'nullable|string|in:active,closed,all',
             'sort' => 'nullable|string|in:created_at,responses_count,status,semester,form_title',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
+
+        $user = Auth::user();
+        $isAdmin = $user->hasSystemRole('admin') || $user->hasSystemRole('super_admin');
+
+        $departments = $isAdmin 
+            ? Department::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code'])
+            : Department::whereHas('memberships', function ($q) use ($user) {
+                $q->where('user_id', $user->id)->where('is_active', true);
+            })->orderBy('name')->get(['id', 'name', 'code']);
 
         $runs = $action->execute($validated);
 
@@ -35,12 +47,14 @@ class SurveyResultController extends Controller
             'filters' => [
                 'search' => $validated['search'] ?? null,
                 'semester_id' => $validated['semester_id'] ?? 'all',
+                'department_id' => $validated['department_id'] ?? 'all',
                 'status' => $validated['status'] ?? 'all',
                 'sort' => $validated['sort'] ?? null,
                 'direction' => $validated['direction'] ?? null,
                 'per_page' => $validated['per_page'] ?? 15,
             ],
             'semesters' => Semester::orderBy('start_date', 'desc')->get(['id', 'name']),
+            'departments' => $departments,
         ]);
     }
 

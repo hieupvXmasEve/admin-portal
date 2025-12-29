@@ -30,6 +30,7 @@ interface RunWithStats extends FormTarget {
 interface ResultFilters {
     search: string;
     semester_id: string;
+    department_id: string;
     status: string;
     sort: string | null;
     direction: 'asc' | 'desc' | null;
@@ -40,6 +41,7 @@ const props = defineProps<{
     runs: PaginatedResponse<RunWithStats>;
     filters?: Partial<ResultFilters>;
     semesters: Semester[];
+    departments: { id: number; name: string; code: string }[];
 }>();
 
 const data = computed(() => props.runs.data);
@@ -49,6 +51,7 @@ const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilte
     initialFilters: {
         search: props.filters?.search || '',
         semester_id: props.filters?.semester_id || 'all',
+        department_id: props.filters?.department_id || 'all',
         status: props.filters?.status || 'all',
         sort: props.filters?.sort || null,
         direction: (props.filters?.direction as 'asc' | 'desc') || null,
@@ -57,6 +60,7 @@ const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilte
     defaultValues: {
         search: '',
         semester_id: 'all',
+        department_id: 'all',
         status: 'all',
         sort: null,
         direction: 'asc',
@@ -144,6 +148,7 @@ const columns: ColumnDef<RunWithStats>[] = [
 </script>
 
 <template>
+
     <Head title="Survey Results" />
 
     <div class="flex items-center justify-between">
@@ -153,7 +158,8 @@ const columns: ColumnDef<RunWithStats>[] = [
     <div class="space-y-4 rounded-lg border p-4 bg-card">
         <div class="flex flex-wrap items-center gap-4">
             <div class="min-w-[250px] flex-1">
-                <DebouncedInput placeholder="Search surveys, courses, sections or instructors..." :model-value="filters.search" @update:model-value="handleSearch" />
+                <DebouncedInput placeholder="Search surveys, courses, sections or instructors..."
+                    :model-value="filters.search" @update:model-value="handleSearch" />
             </div>
 
             <Button v-if="hasActiveFilters" variant="ghost" size="sm" @click="clearFilters">
@@ -164,21 +170,39 @@ const columns: ColumnDef<RunWithStats>[] = [
 
         <div class="flex flex-wrap items-center gap-4">
             <div class="flex flex-col gap-1">
+                <Label class="text-muted-foreground text-xs font-semibold">Department</Label>
+                <Select :model-value="filters.department_id"
+                    @update:model-value="(v) => handleSelectFilter('department_id', v, 'all')">
+                    <SelectTrigger class="w-48">
+                        <SelectValue placeholder="All Departments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Departments</SelectItem>
+                        <SelectItem v-for="d in departments" :key="d.id" :value="d.id.toString()">{{ d.name }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div class="flex flex-col gap-1">
                 <Label class="text-muted-foreground text-xs font-semibold">Semester</Label>
-                <Select :model-value="filters.semester_id" @update:model-value="(v) => handleSelectFilter('semester_id', v, 'all')">
+                <Select :model-value="filters.semester_id"
+                    @update:model-value="(v) => handleSelectFilter('semester_id', v, 'all')">
                     <SelectTrigger class="w-48">
                         <SelectValue placeholder="All Semesters" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Semesters</SelectItem>
-                        <SelectItem v-for="s in semesters" :key="s.id" :value="s.id.toString()">{{ s.name }}</SelectItem>
+                        <SelectItem v-for="s in semesters" :key="s.id" :value="s.id.toString()">{{ s.name }}
+                        </SelectItem>
                     </SelectContent>
                 </Select>
             </div>
 
             <div class="flex flex-col gap-1">
                 <Label class="text-muted-foreground text-xs font-semibold">Status</Label>
-                <Select :model-value="filters.status" @update:model-value="(v) => handleSelectFilter('status', v, 'all')">
+                <Select :model-value="filters.status"
+                    @update:model-value="(v) => handleSelectFilter('status', v, 'all')">
                     <SelectTrigger class="w-32">
                         <SelectValue placeholder="All Status" />
                     </SelectTrigger>
@@ -192,19 +216,9 @@ const columns: ColumnDef<RunWithStats>[] = [
         </div>
     </div>
 
-    <DataTable 
-        :data="data" 
-        :columns="columns" 
-        enable-server-sorting 
-        :initial-sort="currentSort" 
-        :initial-direction="currentDirection" 
-        @sort-change="handleSortChange"
-    />
+    <DataTable :data="data" :columns="columns" enable-server-sorting :initial-sort="currentSort"
+        :initial-direction="currentDirection" @sort-change="handleSortChange" />
 
-    <DataPagination 
-        :pagination-data="runs" 
-        item-name="results" 
-        @navigate="handlePaginationNavigate" 
-        @page-size-change="handlePageSizeChange" 
-    />
+    <DataPagination :pagination-data="runs" item-name="results" @navigate="handlePaginationNavigate"
+        @page-size-change="handlePageSizeChange" />
 </template>

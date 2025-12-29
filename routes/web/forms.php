@@ -40,7 +40,9 @@ Route::middleware(['auth'])->group(function () {
             // Staff survey inbox
             Route::prefix('results')->name('results.')->group(function () {
                 // List survey results
-                Route::get('/', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'index'])->name('index');
+                Route::get('/', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'index'])
+                    ->name('index')
+                    ->middleware('can:view_survey');
                 // Aggregate survey results
                 Route::get('/{target}/aggregate', [\App\Http\Controllers\Web\Admin\SurveyResultController::class, 'aggregate'])
                     ->name('aggregate')
