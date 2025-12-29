@@ -284,9 +284,7 @@ return [
             'edit_form' => 'edit_form',
             'create_form' => 'create_form',
             'review_form' => 'review_form',
-            'view_form_analytics' => 'view_form_analytics',
-            'view_survey_results_aggregate' => 'view_survey_results_aggregate',
-            'view_survey_results_raw' => 'view_survey_results_raw'
+            'view_form_analytics' => 'view_form_analytics'
         ],
 
         // Student Wallet Management
@@ -344,6 +342,8 @@ return [
             'edit_survey' => 'edit_survey',
             'delete_survey' => 'delete_survey',
             'view_survey_analytics' => 'view_survey_analytics',
+            'view_survey_results_aggregate' => 'view_survey_results_aggregate',
+            'view_survey_results_raw' => 'view_survey_results_raw'
         ],
         'notifications' => [
             'send_manual_notification' => 'send_manual_notification',

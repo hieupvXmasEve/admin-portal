@@ -3,7 +3,9 @@
 namespace App\Actions\Form;
 
 use App\Models\FormTarget;
+use App\Models\Department;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
 
 class GetSurveyRunListAction
 {
@@ -12,7 +14,14 @@ class GetSurveyRunListAction
      */
     public function execute(array $filters = []): LengthAwarePaginator
     {
-        $query = FormTarget::query();
+        $query = FormTarget::query()
+            ->whereHas('form', function ($q) {
+                $q->where('type', 'survey');
+            });
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $isAdmin = $user->hasSystemRole('admin') || $user->hasSystemRole('super_admin');
 
         // Filter by current campus
         if ($campusId = session('current_campus_id')) {
@@ -44,6 +53,57 @@ class GetSurveyRunListAction
         ->leftJoin('units', 'course_offerings.unit_id', '=', 'units.id')
         ->leftJoin('lectures', 'course_offerings.lecture_id', '=', 'lectures.id')
         ->selectRaw("form_targets.*, units.code as course_code, units.name as course_name, course_offerings.section_code, CONCAT_WS(' ', lectures.first_name, lectures.last_name) as instructor_name");
+
+        // 3. Department Filtering & Security
+        $userDepts = Department::whereHas('memberships', function ($q) use ($user) {
+            $q->where('user_id', $user->id)->where('is_active', true);
+        })->get(['id', 'code']);
+
+        $userDeptIds = $userDepts->pluck('id')->toArray();
+        $userDeptCodes = $userDepts->pluck('code')->filter()->toArray();
+
+        // If not admin and no departments, hide everything as requested
+        if (!$isAdmin && empty($userDeptIds)) {
+            $query->whereRaw('1 = 0');
+        } elseif (!$isAdmin) {
+            // Restrict results to user's departments
+            $query->where(function ($q) use ($userDeptIds, $userDeptCodes) {
+                // Match department-scoped surveys
+                $q->where(function ($sq) use ($userDeptIds) {
+                    $sq->where('form_targets.scope_type', 'department')
+                        ->whereIn('form_targets.scope_id', $userDeptIds);
+                });
+
+                // Match course-scoped surveys via instructor's department
+                if (!empty($userDeptCodes)) {
+                    $q->orWhere(function ($sq) use ($userDeptCodes) {
+                        $sq->where('form_targets.scope_type', 'course')
+                            ->whereIn('lectures.department', $userDeptCodes);
+                    });
+                }
+            });
+        }
+
+        // Explicit department filter from UI
+        if (!empty($filters['department_id']) && $filters['department_id'] !== 'all') {
+            $deptId = (int) $filters['department_id'];
+            $targetDept = Department::find($deptId);
+            $targetDeptCode = $targetDept?->code;
+
+            $query->where(function ($q) use ($deptId, $targetDeptCode) {
+                $q->where(function ($sq) use ($deptId) {
+                    $sq->where('form_targets.scope_type', 'department')
+                        ->where('form_targets.scope_id', $deptId);
+                });
+
+                if ($targetDeptCode) {
+                    $q->orWhere(function ($sq) use ($targetDeptCode) {
+                        $sq->where('form_targets.scope_type', 'course')
+                            ->where('lectures.department', $targetDeptCode);
+                    });
+                }
+            });
+        }
 
         if (! empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {
