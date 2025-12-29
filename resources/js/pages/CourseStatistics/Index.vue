@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { PaginatedResponse } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, BookOpen, Calendar, ClipboardList, Eye, TrendingDown, TrendingUp, Users, UserX } from 'lucide-vue-next';
+import { BarChart3, BookOpen, Calendar, ClipboardList, Download, Eye, TrendingDown, TrendingUp, Users, UserX } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface CourseStatistic {
@@ -215,16 +215,22 @@ const goToDetailPage = (courseOfferingId: number) => {
 const goToAssessmentScoresPage = (courseOfferingId: number) => {
     router.visit(`/course-statistics/${courseOfferingId}/assessment-scores`);
 };
+
+const exportStatistics = (courseOfferingId: number) => {
+    window.location.href = `/course-statistics/${courseOfferingId}/export-combined`;
+};
 </script>
 
 <template>
+
     <Head title="Course Statistics" />
 
     <div class="space-y-6">
         <div class="flex items-center justify-between">
             <div>
                 <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Course Statistics</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">View attendance and grade statistics for each course offering</p>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">View attendance and grade statistics for each
+                    course offering</p>
             </div>
         </div>
 
@@ -239,21 +245,19 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div class="space-y-2">
                         <Label>Semester</Label>
-                        <Select
-                            :model-value="String(filters.semester_id)"
-                            @update:model-value="
-                                (value) => {
-                                    filters.semester_id = value === 'all' ? 'all' : Number(value);
-                                    applyFilters(filters);
-                                }
-                            "
-                        >
+                        <Select :model-value="String(filters.semester_id)" @update:model-value="
+                            (value) => {
+                                filters.semester_id = value === 'all' ? 'all' : Number(value);
+                                applyFilters(filters);
+                            }
+                        ">
                             <SelectTrigger>
                                 <SelectValue placeholder="All semesters" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All semesters</SelectItem>
-                                <SelectItem v-for="semester in semesters" :key="semester.id" :value="String(semester.id)">
+                                <SelectItem v-for="semester in semesters" :key="semester.id"
+                                    :value="String(semester.id)">
                                     {{ semester.name }}
                                 </SelectItem>
                             </SelectContent>
@@ -262,11 +266,13 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
 
                     <div class="space-y-2">
                         <Label>Search</Label>
-                        <DebouncedInput :model-value="filters.search" placeholder="Course code or name..." @update:model-value="handleSearch" />
+                        <DebouncedInput :model-value="filters.search" placeholder="Course code or name..."
+                            @update:model-value="handleSearch" />
                     </div>
 
                     <div class="flex items-end space-y-2">
-                        <Button v-if="hasActiveFilters" variant="outline" @click="clearFilters" class="w-full"> Clear Filters </Button>
+                        <Button v-if="hasActiveFilters" variant="outline" @click="clearFilters" class="w-full"> Clear
+                            Filters </Button>
                     </div>
                 </div>
             </CardContent>
@@ -280,7 +286,8 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
                     </template>
 
                     <template #cell-course="{ row }">
-                        <Link :href="`/course-offerings/${row.original.course_offering_id}`" class="block text-blue-500 hover:opacity-80">
+                        <Link :href="`/course-offerings/${row.original.course_offering_id}`"
+                            class="block text-blue-500 hover:opacity-80">
                             <div class="flex items-center gap-2">
                                 <BookOpen class="text-primary h-4 w-4" />
                                 <span class="font-mono font-semibold">{{ row.original.course_code }}</span>
@@ -313,52 +320,65 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
                                 <Users class="h-4 w-4 text-blue-600" />
                                 <span class="font-bold text-blue-600">{{ row.original.total_students }}</span>
                             </div>
-                            <div class="text-muted-foreground text-xs">{{ row.original.current_enrollment }}/{{ row.original.max_capacity }} enrolled</div>
+                            <div class="text-muted-foreground text-xs">{{ row.original.current_enrollment }}/{{
+                                row.original.max_capacity }} enrolled</div>
                         </div>
                     </template>
 
                     <template #cell-absent_exceeded="{ row }">
                         <div class="space-y-1 text-center">
                             <div class="flex items-center justify-center gap-1">
-                                <UserX :class="['h-4 w-4', row.original.students_absent_exceeded > 0 ? 'text-red-600' : 'text-green-600']" />
-                                <span :class="['font-bold', row.original.students_absent_exceeded > 0 ? 'text-red-600' : 'text-green-600']">
+                                <UserX
+                                    :class="['h-4 w-4', row.original.students_absent_exceeded > 0 ? 'text-red-600' : 'text-green-600']" />
+                                <span
+                                    :class="['font-bold', row.original.students_absent_exceeded > 0 ? 'text-red-600' : 'text-green-600']">
                                     {{ row.original.students_absent_exceeded }}
                                 </span>
                             </div>
-                            <div class="text-muted-foreground text-xs">of {{ row.original.total_students }} students</div>
-                            <div class="text-muted-foreground text-xs">(Max {{ row.original.allowed_absences }} absences)</div>
+                            <div class="text-muted-foreground text-xs">of {{ row.original.total_students }} students
+                            </div>
+                            <div class="text-muted-foreground text-xs">(Max {{ row.original.allowed_absences }}
+                                absences)</div>
                         </div>
                     </template>
 
                     <template #cell-average_attendance="{ row }">
-                        <div :class="['text-center font-mono font-semibold', row.original.average_attendance >= 85 ? 'text-green-600' : row.original.average_attendance >= 70 ? 'text-yellow-600' : 'text-red-600']">
+                        <div
+                            :class="['text-center font-mono font-semibold', row.original.average_attendance >= 85 ? 'text-green-600' : row.original.average_attendance >= 70 ? 'text-yellow-600' : 'text-red-600']">
                             {{ row.original.average_attendance.toFixed(1) }}%
                         </div>
                     </template>
 
                     <template #cell-average_grade="{ row }">
-                        <div :class="['text-center font-mono font-semibold', row.original.average_grade >= 80 ? 'text-green-600' : row.original.average_grade >= 60 ? 'text-yellow-600' : 'text-red-600']">
+                        <div
+                            :class="['text-center font-mono font-semibold', row.original.average_grade >= 80 ? 'text-green-600' : row.original.average_grade >= 60 ? 'text-yellow-600' : 'text-red-600']">
                             {{ row.original.average_grade > 0 ? row.original.average_grade.toFixed(1) : 'N/A' }}
                         </div>
                     </template>
 
                     <template #cell-pass_rate="{ row }">
                         <div class="flex items-center justify-center gap-1">
-                            <TrendingUp v-if="row.original.pass_rate >= 70" :class="['h-4 w-4', row.original.pass_rate >= 90 ? 'text-green-600' : 'text-yellow-600']" />
+                            <TrendingUp v-if="row.original.pass_rate >= 70"
+                                :class="['h-4 w-4', row.original.pass_rate >= 90 ? 'text-green-600' : 'text-yellow-600']" />
                             <TrendingDown v-else class="h-4 w-4 text-red-600" />
-                            <span :class="['font-mono font-semibold', row.original.pass_rate >= 90 ? 'text-green-600' : row.original.pass_rate >= 70 ? 'text-yellow-600' : 'text-red-600']"> {{ row.original.pass_rate.toFixed(1) }}% </span>
+                            <span
+                                :class="['font-mono font-semibold', row.original.pass_rate >= 90 ? 'text-green-600' : row.original.pass_rate >= 70 ? 'text-yellow-600' : 'text-red-600']">
+                                {{ row.original.pass_rate.toFixed(1) }}% </span>
                         </div>
                     </template>
 
                     <template #cell-actions="{ row }">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center ">
                             <Button variant="ghost" size="sm" @click="goToDetailPage(row.original.course_offering_id)">
-                                <Eye class="mr-2 h-4 w-4" />
-                                Attendance
+                                <Eye class="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" @click="goToAssessmentScoresPage(row.original.course_offering_id)">
-                                <ClipboardList class="mr-2 h-4 w-4" />
-                                Scores
+                            <Button variant="ghost" size="sm"
+                                @click="goToAssessmentScoresPage(row.original.course_offering_id)">
+                                <ClipboardList class="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm"
+                                @click="exportStatistics(row.original.course_offering_id)">
+                                <Download class="h-4 w-4" />
                             </Button>
                         </div>
                     </template>
@@ -366,6 +386,7 @@ const goToAssessmentScoresPage = (courseOfferingId: number) => {
             </CardContent>
         </Card>
 
-        <DataPagination :pagination-data="statistics" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+        <DataPagination :pagination-data="statistics" @navigate="handlePaginationNavigate"
+            @page-size-change="handlePageSizeChange" />
     </div>
 </template>
