@@ -102,13 +102,8 @@ class CanvasGradeSyncService
                 'first_canvas_student_sample' => $canvasStudents[0] ?? null,
             ]);
 
-            Log::info('Local students sample', [
+            Log::info('Local students fetched for grade sync', [
                 'total_enrollments' => $enrollments->count(),
-                'first_3_students' => $enrollments->take(3)->map(fn($e) => [
-                    'student_id' => $e->student->student_id,
-                    'full_name' => $e->student->full_name ?? 'N/A',
-                    'id' => $e->student->id,
-                ])->toArray(),
             ]);
 
             // Get all Canvas-synced assignments to build filter list
@@ -178,8 +173,6 @@ class CanvasGradeSyncService
             Log::info('Submission map built', [
                 'unique_students' => count($submissionMap),
                 'map_time_seconds' => round($mapTime, 2),
-                'submission_map_keys' => array_keys($submissionMap),
-                'first_submission_sample' => ! empty($allSubmissions) ? $allSubmissions[0] : null,
             ]);
 
             $synced = 0;
@@ -206,13 +199,6 @@ class CanvasGradeSyncService
                 $student = $enrollment->student;
                 // Use student_id column (e.g., "AUS15189") to match with Canvas SIS User ID
                 $studentId = strtoupper(trim((string) $student->student_id));
-
-                Log::debug('Processing student', [
-                    'student_id' => $student->id,
-                    'student_code' => $studentId,
-                    'student_name' => $student->full_name ?? 'N/A',
-                    'looking_in_map' => array_key_exists($studentId, $canvasStudentMap),
-                ]);
 
                 // Try to find Canvas student by matching student_id with SIS User ID or SIS Login ID
                 $canvasStudent = $canvasStudentMap[$studentId] ?? null;
@@ -324,13 +310,6 @@ class CanvasGradeSyncService
 
         $studentSubmissions = $submissionMap[$canvasUserId] ?? [];
 
-        Log::debug('syncStudentGradesFromBulk called', [
-            'student_id' => $student->id,
-            'canvas_user_id' => $canvasUserId,
-            'submissions_found' => count($studentSubmissions),
-            'submission_assignment_ids' => array_keys($studentSubmissions),
-        ]);
-
         foreach ($canvasComponents as $component) {
             // Get all assignment details for this component
             $assignmentDetails = AssessmentComponentDetail::where('assessment_component_id', $component->id)
@@ -350,12 +329,6 @@ class CanvasGradeSyncService
 
                     continue;
                 }
-
-                Log::debug('Processing submission', [
-                    'student_id' => $student->id,
-                    'canvas_assignment_id' => $detail->canvas_assignment_id,
-                    'submission_data' => $submission,
-                ]);
 
                 // Calculate percentage
                 $score = $submission['score'] ?? null;
@@ -393,23 +366,10 @@ class CanvasGradeSyncService
                     ->first();
 
                 if ($existing) {
-                    Log::debug('Updating existing score', [
-                        'score_id' => $existing->id,
-                        'old_points' => $existing->points_earned,
-                        'new_points' => $data['points_earned'],
-                        'student_id' => $student->id,
-                        'detail_id' => $detail->id,
-                    ]);
                     $existing->update($data);
                     $updated++;
                 } else {
-                    Log::debug('Creating new score', [
-                        'student_id' => $student->id,
-                        'detail_id' => $detail->id,
-                        'data' => $data,
-                    ]);
-                    $newScore = AssessmentComponentDetailScore::create($data);
-                    Log::debug('Created score', ['score_id' => $newScore->id]);
+                    AssessmentComponentDetailScore::create($data);
                     $created++;
                 }
 
@@ -419,16 +379,25 @@ class CanvasGradeSyncService
 
         // Sync Canvas total grade to academic record
         try {
-            // Fetch Canvas total grade
             $enrollment = $this->apiService->getStudentEnrollment(
                 $mapping->canvasIntegration,
                 $mapping->canvas_course_id,
                 $canvasUserId
             );
 
-            if ($enrollment && isset($enrollment['grades']['current_score'])) {
-                $canvasTotal = (float) $enrollment['grades']['current_score'];
+            // Use current_score (posted) or fallback to unposted_current_score
+            $grades = $enrollment['grades'] ?? null;
+            $canvasTotal = null;
 
+            if ($grades) {
+                if (isset($grades['current_score']) && $grades['current_score'] !== null) {
+                    $canvasTotal = (float) $grades['current_score'];
+                } elseif (isset($grades['unposted_current_score']) && $grades['unposted_current_score'] !== null) {
+                    $canvasTotal = (float) $grades['unposted_current_score'];
+                }
+            }
+
+            if ($canvasTotal !== null) {
                 // Check if academic record already exists
                 $existingRecord = \App\Models\AcademicRecord::where('student_id', $student->id)
                     ->where('course_offering_id', $courseOffering->id)
@@ -457,118 +426,53 @@ class CanvasGradeSyncService
                         'course_offering_id' => $courseOffering->id,
                         'final_percentage' => $finalPercentage,
                         'final_letter_grade' => \App\Models\AcademicRecord::calculateLetterGrade($finalPercentage),
-                        'enrollment_date' => now()->toDateString(), // Required field - use current date or semester start
+                        'enrollment_date' => now()->toDateString(),
                     ];
 
                     // Add required fields from course offering
-                    if ($courseOffering->semester_id) {
-                        $academicRecordData['semester_id'] = $courseOffering->semester_id;
-                    }
-                    if ($courseOffering->unit_id) {
-                        $academicRecordData['unit_id'] = $courseOffering->unit_id;
-                    }
-                    if ($courseOffering->campus_id) {
-                        $academicRecordData['campus_id'] = $courseOffering->campus_id;
-                    }
-
-                    // Get credit_hours from unit - this is REQUIRED
-                    $creditHours = null;
-
-                    if ($courseOffering->unit && $courseOffering->unit->credit_points !== null) {
-                        $creditHours = $courseOffering->unit->credit_points;
-                    } else {
-                        // If unit not loaded, try to load it explicitly
-                        $unit = \App\Models\Unit::find($courseOffering->unit_id);
-                        if ($unit && $unit->credit_points !== null) {
-                            $creditHours = $unit->credit_points;
+                    foreach (['semester_id', 'unit_id', 'campus_id'] as $field) {
+                        if ($courseOffering->$field) {
+                            $academicRecordData[$field] = $courseOffering->$field;
                         }
                     }
 
-                    if ($creditHours === null || $creditHours < 0) {
-                        Log::warning('Cannot create academic record: invalid credit_hours from unit', [
-                            'student_id' => $student->id,
-                            'course_offering_id' => $courseOffering->id,
-                            'unit_id' => $courseOffering->unit_id,
-                            'has_unit' => ! is_null($courseOffering->unit),
-                            'credit_points' => $courseOffering->unit->credit_points ?? null,
-                            'canvas_total' => $canvasTotal,
-                            'note' => 'Unit must have valid credit_points (>= 0)',
-                        ]);
-                        // Don't attempt to create record - continue to next step
-                    } else {
+                    // Get credit_points from unit - this is REQUIRED
+                    $creditHours = $courseOffering->unit->credit_points ?? null;
+                    if ($creditHours === null) {
+                        $unit = \App\Models\Unit::find($courseOffering->unit_id);
+                        $creditHours = $unit->credit_points ?? null;
+                    }
+
+                    if ($creditHours !== null && $creditHours >= 0) {
                         $academicRecordData['credit_hours'] = $creditHours;
 
-                        // Get program_id - try from student first
+                        // Get program_id
                         $programId = $student->program_id ?? null;
-
-                        // If student doesn't have program_id, try to get it from unit's curriculum
                         if (! $programId && $courseOffering->unit_id) {
                             $curriculumUnit = \App\Models\CurriculumUnit::where('unit_id', $courseOffering->unit_id)
                                 ->with('curriculumVersion')
                                 ->first();
-                            if ($curriculumUnit && $curriculumUnit->curriculumVersion) {
-                                $programId = $curriculumUnit->curriculumVersion->program_id ?? null;
-                            }
+                            $programId = $curriculumUnit->curriculumVersion->program_id ?? null;
                         }
 
                         if ($programId) {
                             $academicRecordData['program_id'] = $programId;
 
-                            // Validate we have all required fields before creating
-                            $missingFields = [];
-                            if (empty($academicRecordData['semester_id'])) {
-                                $missingFields[] = 'semester_id';
-                            }
-                            if (empty($academicRecordData['unit_id'])) {
-                                $missingFields[] = 'unit_id';
-                            }
-                            if (empty($academicRecordData['campus_id'])) {
-                                $missingFields[] = 'campus_id';
-                            }
-                            if (empty($academicRecordData['credit_hours'])) {
-                                $missingFields[] = 'credit_hours';
-                            }
-                            if (empty($academicRecordData['enrollment_date'])) {
-                                $missingFields[] = 'enrollment_date';
-                            }
+                            // Check all required fields
+                            $required = ['semester_id', 'unit_id', 'campus_id', 'credit_hours', 'enrollment_date'];
+                            $missing = array_filter($required, fn($f) => empty($academicRecordData[$f]));
 
-                            if (empty($missingFields)) {
-                                // Create new academic record
+                            if (empty($missing)) {
                                 $newRecord = \App\Models\AcademicRecord::create($academicRecordData);
-
                                 Log::info('Created new academic record with Canvas total grade', [
                                     'student_id' => $student->id,
                                     'academic_record_id' => $newRecord->id,
                                     'canvas_total' => $canvasTotal,
-                                    'final_percentage' => round($canvasTotal, 2),
-                                    'program_id' => $programId,
-                                    'credit_hours' => $academicRecordData['credit_hours'],
-                                ]);
-                            } else {
-                                Log::warning('Cannot create academic record: missing required fields', [
-                                    'student_id' => $student->id,
-                                    'course_offering_id' => $courseOffering->id,
-                                    'canvas_total' => $canvasTotal,
-                                    'missing_fields' => $missingFields,
-                                    'note' => 'Academic record must be created manually with all required fields',
                                 ]);
                             }
-                        } else {
-                            Log::warning('Cannot create academic record: program_id not found', [
-                                'student_id' => $student->id,
-                                'course_offering_id' => $courseOffering->id,
-                                'canvas_total' => $canvasTotal,
-                                'note' => 'Academic record must be created manually or student must be assigned to a program',
-                            ]);
                         }
                     }
                 }
-            } else {
-                Log::debug('No Canvas total grade available', [
-                    'student_id' => $student->id,
-                    'canvas_user_id' => $canvasUserId,
-                    'enrollment_data' => $enrollment,
-                ]);
             }
         } catch (\Exception $e) {
             Log::warning('Failed to sync Canvas total grade', [
@@ -576,7 +480,6 @@ class CanvasGradeSyncService
                 'canvas_user_id' => $canvasUserId,
                 'error' => $e->getMessage(),
             ]);
-            // Don't throw - assignment scores already synced successfully
         }
 
         return [

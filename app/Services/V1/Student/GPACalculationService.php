@@ -90,7 +90,6 @@ class GPACalculationService
     public function getGPATrend(Student $student, int $semesterCount = 6): array
     {
         $gpaCalculations = GpaCalculation::where('student_id', $student->id)
-            ->where('calculation_type', 'semester')
             ->with('semester')
             ->orderBy('created_at', 'desc')
             ->limit($semesterCount)
@@ -103,8 +102,9 @@ class GPACalculationService
                 return [
                     'semester' => $calculation->semester->name,
                     'semester_code' => $calculation->semester->code,
-                    'gpa' => round($calculation->gpa, 2),
-                    'credit_hours' => $calculation->credit_hours_earned,
+                    'gpa' => round($calculation->semester_gpa, 2),
+                    'cumulative_gpa' => round($calculation->cumulative_gpa, 2),
+                    'credit_hours' => $calculation->semester_credits_earned,
                     'academic_standing' => $calculation->academic_standing,
                     'date' => $calculation->created_at->toDateString(),
                 ];
@@ -151,29 +151,30 @@ class GPACalculationService
     public function getAcademicStanding(Student $student): array
     {
         $latestGPA = GpaCalculation::where('student_id', $student->id)
+            ->where('is_current', true)
             ->orderBy('created_at', 'desc')
             ->first();
 
         if (! $latestGPA) {
             return [
                 'standing' => 'unknown',
-                'gpa' => 0.0,
+                'semester_gpa' => 0.0,
+                'cumulative_gpa' => 0.0,
                 'required_gpa' => 2.0,
                 'meets_requirement' => false,
                 'warning_level' => null,
             ];
         }
 
-        $standing = $this->determineAcademicStanding($latestGPA->gpa);
+        $standing = $this->determineAcademicStanding($latestGPA->cumulative_gpa);
 
         return [
             'standing' => $standing,
-            'gpa' => round($latestGPA->gpa, 2),
-            'required_gpa' => $latestGPA->required_gpa ?? 2.0,
-            'meets_requirement' => $latestGPA->meets_gpa_requirement ?? false,
-            'warning_level' => $this->getWarningLevel($latestGPA->gpa),
-            'dean_list_eligible' => $latestGPA->dean_list_eligible ?? false,
-            'honors_eligible' => $latestGPA->honors_eligible ?? false,
+            'semester_gpa' => round($latestGPA->semester_gpa, 2),
+            'cumulative_gpa' => round($latestGPA->cumulative_gpa, 2),
+            'required_gpa' => 2.0, // Default for now
+            'meets_requirement' => $latestGPA->cumulative_gpa >= 2.0,
+            'warning_level' => $this->getWarningLevel($latestGPA->cumulative_gpa),
         ];
     }
 
@@ -190,7 +191,7 @@ class GPACalculationService
             ];
         }
 
-        $gpas = $gpaCalculations->pluck('gpa');
+        $gpas = $gpaCalculations->pluck('semester_gpa');
         $latest = $gpas->last();
         $previous = $gpas->get($gpas->count() - 2);
 

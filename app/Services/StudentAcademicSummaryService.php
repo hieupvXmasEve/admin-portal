@@ -218,11 +218,11 @@ class StudentAcademicSummaryService
                 'total_credits_earned' => $student->academicRecords()
                     ->where('completion_status', 'completed')
                     ->where('grade_status', 'passing')
-                    ->sum('credit_hours_earned'),
+                    ->sum('credit_points_earned'),
                 'total_credits_attempted' => $student->academicRecords()
-                    ->sum('credit_hours'),
-                'current_gpa' => $currentGpa?->gpa ?? 0,
-                'cumulative_gpa' => $currentGpa?->cumulative_gpa ?? $currentGpa?->gpa ?? 0,
+                    ->sum('credit_points'),
+                'current_gpa' => $currentGpa?->semester_gpa ?? 0,
+                'cumulative_gpa' => $currentGpa?->cumulative_gpa ?? $currentGpa?->semester_gpa ?? 0,
                 'academic_standing' => $currentGpa?->academic_standing ?? 'unknown',
                 'active_holds' => $student->academicHolds()->where('status', 'active')->count(),
                 'retake_courses' => $student->courseRegistrations()->where('is_retake', true)->count(),
@@ -345,7 +345,7 @@ class StudentAcademicSummaryService
                 'course_name' => $unit->name ?? 'N/A',
                 'course_code' => $unit->code ?? 'N/A',
                 'section_code' => $registration->courseOffering->section_code ?? 'N/A',
-                'credit_points' => $unit->credit_points ?? 0,
+                'unit_credit_points' => $unit->credit_points ?? 0,
                 'semester' => $semester->name ?? 'N/A',
                 'semester_code' => $semester->code ?? 'N/A',
                 'academic_year' => $this->getAcademicYear($semester),
@@ -361,7 +361,7 @@ class StudentAcademicSummaryService
                 'grade_status' => $gradeStatus,
                 'completion_status' => $completionStatus,
                 'pass_fail_status' => $passFailStatus,
-                'credit_hours' => $registration->credit_hours,
+                'credit_points' => $registration->credit_points,
                 'is_retake' => $registration->is_retake,
                 'attempt_number' => $registration->attempt_number,
                 'completion_date' => $registration->completion_date,
@@ -392,13 +392,13 @@ class StudentAcademicSummaryService
             'dropped' => $allRegistrations->where('registration_status', 'dropped')->count(),
             'withdrawn' => $allRegistrations->where('registration_status', 'withdrawn')->count(),
             'retakes' => $allRegistrations->where('is_retake', true)->count(),
-            'total_credits_attempted' => $allRegistrations->sum('credit_hours'),
+            'total_credits_attempted' => $allRegistrations->sum('credit_points'),
             'total_credits_earned' => $allRegistrations->where('registration_status', 'completed')
                 ->where('final_grade', '!=', null)
                 ->filter(function ($reg) {
                     return $this->isPassingGrade($reg->final_grade);
                 })
-                ->sum('credit_hours'),
+                ->sum('credit_points'),
             'completion_rate' => $allRegistrations->count() > 0 ?
                 round(($allRegistrations->where('registration_status', 'completed')->count() / $allRegistrations->count()) * 100, 2) : 0,
             'retake_rate' => $allRegistrations->count() > 0 ?
@@ -1074,7 +1074,6 @@ class StudentAcademicSummaryService
     {
         $gpaCalculations = $student->gpaCalculations()
             ->with(['semester:id,name,code,start_date,end_date'])
-            ->orderBy('academic_year', 'desc')
             ->orderBy('semester_id', 'desc')
             ->get()
             ->map(function ($gpa) {
@@ -1082,12 +1081,12 @@ class StudentAcademicSummaryService
                     'id' => $gpa->id,
                     'semester' => $gpa->semester->name ?? 'N/A',
                     'semester_code' => $gpa->semester->code ?? 'N/A',
-                    'academic_year' => $gpa->academic_year,
-                    'semester_gpa' => $gpa->gpa,
-                    'cumulative_gpa' => $gpa->cumulative_gpa ?? $gpa->gpa,
-                    'credit_hours_attempted' => $gpa->credit_hours_attempted,
-                    'credit_hours_earned' => $gpa->credit_hours_earned,
-                    'quality_points' => $gpa->quality_points,
+                    'academic_year' => 'N/A', // Column missing in table
+                    'semester_gpa' => $gpa->semester_gpa,
+                    'cumulative_gpa' => $gpa->cumulative_gpa,
+                    'credit_points_attempted' => $gpa->semester_credit_points,
+                    'credit_points_earned' => $gpa->semester_credit_points_earned,
+                    'quality_points' => $gpa->semester_quality_points,
                     'academic_standing' => $gpa->academic_standing,
                     'dean_list_eligible' => $gpa->dean_list_eligible ?? false,
                     'honors_eligible' => $gpa->honors_eligible ?? false,
@@ -1102,11 +1101,11 @@ class StudentAcademicSummaryService
         return [
             'data' => $gpaCalculations,
             'summary' => [
-                'current_semester_gpa' => $currentGpa->semester_gpa ?? 0,
-                'current_cumulative_gpa' => $currentGpa->cumulative_gpa ?? 0,
-                'total_credit_hours_earned' => $gpaCalculations->sum('credit_hours_earned'),
+                'current_semester_gpa' => $currentGpa['semester_gpa'] ?? 0,
+                'current_cumulative_gpa' => $currentGpa['cumulative_gpa'] ?? 0,
+                'total_credit_points_earned' => $gpaCalculations->sum('credit_points_earned'),
                 'total_quality_points' => $gpaCalculations->sum('quality_points'),
-                'current_academic_standing' => $currentGpa->academic_standing ?? 'unknown',
+                'current_academic_standing' => $currentGpa['academic_standing'] ?? 'unknown',
                 'dean_list_semesters' => $gpaCalculations->where('dean_list_eligible', true)->count(),
                 'probation_semesters' => $gpaCalculations->where('probation_status', true)->count(),
                 'warning_semesters' => $gpaCalculations->where('warning_status', true)->count(),
@@ -1173,7 +1172,7 @@ class StudentAcademicSummaryService
         $totalCreditsRequired = $curriculumUnits->sum(function ($curriculumUnit) {
             return $curriculumUnit->unit ? $curriculumUnit->unit->credit_points : 0;
         });
-        $totalCreditsEarned = $completedRecords->sum('credit_hours_earned');
+        $totalCreditsEarned = $completedRecords->sum('credit_points_earned');
         $creditsRemaining = max(0, $totalCreditsRequired - $totalCreditsEarned);
 
         // Check specific requirements (simplified - would need more complex logic in real implementation)
@@ -1185,7 +1184,7 @@ class StudentAcademicSummaryService
                 'earned' => $completedRecords->whereIn(
                     'unit_id',
                     $curriculumUnits->where('type', 'core')->pluck('unit_id')
-                )->sum('credit_hours_earned'),
+                )->sum('credit_points_earned'),
                 'status' => 'in_progress', // Would calculate based on actual completion
             ],
             'elective_credits' => [
@@ -1195,7 +1194,7 @@ class StudentAcademicSummaryService
                 'earned' => $completedRecords->whereIn(
                     'unit_id',
                     $curriculumUnits->where('type', 'elective')->pluck('unit_id')
-                )->sum('credit_hours_earned'),
+                )->sum('credit_points_earned'),
                 'status' => 'in_progress',
             ],
             'internship' => [
@@ -1291,7 +1290,7 @@ class StudentAcademicSummaryService
         $currentRegistrations = $student->courseRegistrations()
             ->where('semester_id', $currentSemester->id)
             ->whereIn('registration_status', ['enrolled', 'active'])
-            ->sum('credit_hours');
+            ->sum('credit_points');
 
         return [
             'semester' => $currentSemester->name,
@@ -1350,7 +1349,7 @@ class StudentAcademicSummaryService
                     'course_code' => $registration->courseOffering->unit->code ?? 'N/A',
                     'registration_status' => $registration->registration_status,
                     'final_grade' => $registration->final_grade,
-                    'credit_hours' => $registration->credit_hours,
+                    'credit_points' => $registration->credit_points,
                     'is_retake' => $registration->is_retake,
                     'attempt_number' => $registration->attempt_number,
                 ];
@@ -1450,7 +1449,7 @@ class StudentAcademicSummaryService
             'registration' => $registration ? [
                 'registration_status' => $registration->registration_status,
                 'final_grade' => $registration->final_grade,
-                'credit_hours' => $registration->credit_hours,
+                'credit_points' => $registration->credit_points,
                 'is_retake' => $registration->is_retake,
                 'attempt_number' => $registration->attempt_number,
             ] : null,

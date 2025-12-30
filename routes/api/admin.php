@@ -152,6 +152,7 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
     
     // API for Web Modals
     require __DIR__ . '/admin/buildings.php';
+    require __DIR__ . '/admin/academic.php';
 });
 
 // Admin API routes (for external use)

@@ -63,7 +63,7 @@ class CourseOffering extends AuditableModel
     protected $appends = [
         'course_code',
         'course_title',
-        'credit_hours',
+        'credit_points',
         'status',
         'max_enrollment',
     ];
@@ -201,7 +201,7 @@ class CourseOffering extends AuditableModel
         return $this->unit?->name;
     }
 
-    public function getCreditHoursAttribute(): ?int
+    public function getCreditPointsAttribute(): ?int
     {
         return $this->unit ? (int) $this->unit->credit_points : null;
     }
