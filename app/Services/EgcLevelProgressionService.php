@@ -84,7 +84,7 @@ class EgcLevelProgressionService
             // 1. Attendance requirement (>= 80%) - PRIORITY
             // 2. Grade threshold (EGC: >= 70%, Others: >= 60%)
             // If either fails, completion_status = 'failed'
-            $isPassing = $record->completion_status === 'completed';
+            $isPassing = $record->is_passed;
 
             // Check if student's current level matches unit level
             $studentLevel = $student->gc_current_level ?? null;

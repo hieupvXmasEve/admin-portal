@@ -76,6 +76,7 @@ class CourseCompletionService
 
     /**
      * Finalize all academic records for the course
+     * SKIP Attendance requirement check
      */
     private function finalizeAcademicRecords(CourseOffering $courseOffering): void
     {
@@ -88,7 +89,7 @@ class CourseCompletionService
         $passingThreshold = $courseOffering->syllabusTemplate?->min_grade_threshold ?? ($isEgcCourse ? 70 : 60);
 
         // Attendance threshold:
-        $attendanceThreshold = $courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00;
+        // $attendanceThreshold = $courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00;
 
         // Get all registered student IDs to filter academic records
         $registeredStudentIds = CourseRegistration::where('course_offering_id', $courseOffering->id)
@@ -108,42 +109,42 @@ class CourseCompletionService
         foreach ($records as $record) {
             // STEP 1: CHECK ATTENDANCE REQUIREMENT FIRST (PRIORITY)
             // Student must attend >= threshold% of classes
-            $meetsAttendanceRequirement = $record->meets_attendance_requirement ?? true;
+            // $meetsAttendanceRequirement = $record->meets_attendance_requirement ?? true;
 
             // If student failed attendance requirement, automatic FAIL regardless of grade
-            if (! $meetsAttendanceRequirement) {
-                $attendancePercentage = (float) ($record->attendance_percentage ?? 0);
-                $attendanceNote = "FAILED: Attendance requirement not met ({$attendancePercentage}% attendance, required >= {$attendanceThreshold}%)";
+            // if (! $meetsAttendanceRequirement) {
+            //     $attendancePercentage = (float) ($record->attendance_percentage ?? 0);
+            //     $attendanceNote = "FAILED: Attendance requirement not met ({$attendancePercentage}% attendance, required >= {$attendanceThreshold}%)";
 
-                // Ensure we don't duplicate the note
-                $newNotes = $record->administrative_notes;
-                if (! $newNotes || ! str_contains($newNotes, "FAILED: Attendance requirement not met")) {
-                    $newNotes = ($newNotes ? $newNotes . "\n" : '') . $attendanceNote;
-                }
+            //     // Ensure we don't duplicate the note
+            //     $newNotes = $record->administrative_notes;
+            //     if (! $newNotes || ! str_contains($newNotes, "FAILED: Attendance requirement not met")) {
+            //         $newNotes = ($newNotes ? $newNotes . "\n" : '') . $attendanceNote;
+            //     }
 
-                $record->update([
-                    'grade_status' => 'final',
-                    'grade_finalized_date' => now(),
-                    'final_letter_grade' => 'F', // Override letter grade to F for attendance failure
-                    'grade_points' => 0.0, // F grade for attendance failure
-                    'completion_status' => ($record->override_pass && $record->is_passed) ? 'completed' : 'failed',
-                    'is_passed' => $record->override_pass ? $record->is_passed : false,
-                    'credit_points_earned' => ($record->override_pass && $record->is_passed) ? $record->credit_points : 0,
-                    'credit_hours_earned' => ($record->override_pass && $record->is_passed) ? $record->credit_hours : 0,
-                    'affects_graduation_requirement' => true,
-                    'satisfies_prerequisite' => ($record->override_pass && $record->is_passed),
-                    'administrative_notes' => $newNotes,
-                ]);
+            //     $record->update([
+            //         'grade_status' => 'final',
+            //         'grade_finalized_date' => now(),
+            //         'final_letter_grade' => 'F', // Override letter grade to F for attendance failure
+            //         'grade_points' => 0.0, // F grade for attendance failure
+            //         'completion_status' => ($record->override_pass && $record->is_passed) ? 'completed' : 'failed',
+            //         'is_passed' => $record->override_pass ? $record->is_passed : false,
+            //         'credit_points_earned' => ($record->override_pass && $record->is_passed) ? $record->credit_points : 0,
+            //         'credit_hours_earned' => ($record->override_pass && $record->is_passed) ? $record->credit_hours : 0,
+            //         'affects_graduation_requirement' => true,
+            //         'satisfies_prerequisite' => ($record->override_pass && $record->is_passed),
+            //         'administrative_notes' => $newNotes,
+            //     ]);
 
-                $attendanceFailedCount++;
-                Log::warning('Student failed due to attendance', [
-                    'student_id' => $record->student_id,
-                    'course_offering_id' => $courseOffering->id,
-                    'attendance_percentage' => $attendancePercentage,
-                ]);
+            //     $attendanceFailedCount++;
+            //     Log::warning('Student failed due to attendance', [
+            //         'student_id' => $record->student_id,
+            //         'course_offering_id' => $courseOffering->id,
+            //         'attendance_percentage' => $attendancePercentage,
+            //     ]);
 
-                continue;
-            }
+            //     continue;
+            // }
 
             // STEP 2: CHECK GRADE (only if attendance requirement is met)
             // Cast to float to ensure type safety
@@ -178,7 +179,7 @@ class CourseCompletionService
                 'grade_finalized_date' => now(),
                 'final_letter_grade' => $finalLetterGrade,
                 'grade_points' => $gradePoints,
-                'completion_status' => $finalPassed ? 'completed' : 'failed',
+                'completion_status' => 'completed',
                 'is_passed' => $finalPassed,
                 'credit_points_earned' => $finalPassed ? $record->credit_points : 0,
                 'credit_hours_earned' => $finalPassed ? $record->credit_hours : 0,

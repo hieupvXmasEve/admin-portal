@@ -56,8 +56,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function show(Student $student): Response
     {
-        // Additional authorization check for the specific student
-        $this->authorize('view_student_summary', $student);
 
         // Get comprehensive academic summary data
         $academicSummary = $this->academicSummaryService->getAcademicSummary($student->id);
@@ -83,7 +81,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function overview(Student $student): Response
     {
-        $this->authorize('view_student_summary', $student);
 
         // Load necessary relationships
         $student->load([
@@ -113,22 +110,27 @@ class StudentAcademicSummaryController extends Controller
      * @param  Student  $student  The student to display registrations for
      * @return Response Inertia response with registrations data
      */
-    public function registrations(Student $student): Response
+    /**
+     * Get registrations tab data
+     */
+    public function registrations(Student $student, \App\Http\Requests\Student\GetRegistrationsRequest $request, \App\Actions\Student\GetStudentRegistrationsAction $action): Response
     {
-        $this->authorize('view_student_summary', $student);
-
-        // Load necessary relationships
-        $student->load([
-            'campus:id,name,code',
-            'program:id,name,code',
-            'specialization:id,name,code',
-        ]);
-
-        $registrationsData = $this->academicSummaryService->getRegistrationsData($student);
+        $validated = $request->validated();
+        $registrationsData = $action->execute($student, $validated);
 
         return Inertia::render('students/AcademicSummary/Registrations', [
             'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
             'registrations' => $registrationsData,
+            'filters' => [
+                'academic_year' => $validated['academic_year'] ?? null,
+                'semester_id' => $validated['semester_id'] ?? null,
+                'status' => $validated['status'] ?? null,
+                'is_retake' => $validated['is_retake'] ?? null,
+                'per_page' => $validated['per_page'] ?? null,
+                'page' => $validated['page'] ?? null,
+                'sort' => $validated['sort'] ?? null,
+                'direction' => $validated['direction'] ?? null,
+            ],
         ]);
     }
 
@@ -140,7 +142,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function scores(Student $student): Response
     {
-        $this->authorize('view_student_summary', $student);
 
         $scoresData = $this->academicSummaryService->getScoresData($student);
 
@@ -158,7 +159,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function attendance(Student $student): Response
     {
-        $this->authorize('view_student_summary', $student);
 
         $attendanceData = $this->academicSummaryService->getAttendanceData($student);
 
@@ -176,7 +176,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function gpa(Student $student): Response
     {
-        $this->authorize('view_student_summary', $student);
 
         $gpaData = $this->academicSummaryService->getGpaData($student);
 
@@ -194,7 +193,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function graduation(Student $student): Response
     {
-        $this->authorize('view_student_summary', $student);
 
         $graduationData = $this->academicSummaryService->getGraduationData($student);
 
@@ -213,7 +211,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function gold(Student $student, Request $request): Response
     {
-        $this->authorize('view_student_summary', $student);
 
         // Get gold summary data
         $goldSummary = $this->studentWalletController->summaryForStudent($student);
@@ -245,7 +242,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function tuitionPlan(Student $student): Response
     {
-        $this->authorize('view_student_summary', $student);
 
         // Get tuition plan for the student
         $tuitionPlan = \App\Models\TuitionPlan::where('curriculum_version_id', $student->curriculum_version_id)
@@ -529,7 +525,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function filterBySemester(Student $student, Request $request): JsonResponse
     {
-        $this->authorize('view_student_summary', $student);
 
         $validated = $request->validate([
             'semester_id' => 'required|exists:semesters,id',
@@ -555,7 +550,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function filterByCourseOffering(Student $student, Request $request): JsonResponse
     {
-        $this->authorize('view_student_summary', $student);
 
         $validated = $request->validate([
             'course_offering_id' => 'required|exists:course_offerings,id',
@@ -581,7 +575,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function getAttendanceDetails(Student $student, Request $request): JsonResponse
     {
-        $this->authorize('view_student_summary', $student);
 
         $validated = $request->validate([
             'unit_id' => 'required|exists:units,id',
@@ -609,7 +602,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function getScoreDetails(Student $student, Request $request): JsonResponse
     {
-        $this->authorize('view_student_summary', $student);
 
         $validated = $request->validate([
             'course_offering_id' => 'required|exists:course_offerings,id',
@@ -636,7 +628,6 @@ class StudentAcademicSummaryController extends Controller
      */
     public function getCourseScores(Student $student, int $courseOfferingId, Request $request): JsonResponse
     {
-        $this->authorize('view_student_summary', $student);
 
         $validated = $request->validate([
             'offset' => 'integer|min:0',

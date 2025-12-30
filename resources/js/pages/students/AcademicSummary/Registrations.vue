@@ -7,6 +7,7 @@ import RegistrationsTab from '../AcademicSummary/RegistrationsTab.vue';
 interface Props {
     student: Pick<Student, 'id' | 'student_id' | 'full_name' | 'status' | 'email' | 'intake'>;
     registrations: RegistrationsData;
+    filters?: any;
 }
 
 defineProps<Props>();
@@ -14,10 +15,11 @@ defineProps<Props>();
 
 <template>
     <div>
+
         <Head :title="`Academic Summary - Registrations - ${student.full_name}`" />
 
         <StudentLayout :student="student" current-tab="registrations">
-            <RegistrationsTab :registrations="registrations" :student-id="student.id" />
+            <RegistrationsTab :registrations="registrations" :student-id="student.id" :filters="filters" />
         </StudentLayout>
     </div>
 </template>

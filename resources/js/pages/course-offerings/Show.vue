@@ -396,17 +396,21 @@ const openBulkEdit = () => {
 </script>
 
 <template>
+
     <Head title="Course Offering Details" />
     <!-- Header -->
     <div class="flex flex-col items-center md:flex-row md:justify-between">
         <div class="flex items-center justify-between gap-4">
             <div>
-                <h1 class="text-3xl font-bold tracking-tight">{{ courseOffering.course_code }} - {{ courseOffering.course_title }}</h1>
+                <h1 class="text-3xl font-bold tracking-tight">{{ courseOffering.course_code }} - {{
+                    courseOffering.course_title }}</h1>
                 <p class="text-muted-foreground">Course offering details and enrollment information</p>
             </div>
         </div>
         <div class="flex items-center gap-2">
-            <Link v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0 && !courseOffering.class_sessions?.length" :href="`/course-offerings/${courseOffering.id}/split`">
+            <Link
+                v-if="!courseOffering.section_code && courseOffering.current_enrollment > 0 && !courseOffering.class_sessions?.length"
+                :href="`/course-offerings/${courseOffering.id}/split`">
                 <Button variant="outline">
                     <Users class="mr-2 h-4 w-4" />
                     Split into Sections
@@ -487,7 +491,8 @@ const openBulkEdit = () => {
             </CardHeader>
             <CardContent class="space-y-4">
                 <div class="text-center">
-                    <p class="text-3xl font-bold">{{ courseOffering.current_enrollment }}/{{ courseOffering.max_capacity }}</p>
+                    <p class="text-3xl font-bold">{{ courseOffering.current_enrollment }}/{{ courseOffering.max_capacity
+                        }}</p>
                     <p class="text-muted-foreground text-sm">Students Enrolled</p>
                     <div class="mt-2 h-2 w-full rounded-full bg-gray-200">
                         <div class="h-2 rounded-full bg-blue-600" :style="{ width: `${enrollmentPercentage}%` }"></div>
@@ -499,7 +504,8 @@ const openBulkEdit = () => {
 
                 <div>
                     <p class="text-muted-foreground text-sm font-medium">Waitlist</p>
-                    <p class="text-lg font-semibold">{{ courseOffering.current_waitlist }}/{{ courseOffering.waitlist_capacity }}</p>
+                    <p class="text-lg font-semibold">{{ courseOffering.current_waitlist }}/{{
+                        courseOffering.waitlist_capacity }}</p>
                 </div>
 
                 <div>
@@ -523,20 +529,24 @@ const openBulkEdit = () => {
                 <div class="space-y-4">
                     <div>
                         <p class="text-muted-foreground text-sm font-medium">Semester</p>
-                        <p class="text-lg font-semibold">{{ courseOffering.semester?.name }} ({{ courseOffering.semester?.code }})</p>
+                        <p class="text-lg font-semibold">{{ courseOffering.semester?.name }} ({{
+                            courseOffering.semester?.code }})</p>
                     </div>
 
                     <div v-if="courseOffering.curriculum_unit">
                         <p class="text-muted-foreground text-sm font-medium">Unit</p>
-                        <Link :href="`/units/${courseOffering.curriculum_unit.unit.id}`" class="flex items-center gap-2 text-lg font-semibold text-green-400">
-                            <span class="">{{ courseOffering.curriculum_unit.unit.code }} - {{ courseOffering.curriculum_unit.unit.name }}</span>
+                        <Link :href="`/units/${courseOffering.curriculum_unit.unit.id}`"
+                            class="flex items-center gap-2 text-lg font-semibold text-green-400">
+                            <span class="">{{ courseOffering.curriculum_unit.unit.code }} - {{
+                                courseOffering.curriculum_unit.unit.name }}</span>
                             <ExternalLink class="h-4 w-4" />
                         </Link>
                     </div>
 
                     <div>
                         <p class="text-muted-foreground text-sm font-medium">Lecturer</p>
-                        <p class="text-muted-foreground text-lg font-semibold">{{ courseOffering.lecture?.display_name || 'Not set' }}</p>
+                        <p class="text-muted-foreground text-lg font-semibold">{{ courseOffering.lecture?.display_name
+                            || 'Not set' }}</p>
                     </div>
                 </div>
                 <div class="space-y-4">
@@ -560,15 +570,21 @@ const openBulkEdit = () => {
                             <div class="flex items-start gap-2">
                                 <div class="flex-1">
                                     <!-- <p class="text-lg font-semibold">{{ courseOffering.syllabus_template.title }} - {{ courseOffering.syllabus_template.version }}</p> -->
-                                    <Link v-if="courseOffering.syllabus_template" :href="curriculumRoutes.syllabusTemplates.show(courseOffering.syllabus_template.id)" class="flex items-center gap-2 text-lg font-semibold">
-                                        {{ courseOffering.syllabus_template.title }} - {{ courseOffering.syllabus_template.version }}
+                                    <Link v-if="courseOffering.syllabus_template"
+                                        :href="curriculumRoutes.syllabusTemplates.show(courseOffering.syllabus_template.id)"
+                                        class="flex items-center gap-2 text-lg font-semibold">
+                                        {{ courseOffering.syllabus_template.title }} - {{
+                                            courseOffering.syllabus_template.version }}
                                         <ExternalLink class="h-4 w-4" />
                                     </Link>
-                                    <p v-if="courseOffering.syllabus_template.description" class="text-muted-foreground mt-1 text-sm">
+                                    <p v-if="courseOffering.syllabus_template.description"
+                                        class="text-muted-foreground mt-1 text-sm">
                                         {{ courseOffering.syllabus_template.description }}
                                     </p>
                                     <div class="text-muted-foreground mt-2 flex items-center gap-4 text-xs">
-                                        <span v-if="courseOffering.syllabus_template.unit"> {{ courseOffering.syllabus_template.unit.code }} - {{ courseOffering.syllabus_template.unit.name }} </span>
+                                        <span v-if="courseOffering.syllabus_template.unit"> {{
+                                            courseOffering.syllabus_template.unit.code }} - {{
+                                                courseOffering.syllabus_template.unit.name }} </span>
                                         <span v-if="courseOffering.syllabus_template.delivery_mode">
                                             {{ getDeliveryModeLabel(courseOffering.syllabus_template.delivery_mode) }}
                                         </span>
@@ -620,11 +636,14 @@ const openBulkEdit = () => {
                     <!-- schedule day -->
                     <div>
                         <p class="text-muted-foreground text-sm font-medium">Schedule Day</p>
-                        <p class="text-muted-foreground text-sm font-semibold">{{ courseOffering.schedule_days?.join(', ') ?? 'Not set' }}</p>
+                        <p class="text-muted-foreground text-sm font-semibold">
+                            {{ courseOffering.schedule_days?.join(',') ?? 'Not set' }}
+                        </p>
                     </div>
                     <div>
                         <p class="text-muted-foreground text-sm font-medium">Schedule Time</p>
-                        <p class="text-sm">{{ courseOffering.schedule_time_start }} - {{ courseOffering.schedule_time_end }}</p>
+                        <p class="text-sm">{{ courseOffering.schedule_time_start }} - {{
+                            courseOffering.schedule_time_end }}</p>
                     </div>
                 </div>
             </CardContent>
@@ -641,7 +660,8 @@ const openBulkEdit = () => {
                             <div class="flex items-center gap-2">
                                 <Calendar class="h-4 w-4" />
                                 <CardTitle class="flex items-center gap-2"> Class Sessions Management </CardTitle>
-                                <ChevronDown class="h-4 w-4 shrink-0 transition-transform duration-200 [&[data-state=open]]:rotate-180" />
+                                <ChevronDown
+                                    class="h-4 w-4 shrink-0 transition-transform duration-200 [&[data-state=open]]:rotate-180" />
                             </div>
                         </Button>
                     </CollapsibleTrigger>
@@ -649,51 +669,52 @@ const openBulkEdit = () => {
             </CardHeader>
             <CollapsibleContent>
                 <CardContent>
-                    <div v-if="!courseOffering.class_sessions || courseOffering.class_sessions.length === 0" class="space-y-2 text-center">
+                    <div v-if="!courseOffering.class_sessions || courseOffering.class_sessions.length === 0"
+                        class="space-y-2 text-center">
                         <Calendar class="text-muted-foreground mx-auto h-12 w-12" />
                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No class sessions</h3>
-                        <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class sessions based on the syllabus.</p>
+                        <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class
+                            sessions based on the syllabus.</p>
                         <div class="mt-1 flex items-center justify-center gap-2">
-                            <RoomSelectionModal
-                                :disable-generate="!courseOffering.syllabus_template"
-                                :available-rooms="availableRooms"
-                                :is-generating="isGenerating"
+                            <RoomSelectionModal :disable-generate="!courseOffering.syllabus_template"
+                                :available-rooms="availableRooms" :is-generating="isGenerating"
                                 :semester-start="courseOffering.semester.start_date"
                                 :semester-end="courseOffering.semester.end_date"
                                 :syllabus-template="courseOffering.syllabus_template"
-                                @generate="generateClassSessions"
-                            />
+                                @generate="generateClassSessions" />
                         </div>
-                        <div v-if="!courseOffering.syllabus_template || !courseOffering.syllabus_template.total_sessions">
+                        <div
+                            v-if="!courseOffering.syllabus_template || !courseOffering.syllabus_template.total_sessions">
                             <!-- Notice for user about missing syllabus template -->
-                            <p class="text-sm text-yellow-600">Please ensure a syllabus template with total sessions is assigned to this course offering before generating class sessions.</p>
+                            <p class="text-sm text-yellow-600">Please ensure a syllabus template with total sessions is
+                                assigned to this course offering before generating class sessions.</p>
                         </div>
                     </div>
                     <div v-else class="space-y-4">
                         <!-- Change Room action -->
                         <div class="flex items-center justify-between">
-                            <div class="text-muted-foreground text-sm">{{ courseOffering.class_sessions.length }} session(s)</div>
+                            <div class="text-muted-foreground text-sm">{{ courseOffering.class_sessions.length }}
+                                session(s)</div>
                             <!-- Action buttons -->
                             <div class="flex items-center gap-2">
                                 <!-- Bulk Edit Button (shown when sessions are selected) -->
-                                <Button v-if="selectedSessions.length > 0" size="sm" variant="default" @click="openBulkEdit">
+                                <Button v-if="selectedSessions.length > 0" size="sm" variant="default"
+                                    @click="openBulkEdit">
                                     <Edit2 class="mr-2 h-4 w-4" />
                                     Bulk Edit ({{ selectedSessions.length }})
                                 </Button>
                             </div>
                         </div>
 
-                        <DataTable
-                            :data="courseOffering.class_sessions || []"
-                            :columns="classSessionColumns"
-                            :enable-row-selection="!isAllClassSessionsCompleted"
-                            :enable-server-sorting="false"
-                            empty-message="No class sessions found."
-                            @selection-change="handleSelectionChange"
-                        >
+                        <DataTable :data="courseOffering.class_sessions || []" :columns="classSessionColumns"
+                            :enable-row-selection="!isAllClassSessionsCompleted" :enable-server-sorting="false"
+                            empty-message="No class sessions found." @selection-change="handleSelectionChange">
                             <template #cell-actions="{ row }">
                                 <div class="flex items-center gap-2">
-                                    <Button v-if="row.original.status !== 'completed' && row.original.status !== 'in_progress'" variant="ghost" size="sm" title="Quick Edit" @click="openQuickEdit(row.original)">
+                                    <Button
+                                        v-if="row.original.status !== 'completed' && row.original.status !== 'in_progress'"
+                                        variant="ghost" size="sm" title="Quick Edit"
+                                        @click="openQuickEdit(row.original)">
                                         <Settings class="h-4 w-4" />
                                     </Button>
                                     <Link :href="classSessionRoutes.show(row.original.id)">
@@ -703,12 +724,9 @@ const openBulkEdit = () => {
                                     </Link>
                                     <Button
                                         v-if="row.original.status !== 'completed' && row.original.status !== 'in_progress'"
-                                        variant="ghost"
-                                        size="sm"
-                                        title="Delete Session"
+                                        variant="ghost" size="sm" title="Delete Session"
                                         class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        @click="deleteClassSession(row.original)"
-                                    >
+                                        @click="deleteClassSession(row.original)">
                                         <Trash2 class="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -721,15 +739,19 @@ const openBulkEdit = () => {
                         </DataTable>
                         <!-- Add Class Session Button -->
                         <div class="flex items-center justify-center gap-2">
-                            <Button @click="openAddSessionModal" :disabled="!canAddSession" :variant="canAddSession ? 'default' : 'outline'">
+                            <Button @click="openAddSessionModal" :disabled="!canAddSession"
+                                :variant="canAddSession ? 'default' : 'outline'">
                                 <Calendar class="mr-2 h-4 w-4" />
                                 {{ getAddSessionButtonText }}
                             </Button>
                         </div>
 
                         <!-- Session limit warning -->
-                        <div v-if="!canAddSession && courseOffering.syllabus_template?.total_sessions" class="text-center">
-                            <p class="text-sm text-orange-600">Session limit reached. Maximum of {{ courseOffering.syllabus_template.total_sessions }} sessions allowed by syllabus template.</p>
+                        <div v-if="!canAddSession && courseOffering.syllabus_template?.total_sessions"
+                            class="text-center">
+                            <p class="text-sm text-orange-600">Session limit reached. Maximum of {{
+                                courseOffering.syllabus_template.total_sessions }} sessions allowed by syllabus
+                                template.</p>
                         </div>
                     </div>
                 </CardContent>
@@ -747,7 +769,8 @@ const openBulkEdit = () => {
                             <div class="flex items-center gap-2">
                                 <UserCheck class="h-4 w-4" />
                                 <CardTitle class="flex items-center gap-2"> Student Registration Status </CardTitle>
-                                <ChevronDown class="h-4 w-4 shrink-0 transition-transform duration-200 [&[data-state=open]]:rotate-180" />
+                                <ChevronDown
+                                    class="h-4 w-4 shrink-0 transition-transform duration-200 [&[data-state=open]]:rotate-180" />
                             </div>
                         </Button>
                     </CollapsibleTrigger>
@@ -765,10 +788,13 @@ const openBulkEdit = () => {
             <CollapsibleContent>
                 <CardContent>
                     <StudentSearchModal :course-offering-id="courseOffering.id" :on-success="handleStudentAddSuccess" />
-                    <div v-if="!courseOffering.course_registrations || courseOffering.course_registrations?.length === 0" class="py-8 text-center">
+                    <div v-if="!courseOffering.course_registrations || courseOffering.course_registrations?.length === 0"
+                        class="py-8 text-center">
                         <Users class="text-muted-foreground mx-auto h-12 w-12" />
                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No registrations</h3>
-                        <p class="text-muted-foreground mt-1 text-sm">No students have registered for this course offering yet.</p>
+                        <p class="text-muted-foreground mt-1 text-sm">No students have registered for this course
+                            offering
+                            yet.</p>
                     </div>
                     <div v-else>
                         <Table>
@@ -786,7 +812,8 @@ const openBulkEdit = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                <TableRow v-for="(registration, index) in courseOffering.course_registrations" :key="registration.id">
+                                <TableRow v-for="(registration, index) in courseOffering.course_registrations"
+                                    :key="registration.id">
                                     <!-- No column -->
                                     <TableCell>
                                         {{ index + 1 }}
@@ -801,21 +828,33 @@ const openBulkEdit = () => {
                                         {{ registration.student?.email }}
                                     </TableCell>
                                     <TableCell>
-                                        <Badge :variant="getRegistrationStatusVariant(registration.registration_status)">
+                                        <Badge
+                                            :variant="getRegistrationStatusVariant(registration.registration_status)">
                                             {{ registration.registration_status.toUpperCase() }}
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
                                         <template v-if="registration.student">
-                                            <div v-if="getAcademicRecordForStudent(registration.student.id)" class="space-y-1">
-                                                <div v-if="getAcademicRecordForStudent(registration.student.id)?.is_repeat_course" class="flex items-center gap-2">
-                                                    <Badge variant="secondary" class="bg-orange-100 text-orange-800"> Retake (Attempt #{{ getAcademicRecordForStudent(registration.student.id)?.attempt_number }}) </Badge>
+                                            <div v-if="getAcademicRecordForStudent(registration.student.id)"
+                                                class="space-y-1">
+                                                <div v-if="getAcademicRecordForStudent(registration.student.id)?.is_repeat_course"
+                                                    class="flex items-center gap-2">
+                                                    <Badge variant="secondary" class="bg-orange-100 text-orange-800">
+                                                        Retake (Attempt #{{
+                                                            getAcademicRecordForStudent(registration.student.id)?.attempt_number }})
+                                                    </Badge>
                                                 </div>
                                                 <div v-else class="text-muted-foreground text-sm">First Attempt</div>
-                                                <div v-if="getAcademicRecordForStudent(registration.student.id)?.is_repeat_course && getAcademicRecordForStudent(registration.student.id)?.original_record" class="text-muted-foreground text-xs">
-                                                    Previous: {{ getAcademicRecordForStudent(registration.student.id)?.original_record?.final_letter_grade || 'N/A' }}
-                                                    <template v-if="getAcademicRecordForStudent(registration.student.id)?.original_record?.final_percentage">
-                                                        ({{ Number(getAcademicRecordForStudent(registration.student.id)?.original_record?.final_percentage).toFixed(2) }}%)
+                                                <div v-if="getAcademicRecordForStudent(registration.student.id)?.is_repeat_course && getAcademicRecordForStudent(registration.student.id)?.original_record"
+                                                    class="text-muted-foreground text-xs">
+                                                    Previous: {{
+                                                        getAcademicRecordForStudent(registration.student.id)?.original_record?.final_letter_grade
+                                                        || 'N/A' }}
+                                                    <template
+                                                        v-if="getAcademicRecordForStudent(registration.student.id)?.original_record?.final_percentage">
+                                                        ({{
+                                                            Number(getAcademicRecordForStudent(registration.student.id)?.original_record?.final_percentage).toFixed(2)
+                                                        }}%)
                                                     </template>
                                                     <template v-else>(N/A)</template>
                                                 </div>
@@ -830,13 +869,9 @@ const openBulkEdit = () => {
                                         {{ registration.registration_method }}
                                     </TableCell>
                                     <TableCell>
-                                        <Button
-                                            v-if="can('delete_student_registration') && !isStartedCourse"
-                                            variant="ghost"
-                                            size="sm"
-                                            @click="deleteStudentRegistration(registration)"
-                                            class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        >
+                                        <Button v-if="can('delete_student_registration') && !isStartedCourse"
+                                            variant="ghost" size="sm" @click="deleteStudentRegistration(registration)"
+                                            class="text-destructive hover:text-destructive hover:bg-destructive/10">
                                             <Trash2 class="h-4 w-4" />
                                         </Button>
                                     </TableCell>
@@ -850,13 +885,18 @@ const openBulkEdit = () => {
     </Collapsible>
 
     <!-- Quick Edit Class Session Modal -->
-    <QuickEditClassSessionModal :open="quickEditOpen" :session="selectedSession" @update:open="quickEditOpen = $event" @session-updated="handleSessionUpdated" :campus_id="courseOffering.campus_id" />
+    <QuickEditClassSessionModal :open="quickEditOpen" :session="selectedSession" @update:open="quickEditOpen = $event"
+        @session-updated="handleSessionUpdated" :campus_id="courseOffering.campus_id" />
 
     <!-- Add Class Session Modal -->
-    <AddClassSessionModal :open="addSessionOpen" :course-offering-id="courseOffering.id" :campus_id="courseOffering.campus_id" @update:open="addSessionOpen = $event" @session-created="handleSessionCreated" />
+    <AddClassSessionModal :open="addSessionOpen" :course-offering-id="courseOffering.id"
+        :campus_id="courseOffering.campus_id" @update:open="addSessionOpen = $event"
+        @session-created="handleSessionCreated" />
 
     <!-- Bulk Edit Class Session Modal -->
-    <BulkEditClassSessionModal :open="bulkEditOpen" :selected-sessions="selectedSessions" :campus_id="courseOffering.campus_id" @update:open="bulkEditOpen = $event" @sessions-updated="handleBulkEditSuccess" />
+    <BulkEditClassSessionModal :open="bulkEditOpen" :selected-sessions="selectedSessions"
+        :campus_id="courseOffering.campus_id" @update:open="bulkEditOpen = $event"
+        @sessions-updated="handleBulkEditSuccess" />
 
     <!-- Registration Status Management Modal -->
     <!--    <RegistrationStatusModal-->

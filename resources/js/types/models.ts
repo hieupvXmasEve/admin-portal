@@ -479,6 +479,7 @@ export interface CourseRegistrationRecord {
     completion_status: string | null;
     pass_fail_status: 'pass' | 'fail' | null;
     credit_points: number;
+    credit_points_earned: number;
     is_retake: boolean;
     attempt_number: number;
     completion_date: string | null;
@@ -552,6 +553,9 @@ export interface RegistrationsFilters {
     status?: string;
     is_retake?: string;
     per_page?: number;
+    page?: number;
+    sort?: string;
+    direction?: 'asc' | 'desc';
 }
 
 // Scores interfaces
