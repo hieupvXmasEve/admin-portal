@@ -141,7 +141,7 @@ export const systemRoutes = {
         index: () => route(NOTIFICATION_ROUTE_NAMES.INDEX),
         send: () => route(NOTIFICATION_ROUTE_NAMES.SEND),
         store: () => route(NOTIFICATION_ROUTE_NAMES.STORE),
-        searchStudents: () => route(NOTIFICATION_ROUTE_NAMES.SEARCH_STUDENTS),
+        searchStudents: () => route(NOTIFICATION_ROUTE_NAMES.SEARCH_TARGETS),
     },
 } as const;
 
@@ -309,7 +309,8 @@ export const assessmentRoutes = {
 
 // Academic Summary Routes (Placeholder for future implementation)
 export const academicSummaryRoutes = {
-    gpaCalculations: () => '#', // Will be implemented later
+    gpaFinalization: () => route('academic.gpa.finalize.index'),
+    academicReport: () => route('academic.report.index'),
     degreeClassification: () => '#',
     transcriptHistory: () => '#',
     performanceReport: () => '#',

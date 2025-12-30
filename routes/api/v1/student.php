@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Student\AttendanceController;
 use App\Http\Controllers\Api\V1\Student\AuthController;
+use App\Http\Controllers\Api\V1\Student\AcademicRecordController;
 use App\Http\Controllers\Api\V1\Student\CalendarController;
 use App\Http\Controllers\Api\V1\Student\ClubController;
 use App\Http\Controllers\Api\V1\Student\ClubManagementController;
@@ -129,6 +130,9 @@ Route::middleware([
             Route::get('/assessment/{assessmentId}', [GradeController::class, 'assessmentDetail'])
                 ->name('assessment-detail');
         });
+
+        // Academic Records & GPA Summary
+        Route::get('/academic-records', [AcademicRecordController::class, 'index'])->name('academic-records');
 
         // Module progress endpoints (Finland campus modular system)
         Route::prefix('modules')->name('modules.')->group(function () {

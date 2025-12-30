@@ -462,7 +462,7 @@ export interface CourseRegistrationRecord {
     course_name: string;
     course_code: string;
     section_code?: string;
-    credit_points: number;
+    unit_credit_points: number;
     semester: string;
     semester_code: string;
     academic_year: string;
@@ -478,7 +478,7 @@ export interface CourseRegistrationRecord {
     grade_status: string | null;
     completion_status: string | null;
     pass_fail_status: 'pass' | 'fail' | null;
-    credit_hours: number;
+    credit_points: number;
     is_retake: boolean;
     attempt_number: number;
     completion_date: string | null;
@@ -698,8 +698,8 @@ export interface GpaRecord {
     academic_year: string;
     semester_gpa: number;
     cumulative_gpa: number;
-    credit_hours_attempted: number;
-    credit_hours_earned: number;
+    credit_points_attempted: number;
+    credit_points_earned: number;
     quality_points: number;
     academic_standing: string;
     dean_list_eligible: boolean;
@@ -714,7 +714,7 @@ export interface GpaData {
     summary: {
         current_semester_gpa: number;
         current_cumulative_gpa: number;
-        total_credit_hours_earned: number;
+        total_credit_points_earned: number;
         total_quality_points: number;
         current_academic_standing: string;
         dean_list_semesters: number;

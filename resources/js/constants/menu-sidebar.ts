@@ -38,7 +38,7 @@ import {
     Wallet,
 } from 'lucide-vue-next';
 
-import { attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, studentRoutes, systemRoutes } from '@/utils/routes';
+import { academicSummaryRoutes, attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, studentRoutes, systemRoutes } from '@/utils/routes';
 
 export const mainNavItems: NavItem[] = [
     {
@@ -328,6 +328,18 @@ export const mainNavItems: NavItem[] = [
                 href: '/failed-students',
                 icon: ClipboardList,
                 requiredPermissions: ['view_attendance'],
+            },
+            {
+                title: 'GPA Management',
+                href: academicSummaryRoutes.gpaFinalization(),
+                icon: Calculator,
+                requiredPermissions: ['view_grade'],
+            },
+            {
+                title: 'Academic Report',
+                href: academicSummaryRoutes.academicReport(),
+                icon: FileText,
+                requiredPermissions: ['view_grade'],
             },
             // {
             //     title: 'Student Statistics',

@@ -128,6 +128,7 @@ class CourseCompletionService
                     'grade_points' => 0.0, // F grade for attendance failure
                     'completion_status' => ($record->override_pass && $record->is_passed) ? 'completed' : 'failed',
                     'is_passed' => $record->override_pass ? $record->is_passed : false,
+                    'credit_points_earned' => ($record->override_pass && $record->is_passed) ? $record->credit_points : 0,
                     'credit_hours_earned' => ($record->override_pass && $record->is_passed) ? $record->credit_hours : 0,
                     'affects_graduation_requirement' => true,
                     'satisfies_prerequisite' => ($record->override_pass && $record->is_passed),
@@ -179,6 +180,7 @@ class CourseCompletionService
                 'grade_points' => $gradePoints,
                 'completion_status' => $finalPassed ? 'completed' : 'failed',
                 'is_passed' => $finalPassed,
+                'credit_points_earned' => $finalPassed ? $record->credit_points : 0,
                 'credit_hours_earned' => $finalPassed ? $record->credit_hours : 0,
                 'affects_graduation_requirement' => true,
                 'satisfies_prerequisite' => $finalPassed,

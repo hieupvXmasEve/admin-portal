@@ -39,6 +39,14 @@ class Unit extends AuditableModel
     }
 
     /**
+     * Get the academic records for this unit.
+     */
+    public function academicRecords(): HasMany
+    {
+        return $this->hasMany(AcademicRecord::class);
+    }
+
+    /**
      * Get the equivalent units for this unit.
      */
     public function equivalentUnits(): HasMany

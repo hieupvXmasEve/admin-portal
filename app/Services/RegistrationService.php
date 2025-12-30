@@ -43,7 +43,7 @@ class RegistrationService
                 'registration_status' => 'registered',
                 'registration_date' => now(),
                 'registration_method' => $method,
-                'credit_hours' => $courseOffering->credit_hours,
+                'credit_points' => $courseOffering->credit_points,
 
             ]);
 
@@ -259,13 +259,13 @@ class RegistrationService
         $currentCredits = CourseRegistration::where('student_id', $student->id)
             ->where('semester_id', $courseOffering->semester_id)
             ->whereIn('registration_status', ['registered', 'confirmed'])
-            ->sum('credit_hours');
+            ->sum('credit_points');
 
-        $newTotal = $currentCredits + $courseOffering->credit_hours;
+        $newTotal = $currentCredits + $courseOffering->credit_points;
         $maxCredits = 18; // Default maximum, could be configurable
 
         if ($newTotal > $maxCredits) {
-            throw new Exception("Credit limit exceeded. Current: {$currentCredits}, Adding: {$courseOffering->credit_hours}, Max: {$maxCredits}");
+            throw new Exception("Credit limit exceeded. Current: {$currentCredits}, Adding: {$courseOffering->credit_points}, Max: {$maxCredits}");
         }
     }
 
@@ -325,7 +325,7 @@ class RegistrationService
 
         foreach ($registrations as $registration) {
             $gradePoints = $registration->getGradePoints();
-            $credits = $registration->credit_hours;
+            $credits = $registration->credit_points;
 
             $totalPoints += $gradePoints * $credits;
             $totalCredits += $credits;
