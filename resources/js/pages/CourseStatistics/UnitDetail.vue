@@ -182,7 +182,7 @@ const columns: ColumnDef<any>[] = [
 ];
 
 const goToOfferingDetail = (id: number) => {
-    router.visit(`/course-statistics/${id}`);
+    router.visit(`/course-statistics/${id}/students`);
 };
 
 

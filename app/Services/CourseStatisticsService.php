@@ -157,7 +157,10 @@ class CourseStatisticsService
 
         $sessions = $courseOffering->classSessions;
         $totalSessions = $sessions->count();
-        $allowedAbsences = (int) floor($totalSessions * 0.2); // 20% allowed absences
+        
+        $attendanceThreshold = (float) ($courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00);
+        $allowedAbsenceRatio = (100 - $attendanceThreshold) / 100;
+        $allowedAbsences = (int) floor($totalSessions * $allowedAbsenceRatio);
 
         $attendanceGrid = [];
         foreach ($students as $student) {
@@ -200,8 +203,8 @@ class CourseStatisticsService
                 ? round((($totalPresent + $totalLate) / $totalSessions) * 100, 2)
                 : 0;
 
-            // Determine if meets requirement based on absences vs allowed
-            $meetsRequirement = $totalAbsences <= $allowedAbsences;
+            // Determine if meets requirement based on percentage vs threshold
+            $meetsRequirement = $attendancePercentage >= $attendanceThreshold;
 
             $studentData['total_present'] = $totalPresent;
             $studentData['total_absences'] = $totalAbsences;

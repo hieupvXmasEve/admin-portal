@@ -151,10 +151,13 @@ class SyncAttendanceToAcademicRecords extends Command
                 return ['synced' => 0, 'errors' => 0];
             }
 
-            $sessionIds = $sessions->pluck('id')->toArray();
+            // Load syllabus template for thresholds
+            $courseOffering->load('syllabusTemplate');
+            $attendanceThreshold = (float) ($courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00);
+            $allowedAbsenceRatio = (100 - $attendanceThreshold) / 100;
+            $allowedAbsences = (int) floor($totalSessions * $allowedAbsenceRatio);
 
-            // Calculate allowed absences (20% of total sessions)
-            $allowedAbsences = (int) ceil($totalSessions * 0.2);
+            $sessionIds = $sessions->pluck('id')->toArray();
 
             // Get all academic records for this course offering
             $academicRecords = AcademicRecord::where('course_offering_id', $courseOffering->id)->get();
@@ -177,8 +180,8 @@ class SyncAttendanceToAcademicRecords extends Command
                         ? round((($totalPresent + $totalLate) / $totalSessions) * 100, 2)
                         : 0;
 
-                    // Determine if meets requirement (absences must not exceed allowed)
-                    $meetsRequirement = $totalAbsences <= $allowedAbsences;
+                    // Determine if meets requirement (compare percentage with threshold)
+                    $meetsRequirement = $attendancePercentage >= $attendanceThreshold;
 
                     // Update academic record
                     $record->update([

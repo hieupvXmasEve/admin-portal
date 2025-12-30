@@ -158,6 +158,7 @@ class LecturerCourseService
             ->whereHas('classSessions', function ($sessionQuery) use ($lecturer) {
                 $sessionQuery->where('lecture_id', $lecturer->id);
             })
+            ->with("syllabusTemplate")
             ->where('id', $courseOfferingId)
             ->where('is_active', true)
             ->first();
@@ -188,8 +189,9 @@ class LecturerCourseService
         $this->applyStudentFilters($studentsQuery, $filters);
 
         $students = $studentsQuery->get();
+        $attendanceThreshold = (float) ($courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00);
 
-        return $students->map(function ($registration) use ($courseOfferingId) {
+        return $students->map(function ($registration) use ($courseOfferingId, $attendanceThreshold) {
             $student = $registration->student;
             $attendanceStats = $this->calculateStudentAttendanceStats($student, $courseOfferingId);
             $academicRecord = $student->academicRecords->first();
@@ -219,11 +221,11 @@ class LecturerCourseService
                 'total_sessions' => $attendanceStats['total'],
                 'last_attendance' => $attendanceStats['last_attendance'],
                 'meets_attendance_requirement' => $academicRecord?->meets_attendance_requirement ??
-                    ($attendanceStats['percentage'] >= 75),
+                    ($attendanceStats['percentage'] >= $attendanceThreshold),
                 'academic_standing' => $academicStanding?->standing ?? 'good',
                 'academic_standing_label' => $academicStanding?->standing_label ?? 'Good Standing',
 
-                'status' => $this->getStudentStatus($attendanceStats),
+                'status' => $this->getStudentStatus($attendanceStats, $attendanceThreshold),
             ];
         })->toArray();
     }
@@ -609,17 +611,17 @@ class LecturerCourseService
     /**
      * Get student status based on attendance
      */
-    protected function getStudentStatus(array $attendanceStats): string
+    protected function getStudentStatus(array $attendanceStats, float $threshold = 80.00): string
     {
         $percentage = $attendanceStats['percentage'];
 
         if ($percentage >= 90) {
             return 'excellent';
         }
-        if ($percentage >= 75) {
+        if ($percentage >= $threshold) {
             return 'good';
         }
-        if ($percentage >= 60) {
+        if ($percentage >= ($threshold - 15)) {
             return 'warning';
         }
 
