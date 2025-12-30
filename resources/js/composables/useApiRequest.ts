@@ -14,7 +14,7 @@ const useApiRequest = createFetch({
             options.headers = {
                 ...options.headers,
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                Accept: 'application/json',
                 'X-CSRF-TOKEN': token || '',
                 'X-Requested-With': 'XMLHttpRequest', // Laravel SPA authentication requirement
             };
@@ -97,13 +97,14 @@ export function useApi() {
     /**
      * DELETE request
      * @param url - API endpoint URL
+     * @param data - Optional request payload
      * @returns Promise with standardized API response
      */
-    const del = async <T = any>(url: string) => {
+    const del = async <T = any>(url: string, data?: Record<string, any>) => {
         return useApiRequest(url, {
             method: 'DELETE',
         })
-            .delete()
+            .delete(data)
             .json<ApiResponse<T>>();
     };
 
@@ -119,7 +120,7 @@ export function useApi() {
         if (params) {
             // Handle nested params object (e.g. { params: { key: 'value' } })
             const actualParams = params.params || params;
-            
+
             // Convert parameters to query string, handling different data types
             const searchParams = new URLSearchParams();
             for (const [key, value] of Object.entries(actualParams)) {
@@ -129,7 +130,7 @@ export function useApi() {
             }
             queryString = searchParams.toString() ? '?' + searchParams.toString() : '';
         }
-        
+
         return useApiRequest(url + queryString, {
             method: 'GET',
             signal: options?.signal,

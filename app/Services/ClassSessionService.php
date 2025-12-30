@@ -23,16 +23,12 @@ class ClassSessionService
         CourseOffering $courseOffering,
         int $roomId,
         ?Carbon $startDateOverride = null,
-        ?array $weeklySchedule = null
+        ?array $weeklySchedule = null,
+        array $excludedDates = []
     ): Collection {
         Log::info("Generating class sessions for course offering {$courseOffering->id}");
 
         try {
-            // Check if class sessions already exist for this course offering
-            $existingSessions = ClassSession::where('course_offering_id', $courseOffering->id)->count();
-            if ($existingSessions > 0) {
-                throw new \Exception('Class sessions already exist for this course offering');
-            }
             // Load required relationships with proper error checking
             $courseOffering->load([
                 'syllabusTemplate.assessmentComponents.details',
@@ -48,10 +44,16 @@ class ClassSessionService
             Log::info("Found syllabus template: {$syllabusTemplate->id} for course offering {$courseOffering->id}");
 
             // Calculate session details
-            $totalSessions = $this->calculateTotalSessions($syllabusTemplate);
+            $totalRequired = $this->calculateTotalSessions($syllabusTemplate);
             $sessionDuration = $this->calculateSessionDuration($syllabusTemplate);
 
-            Log::info("Total sessions to generate: {$totalSessions}, Duration: {$sessionDuration} hours");
+            // Check if class sessions already exist for this course offering and if they reached totalRequired
+            $currentCount = ClassSession::where('course_offering_id', $courseOffering->id)->count();
+            if ($currentCount >= $totalRequired) {
+                throw new \Exception('Class sessions already reached the maximum sessions defined in the syllabus template (' . $totalRequired . ').');
+            }
+
+            Log::info("Current sessions: {$currentCount}, Target: {$totalRequired}, Duration: {$sessionDuration} hours");
 
             // Get semester dates and schedule
             $startDate = $startDateOverride ?: $this->getStartDate($courseOffering);
@@ -67,12 +69,14 @@ class ClassSessionService
                 Log::info("Using provided weekly schedule for session generation");
                 $regularSessions = $this->generateSessionsWithWeeklySchedule(
                     $courseOffering,
-                    $totalSessions,
+                    $totalRequired,
+                    $currentCount,
                     $startDate,
                     $weeklySchedule,
                     $sessionDuration,
                     $lectureId,
-                    $roomId
+                    $roomId,
+                    $excludedDates
                 );
             } else {
                 // Fallback to course offering schedule
@@ -84,19 +88,21 @@ class ClassSessionService
 
                 $regularSessions = $this->generateRegularSessions(
                     $courseOffering,
-                    $totalSessions,
+                    $totalRequired,
+                    $currentCount,
                     $startDate,
                     $scheduleDays,
                     $startTime,
                     $endTime,
                     $sessionDuration,
                     $lectureId,
-                    $roomId
+                    $roomId,
+                    $excludedDates
                 );
             }
 
             $sessions = $sessions->merge($regularSessions);
-            Log::info("Generated {$regularSessions} regular sessions");
+            Log::info("Generated " . $regularSessions->count() . " regular sessions");
 
             // // Generate assessment sessions
             // $assessmentSessions = $this->generateAssessmentSessions(
@@ -170,30 +176,53 @@ class ClassSessionService
      */
     private function generateRegularSessions(
         CourseOffering $courseOffering,
-        int $totalSessions,
+        int $targetTotal,
+        int $currentCount,
         Carbon $startDate,
         array $scheduleDays,
         string $startTime,
         string $endTime,
         int $sessionDuration,
         ?int $lectureId,
-        int $roomId
+        int $roomId,
+        array $excludedDates = []
     ): Collection {
         $sessions = collect();
         $currentDate = $startDate->copy();
-        $sessionCount = 0;
+        $currentTotal = $currentCount;
 
         // Convert schedule days to numbers for easier processing
         $dayNumbers = $this->convertDaysToNumbers($scheduleDays);
 
-        while ($sessionCount < $totalSessions) {
+        while ($currentTotal < $targetTotal) {
+            // Check if date is excluded
+            if ($this->isDateExcluded($currentDate, $excludedDates)) {
+                $currentDate->addDay();
+                continue;
+            }
+
             if (in_array($currentDate->dayOfWeek, $dayNumbers)) {
+                $fullStartTime = $currentDate->copy()->setTimeFromTimeString($startTime);
+
+                // Check if session already exists for this offering on this date and time
+                $exists = ClassSession::where('course_offering_id', $courseOffering->id)
+                    ->where('session_date', $currentDate->toDateString())
+                    ->where('start_time', $fullStartTime)
+                    ->exists();
+
+                if ($exists) {
+                    // Update current total if session found (though it should already be counted in currentCount)
+                    // We increment currentDate and continue without creating a new one
+                    $currentDate->addDay();
+                    continue;
+                }
+
                 $sessionData = [
                     'course_offering_id' => $courseOffering->id,
-                    'session_title' => 'Session ' . ($sessionCount + 1),
+                    'session_title' => 'Session ' . ($currentTotal + 1),
                     'session_description' => 'Regular class session',
                     'session_date' => $currentDate->toDateString(),
-                    'start_time' => $currentDate->copy()->setTimeFromTimeString($startTime),
+                    'start_time' => $fullStartTime,
                     'end_time' => $currentDate->copy()->setTimeFromTimeString($endTime),
                     'duration_minutes' => $sessionDuration * 60,
                     'session_type' => 'lecture',
@@ -203,16 +232,21 @@ class ClassSessionService
                     'attendance_tracking_enabled' => true,
                     'is_assessment' => false,
                     'is_recurring' => false,
-                    'sequence_number' => $sessionCount + 1,
+                    'sequence_number' => $currentTotal + 1,
                     'lecture_id' => $lectureId,
                     'room_id' => $roomId,
                 ];
 
                 $session = ClassSession::create($sessionData);
                 $sessions->push($session);
-                $sessionCount++;
+                $currentTotal++;
             }
             $currentDate->addDay();
+
+            // Safety break to prevent infinite loops (semester is usually ~20 weeks)
+            if ($currentDate->diffInDays($startDate) > 365) {
+                break;
+            }
         }
 
         return $sessions;
@@ -285,56 +319,87 @@ class ClassSessionService
      */
     private function generateSessionsWithWeeklySchedule(
         CourseOffering $courseOffering,
-        int $totalSessions,
+        int $targetTotal,
+        int $currentCount,
         Carbon $startDate,
         array $weeklySchedule,
         int $sessionDuration,
         ?int $lectureId,
-        int $roomId
+        int $roomId,
+        array $excludedDates = []
     ): Collection {
         $sessions = collect();
         $currentDate = $startDate->copy();
-        $sessionCount = 0;
+        $currentTotal = $currentCount;
 
         // Get enabled days
         $enabledDays = $this->getEnabledDaysFromSchedule($weeklySchedule);
         $dayNumbers = $this->convertDaysToNumbers($enabledDays);
 
-        while ($sessionCount < $totalSessions) {
+        while ($currentTotal < $targetTotal) {
+            // Check if date is excluded
+            if ($this->isDateExcluded($currentDate, $excludedDates)) {
+                $currentDate->addDay();
+                continue;
+            }
+
             if (in_array($currentDate->dayOfWeek, $dayNumbers)) {
-                // Get the day name
-                $dayName = $currentDate->format('l'); // Full day name like 'Monday'
+                // Get the day key
+                $dayKey = strtolower($currentDate->format('l'));
 
-                // Get times for this specific day
-                $dayTimes = $this->getScheduleTimesForDay($weeklySchedule, $dayName);
+                // Get settings for this specific day
+                $daySettings = $weeklySchedule[$dayKey] ?? null;
 
-                if (!empty($dayTimes)) {
-                    $sessionData = [
-                        'course_offering_id' => $courseOffering->id,
-                        'session_title' => 'Session ' . ($sessionCount + 1),
-                        'session_description' => 'Regular class session',
-                        'session_date' => $currentDate->toDateString(),
-                        'start_time' => $currentDate->copy()->setTimeFromTimeString($dayTimes['start_time']),
-                        'end_time' => $currentDate->copy()->setTimeFromTimeString($dayTimes['end_time']),
-                        'duration_minutes' => $this->calculateDurationMinutes($dayTimes['start_time'], $dayTimes['end_time']),
-                        'session_type' => 'lecture',
-                        'delivery_mode' => $courseOffering->delivery_mode,
-                        'status' => 'scheduled',
-                        'attendance_required' => true,
-                        'attendance_tracking_enabled' => true,
-                        'is_assessment' => false,
-                        'is_recurring' => false,
-                        'sequence_number' => $sessionCount + 1,
-                        'lecture_id' => $lectureId,
-                        'room_id' => $roomId,
-                    ];
+                if ($daySettings && isset($daySettings['enabled']) && $daySettings['enabled'] && !empty($daySettings['timeRanges'])) {
+                    foreach ($daySettings['timeRanges'] as $range) {
+                        if ($currentTotal >= $targetTotal) {
+                            break 2;
+                        }
 
-                    $session = ClassSession::create($sessionData);
-                    $sessions->push($session);
-                    $sessionCount++;
+                        $fullStartTime = $currentDate->copy()->setTimeFromTimeString($range['startTime']);
+
+                        // Check if session already exists for this offering on this date and time
+                        $exists = ClassSession::where('course_offering_id', $courseOffering->id)
+                            ->where('session_date', $currentDate->toDateString())
+                            ->where('start_time', $fullStartTime)
+                            ->exists();
+
+                        if ($exists) {
+                            // Already exists, skip this slot but it's part of currentTotal
+                            continue;
+                        }
+
+                        $sessionData = [
+                            'course_offering_id' => $courseOffering->id,
+                            'session_title' => 'Session ' . ($currentTotal + 1),
+                            'session_description' => 'Regular class session',
+                            'session_date' => $currentDate->toDateString(),
+                            'start_time' => $fullStartTime,
+                            'end_time' => $currentDate->copy()->setTimeFromTimeString($range['endTime']),
+                            'duration_minutes' => $this->calculateDurationMinutes($range['startTime'], $range['endTime']),
+                            'session_type' => 'lecture',
+                            'delivery_mode' => $courseOffering->delivery_mode,
+                            'status' => 'scheduled',
+                            'attendance_required' => true,
+                            'attendance_tracking_enabled' => true,
+                            'is_recurring' => false,
+                            'sequence_number' => $currentTotal + 1,
+                            'lecture_id' => $lectureId,
+                            'room_id' => $roomId,
+                        ];
+
+                        $session = ClassSession::create($sessionData);
+                        $sessions->push($session);
+                        $currentTotal++;
+                    }
                 }
             }
             $currentDate->addDay();
+
+            // Safety break to prevent infinite loops (semester is usually ~20 weeks)
+            if ($currentDate->diffInDays($startDate) > 365) {
+                break;
+            }
         }
 
         return $sessions;
@@ -418,6 +483,21 @@ class ClassSessionService
             $classSession->attendances()->delete();
 
             return $classSession->delete();
+        });
+    }
+
+    /**
+     * Delete multiple class sessions
+     */
+    public function deleteBulk(array $sessionIds): int
+    {
+        Log::info('Deleting bulk class sessions: '.implode(',', $sessionIds));
+
+        return DB::transaction(function () use ($sessionIds) {
+            // Delete associated attendance records first
+            DB::table('attendances')->whereIn('class_session_id', $sessionIds)->delete();
+
+            return ClassSession::whereIn('id', $sessionIds)->delete();
         });
     }
 
@@ -719,5 +799,22 @@ class ClassSessionService
                 'new_records_created' => count($attendanceRecords),
             ];
         });
+    }
+
+    /**
+     * Check if a date falls within any excluded ranges
+     */
+    private function isDateExcluded(Carbon $date, array $excludedDates): bool
+    {
+        foreach ($excludedDates as $range) {
+            $start = Carbon::parse($range['start'])->startOfDay();
+            $end = Carbon::parse($range['end'])->endOfDay();
+
+            if ($date->between($start, $end)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

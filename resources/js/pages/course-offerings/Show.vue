@@ -41,6 +41,7 @@ const { showConfirmDialog } = useGlobalConfirmDialog();
 const { can } = usePermission();
 // const showStatusModal = ref(false);
 const isGenerating = ref(false);
+const classSessionsTable = ref();
 const isAllClassSessionsCompleted = computed(() => {
     return props.courseOffering.class_sessions?.every((session) => session.status === 'completed') ?? true;
 });
@@ -95,7 +96,7 @@ const getDeliveryModeLabel = (mode: string) => {
 const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
     //format short day - mm/dd/yyyy
-    return format(dateString, 'EEEE, MM/dd/yyyy');
+    return format(dateString, 'EEEE, dd/MM/yyyy');
 };
 const formatAttendancePercentage = (percentage: number | string | null | undefined): string => {
     if (percentage === null || percentage === undefined || percentage === '') return '0.00%';
@@ -115,13 +116,14 @@ const enrollmentPercentage = props.courseOffering.max_capacity > 0 ? Math.round(
 // };
 
 // Class sessions management functions
-const generateClassSessions = async ({ roomId, startDate, weeklySchedule }: { roomId: number; startDate: string; weeklySchedule: any }) => {
+const generateClassSessions = async ({ roomId, startDate, weeklySchedule, excludedDates }: { roomId: number; startDate: string; weeklySchedule: any; excludedDates: { start: string; end: string }[] }) => {
     try {
         isGenerating.value = true;
         const result = await api.post(`/api/course-offerings/${props.courseOffering.id}/class-sessions/generate`, {
             room_id: roomId,
             start_date: startDate,
             weekly_schedule: weeklySchedule,
+            excluded_dates: excludedDates,
         });
         if (result.data?.value?.success) {
             toast.success(`${result.data.value.data.sessions_count} class sessions generated successfully`);
@@ -244,6 +246,7 @@ const deleteClassSession = (session: ClassSession) => {
                     const result = await api.delete(`/api/class-sessions/${session.id}`);
 
                     if (result.data?.value?.success) {
+                        classSessionsTable.value?.clearSelection();
                         router.reload({
                             only: ['courseOffering'],
                         });
@@ -392,6 +395,47 @@ const openBulkEdit = () => {
         return;
     }
     bulkEditOpen.value = true;
+};
+
+// Bulk delete class sessions
+const bulkDeleteSessions = () => {
+    if (selectedSessions.value.length === 0) {
+        toast.error('Please select sessions to delete');
+        return;
+    }
+
+    const count = selectedSessions.value.length;
+    showConfirmDialog(
+        {
+            title: 'Bulk Delete Class Sessions',
+            message: `Are you sure you want to delete ${count} selected class sessions? This action cannot be undone.`,
+            confirmText: 'Delete Sessions',
+        },
+        {
+            onConfirm: async () => {
+                try {
+                    const result = await api.delete('/api/class-sessions/bulk', {
+                        ids: selectedSessions.value.map((s) => s.id),
+                    });
+
+                    if (result.data?.value?.success) {
+                        selectedSessions.value = [];
+                        classSessionsTable.value?.clearSelection();
+                        router.reload({
+                            only: ['courseOffering'],
+                        });
+                        toast.success(result.data.value.message || `${count} class sessions deleted successfully`);
+                    } else {
+                        toast.error(result.data?.value?.message || 'Failed to delete class sessions');
+                    }
+                } catch (error) {
+                    console.error('Error deleting class sessions:', error);
+                    toast.error('Failed to delete class sessions');
+                    throw error;
+                }
+            },
+        },
+    );
 };
 </script>
 
@@ -676,10 +720,10 @@ const openBulkEdit = () => {
                         <p class="text-muted-foreground mt-1 text-sm">Click "Auto-Generate Sessions" to create class
                             sessions based on the syllabus.</p>
                         <div class="mt-1 flex items-center justify-center gap-2">
-                            <RoomSelectionModal :disable-generate="!courseOffering.syllabus_template"
+                            <RoomSelectionModal :disable-generate="!courseOffering.syllabus_template || !canAddSession"
                                 :available-rooms="availableRooms" :is-generating="isGenerating"
-                                :semester-start="courseOffering.semester.start_date"
-                                :semester-end="courseOffering.semester.end_date"
+                                :semester-start="courseOffering.semester?.start_date"
+                                :semester-end="courseOffering.semester?.end_date"
                                 :syllabus-template="courseOffering.syllabus_template"
                                 @generate="generateClassSessions" />
                         </div>
@@ -703,12 +747,19 @@ const openBulkEdit = () => {
                                     <Edit2 class="mr-2 h-4 w-4" />
                                     Bulk Edit ({{ selectedSessions.length }})
                                 </Button>
+                                <!-- Bulk Delete Button -->
+                                <Button v-if="selectedSessions.length > 0" size="sm" variant="destructive"
+                                    @click="bulkDeleteSessions">
+                                    <Trash2 class="mr-2 h-4 w-4" />
+                                    Delete ({{ selectedSessions.length }})
+                                </Button>
                             </div>
                         </div>
 
-                        <DataTable :data="courseOffering.class_sessions || []" :columns="classSessionColumns"
-                            :enable-row-selection="!isAllClassSessionsCompleted" :enable-server-sorting="false"
-                            empty-message="No class sessions found." @selection-change="handleSelectionChange">
+                        <DataTable ref="classSessionsTable" :data="courseOffering.class_sessions || []"
+                            :columns="classSessionColumns" :enable-row-selection="!isAllClassSessionsCompleted"
+                            :enable-server-sorting="false" empty-message="No class sessions found."
+                            @selection-change="handleSelectionChange">
                             <template #cell-actions="{ row }">
                                 <div class="flex items-center gap-2">
                                     <Button
@@ -739,6 +790,13 @@ const openBulkEdit = () => {
                         </DataTable>
                         <!-- Add Class Session Button -->
                         <div class="flex items-center justify-center gap-2">
+                            <RoomSelectionModal :disable-generate="!courseOffering.syllabus_template || !canAddSession"
+                                :available-rooms="availableRooms" :is-generating="isGenerating"
+                                :semester-start="courseOffering.semester?.start_date"
+                                :semester-end="courseOffering.semester?.end_date"
+                                :syllabus-template="courseOffering.syllabus_template"
+                                @generate="generateClassSessions" />
+
                             <Button @click="openAddSessionModal" :disabled="!canAddSession"
                                 :variant="canAddSession ? 'default' : 'outline'">
                                 <Calendar class="mr-2 h-4 w-4" />
@@ -841,7 +899,8 @@ const openBulkEdit = () => {
                                                     class="flex items-center gap-2">
                                                     <Badge variant="secondary" class="bg-orange-100 text-orange-800">
                                                         Retake (Attempt #{{
-                                                            getAcademicRecordForStudent(registration.student.id)?.attempt_number }})
+                                                            getAcademicRecordForStudent(registration.student.id)?.attempt_number
+                                                        }})
                                                     </Badge>
                                                 </div>
                                                 <div v-else class="text-muted-foreground text-sm">First Attempt</div>
