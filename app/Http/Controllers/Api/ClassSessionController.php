@@ -11,6 +11,8 @@ use App\Models\CourseOffering;
 use App\Services\ClassSessionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use App\Http\Requests\ClassSession\BulkDeleteClassSessionsRequest;
+use App\Actions\ClassSession\BulkDeleteClassSessionsAction;
 use Carbon\Carbon;
 
 class ClassSessionController extends Controller
@@ -37,13 +39,15 @@ class ClassSessionController extends Controller
             $roomId = $validated['room_id'];
             $startDate = isset($validated['start_date']) ? Carbon::parse($validated['start_date']) : null;
             $weeklySchedule = $validated['weekly_schedule'];
+            $excludedDates = $validated['excluded_dates'] ?? [];
 
             // Generate new sessions
             $sessions = $this->classSessionService->generateClassSessions(
                 $courseOffering, 
                 $roomId, 
                 $startDate,
-                $weeklySchedule
+                $weeklySchedule,
+                $excludedDates
             );
 
             return response()->json([
@@ -172,6 +176,26 @@ class ClassSessionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete class session: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete multiple class sessions
+     */
+    public function bulkDestroy(BulkDeleteClassSessionsRequest $request, BulkDeleteClassSessionsAction $action): JsonResponse
+    {
+        try {
+            $deletedCount = $action->execute($request->validated()['ids']);
+
+            return response()->json([
+                'success' => true,
+                'message' => $deletedCount.' class sessions deleted successfully',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete class sessions: '.$e->getMessage(),
             ], 500);
         }
     }

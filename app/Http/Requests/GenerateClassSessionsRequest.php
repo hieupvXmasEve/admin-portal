@@ -53,6 +53,19 @@ class GenerateClassSessionsRequest extends FormRequest
             'weekly_schedule.friday' => $this->getDayValidationRules(),
             'weekly_schedule.saturday' => $this->getDayValidationRules(),
             'weekly_schedule.sunday' => $this->getDayValidationRules(),
+            'excluded_dates' => [
+                'nullable',
+                'array',
+            ],
+            'excluded_dates.*.start' => [
+                'required_with:excluded_dates',
+                'date',
+            ],
+            'excluded_dates.*.end' => [
+                'required_with:excluded_dates',
+                'date',
+                'after_or_equal:excluded_dates.*.start',
+            ],
         ];
 
         // Add custom validation to ensure at least one day is enabled
@@ -92,22 +105,33 @@ class GenerateClassSessionsRequest extends FormRequest
                 if (!isset($value['enabled'])) {
                     $fail("The {$attribute}.enabled field is required.");
                 }
-                if (!is_bool($value['enabled'])) {
-                    $fail("The {$attribute}.enabled field must be a boolean.");
-                }
-                if ($value['enabled']) {
-                    if (!isset($value['startTime']) || !isset($value['endTime'])) {
-                        $fail("The {$attribute} must have startTime and endTime when enabled.");
+                if (isset($value['enabled']) && $value['enabled']) {
+                    if (!isset($value['timeRanges']) || !is_array($value['timeRanges'])) {
+                        $fail("The {$attribute}.timeRanges field is required and must be an array when enabled.");
+                        return;
                     }
-                    if (isset($value['startTime'], $value['endTime'])) {
-                        if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $value['startTime'])) {
-                            $fail("The {$attribute}.startTime must be in HH:MM format.");
+                    if (empty($value['timeRanges'])) {
+                        $fail("At least one time range is required for {$attribute} when enabled.");
+                        return;
+                    }
+
+                    foreach ($value['timeRanges'] as $index => $range) {
+                        $start = $range['startTime'] ?? null;
+                        $end = $range['endTime'] ?? null;
+
+                        if (!$start || !$end) {
+                            $fail("Time range #".($index+1)." for {$attribute} must have both startTime and endTime.");
+                            continue;
                         }
-                        if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $value['endTime'])) {
-                            $fail("The {$attribute}.endTime must be in HH:MM format.");
+
+                        if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $start)) {
+                            $fail("Time range #".($index+1)." for {$attribute} has invalid startTime format.");
                         }
-                        if (strtotime($value['startTime']) >= strtotime($value['endTime'])) {
-                            $fail("The {$attribute}.endTime must be after startTime.");
+                        if (!preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $end)) {
+                            $fail("Time range #".($index+1)." for {$attribute} has invalid endTime format.");
+                        }
+                        if ($start && $end && strtotime($start) >= strtotime($end)) {
+                            $fail("Time range #".($index+1)." for {$attribute} endTime must be after startTime.");
                         }
                     }
                 }

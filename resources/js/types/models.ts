@@ -930,6 +930,7 @@ export interface CourseOffering {
     academicRecords?: AcademicRecord[];
     class_sessions?: ClassSession[];
     syllabus_template?: SyllabusTemplate;
+    curriculum_unit?: CurriculumUnit;
     created_at: string;
     updated_at: string;
     // Computed properties from model accessors

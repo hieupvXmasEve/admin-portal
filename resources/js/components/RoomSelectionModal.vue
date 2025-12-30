@@ -10,9 +10,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import type { Room, SyllabusTemplate } from '@/types/models';
+import DateRangePicker from '@/components/ui/date-range-picker/DateRangePicker.vue';
 import { toTypedSchema } from '@vee-validate/zod';
 import { useVirtualList } from '@vueuse/core';
-import { CheckCircle, Clock, MapPin, Users } from 'lucide-vue-next';
+import { CheckCircle, Clock, MapPin, Plus, Trash2, Users, X } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
 import { computed, ref, shallowRef, watch } from 'vue';
 import * as z from 'zod';
@@ -30,13 +31,12 @@ interface Props {
 interface WeeklySchedule {
     [key: string]: {
         enabled: boolean;
-        startTime: string;
-        endTime: string;
+        timeRanges: { startTime: string; endTime: string }[];
     };
 }
 
 interface Emits {
-    (e: 'generate', payload: { roomId: number; startDate: string; weeklySchedule: WeeklySchedule }): void;
+    (e: 'generate', payload: { roomId: number; startDate: string; weeklySchedule: WeeklySchedule; excludedDates: { start: string; end: string }[] }): void;
 }
 
 const props = defineProps<Props>();
@@ -63,8 +63,18 @@ const formSchema = toTypedSchema(
         selectedDays: z.array(z.string()).min(1, 'Please select at least one day'),
         schedule: z.record(
             z.object({
-                startTime: z.string(),
-                endTime: z.string(),
+                timeRanges: z.array(
+                    z.object({
+                        startTime: z.string(),
+                        endTime: z.string(),
+                    }),
+                ),
+            }),
+        ),
+        excludedDateRanges: z.array(
+            z.object({
+                start: z.string().nullable(),
+                end: z.string().nullable(),
             }),
         ),
     }),
@@ -77,15 +87,15 @@ const { handleSubmit, setFieldValue, values } = useForm({
         roomId: undefined,
         startDate: '',
         selectedDays: [] as string[],
+        excludedDateRanges: [] as { start: string | null; end: string | null }[],
         schedule: daysOfWeek.reduce(
             (acc, day) => {
                 acc[day.key] = {
-                    startTime: '09:00',
-                    endTime: '10:00',
+                    timeRanges: [{ startTime: '09:00', endTime: '10:00' }],
                 };
                 return acc;
             },
-            {} as Record<string, { startTime: string; endTime: string }>,
+            {} as Record<string, { timeRanges: { startTime: string; endTime: string }[] }>,
         ),
     },
 });
@@ -142,11 +152,11 @@ watch(open, (newValue) => {
         if (!values.startDate && props.semesterStart) {
             setFieldValue('startDate', props.semesterStart.split('T')[0] || props.semesterStart);
         }
-        // Reset schedule times
+        // Reset schedule
         daysOfWeek.forEach((day) => {
-            setFieldValue(`schedule.${day.key}.startTime`, '09:00');
-            setFieldValue(`schedule.${day.key}.endTime`, '10:00');
+            setFieldValue(`schedule.${day.key}.timeRanges`, [{ startTime: '09:00', endTime: '10:00' }]);
         });
+        setFieldValue('excludedDateRanges', []);
     }
 });
 
@@ -154,16 +164,19 @@ const onSubmit = handleSubmit((formValues) => {
     // Build weekly schedule from form values
     const weeklySchedule: WeeklySchedule = {};
     daysOfWeek.forEach((day) => {
+        const isEnabled = formValues.selectedDays.includes(day.key);
         weeklySchedule[day.key] = {
-            enabled: formValues.selectedDays.includes(day.key),
-            startTime: formValues.schedule[day.key].startTime,
-            endTime: formValues.schedule[day.key].endTime,
+            enabled: isEnabled,
+            timeRanges: isEnabled ? formValues.schedule[day.key].timeRanges : [],
         };
     });
     emit('generate', {
         roomId: formValues.roomId!,
         startDate: formValues.startDate,
         weeklySchedule,
+        excludedDates: formValues.excludedDateRanges
+            .filter((r) => r.start && r.end)
+            .map((r) => ({ start: r.start!, end: r.end! })),
     });
     open.value = false;
 });
@@ -188,10 +201,45 @@ const getRoomDisplayName = (room: Room) => {
     return room.building ? `${room.building} - ${room.name}` : room.name;
 };
 
-const isEndOptionDisabled = (dayKey: string, optionValue: string): boolean => {
-    const startTime: string | undefined = values.schedule?.[dayKey]?.startTime;
+const isEndOptionDisabled = (dayKey: string, rangeIndex: number, optionValue: string): boolean => {
+    const startTime: string | undefined = values.schedule?.[dayKey]?.timeRanges?.[rangeIndex]?.startTime;
     if (!startTime) return false;
     return optionValue <= startTime;
+};
+
+const addTimeRange = (dayKey: string) => {
+    const current = [...(values.schedule?.[dayKey]?.timeRanges || [])];
+    const lastRange = current[current.length - 1];
+    let newStart = '09:00';
+    let newEnd = '10:00';
+
+    if (lastRange) {
+        // Try to suggest next range
+        const [h, m] = lastRange.endTime.split(':').map(Number);
+        const nextH = (h + 1) % 24;
+        newStart = `${String(nextH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        newEnd = `${String((nextH + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    setFieldValue(`schedule.${dayKey}.timeRanges`, [...current, { startTime: newStart, endTime: newEnd }]);
+};
+
+const removeTimeRange = (dayKey: string, index: number) => {
+    const current = [...(values.schedule?.[dayKey]?.timeRanges || [])];
+    if (current.length <= 1) return; // Must have at least one
+    current.splice(index, 1);
+    setFieldValue(`schedule.${dayKey}.timeRanges`, current);
+};
+
+const addExcludedRange = () => {
+    const current = values.excludedDateRanges || [];
+    setFieldValue('excludedDateRanges', [...current, { start: null, end: null }]);
+};
+
+const removeExcludedRange = (index: number) => {
+    const current = [...(values.excludedDateRanges || [])];
+    current.splice(index, 1);
+    setFieldValue('excludedDateRanges', current);
 };
 </script>
 
@@ -207,8 +255,10 @@ const isEndOptionDisabled = (dayKey: string, optionValue: string): boolean => {
             <DialogHeader>
                 <DialogTitle>Generate Class Sessions</DialogTitle>
                 <DialogDescription>
-                    Configure the weekly schedule for class sessions. Sessions will be generated based on the syllabus template's total sessions requirement
-                    <span v-if="syllabusTemplate?.total_sessions" class="font-medium">({{ syllabusTemplate.total_sessions }} sessions)</span>.
+                    Configure the weekly schedule for class sessions. Sessions will be generated based on the syllabus
+                    template's total sessions requirement
+                    <span v-if="syllabusTemplate?.total_sessions" class="font-medium">({{
+                        syllabusTemplate.total_sessions }} sessions)</span>.
                 </DialogDescription>
             </DialogHeader>
 
@@ -241,69 +291,104 @@ const isEndOptionDisabled = (dayKey: string, optionValue: string): boolean => {
                         <FormField name="selectedDays">
                             <FormItem>
                                 <div class="space-y-3">
-                                    <FormField v-for="day in daysOfWeek" v-slot="{ value, handleChange }" :key="day.key" type="checkbox" :value="day.key" :unchecked-value="false" name="selectedDays">
-                                        <FormItem
-                                            class="flex items-center gap-4 rounded-lg border p-3"
-                                            :class="{
-                                                'bg-primary/5 border-primary': value.includes(day.key),
-                                                'bg-background': !value.includes(day.key),
-                                            }"
-                                        >
+                                    <FormField v-for="day in daysOfWeek" v-slot="{ value, handleChange }" :key="day.key"
+                                        type="checkbox" :value="day.key" :unchecked-value="false" name="selectedDays">
+                                        <FormItem class="flex items-center gap-4 rounded-lg border p-3" :class="{
+                                            'bg-primary/5 border-primary': value.includes(day.key),
+                                            'bg-background': !value.includes(day.key),
+                                        }">
                                             <FormControl>
-                                                <Checkbox :model-value="value.includes(day.key)" @update:model-value="handleChange" />
+                                                <Checkbox :model-value="value.includes(day.key)"
+                                                    @update:model-value="handleChange" />
                                             </FormControl>
                                             <FormLabel class="flex-1 cursor-pointer font-medium">
                                                 {{ day.label }}
                                             </FormLabel>
 
-                                            <div class="flex items-center gap-2">
-                                                <FormField v-slot="{ componentField }" :name="`schedule.${day.key}.startTime`">
-                                                    <FormItem>
-                                                        <FormControl>
-                                                            <Select v-bind="componentField" :disabled="!value.includes(day.key)">
-                                                                <SelectTrigger class="">
-                                                                    <SelectValue placeholder="Start time" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem v-for="option in timeOptions" :key="option.value" :value="option.value">
-                                                                        {{ option.label }}
-                                                                    </SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </FormControl>
-                                                    </FormItem>
-                                                </FormField>
+                                            <div v-if="values.schedule?.[day.key]" class="flex items-center gap-2">
+                                                <div class="flex flex-1 flex-col gap-2">
+                                                    <div v-for="(range, index) in values.schedule?.[day.key]?.timeRanges"
+                                                        :key="index" class="flex items-center gap-2">
+                                                        <div class="flex flex-1 items-center gap-2">
+                                                            <FormField
+                                                                :name="`schedule.${day.key}.timeRanges[${index}].startTime`">
+                                                                <FormItem class="flex-1">
+                                                                    <Select :model-value="range.startTime"
+                                                                        @update:model-value="(val: any) => setFieldValue(`schedule.${day.key}.timeRanges[${index}].startTime` as any, val)"
+                                                                        :disabled="!value.includes(day.key)">
+                                                                        <FormControl>
+                                                                            <SelectTrigger>
+                                                                                <SelectValue />
+                                                                            </SelectTrigger>
+                                                                        </FormControl>
+                                                                        <SelectContent>
+                                                                            <SelectItem v-for="option in timeOptions"
+                                                                                :key="option.value"
+                                                                                :value="option.value">
+                                                                                {{ option.label }}
+                                                                            </SelectItem>
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            </FormField>
 
-                                                <span class="text-muted-foreground">to</span>
+                                                            <span class="text-muted-foreground">to</span>
 
-                                                <FormField v-slot="{ componentField }" :name="`schedule.${day.key}.endTime`">
-                                                    <FormItem>
-                                                        <FormControl>
-                                                            <Select v-bind="componentField" :disabled="!value.includes(day.key)">
-                                                                <SelectTrigger class="">
-                                                                    <SelectValue placeholder="End time" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem v-for="option in timeOptions" :key="option.value" :value="option.value" :disabled="isEndOptionDisabled(day.key, option.value)">
-                                                                        {{ option.label }}
-                                                                    </SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </FormControl>
-                                                    </FormItem>
-                                                </FormField>
+                                                            <FormField
+                                                                :name="`schedule.${day.key}.timeRanges[${index}].endTime`">
+                                                                <FormItem class="flex-1">
+                                                                    <Select :model-value="range.endTime"
+                                                                        @update:model-value="(val: any) => setFieldValue(`schedule.${day.key}.timeRanges[${index}].endTime` as any, val)"
+                                                                        :disabled="!value.includes(day.key)">
+                                                                        <FormControl>
+                                                                            <SelectTrigger>
+                                                                                <SelectValue />
+                                                                            </SelectTrigger>
+                                                                        </FormControl>
+                                                                        <SelectContent>
+                                                                            <SelectItem v-for="option in timeOptions"
+                                                                                :key="option.value"
+                                                                                :value="option.value"
+                                                                                :disabled="isEndOptionDisabled(day.key, index, option.value)">
+                                                                                {{ option.label }}
+                                                                            </SelectItem>
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            </FormField>
+                                                        </div>
+                                                        <Button
+                                                            v-if="(values.schedule?.[day.key]?.timeRanges?.length ?? 0) > 1"
+                                                            type="button" variant="ghost" size="icon"
+                                                            class="text-destructive h-9 w-9 shrink-0"
+                                                            @click="removeTimeRange(day.key, index)"
+                                                            :disabled="!value.includes(day.key)">
+                                                            <Trash2 class="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                    <Button type="button" variant="outline" size="sm" class="h-8 w-fit"
+                                                        @click="addTimeRange(day.key)"
+                                                        :disabled="!value.includes(day.key)">
+                                                        <Plus class="mr-2 h-4 w-4" />
+                                                        Add Time
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </FormItem>
                                     </FormField>
                                 </div>
 
                                 <div v-if="!hasSelectedDays" class="bg-muted/50 mt-3 rounded-lg p-3">
-                                    <p class="text-muted-foreground text-center text-sm">Please select at least one day</p>
+                                    <p class="text-muted-foreground text-center text-sm">Please select at least one day
+                                    </p>
                                 </div>
 
                                 <div v-else-if="estimatedSessions > 0" class="bg-primary/10 mt-3 rounded-lg p-3">
                                     <p class="text-center text-sm">
-                                        Will generate <span class="font-medium">{{ estimatedSessions }} sessions</span> across selected days
+                                        Will generate <span class="font-medium">{{ estimatedSessions }} sessions</span>
+                                        across selected days
                                     </p>
                                 </div>
 
@@ -326,7 +411,8 @@ const isEndOptionDisabled = (dayKey: string, optionValue: string): boolean => {
                                         <FormField v-slot="{ value, handleChange }" name="roomId">
                                             <FormItem>
                                                 <FormControl>
-                                                    <RadioGroup :model-value="value" @update:model-value="handleChange" class="flex flex-col gap-4" v-bind="wrapperProps">
+                                                    <RadioGroup :model-value="value" @update:model-value="handleChange"
+                                                        class="flex flex-col gap-4" v-bind="wrapperProps">
                                                         <div v-for="{ data: room } in list" :key="room.id" class="">
                                                             <Label :for="`room-${room.id}`" class="cursor-pointer">
                                                                 <Card
@@ -334,29 +420,37 @@ const isEndOptionDisabled = (dayKey: string, optionValue: string): boolean => {
                                                                     :class="{
                                                                         'border-primary bg-primary/5': value === room.id,
                                                                         'border-border': value !== room.id,
-                                                                    }"
-                                                                >
+                                                                    }">
                                                                     <CardHeader>
                                                                         <div class="flex items-center justify-between">
                                                                             <div class="flex items-center space-x-3">
-                                                                                <RadioGroupItem :id="`room-${room.id}`" :value="room.id" class="mt-0.5" />
+                                                                                <RadioGroupItem :id="`room-${room.id}`"
+                                                                                    :value="room.id" class="mt-0.5" />
                                                                                 <div>
                                                                                     <CardTitle class="text-base">
                                                                                         {{ getRoomDisplayName(room) }}
                                                                                     </CardTitle>
-                                                                                    <CardDescription class="text-sm"> {{ room.code }} • {{ getRoomTypeLabel(room.type) }} </CardDescription>
+                                                                                    <CardDescription class="text-sm"> {{
+                                                                                        room.code }} • {{
+                                                                                            getRoomTypeLabel(room.type) }}
+                                                                                    </CardDescription>
                                                                                 </div>
                                                                             </div>
-                                                                            <CheckCircle v-if="value === room.id" class="text-primary h-5 w-5" />
+                                                                            <CheckCircle v-if="value === room.id"
+                                                                                class="text-primary h-5 w-5" />
                                                                         </div>
                                                                     </CardHeader>
                                                                     <CardContent class="pt-0">
-                                                                        <div class="flex items-center justify-between text-sm">
-                                                                            <div class="text-muted-foreground flex items-center">
+                                                                        <div
+                                                                            class="flex items-center justify-between text-sm">
+                                                                            <div
+                                                                                class="text-muted-foreground flex items-center">
                                                                                 <Users class="mr-1 h-4 w-4" />
-                                                                                <span>Capacity: {{ room.capacity }}</span>
+                                                                                <span>Capacity: {{ room.capacity
+                                                                                }}</span>
                                                                             </div>
-                                                                            <div v-if="room.building" class="text-muted-foreground flex items-center">
+                                                                            <div v-if="room.building"
+                                                                                class="text-muted-foreground flex items-center">
                                                                                 <MapPin class="mr-1 h-4 w-4" />
                                                                                 <span>{{ room.building }}</span>
                                                                             </div>
@@ -373,12 +467,52 @@ const isEndOptionDisabled = (dayKey: string, optionValue: string): boolean => {
                                     <div v-if="!availableRooms || availableRooms.length === 0" class="py-8 text-center">
                                         <Users class="text-muted-foreground mx-auto h-12 w-12" />
                                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No available rooms</h3>
-                                        <p class="text-muted-foreground mt-1 text-sm">There are no bookable rooms available at the moment.</p>
+                                        <p class="text-muted-foreground mt-1 text-sm">There are no bookable rooms
+                                            available at the moment.</p>
                                     </div>
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                         </FormField>
+                    </div>
+                </div>
+
+                <Separator />
+
+                <!-- Exclude Dates -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <Label class="text-base">Exclude Date Ranges</Label>
+                            <p class="text-muted-foreground text-xs">No sessions will be generated during these periods
+                                (e.g., holidays, breaks)</p>
+                        </div>
+                        <Button type="button" variant="outline" size="sm" @click="addExcludedRange">
+                            <Plus class="mr-2 h-4 w-4" />
+                            Add Range
+                        </Button>
+                    </div>
+
+                    <div v-if="values.excludedDateRanges && values.excludedDateRanges.length > 0"
+                        class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div v-for="(range, index) in values.excludedDateRanges" :key="index"
+                            class="flex items-center gap-2">
+                            <div class="flex-1">
+                                <DateRangePicker :model-value="{ start: range.start, end: range.end }"
+                                    @update:model-value="(val: any) => {
+                                        setFieldValue(`excludedDateRanges[${index}].start` as any, val.start);
+                                        setFieldValue(`excludedDateRanges[${index}].end` as any, val.end);
+                                    }" placeholder="Select holiday/break period" />
+                            </div>
+                            <Button type="button" variant="ghost" size="icon"
+                                class="text-destructive h-10 w-10 shrink-0" @click="removeExcludedRange(index)">
+                                <Trash2 class="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                    <div v-else
+                        class="bg-muted/30 flex h-20 items-center justify-center rounded-lg border border-dashed">
+                        <p class="text-muted-foreground text-sm">No excluded dates defined</p>
                     </div>
                 </div>
             </div>
@@ -387,7 +521,8 @@ const isEndOptionDisabled = (dayKey: string, optionValue: string): boolean => {
                 <DialogClose as-child>
                     <Button variant="outline">Cancel</Button>
                 </DialogClose>
-                <Button @click="onSubmit" :disabled="!values.roomId || !values.startDate || !hasSelectedDays || isGenerating">
+                <Button @click="onSubmit"
+                    :disabled="!values.roomId || !values.startDate || !hasSelectedDays || isGenerating">
                     {{ isGenerating ? 'Generating...' : 'Generate Sessions' }}
                 </Button>
             </DialogFooter>

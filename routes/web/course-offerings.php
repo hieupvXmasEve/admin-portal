@@ -138,6 +138,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:edit_course_offering')
         ->name('api.class-sessions.store');
 
+    Route::delete('api/class-sessions/bulk', [\App\Http\Controllers\Api\ClassSessionController::class, 'bulkDestroy'])
+        ->middleware('can:edit_course_offering')
+        ->name('api.class-sessions.bulk-destroy');
+
     Route::delete('api/class-sessions/{classSession}', [\App\Http\Controllers\Api\ClassSessionController::class, 'destroySingle'])
         ->middleware('can:edit_course_offering')
         ->name('api.class-sessions.destroy');
