@@ -263,7 +263,13 @@ class StudentAcademicSummaryService
                 'academic_records.grade_points as academic_grade_points',
                 'academic_records.meets_attendance_requirement',
                 'academic_records.grade_status',
-                'academic_records.completion_status as academic_completion_status'
+                'academic_records.completion_status as academic_completion_status',
+                'academic_records.is_passed as academic_is_passed',
+                'academic_records.credit_points as academic_credit_points',
+                'academic_records.credit_points_earned as academic_credit_points_earned',
+                'academic_records.attempt_number as academic_attempt_number',
+                'academic_records.is_repeat_course as academic_is_repeat_course',
+
             );
 
         // Apply filters
@@ -306,9 +312,28 @@ class StudentAcademicSummaryService
             $query->where('is_retake', $filters['is_retake'] === 'true');
         }
 
-        // Order by registration date (most recent first) and then by semester
-        $query->orderBy('registration_date', 'desc')
-            ->orderBy('semester_id', 'desc');
+        // Apply sorting
+        $sortField = $filters['sort'] ?? 'registration_date';
+        $direction = $filters['direction'] ?? 'desc';
+
+        $mappedSortField = match ($sortField) {
+            'course_name' => 'units.name',
+            'course_code' => 'units.code',
+            'semester' => 'semesters.name',
+            'registration_status' => 'course_registrations.registration_status',
+            'final_grade' => 'academic_records.final_letter_grade',
+            'pass_fail_status' => 'academic_records.is_passed',
+            default => 'course_registrations.registration_date',
+        };
+
+        if (in_array($sortField, ['course_name', 'course_code'])) {
+            $query->join('course_offerings as co_sort', 'course_registrations.course_offering_id', '=', 'co_sort.id')
+                ->join('units', 'co_sort.unit_id', '=', 'units.id');
+        } elseif ($sortField === 'semester') {
+            $query->join('semesters', 'course_registrations.semester_id', '=', 'semesters.id');
+        }
+
+        $query->orderBy($mappedSortField, $direction);
 
         // Get all registrations for summary calculations (without pagination)
         $allRegistrations = $query->get();
@@ -331,12 +356,8 @@ class StudentAcademicSummaryService
 
             // Determine Pass/Fail status based on academic_record
             $passFailStatus = null;
-            if ($completionStatus === 'completed' && $gradeStatus === 'passing') {
-                $passFailStatus = 'pass';
-            } elseif ($completionStatus === 'completed' && $gradeStatus === 'failing') {
-                $passFailStatus = 'fail';
-            } elseif ($completionStatus === 'failed') {
-                $passFailStatus = 'fail';
+            if ($completionStatus === 'completed') {
+                $passFailStatus = $registration->academic_is_passed ? 'pass' : 'fail';
             }
 
             return [
@@ -354,24 +375,32 @@ class StudentAcademicSummaryService
                 'registration_status' => $registration->registration_status,
                 'registration_date' => $registration->registration_date,
                 'registration_method' => $registration->registration_method ?? 'N/A',
-                'final_grade' => $finalGrade,
-                'grade_points' => $gradePoints,
-                'final_percentage' => $finalPercentage,
                 'meets_attendance_requirement' => $meetsAttendance,
                 'grade_status' => $gradeStatus,
-                'completion_status' => $completionStatus,
+                
+                // Information of academic record
+                'final_grade' => $finalGrade, // for grade column
+                'final_percentage' => $finalPercentage, // for grade column
+                'credit_points' => $registration->academic_credit_points, // for credit points column
+                'credit_points_earned' => $registration->academic_credit_points_earned,
+                'completion_status' => $completionStatus, 
                 'pass_fail_status' => $passFailStatus,
-                'credit_points' => $registration->credit_points,
-                'is_retake' => $registration->is_retake,
-                'attempt_number' => $registration->attempt_number,
+                
+
+                // Information of course retake
+                'is_retake' => $registration->academic_is_repeat_course,
+                'attempt_number' => $registration->academic_attempt_number,
+
+                // Information of course registration
                 'completion_date' => $registration->completion_date,
                 'drop_date' => $registration->drop_date,
+
                 'withdrawal_date' => $registration->withdrawal_date,
                 'retake_fee' => $registration->retake_fee ?? 0,
                 'is_retake_paid' => $registration->is_retake_paid ?? 'no',
                 'notes' => $registration->notes,
-                'status_badge_color' => $this->getRegistrationStatusBadgeColor($registration->registration_status),
-                'grade_badge_color' => $this->getGradeBadgeColor($finalGrade),
+                'status_badge_color' => $this->getCompletionStatusBadgeColor($completionStatus),
+                'grade_badge_color' => $this->getGradeStatusBadgeColor($gradeStatus),
                 'pass_fail_badge_color' => $this->getPassFailBadgeColor($passFailStatus),
                 'is_passing_grade' => $this->isPassingGrade($finalGrade),
                 'formatted_registration_date' => $registration->registration_date ?
@@ -510,6 +539,38 @@ class StudentAcademicSummaryService
             'C', 'C+', 'C-' => 'warning',
             'D', 'D+', 'D-' => 'warning',
             'F' => 'destructive',
+            default => 'secondary',
+        };
+    }
+
+    /**
+     * Get badge color for completion status
+     *
+     * @param string|null $status Completion status
+     * @return string CSS color class
+     */
+    private function getCompletionStatusBadgeColor(?string $status): string
+    {
+        return match ($status) {
+            'completed' => 'success',
+            'in_progress' => 'primary',
+            'failed' => 'destructive',
+            'withdrawn' => 'warning',
+            default => 'secondary',
+        };
+    }
+
+    /**
+     * Get badge color for grade status
+     *
+     * @param string|null $status Grade status
+     * @return string CSS color class
+     */
+    private function getGradeStatusBadgeColor(?string $status): string
+    {
+        return match ($status) {
+            'passing' => 'success',
+            'failing' => 'destructive',
             default => 'secondary',
         };
     }

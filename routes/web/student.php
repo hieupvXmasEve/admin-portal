@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Constants\StudentRoutes;
 use App\Http\Controllers\Web\AcademicRecordController;
 use App\Http\Controllers\Web\AcademicStandingController;
-use App\Http\Controllers\Web\CourseRetakeController;
 use App\Http\Controllers\Web\ProgramChangeController;
 use App\Http\Controllers\Web\StudentAcademicSummaryController;
 use App\Http\Controllers\Web\StudentController;
@@ -54,9 +53,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('can:edit_student')
         ->name('students.photo-capture');
 
-    Route::delete('students/{student}', [StudentController::class, 'destroy'])
-        ->middleware('can:delete_student')
-        ->name(StudentRoutes::DESTROY);
+    // Route::delete('students/{student}', [StudentController::class, 'destroy'])
+    //     ->middleware('can:delete_student')
+    //     ->name(StudentRoutes::DESTROY);
 
     // Additional student management actions
     //    Route::post('students/{student}/assign-program', [StudentController::class, 'assignProgram'])
@@ -172,13 +171,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/statistics', [CourseRetakeController::class, 'statistics'])->name('statistics');
     });
 
-    // Course Retakes - Student Specific
-    Route::prefix('students/{student}/retakes')->name('students.retakes.')->group(function () {
-        Route::get('/', [CourseRetakeController::class, 'index'])->name('index');
-        Route::get('/create', [CourseRetakeController::class, 'create'])->name('create');
-        Route::post('/', [CourseRetakeController::class, 'store'])->name('store');
-        Route::get('/{registration}', [CourseRetakeController::class, 'show'])->name('show');
-    });
 
     // Academic Standing
     Route::prefix('students/{student}/standing')->name('students.standing.')->group(function () {

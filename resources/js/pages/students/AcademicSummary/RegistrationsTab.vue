@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { BookOpen, CheckCircle, Clock, Eye, RotateCcw, X } from 'lucide-vue-next';
+import { BookOpen, CheckCircle, Clock, Eye, RotateCcw, X, ArrowUpDown } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 
 // UI Components
@@ -19,10 +19,12 @@ import DataTable from '@/components/DataTable.vue';
 // Types
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { CourseRegistrationRecord, RegistrationsData, RegistrationsFilters } from '@/types/models';
+import { useInertiaFilters } from '@/composables/useInertiaFilters';
 
 interface Props {
     registrations: RegistrationsData;
     studentId: number;
+    filters?: Partial<RegistrationsFilters>;
 }
 
 const props = defineProps<Props>();
@@ -32,18 +34,40 @@ const loading = ref(false);
 const isDetailsModalOpen = ref(false);
 const selectedRegistration = ref<CourseRegistrationRecord | null>(null);
 
-// Filters
-const filters = ref<RegistrationsFilters>({
-    academic_year: props.registrations.filters.academic_year || '',
-    semester_id: props.registrations.filters.semester_id || '',
-    status: props.registrations.filters.status || '',
-    is_retake: props.registrations.filters.is_retake || '',
-    per_page: props.registrations.filters.per_page || 50,
-});
-
-// Computed properties
-const hasActiveFilters = computed(() => {
-    return filters.value.academic_year || filters.value.semester_id || filters.value.status || filters.value.is_retake;
+// Filters using useInertiaFilters
+const {
+    filters,
+    hasActiveFilters,
+    clearFilters,
+    handleSelectFilter,
+    handleSortChange,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    currentSort,
+    currentDirection
+} = useInertiaFilters<RegistrationsFilters>({
+    baseUrl: `/students/${props.studentId}/academic-summary/registrations`,
+    initialFilters: {
+        academic_year: (typeof props.filters?.academic_year === 'string' ? props.filters.academic_year : '') || '',
+        semester_id: (typeof props.filters?.semester_id === 'number' ? props.filters.semester_id : (typeof props.filters?.semester_id === 'string' ? parseInt(props.filters.semester_id) : 0)) || 0,
+        status: (typeof props.filters?.status === 'string' ? props.filters.status : 'all') || 'all',
+        is_retake: (typeof props.filters?.is_retake === 'string' ? props.filters.is_retake : 'all') || 'all',
+        per_page: props.filters?.per_page || 50,
+        page: props.registrations.pagination.current_page || 1,
+        sort: (typeof props.filters?.sort === 'string' ? props.filters.sort : 'registration_date') || 'registration_date',
+        direction: (props.filters?.direction as 'asc' | 'desc') || 'desc',
+    },
+    defaultValues: {
+        academic_year: '',
+        semester_id: 0,
+        status: 'all',
+        is_retake: 'all',
+        per_page: 50,
+        sort: 'registration_date',
+        direction: 'desc',
+    },
+    only: ['registrations', 'filters'],
+    debounce: 400,
 });
 
 const paginationData = computed(() => {
@@ -55,9 +79,9 @@ const paginationData = computed(() => {
         total: pagination.total,
         from: pagination.from,
         to: pagination.to,
-        prev_page_url: null, // Will be constructed by navigation handler
-        next_page_url: null, // Will be constructed by navigation handler
-        links: [], // Will be constructed by navigation handler
+        prev_page_url: null,
+        next_page_url: null,
+        links: [],
         first_page_url: '',
         last_page_url: '',
         path: '',
@@ -81,38 +105,43 @@ const columns: ColumnDef<CourseRegistrationRecord>[] = [
     {
         header: 'Course',
         id: 'course',
+        accessorKey: 'course_name',
         enableSorting: true,
         cell: 'course',
     },
     {
         header: 'Semester',
         id: 'semester',
+        accessorKey: 'semester',
         enableSorting: true,
         cell: 'semester',
     },
     {
         header: 'Status',
-        id: 'status',
+        id: 'completion_status',
+        accessorKey: 'completion_status',
         enableSorting: true,
         cell: 'status',
     },
     {
         header: 'Grade',
-        id: 'grade',
+        id: 'grade_status',
+        accessorKey: 'grade_status',
         enableSorting: true,
         cell: 'grade',
     },
     {
         header: 'Pass/Fail',
-        id: 'pass_fail',
+        id: 'pass_fail_status',
+        accessorKey: 'pass_fail_status',
         enableSorting: true,
         cell: 'pass_fail',
     },
     {
         header: 'Credits',
-        accessorKey: 'credit_hours',
+        accessorKey: 'credit_points',
         enableSorting: true,
-        cell: ({ row }) => `${row.original.credit_hours} hrs`,
+        cell: ({ row }) => `${row.original.credit_points ?? 0} pts`,
     },
     {
         header: 'Retake',
@@ -122,8 +151,10 @@ const columns: ColumnDef<CourseRegistrationRecord>[] = [
     },
     {
         header: 'Registration Date',
-        accessorKey: 'formatted_registration_date',
+        accessorKey: 'registration_date',
+        id: 'registration_date',
         enableSorting: true,
+        cell: ({ row }) => row.original.formatted_registration_date || '-',
     },
     {
         id: 'actions',
@@ -135,68 +166,18 @@ const columns: ColumnDef<CourseRegistrationRecord>[] = [
 ];
 
 // Methods
-const formatStatusName = (status: string): string => {
+const formatStatusName = (status: string | null): string => {
+    if (!status) return 'N/A';
     return status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 };
 
 const formatDate = (dateString: string): string => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
     });
-};
-
-const applyFilters = (): void => {
-    loading.value = true;
-
-    const params = new URLSearchParams();
-
-    if (filters.value.academic_year) params.set('registrations[academic_year]', filters.value.academic_year);
-    if (filters.value.semester_id) params.set('registrations[semester_id]', filters.value.semester_id.toString());
-    if (filters.value.status) params.set('registrations[status]', filters.value.status);
-    if (filters.value.is_retake) params.set('registrations[is_retake]', filters.value.is_retake);
-    if (filters.value.per_page) params.set('per_page', filters.value.per_page.toString());
-    console.log(params.toString());
-
-    const url = `/students/${props.studentId}/academic-summary${params.toString() ? '?tab=registrations&' + params.toString() : ''}`;
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['registrations'],
-        onFinish: () => {
-            loading.value = false;
-        },
-    });
-};
-
-const clearFilters = (): void => {
-    filters.value = {
-        academic_year: '',
-        semester_id: 0,
-        status: 'all',
-        is_retake: 'all',
-        per_page: 50,
-    };
-    applyFilters();
-};
-
-const handlePaginationNavigate = (url: string): void => {
-    loading.value = true;
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['registrations'],
-        onFinish: () => {
-            loading.value = false;
-        },
-    });
-};
-
-const handlePageSizeChange = (pageSize: number): void => {
-    filters.value.per_page = pageSize;
-    applyFilters();
 };
 
 const showDetails = (registration: CourseRegistrationRecord): void => {
@@ -230,7 +211,8 @@ onMounted(() => {
                     <div>
                         <p class="text-sm font-medium text-gray-600">Completed</p>
                         <p class="text-2xl font-bold text-green-600">{{ registrations.summary.completed }}</p>
-                        <p class="text-xs text-gray-500">{{ registrations.summary.completion_rate }}% completion rate</p>
+                        <p class="text-xs text-gray-500">{{ registrations.summary.completion_rate }}% completion rate
+                        </p>
                     </div>
                     <div class="rounded-full bg-green-50 p-3">
                         <CheckCircle class="h-6 w-6 text-green-600" />
@@ -270,27 +252,33 @@ onMounted(() => {
             <div class="flex flex-wrap items-center gap-4">
                 <div class="min-w-[200px] flex-1">
                     <Label for="academic-year-filter">Academic Year</Label>
-                    <Select v-model="filters.academic_year" @update:model-value="applyFilters">
+                    <Select :model-value="String(filters.academic_year ?? 'all')"
+                        @update:model-value="(val) => handleSelectFilter('academic_year', val as string)">
                         <SelectTrigger id="academic-year-filter">
                             <SelectValue placeholder="All Academic Years" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Academic Years</SelectItem>
-                            <SelectItem v-for="group in registrations.semester_groups" :key="group.academic_year" :value="group.academic_year"> {{ group.academic_year }} ({{ group.total_registrations }} courses) </SelectItem>
+                            <SelectItem v-for="group in registrations.semester_groups" :key="group.academic_year"
+                                :value="group.academic_year"> {{ group.academic_year }} ({{ group.total_registrations }}
+                                courses) </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
                 <div class="min-w-[200px] flex-1">
                     <Label for="semester-filter">Semester</Label>
-                    <Select v-model="filters.semester_id" @update:model-value="applyFilters">
+                    <Select :model-value="String(filters.semester_id ?? 0)"
+                        @update:model-value="(val) => handleSelectFilter('semester_id', parseInt(val as string))">
                         <SelectTrigger id="semester-filter">
                             <SelectValue placeholder="All Semesters" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">All Semesters</SelectItem>
+                            <SelectItem value="0">All Semesters</SelectItem>
                             <template v-for="group in registrations.semester_groups" :key="group.academic_year">
-                                <SelectItem v-for="semester in group.semesters" :key="semester.id" :value="semester.id.toString()"> {{ semester.name }} ({{ semester.academic_year }}) </SelectItem>
+                                <SelectItem v-for="semester in group.semesters" :key="semester.id"
+                                    :value="String(semester.id)"> {{ semester.name }} ({{ semester.academic_year }})
+                                </SelectItem>
                             </template>
                         </SelectContent>
                     </Select>
@@ -298,20 +286,24 @@ onMounted(() => {
 
                 <div class="min-w-[200px] flex-1">
                     <Label for="status-filter">Status</Label>
-                    <Select v-model="filters.status" @update:model-value="applyFilters">
+                    <Select :model-value="String(filters.status ?? 'all')"
+                        @update:model-value="(val) => handleSelectFilter('status', val as string)">
                         <SelectTrigger id="status-filter">
                             <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem v-for="status in registrations.status_breakdown" :key="status.status" :value="status.status"> {{ formatStatusName(status.status) }} ({{ status.count }}) </SelectItem>
+                            <SelectItem v-for="status in registrations.status_breakdown" :key="status.status"
+                                :value="status.status"> {{
+                                    formatStatusName(status.status) }} ({{ status.count }}) </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
                 <div class="min-w-[150px] flex-1">
                     <Label for="retake-filter">Retakes</Label>
-                    <Select v-model="filters.is_retake" @update:model-value="applyFilters">
+                    <Select :model-value="String(filters.is_retake ?? 'all')"
+                        @update:model-value="(val) => handleSelectFilter('is_retake', val as string)">
                         <SelectTrigger id="retake-filter">
                             <SelectValue placeholder="All Courses" />
                         </SelectTrigger>
@@ -332,15 +324,18 @@ onMounted(() => {
 
         <!-- Desktop Table View -->
         <div class="hidden rounded-lg border bg-white shadow-sm md:block">
-            <DataTable :data="registrations.data" :columns="columns" :loading="loading">
+            <DataTable :data="registrations.data" :columns="columns" :loading="loading" :initial-sort="currentSort"
+                :initial-direction="currentDirection" enable-server-sorting @sort-change="handleSortChange">
                 <template #cell-course="{ row }">
                     <div>
-                        <Link :href="`/course-offerings/${row.original.course_offering_id}`" class="font-medium text-blue-600 hover:underline">
+                        <Link :href="`/course-offerings/${row.original.course_offering_id}`"
+                            class="font-medium text-blue-600 hover:underline">
                             {{ row.original.course_name }}
                         </Link>
                         <p class="text-sm text-gray-500">
                             {{ row.original.course_code }}
-                            <span v-if="row.original.section_code && row.original.section_code !== 'N/A'"> — Section {{ row.original.section_code }}</span>
+                            <span v-if="row.original.section_code && row.original.section_code !== 'N/A'"> — Section {{
+                                row.original.section_code }}</span>
                         </p>
                     </div>
                 </template>
@@ -352,24 +347,26 @@ onMounted(() => {
                     </div>
                 </template>
 
-                <template #cell-status="{ row }">
+                <template #cell-completion_status="{ row }">
                     <Badge :variant="row.original.status_badge_color">
-                        {{ formatStatusName(row.original.registration_status) }}
+                        {{ formatStatusName(row.original.completion_status) }}
                     </Badge>
                 </template>
 
-                <template #cell-grade="{ row }">
-                    <div v-if="row.original.final_grade">
+                <template #cell-grade_status="{ row }">
+                    <div v-if="row.original.grade_status">
                         <Badge :variant="row.original.grade_badge_color">
-                            {{ row.original.final_grade }}
+                            {{ formatStatusName(row.original.grade_status) }}
                         </Badge>
-                        <p v-if="row.original.final_percentage" class="mt-1 text-xs text-gray-500">{{ row.original.final_percentage }}%</p>
-                        <p v-else-if="row.original.grade_points" class="mt-1 text-xs text-gray-500">{{ row.original.grade_points }} pts</p>
+                        <p v-if="row.original.final_grade" class="mt-1 text-xs text-gray-500">
+                            Grade: {{ row.original.final_grade }}
+                            <span v-if="row.original.final_percentage">({{ row.original.final_percentage }}%)</span>
+                        </p>
                     </div>
                     <span v-else class="text-gray-400">-</span>
                 </template>
 
-                <template #cell-pass_fail="{ row }">
+                <template #cell-pass_fail_status="{ row }">
                     <Badge v-if="row.original.pass_fail_status" :variant="row.original.pass_fail_badge_color">
                         {{ row.original.pass_fail_status === 'pass' ? 'Pass' : 'Fail' }}
                     </Badge>
@@ -378,7 +375,8 @@ onMounted(() => {
 
                 <template #cell-retake="{ row }">
                     <div class="flex items-center gap-2">
-                        <Badge v-if="row.original.is_retake" variant="outline" class="text-orange-600"> Attempt {{ row.original.attempt_number }} </Badge>
+                        <Badge v-if="row.original.is_retake" variant="outline" class="text-orange-600"> Attempt {{
+                            row.original.attempt_number }} </Badge>
                         <span v-else class="text-gray-400">-</span>
                     </div>
                 </template>
@@ -417,21 +415,25 @@ onMounted(() => {
             </div>
 
             <div v-else class="space-y-4">
-                <div v-for="registration in registrations.data" :key="registration.id" class="rounded-lg border bg-white p-4 shadow-sm">
+                <div v-for="registration in registrations.data" :key="registration.id"
+                    class="rounded-lg border bg-white p-4 shadow-sm">
                     <div class="mb-3 flex items-start justify-between">
                         <div class="flex-1">
                             <h3 class="font-medium text-blue-600">
-                                <Link :href="`/course-offerings/${registration.course_offering_id}`" class="hover:underline">
+                                <Link :href="`/course-offerings/${registration.course_offering_id}`"
+                                    class="hover:underline">
                                     {{ registration.course_name }}
                                 </Link>
                             </h3>
                             <p class="text-sm text-gray-500">
                                 {{ registration.course_code }}
-                                <span v-if="registration.section_code && registration.section_code !== 'N/A'"> — Section {{ registration.section_code }}</span>
+                                <span v-if="registration.section_code && registration.section_code !== 'N/A'"> — Section
+                                    {{
+                                        registration.section_code }}</span>
                             </p>
                         </div>
                         <Badge :variant="registration.status_badge_color">
-                            {{ formatStatusName(registration.registration_status) }}
+                            {{ formatStatusName(registration.completion_status) }}
                         </Badge>
                     </div>
 
@@ -443,12 +445,15 @@ onMounted(() => {
                         </div>
                         <div>
                             <p class="font-medium text-gray-700">Grade</p>
-                            <div v-if="registration.final_grade">
+                            <div v-if="registration.grade_status">
                                 <Badge :variant="registration.grade_badge_color">
-                                    {{ registration.final_grade }}
+                                    {{ formatStatusName(registration.grade_status) }}
                                 </Badge>
-                                <p v-if="registration.final_percentage" class="mt-1 text-gray-500">{{ registration.final_percentage }}%</p>
-                                <p v-else-if="registration.grade_points" class="mt-1 text-gray-500">{{ registration.grade_points }} pts</p>
+                                <p v-if="registration.final_grade" class="mt-1 text-xs text-gray-500">
+                                    {{ registration.final_grade }}
+                                    <span v-if="registration.final_percentage">({{ registration.final_percentage
+                                        }}%)</span>
+                                </p>
                             </div>
                             <span v-else class="text-gray-400">Not graded</span>
                         </div>
@@ -459,13 +464,16 @@ onMounted(() => {
                         <Badge :variant="registration.pass_fail_badge_color">
                             {{ registration.pass_fail_status === 'pass' ? 'Pass' : 'Fail' }}
                         </Badge>
-                        <span v-if="registration.meets_attendance_requirement === false" class="text-xs text-orange-600">(Low Attendance)</span>
+                        <span v-if="registration.meets_attendance_requirement === false"
+                            class="text-xs text-orange-600">(Low
+                            Attendance)</span>
                     </div>
 
                     <div class="mt-3 flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <span class="text-sm text-gray-500">{{ registration.credit_hours }} credits</span>
-                            <Badge v-if="registration.is_retake" variant="outline" class="text-orange-600"> Attempt {{ registration.attempt_number }} </Badge>
+                            <span class="text-sm text-gray-500">{{ registration.credit_points ?? 0 }} pts</span>
+                            <Badge v-if="registration.is_retake" variant="outline" class="text-orange-600"> Attempt {{
+                                registration.attempt_number }} </Badge>
                         </div>
                         <Button variant="ghost" size="sm" @click="showDetails(registration)">
                             <Eye class="mr-2 h-4 w-4" />
@@ -477,7 +485,8 @@ onMounted(() => {
         </div>
 
         <!-- Pagination -->
-        <DataPagination :pagination-data="paginationData" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+        <DataPagination :pagination-data="paginationData" @navigate="handlePaginationNavigate"
+            @page-size-change="handlePageSizeChange" />
 
         <!-- Details Modal -->
         <Dialog v-model:open="isDetailsModalOpen">
@@ -507,8 +516,11 @@ onMounted(() => {
                         </div>
                         <div>
                             <Label class="text-sm font-medium">Credits</Label>
-                            <p class="text-sm text-gray-600">{{ selectedRegistration.credit_hours }} credit hours</p>
-                            <p class="text-sm text-gray-500">{{ selectedRegistration.credit_points }} credit points</p>
+                            <p class="text-sm text-gray-600">{{ selectedRegistration.credit_points }} credit points
+                                (equivalent)</p>
+                            <p class="text-sm text-gray-500">{{ selectedRegistration.credit_points_earned }} credit
+                                points
+                                (earned)</p>
                         </div>
                     </div>
 
@@ -541,41 +553,49 @@ onMounted(() => {
                                 <Badge :variant="selectedRegistration.grade_badge_color">
                                     {{ selectedRegistration.final_grade }}
                                 </Badge>
-                                <span v-if="selectedRegistration.final_percentage" class="text-sm text-gray-500">{{ selectedRegistration.final_percentage }}%</span>
-                                <span v-else-if="selectedRegistration.grade_points" class="text-sm text-gray-500">{{ selectedRegistration.grade_points }} points</span>
+                                <span v-if="selectedRegistration.final_percentage" class="text-sm text-gray-500">{{
+                                    selectedRegistration.final_percentage }}%</span>
+                                <span v-else-if="selectedRegistration.grade_points" class="text-sm text-gray-500">{{
+                                    selectedRegistration.grade_points }} points</span>
                             </div>
                         </div>
                         <div>
                             <Label class="text-sm font-medium">Result Status</Label>
                             <div class="flex items-center gap-2">
-                                <Badge v-if="selectedRegistration.pass_fail_status" :variant="selectedRegistration.pass_fail_badge_color">
+                                <Badge v-if="selectedRegistration.pass_fail_status"
+                                    :variant="selectedRegistration.pass_fail_badge_color">
                                     {{ selectedRegistration.pass_fail_status === 'pass' ? 'Pass' : 'Fail' }}
                                 </Badge>
-                                <Badge v-else :variant="selectedRegistration.is_passing_grade ? 'success' : 'destructive'">
+                                <Badge v-else
+                                    :variant="selectedRegistration.is_passing_grade ? 'success' : 'destructive'">
                                     {{ selectedRegistration.is_passing_grade ? 'Passing' : 'Failing' }}
                                 </Badge>
                             </div>
                         </div>
                     </div>
 
-                    <div v-if="selectedRegistration.meets_attendance_requirement !== null || selectedRegistration.grade_status" class="rounded-lg bg-blue-50 p-4">
+                    <div v-if="selectedRegistration.meets_attendance_requirement !== null || selectedRegistration.grade_status"
+                        class="rounded-lg bg-blue-50 p-4">
                         <h4 class="mb-2 font-medium text-blue-900">Academic Record Details</h4>
                         <div class="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                             <div v-if="selectedRegistration.meets_attendance_requirement !== null">
                                 <Label class="text-sm font-medium">Attendance Requirement</Label>
-                                <Badge :variant="selectedRegistration.meets_attendance_requirement ? 'success' : 'destructive'">
+                                <Badge
+                                    :variant="selectedRegistration.meets_attendance_requirement ? 'success' : 'destructive'">
                                     {{ selectedRegistration.meets_attendance_requirement ? 'Met' : 'Not Met' }}
                                 </Badge>
                             </div>
                             <div v-if="selectedRegistration.grade_status">
                                 <Label class="text-sm font-medium">Grade Status</Label>
-                                <Badge :variant="selectedRegistration.grade_status === 'passing' ? 'success' : 'destructive'">
+                                <Badge
+                                    :variant="selectedRegistration.grade_status === 'passing' ? 'success' : 'destructive'">
                                     {{ selectedRegistration.grade_status }}
                                 </Badge>
                             </div>
                             <div v-if="selectedRegistration.completion_status">
                                 <Label class="text-sm font-medium">Completion Status</Label>
-                                <Badge :variant="selectedRegistration.completion_status === 'completed' ? 'success' : 'warning'">
+                                <Badge
+                                    :variant="selectedRegistration.completion_status === 'completed' ? 'success' : 'warning'">
                                     {{ selectedRegistration.completion_status }}
                                 </Badge>
                             </div>

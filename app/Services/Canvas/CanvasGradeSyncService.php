@@ -387,7 +387,7 @@ class CanvasGradeSyncService
 
             // Use current_score (posted) or fallback to unposted_current_score
             $grades = $enrollment['grades'] ?? null;
-            $canvasTotal = null;
+            $canvasTotal = 0;
 
             if ($grades) {
                 if (isset($grades['current_score']) && $grades['current_score'] !== null) {
