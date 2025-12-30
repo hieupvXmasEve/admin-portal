@@ -251,6 +251,15 @@ class AcademicRecordGenerationServiceOptimized
      */
     private function calculateAttendanceStatsBulk(array $studentIds, array $courseOfferingIds): array
     {
+        // Get thresholds per course offering
+        $thresholds = DB::table('course_offerings')
+            ->leftJoin('syllabus_templates', 'course_offerings.syllabus_template_id', '=', 'syllabus_templates.id')
+            ->whereIn('course_offerings.id', $courseOfferingIds)
+            ->select('course_offerings.id', 'syllabus_templates.min_attendance_threshold')
+            ->get()
+            ->pluck('min_attendance_threshold', 'id')
+            ->toArray();
+
         // Get total sessions per course offering
         $sessionCounts = DB::table('class_sessions')
             ->whereIn('course_offering_id', $courseOfferingIds)
@@ -297,7 +306,9 @@ class AcademicRecordGenerationServiceOptimized
             $attendancePercentage = $totalRecorded > 0
                 ? round(($stat->total_attended / $totalRecorded) * 100, 2)
                 : 0;
-            $meetsRequirement = $attendancePercentage >= 80;
+
+            $threshold = (float) ($thresholds[$stat->course_offering_id] ?? 80.00);
+            $meetsRequirement = $attendancePercentage >= $threshold;
 
             $key = "{$stat->student_id}_{$stat->course_offering_id}";
             $statsMap[$key] = [

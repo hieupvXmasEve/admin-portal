@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Actions\SyllabusTemplate\CreateSyllabusTemplateAction;
+use App\Actions\SyllabusTemplate\GetSyllabusTemplateListAction;
+use App\Actions\SyllabusTemplate\UpdateSyllabusTemplateAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SyllabusTemplate\StoreSyllabusTemplateRequest;
 use App\Http\Requests\SyllabusTemplate\UpdateSyllabusTemplateRequest;
@@ -21,55 +24,30 @@ use Inertia\Response;
 class SyllabusTemplateController extends Controller
 {
     // Inertia pages
-    public function pageIndex(Request $request): Response
+    public function pageIndex(Request $request, GetSyllabusTemplateListAction $action): Response
     {
-        $perPage = (int) $request->query('per_page', 10);
-        $perPage = max(5, min(100, $perPage));
+        $validated = $request->validate([
+            'search' => 'nullable|string|max:255',
+            'unit_id' => 'nullable|string',
+            'is_active' => 'nullable|string|in:1,0,all',
+            'sort' => 'nullable|string|in:title,version,is_active,created_at',
+            'direction' => 'nullable|string|in:asc,desc',
+            'per_page' => 'nullable|integer|min:5|max:100',
+        ]);
 
-        $query = SyllabusTemplate::query()->with(['unit']);
-
-        // Filters: is_active (bool), unit_id (int), search (string)
-        $search = (string) $request->query('search', '');
-        $unitId = $request->query('unit_id');
-        $isActive = $request->query('is_active'); // can be '1' | '0' | null
-
-        if ($unitId !== null && $unitId !== '') {
-            $query->where('unit_id', (int) $unitId);
-        }
-
-        if ($isActive !== null && $isActive !== '') {
-            // '0' casts to false, '1' to true
-            $query->where('is_active', (bool) $isActive);
-        }
-
-        if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('version', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhereHas('unit', function ($uq) use ($search) {
-                        $uq->where('code', 'like', "%{$search}%")
-                            ->orWhere('name', 'like', "%{$search}%");
-                    });
-            });
-        }
-
-        $items = $query
-            ->orderByDesc('is_default')
-            ->orderByDesc('is_active')
-            ->orderByDesc('created_at')
-            ->paginate($perPage)
-            ->withQueryString();
+        $items = $action->execute($validated);
 
         $units = Unit::query()->orderBy('code')->get(['id', 'code', 'name']);
 
         return Inertia::render('syllabus/TemplatesIndex', [
             'items' => $items,
             'filters' => [
-                'search' => $search,
-                'unit_id' => $unitId !== null && $unitId !== '' ? (int) $unitId : null,
-                'is_active' => $isActive !== null && $isActive !== '' ? (string) $isActive : null,
-                'per_page' => $perPage,
+                'search' => $validated['search'] ?? null,
+                'unit_id' => $validated['unit_id'] ?? 'all',
+                'is_active' => $validated['is_active'] ?? 'all',
+                'sort' => $validated['sort'] ?? null,
+                'direction' => $validated['direction'] ?? null,
+                'per_page' => $validated['per_page'] ?? 10,
             ],
             'units' => $units,
         ]);
@@ -117,72 +95,15 @@ class SyllabusTemplateController extends Controller
         return response()->json(['data' => $templates]);
     }
 
-    public function store(StoreSyllabusTemplateRequest $request, ?Unit $unit = null): JsonResponse|RedirectResponse
+    public function store(StoreSyllabusTemplateRequest $request, CreateSyllabusTemplateAction $action): JsonResponse|RedirectResponse
     {
         $data = $request->validated();
-
-        // Support both routes: with /units/{unit} and direct POST body unit_id
-        $unitId = $unit?->getKey() ?? ($data['unit_id'] ?? $request->integer('unit_id'));
-        if (empty($unitId)) {
-            return back()->withErrors(['unit_id' => 'Unit is required'])->withInput();
-        }
-
-        $data['unit_id'] = (int) $unitId;
         $data['created_by'] = auth()->id();
 
-        $template = null;
-        DB::transaction(function () use (&$template, $data, $request) {
-            $template = SyllabusTemplate::create($data);
-
-            // Create assessment components if provided
-            $components = $data['assessment_components'] ?? $request->input('assessment_components', []);
-            if (is_array($components) && ! empty($components)) {
-                foreach ($components as $idx => $comp) {
-                    if (! is_array($comp)) {
-                        continue;
-                    }
-
-                    $component = new AssessmentComponent([
-                        'name' => $comp['name'] ?? null,
-                        'weight' => $comp['weight'] ?? 0,
-                        'type' => $comp['type'] ?? 'other',
-                        'sort_order' => $idx,
-                    ]);
-                    $component->syllabus_template_id = $template->getKey();
-                    $component->save();
-
-                    $details = $comp['details'] ?? [];
-                    if (is_array($details) && ! empty($details)) {
-                        foreach ($details as $d) {
-                            if (! is_array($d)) {
-                                continue;
-                            }
-                            AssessmentComponentDetail::create([
-                                'assessment_component_id' => $component->getKey(),
-                                'name' => $d['name'] ?? '',
-                                'weight' => $d['weight'] ?? null,
-                                'max_points' => 100.00
-                            ]);
-                        }
-                    } else {
-                        // Create default detail if no details provided
-                        AssessmentComponentDetail::create([
-                            'assessment_component_id' => $component->getKey(),
-                            'name' => $component->name,
-                            'weight' => 100.00,
-                            'max_points' => 100.00
-                        ]);
-                    }
-                }
-            }
-        });
-
-        if (! empty($data['is_default'])) {
-            $this->setDefaultForUnit($template);
-        }
+        $template = $action->execute($data);
 
         if ($request->wantsJson()) {
-            return response()->json(['data' => $template->fresh()], 201);
+            return response()->json(['data' => $template], 201);
         }
 
         return redirect()->route('syllabus_templates.index')->with('success', 'Template created');
@@ -202,142 +123,14 @@ class SyllabusTemplateController extends Controller
         ]);
     }
 
-    public function update(UpdateSyllabusTemplateRequest $request, SyllabusTemplate $syllabusTemplate): JsonResponse|RedirectResponse
+    public function update(UpdateSyllabusTemplateRequest $request, SyllabusTemplate $syllabusTemplate, UpdateSyllabusTemplateAction $action): JsonResponse|RedirectResponse
     {
         $data = $request->validated();
 
-        DB::transaction(function () use (&$syllabusTemplate, $data, $request) {
-            // Update template basic fields
-            $syllabusTemplate->fill($data);
-            $syllabusTemplate->save();
-
-            // Optional: sync assessment components if provided
-            if ($request->has('assessment_components') && is_array($request->input('assessment_components'))) {
-                $incomingComponents = $request->input('assessment_components', []);
-
-                // Map existing components by id
-                $existingComponents = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->getKey())
-                    ->get()
-                    ->keyBy('id');
-
-                $keepComponentIds = [];
-
-                foreach ($incomingComponents as $idx => $compData) {
-                    if (!is_array($compData)) continue;
-
-                    $componentId = $compData['id'] ?? null;
-                    $component = null;
-
-                    if ($componentId && isset($existingComponents[$componentId])) {
-                        $component = $existingComponents[$componentId];
-                        $component->fill([
-                            'name' => $compData['name'] ?? $component->name,
-                            'weight' => $compData['weight'] ?? $component->weight,
-                            'type' => $compData['type'] ?? $component->type,
-                            'sort_order' => $idx,
-                        ]);
-                        $component->save();
-                    } else {
-                        $component = new \App\Models\AssessmentComponent([
-                            'name' => $compData['name'] ?? null,
-                            'weight' => $compData['weight'] ?? 0,
-                            'type' => $compData['type'] ?? 'other',
-                            'sort_order' => $idx,
-                        ]);
-                        $component->syllabus_template_id = $syllabusTemplate->getKey();
-                        $component->save();
-                    }
-
-                    $keepComponentIds[] = $component->getKey();
-
-                    // Sync details for this component
-                    $incomingDetails = $compData['details'] ?? [];
-                    $existingDetails = \App\Models\AssessmentComponentDetail::where('assessment_component_id', $component->getKey())
-                        ->get()
-                        ->keyBy('id');
-                    $keepDetailIds = [];
-
-                    if (is_array($incomingDetails) && !empty($incomingDetails)) {
-                        foreach ($incomingDetails as $d) {
-                            if (!is_array($d)) continue;
-                            $detailId = $d['id'] ?? null;
-                            if ($detailId && isset($existingDetails[$detailId])) {
-                                $detail = $existingDetails[$detailId];
-                                $detail->fill([
-                                    'name' => $d['name'] ?? $detail->name,
-                                    'weight' => $d['weight'] ?? $detail->weight,
-                                ]);
-                                $detail->save();
-                            } else {
-                                $detail = new \App\Models\AssessmentComponentDetail([
-                                    'assessment_component_id' => $component->getKey(),
-                                    'name' => $d['name'] ?? '',
-                                    'weight' => $d['weight'] ?? null,
-                                ]);
-                                $detail->save();
-                            }
-                            $keepDetailIds[] = $detail->getKey();
-                        }
-                    } else {
-                        // If this is a new component (no componentId) and no details provided,
-                        // create a default detail
-                        if (!$componentId) {
-                            $detail = new \App\Models\AssessmentComponentDetail([
-                                'assessment_component_id' => $component->getKey(),
-                                'name' => $component->name,
-                                'weight' => 100.00,
-                                'max_points' => 100.00
-                            ]);
-                            $detail->save();
-                            $keepDetailIds[] = $detail->getKey();
-                        }
-                    }
-
-                    // Delete details not present
-                    if (!empty($keepDetailIds)) {
-                        \App\Models\AssessmentComponentDetail::where('assessment_component_id', $component->getKey())
-                            ->whereNotIn('id', $keepDetailIds)
-                            ->delete();
-                    } else {
-                        // If no details in payload, remove all existing details and create default
-                        \App\Models\AssessmentComponentDetail::where('assessment_component_id', $component->getKey())->delete();
-
-                        // Create default detail
-                        \App\Models\AssessmentComponentDetail::create([
-                            'assessment_component_id' => $component->getKey(),
-                            'name' => $component->name,
-                            'weight' => 100.00,
-                            'max_points' => 100.00
-                        ]);
-                    }
-                }
-
-                // Delete components not present
-                if (!empty($keepComponentIds)) {
-                    $toDelete = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->getKey())
-                        ->whereNotIn('id', $keepComponentIds)
-                        ->get();
-                    foreach ($toDelete as $delComp) {
-                        \App\Models\AssessmentComponentDetail::where('assessment_component_id', $delComp->getKey())->delete();
-                        $delComp->delete();
-                    }
-                } else {
-                    // No components in payload => remove all
-                    $all = AssessmentComponent::where('syllabus_template_id', $syllabusTemplate->getKey())->get();
-                    foreach ($all as $delComp) {
-                        \App\Models\AssessmentComponentDetail::where('assessment_component_id', $delComp->getKey())->delete();
-                        $delComp->delete();
-                    }
-                }
-            }
-        });
-
-        if (array_key_exists('is_default', $data) && $syllabusTemplate->is_default) {
-            $this->setDefaultForUnit($syllabusTemplate);
-        }
+        $template = $action->execute($syllabusTemplate, $data);
 
         if ($request->wantsJson()) {
-            return response()->json(['data' => $syllabusTemplate->fresh()]);
+            return response()->json(['data' => $template]);
         }
 
         return redirect()->route('syllabus_templates.edit', $syllabusTemplate)

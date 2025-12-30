@@ -22,6 +22,8 @@ class UpdateSyllabusTemplateRequest extends FormRequest
 
             'total_hours' => ['nullable', 'integer', 'min:0'],
             'total_sessions' => ['nullable', 'integer', 'min:0'],
+            'min_attendance_threshold' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'min_grade_threshold' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'learning_outcomes' => ['nullable', 'array'],
             'grading_criteria' => ['nullable', 'array'],
             'required_materials' => ['nullable', 'array'],

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberField, NumberFieldContent, NumberFieldInput } from '@/components/ui/number-field';
@@ -40,6 +40,8 @@ const formSchema = toTypedSchema(
         // Total hours can be 0
         total_hours: z.number().min(0, { message: 'Total hours must be a positive number' }),
         total_sessions: z.number().int({ message: 'Total sessions must be an integer' }).min(1, { message: 'Total sessions must be at least 1' }),
+        min_attendance_threshold: z.number().min(0).max(100, { message: 'Cannot exceed 100%' }).default(80),
+        min_grade_threshold: z.number().min(0).max(100, { message: 'Cannot exceed 100%' }).default(40),
         unit_id: z.string({ message: 'Please select a curriculum unit' }),
         is_active: z.boolean().default(true),
         assessment_components: z
@@ -90,25 +92,15 @@ const form = useForm({
         description: '',
         total_hours: 0,
         total_sessions: 1,
+        min_attendance_threshold: 80,
+        min_grade_threshold: 60,
         unit_id: '0',
         is_active: true,
-        // init 3 components
+        // init default 100% component
         assessment_components: [
             {
-                name: 'Attendance',
-                weight: 10,
-                type: 'attendance',
-                details: [{ name: 'Attendance', weight: 100 }],
-            },
-            {
-                name: 'Middle Exam',
-                weight: 40,
-                type: 'exam',
-                details: [],
-            },
-            {
                 name: 'Final Exam',
-                weight: 50,
+                weight: 100,
                 type: 'exam',
                 details: [],
             },
@@ -209,7 +201,7 @@ const getAssessmentTypeColor = (type: string) => {
 };
 
 const handleTypeChange = (componentIndex: number, newType: string) => {
-    const current = form.values.assessment_components || [];
+    const current = (form.values.assessment_components as any[]) || [];
     const next = [...current];
     if (next[componentIndex]) {
         next[componentIndex].type = newType;
@@ -258,6 +250,7 @@ const filteredAvailableUnits = computed(() => {
 </script>
 
 <template>
+
     <Head :title="`Create Syllabus Template`" />
     <!-- Header -->
     <div class="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
@@ -298,7 +291,8 @@ const filteredAvailableUnits = computed(() => {
                         <FormItem>
                             <FormLabel for="version">Version *</FormLabel>
                             <FormControl>
-                                <Input id="version" type="text" placeholder="e.g., v1.0, v2.1" v-bind="componentField" />
+                                <Input id="version" type="text" placeholder="e.g., v1.0, v2.1"
+                                    v-bind="componentField" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -311,27 +305,28 @@ const filteredAvailableUnits = computed(() => {
                                 <Combobox v-bind="componentField">
                                     <ComboboxAnchor>
                                         <div class="relative w-full items-center">
-                                            <ComboboxInput
-                                                v-model="addUnitSearch"
-                                                placeholder="Search for a unit..."
-                                                :display-value="
-                                                    (value) => {
-                                                        const unit = units.find((u) => u.id.toString() === value?.toString());
-                                                        return unit ? `${unit.code} - ${unit.name}` : '';
-                                                    }
-                                                "
-                                            />
-                                            <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                            <ComboboxInput v-model="addUnitSearch" placeholder="Search for a unit..."
+                                                :display-value="(value) => {
+                                                    const unit = units.find((u) => u.id.toString() === value?.toString());
+                                                    return unit ? `${unit.code} - ${unit.name}` : '';
+                                                }
+                                                    " />
+                                            <ComboboxTrigger
+                                                class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
                                                 <ChevronsUpDown class="text-muted-foreground size-4" />
                                             </ComboboxTrigger>
                                         </div>
                                     </ComboboxAnchor>
-                                    <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                    <ComboboxList
+                                        class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
                                         <ComboboxViewport>
                                             <ComboboxEmpty v-if="filteredAvailableUnits.length === 0">
-                                                {{ units.length === 0 ? 'No available units to add' : 'No units found' }}
+                                                {{ units.length === 0 ? 'No available units to add' : 'No units found'
+                                                }}
                                             </ComboboxEmpty>
-                                            <ComboboxItem v-for="unit in filteredAvailableUnits" :key="unit.id" :value="unit.id.toString()" class="cursor-pointer"> {{ unit.code }} - {{ unit.name }} </ComboboxItem>
+                                            <ComboboxItem v-for="unit in filteredAvailableUnits" :key="unit.id"
+                                                :value="unit.id.toString()" class="cursor-pointer"> {{ unit.code }} - {{
+                                                    unit.name }} </ComboboxItem>
                                         </ComboboxViewport>
                                     </ComboboxList>
                                 </Combobox>
@@ -342,29 +337,22 @@ const filteredAvailableUnits = computed(() => {
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField
-                        v-slot="{ componentField }"
-                        name="total_hours"
-                        :transform="
-                            (value: any) => {
-                                if (value === '' || value === null || value === undefined) return 0;
-                                const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
-                                return isNaN(num) ? 0 : num;
-                            }
-                        "
-                    >
+                    <FormField v-slot="{ componentField }" name="total_hours" :transform="(value: any) => {
+                        if (value === '' || value === null || value === undefined) return 0;
+                        const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                        return isNaN(num) ? 0 : num;
+                    }
+                        ">
                         <FormItem>
                             <FormLabel for="total_hours">Total Hours *</FormLabel>
                             <FormControl>
                                 <NumberField
                                     :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || 0 : componentField.modelValue"
-                                    @update:model-value="componentField['onUpdate:modelValue']"
-                                    :step="0.5"
+                                    @update:model-value="componentField['onUpdate:modelValue']" :step="0.5"
                                     :format-options="{
                                         minimumFractionDigits: 0,
                                         maximumFractionDigits: 2,
-                                    }"
-                                >
+                                    }">
                                     <NumberFieldContent>
                                         <NumberFieldInput />
                                     </NumberFieldContent>
@@ -374,29 +362,22 @@ const filteredAvailableUnits = computed(() => {
                         </FormItem>
                     </FormField>
 
-                    <FormField
-                        v-slot="{ componentField }"
-                        name="total_sessions"
-                        :transform="
-                            (value: any) => {
-                                if (value === '' || value === null || value === undefined) return 1;
-                                const num = typeof value === 'string' ? parseInt(value, 10) : Number(value);
-                                return isNaN(num) ? 1 : Math.round(num);
-                            }
-                        "
-                    >
+                    <FormField v-slot="{ componentField }" name="total_sessions" :transform="(value: any) => {
+                        if (value === '' || value === null || value === undefined) return 1;
+                        const num = typeof value === 'string' ? parseInt(value, 10) : Number(value);
+                        return isNaN(num) ? 1 : Math.round(num);
+                    }
+                        ">
                         <FormItem>
                             <FormLabel for="total_sessions">Total Sessions *</FormLabel>
                             <FormControl>
                                 <NumberField
                                     :model-value="typeof componentField.modelValue === 'string' ? parseInt(componentField.modelValue, 10) || 1 : componentField.modelValue"
-                                    @update:model-value="componentField['onUpdate:modelValue']"
-                                    :step="1"
+                                    @update:model-value="componentField['onUpdate:modelValue']" :step="1"
                                     :format-options="{
                                         minimumFractionDigits: 0,
                                         maximumFractionDigits: 0,
-                                    }"
-                                >
+                                    }">
                                     <NumberFieldContent>
                                         <NumberFieldInput />
                                     </NumberFieldContent>
@@ -407,11 +388,61 @@ const filteredAvailableUnits = computed(() => {
                     </FormField>
                 </div>
 
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="min_attendance_threshold" :transform="(value: any) => {
+                        if (value === '' || value === null || value === undefined) return 80;
+                        const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                        return isNaN(num) ? 80 : num;
+                    }
+                        ">
+                        <FormItem>
+                            <FormLabel for="min_attendance_threshold">Min Attendance (%) *</FormLabel>
+                            <FormControl>
+                                <NumberField
+                                    :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || 80 : componentField.modelValue"
+                                    @update:model-value="componentField['onUpdate:modelValue']" :step="1" :min="0"
+                                    :max="100">
+                                    <NumberFieldContent>
+                                        <NumberFieldInput />
+                                    </NumberFieldContent>
+                                </NumberField>
+                            </FormControl>
+                            <FormDescription>Students must attend at least this percentage to pass.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="min_grade_threshold" :transform="(value: any) => {
+                        if (value === '' || value === null || value === undefined) return 40;
+                        const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                        return isNaN(num) ? 40 : num;
+                    }
+                        ">
+                        <FormItem>
+                            <FormLabel for="min_grade_threshold">Min Pass Grade (out of 100) *</FormLabel>
+                            <FormControl>
+                                <NumberField
+                                    :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || 40 : componentField.modelValue"
+                                    @update:model-value="componentField['onUpdate:modelValue']" :step="0.5" :min="0"
+                                    :max="100">
+                                    <NumberFieldContent>
+                                        <NumberFieldInput />
+                                    </NumberFieldContent>
+                                </NumberField>
+                            </FormControl>
+                            <FormDescription>Minimum total score required to pass the course.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
                 <FormField v-slot="{ componentField }" name="description">
                     <FormItem>
                         <FormLabel for="description">Description</FormLabel>
                         <FormControl>
-                            <Textarea id="description" rows="4" placeholder="Describe the course content, objectives, and structure..." v-bind="componentField" />
+                            <Textarea id="description" rows="4"
+                                placeholder="Describe the course content, objectives, and structure..."
+                                v-bind="componentField" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -440,7 +471,8 @@ const filteredAvailableUnits = computed(() => {
                     </div>
                     <div class="text-right">
                         <div class="text-lg font-bold">Total Weight: {{ getTotalWeight().toFixed(2) }}%</div>
-                        <div v-if="Math.abs(getTotalWeight() - 100) >= 0.01" class="text-sm text-red-600">❌ Must equal exactly 100%</div>
+                        <div v-if="Math.abs(getTotalWeight() - 100) >= 0.01" class="text-sm text-red-600">❌ Must equal
+                            exactly 100%</div>
                         <div v-else class="text-sm text-green-600">✅ Complete</div>
                     </div>
                 </div>
@@ -456,49 +488,48 @@ const filteredAvailableUnits = computed(() => {
                     Add Assessment Component
                 </Button>
 
-                <div v-if="form.values.assessment_components && form.values.assessment_components.length > 0" class="space-y-4">
-                    <div v-for="(component, componentIndex) in form.values.assessment_components" :key="componentIndex" class="rounded-lg border p-4">
+                <div v-if="form.values.assessment_components && form.values.assessment_components.length > 0"
+                    class="space-y-4">
+                    <div v-for="(component, componentIndex) in form.values.assessment_components" :key="componentIndex"
+                        class="rounded-lg border p-4">
                         <div class="mb-4 flex items-center justify-between">
                             <h3 class="text-lg font-medium">Component {{ componentIndex + 1 }}</h3>
-                            <Button type="button" variant="ghost" size="sm" @click="removeAssessmentComponent(componentIndex)">
+                            <Button type="button" variant="ghost" size="sm"
+                                @click="removeAssessmentComponent(componentIndex)">
                                 <Trash2 class="h-4 w-4 text-red-600" />
                             </Button>
                         </div>
 
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.name`">
+                            <FormField v-slot="{ componentField }"
+                                :name="`assessment_components.${componentIndex}.name`">
                                 <FormItem>
                                     <FormLabel :for="`component_name_${componentIndex}`">Name</FormLabel>
                                     <FormControl>
-                                        <Input :id="`component_name_${componentIndex}`" placeholder="e.g., Final Exam" v-bind="componentField" />
+                                        <Input :id="`component_name_${componentIndex}`" placeholder="e.g., Final Exam"
+                                            v-bind="componentField" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             </FormField>
 
-                            <FormField
-                                v-slot="{ componentField }"
-                                :name="`assessment_components.${componentIndex}.weight`"
-                                :transform="
-                                    (value: any) => {
-                                        if (value === '' || value === null || value === undefined) return 0;
-                                        const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
-                                        return isNaN(num) ? 0 : num;
-                                    }
-                                "
-                            >
+                            <FormField v-slot="{ componentField }"
+                                :name="`assessment_components.${componentIndex}.weight`" :transform="(value: any) => {
+                                    if (value === '' || value === null || value === undefined) return 0;
+                                    const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                                    return isNaN(num) ? 0 : num;
+                                }
+                                    ">
                                 <FormItem>
                                     <FormLabel :for="`component_weight_${componentIndex}`">Weight (%)</FormLabel>
                                     <FormControl>
                                         <NumberField
                                             :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || 0 : componentField.modelValue"
-                                            @update:model-value="componentField['onUpdate:modelValue']"
-                                            :step="0.01"
+                                            @update:model-value="componentField['onUpdate:modelValue']" :step="0.01"
                                             :format-options="{
                                                 minimumFractionDigits: 0,
                                                 maximumFractionDigits: 2,
-                                            }"
-                                        >
+                                            }">
                                             <NumberFieldContent>
                                                 <NumberFieldInput />
                                             </NumberFieldContent>
@@ -508,19 +539,19 @@ const filteredAvailableUnits = computed(() => {
                                 </FormItem>
                             </FormField>
 
-                            <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.type`">
+                            <FormField v-slot="{ componentField }"
+                                :name="`assessment_components.${componentIndex}.type`">
                                 <FormItem>
                                     <FormLabel :for="`component_type_${componentIndex}`">Type</FormLabel>
                                     <FormControl>
-                                        <Select
-                                            :model-value="componentField.modelValue"
-                                            @update:model-value="(value) => { componentField['onUpdate:modelValue'](value); handleTypeChange(componentIndex, value); }"
-                                        >
+                                        <Select :model-value="componentField.modelValue"
+                                            @update:model-value="(value) => { componentField['onUpdate:modelValue']?.(value); handleTypeChange(componentIndex, String(value)); }">
                                             <SelectTrigger>
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem v-for="(label, value) in assessmentTypes" :key="value" :value="value">
+                                                <SelectItem v-for="(label, value) in assessmentTypes" :key="value"
+                                                    :value="value">
                                                     <div class="flex items-center gap-2">
                                                         <Badge :class="getAssessmentTypeColor(value)" class="text-xs">
                                                             {{ value.toUpperCase() }}
@@ -542,17 +573,16 @@ const filteredAvailableUnits = computed(() => {
                                 <Label>Sub-components (optional)</Label>
                                 <div class="flex items-center gap-2">
                                     <div v-if="getSubComponentTotalWeight(componentIndex) !== null" class="text-sm">
-                                        <span class="font-medium">Subcomponent Total: {{ getSubComponentTotalWeight(componentIndex)?.toFixed(2) }}%</span>
-                                        <span v-if="Math.abs((getSubComponentTotalWeight(componentIndex) || 0) - 100) >= 0.01" class="ml-2 text-red-600">❌ Must equal 100%</span>
+                                        <span class="font-medium">Subcomponent Total: {{
+                                            getSubComponentTotalWeight(componentIndex)?.toFixed(2) }}%</span>
+                                        <span
+                                            v-if="Math.abs((getSubComponentTotalWeight(componentIndex) || 0) - 100) >= 0.01"
+                                            class="ml-2 text-red-600">❌ Must equal 100%</span>
                                         <span v-else class="ml-2 text-green-600">✅</span>
                                     </div>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
+                                    <Button type="button" variant="outline" size="sm"
                                         @click="addComponentDetail(componentIndex)"
-                                        :disabled="component.type === 'attendance'"
-                                    >
+                                        :disabled="component.type === 'attendance'">
                                         <Plus class="mr-1 h-3 w-3" />
                                         Add Detail
                                     </Button>
@@ -565,42 +595,35 @@ const filteredAvailableUnits = computed(() => {
                                         <FormMessage />
                                     </FormItem>
                                 </FormField>
-                                <div v-for="(detail, detailIndex) in component.details" :key="detailIndex" class="flex items-center gap-2">
-                                    <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`">
+                                <div v-for="(detail, detailIndex) in component.details" :key="detailIndex"
+                                    class="flex items-center gap-2">
+                                    <FormField v-slot="{ componentField }"
+                                        :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`">
                                         <FormItem class="flex-1">
                                             <FormControl>
-                                                <Input
-                                                    placeholder="Detail name"
-                                                    v-bind="componentField"
-                                                    :disabled="component.type === 'attendance'"
-                                                />
+                                                <Input placeholder="Detail name" v-bind="componentField"
+                                                    :disabled="component.type === 'attendance'" />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     </FormField>
-                                    <FormField
-                                        v-slot="{ componentField }"
+                                    <FormField v-slot="{ componentField }"
                                         :name="`assessment_components.${componentIndex}.details.${detailIndex}.weight`"
-                                        :transform="
-                                            (value: any) => {
-                                                if (value === '' || value === null || value === undefined) return null;
-                                                const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
-                                                return isNaN(num) ? null : num;
-                                            }
-                                        "
-                                    >
+                                        :transform="(value: any) => {
+                                            if (value === '' || value === null || value === undefined) return null;
+                                            const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                                            return isNaN(num) ? null : num;
+                                        }
+                                            ">
                                         <FormItem class="w-24">
                                             <FormControl>
                                                 <NumberField
                                                     :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || null : componentField.modelValue"
                                                     @update:model-value="componentField['onUpdate:modelValue']"
-                                                    :step="0.01"
-                                                    :format-options="{
+                                                    :step="0.01" :format-options="{
                                                         minimumFractionDigits: 0,
                                                         maximumFractionDigits: 2,
-                                                    }"
-                                                    :disabled="component.type === 'attendance'"
-                                                >
+                                                    }" :disabled="component.type === 'attendance'">
                                                     <NumberFieldContent>
                                                         <NumberFieldInput />
                                                     </NumberFieldContent>
@@ -609,13 +632,9 @@ const filteredAvailableUnits = computed(() => {
                                             <FormMessage />
                                         </FormItem>
                                     </FormField>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
+                                    <Button type="button" variant="ghost" size="sm"
                                         @click="removeComponentDetail(componentIndex, detailIndex)"
-                                        :disabled="component.type === 'attendance'"
-                                    >
+                                        :disabled="component.type === 'attendance'">
                                         <Trash2 class="h-4 w-4 text-red-600" />
                                     </Button>
                                 </div>

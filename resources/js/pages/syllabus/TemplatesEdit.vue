@@ -48,6 +48,8 @@ interface SyllabusTemplate {
     description: string | null;
     total_hours: number;
     total_sessions: number;
+    min_attendance_threshold: number;
+    min_grade_threshold: number;
     is_active: boolean;
     assessment_components: AssessmentComponent[];
 }
@@ -67,6 +69,8 @@ const formSchema = toTypedSchema(
         description: z.string().optional(),
         total_hours: z.number().min(0, { message: 'Total hours must be a positive number' }),
         total_sessions: z.number().int({ message: 'Total sessions must be an integer' }).min(1, { message: 'Total sessions must be at least 1' }).optional(),
+        min_attendance_threshold: z.number().min(0).max(100).default(80),
+        min_grade_threshold: z.number().min(0).max(100).default(40),
         unit_id: z.string({ message: 'Please select a curriculum unit' }),
         is_active: z.boolean().default(true).optional(),
         assessment_components: z.array(z.any()).optional(),
@@ -80,6 +84,8 @@ const initialValues = {
     description: props.syllabusTemplate.description ?? '',
     total_hours: Number(props.syllabusTemplate.total_hours ?? 0),
     total_sessions: Number(props.syllabusTemplate.total_sessions ?? 1),
+    min_attendance_threshold: Number(props.syllabusTemplate.min_attendance_threshold ?? 80),
+    min_grade_threshold: Number(props.syllabusTemplate.min_grade_threshold ?? 40),
     unit_id: (props.syllabusTemplate.unit_id ?? props.unit.id).toString(),
     is_active: !!props.syllabusTemplate.is_active,
     assessment_components:
@@ -196,6 +202,8 @@ const onSubmit = form.handleSubmit((formData) => {
         description: formData.description,
         total_hours: formData.total_hours,
         total_sessions: formData.total_sessions,
+        min_attendance_threshold: formData.min_attendance_threshold,
+        min_grade_threshold: formData.min_grade_threshold,
         is_active: formData.is_active,
         assessment_components: formData.assessment_components,
         // unit_id intentionally omitted from update on backend (not supported),
@@ -219,6 +227,7 @@ const onSubmit = form.handleSubmit((formData) => {
 </script>
 
 <template>
+
     <Head :title="`Edit Syllabus Template`" />
 
     <div class="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
@@ -261,7 +270,8 @@ const onSubmit = form.handleSubmit((formData) => {
                         <FormItem>
                             <FormLabel for="version">Version *</FormLabel>
                             <FormControl>
-                                <Input id="version" type="text" placeholder="e.g., v1.0, v2.1" v-bind="componentField" />
+                                <Input id="version" type="text" placeholder="e.g., v1.0, v2.1"
+                                    v-bind="componentField" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -274,25 +284,24 @@ const onSubmit = form.handleSubmit((formData) => {
                                 <Combobox v-bind="componentField" disabled>
                                     <ComboboxAnchor>
                                         <div class="relative w-full items-center">
-                                            <ComboboxInput
-                                                v-model="addUnitSearch"
-                                                placeholder="Search for a unit..."
-                                                :display-value="
-                                                    (value) => {
-                                                        const u = units.find((x) => x.id.toString() === value?.toString());
-                                                        return u ? `${u.code} - ${u.name}` : '';
-                                                    }
-                                                "
-                                            />
-                                            <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                            <ComboboxInput v-model="addUnitSearch" placeholder="Search for a unit..."
+                                                :display-value="(value) => {
+                                                    const u = units.find((x) => x.id.toString() === value?.toString());
+                                                    return u ? `${u.code} - ${u.name}` : '';
+                                                }
+                                                    " />
+                                            <ComboboxTrigger
+                                                class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
                                                 <ChevronsUpDown class="text-muted-foreground size-4" />
                                             </ComboboxTrigger>
                                         </div>
                                     </ComboboxAnchor>
-                                    <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                    <ComboboxList
+                                        class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
                                         <ComboboxViewport>
                                             <ComboboxEmpty>No units</ComboboxEmpty>
-                                            <ComboboxItem v-for="u in filteredAvailableUnits" :key="u.id" :value="u.id.toString()">{{ u.code }} - {{ u.name }}</ComboboxItem>
+                                            <ComboboxItem v-for="u in filteredAvailableUnits" :key="u.id"
+                                                :value="u.id.toString()">{{ u.code }} - {{ u.name }}</ComboboxItem>
                                         </ComboboxViewport>
                                     </ComboboxList>
                                 </Combobox>
@@ -303,26 +312,19 @@ const onSubmit = form.handleSubmit((formData) => {
                 </div>
 
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField
-                        v-slot="{ componentField }"
-                        name="total_hours"
-                        :transform="
-                            (value: any) => {
-                                if (value === '' || value === null || value === undefined) return 0;
-                                const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
-                                return isNaN(num) ? 0 : num;
-                            }
-                        "
-                    >
+                    <FormField v-slot="{ componentField }" name="total_hours" :transform="(value: any) => {
+                        if (value === '' || value === null || value === undefined) return 0;
+                        const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                        return isNaN(num) ? 0 : num;
+                    }
+                        ">
                         <FormItem>
                             <FormLabel for="total_hours">Total Hours *</FormLabel>
                             <FormControl>
                                 <NumberField
                                     :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || 0 : componentField.modelValue"
-                                    @update:model-value="componentField['onUpdate:modelValue']"
-                                    :step="0.5"
-                                    :format-options="{ minimumFractionDigits: 0, maximumFractionDigits: 2 }"
-                                >
+                                    @update:model-value="componentField['onUpdate:modelValue']" :step="0.5"
+                                    :format-options="{ minimumFractionDigits: 0, maximumFractionDigits: 2 }">
                                     <NumberFieldContent>
                                         <NumberFieldInput />
                                     </NumberFieldContent>
@@ -332,26 +334,19 @@ const onSubmit = form.handleSubmit((formData) => {
                         </FormItem>
                     </FormField>
 
-                    <FormField
-                        v-slot="{ componentField }"
-                        name="total_sessions"
-                        :transform="
-                            (value: any) => {
-                                if (value === '' || value === null || value === undefined) return 1;
-                                const num = typeof value === 'string' ? parseInt(value, 10) : Number(value);
-                                return isNaN(num) ? 1 : Math.round(num);
-                            }
-                        "
-                    >
+                    <FormField v-slot="{ componentField }" name="total_sessions" :transform="(value: any) => {
+                        if (value === '' || value === null || value === undefined) return 1;
+                        const num = typeof value === 'string' ? parseInt(value, 10) : Number(value);
+                        return isNaN(num) ? 1 : Math.round(num);
+                    }
+                        ">
                         <FormItem>
                             <FormLabel for="total_sessions">Total Sessions *</FormLabel>
                             <FormControl>
                                 <NumberField
                                     :model-value="typeof componentField.modelValue === 'string' ? parseInt(componentField.modelValue, 10) || 1 : componentField.modelValue"
-                                    @update:model-value="componentField['onUpdate:modelValue']"
-                                    :step="1"
-                                    :format-options="{ minimumFractionDigits: 0, maximumFractionDigits: 0 }"
-                                >
+                                    @update:model-value="componentField['onUpdate:modelValue']" :step="1"
+                                    :format-options="{ minimumFractionDigits: 0, maximumFractionDigits: 0 }">
                                     <NumberFieldContent>
                                         <NumberFieldInput />
                                     </NumberFieldContent>
@@ -362,11 +357,61 @@ const onSubmit = form.handleSubmit((formData) => {
                     </FormField>
                 </div>
 
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FormField v-slot="{ componentField }" name="min_attendance_threshold" :transform="(value: any) => {
+                        if (value === '' || value === null || value === undefined) return 80;
+                        const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                        return isNaN(num) ? 80 : num;
+                    }
+                        ">
+                        <FormItem>
+                            <FormLabel for="min_attendance_threshold">Min Attendance (%) *</FormLabel>
+                            <FormControl>
+                                <NumberField
+                                    :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || 80 : (componentField.modelValue as number)"
+                                    @update:model-value="componentField['onUpdate:modelValue']" :step="1" :min="0"
+                                    :max="100">
+                                    <NumberFieldContent>
+                                        <NumberFieldInput />
+                                    </NumberFieldContent>
+                                </NumberField>
+                            </FormControl>
+                            <FormDescription>Students must attend at least this percentage to pass.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+
+                    <FormField v-slot="{ componentField }" name="min_grade_threshold" :transform="(value: any) => {
+                        if (value === '' || value === null || value === undefined) return 40;
+                        const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : Number(value);
+                        return isNaN(num) ? 40 : num;
+                    }
+                        ">
+                        <FormItem>
+                            <FormLabel for="min_grade_threshold">Min Pass Grade (out of 100) *</FormLabel>
+                            <FormControl>
+                                <NumberField
+                                    :model-value="typeof componentField.modelValue === 'string' ? parseFloat(componentField.modelValue) || 40 : (componentField.modelValue as number)"
+                                    @update:model-value="componentField['onUpdate:modelValue']" :step="0.5" :min="0"
+                                    :max="100">
+                                    <NumberFieldContent>
+                                        <NumberFieldInput />
+                                    </NumberFieldContent>
+                                </NumberField>
+                            </FormControl>
+                            <FormDescription>Minimum total score required to pass the course.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    </FormField>
+                </div>
+
                 <FormField v-slot="{ componentField }" name="description">
                     <FormItem>
                         <FormLabel for="description">Description</FormLabel>
                         <FormControl>
-                            <Textarea id="description" rows="4" placeholder="Describe the course content, objectives, and structure..." v-bind="componentField" />
+                            <Textarea id="description" rows="4"
+                                placeholder="Describe the course content, objectives, and structure..."
+                                v-bind="componentField" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -391,7 +436,9 @@ const onSubmit = form.handleSubmit((formData) => {
                 <div>
                     <CardTitle class="flex items-center gap-2">
                         Assessment Components
-                        <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'"> {{ getTotalWeight() }}% </Badge>
+                        <Badge
+                            :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
+                            {{ getTotalWeight() }}% </Badge>
                     </CardTitle>
                     <CardDescription>Define the assessment structure and weightings for this syllabus.</CardDescription>
                 </div>
@@ -401,7 +448,8 @@ const onSubmit = form.handleSubmit((formData) => {
                 </Button>
             </CardHeader>
             <CardContent class="space-y-6">
-                <div v-for="(component, componentIndex) in form.values.assessment_components || []" :key="componentIndex" class="rounded-lg border p-4">
+                <div v-for="(component, componentIndex) in form.values.assessment_components || []"
+                    :key="componentIndex" class="rounded-lg border p-4">
                     <div class="mb-4 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <h4 class="font-medium">Component {{ componentIndex + 1 }}</h4>
@@ -409,7 +457,8 @@ const onSubmit = form.handleSubmit((formData) => {
                                 {{ assessmentTypes[component.type] || component.type }}
                             </Badge>
                         </div>
-                        <Button v-if="(form.values.assessment_components || []).length > 1" type="button" variant="ghost" size="sm" @click="removeAssessmentComponent(componentIndex)">
+                        <Button v-if="(form.values.assessment_components || []).length > 1" type="button"
+                            variant="ghost" size="sm" @click="removeAssessmentComponent(componentIndex)">
                             <Trash2 class="h-4 w-4" />
                         </Button>
                     </div>
@@ -425,25 +474,20 @@ const onSubmit = form.handleSubmit((formData) => {
                             </FormItem>
                         </FormField>
 
-                        <FormField v-slot="{ value, setValue }" :name="`assessment_components.${componentIndex}.weight`">
+                        <FormField v-slot="{ value, setValue }"
+                            :name="`assessment_components.${componentIndex}.weight`">
                             <FormItem>
                                 <FormLabel>Weight (%)</FormLabel>
                                 <FormControl>
-                                    <NumberField
-                                        :model-value="value"
-                                        @update:model-value="
-                                            (v) => {
-                                                if (v) {
-                                                    setValue(v);
-                                                } else {
-                                                    setValue(0);
-                                                }
+                                    <NumberField :model-value="value" @update:model-value="
+                                        (v) => {
+                                            if (v) {
+                                                setValue(v);
+                                            } else {
+                                                setValue(0);
                                             }
-                                        "
-                                        :default-value="0"
-                                        :min="0"
-                                        :max="100"
-                                    >
+                                        }
+                                    " :default-value="0" :min="0" :max="100">
                                         <NumberFieldContent>
                                             <NumberFieldInput />
                                         </NumberFieldContent>
@@ -457,20 +501,18 @@ const onSubmit = form.handleSubmit((formData) => {
                             <FormItem>
                                 <FormLabel>Type</FormLabel>
                                 <FormControl>
-                                    <Select
-                                        :model-value="componentField.modelValue"
-                                        @update:model-value="
-                                            (value) => {
-                                                componentField['onUpdate:modelValue'](value);
-                                                handleTypeChange(componentIndex, value);
-                                            }
-                                        "
-                                    >
+                                    <Select :model-value="componentField.modelValue" @update:model-value="
+                                        (value) => {
+                                            componentField['onUpdate:modelValue']?.(value);
+                                            handleTypeChange(componentIndex, String(value));
+                                        }
+                                    ">
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select type" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem v-for="(label, value) in assessmentTypes" :key="value" :value="value">
+                                            <SelectItem v-for="(label, value) in assessmentTypes" :key="value"
+                                                :value="value">
                                                 {{ label }}
                                             </SelectItem>
                                         </SelectContent>
@@ -481,14 +523,16 @@ const onSubmit = form.handleSubmit((formData) => {
                         </FormField>
 
                         <div class="flex items-end">
-                            <Button type="button" variant="outline" size="sm" @click="addComponentDetail(componentIndex)" :disabled="component.type === 'attendance'">
+                            <Button type="button" variant="outline" size="sm"
+                                @click="addComponentDetail(componentIndex)" :disabled="component.type === 'attendance'">
                                 <Plus class="mr-1 h-3 w-3" />
                                 Add Detail
                             </Button>
                         </div>
                     </div>
 
-                    <FormField v-slot="{ value, handleChange }" :name="`assessment_components.${componentIndex}.is_required_to_sit_final_exam`">
+                    <FormField v-slot="{ value, handleChange }"
+                        :name="`assessment_components.${componentIndex}.is_required_to_sit_final_exam`">
                         <FormItem class="mt-4 flex items-center space-y-0 space-x-3">
                             <FormControl>
                                 <Checkbox :model-value="value" @update:model-value="handleChange" />
@@ -498,46 +542,46 @@ const onSubmit = form.handleSubmit((formData) => {
                     </FormField>
 
                     <!-- Component Details -->
-                    <FormField v-if="component.details && component.details.length > 0" v-slot="{}" :name="`assessment_components.${componentIndex}.details`">
+                    <FormField v-if="component.details && component.details.length > 0" v-slot="{ }"
+                        :name="`assessment_components.${componentIndex}.details`">
                         <div class="mt-4 space-y-3">
                             <div class="flex items-center gap-2">
                                 <Label class="text-sm font-medium">Subcomponents</Label>
-                                <Badge v-if="getSubComponentTotalWeight(componentIndex) !== null" :class="getSubComponentTotalWeight(componentIndex) === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
+                                <Badge v-if="getSubComponentTotalWeight(componentIndex) !== null"
+                                    :class="getSubComponentTotalWeight(componentIndex) === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
                                     {{ getSubComponentTotalWeight(componentIndex) }}%
                                 </Badge>
                             </div>
                             <div class="rounded border bg-gray-50 p-3">
-                                <div v-for="(detail, detailIndex) in component.details" :key="detailIndex" class="mb-3 flex items-end gap-3 last:mb-0">
-                                    <FormField v-slot="{ componentField }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`">
+                                <div v-for="(detail, detailIndex) in component.details" :key="detailIndex"
+                                    class="mb-3 flex items-end gap-3 last:mb-0">
+                                    <FormField v-slot="{ componentField }"
+                                        :name="`assessment_components.${componentIndex}.details.${detailIndex}.name`">
                                         <FormItem class="flex-1">
                                             <FormLabel v-if="detailIndex === 0" class="text-xs">Detail Name</FormLabel>
                                             <FormControl>
-                                                <Input v-bind="componentField" placeholder="e.g., Part A" class="text-sm" :disabled="component.type === 'attendance'" />
+                                                <Input v-bind="componentField" placeholder="e.g., Part A"
+                                                    class="text-sm" :disabled="component.type === 'attendance'" />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     </FormField>
 
-                                    <FormField v-slot="{ value, setValue }" :name="`assessment_components.${componentIndex}.details.${detailIndex}.weight`">
+                                    <FormField v-slot="{ value, setValue }"
+                                        :name="`assessment_components.${componentIndex}.details.${detailIndex}.weight`">
                                         <FormItem class="w-24">
                                             <FormLabel v-if="detailIndex === 0" class="text-xs">Weight (%)</FormLabel>
                                             <FormControl>
-                                                <NumberField
-                                                    :model-value="value"
-                                                    @update:model-value="
-                                                        (v) => {
-                                                            if (v) {
-                                                                setValue(v);
-                                                            } else {
-                                                                setValue(0);
-                                                            }
+                                                <NumberField :model-value="(value as number)" @update:model-value="
+                                                    (v) => {
+                                                        if (v) {
+                                                            setValue(v);
+                                                        } else {
+                                                            setValue(0);
                                                         }
-                                                    "
-                                                    :default-value="0"
-                                                    :min="0"
-                                                    :max="100"
-                                                    :disabled="component.type === 'attendance'"
-                                                >
+                                                    }
+                                                " :default-value="0" :min="0" :max="100"
+                                                    :disabled="component.type === 'attendance'">
                                                     <NumberFieldContent>
                                                         <NumberFieldInput class="text-sm" />
                                                     </NumberFieldContent>
@@ -547,7 +591,9 @@ const onSubmit = form.handleSubmit((formData) => {
                                         </FormItem>
                                     </FormField>
 
-                                    <Button type="button" variant="ghost" size="sm" @click="removeComponentDetail(componentIndex, detailIndex)" class="mb-1" :disabled="component.type === 'attendance'">
+                                    <Button type="button" variant="ghost" size="sm"
+                                        @click="removeComponentDetail(componentIndex, detailIndex)" class="mb-1"
+                                        :disabled="component.type === 'attendance'">
                                         <Trash2 class="h-3 w-3" />
                                     </Button>
                                 </div>
@@ -560,13 +606,16 @@ const onSubmit = form.handleSubmit((formData) => {
                 </div>
 
                 <!-- Total Weight Summary -->
-                <FormField v-slot="{}" name="assessment_components">
+                <FormField v-slot="{ }" name="assessment_components">
                     <div class="rounded-lg bg-gray-50 p-4">
                         <div class="flex items-center justify-between">
                             <span class="font-medium">Total Assessment Weight:</span>
-                            <Badge :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'"> {{ getTotalWeight() }}% / 100% </Badge>
+                            <Badge
+                                :class="getTotalWeight() === 100 ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'">
+                                {{ getTotalWeight() }}% / 100% </Badge>
                         </div>
-                        <p class="mt-1 text-sm text-gray-600">All assessment components must total exactly 100% for a valid syllabus.</p>
+                        <p class="mt-1 text-sm text-gray-600">All assessment components must total exactly 100% for a
+                            valid syllabus.</p>
                         <FormItem class="mt-2">
                             <FormMessage />
                         </FormItem>

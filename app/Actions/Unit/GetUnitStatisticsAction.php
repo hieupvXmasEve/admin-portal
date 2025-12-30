@@ -27,10 +27,17 @@ class GetUnitStatisticsAction
             $query->where('semester_id', $semesterId);
         }
 
-        // Clone query for different aggregations
         $gradeQuery = clone $query;
         $passFailQuery = clone $query;
         $attendanceQuery = clone $query;
+        $syllabusQuery = clone $query;
+
+        // 0. Get thresholds from the most recent active syllabus template
+        $activeSyllabus = $unit->activeSyllabusTemplates()->where('is_default', true)->first() 
+            ?? $unit->activeSyllabusTemplates()->orderBy('version', 'desc')->first();
+        
+        $minAttendance = $activeSyllabus?->min_attendance_threshold ?? 80.00;
+        $minGrade = $activeSyllabus?->min_grade_threshold ?? 60.00;
 
         // 1. Grade Distribution (final grades only)
         $grades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F'];
@@ -62,9 +69,9 @@ class GetUnitStatisticsAction
             ['label' => 'Fail', 'total' => $rawPassFail->get('Fail', 0)],
         ];
 
-        // 3. Attendance Buckets
+        // 3. Attendance Buckets (using syllabus threshold)
         $rawAttendance = $attendanceQuery->select(
-            DB::raw('CASE WHEN attendance_percentage >= 80 THEN ">=80%" ELSE "<80%" END as bucket'),
+            DB::raw("CASE WHEN attendance_percentage >= {$minAttendance} THEN \">={$minAttendance}%\" ELSE \"<{$minAttendance}%\" END as bucket"),
             DB::raw('count(*) as total')
         )
             ->groupBy('bucket')
@@ -72,8 +79,8 @@ class GetUnitStatisticsAction
             ->pluck('total', 'bucket');
 
         $attendance = [
-            ['bucket' => '>=80%', 'total' => $rawAttendance->get('>=80%', 0)],
-            ['bucket' => '<80%', 'total' => $rawAttendance->get('<80%', 0)],
+            ['bucket' => ">={$minAttendance}%", 'total' => $rawAttendance->get(">={$minAttendance}%", 0)],
+            ['bucket' => "<{$minAttendance}%", 'total' => $rawAttendance->get("<{$minAttendance}%", 0)],
         ];
 
         // 4. Offerings List
@@ -109,6 +116,8 @@ class GetUnitStatisticsAction
                 'id' => $unit->id,
                 'code' => $unit->code,
                 'name' => $unit->name,
+                'min_attendance_threshold' => $minAttendance,
+                'min_grade_threshold' => $minGrade,
             ],
             'grade_distribution' => $gradeDistribution,
             'pass_fail' => $passFail,
