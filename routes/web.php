@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\ElectiveController;
 use App\Http\Controllers\Web\CurriculumVersionController;
-use App\Http\Controllers\Web\SelectCampus;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -13,19 +12,8 @@ Route::get('dashboard', [\App\Http\Controllers\Web\DashboardController::class, '
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
-// Dashboard chart API endpoints
-// Route::middleware(['web', 'verified'])->prefix('api/dashboard')->name('api.dashboard.')->group(function () {
-//     Route::get('student-distribution', [\App\Http\Controllers\Web\DashboardController::class, 'studentDistribution'])->name('student-distribution');
-//     Route::get('enrollment-growth', [\App\Http\Controllers\Web\DashboardController::class, 'enrollmentGrowth'])->name('enrollment-growth');
-//     Route::get('academic-standing', [\App\Http\Controllers\Web\DashboardController::class, 'academicStanding'])->name('academic-standing');
-//     Route::get('graduation-rate', [\App\Http\Controllers\Web\DashboardController::class, 'graduationRate'])->name('graduation-rate');
-// });
+// Identity routes are now registered via IdentityServiceProvider from app/Modules/Identity/routes/web.php
 
-Route::middleware(['auth'])->group(callback: function () {
-    Route::get('select-campus', [SelectCampus::class, 'index'])->name('select-campus.index');
-    Route::post('select-campus/set-current', [SelectCampus::class, 'setCurrentCampus'])->name('select-campus.set-current');
-    Route::post('select-campus/change', [SelectCampus::class, 'changeCampus'])->name('select-campus.change');
-});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Curriculum Version routes with permission middleware

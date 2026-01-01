@@ -1,5 +1,5 @@
 ---
-alwaysApply: false
+trigger: manual
 ---
 
 # Project Structure & Organization

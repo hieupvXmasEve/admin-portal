@@ -29,6 +29,7 @@ class User extends UserAuditableModel
         'address',
         'status',
         'department_id',
+        'type',
     ];
 
     /**
@@ -49,6 +50,7 @@ class User extends UserAuditableModel
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'type' => \App\Shared\Support\Enums\UserType::class,
     ];
 
     /**
@@ -275,9 +277,44 @@ class User extends UserAuditableModel
         return $this->hasMany(UserEmailPreference::class);
     }
 
+    public function parentProfile()
+    {
+        return $this->hasOne(ParentProfile::class);
+    }
+
     public function children()
     {
         return $this->hasMany(Student::class, 'parent_user_id');
+    }
+
+    public function student()
+    {
+        return $this->hasOne(Student::class);
+    }
+
+    public function lecturer()
+    {
+        return $this->hasOne(Lecture::class);
+    }
+
+    public function isStudent(): bool
+    {
+        return $this->type === \App\Shared\Support\Enums\UserType::STUDENT;
+    }
+
+    public function isLecturer(): bool
+    {
+        return $this->type === \App\Shared\Support\Enums\UserType::LECTURER;
+    }
+
+    public function isParent(): bool
+    {
+        return $this->type === \App\Shared\Support\Enums\UserType::PARENT;
+    }
+
+    public function isStaff(): bool
+    {
+        return $this->type === \App\Shared\Support\Enums\UserType::STAFF;
     }
 
     /**

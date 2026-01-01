@@ -36,6 +36,7 @@ class Student extends StudentAuditableModel
 
     protected $fillable = [
         'student_id',
+        'user_id',
         'full_name',
         'email',
         'phone',
@@ -166,9 +167,22 @@ class Student extends StudentAuditableModel
         return $this->belongsTo(Campus::class);
     }
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+
     public function intakeSemester(): BelongsTo
     {
         return $this->belongsTo(Semester::class, 'intake_semester_id');
+    }
+
+    public function parentProfiles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(ParentProfile::class, 'parent_student', 'student_id', 'parent_id')
+            ->withPivot(['relationship', 'is_primary', 'access_level'])
+            ->withTimestamps();
     }
 
     public function parentUser(): BelongsTo

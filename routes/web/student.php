@@ -165,12 +165,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/evaluate-credits', [ProgramChangeController::class, 'evaluateCredits'])->name('evaluate-credits');
     });
 
-    // Course Retakes - General Access (for menu)
-    Route::prefix('course-retakes')->name('course-retakes.')->group(function () {
-        Route::get('/', [CourseRetakeController::class, 'globalIndex'])->name('index');
-        Route::get('/statistics', [CourseRetakeController::class, 'statistics'])->name('statistics');
-    });
-
 
     // Academic Standing
     Route::prefix('students/{student}/standing')->name('students.standing.')->group(function () {

@@ -55,7 +55,6 @@ class EitherMiddleware
                     $lastResponse = $response;
                 }
             } catch (\Exception $e) {
-                // Continue to next middleware if current one fails
                 continue;
             }
         }
