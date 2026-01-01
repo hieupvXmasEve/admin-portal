@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Student\AttendanceController;
-use App\Http\Controllers\Api\V1\Student\AuthController;
 use App\Http\Controllers\Api\V1\Student\AcademicRecordController;
 use App\Http\Controllers\Api\V1\Student\CalendarController;
 use App\Http\Controllers\Api\V1\Student\ClubController;
@@ -24,21 +23,6 @@ use App\Http\Controllers\Api\GoldTransactionController;
 use App\Http\Controllers\Api\ImageUploadController;
 use Illuminate\Support\Facades\Route;
 
-// Public authentication routes
-Route::prefix('auth')->name('auth.')->group(function () {
-    Route::post('/login', [AuthController::class, 'login'])
-        // ->middleware(['student.api.rate:student-auth'])
-        ->name('login');
-
-    Route::post('/login/google', [AuthController::class, 'loginWithGoogle'])
-        // ->middleware(['student.api.rate:student-auth'])
-        ->name('login.google');
-
-    Route::post('/refresh', [AuthController::class, 'refresh'])
-        // ->middleware(['student.api.rate:student-auth'])
-        ->name('refresh');
-});
-
 // Protected student API routes
 Route::middleware([
     'auth:sanctum',
@@ -50,12 +34,6 @@ Route::middleware([
         'either:parent.student.access,student.api.auth',
         //    'student.api.rate:student-api',
     ])->group(function () {
-
-        // Authentication management
-        Route::prefix('auth')->name('auth.')->group(function () {
-            Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-            Route::get('/me', [AuthController::class, 'me'])->name('me');
-        });
 
         // Dashboard endpoints
         Route::prefix('dashboard')->name('dashboard.')->group(function () {
@@ -202,10 +180,6 @@ Route::middleware([
             Route::get('/current-semester', [CalendarController::class, 'currentSemester'])->name('current-semester');
         });
 
-        // Context & Settings
-        Route::get('/context', [\App\Http\Controllers\Api\V1\Student\StudentContextController::class, 'index'])->name('context');
-        Route::post('/settings', [\App\Http\Controllers\Api\V1\Student\StudentContextController::class, 'updateSettings'])->name('settings.update');
-
         // Form endpoints
         Route::prefix('forms')->name('forms.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'index'])->name('index');
@@ -220,7 +194,7 @@ Route::middleware([
                 Route::post('/{form}/submit', [\App\Http\Controllers\Api\V1\Student\FormController::class, 'submit'])->name('submit');
             });
         });
-         // Query ticket endpoints
+        // Query ticket endpoints
         Route::prefix('queries')->name('queries.')->group(function () {
             Route::get('/', [QueryTicketController::class, 'index'])->name('index');
             Route::get('/{ticket}', [QueryTicketController::class, 'show'])->name('show');
@@ -236,7 +210,7 @@ Route::middleware([
         //     Route::get('/{survey}/responses', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'responses'])->name('responses');
         // });
 
-       
+
 
         // Student-controlled uploads
         Route::prefix('uploads')->name('uploads.')->group(function () {

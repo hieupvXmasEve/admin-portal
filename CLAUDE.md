@@ -16,11 +16,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Backend**: Laravel 12, PHP 8.4, FrankenPHP, MySQL 8, Redis
 **Frontend**: Vue 3, TS, Inertia.js, TailwindCSS 4
-**UI**: reka-ui (shadcn-vue), @tanstack/vue-table
-**Validation**: vee-validate + Zod
+**UI**: reka-ui (shadcn-vue), @tanstack/vue-table, lucide-vue-next
+**Validation**: vee-validate + Zod (Frontend), FormRequest (Backend)
 **State**: Pinia
 **Auth**: Sanctum + Socialite, multiple guards (web, student, api)
 **Permissions**: Spatie Laravel Permission (campus-scoped)
+**Architecture**: Transitioning to **Modular Monolith** (`app/Modules`) from Service-layer (`app/Services`).
 
 ## 2. Commands You May Need
 
@@ -29,9 +30,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 composer dev
 
 # PHP tests
-composer test
-php artisan test
-./vendor/bin/pest
+composer test          # Run all
+php artisan test       # Run pest
+./vendor/bin/pest      # Run pest directly
 
 # TS type check
 pnpm run type-check
@@ -40,14 +41,12 @@ pnpm run vue-tsc --noEmit
 # Frontend build/lint/format
 pnpm run dev
 pnpm run build
-pnpm run build:ssr
 pnpm run lint
 pnpm run format
 pnpm run format:check
 
 # PHP format
 ./vendor/bin/pint
-
 ```
 
 ## 3. Workflow You Must Follow
@@ -63,127 +62,57 @@ pnpm run format:check
 4. **Self-Review**
     * Validate field names, route names, relationships.
     * Ensure TS/PHPCS/ESLint rules will pass.
-5. **Next Step Suggestion (Optional)**
 
-    * One line if obvious.
+## 4. Architectural Rules
 
-## 4. Architectural Rules (Service–Request–Resource Pattern)
+### New Code (Modular Monolith) - Preferred
+* **Modules** (`app/Modules/{Domain}/`): Independent domains (e.g., Identity, Academic).
+* **Actions** (`Actions/`): Business logic, single use-case (e.g., `CreateStudentAction`). Entry point: `run()`.
+* **Queries** (`Queries/`): Complex reads/reporting. Entry point: `handle()`.
+* **Controllers**: Adapters only. Validate request → Call Action/Query → Return Response.
 
+### Legacy Code (Service Pattern)
 * **Service** (`app/Services/`): Business logic + transactions.
-* **FormRequest** (`app/Http/Requests/`): Validation only.
-* **API Resource** (`app/Http/Resources/`): JSON shaping.
-* **Web Controller** (`app/Http/Controllers/Web/`): Inertia views.
-* **API Controller** (`app/Http/Controllers/Api/`): JSON endpoints.
+* **FormRequest** (`app/Http/Requests/`): Validation.
+* **Controllers**: Call Service → Return Resource/Redirect.
 
-Controllers stay thin: call Service → return Resource/Redirect.
+### General Backend
+* **Inertia Pages**: Do not call APIs directly. Pass data via props.
+* **Multi-Campus**: Queries must filter by current campus (via middleware/scope).
+* **Validation**: Always use FormRequests.
 
-## 5. Multi-Campus Rules
-
-* Campus context must exist (middleware `CheckCampusSelected`).
-* All queries filter by current campus.
-* Permissions/roles are campus-specific.
-
-## 6. Frontend Standards (Vue 3 + TS)
+## 5. Frontend Standards (Vue 3 + TS)
 
 * `<script setup lang="ts">` for all new components.
-* Use `reka-ui` components, `DataTable.vue`, `DataPagination.vue`, `DebouncedInput.vue`.
-* Filters are server-driven; use `applyFilters()` to push params via Inertia.
-* **Never** use empty string in `<SelectItem value="">`; use meaningful placeholders (e.g. "none").
-* Zod schema ≙ Laravel validation. Keep them in sync.
-* Convert form data types before submit (string→number/null, etc.).
-* Use `preserveState` & `preserveScroll` in Inertia visits.
+* **UI Components**: Use `reka-ui` (shadcn) in `@/components/ui`.
+* **Icons**: Use `lucide-vue-next`.
+* **Forms**:
+    * Use `vee-validate` + `zod` schema (sync with Backend validation).
+    * Use `useForm` from `@inertiajs/vue3` for submission.
+* **Tables**: Use `DataTable.vue` + `DataPagination.vue`.
+* **Filters**: Server-driven. Update URL params via `router.visit()` with `preserveState`.
+* **API**: If needed (rarely), use `useApi()` composable.
 
-**Table with Selection:**
-* Use `createColumns()` with `{ enableSelection: true }` for selectable tables
-* Handle selection changes via `@selection-change="onSelectionChange"`
-* Access selected rows via reactive ref: `const selected = ref<T[]>([])`
-* Clear selection: `dataTableRef.value?.clearSelection()`
+## 6. Naming Conventions
 
-**API Calls:**
-* Use `useApi()` composable for API requests
-* Pattern: `const api = useApi(); const { data } = await api.get('/endpoint', params)`
-* Handle errors in try/catch with toast notifications
+* **Modules**: PascalCase, Singular (e.g., `Identity`, `Finance`).
+* **Actions**: Verb + Entity + Action (e.g., `UpdateStudentProfileAction`).
+* **Controllers**: `Web/Admin/StudentController.php`, `Api/Student/AuthController.php`.
+* **Vue Components**: PascalCase (e.g., `StudentList.vue`).
+* **Routes**: `{module}.{resource}.{action}` (e.g., `identity.login.show`).
 
-**DataTable pattern (short):**
-
-```ts
-const filters = ref({ search: '', sort: '', direction: 'asc', per_page: 15 })
-const applyFilters = (f: typeof filters.value) => {
-    const p = new URLSearchParams()
-    // set params if present ...
-    router.visit(`/resource-path${p.toString() ? '?' + p : ''}`, {
-        preserveState: true,
-        preserveScroll: true,
-        only: ['items', 'filters'],
-    })
-}
-```
-
-## 7. Testing & Quality
-
-* Use Pest for PHP tests, factories for data.
-* Unit tests for services, feature/integration for APIs.
-* Transactional tests for DB isolation.
-* All code must pass ESLint, Prettier, Pint, TS strict.
-
-## 8. Common Mistakes To Avoid
-
-* Using fields not in DB schema.
-* Mixing controller concerns (validation/business logic).
-* Returning partial diffs or unnamed files.
-* Ignoring campus context or permissions.
-* TS any/implicit types.
-
-## 9. Output Format Rules For Claude
-
-* **Edits**: Prefer diff blocks:
-
-```dif a/app/Services/ExampleService.php
-+++ b/app/Services/ExampleService.php
-@@
-- old line
-+ new line
-```
-
-* **New files**: Show full path then code block.
-* **Multiple files**: Separate clearly with headings.
-* **No prose walls**: Keep explanations short.
-
-## 10. When Unsure
-
-* Ask a **single, precise** clarification question.
-* Offer safest assumption and proceed if trivial.
-
-## 11. Import/Export & Misc
-
-* Uses `maatwebsite/excel` for bulk ops → validate client & server side.
-* Soft deletes everywhere unless stated.
-* Transactions for multi-step data ops.
-*
-
-## 12. Model & Schema Compliance (MANDATORY)
+## 7. Model & Schema Compliance (MANDATORY)
 
 You MUST validate that all:
-
-- Field names exist in the actual database schema
-- Eloquent relationships are correctly defined and used
-- Foreign key references match real model connections
-- Pivot tables (many-to-many) are handled with correct intermediate model or `belongsToMany()`
-
-Before using any model field or relationship:
-
-- Look at the actual Model class if present
-- OR ask for schema/table definition if unsure
+- Field names exist in the actual database schema.
+- Eloquent relationships are correctly defined and used.
+- Foreign key references match real model connections.
 
 ❌ DO NOT:
-
-- Guess field names
-- Invent relationships
-- Assume `$model->relatedModel` exists without confirmation
+- Guess field names.
+- Invent relationships.
+- Assume `$model->relatedModel` exists without confirmation.
 
 ✅ INSTEAD:
-
-- Use `$model->relation_name` only if it's defined in the Model class
-- Use `::with('relation')` only for valid eager-loadable relations
-
-Always assume the schema is real, fixed, and authoritative.
+- Look at the actual Model class if present.
+- OR ask for schema/table definition if unsure.

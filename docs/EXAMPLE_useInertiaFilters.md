@@ -3,6 +3,7 @@
 ## Tại sao nên dùng `useInertiaFilters` thay vì code thủ công?
 
 ### ❌ Cách cũ (thủ công)
+
 ```vue
 <script setup lang="ts">
 const filters = ref({
@@ -79,6 +80,7 @@ const updateFilters = () => {
 ```
 
 ### ✅ Cách mới (useInertiaFilters)
+
 ```vue
 <script setup lang="ts">
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
@@ -94,23 +96,14 @@ interface StudentFilters {
 
 const props = defineProps<Props>();
 
-const { 
-    filters, 
-    hasActiveFilters, 
-    clearFilters,
-    handleSearch,
-    handleSelectFilter,
-    handleSortChange,
-    handlePageSizeChange,
-    handlePaginationNavigate,
-} = useInertiaFilters<StudentFilters>({
+const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePageSizeChange, handlePaginationNavigate } = useInertiaFilters<StudentFilters>({
     baseUrl: studentRoutes.list(),
     initialFilters: {
         search: props.filters.search || '',
         program_id: props.filters.program_id?.toString() || 'all',
         status: props.filters.status || 'all',
         sort: props.filters.sort || null,
-        direction: props.filters.direction as 'asc' | 'desc' || null,
+        direction: (props.filters.direction as 'asc' | 'desc') || null,
         per_page: props.filters.per_page || 15,
     },
     defaultValues: {
@@ -127,27 +120,19 @@ const {
 <template>
     <!-- Auto syncs! -->
     <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" />
-    
+
     <!-- Auto syncs! -->
-    <Select 
-        v-model="filters.program_id" 
-        @update:model-value="(v) => handleSelectFilter('program_id', v)"
-    />
-    
+    <Select v-model="filters.program_id" @update:model-value="(v) => handleSelectFilter('program_id', v)" />
+
     <!-- Auto syncs! -->
-    <DataTable 
-        @sort-change="handleSortChange"
-        :initial-sort="filters.sort"
-        :initial-direction="filters.direction"
-    />
-    
-    <Button v-if="hasActiveFilters" @click="clearFilters">
-        Clear Filters
-    </Button>
+    <DataTable @sort-change="handleSortChange" :initial-sort="filters.sort" :initial-direction="filters.direction" />
+
+    <Button v-if="hasActiveFilters" @click="clearFilters"> Clear Filters </Button>
 </template>
 ```
 
 **Lợi ích:**
+
 - ✅ Giảm ~100 lines code
 - ✅ Type-safe
 - ✅ Auto debounce
@@ -179,16 +164,7 @@ const props = defineProps<{
     programs: Program[];
 }>();
 
-const { 
-    filters, 
-    hasActiveFilters, 
-    clearFilters,
-    handleSearch,
-    handleSelectFilter,
-    handleSortChange,
-    handlePageSizeChange,
-    handlePaginationNavigate,
-} = useInertiaFilters<StudentFilters>({
+const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilter, handleSortChange, handlePageSizeChange, handlePaginationNavigate } = useInertiaFilters<StudentFilters>({
     baseUrl: studentRoutes.list(),
     initialFilters: {
         search: props.filters.search || '',
@@ -217,35 +193,21 @@ const {
         <Card>
             <CardContent class="p-4">
                 <div class="flex gap-2">
-                    <DebouncedInput 
-                        :model-value="filters.search" 
-                        @update:model-value="handleSearch" 
-                        placeholder="Search students..." 
-                    />
-                    
-                    <Select 
-                        v-model="filters.program_id" 
-                        @update:model-value="(v) => handleSelectFilter('program_id', v)"
-                    >
+                    <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" placeholder="Search students..." />
+
+                    <Select v-model="filters.program_id" @update:model-value="(v) => handleSelectFilter('program_id', v)">
                         <SelectTrigger>
                             <SelectValue placeholder="All Programs" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Programs</SelectItem>
-                            <SelectItem 
-                                v-for="program in programs" 
-                                :key="program.id" 
-                                :value="program.id.toString()"
-                            >
+                            <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
                                 {{ program.name }}
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    
-                    <Select 
-                        v-model="filters.status" 
-                        @update:model-value="(v) => handleSelectFilter('status', v)"
-                    >
+
+                    <Select v-model="filters.status" @update:model-value="(v) => handleSelectFilter('status', v)">
                         <SelectTrigger>
                             <SelectValue placeholder="All Status" />
                         </SelectTrigger>
@@ -255,36 +217,19 @@ const {
                             <SelectItem value="inactive">Inactive</SelectItem>
                         </SelectContent>
                     </Select>
-                    
-                    <Button 
-                        v-if="hasActiveFilters" 
-                        variant="ghost" 
-                        @click="clearFilters"
-                    >
-                        <X class="mr-2 h-4 w-4" /> Clear
-                    </Button>
+
+                    <Button v-if="hasActiveFilters" variant="ghost" @click="clearFilters"> <X class="mr-2 h-4 w-4" /> Clear </Button>
                 </div>
             </CardContent>
         </Card>
-        
+
         <!-- Table -->
-        <DataTable 
-            :columns="columns" 
-            :data="students.data"
-            enable-server-sorting
-            :initial-sort="filters.sort"
-            :initial-direction="filters.direction"
-            @sort-change="handleSortChange"
-        >
+        <DataTable :columns="columns" :data="students.data" enable-server-sorting :initial-sort="filters.sort" :initial-direction="filters.direction" @sort-change="handleSortChange">
             <!-- ... -->
         </DataTable>
-        
+
         <!-- Pagination -->
-        <DataPagination 
-            :pagination-data="students"
-            @navigate="handlePaginationNavigate"
-            @page-size-change="handlePageSizeChange"
-        />
+        <DataPagination :pagination-data="students" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
     </div>
 </template>
 ```
@@ -323,14 +268,14 @@ const { filters, hasActiveFilters, clearFilters, handleSearch } = useInertiaFilt
 
 <template>
     <DebouncedInput :model-value="filters.search" @update:model-value="handleSearch" />
-    
+
     <!-- Direct binding - auto syncs! -->
     <Select v-model="filters.type">
         <SelectItem value="all">All Types</SelectItem>
         <SelectItem value="theory">Theory</SelectItem>
         <SelectItem value="lab">Lab</SelectItem>
     </Select>
-    
+
     <Select v-model="filters.level">
         <SelectItem value="all">All Levels</SelectItem>
         <SelectItem value="100">Level 100</SelectItem>
@@ -372,10 +317,10 @@ Nếu muốn control manually:
 
 ```vue
 <script setup lang="ts">
-const { 
-    filters, 
+const {
+    filters,
     applyFilters, // Manual apply
-    clearFilters 
+    clearFilters,
 } = useInertiaFilters({
     baseUrl: '/students',
     initialFilters: props.filters,
@@ -400,11 +345,13 @@ const handleApply = () => {
 ## Migration Guide
 
 ### Step 1: Import composable
+
 ```ts
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 ```
 
 ### Step 2: Define filter types
+
 ```ts
 interface YourFilters {
     search: string;
@@ -413,6 +360,7 @@ interface YourFilters {
 ```
 
 ### Step 3: Replace manual filter logic
+
 ```ts
 // Old
 const filters = ref({ ... });
@@ -428,6 +376,7 @@ const { filters, handleSearch } = useInertiaFilters<YourFilters>({
 ```
 
 ### Step 4: Update template
+
 ```vue
 <!-- Old -->
 <DebouncedInput v-model="filters.search" @debounced="handleSearch" />

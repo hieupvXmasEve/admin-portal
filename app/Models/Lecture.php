@@ -25,6 +25,7 @@ class Lecture extends Authenticatable
 
     protected $fillable = [
         'employee_id',
+        'user_id',
         'title',
         'first_name',
         'last_name',
@@ -192,6 +193,12 @@ class Lecture extends Authenticatable
     {
         return $this->belongsTo(Campus::class);
     }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
 
     public function courseOfferings(): HasMany
     {

@@ -900,6 +900,7 @@ class GradeService
                     'override_reason' => $record?->override_reason,
                     'course_offering_id' => $record?->course_offering_id,
                     'lecturer' => $record?->courseOffering?->lecture?->full_name ?? null,
+                    'section_code' => $record?->courseOffering?->section_code ?? null,
                 ];
             })->values();
 

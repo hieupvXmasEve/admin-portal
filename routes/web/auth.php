@@ -1,30 +1,16 @@
 <?php
 
-use App\Http\Controllers\Web\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Web\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Web\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Web\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Web\Auth\NewPasswordController;
 use App\Http\Controllers\Web\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Web\Auth\RegisteredUserController;
-use App\Http\Controllers\Web\Auth\SocialController;
 use App\Http\Controllers\Web\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    // Google Login
-    Route::get('auth/google/redirect', [SocialController::class, 'redirect'])->name('google.login');
-    Route::get('auth/google/callback', [SocialController::class, 'callback']);
-
-    Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
-
-    Route::post('register', [RegisteredUserController::class, 'store']);
-
-    Route::get('login', [AuthenticatedSessionController::class, 'create'])
-        ->name('login');
-
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    // Identity routes (login, google auth) moved to Identity module
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
@@ -56,6 +42,5 @@ Route::middleware('auth')->group(function () {
 
     Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
 
-    Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
-        ->name('logout');
+    // Logout moved to Identity module
 });

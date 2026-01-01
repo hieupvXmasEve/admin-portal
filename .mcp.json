@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "shadcnVue": {
+            "command": "npx",
+            "args": ["shadcn-vue@latest", "mcp"]
+        },
+        "sequential-thinking": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+            "enabled": true
+        }
+    }
+}

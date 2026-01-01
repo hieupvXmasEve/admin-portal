@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Lecturer\AssessmentController;
 use App\Http\Controllers\Api\V1\Lecturer\AssessmentReportController;
 use App\Http\Controllers\Api\V1\Lecturer\AttendanceController;
-use App\Http\Controllers\Api\V1\Lecturer\AuthController;
 use App\Http\Controllers\Api\V1\Lecturer\CourseController;
 use App\Http\Controllers\Api\V1\Lecturer\DashboardController;
 use App\Http\Controllers\Api\V1\Lecturer\StudentController;
@@ -22,22 +21,6 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// Public authentication routes
-Route::prefix('auth')->name('auth.')->group(function () {
-    Route::post('/login', [AuthController::class, 'login'])
-        //        ->middleware(['lecturer.api.rate:lecturer-auth'])
-        ->name('login');
-
-    Route::post('/login/google', [AuthController::class, 'loginWithGoogle'])
-        //        ->middleware(['lecturer.api.rate:lecturer-auth'])
-        ->name('login.google');
-
-    Route::post('/refresh', [AuthController::class, 'refresh'])
-        //        ->middleware(['lecturer.api.rate:lecturer-auth'])
-        ->name('refresh');
-    Route::get('/check-science', [AuthController::class, 'checkScience'])->name('check-science');
-});
-
 // Protected lecturer API routes
 Route::middleware([
     'auth:sanctum',
@@ -45,12 +28,6 @@ Route::middleware([
     //    'lecturer.api.rate:lecturer-api',
     'api.logging',
 ])->group(function () {
-
-    // Authentication management
-    Route::prefix('auth')->name('auth.')->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-        Route::get('/me', [AuthController::class, 'me'])->name('me');
-    });
 
     // Dashboard endpoints
     Route::prefix('dashboard')->name('dashboard.')->group(function () {

@@ -58,9 +58,9 @@ class ParentStudentAccess
         }
 
         // Find the student and verify parent relationship
-        $student = Student::where('id', $studentId)
-            ->orWhere('student_id', $studentId)
-            ->first();
+        // Prioritize business student_id over internal ID
+        $student = Student::where('student_id', $studentId)->first()
+            ?? Student::where('id', $studentId)->first();
 
         if (!$student) {
             return ApiResponse::notFound('Student not found');
@@ -93,13 +93,22 @@ class ParentStudentAccess
      */
     protected function canParentAccessStudent(User $parent, Student $student): bool
     {
-        // Direct parent relationship
+        // 1. Check new relationship via ParentProfile and pivot table
+        $parentProfile = $parent->parentProfile;
+        if ($parentProfile) {
+            $hasPivotAccess = $parentProfile->students()
+                ->where('parent_student.student_id', $student->id)
+                ->exists();
+
+            if ($hasPivotAccess) {
+                return true;
+            }
+        }
+
+        // 2. Backward Compatibility: Direct parent relationship on students table
         if ($student->parent_user_id === $parent->id) {
             return true;
         }
-
-        // Could add additional parent-child relationships here if needed
-        // e.g., guardian relationships, secondary parents, etc.
 
         return false;
     }
@@ -109,20 +118,25 @@ class ParentStudentAccess
      */
     protected function isStudentAccessible(Student $student): bool
     {
-        // Check if student account is active or in valid intake status
-        $allowedStatuses = ['active', 'enrolled', 'intake_pre_uni_gc', 'intake_pre_uni', 'intake', 'pre_uni'];
+        // Use the Model's logic for consistency
         if (!$student->isActive()) {
             return false;
         }
 
-        // Check for blocking academic holds (optional)
-        $hasBlockingHolds = $student->academicHolds()
-            ->where('status', 'active')
-            ->where('hold_category', 'all')
-            ->exists();
+        // Specific allowed statuses for parents (may include 'pending' or 'intake' types)
+        $allowedStatuses = [
+            'active',
+            'enrolled',
+            'intake_pre_uni_gc',
+            'intake_pre_uni',
+            'intake',
+            'pre_uni',
+            'intake_course'
+        ];
 
-        // Allow access even with holds for parent monitoring
-        // You might want to restrict this based on business rules
+        if (!in_array($student->status, $allowedStatuses)) {
+            return false;
+        }
 
         return true;
     }

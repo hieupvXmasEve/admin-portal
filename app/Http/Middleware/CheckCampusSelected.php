@@ -15,18 +15,25 @@ class CheckCampusSelected
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Nếu chưa login thì để middleware auth xử lý
-        if (! auth()->check()) {
+        // 1. Skip for guests - let auth middleware handle them
+        if (!auth()->check()) {
             return $next($request);
         }
-        if (session()->has('current_campus_id') && $request->routeIs('select-campus.index')) {
-            // go to dashboard
-            return redirect()->route('dashboard');
-        }
-        // Skip kiểm tra cho các route select-campus, email verification, password confirmation, và logout
-        if ($request->routeIs([
+
+        $campusId = session('current_campus_id');
+        $isSelectCampusRoute = $request->routeIs([
             'select-campus.index',
             'select-campus.set-current',
+            'select-campus.change'
+        ]);
+
+        // 2. If already has campus, and trying to go to selection page, go to dashboard
+        if ($campusId && $isSelectCampusRoute && !$request->routeIs('select-campus.change')) {
+            return redirect()->route('dashboard');
+        }
+
+        // 3. Whitelist routes that DON'T need campus selected
+        if ($isSelectCampusRoute || $request->routeIs([
             'verification.notice',
             'verification.verify',
             'verification.send',
@@ -36,8 +43,8 @@ class CheckCampusSelected
             return $next($request);
         }
 
-        // Redirect nếu chưa chọn campus
-        if (! session()->has('current_campus_id')) {
+        // 4. If no campus selected, redirect to selection page
+        if (!$campusId) {
             return redirect()->route('select-campus.index');
         }
 
