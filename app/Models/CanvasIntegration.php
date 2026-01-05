@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Contracts\Encryption\DecryptException;
 
 class CanvasIntegration extends AuditableModel
 {
@@ -79,7 +81,20 @@ class CanvasIntegration extends AuditableModel
 
     public function getClientSecretAttribute(?string $value): ?string
     {
-        return $value ? Crypt::decryptString($value) : null;
+        if (! $value) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (DecryptException $e) {
+            Log::warning('Failed to decrypt client_secret for CanvasIntegration', [
+                'integration_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     public function setAccessTokenAttribute(?string $value): void
@@ -89,7 +104,20 @@ class CanvasIntegration extends AuditableModel
 
     public function getAccessTokenAttribute(?string $value): ?string
     {
-        return $value ? Crypt::decryptString($value) : null;
+        if (! $value) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (DecryptException $e) {
+            Log::warning('Failed to decrypt access_token for CanvasIntegration', [
+                'integration_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     public function setRefreshTokenAttribute(?string $value): void
@@ -99,7 +127,20 @@ class CanvasIntegration extends AuditableModel
 
     public function getRefreshTokenAttribute(?string $value): ?string
     {
-        return $value ? Crypt::decryptString($value) : null;
+        if (! $value) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (DecryptException $e) {
+            Log::warning('Failed to decrypt refresh_token for CanvasIntegration', [
+                'integration_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     // Helper Methods
