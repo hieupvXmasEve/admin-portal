@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import LoadingSpinner from '@/components/ui/LoadingSpinner.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
@@ -47,18 +48,11 @@ interface Props {
         warning?: string;
         info?: string;
     };
-    surveyForms: { id: number; title: string, code: string }[];
+    surveyForms: { id: number; title: string; code: string }[];
 }
 const props = defineProps<Props>();
 
-const {
-    filters,
-    handleSearch,
-    handleSelectFilter,
-    handleSortChange,
-    handlePaginationNavigate,
-    handlePageSizeChange,
-} = useInertiaFilters<CourseOfferingFilters>({
+const { filters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange } = useInertiaFilters<CourseOfferingFilters>({
     baseUrl: '/course-offerings',
     initialFilters: {
         ...props.filters,
@@ -120,9 +114,12 @@ const loadStatistics = async () => {
     }
 };
 
-watch(() => filters.semester_id, () => {
-    loadStatistics();
-});
+watch(
+    () => filters.semester_id,
+    () => {
+        loadStatistics();
+    },
+);
 
 // Load statistics on mount
 loadStatistics();
@@ -260,6 +257,7 @@ const closeStatusDialog = () => {
 
 const updateCourseStatus = () => {
     if (!selectedCourse.value) return;
+    isLoading.value = true;
 
     // Direct update for all statuses
     router.patch(
@@ -274,7 +272,7 @@ const updateCourseStatus = () => {
                 }
 
                 const successMessage = ((page.props as any).flash?.success as string) || 'Course status updated successfully';
-
+                isLoading.value = false;
                 // Render HTML in toast for detailed messages with proper styling
                 toast(
                     h('div', {
@@ -293,6 +291,7 @@ const updateCourseStatus = () => {
                 const firstError = Object.values(errors)[0];
                 const errorMessage = Array.isArray(firstError) ? firstError[0] : (firstError as string) || 'Failed to update course status';
                 toast.error(errorMessage);
+                isLoading.value = false;
             },
         },
     );
@@ -447,7 +446,7 @@ const columns: ColumnDef<CourseOffering>[] = [
         cell: ({ row }) => {
             const course = row.original;
 
-             // Don't show survey column for EGC units
+            // Don't show survey column for EGC units
             if (course.unit?.unit_type === 'egc') {
                 return h('span', { class: 'text-xs text-muted-foreground' }, '-');
             }
@@ -459,7 +458,7 @@ const columns: ColumnDef<CourseOffering>[] = [
             }
 
             if (!props.surveyForms || props.surveyForms.length === 0) {
-                 return h('span', { class: 'text-xs text-muted-foreground' }, 'No Forms');
+                return h('span', { class: 'text-xs text-muted-foreground' }, 'No Forms');
             }
 
             return h(
@@ -473,7 +472,7 @@ const columns: ColumnDef<CourseOffering>[] = [
                         openSurveyDialog(course);
                     },
                 },
-                () => 'Create Survey'
+                () => 'Create Survey',
             );
         },
     },
@@ -811,7 +810,10 @@ const columns: ColumnDef<CourseOffering>[] = [
             </div>
             <DialogFooter>
                 <Button variant="outline" @click="closeStatusDialog">Cancel</Button>
-                <Button @click="updateCourseStatus">Update Status</Button>
+                <Button :disabled="isLoading" @click="updateCourseStatus">
+                    <LoadingSpinner v-if="isLoading" size="sm" />
+                    {{ isLoading ? 'Updating...' : 'Update Status' }}
+                </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
@@ -828,28 +830,24 @@ const columns: ColumnDef<CourseOffering>[] = [
                     </template>
                 </DialogDescription>
             </DialogHeader>
-            <div class="space-y-4 py-4 min-w-0 overflow-hidden">
-                <div class="space-y-2 min-w-0 overflow-hidden">
+            <div class="min-w-0 space-y-4 overflow-hidden py-4">
+                <div class="min-w-0 space-y-2 overflow-hidden">
                     <label class="text-sm font-medium">Select Survey Form</label>
                     <div class="grid w-full min-w-0 grid-cols-1 overflow-hidden">
                         <Select v-model="selectedFormId">
                             <SelectTrigger class="w-full min-w-0 overflow-hidden">
-                                <SelectValue placeholder="Select a form" class="truncate block text-left" />
+                                <SelectValue placeholder="Select a form" class="block truncate text-left" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem v-for="form in surveyForms" :key="form.id" :value="form.id.toString()">
-                                    <span class="truncate block max-w-[280px]" :title="`${form.title} (${form.code})`">
-                                        {{ form.title }} ({{ form.code }})
-                                    </span>
+                                    <span class="block max-w-[280px] truncate" :title="`${form.title} (${form.code})`"> {{ form.title }} ({{ form.code }}) </span>
                                 </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                 </div>
                 <div class="space-y-3 rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-                    <p class="text-sm text-blue-800 dark:text-blue-200">
-                        This will create a survey target for this course and automatically assign it to all enrolled students.
-                    </p>
+                    <p class="text-sm text-blue-800 dark:text-blue-200">This will create a survey target for this course and automatically assign it to all enrolled students.</p>
                 </div>
             </div>
             <DialogFooter>

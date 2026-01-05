@@ -310,6 +310,8 @@ export const assessmentRoutes = {
 // Academic Summary Routes (Placeholder for future implementation)
 export const academicSummaryRoutes = {
     gpaFinalization: () => route('academic.gpa.finalize.index'),
+    gpaHistory: () => route('academic.gpa.history'),
+    performanceDashboard: () => route('academic.students.performance'),
     academicReport: () => route('academic.report.index'),
     degreeClassification: () => '#',
     transcriptHistory: () => '#',

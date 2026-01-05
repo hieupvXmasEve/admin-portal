@@ -61,7 +61,8 @@ class FinalizeSemesterGpaAction
                     continue;
                 }
 
-                $cumulativeData = $this->calculateCumulativeGpa->execute($student);
+                // Calculate cumulative GPA up to and including the current semester
+                $cumulativeData = $this->calculateCumulativeGpa->execute($student, $semesterId);
                 $standing = $this->determineStanding->execute($cumulativeData['gpa']);
 
                 // Mark previous records for this student as not current

@@ -57,7 +57,7 @@ class CourseStatisticsService
             DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "D" THEN 1 END) as grade_d'),
             DB::raw('COUNT(CASE WHEN academic_records.final_letter_grade = "F" THEN 1 END) as grade_f'),
         ])
-        ->groupBy('units.id', 'units.code', 'units.name', 'units.credit_points');
+            ->groupBy('units.id', 'units.code', 'units.name', 'units.credit_points');
 
         $sortColumn = match ($sortBy) {
             'unit_code' => 'units.code',
@@ -157,7 +157,7 @@ class CourseStatisticsService
 
         $sessions = $courseOffering->classSessions;
         $totalSessions = $sessions->count();
-        
+
         $attendanceThreshold = (float) ($courseOffering->syllabusTemplate?->min_attendance_threshold ?? 80.00);
         $allowedAbsenceRatio = (100 - $attendanceThreshold) / 100;
         $allowedAbsences = (int) floor($totalSessions * $allowedAbsenceRatio);
@@ -463,7 +463,7 @@ class CourseStatisticsService
         ];
 
         return [
-            'course_offering' => ['id' => $courseOffering->id],
+            'course_offering' => ['id' => $courseOffering->id, 'min_grade_threshold' => (float)($courseOffering->syllabusTemplate?->min_grade_threshold ?? 60.00)],
             'statistics' => $statistics,
             'assessment_components' => $assessmentComponents->map(function ($component) {
                 return [

@@ -336,35 +336,23 @@ export const mainNavItems: NavItem[] = [
                 requiredPermissions: ['view_grade'],
             },
             {
+                title: 'GPA History',
+                href: academicSummaryRoutes.gpaHistory(),
+                icon: Clock,
+                requiredPermissions: ['view_grade'],
+            },
+            {
+                title: 'Performance Dashboard',
+                href: academicSummaryRoutes.performanceDashboard(),
+                icon: BarChart3,
+                requiredPermissions: ['view_grade'],
+            },
+            {
                 title: 'Academic Report',
                 href: academicSummaryRoutes.academicReport(),
                 icon: FileText,
                 requiredPermissions: ['view_grade'],
             },
-            // {
-            //     title: 'Student Statistics',
-            //     href: reportRoutes.studentStatistics(),
-            //     icon: Users,
-            //     requiredPermissions: ['view_report'], // Will be implemented later
-            // },
-            // {
-            //     title: 'Academic Performance Summary',
-            //     href: reportRoutes.performanceSummary(),
-            //     icon: TrendingUp,
-            //     requiredPermissions: ['view_report'], // Will be implemented later
-            // },
-            // {
-            //     title: 'Attendance Summary',
-            //     href: reportRoutes.attendanceSummary(),
-            //     icon: Clock,
-            //     requiredPermissions: ['view_report'], // Will be implemented later
-            // },
-            // {
-            //     title: 'GPA Distribution Charts',
-            //     href: reportRoutes.gpaDistribution(),
-            //     icon: PieChart,
-            //     requiredPermissions: ['view_report'], // Will be implemented later
-            // },
         ],
     },
 
@@ -444,162 +432,7 @@ export const mainNavItems: NavItem[] = [
             // },
         ],
     },
-    // {
-    //     title: 'Course Survey',
-    //     href: '#',
-    //     icon: ClipboardCheck,
-    //     children: [
-    //         {
-    //             title: 'Survey List',
-    //             href: '/surveys',
-    //             icon: ClipboardCheck,
-    //             requiredPermissions: ['view_survey'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Settings',
-    //             href: '/surveys/settings',
-    //             icon: Settings2,
-    //             requiredPermissions: ['edit_survey'], // Will be implemented later
-    //         },
-    //     ],
-    // },
-    // {
-    //     title: 'Assessments & Grading',
-    //     href: '#',
-    //     icon: Star,
-    //     children: [
-    //         {
-    //             title: 'Assessment Components',
-    //             href: assessmentRoutes.components(),
-    //             icon: Target,
-    //             requiredPermissions: ['view_assessment'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Enter Grades',
-    //             href: assessmentRoutes.enterGrades(),
-    //             icon: Star,
-    //             requiredPermissions: ['edit_grade'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Academic Results',
-    //             href: assessmentRoutes.academicResults(),
-    //             icon: Trophy,
-    //             requiredPermissions: ['view_grade'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Re-assessments',
-    //             href: assessmentRoutes.reAssessments(),
-    //             icon: Repeat,
-    //             requiredPermissions: ['edit_assessment'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Semester Grade Reports',
-    //             href: assessmentRoutes.gradeReports(),
-    //             icon: FileSpreadsheet,
-    //             requiredPermissions: ['view_grade'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'GPA History',
-    //             href: assessmentRoutes.gpaHistory(),
-    //             icon: TrendingUp,
-    //             requiredPermissions: ['view_grade'], // Will be implemented later
-    //         },
-    //     ],
-    // },
-    // `{
-    //     title: 'Academic Summary',
-    //     href: '#',
-    //     icon: Presentation,
-    //     children: [
-    //         {
-    //             title: 'GPA Calculations',
-    //             href: academicSummaryRoutes.gpaCalculations(),
-    //             icon: Target,
-    //             requiredPermissions: ['view_grade'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Degree Classification',
-    //             href: academicSummaryRoutes.degreeClassification(),
-    //             icon: Award,
-    //             requiredPermissions: ['view_grade'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Transcript History',
-    //             href: academicSummaryRoutes.transcriptHistory(),
-    //             icon: FileText,
-    //             requiredPermissions: ['view_grade'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Academic Performance Report',
-    //             href: academicSummaryRoutes.performanceReport(),
-    //             icon: LineChart,
-    //             requiredPermissions: ['view_grade'], // Will be implemented later
-    //         },
-    //     ],
-    // },`
-    // {
-    //     title: 'Program Transfers & Course Retakes',
-    //     href: '#',
-    //     icon: ArrowUpRight,
-    //     children: [
-    //         {
-    //             title: 'Program Change Requests',
-    //             href: transferRoutes.programChangeRequests(),
-    //             icon: RefreshCw,
-    //             requiredPermissions: ['edit_student'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Repeated Courses',
-    //             href: transferRoutes.repeatedCourses(),
-    //             icon: Repeat,
-    //             requiredPermissions: ['view_student'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Substitute Course Mapping',
-    //             href: transferRoutes.substituteCourseMapping(),
-    //             icon: BookMarked,
-    //             requiredPermissions: ['view_unit'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Credit Transfer Evaluation',
-    //             href: transferRoutes.creditTransferEvaluation(),
-    //             icon: CheckSquare,
-    //             requiredPermissions: ['edit_student'], // Will be implemented later
-    //         },
-    //     ],
-    // },
 
-    // {
-    //     title: 'Course Syllabus & Content',
-    //     href: '#',
-    //     icon: FileText,
-    //     children: [
-    //         {
-    //             title: 'Syllabi Management',
-    //             href: '#', // Will use dynamic routes based on unit
-    //             icon: FileText,
-    //             requiredPermissions: ['view_syllabus'],
-    //         },
-    //         {
-    //             title: 'Learning Materials',
-    //             href: syllabusRoutes.learningMaterials(),
-    //             icon: BookOpen,
-    //             requiredPermissions: ['view_syllabus'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Course Learning Outcomes',
-    //             href: syllabusRoutes.learningOutcomes(),
-    //             icon: Target,
-    //             requiredPermissions: ['view_syllabus'], // Will be implemented later
-    //         },
-    //         {
-    //             title: 'Assessment Rubrics',
-    //             href: syllabusRoutes.assessmentRubrics(),
-    //             icon: CheckSquare,
-    //             requiredPermissions: ['view_syllabus'], // Will be implemented later
-    //         },
-    //     ],
-    // },
     {
         title: 'Events',
         href: '#',
