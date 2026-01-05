@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web\Admin\Academic;
 
 use App\Http\Controllers\Web\Admin\Academic\AcademicReportController;
+use App\Http\Controllers\Web\Admin\Academic\CourseRankingController;
 use App\Http\Controllers\Web\Admin\Academic\GpaManagementController;
 use App\Modules\Academic\Http\Web\Admin\GpaHistoryController;
 use App\Modules\Academic\Http\Web\Admin\PerformanceDashboardController;
@@ -36,4 +37,8 @@ Route::middleware(['auth', 'verified'])->prefix('academic')->name('academic.')->
     Route::get('/report', [AcademicReportController::class, 'index'])
         ->middleware('can:view_academic_report')
         ->name('report.index');
+
+    Route::get('/course-ranking', [CourseRankingController::class, 'index'])
+        ->middleware('can:view_academic_report')
+        ->name('course-ranking.index');
 });
