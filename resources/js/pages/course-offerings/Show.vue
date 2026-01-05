@@ -2,6 +2,7 @@
 import AddClassSessionModal from '@/components/AddClassSessionModal.vue';
 import BulkEditClassSessionModal from '@/components/BulkEditClassSessionModal.vue';
 import DataTable from '@/components/DataTable.vue';
+import MoveStudentModal from '@/components/MoveStudentModal.vue';
 import QuickEditClassSessionModal from '@/components/QuickEditClassSessionModal.vue';
 import RoomSelectionModal from '@/components/RoomSelectionModal.vue';
 import StudentSearchModal from '@/components/StudentSearchModal.vue';
@@ -15,13 +16,13 @@ import { useApi } from '@/composables/useApiRequest';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { usePermission } from '@/composables/usePermission';
 import { createSelectionColumn } from '@/lib/table-utils';
-import type { AcademicRecord, ClassSession, CourseOffering, CourseRegistration, Room } from '@/types/models';
+import type { AcademicRecord, ClassSession, CourseOffering, CourseRegistration, Room, Student } from '@/types/models';
 import { formatDateTimeToShort } from '@/utils/date';
 import { classSessionRoutes, curriculumRoutes } from '@/utils/routes';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
 import { format } from 'date-fns';
-import { ArrowLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, Edit2, ExternalLink, Eye, MapPin, Settings, Trash2, UserCheck, Users } from 'lucide-vue-next';
+import { ArrowLeft, ArrowRightLeft, BookOpen, Calendar, ChevronDown, Clock, Edit, Edit2, ExternalLink, Eye, MapPin, Settings, Trash2, UserCheck, Users } from 'lucide-vue-next';
 import { computed, h, ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -32,6 +33,7 @@ interface Props {
         academic_records?: AcademicRecord[];
     };
     availableRooms: Room[];
+    siblingOfferings: CourseOffering[];
     // canGenerateClassSessions: boolean;
 }
 
@@ -178,6 +180,10 @@ const selectedSessions = ref<ClassSession[]>([]);
 // Add class session modal state
 const addSessionOpen = ref(false);
 
+// Move student modal state
+const moveStudentOpen = ref(false);
+const studentToMove = ref<Student | null>(null);
+
 // Student addition success handler
 const handleStudentAddSuccess = () => {
     router.reload({ only: ['courseOffering'] });
@@ -215,6 +221,16 @@ const deleteStudentRegistration = (registration: CourseRegistration) => {
             },
         },
     );
+};
+
+const openMoveStudentModal = (student: Student | undefined) => {
+    if (!student) return;
+    studentToMove.value = student;
+    moveStudentOpen.value = true;
+};
+
+const handleMoveSuccess = () => {
+    router.reload({ only: ['courseOffering', 'siblingOfferings'] });
 };
 
 // Quick edit session functions
@@ -928,11 +944,18 @@ const bulkDeleteSessions = () => {
                                         {{ registration.registration_method }}
                                     </TableCell>
                                     <TableCell>
-                                        <Button v-if="can('delete_student_registration') && !isStartedCourse"
-                                            variant="ghost" size="sm" @click="deleteStudentRegistration(registration)"
-                                            class="text-destructive hover:text-destructive hover:bg-destructive/10">
-                                            <Trash2 class="h-4 w-4" />
-                                        </Button>
+                                        <div class="flex items-center gap-1">
+                                            <Button v-if="can('edit_course_offering') && siblingOfferings.length > 0"
+                                                variant="ghost" size="sm" title="Move to another section"
+                                                @click="openMoveStudentModal(registration.student)">
+                                                <ArrowRightLeft class="h-4 w-4" />
+                                            </Button>
+                                            <Button v-if="can('delete_student_registration') && !isStartedCourse"
+                                                variant="ghost" size="sm" @click="deleteStudentRegistration(registration)"
+                                                class="text-destructive hover:text-destructive hover:bg-destructive/10">
+                                                <Trash2 class="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
@@ -956,6 +979,10 @@ const bulkDeleteSessions = () => {
     <BulkEditClassSessionModal :open="bulkEditOpen" :selected-sessions="selectedSessions"
         :campus_id="courseOffering.campus_id" @update:open="bulkEditOpen = $event"
         @sessions-updated="handleBulkEditSuccess" />
+
+    <!-- Move Student Modal -->
+    <MoveStudentModal :open="moveStudentOpen" :current-offering-id="courseOffering.id" :student="studentToMove"
+        :sibling-offerings="siblingOfferings" @update:open="moveStudentOpen = $event" @success="handleMoveSuccess" />
 
     <!-- Registration Status Management Modal -->
     <!--    <RegistrationStatusModal-->

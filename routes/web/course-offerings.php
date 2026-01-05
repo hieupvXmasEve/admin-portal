@@ -72,6 +72,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{courseOffering}/delete-student-registration', [CourseOfferingController::class, 'deleteStudentRegistration'])
             ->middleware('can:delete_student_registration')
             ->name('course-offerings.delete-student-registration');
+
+        Route::post('/{courseOffering}/move-student', [CourseOfferingController::class, 'moveStudent'])
+            ->middleware('can:edit_course_offering')
+            ->name('course-offerings.move-student');
     });
 
     Route::prefix('api/course-offerings')->group(function () {
