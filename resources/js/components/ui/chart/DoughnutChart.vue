@@ -11,12 +11,14 @@ interface Props extends DoughnutChartProps {
     height?: string;
     width?: string;
     class?: string;
+    plugins?: any[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
     height: '300px',
     width: '100%',
     class: '',
+    plugins: () => [],
 });
 
 const defaultOptions: DefaultChartOptions = {
@@ -76,6 +78,6 @@ const mergedOptions = computed(() => {
             width: width,
         }"
     >
-        <Doughnut :data="data" :options="mergedOptions" class="h-full w-full" />
+        <Doughnut :data="data" :options="mergedOptions" :plugins="plugins" class="h-full w-full" />
     </div>
 </template>

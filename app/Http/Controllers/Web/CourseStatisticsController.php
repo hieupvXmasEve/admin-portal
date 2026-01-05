@@ -70,7 +70,11 @@ class CourseStatisticsController extends Controller
     public function show(CourseOffering $courseOffering): Response
     {
         $data = $this->service->getAttendanceGrid($courseOffering->id);
-        $data['course_offering'] = ['id' => $courseOffering->id];
+        $data['course_offering'] = [
+            'id' => $courseOffering->id,
+            'unit_id' => $courseOffering->unit->id,
+            'semester_id' => $courseOffering->semester->id,
+        ];
 
         return Inertia::render('CourseStatistics/Detail', $data);
     }

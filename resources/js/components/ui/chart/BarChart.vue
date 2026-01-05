@@ -116,6 +116,6 @@ const mergedOptions = computed(() => {
             width: width,
         }"
     >
-        <Bar :data="data" :options="mergedOptions" class="h-full w-full" />
+        <Bar :data="data" :options="mergedOptions" :plugins="plugins" class="h-full w-full" />
     </div>
 </template>

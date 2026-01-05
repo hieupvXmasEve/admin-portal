@@ -1192,12 +1192,7 @@ class CourseOfferingController extends Controller
             $results[] = $eligibilityInfo;
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'students' => $results,
-            ],
-        ]);
+        return ApiResponse::success(['students' => $results]);
     }
 
     /**
@@ -1212,10 +1207,7 @@ class CourseOfferingController extends Controller
 
         // Validate course status - cannot register to completed/cancelled courses
         if (in_array($courseOffering->course_status, ['completed', 'cancelled'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot register students to a completed or cancelled course.',
-            ], 422);
+            return ApiResponse::error('Cannot register students to a completed or cancelled course.', [], 422);
         }
 
         $validated = $request->validate([
@@ -1492,23 +1484,16 @@ class CourseOfferingController extends Controller
 
             $message = "Registration completed. {$successCount} successful, {$failureCount} failed.";
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'successful_registrations' => $successCount,
-                    'failed_registrations' => $failureCount,
-                    'results' => $results,
-                ],
-                'message' => $message,
-            ]);
+            return ApiResponse::success([
+                'successful_registrations' => $successCount,
+                'failed_registrations' => $failureCount,
+                'results' => $results,
+            ], [], $message);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Bulk registration failed: ' . $e->getMessage());
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Bulk registration failed: ' . $e->getMessage(),
-            ], 500);
+            return ApiResponse::error('Bulk registration failed: ' . $e->getMessage(), [], 500);
         }
     }
 
@@ -1538,10 +1523,7 @@ class CourseOfferingController extends Controller
             ? round(($stats['total_enrollment'] / $stats['total_capacity']) * 100, 2)
             : 0;
 
-        return response()->json([
-            'success' => true,
-            'data' => $stats,
-        ]);
+        return ApiResponse::success($stats);
     }
 
     /**
@@ -1806,28 +1788,25 @@ class CourseOfferingController extends Controller
         $semester = Semester::find($semesterId);
         $classesStarted = $semester && $semester->start_date <= now();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'semester_id' => $semesterId,
-                'semester_name' => $semester->name ?? 'Unknown',
-                'classes_started' => $classesStarted,
-                'offerings_without_instructors' => $offeringsWithoutInstructors->count(),
-                'unassigned_offerings' => $offeringsWithoutInstructors->map(function ($offering) {
-                    return [
-                        'id' => $offering->id,
-                        'course_code' => $offering->course_code,
-                        'course_title' => $offering->course_title,
-                        'section_code' => $offering->section_code,
-                        'current_enrollment' => $offering->current_enrollment,
-                        'max_capacity' => $offering->max_capacity,
-                    ];
-                }),
-                'is_ready_for_classes' => $offeringsWithoutInstructors->count() === 0,
-                'warning_message' => $offeringsWithoutInstructors->count() > 0 && $classesStarted
-                    ? 'Classes have started but some course offerings do not have assigned instructors!'
-                    : null,
-            ],
+        return ApiResponse::success([
+            'semester_id' => $semesterId,
+            'semester_name' => $semester->name ?? 'Unknown',
+            'classes_started' => $classesStarted,
+            'offerings_without_instructors' => $offeringsWithoutInstructors->count(),
+            'unassigned_offerings' => $offeringsWithoutInstructors->map(function ($offering) {
+                return [
+                    'id' => $offering->id,
+                    'course_code' => $offering->course_code,
+                    'course_title' => $offering->course_title,
+                    'section_code' => $offering->section_code,
+                    'current_enrollment' => $offering->current_enrollment,
+                    'max_capacity' => $offering->max_capacity,
+                ];
+            }),
+            'is_ready_for_classes' => $offeringsWithoutInstructors->count() === 0,
+            'warning_message' => $offeringsWithoutInstructors->count() > 0 && $classesStarted
+                ? 'Classes have started but some course offerings do not have assigned instructors!'
+                : null,
         ]);
     }
 
@@ -1891,10 +1870,7 @@ class CourseOfferingController extends Controller
                 ->first();
 
             if (! $registration) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Registration not found or does not belong to this course offering.',
-                ], 404);
+                return ApiResponse::error('Registration not found or does not belong to this course offering.', [], 404);
             }
 
             $studentName = $registration->student->full_name ?? 'Unknown Student';
@@ -1929,23 +1905,16 @@ class CourseOfferingController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => "Successfully removed {$studentName} ({$studentId}) from the course.",
-                'data' => [
-                    'deleted_registration_id' => $request->registration_id,
-                    'student_name' => $studentName,
-                    'student_id' => $studentId,
-                ],
-            ]);
+            return ApiResponse::success([
+                'deleted_registration_id' => $request->registration_id,
+                'student_name' => $studentName,
+                'student_id' => $studentId,
+            ], [], "Successfully removed {$studentName} ({$studentId}) from the course.");
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to delete student registration: ' . $e->getMessage());
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to remove student from course: ' . $e->getMessage(),
-            ], 500);
+            return ApiResponse::error('Failed to remove student from course: ' . $e->getMessage(), [], 500);
         }
     }
 
@@ -1994,22 +1963,15 @@ class CourseOfferingController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => "Successfully updated {$updatedCount} student registration(s) from {$request->from_status} to {$request->to_status}.",
-                'data' => [
-                    'updated_count' => $updatedCount,
-                    'from_status' => $request->from_status,
-                    'to_status' => $request->to_status,
-                ],
-            ]);
+            return ApiResponse::success([
+                'updated_count' => $updatedCount,
+                'from_status' => $request->from_status,
+                'to_status' => $request->to_status,
+            ], [], "Successfully updated {$updatedCount} student registration(s) from {$request->from_status} to {$request->to_status}.");
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update registration status: ' . $e->getMessage(),
-            ], 500);
+            return ApiResponse::error('Failed to update registration status: ' . $e->getMessage(), [], 500);
         }
     }
 

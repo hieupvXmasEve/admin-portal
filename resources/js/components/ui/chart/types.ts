@@ -6,6 +6,7 @@ export interface BaseChartProps {
     height?: string;
     width?: string;
     class?: string;
+    plugins?: any[];
 }
 
 export interface LineChartProps extends BaseChartProps {
