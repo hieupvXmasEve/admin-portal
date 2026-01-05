@@ -88,11 +88,12 @@ interface Props {
     scores_grid: StudentScore[];
     course_offering: {
         id: number;
+        min_grade_threshold: number;
     };
 }
 
 const props = defineProps<Props>();
-
+console.log('props', props);
 const statusFilter = ref<string>('all');
 
 const filteredScoresGrid = computed(() => {
@@ -101,11 +102,11 @@ const filteredScoresGrid = computed(() => {
     }
 
     if (statusFilter.value === 'pass') {
-        return props.scores_grid.filter((student) => student.total_percentage !== null && student.total_percentage >= 60);
+        return props.scores_grid.filter((student) => student.total_percentage !== null && student.total_percentage >= props.course_offering.min_grade_threshold);
     }
 
     if (statusFilter.value === 'fail') {
-        return props.scores_grid.filter((student) => student.total_percentage !== null && student.total_percentage < 60);
+        return props.scores_grid.filter((student) => student.total_percentage !== null && student.total_percentage < props.course_offering.min_grade_threshold);
     }
 
     return props.scores_grid;
@@ -416,7 +417,9 @@ const getGradeStatusLabel = (status: string): string => {
             <CardContent>
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <div class="space-y-2">
-                        <Label>Student Status</Label>
+                        <Label
+                            >Student Status - <span class="text-sm text-yellow-500">Minimum Grade Threshold: {{ course_offering.min_grade_threshold }}</span></Label
+                        >
                         <Select v-model="statusFilter">
                             <SelectTrigger>
                                 <SelectValue placeholder="All students" />
@@ -541,7 +544,7 @@ const getGradeStatusLabel = (status: string): string => {
                                             :variant="getComponentTotalBadgeVariant(student.component_totals.find((ct) => ct.component_id === component.id)!)"
                                             class="text-base font-bold"
                                         >
-                                            {{ student.component_totals.find((ct) => ct.component_id === component.id)!.percentage_score!.toFixed(1) }}%
+                                            {{ student.component_totals.find((ct) => ct.component_id === component.id)!.percentage_score!.toFixed(1) }}
                                         </Badge>
                                         <Badge v-else variant="outline" class="text-base"> - </Badge>
                                     </TableCell>
@@ -554,7 +557,7 @@ const getGradeStatusLabel = (status: string): string => {
                                 </TableCell>
                                 <TableCell class="sticky right-0 z-10 bg-white text-center dark:bg-gray-950">
                                     <div class="space-y-1">
-                                        <Badge v-if="student.total_percentage !== null" :variant="getTotalBadgeVariant(student.total_percentage)" class="text-base font-bold"> {{ Number(student.total_percentage).toFixed(1) }}% </Badge>
+                                        <Badge v-if="student.total_percentage !== null" :variant="getTotalBadgeVariant(student.total_percentage)" class="text-base font-bold"> {{ Number(student.total_percentage).toFixed(1) }}</Badge>
                                         <Badge v-else variant="outline" class="text-base"> Not Graded </Badge>
                                         <div v-if="student.total_letter_grade" class="text-sm font-semibold">({{ student.total_letter_grade }})</div>
                                     </div>

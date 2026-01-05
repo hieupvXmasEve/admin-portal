@@ -125,6 +125,15 @@ return [
             'edit_course_registration' => 'edit_course_registration',
             'delete_course_registration' => 'delete_course_registration',
         ],
+        'gpa_management' => [
+            'view_gpa_finalization' => 'view_gpa_finalization',
+            'create_gpa_finalization' => 'create_gpa_finalization',
+            'view_performance_dashboard' => 'view_performance_dashboard',
+            'view_academic_report' => 'view_academic_report',
+        ],
+        'gpa_history' => [
+            'view_gpa_history' => 'view_gpa_history',
+        ],
 
         // Student Management
         'students' => [

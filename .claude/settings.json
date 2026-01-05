@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(ls:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "shadcnVue"
+  ],
+  "extraKnownMarketplaces": {
+    "claudekit-skills": {
+      "source": {
+        "source": "github",
+        "repo": "mrgoonie/claudekit-skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "ai-ml-tools@claudekit-skills": true,
+    "specialized-tools@claudekit-skills": true,
+    "meta-tools@claudekit-skills": true,
+    "platform-tools@claudekit-skills": true,
+    "problem-solving-tools@claudekit-skills": true
+  }
+}

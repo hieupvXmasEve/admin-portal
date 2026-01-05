@@ -29,12 +29,12 @@ class PreviewSemesterGpaAction
         }
 
         $students = $studentsQuery->whereHas('academicRecords', function ($query) use ($semesterId) {
-                $query->where('semester_id', $semesterId)
-                    ->where('excluded_from_gpa', false)
-                    ->where('credit_points', '>', 0);
-            })->with(['program', 'academicRecords' => function ($query) use ($semesterId) {
-                $query->where('semester_id', $semesterId);
-            }])->get();
+            $query->where('semester_id', $semesterId)
+                ->where('excluded_from_gpa', false)
+                ->where('credit_points', '>', 0);
+        })->with(['program', 'academicRecords' => function ($query) use ($semesterId) {
+            $query->where('semester_id', $semesterId);
+        }])->get();
 
         $previewData = [];
 
@@ -45,13 +45,14 @@ class PreviewSemesterGpaAction
                 ->isNotEmpty();
 
             $semesterData = $this->calculateSemesterGpa->execute($student, $semesterId);
-            
+
             // If no credit records (as per Rule 2/3)
             if ($semesterData['credit_points'] <= 0) {
                 continue;
             }
 
-            $cumulativeData = $this->calculateCumulativeGpa->execute($student);
+            // Calculate cumulative GPA up to and including the current semester
+            $cumulativeData = $this->calculateCumulativeGpa->execute($student, $semesterId);
             $standing = $this->determineStanding->execute($cumulativeData['gpa']);
 
             $previewData[] = [
