@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Constants\CourseOfferingRoutes;
 use App\Http\Controllers\Controller;
+use App\Http\Responses\ApiResponse;
 use App\Http\Requests\StoreCourseOfferingRequest;
 use App\Http\Requests\UpdateCourseOfferingRequest;
 use App\Models\ClassSession;
@@ -33,6 +34,8 @@ use App\Models\FormSurvey;
 use App\Models\FormVersion;
 
 use App\Services\CourseSurveyService;
+use App\Modules\Academic\Http\Requests\MoveStudentRequest;
+use App\Modules\Academic\Actions\MoveStudentToSectionAction;
 
 class CourseOfferingController extends Controller
 {
@@ -446,11 +449,45 @@ class CourseOfferingController extends Controller
             ->get(['id', 'name', 'code', 'capacity', 'type']);
 
         // $canGenerateClassSessions = $courseOffering->canGenerateClassSessions();
+
+        // Get sibling course offerings (other sections of the same unit in the same semester)
+        $siblings = CourseOffering::where('unit_id', $courseOffering->unit_id)
+            ->where('semester_id', $courseOffering->semester_id)
+            ->where('id', '!=', $courseOffering->id)
+            ->where('campus_id', app('campus')->id)
+            ->where('is_active', true)
+            ->with(['lecture:id,first_name,last_name'])
+            ->get(['id', 'section_code', 'current_enrollment', 'max_capacity', 'schedule_days', 'schedule_time_start', 'schedule_time_end', 'lecture_id']);
+
         return Inertia::render('course-offerings/Show', [
             'courseOffering' => $courseOffering,
             'availableRooms' => $availableRooms,
+            'siblingOfferings' => $siblings,
             // 'canGenerateClassSessions' => $canGenerateClassSessions,
         ]);
+    }
+
+    /**
+     * Move a student to another section
+     */
+    public function moveStudent(MoveStudentRequest $request, CourseOffering $courseOffering)
+    {
+        // Ensure the course offering belongs to current campus
+        if ($courseOffering->campus_id !== app('campus')->id) {
+            abort(404);
+        }
+
+        try {
+            MoveStudentToSectionAction::run($request->validated());
+
+            return ApiResponse::success(null, [], 'Student moved successfully.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Failed to move student: ' . $e->getMessage());
+
+            return ApiResponse::error('Failed to move student: ' . $e->getMessage(), [], 500);
+        }
     }
 
     /**
@@ -728,10 +765,7 @@ class CourseOfferingController extends Controller
             ->get();
 
         if ($sessions->count() !== count($sessionIds)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Some sessions do not belong to this course offering.',
-            ], 422);
+            return ApiResponse::error('Some sessions do not belong to this course offering.', [], 422);
         }
 
         // // Check if any session is completed or in_progress - cannot update those
@@ -804,21 +838,14 @@ class CourseOfferingController extends Controller
             // Log bulk update activity (single log entry for the entire operation)
             $this->logBulkUpdateActivity($courseOffering, $sessions, $updateData);
 
-            return response()->json([
-                'success' => true,
-                'message' => "Successfully updated {$sessions->count()} class session(s).",
-                'data' => [
-                    'updated_count' => $sessions->count(),
-                ],
-            ]);
+            return ApiResponse::success([
+                'updated_count' => $sessions->count(),
+            ], [], "Successfully updated {$sessions->count()} class session(s).");
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to bulk update class sessions: ' . $e->getMessage());
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update class sessions: ' . $e->getMessage(),
-            ], 500);
+            return ApiResponse::error('Failed to update class sessions: ' . $e->getMessage(), [], 500);
         }
     }
 
