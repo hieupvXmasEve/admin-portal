@@ -313,6 +313,7 @@ export const academicSummaryRoutes = {
     gpaHistory: () => route('academic.gpa.history'),
     performanceDashboard: () => route('academic.students.performance'),
     academicReport: () => route('academic.report.index'),
+    courseRanking: () => route('academic.course-ranking.index'),
     degreeClassification: () => '#',
     transcriptHistory: () => '#',
     performanceReport: () => '#',
