@@ -186,6 +186,7 @@ class CourseCompletionService
                 'affects_graduation_requirement' => true,
                 'satisfies_prerequisite' => $finalPassed,
                 'administrative_notes' => $cleanNotes ?: null,
+                'quality_points' => $finalPercentage * $record->credit_points,
             ]);
         }
 
@@ -247,7 +248,7 @@ class CourseCompletionService
 
                 foreach ($component->details as $detail) {
                     $score = $studentScores->where('assessment_component_detail_id', $detail->id)->first();
-                    
+
                     if ($score && $score->percentage_score !== null) {
                         $componentWeightedScore += ($score->percentage_score * $detail->weight);
                         $componentWeight += $detail->weight;

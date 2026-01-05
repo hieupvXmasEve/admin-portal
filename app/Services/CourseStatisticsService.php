@@ -463,7 +463,12 @@ class CourseStatisticsService
         ];
 
         return [
-            'course_offering' => ['id' => $courseOffering->id, 'min_grade_threshold' => (float)($courseOffering->syllabusTemplate?->min_grade_threshold ?? 60.00)],
+            'course_offering' => [
+                'id' => $courseOffering->id,
+                'unit_id' => $courseOffering->unit_id,
+                'semester_id' => $courseOffering->semester_id,
+                'min_grade_threshold' => (float)($courseOffering->syllabusTemplate?->min_grade_threshold ?? 60.00)
+            ],
             'statistics' => $statistics,
             'assessment_components' => $assessmentComponents->map(function ($component) {
                 return [

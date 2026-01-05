@@ -60,7 +60,7 @@ const props = defineProps<{
 }>();
 
 const selectedSemesterId = ref<string | undefined>(props.filters.semester_id ? String(props.filters.semester_id) : undefined);
-const selectedCampusId = ref<string | undefined>(props.filters.campus_id ? String(props.filters.campus_id) : (props.default_campus_id ? String(props.default_campus_id) : undefined));
+const selectedCampusId = ref<string | undefined>(props.filters.campus_id ? String(props.filters.campus_id) : props.default_campus_id ? String(props.default_campus_id) : undefined);
 const showFinalizeDialog = ref(false);
 const isLoading = ref(false);
 

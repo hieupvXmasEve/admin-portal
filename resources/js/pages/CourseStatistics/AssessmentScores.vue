@@ -88,12 +88,13 @@ interface Props {
     scores_grid: StudentScore[];
     course_offering: {
         id: number;
+        unit_id: number;
         min_grade_threshold: number;
+        semester_id: number;
     };
 }
 
 const props = defineProps<Props>();
-console.log('props', props);
 const statusFilter = ref<string>('all');
 
 const filteredScoresGrid = computed(() => {
@@ -264,7 +265,7 @@ const getGradeStatusLabel = (status: string): string => {
     <div class="space-y-6">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
-                <Link href="/course-statistics">
+                <Link :href="`/course-statistics/units/${course_offering.unit_id}?semester_id=${course_offering.semester_id}`">
                     <Button variant="outline" size="sm">
                         <ArrowLeft class="mr-2 h-4 w-4" />
                         Back
@@ -278,7 +279,7 @@ const getGradeStatusLabel = (status: string): string => {
                     </p>
                 </div>
             </div>
-            <Link :href="`/course-statistics/${course_offering.id}`">
+            <Link :href="`/course-statistics/${course_offering.id}/students`">
                 <Button variant="outline" size="sm">
                     <CheckCircle class="mr-2 h-4 w-4" />
                     Attendance

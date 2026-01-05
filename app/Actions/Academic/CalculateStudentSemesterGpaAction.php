@@ -35,16 +35,14 @@ class CalculateStudentSemesterGpaAction
         // If we still use quality_points from record, we must ensure it was calculated using credit_points
         // For now, let's calculate them dynamically to be safe
         $totalQualityPoints = $records->sum(function ($record) {
-            return (float) $record->grade_points * (float) $record->credit_points;
+            return (float) $record->final_percentage * (float) $record->credit_points;
         });
-        
         $totalCreditPoints = (float) $records->sum('credit_points');
-        
+
         // Credits earned are from passed records
         $creditPointsEarned = (float) $records->where('is_passed', true)->sum('credit_points');
 
         $gpa = $totalCreditPoints > 0 ? $totalQualityPoints / $totalCreditPoints : 0.0;
-
         return [
             'gpa' => round((float) $gpa, 3),
             'quality_points' => round((float) $totalQualityPoints, 3),

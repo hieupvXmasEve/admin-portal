@@ -39,6 +39,11 @@ class GetUnitStatisticsAction
         $minAttendance = $activeSyllabus?->min_attendance_threshold ?? 80.00;
         $minGrade = $activeSyllabus?->min_grade_threshold ?? 60.00;
 
+        // Clean up attendance threshold for display (remove decimals if whole number)
+        $displayMinAttendance = (floatval($minAttendance) == intval($minAttendance))
+            ? intval($minAttendance)
+            : $minAttendance;
+
         // 1. Grade Distribution (final grades only)
         $grades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F'];
         $rawGrades = $gradeQuery->where('grade_status', 'final')
@@ -64,23 +69,45 @@ class GetUnitStatisticsAction
             ->get()
             ->pluck('total', 'result');
 
+        $totalPassFail = $rawPassFail->sum();
+
         $passFail = [
-            ['label' => 'Pass', 'total' => $rawPassFail->get('Pass', 0)],
-            ['label' => 'Fail', 'total' => $rawPassFail->get('Fail', 0)],
+            [
+                'label' => 'Pass',
+                'total' => $rawPassFail->get('Pass', 0),
+                'percentage' => $totalPassFail > 0 ? round(($rawPassFail->get('Pass', 0) / $totalPassFail) * 100, 1) : 0,
+            ],
+            [
+                'label' => 'Fail',
+                'total' => $rawPassFail->get('Fail', 0),
+                'percentage' => $totalPassFail > 0 ? round(($rawPassFail->get('Fail', 0) / $totalPassFail) * 100, 1) : 0,
+            ],
         ];
 
         // 3. Attendance Buckets (using syllabus threshold)
+        // Use the display value for the query to ensure consistency or match carefully
+        // Ideally we query with the numeric value but return the display string
         $rawAttendance = $attendanceQuery->select(
-            DB::raw("CASE WHEN attendance_percentage >= {$minAttendance} THEN \">={$minAttendance}%\" ELSE \"<{$minAttendance}%\" END as bucket"),
+            DB::raw("CASE WHEN attendance_percentage >= {$minAttendance} THEN \">={$displayMinAttendance}%\" ELSE \"<{$displayMinAttendance}%\" END as bucket"),
             DB::raw('count(*) as total')
         )
             ->groupBy('bucket')
             ->get()
             ->pluck('total', 'bucket');
 
+        $totalAttendance = $rawAttendance->sum();
+
         $attendance = [
-            ['bucket' => ">={$minAttendance}%", 'total' => $rawAttendance->get(">={$minAttendance}%", 0)],
-            ['bucket' => "<{$minAttendance}%", 'total' => $rawAttendance->get("<{$minAttendance}%", 0)],
+            [
+                'bucket' => ">={$displayMinAttendance}%",
+                'total' => $rawAttendance->get(">={$displayMinAttendance}%", 0),
+                'percentage' => $totalAttendance > 0 ? round(($rawAttendance->get(">={$displayMinAttendance}%", 0) / $totalAttendance) * 100, 1) : 0,
+            ],
+            [
+                'bucket' => "<{$displayMinAttendance}%",
+                'total' => $rawAttendance->get("<{$displayMinAttendance}%", 0),
+                'percentage' => $totalAttendance > 0 ? round(($rawAttendance->get("<{$displayMinAttendance}%", 0) / $totalAttendance) * 100, 1) : 0,
+            ],
         ];
 
         // 4. Offerings List

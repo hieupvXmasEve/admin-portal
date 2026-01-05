@@ -59,11 +59,12 @@ interface Props {
     attendance_grid: StudentAttendance[];
     course_offering: {
         id: number;
+        unit_id: number;
+        semester_id: number;
     };
 }
 
 const props = defineProps<Props>();
-
 const statusFilter = ref<string>('all');
 
 const filteredAttendanceGrid = computed(() => {
@@ -123,7 +124,7 @@ const getStatusLabel = (status: string) => {
     <div class="space-y-6">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
-                <Link href="/course-statistics">
+                <Link :href="`/course-statistics/units/${course_offering.unit_id}?semester_id=${course_offering.semester_id}`">
                     <Button variant="outline" size="sm">
                         <ArrowLeft class="mr-2 h-4 w-4" />
                         Back
