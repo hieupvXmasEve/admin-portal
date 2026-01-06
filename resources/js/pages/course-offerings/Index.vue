@@ -9,13 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useApi } from '@/composables/useApiRequest';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import type { PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, Copy, Edit, Eye, MoreHorizontal, Plus, RefreshCw, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
+import { BarChart3, CheckCircle, Copy, Edit, Eye, MoreHorizontal, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
 import { h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -80,12 +81,12 @@ const isLoading = ref(false);
 const statistics = ref<any>(null);
 const showStatusDialog = ref(false);
 const selectedCourse = ref<CourseOffering | null>(null);
-const selectedStatus = ref<string>('not_started');
 const showSurveyDialog = ref(false);
 const selectedFormId = ref<string>('');
 
 // Initialize the confirm dialog composable
 const confirmDialog = useGlobalConfirmDialog();
+const api = useApi();
 
 // Load statistics
 const loadStatistics = async () => {
@@ -245,56 +246,30 @@ const handleCreateSurvey = () => {
 
 const openStatusDialog = (courseOffering: CourseOffering) => {
     selectedCourse.value = courseOffering;
-    selectedStatus.value = courseOffering.course_status || 'not_started';
     showStatusDialog.value = true;
 };
 
 const closeStatusDialog = () => {
     showStatusDialog.value = false;
     selectedCourse.value = null;
-    selectedStatus.value = 'not_started';
 };
 
-const updateCourseStatus = () => {
+const updateCourseStatus = async () => {
     if (!selectedCourse.value) return;
     isLoading.value = true;
 
-    // Direct update for all statuses
-    router.patch(
-        `/course-offerings/${selectedCourse.value.id}/update-course-status`,
-        { course_status: selectedStatus.value },
-        {
-            onSuccess: (page) => {
-                // Check for flash messages from backend
-                if ((page.props as any).flash?.error) {
-                    toast.error((page.props as any).flash.error as string);
-                    return;
-                }
+    const { data: apiData } = await api.post(`/api/course-offerings/${selectedCourse.value.id}/complete`, {});
 
-                const successMessage = ((page.props as any).flash?.success as string) || 'Course status updated successfully';
-                isLoading.value = false;
-                // Render HTML in toast for detailed messages with proper styling
-                toast(
-                    h('div', {
-                        innerHTML: successMessage,
-                        class: 'text-sm leading-relaxed',
-                    }),
-                    {
-                        duration: 15000, // 15 seconds for detailed messages
-                        closeButton: true,
-                        class: '!max-w-3xl',
-                    },
-                );
-                closeStatusDialog();
-            },
-            onError: (errors) => {
-                const firstError = Object.values(errors)[0];
-                const errorMessage = Array.isArray(firstError) ? firstError[0] : (firstError as string) || 'Failed to update course status';
-                toast.error(errorMessage);
-                isLoading.value = false;
-            },
-        },
-    );
+    isLoading.value = false;
+    console.log('apiData.value', apiData.value);
+    if (apiData.value?.success) {
+        toast.success(apiData.value.message);
+        closeStatusDialog();
+        router.reload();
+        loadStatistics();
+    } else {
+        toast.error(apiData.value?.message || 'Failed to update course status');
+    }
 };
 
 const bulkDelete = () => {
@@ -563,7 +538,7 @@ const columns: ColumnDef<CourseOffering>[] = [
                         {
                             onClick: () => openStatusDialog(course),
                         },
-                        () => [h(RefreshCw, { class: 'mr-2 h-4 w-4' }), 'Change Status'],
+                        () => [h(CheckCircle, { class: 'mr-2 h-4 w-4 text-green-600' }), 'Mark as Completed'],
                     ),
                     h(
                         DropdownMenuItem,
@@ -764,33 +739,19 @@ const columns: ColumnDef<CourseOffering>[] = [
     <!-- Pagination -->
     <DataPagination :pagination-data="courseOfferings" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 
-    <!-- Change Status Dialog -->
+    <!-- Mark Completed Dialog -->
     <Dialog v-model:open="showStatusDialog">
         <DialogContent class="sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>Change Course Status</DialogTitle>
+                <DialogTitle>Mark Course as Completed</DialogTitle>
                 <DialogDescription>
                     <template v-if="selectedCourse">
-                        Update status for <strong>{{ selectedCourse.unit?.code }}</strong>
-                        <span v-if="selectedCourse.section_code"> - Section {{ selectedCourse.section_code }}</span>
+                        Are you sure you want to mark <strong>{{ selectedCourse.unit?.code }}</strong> <span v-if="selectedCourse.section_code"> - Section {{ selectedCourse.section_code }}</span> as completed?
                     </template>
                 </DialogDescription>
             </DialogHeader>
             <div class="space-y-4 py-4">
-                <div class="space-y-2">
-                    <label class="text-sm font-medium">Select New Status</label>
-                    <Select v-model="selectedStatus">
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem v-for="option in courseStatusOptions" :key="option.value" :value="option.value">
-                                {{ option.label }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div v-if="selectedStatus === 'completed'" class="space-y-3 rounded-md border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
+                <div class="space-y-3 rounded-md border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
                     <div class="flex items-start gap-2">
                         <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-800 dark:text-yellow-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -812,7 +773,7 @@ const columns: ColumnDef<CourseOffering>[] = [
                 <Button variant="outline" @click="closeStatusDialog">Cancel</Button>
                 <Button :disabled="isLoading" @click="updateCourseStatus">
                     <LoadingSpinner v-if="isLoading" size="sm" />
-                    {{ isLoading ? 'Updating...' : 'Update Status' }}
+                    {{ isLoading ? 'Processing...' : 'Confirm Completion' }}
                 </Button>
             </DialogFooter>
         </DialogContent>

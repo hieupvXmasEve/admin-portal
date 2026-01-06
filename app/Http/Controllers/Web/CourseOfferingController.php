@@ -1975,154 +1975,17 @@ class CourseOfferingController extends Controller
         }
     }
 
+
     /**
-     * Update course status
+     * Mark course as completed
      */
+    /*
     public function updateCourseStatus(Request $request, CourseOffering $courseOffering): RedirectResponse
     {
-        // Ensure the course offering belongs to current campus
-        if ($courseOffering->campus_id !== app('campus')->id) {
-            abort(404);
-        }
-
-        // Check if course is already completed - cannot modify
-        if ($courseOffering->course_status === 'completed') {
-            return Redirect::back()
-                ->with('error', 'Cannot change status of a completed course.');
-        }
-
-        $request->validate([
-            'course_status' => ['required', 'in:not_started,in_progress,completed,cancelled'],
-        ]);
-
-        $oldStatus = $courseOffering->course_status ?? 'not_started';
-        $newStatus = $request->course_status;
-
-        // If marking as completed, run finalization process
-        if ($newStatus === 'completed') {
-            try {
-                DB::beginTransaction();
-
-                // Load necessary relationships
-                $courseOffering->load(['unit', 'semester']);
-
-                // Finalize course with all validations and EGC progression
-                $result = app(\App\Services\CourseCompletionService::class)->finalizeCourse($courseOffering);
-
-                // Update course offering status
-                $courseOffering->update(['course_status' => 'completed']);
-
-                DB::commit();
-
-                // Prepare success message with details
-                $message = "Course '{$result['course_code']}' marked as completed successfully.";
-
-                if ($result['egc_progression']['processed']) {
-                    // EGC course message with detailed breakdown
-                    $egc = $result['egc_progression'];
-                    $message .= "<br><br><strong>EGC Summary:</strong> {$egc['total_students']} student(s) processed";
-
-                    // Show progressed students
-                    if (count($egc['progressed']) > 0) {
-                        $message .= "<br>✅ <strong>" . count($egc['progressed']) . " Progressed:</strong>";
-                        foreach (array_slice($egc['progressed'], 0, 5) as $prog) {
-                            $message .= "<br>&nbsp;&nbsp;• {$prog['student_id']} ({$prog['student_name']}): Level {$prog['from_level']} → {$prog['to_level']}";
-                        }
-                        if (count($egc['progressed']) > 5) {
-                            $message .= "<br>&nbsp;&nbsp;• +" . (count($egc['progressed']) - 5) . " more...";
-                        }
-                    }
-
-                    // Show failed students with reasons
-                    if (count($egc['failed_students']) > 0) {
-                        $message .= "<br>❌ <strong>" . count($egc['failed_students']) . " Failed:</strong>";
-                        foreach (array_slice($egc['failed_students'], 0, 5) as $fail) {
-                            $reason = $fail['action'];
-                            $message .= "<br>&nbsp;&nbsp;• {$fail['student_id']} ({$fail['student_name']}): Grade {$fail['grade']} - {$reason}";
-                        }
-                        if (count($egc['failed_students']) > 5) {
-                            $message .= "<br>&nbsp;&nbsp;• +" . (count($egc['failed_students']) - 5) . " more...";
-                        }
-                    }
-
-                    // Show level mismatch warnings
-                    if (count($egc['warnings']) > 0) {
-                        $message .= "<br>⚠️ <strong>" . count($egc['warnings']) . " Warnings:</strong>";
-                        foreach (array_slice($egc['warnings'], 0, 5) as $warn) {
-                            $studentLevel = $warn['student_level'] ?? 'N/A';
-                            $unitLevel = $warn['unit_level'] ?? 'N/A';
-
-                            // Check if this is a level mismatch warning or status warning
-                            if (isset($warn['reason']) && strpos($warn['reason'], 'Level mismatch') !== false) {
-                                $message .= "<br>&nbsp;&nbsp;• {$warn['student_id']} ({$warn['student_name']}): Student at Level {$studentLevel}, passed Level {$unitLevel} course - Grade recorded but NOT progressed";
-                            } elseif (isset($warn['reason'])) {
-                                $message .= "<br>&nbsp;&nbsp;• {$warn['student_id']} ({$warn['student_name']}): {$warn['reason']}";
-                            } else {
-                                $message .= "<br>&nbsp;&nbsp;• {$warn['student_id']} ({$warn['student_name']}): " . ($warn['reason'] ?? 'Warning');
-                            }
-                        }
-                        if (count($egc['warnings']) > 5) {
-                            $message .= "<br>&nbsp;&nbsp;• +" . (count($egc['warnings']) - 5) . " more...";
-                        }
-                    }
-                } elseif ($result['non_egc_result']) {
-                    // Non-EGC course message
-                    $nonEgc = $result['non_egc_result'];
-                    $totalStudents = $nonEgc['passed'] + $nonEgc['failed'];
-                    $message .= "<br><br><strong>Summary:</strong> {$totalStudents} student(s) processed";
-
-                    if ($nonEgc['passed'] > 0) {
-                        $message .= "<br>✅ {$nonEgc['passed']} passed";
-                    }
-
-                    if ($nonEgc['failed'] > 0) {
-                        $message .= "<br>❌ {$nonEgc['failed']} failed";
-                    }
-                }
-
-                Log::info('Course status updated to completed', [
-                    'course_offering_id' => $courseOffering->id,
-                    'course_code' => $courseOffering->course_code,
-                    'old_status' => $oldStatus,
-                    'new_status' => $newStatus,
-                    'egc_result' => $result['egc_progression'],
-                ]);
-
-                return Redirect::back()->with('success', $message);
-            } catch (\Exception $e) {
-                DB::rollBack();
-                Log::error('Failed to complete course: ' . $e->getMessage(), [
-                    'course_offering_id' => $courseOffering->id,
-                    'course_code' => $courseOffering->course_code,
-                ]);
-
-                // Return with error status for Inertia to trigger onError
-                return Redirect::back()
-                    ->with('error', 'Failed to complete course: ' . $e->getMessage())
-                    ->withErrors(['course_status' => 'Failed to complete course: ' . $e->getMessage()]);
-            }
-        } else {
-            // Simple status update for non-completed statuses
-            try {
-                $courseOffering->update(['course_status' => $newStatus]);
-
-                Log::info('Course status updated', [
-                    'course_offering_id' => $courseOffering->id,
-                    'course_code' => $courseOffering->course_code,
-                    'old_status' => $oldStatus,
-                    'new_status' => $newStatus,
-                ]);
-
-                return Redirect::back()
-                    ->with('success', "Course status updated to '{$newStatus}' successfully.");
-            } catch (\Exception $e) {
-                Log::error('Failed to update course status: ' . $e->getMessage());
-
-                return Redirect::back()
-                    ->with('error', 'Failed to update course status: ' . $e->getMessage());
-            }
-        }
+        // Moved to app/Modules/Academic/Http/Api/Admin/MarkCourseCompletedController.php
+        return Redirect::back()->with('error', 'This route is deprecated. Please use the API endpoint.');
     }
+    */
 
     /**
      * Create invoice item for course registration fee (EGC base_fee or retake_fee)

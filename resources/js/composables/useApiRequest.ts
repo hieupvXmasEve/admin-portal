@@ -7,6 +7,7 @@ import { createFetch } from '@vueuse/core';
 const useApiRequest = createFetch({
     baseUrl: '',
     options: {
+        updateDataOnError: true,
         credentials: 'include', // Include cookies for Laravel Sanctum session auth
         beforeFetch({ options }) {
             const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
