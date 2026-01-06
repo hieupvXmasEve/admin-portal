@@ -66,9 +66,7 @@ const GRADE_METADATA: Record<string, { color: string; range: string }> = {
     'C+': { color: '#f97316', range: '60-64' },
     C: { color: '#fb923c', range: '55-59' },
     'C-': { color: '#fdba74', range: '50-54' },
-    'D+': { color: '#ef4444', range: '45-49' },
-    D: { color: '#f87171', range: '40-44' },
-    F: { color: '#b91c1c', range: '0-39' },
+    F: { color: '#b91c1c', range: '0-49' },
     'N/A': { color: '#94a3b8', range: '' },
 };
 
@@ -220,6 +218,7 @@ const doughnutLabelPlugin = {
             if (!meta.hidden) {
                 meta.data.forEach((element: any, index: number) => {
                     const value = dataset.data[index];
+
                     // Use server-provided percentage if available, otherwise fallback to calculation
                     let percentage;
 
@@ -230,7 +229,7 @@ const doughnutLabelPlugin = {
                         percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
                     }
 
-                    if (value > 0) {
+                    if (value > 0 && element && element.tooltipPosition) {
                         const { x, y } = element.tooltipPosition();
 
                         ctx.save();

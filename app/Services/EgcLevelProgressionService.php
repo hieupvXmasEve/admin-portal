@@ -255,18 +255,17 @@ class EgcLevelProgressionService
         ];
 
         // Check if student completed all EGC levels
-        $completedProgram = false;
-        if ($newLevel >= $totalLevels) {
-            // Auto transition to intake_course status
-            $updateData['status'] = 'intake_course';
-            $completedProgram = true;
+        // Note: Status is NOT automatically changed to 'intake_course'
+        // Admin must manually transition the student status
+        $completedProgram = $newLevel >= $totalLevels;
 
-            Log::info('EGC Program Completed - Status Transitioned', [
+        if ($completedProgram) {
+            Log::info('EGC Program Completed - Manual Status Transition Required', [
                 'student_id' => $student->student_id,
                 'student_name' => $student->full_name,
-                'from_status' => 'intake_pre_uni_gc',
-                'to_status' => 'intake_course',
+                'current_status' => $student->status,
                 'completed_levels' => $totalLevels,
+                'action_required' => 'Admin must manually change status to intake_course',
             ]);
         }
 

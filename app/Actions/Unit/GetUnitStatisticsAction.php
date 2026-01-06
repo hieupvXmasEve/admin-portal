@@ -45,7 +45,7 @@ class GetUnitStatisticsAction
             : $minAttendance;
 
         // 1. Grade Distribution (final grades only)
-        $grades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F'];
+        $grades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'F'];
         $rawGrades = $gradeQuery->where('grade_status', 'final')
             ->select('final_letter_grade', DB::raw('count(*) as total'))
             ->groupBy('final_letter_grade')
