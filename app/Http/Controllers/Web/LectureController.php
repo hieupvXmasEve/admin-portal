@@ -16,9 +16,12 @@ use App\Models\Campus;
 use App\Models\ClassSession;
 use App\Models\Lecture;
 use App\Models\Semester;
+use App\Models\User;
+use App\Shared\Support\Enums\UserType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -126,7 +129,48 @@ class LectureController extends Controller
      */
     public function store(StoreLectureRequest $request): RedirectResponse
     {
-        $lecture = Lecture::create($request->validated());
+        $validated = $request->validated();
+
+        DB::transaction(function () use ($validated, &$lecture) {
+            // Extract password if provided (remove from validated to avoid storing in Lecture)
+            $password = $validated['password'] ?? null;
+            unset($validated['password']);
+
+            // Create or find User record
+            $user = User::firstOrCreate(
+                ['email' => $validated['email']],
+                [
+                    'name' => trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')),
+                    'email' => $validated['email'],
+                    'phone' => $validated['phone'] ?? null,
+                    'password' => Hash::make($password ?? \Illuminate\Support\Str::random(16)),
+                    'type' => UserType::LECTURER,
+                    'status' => User::STATUS_ACTIVE,
+                ]
+            );
+
+            // Update user type if it was created with different type
+            if ($user->type !== UserType::LECTURER) {
+                $user->update(['type' => UserType::LECTURER]);
+            }
+
+            // Update user fields from lecture data
+            $user->update([
+                'name' => trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')),
+                'phone' => $validated['phone'] ?? $user->phone,
+            ]);
+
+            // Update password if provided
+            if ($password !== null) {
+                $user->update(['password' => Hash::make($password)]);
+            }
+
+            // Set user_id in validated data
+            $validated['user_id'] = $user->id;
+
+            // Create lecture record
+            $lecture = Lecture::create($validated);
+        });
 
         return Redirect::route(LectureRoutes::INDEX)
             ->with('success', 'Lecturer created successfully.');
@@ -166,7 +210,45 @@ class LectureController extends Controller
      */
     public function update(UpdateLectureRequest $request, Lecture $lecture): RedirectResponse
     {
-        $lecture->update($request->validated());
+        $validated = $request->validated();
+
+        DB::transaction(function () use ($validated, $lecture) {
+            // Extract password if provided (remove from validated to avoid storing in Lecture)
+            $password = $validated['password'] ?? null;
+            unset($validated['password']);
+
+            // Get or create User record
+            $user = $lecture->user;
+
+            if (!$user) {
+                // Create new User if doesn't exist
+                $user = User::create([
+                    'name' => trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')),
+                    'email' => $validated['email'],
+                    'phone' => $validated['phone'] ?? null,
+                    'password' => Hash::make($password ?? \Illuminate\Support\Str::random(16)),
+                    'type' => UserType::LECTURER,
+                    'status' => User::STATUS_ACTIVE,
+                ]);
+                $validated['user_id'] = $user->id;
+            } else {
+                // Update existing User
+                $user->update([
+                    'name' => trim(($validated['first_name'] ?? '') . ' ' . ($validated['last_name'] ?? '')),
+                    'email' => $validated['email'],
+                    'phone' => $validated['phone'] ?? $user->phone,
+                    'type' => UserType::LECTURER, // Ensure type is lecturer
+                ]);
+
+                // Update password if provided
+                if ($password !== null) {
+                    $user->update(['password' => Hash::make($password)]);
+                }
+            }
+
+            // Update lecture record
+            $lecture->update($validated);
+        });
 
         return Redirect::route(LectureRoutes::INDEX)
             ->with('success', 'Lecturer updated successfully.');
