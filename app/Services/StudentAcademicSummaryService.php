@@ -7,7 +7,6 @@ namespace App\Services;
 use App\Models\AssessmentComponentDetailScore;
 use App\Models\Attendance;
 use App\Models\CourseOffering;
-use App\Models\CurriculumVersion;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
@@ -28,9 +27,9 @@ class StudentAcademicSummaryService
     /**
      * Get comprehensive academic summary for a student with caching
      *
-     * @param int $studentId The student ID to get summary for
-     * @param array $filters Optional filters for specific data sections
-     * @param bool $useCache Whether to use cache (default: true)
+     * @param  int  $studentId  The student ID to get summary for
+     * @param  array  $filters  Optional filters for specific data sections
+     * @param  bool  $useCache  Whether to use cache (default: true)
      * @return array Complete academic summary data
      */
     public function getAcademicSummary(int $studentId, array $filters = [], bool $useCache = true): array
@@ -88,7 +87,7 @@ class StudentAcademicSummaryService
     /**
      * Clear cached academic summary data for a student
      *
-     * @param int $studentId The student ID
+     * @param  int  $studentId  The student ID
      */
     public function clearAcademicSummaryCache(int $studentId): void
     {
@@ -105,7 +104,7 @@ class StudentAcademicSummaryService
     /**
      * Get student overview information
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return array Student overview data
      */
     private function getStudentOverview(Student $student): array
@@ -136,9 +135,18 @@ class StudentAcademicSummaryService
                 'date_of_birth' => $student->date_of_birth,
                 'gender' => $student->gender,
                 'nationality' => $student->nationality,
+                'ethnicity' => $student->ethnicity,
                 'national_id' => $student->national_id,
                 'address' => $student->address,
+                'current_address_line' => $student->current_address_line,
+                'current_ward' => $student->current_ward,
+                'current_province' => $student->current_province,
+                'current_country' => $student->current_country,
                 'cccd_address' => $student->cccd_address,
+                'cccd_address_line' => $student->cccd_address_line,
+                'cccd_ward' => $student->cccd_ward,
+                'cccd_province' => $student->cccd_province,
+                'cccd_country' => $student->cccd_country,
                 'status' => $student->status,
                 'academic_status' => $student->academic_status,
                 'admission_date' => $student->admission_date,
@@ -205,7 +213,7 @@ class StudentAcademicSummaryService
                 'semester' => [
                     'code' => $student->curriculumVersion->effectiveFromSemester?->code,
                     'intake_year' => Carbon::parse($student->curriculumVersion->effectiveFromSemester?->start_date)->year,
-                ]
+                ],
 
             ],
             'academic_stats' => [
@@ -239,9 +247,9 @@ class StudentAcademicSummaryService
     /**
      * Get course registrations data with comprehensive filtering and pagination support
      *
-     * @param Student $student The student model
-     * @param array $filters Optional filters for semester, status, academic year
-     * @param int $perPage Number of items per page for pagination
+     * @param  Student  $student  The student model
+     * @param  array  $filters  Optional filters for semester, status, academic year
+     * @param  int  $perPage  Number of items per page for pagination
      * @return array Course registrations data with filtering and pagination
      */
     private function getRegistrations(Student $student, array $filters = [], int $perPage = 50): array
@@ -273,11 +281,11 @@ class StudentAcademicSummaryService
             );
 
         // Apply filters
-        if (!empty($filters['semester_id'])) {
+        if (! empty($filters['semester_id'])) {
             $query->where('semester_id', $filters['semester_id']);
         }
 
-        if (!empty($filters['academic_year'])) {
+        if (! empty($filters['academic_year'])) {
             $query->whereHas('semester', function ($q) use ($filters) {
                 // We need to filter by academic year derived from semester data
                 $q->where(function ($subQuery) use ($filters) {
@@ -304,11 +312,11 @@ class StudentAcademicSummaryService
             });
         }
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('registration_status', $filters['status']);
         }
 
-        if (!empty($filters['is_retake'])) {
+        if (! empty($filters['is_retake'])) {
             $query->where('is_retake', $filters['is_retake'] === 'true');
         }
 
@@ -377,15 +385,14 @@ class StudentAcademicSummaryService
                 'registration_method' => $registration->registration_method ?? 'N/A',
                 'meets_attendance_requirement' => $meetsAttendance,
                 'grade_status' => $gradeStatus,
-                
+
                 // Information of academic record
                 'final_grade' => $finalGrade, // for grade column
                 'final_percentage' => $finalPercentage, // for grade column
                 'credit_points' => $registration->academic_credit_points, // for credit points column
                 'credit_points_earned' => $registration->academic_credit_points_earned,
-                'completion_status' => $completionStatus, 
+                'completion_status' => $completionStatus,
                 'pass_fail_status' => $passFailStatus,
-                
 
                 // Information of course retake
                 'is_retake' => $registration->academic_is_repeat_course,
@@ -491,7 +498,7 @@ class StudentAcademicSummaryService
     /**
      * Get badge color for registration status
      *
-     * @param string $status Registration status
+     * @param  string  $status  Registration status
      * @return string CSS color class
      */
     private function getRegistrationStatusBadgeColor(string $status): string
@@ -508,7 +515,7 @@ class StudentAcademicSummaryService
     /**
      * Get badge color for Pass/Fail status
      *
-     * @param string|null $status Pass/Fail status
+     * @param  string|null  $status  Pass/Fail status
      * @return string CSS color class
      */
     private function getPassFailBadgeColor(?string $status): string
@@ -523,12 +530,12 @@ class StudentAcademicSummaryService
     /**
      * Get badge color for grade
      *
-     * @param string|null $grade Final grade
+     * @param  string|null  $grade  Final grade
      * @return string CSS color class
      */
     private function getGradeBadgeColor(?string $grade): string
     {
-        if (!$grade) {
+        if (! $grade) {
             return 'secondary';
         }
 
@@ -546,7 +553,7 @@ class StudentAcademicSummaryService
     /**
      * Get badge color for completion status
      *
-     * @param string|null $status Completion status
+     * @param  string|null  $status  Completion status
      * @return string CSS color class
      */
     private function getCompletionStatusBadgeColor(?string $status): string
@@ -563,7 +570,7 @@ class StudentAcademicSummaryService
     /**
      * Get badge color for grade status
      *
-     * @param string|null $status Grade status
+     * @param  string|null  $status  Grade status
      * @return string CSS color class
      */
     private function getGradeStatusBadgeColor(?string $status): string
@@ -578,12 +585,12 @@ class StudentAcademicSummaryService
     /**
      * Check if grade is passing
      *
-     * @param string|null $grade Final grade
+     * @param  string|null  $grade  Final grade
      * @return bool Whether grade is passing
      */
     private function isPassingGrade(?string $grade): bool
     {
-        if (!$grade) {
+        if (! $grade) {
             return false;
         }
 
@@ -596,19 +603,19 @@ class StudentAcademicSummaryService
     /**
      * Derive academic year from semester data
      *
-     * @param object|null $semester Semester model instance
+     * @param  object|null  $semester  Semester model instance
      * @return string Academic year (e.g., '2024-2025')
      */
     private function getAcademicYear($semester): string
     {
-        if (!$semester) {
+        if (! $semester) {
             return 'Unknown';
         }
 
         // Try to extract from semester code first (e.g., 'SPR2025' -> '2024-2025')
         if ($semester->code) {
             if (preg_match('/(\d{4})/', $semester->code, $matches)) {
-                $year = (int)$matches[1];
+                $year = (int) $matches[1];
                 // If it's a spring semester, it's the second year of the academic year
                 if (str_contains(strtolower($semester->code), 'spr')) {
                     return ($year - 1) . '-' . $year;
@@ -622,7 +629,7 @@ class StudentAcademicSummaryService
         // Try to extract from semester name (e.g., 'Spring 2025' -> '2024-2025')
         if ($semester->name) {
             if (preg_match('/(\d{4})/', $semester->name, $matches)) {
-                $year = (int)$matches[1];
+                $year = (int) $matches[1];
                 // If it's a spring semester, it's the second year of the academic year
                 if (str_contains(strtolower($semester->name), 'spring')) {
                     return ($year - 1) . '-' . $year;
@@ -653,8 +660,8 @@ class StudentAcademicSummaryService
     /**
      * Get assessment scores data grouped by course offering with pagination support
      *
-     * @param Student $student The student model
-     * @param int $limit Limit for recent scores per course (default: 5)
+     * @param  Student  $student  The student model
+     * @param  int  $limit  Limit for recent scores per course (default: 5)
      * @return array Assessment scores data
      */
     private function getScores(Student $student, int $limit = 100): array
@@ -747,13 +754,13 @@ class StudentAcademicSummaryService
     /**
      * Get module scores with sub-unit details
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return \Illuminate\Support\Collection Module scores data
      */
     private function getModuleScores(Student $student): \Illuminate\Support\Collection
     {
         // Check if student has curriculum with modules
-        if (!$student->curriculumVersion) {
+        if (! $student->curriculumVersion) {
             return collect([]);
         }
 
@@ -762,7 +769,7 @@ class StudentAcademicSummaryService
             ->curriculumModules()
             ->with([
                 'module:id,code,name,total_credits,grading_type',
-                'module.units:id,code,name,credit_points'
+                'module.units:id,code,name,credit_points',
             ])
             ->get();
 
@@ -773,10 +780,10 @@ class StudentAcademicSummaryService
         // Calculate progress for each module
         return $curriculumModules->map(function ($curriculumModule) use ($student) {
             $module = $curriculumModule->module;
-            
+
             // Get sub-unit IDs
             $unitIds = $module->units->pluck('id')->toArray();
-            
+
             // Get academic records for sub-units
             $academicRecords = $student->academicRecords()
                 ->whereHas('courseOffering', function ($q) use ($unitIds) {
@@ -786,27 +793,27 @@ class StudentAcademicSummaryService
                 ->get();
 
             // Separate graded vs pass/fail units
-            $gradedRecords = $academicRecords->filter(fn($r) =>
-                $r->courseOffering && $r->courseOffering->grading_type === 'grade'
+            $gradedRecords = $academicRecords->filter(
+                fn($r) => $r->courseOffering && $r->courseOffering->grading_type === 'grade'
             );
-            $passfailRecords = $academicRecords->filter(fn($r) =>
-                $r->courseOffering && $r->courseOffering->grading_type === 'pass_fail'
+            $passfailRecords = $academicRecords->filter(
+                fn($r) => $r->courseOffering && $r->courseOffering->grading_type === 'pass_fail'
             );
 
             // Calculate module grade (only from graded units)
             $moduleGrade = null;
             $usesWeights = false;
-            
+
             if ($gradedRecords->isNotEmpty()) {
                 // Check if weights are defined
                 $firstUnit = $module->units->first();
                 $usesWeights = $firstUnit && $firstUnit->pivot->weight !== null;
-                
+
                 if ($usesWeights) {
                     // Weighted average
                     $totalWeight = 0;
                     $weightedSum = 0;
-                    
+
                     foreach ($gradedRecords as $record) {
                         $unit = $module->units->find($record->unit_id);
                         if ($unit && $unit->pivot->weight) {
@@ -815,7 +822,7 @@ class StudentAcademicSummaryService
                             $weightedSum += ($record->final_percentage ?? 0) * $weight;
                         }
                     }
-                    
+
                     if ($totalWeight > 0) {
                         $moduleGrade = $weightedSum / $totalWeight;
                     }
@@ -829,13 +836,13 @@ class StudentAcademicSummaryService
             $totalUnits = $module->units->count();
             $completedRecords = $academicRecords->where('completion_status', 'completed');
             $completedUnits = $completedRecords->count();
-            
+
             $status = 'in_progress';
             if ($completedUnits === $totalUnits && $totalUnits > 0) {
                 // All units completed - check if all passed
                 $allPassed = $completedRecords->every(function ($record) {
-                    return $record->final_letter_grade && 
-                           !in_array(strtoupper($record->final_letter_grade), ['F', 'FAIL']);
+                    return $record->final_letter_grade &&
+                        ! in_array(strtoupper($record->final_letter_grade), ['F', 'FAIL']);
                 });
                 $status = $allPassed ? 'passed' : 'failed';
             } elseif ($completedUnits > 0) {
@@ -848,7 +855,7 @@ class StudentAcademicSummaryService
             $subUnits = $module->units->map(function ($unit) use ($academicRecords) {
                 $record = $academicRecords->firstWhere('unit_id', $unit->id);
                 $gradingType = $record?->courseOffering?->grading_type ?? 'grade';
-                
+
                 return [
                     'id' => $unit->id,
                     'code' => $unit->code,
@@ -860,8 +867,8 @@ class StudentAcademicSummaryService
                     'final_grade' => $record?->final_percentage,
                     'letter_grade' => $record?->final_letter_grade,
                     'status' => $record?->completion_status ?? 'not_enrolled',
-                    'is_passed' => $record && $record->final_letter_grade && 
-                                   !in_array(strtoupper($record->final_letter_grade), ['F', 'FAIL']),
+                    'is_passed' => $record && $record->final_letter_grade &&
+                        ! in_array(strtoupper($record->final_letter_grade), ['F', 'FAIL']),
                     'included_in_average' => $gradingType === 'grade',
                 ];
             })->sortBy('order')->values();
@@ -896,7 +903,7 @@ class StudentAcademicSummaryService
     /**
      * Get student overview data
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return array Overview data
      */
     public function getOverviewData(Student $student): array
@@ -907,9 +914,9 @@ class StudentAcademicSummaryService
     /**
      * Get registrations data
      *
-     * @param Student $student The student model
-     * @param array $filters Optional filters
-     * @param int $perPage Items per page
+     * @param  Student  $student  The student model
+     * @param  array  $filters  Optional filters
+     * @param  int  $perPage  Items per page
      * @return array Registrations data
      */
     public function getRegistrationsData(Student $student, array $filters = [], int $perPage = 50): array
@@ -920,8 +927,8 @@ class StudentAcademicSummaryService
     /**
      * Get scores data
      *
-     * @param Student $student The student model
-     * @param int $limit Score limit
+     * @param  Student  $student  The student model
+     * @param  int  $limit  Score limit
      * @return array Scores data
      */
     public function getScoresData(Student $student, int $limit = 100): array
@@ -932,7 +939,7 @@ class StudentAcademicSummaryService
     /**
      * Get attendance data
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return array Attendance data
      */
     public function getAttendanceData(Student $student): array
@@ -943,7 +950,7 @@ class StudentAcademicSummaryService
     /**
      * Get GPA data
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return array GPA data
      */
     public function getGpaData(Student $student): array
@@ -954,7 +961,7 @@ class StudentAcademicSummaryService
     /**
      * Get graduation data
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return array Graduation data
      */
     public function getGraduationData(Student $student): array
@@ -965,10 +972,10 @@ class StudentAcademicSummaryService
     /**
      * Get detailed scores for a specific course offering (for lazy loading)
      *
-     * @param Student $student The student model
-     * @param int $courseOfferingId The course offering ID
-     * @param int $offset Offset for pagination
-     * @param int $limit Limit for pagination
+     * @param  Student  $student  The student model
+     * @param  int  $courseOfferingId  The course offering ID
+     * @param  int  $offset  Offset for pagination
+     * @param  int  $limit  Limit for pagination
      * @return array Detailed scores data
      */
     public function getCourseScoresDetails(Student $student, int $courseOfferingId, int $offset = 0, int $limit = 20): array
@@ -1020,7 +1027,7 @@ class StudentAcademicSummaryService
     /**
      * Get attendance data summarized by unit
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return array Attendance summary data
      */
     private function getAttendance(Student $student): array
@@ -1107,7 +1114,7 @@ class StudentAcademicSummaryService
     /**
      * Get attendance status based on percentage
      *
-     * @param float $percentage Attendance percentage
+     * @param  float  $percentage  Attendance percentage
      * @return string Status indicator
      */
     private function getAttendanceStatus(float $percentage): string
@@ -1128,7 +1135,7 @@ class StudentAcademicSummaryService
     /**
      * Get GPA and transcript data
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return array GPA and transcript data
      */
     private function getGpaTranscript(Student $student): array
@@ -1178,7 +1185,7 @@ class StudentAcademicSummaryService
     /**
      * Calculate GPA trend over time
      *
-     * @param \Illuminate\Support\Collection $gpaCalculations
+     * @param  \Illuminate\Support\Collection  $gpaCalculations
      * @return string Trend indicator
      */
     private function calculateGpaTrend($gpaCalculations): string
@@ -1212,7 +1219,7 @@ class StudentAcademicSummaryService
     /**
      * Get graduation progress tracking data
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return array Graduation progress data
      */
     private function getGraduationTracker(Student $student): array
@@ -1303,13 +1310,13 @@ class StudentAcademicSummaryService
         if ($completionPercentage < 50) {
             $risks[] = 'low_credit_completion';
         }
-        if (!$requirements['internship']['completed']) {
+        if (! $requirements['internship']['completed']) {
             $risks[] = 'internship_pending';
         }
-        if (!$requirements['thesis']['completed']) {
+        if (! $requirements['thesis']['completed']) {
             $risks[] = 'thesis_pending';
         }
-        if (!$requirements['english_requirement']['completed']) {
+        if (! $requirements['english_requirement']['completed']) {
             $risks[] = 'english_requirement_pending';
         }
 
@@ -1337,14 +1344,14 @@ class StudentAcademicSummaryService
     /**
      * Get current semester progress
      *
-     * @param Student $student The student model
+     * @param  Student  $student  The student model
      * @return array Current semester progress data
      */
     private function getCurrentSemesterProgress(Student $student): array
     {
         $currentSemester = Semester::where('is_active', true)->first();
 
-        if (!$currentSemester) {
+        if (! $currentSemester) {
             return ['semester' => null, 'enrolled_credits' => 0, 'status' => 'no_current_semester'];
         }
 
@@ -1363,8 +1370,8 @@ class StudentAcademicSummaryService
     /**
      * Calculate projected completion date
      *
-     * @param Student $student The student model
-     * @param float $creditsRemaining Remaining credits to complete
+     * @param  Student  $student  The student model
+     * @param  float  $creditsRemaining  Remaining credits to complete
      * @return array Projected completion data
      */
     private function calculateProjectedCompletion(Student $student, float $creditsRemaining): array
@@ -1387,8 +1394,8 @@ class StudentAcademicSummaryService
     /**
      * Filter academic data by semester
      *
-     * @param int $studentId The student ID
-     * @param int $semesterId The semester ID to filter by
+     * @param  int  $studentId  The student ID
+     * @param  int  $semesterId  The semester ID to filter by
      * @return array Filtered academic data
      */
     public function filterBySemester(int $studentId, int $semesterId): array
@@ -1458,8 +1465,8 @@ class StudentAcademicSummaryService
     /**
      * Filter academic data by course offering
      *
-     * @param int $studentId The student ID
-     * @param int $courseOfferingId The course offering ID to filter by
+     * @param  int  $studentId  The student ID
+     * @param  int  $courseOfferingId  The course offering ID to filter by
      * @return array Filtered academic data
      */
     public function filterByCourseOffering(int $studentId, int $courseOfferingId): array
@@ -1528,9 +1535,9 @@ class StudentAcademicSummaryService
     /**
      * Get detailed attendance information for a specific unit
      *
-     * @param int $studentId The student ID
-     * @param int $unitId The unit ID
-     * @param int|null $semesterId Optional semester filter
+     * @param  int  $studentId  The student ID
+     * @param  int  $unitId  The unit ID
+     * @param  int|null  $semesterId  Optional semester filter
      * @return array Detailed attendance data
      */
     public function getAttendanceDetails(int $studentId, int $unitId, ?int $semesterId = null): array
@@ -1606,8 +1613,8 @@ class StudentAcademicSummaryService
     /**
      * Get detailed score breakdown for a specific course offering
      *
-     * @param int $studentId The student ID
-     * @param int $courseOfferingId The course offering ID
+     * @param  int  $studentId  The student ID
+     * @param  int  $courseOfferingId  The course offering ID
      * @return array Detailed score breakdown
      */
     public function getScoreDetails(int $studentId, int $courseOfferingId): array
@@ -1681,7 +1688,7 @@ class StudentAcademicSummaryService
     /**
      * Calculate weighted average for assessment components
      *
-     * @param \Illuminate\Support\Collection $components
+     * @param  \Illuminate\Support\Collection  $components
      * @return float Weighted average
      */
     private function calculateWeightedAverage($components): float

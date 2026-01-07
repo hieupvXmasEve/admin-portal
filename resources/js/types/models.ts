@@ -365,8 +365,13 @@ export interface StudentOverview {
         date_of_birth?: string;
         gender?: 'male' | 'female' | 'other';
         nationality?: string;
+        ethnicity?: string;
         national_id?: string;
         address?: string;
+        current_address_line?: string;
+        current_ward?: string;
+        current_province?: string;
+        current_country?: string;
         status: 'admitted' | 'active' | 'inactive' | 'graduated' | 'dropped_out';
         academic_status: string;
         admission_date?: string;
@@ -375,6 +380,10 @@ export interface StudentOverview {
         status_reason?: string;
         avatar_url?: string;
         cccd_address: string;
+        cccd_address_line?: string;
+        cccd_ward?: string;
+        cccd_province?: string;
+        cccd_country?: string;
         emergency_contact_name: string | null;
         emergency_contact_phone: string | null;
         emergency_contact_email: string | null;

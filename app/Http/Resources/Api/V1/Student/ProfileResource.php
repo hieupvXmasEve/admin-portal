@@ -16,8 +16,8 @@ class ProfileResource extends JsonResource
     {
         return [
             'info' => $this->formatPersonalInfo($this->resource['info']),
-//            'academic_info' => $this->formatAcademicInfo($this->resource['academic_info']),
-//            'contact_info' => $this->formatContactInfo($this->resource['contact_info']),
+            //            'academic_info' => $this->formatAcademicInfo($this->resource['academic_info']),
+            //            'contact_info' => $this->formatContactInfo($this->resource['contact_info']),
             // 'enrollment_info' => $this->formatEnrollmentInfo($this->resource['enrollment_info']),
             'preferences' => $this->formatPreferences($this->resource['preferences']),
             'profile_completion' => $this->formatProfileCompletion($this->resource['profile_completion']),
@@ -35,8 +35,8 @@ class ProfileResource extends JsonResource
         $campus = $personalInfo['campus'] ?? [];
         $cvVersion = $cv['version'] ?? null;
 
-        $studyMode = (string)($personalInfo['study_mode'] ?? '');
-        $status = (string)($personalInfo['status'] ?? '');
+        $studyMode = (string) ($personalInfo['study_mode'] ?? '');
+        $status = (string) ($personalInfo['status'] ?? '');
 
         return [
             'id' => $personalInfo['id'],
@@ -51,8 +51,15 @@ class ProfileResource extends JsonResource
                 : null,
             'gender' => $personalInfo['gender'],
             'nationality' => $personalInfo['nationality'],
+            'ethnicity' => $personalInfo['ethnicity'] ?? null,
             'national_id' => $personalInfo['national_id'],
             'address' => $personalInfo['address'],
+            'current_address' => [
+                'line' => $personalInfo['current_address_line'] ?? null,
+                'ward' => $personalInfo['current_ward'] ?? null,
+                'province' => $personalInfo['current_province'] ?? null,
+                'country' => $personalInfo['current_country'] ?? null,
+            ],
             'email' => $personalInfo['email'],
             'phone' => $personalInfo['phone'] ?? null,
             'emergency_contact_name' => $personalInfo['emergency_contact_name'] ?? null,
@@ -65,11 +72,16 @@ class ProfileResource extends JsonResource
             'emergency_contact_relationship_1' => $personalInfo['emergency_contact_relationship_1'] ?? null,
             'high_school_name' => $personalInfo['high_school_name'] ?? null,
 
-
             'cccd_address' => $personalInfo['cccd_address'],
+            'cccd_address_detail' => [
+                'line' => $personalInfo['cccd_address_line'] ?? null,
+                'ward' => $personalInfo['cccd_ward'] ?? null,
+                'province' => $personalInfo['cccd_province'] ?? null,
+                'country' => $personalInfo['cccd_country'] ?? null,
+            ],
             'avatar' => [
                 'url' => $personalInfo['avatar_url'],
-                'has_avatar' => !empty($personalInfo['avatar_url']),
+                'has_avatar' => ! empty($personalInfo['avatar_url']),
             ],
             'program' => [
                 'id' => $program['id'] ?? null,
@@ -93,8 +105,8 @@ class ProfileResource extends JsonResource
                 'display_name' => ($campus['name'] ?? '') . (($campus['code'] ?? null) ? ' (' . $campus['code'] . ')' : ''),
             ],
             'enrollment' => [
-                'enrollment_date' => $academicInfo['enrollment_date'] ?? null,
-                'expected_graduation_date' => $academicInfo['expected_graduation_date'] ?? null,
+                'enrollment_date' => $personalInfo['enrollment_date'] ?? null,
+                'expected_graduation_date' => $personalInfo['expected_graduation_date'] ?? null,
                 'study_mode' => $studyMode,
                 'study_mode_display' => $this->getStudyModeDisplay($studyMode),
                 'status' => $status,
@@ -103,6 +115,7 @@ class ProfileResource extends JsonResource
             ],
         ];
     }
+
     /**
      * Format preferences
      */
@@ -221,9 +234,9 @@ class ProfileResource extends JsonResource
      */
     protected function isAddressComplete(array $address): bool
     {
-        return !empty($address['street']) &&
-            !empty($address['city']) &&
-            !empty($address['country']);
+        return ! empty($address['street']) &&
+            ! empty($address['city']) &&
+            ! empty($address['country']);
     }
 
     /**

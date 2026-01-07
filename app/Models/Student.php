@@ -9,10 +9,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Facades\Cache;
+use Laravel\Sanctum\HasApiTokens;
 
 class Student extends StudentAuditableModel
 {
@@ -46,9 +45,18 @@ class Student extends StudentAuditableModel
         'date_of_birth',
         'gender',
         'nationality',
+        'ethnicity',
         'national_id',
         'address',
+        'current_address_line',
+        'current_ward',
+        'current_province',
+        'current_country',
         'cccd_address',
+        'cccd_address_line',
+        'cccd_ward',
+        'cccd_province',
+        'cccd_country',
         'campus_id',
         'program_id',
         'specialization_id',
@@ -132,7 +140,7 @@ class Student extends StudentAuditableModel
             'emergency_contact_phone_1' => ['nullable', 'string', 'max:20'],
             'emergency_contact_relationship_1' => ['nullable', 'string', 'max:100'],
             'high_school_name' => ['nullable', 'string', 'max:255'],
-            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
+            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
             'status' => ['nullable', 'in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending'],
@@ -171,7 +179,6 @@ class Student extends StudentAuditableModel
     {
         return $this->belongsTo(User::class);
     }
-
 
     public function intakeSemester(): BelongsTo
     {
@@ -313,7 +320,6 @@ class Student extends StudentAuditableModel
         return $this->hasMany(GoldTransaction::class);
     }
 
-
     /**
      * Get the student's club memberships.
      */
@@ -367,7 +373,7 @@ class Student extends StudentAuditableModel
 
     public function generateStudentId(string $campusCode, int $year): string
     {
-        $lastStudent = static::where('student_id', 'like', $campusCode . $year . '%')
+        $lastStudent = static::where('student_id', 'like', $campusCode.$year.'%')
             ->orderBy('student_id', 'desc')
             ->first();
 
@@ -378,7 +384,7 @@ class Student extends StudentAuditableModel
             $newNumber = 1;
         }
 
-        return $campusCode . $year . str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
+        return $campusCode.$year.str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
     }
 
     // New Review Management methods
@@ -472,6 +478,7 @@ class Student extends StudentAuditableModel
             default => 'gray',
         };
     }
+
     /**
      * Get the student's current EGC progress record.
      */
@@ -509,7 +516,7 @@ class Student extends StudentAuditableModel
             ->orderByDesc('sequence_order')
             ->first();
 
-        if (!$highestLevel) {
+        if (! $highestLevel) {
             return false;
         }
 
@@ -526,6 +533,7 @@ class Student extends StudentAuditableModel
     public function getCurrentEgcLevel(): ?EgcLevel
     {
         $currentProgress = $this->currentEgcProgress();
+
         return $currentProgress?->egcLevel;
     }
 
@@ -536,7 +544,7 @@ class Student extends StudentAuditableModel
     {
         $currentLevel = $this->getCurrentEgcLevel();
 
-        if (!$currentLevel) {
+        if (! $currentLevel) {
             // Return the first level if no current level
             return EgcLevel::where('is_active', true)
                 ->orderBy('sequence_order')

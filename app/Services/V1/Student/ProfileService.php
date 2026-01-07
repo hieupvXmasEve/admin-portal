@@ -19,18 +19,18 @@ class ProfileService
      */
     public function getProfile(Student $student): array
     {
-        $cacheKey = "profile:student:{$student->id}";
+        // $cacheKey = "profile:student:{$student->id}";
 
-        return Cache::remember($cacheKey, 1, function () use ($student) {
-            return [
-                'info' => $this->getPersonalInfo($student),
-                //                'academic_info' => $this->getAcademicInfo($student),
-                //                'contact_info' => $this->getContactInfo($student),
-                // 'enrollment_info' => $this->getEnrollmentInfo($student),
-                'preferences' => $this->getPreferences($student),
-                'profile_completion' => $this->calculateProfileCompletion($student),
-            ];
-        });
+        // return Cache::remember($cacheKey, 1, function () use ($student) {
+        return [
+            'info' => $this->getPersonalInfo($student),
+            //                'academic_info' => $this->getAcademicInfo($student),
+            //                'contact_info' => $this->getContactInfo($student),
+            // 'enrollment_info' => $this->getEnrollmentInfo($student),
+            'preferences' => $this->getPreferences($student),
+            'profile_completion' => $this->calculateProfileCompletion($student),
+        ];
+        // });
     }
 
     /**
@@ -146,10 +146,19 @@ class ProfileService
             'date_of_birth' => $student->date_of_birth?->toDateString(),
             'gender' => $student->gender,
             'nationality' => $student->nationality,
+            'ethnicity' => $student->ethnicity,
             'avatar_url' => $student->avatar_url,
             'national_id' => $student->national_id,
-            'cccd_address' => $student->cccd_address,
             'address' => $student->address,
+            'current_address_line' => $student->current_address_line,
+            'current_ward' => $student->current_ward,
+            'current_province' => $student->current_province,
+            'current_country' => $student->current_country,
+            'cccd_address' => $student->cccd_address,
+            'cccd_address_line' => $student->cccd_address_line,
+            'cccd_ward' => $student->cccd_ward,
+            'cccd_province' => $student->cccd_province,
+            'cccd_country' => $student->cccd_country,
 
             'email' => $student->email,
             'phone' => $student->phone,
@@ -307,8 +316,17 @@ class ProfileService
             'phone' => ! empty($student->phone),
             'date_of_birth' => ! empty($student->date_of_birth),
             'address' => ! empty($student->address),
+            'current_address_line' => ! empty($student->current_address_line),
+            'current_ward' => ! empty($student->current_ward),
+            'current_province' => ! empty($student->current_province),
+            'current_country' => ! empty($student->current_country),
             'cccd_address' => ! empty($student->cccd_address),
+            'cccd_address_line' => ! empty($student->cccd_address_line),
+            'cccd_ward' => ! empty($student->cccd_ward),
+            'cccd_province' => ! empty($student->cccd_province),
+            'cccd_country' => ! empty($student->cccd_country),
             'national_id' => ! empty($student->national_id),
+            'ethnicity' => ! empty($student->ethnicity),
             'emergency_contact_name' => ! empty($student->emergency_contact_name),
             'emergency_contact_phone' => ! empty($student->emergency_contact_phone),
             'emergency_contact_email' => ! empty($student->emergency_contact_email),
@@ -345,8 +363,17 @@ class ProfileService
             'phone',
             'date_of_birth',
             'address',
+            'current_address_line',
+            'current_ward',
+            'current_province',
+            'current_country',
             'cccd_address',
+            'cccd_address_line',
+            'cccd_ward',
+            'cccd_province',
+            'cccd_country',
             'national_id',
+            'ethnicity',
             'high_school_name',
             'gender',
             'emergency_contact_name',

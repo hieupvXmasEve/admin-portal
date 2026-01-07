@@ -59,8 +59,15 @@ const formatStatus = (status: string) => {
     return status.replace(/_/g, ' ').toUpperCase();
 };
 
-const formatGpa = (gpa: number) => {
-    return gpa > 0 ? gpa.toFixed(2) : 'N/A';
+const formatGpa = (gpa: number | string | null | undefined) => {
+    if (gpa === null || gpa === undefined || gpa === '') {
+        return 'N/A';
+    }
+    const numGpa = typeof gpa === 'string' ? parseFloat(gpa) : gpa;
+    if (isNaN(numGpa) || numGpa <= 0) {
+        return 'N/A';
+    }
+    return parseFloat(numGpa.toFixed(2));
 };
 
 // Academic progress calculation
@@ -244,6 +251,14 @@ const hasAcademicConcerns = computed(() => {
                                         </div>
                                     </div>
 
+                                    <div v-if="overview.student_info.ethnicity" class="flex items-center gap-3">
+                                        <Users class="text-muted-foreground h-4 w-4 flex-shrink-0" />
+                                        <div>
+                                            <p class="text-muted-foreground text-sm">Ethnicity</p>
+                                            <p class="font-medium capitalize">{{ overview.student_info.ethnicity }}</p>
+                                        </div>
+                                    </div>
+
                                     <div v-if="overview.student_info.national_id" class="flex items-center gap-3">
                                         <div class="text-muted-foreground h-4 w-4 flex-shrink-0 text-xs font-bold">ID</div>
                                         <div>
@@ -275,8 +290,16 @@ const hasAcademicConcerns = computed(() => {
                                 <div class="flex items-start gap-3">
                                     <MapPin class="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0" />
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-muted-foreground text-sm">Address of Permanent Residence:</p>
-                                        <p class="font-medium">{{ overview.student_info.cccd_address || 'N/A' }}</p>
+                                        <p class="text-muted-foreground text-sm font-semibold">Address of Permanent Residence (CCCD):</p>
+                                        <div v-if="overview.student_info.cccd_address_line || overview.student_info.cccd_ward || overview.student_info.cccd_province" class="mt-1 space-y-1">
+                                            <p v-if="overview.student_info.cccd_address_line" class="font-medium">{{ overview.student_info.cccd_address_line }}</p>
+                                            <p v-if="overview.student_info.cccd_ward || overview.student_info.cccd_province" class="text-muted-foreground text-sm">
+                                                {{ [overview.student_info.cccd_ward, overview.student_info.cccd_province].filter(Boolean).join(', ') }}
+                                            </p>
+                                            <p v-if="overview.student_info.cccd_country" class="text-muted-foreground text-sm">{{ overview.student_info.cccd_country }}</p>
+                                        </div>
+                                        <p v-else-if="overview.student_info.cccd_address" class="font-medium">{{ overview.student_info.cccd_address }}</p>
+                                        <p v-else class="text-muted-foreground font-medium">N/A</p>
                                     </div>
                                 </div>
                             </div>
@@ -285,8 +308,16 @@ const hasAcademicConcerns = computed(() => {
                                 <div class="flex items-start gap-3">
                                     <MapPin class="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0" />
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-muted-foreground text-sm">Current Address</p>
-                                        <p class="font-medium">{{ overview.student_info.address || 'N/A' }}</p>
+                                        <p class="text-muted-foreground text-sm font-semibold">Current Address:</p>
+                                        <div v-if="overview.student_info.current_address_line || overview.student_info.current_ward || overview.student_info.current_province" class="mt-1 space-y-1">
+                                            <p v-if="overview.student_info.current_address_line" class="font-medium">{{ overview.student_info.current_address_line }}</p>
+                                            <p v-if="overview.student_info.current_ward || overview.student_info.current_province" class="text-muted-foreground text-sm">
+                                                {{ [overview.student_info.current_ward, overview.student_info.current_province].filter(Boolean).join(', ') }}
+                                            </p>
+                                            <p v-if="overview.student_info.current_country" class="text-muted-foreground text-sm">{{ overview.student_info.current_country }}</p>
+                                        </div>
+                                        <p v-else-if="overview.student_info.address" class="font-medium">{{ overview.student_info.address }}</p>
+                                        <p v-else class="text-muted-foreground font-medium">N/A</p>
                                     </div>
                                 </div>
                             </div>
