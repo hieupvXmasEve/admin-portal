@@ -8,6 +8,10 @@
             "command": "npx",
             "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
             "enabled": true
+        },
+        "laravel-boost": {
+            "command": "php",
+            "args": ["artisan", "boost:mcp"]
         }
     }
 }
