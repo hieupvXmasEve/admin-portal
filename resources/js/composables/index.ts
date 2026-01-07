@@ -26,6 +26,9 @@ export type { InertiaFilterOptions } from './useInertiaFilters';
 // QR Scanner composables
 export { useQRScanner } from './useQRScanner';
 
+// Address data composables
+export { useAddressData } from './useAddressData';
+
 // Add other composables here as they are created
 // export { useAuth } from './useAuth';
 // export { useNotifications } from './useNotifications';

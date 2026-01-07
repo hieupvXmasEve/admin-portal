@@ -268,9 +268,18 @@ export interface Student {
     date_of_birth: string;
     gender: 'male' | 'female' | 'other';
     nationality: string;
+    ethnicity?: string;
     national_id: string;
-    address: string;
-    cccd_address?: string;
+    address?: string; // Deprecated: Use current_address_line, current_ward, current_province, current_country
+    current_address_line?: string;
+    current_ward?: string;
+    current_province?: string;
+    current_country?: string;
+    cccd_address?: string; // Deprecated: Use cccd_address_line, cccd_ward, cccd_province, cccd_country
+    cccd_address_line?: string;
+    cccd_ward?: string;
+    cccd_province?: string;
+    cccd_country?: string;
     high_school_name: string;
     high_school_graduation_year: string;
     entrance_exam_score?: string;

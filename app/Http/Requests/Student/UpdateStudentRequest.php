@@ -56,7 +56,7 @@ class UpdateStudentRequest extends FormRequest
         $studentId = $student->id;
 
         // Ensure parent_user relationship is loaded
-        if (!$student->relationLoaded('parentUser')) {
+        if (! $student->relationLoaded('parentUser')) {
             $student->load('parentUser');
         }
 
@@ -160,6 +160,68 @@ class UpdateStudentRequest extends FormRequest
             $this->merge([
                 'parent_name' => null,
             ]);
+        }
+
+        // Convert empty strings to null for address and ethnicity fields
+        $addressFields = [
+            'ethnicity',
+            'current_address_line',
+            'current_ward',
+            'current_province',
+            'current_country',
+            'cccd_address_line',
+            'cccd_ward',
+            'cccd_province',
+            'cccd_country',
+        ];
+
+        foreach ($addressFields as $field) {
+            if ($this->has($field) && $this->input($field) === '') {
+                $this->merge([$field => null]);
+            }
+        }
+
+        // Convert all string fields to lowercase for data consistency
+        // Exclude fields that should not be lowercase: phone (already cleaned), national_id (already cleaned),
+        // date fields, numeric fields, and fields that are already null
+        $stringFieldsToLowercase = [
+            'email',
+            'full_name',
+            'nationality',
+            'ethnicity',
+            'gender',
+            'status',
+            'academic_status',
+            'address',
+            'current_address_line',
+            'current_ward',
+            'current_province',
+            'current_country',
+            'cccd_address',
+            'cccd_address_line',
+            'cccd_ward',
+            'cccd_province',
+            'cccd_country',
+            'emergency_contact_name',
+            'emergency_contact_relationship',
+            'emergency_contact_email',
+            'emergency_contact_name_1',
+            'emergency_contact_email_1',
+            'emergency_contact_relationship_1',
+            'high_school_name',
+            'admission_notes',
+            'status_reason',
+            'parent_email',
+            'parent_name',
+            'intake_mode',
+        ];
+
+        foreach ($stringFieldsToLowercase as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && $this->input($field) !== '') {
+                $this->merge([
+                    $field => mb_strtolower($this->input($field), 'UTF-8'),
+                ]);
+            }
         }
     }
 }

@@ -2,19 +2,22 @@
 import StudentAvatar from '@/components/ui/avatar/StudentAvatar.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Combobox, ComboboxAnchor, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxTrigger, ComboboxViewport } from '@/components/ui/combobox';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useAddressData } from '@/composables/useAddressData';
 import type { Campus, CurriculumVersion, Program, Specialization, Student } from '@/types/models';
 import { relationshipOptions } from '@/types/student';
 import { ValidationRules } from '@/types/validation';
 import { studentRoutes } from '@/utils/routes';
+import { capitalizeFirst } from '@/utils/string';
 import { Head, router } from '@inertiajs/vue3';
 import { toTypedSchema } from '@vee-validate/zod';
-import { Building, GraduationCap, Mail, Phone, Save, User, Users, X } from 'lucide-vue-next';
+import { ChevronsUpDown, GraduationCap, Mail, Phone, Save, User, Users, X } from 'lucide-vue-next';
 import { useForm } from 'vee-validate';
-import { ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import { z } from 'zod';
 
@@ -27,6 +30,17 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+// Load address data
+const { ethnicities, provinces, loadAll, getWardsByProvince } = useAddressData();
+
+// Search terms for comboboxes
+const ethnicitySearch = ref('');
+const currentProvinceSearch = ref('');
+const currentWardSearch = ref('');
+const cccdProvinceSearch = ref('');
+const cccdWardSearch = ref('');
+
 // Form validation schema
 const formSchema = toTypedSchema(
     z
@@ -38,9 +52,16 @@ const formSchema = toTypedSchema(
             date_of_birth: z.string().optional(),
             gender: z.enum(['male', 'female', 'other']).optional(),
             nationality: z.string().max(ValidationRules.student.nationality.maxLength, 'Nationality is too long').optional(),
+            ethnicity: z.string().max(100, 'Ethnicity is too long').optional(),
             national_id: z.string().max(ValidationRules.student.nationalId.maxLength, 'National ID is too long').optional(),
-            address: z.string().optional(),
-            cccd_address: z.string().max(ValidationRules.student.cccdAddress.maxLength, 'CCCD address is too long').optional(),
+            current_address_line: z.string().max(255, 'Current address line is too long').optional(),
+            current_ward: z.string().max(100, 'Current ward is too long').optional(),
+            current_province: z.string().max(100, 'Current province is too long').optional(),
+            current_country: z.string().max(30, 'Current country is too long').optional(),
+            cccd_address_line: z.string().max(255, 'CCCD address line is too long').optional(),
+            cccd_ward: z.string().max(100, 'CCCD ward is too long').optional(),
+            cccd_province: z.string().max(100, 'CCCD province is too long').optional(),
+            cccd_country: z.string().max(100, 'CCCD country is too long').optional(),
             campus_id: z.string().min(1, 'Campus is required'),
             program_id: z.string().min(1, 'Program is required'),
             // specialization_id: z.string().optional(),
@@ -97,9 +118,16 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         date_of_birth: props.student.date_of_birth || '',
         gender: props.student.gender,
         nationality: props.student.nationality || '',
+        ethnicity: props.student.ethnicity || '',
         national_id: props.student.national_id || '',
-        address: props.student.address || '',
-        cccd_address: props.student.cccd_address || '',
+        current_address_line: props.student.current_address_line || '',
+        current_ward: props.student.current_ward || '',
+        current_province: props.student.current_province || '',
+        current_country: props.student.current_country || '',
+        cccd_address_line: props.student.cccd_address_line || '',
+        cccd_ward: props.student.cccd_ward || '',
+        cccd_province: props.student.cccd_province || '',
+        cccd_country: props.student.cccd_country || '',
         campus_id: props.student.campus_id.toString(),
         program_id: props.student.program_id.toString(),
         // specialization_id: props.student.specialization_id?.toString() || '',
@@ -122,9 +150,61 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
     },
 });
 
-// Reactive data for dependent dropdowns
-const availableCurriculumVersions = ref<CurriculumVersion[]>([]);
-const loadingCurriculumVersions = ref(false);
+// Computed filtered provinces for current address
+const filteredCurrentProvinces = computed(() => {
+    if (!currentProvinceSearch.value) return provinces.value;
+    return provinces.value.filter((province) => province.name.toLowerCase().includes(currentProvinceSearch.value.toLowerCase()));
+});
+
+// Computed filtered provinces for CCCD address
+const filteredCccdProvinces = computed(() => {
+    if (!cccdProvinceSearch.value) return provinces.value;
+    return provinces.value.filter((province) => province.name.toLowerCase().includes(cccdProvinceSearch.value.toLowerCase()));
+});
+
+// Computed filtered ethnicities
+const filteredEthnicities = computed(() => {
+    if (!ethnicitySearch.value) return ethnicities.value;
+    return ethnicities.value.filter((ethnicity) => ethnicity.toLowerCase().includes(ethnicitySearch.value.toLowerCase()));
+});
+
+// Computed filtered wards for current address
+const currentWards = computed(() => {
+    const province = values.current_province;
+    const wards = getWardsByProvince.value(province);
+    if (!currentWardSearch.value) return wards;
+    return wards.filter((ward) => ward.name.toLowerCase().includes(currentWardSearch.value.toLowerCase()));
+});
+
+// Computed filtered wards for CCCD address
+const cccdWards = computed(() => {
+    const province = values.cccd_province;
+    const wards = getWardsByProvince.value(province);
+    if (!cccdWardSearch.value) return wards;
+    return wards.filter((ward) => ward.name.toLowerCase().includes(cccdWardSearch.value.toLowerCase()));
+});
+
+// Watch province changes to reset ward
+watch(
+    () => values.current_province,
+    () => {
+        setFieldValue('current_ward', '');
+        currentWardSearch.value = '';
+    },
+);
+
+watch(
+    () => values.cccd_province,
+    () => {
+        setFieldValue('cccd_ward', '');
+        cccdWardSearch.value = '';
+    },
+);
+
+// Load data on mount
+onMounted(() => {
+    loadAll();
+});
 
 // Computed specializations filtered by selected program (same as Create.vue)
 // const filteredSpecializations = computed(() => {
@@ -132,49 +212,6 @@ const loadingCurriculumVersions = ref(false);
 //     const selectedProgram = props.programs.find((p) => p.id.toString() === values.program_id);
 //     return selectedProgram?.specializations || [];
 // });
-
-// Fetch curriculum versions based on program and specialization (same as Create.vue)
-const fetchCurriculumVersions = async () => {
-    // if (!values.program_id || !values.specialization_id) {
-    if (!values.program_id) {
-        availableCurriculumVersions.value = [];
-        return;
-    }
-
-    loadingCurriculumVersions.value = true;
-
-    try {
-        const params = new URLSearchParams({
-            program_id: values.program_id,
-        });
-
-        const response = await fetch(`/api/curriculum-versions/by-program-specialization?${params}`);
-        const data = await response.json();
-        availableCurriculumVersions.value = data;
-
-        // Auto-select curriculum version if only one exists
-        if (data.length === 1) {
-            setFieldValue('curriculum_version_id', data[0].id.toString());
-        }
-    } catch (error) {
-        console.error('Error fetching curriculum versions:', error);
-    } finally {
-        loadingCurriculumVersions.value = false;
-    }
-};
-
-// Watch for program changes to reset dependent fields (same as Create.vue)
-watch(
-    () => values.program_id,
-    (newProgramId, oldProgramId) => {
-        if (newProgramId !== oldProgramId) {
-            // setFieldValue('specialization_id', '');
-            setFieldValue('curriculum_version_id', '');
-            availableCurriculumVersions.value = [];
-            fetchCurriculumVersions();
-        }
-    },
-);
 
 watch(
     () => props.errors,
@@ -197,11 +234,6 @@ watch(
 //     },
 // );
 
-// Initialize curriculum versions on mount if student has program and specialization
-if (props.student.program_id) {
-    fetchCurriculumVersions();
-}
-
 const onSubmit = handleSubmit((formData) => {
     // Convert string values back to appropriate types
     const submitData = {
@@ -221,9 +253,16 @@ const onSubmit = handleSubmit((formData) => {
         date_of_birth: formData.date_of_birth || null,
         gender: formData.gender || null,
         nationality: formData.nationality || null,
+        ethnicity: formData.ethnicity || null,
         national_id: formData.national_id || null,
-        address: formData.address || null,
-        cccd_address: formData.cccd_address || null,
+        current_address_line: formData.current_address_line || null,
+        current_ward: formData.current_ward || null,
+        current_province: formData.current_province || null,
+        current_country: formData.current_country || null,
+        cccd_address_line: formData.cccd_address_line || null,
+        cccd_ward: formData.cccd_ward || null,
+        cccd_province: formData.cccd_province || null,
+        cccd_country: formData.cccd_country || null,
         expected_graduation_date: formData.expected_graduation_date || null,
         emergency_contact_name: formData.emergency_contact_name || null,
         emergency_contact_email: formData.emergency_contact_email || null,
@@ -398,9 +437,9 @@ const handleAvatarUploaded = (avatarData: any) => {
                     </div>
                 </div>
 
-                <!-- Identity & Status -->
+                <!-- Identity  -->
                 <div class="space-y-4 border-t pt-4">
-                    <h3 class="text-sm font-semibold text-gray-700">Identity & Status</h3>
+                    <h3 class="text-sm font-semibold text-gray-700">Identity</h3>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <FormField v-slot="{ componentField }" name="nationality">
@@ -408,6 +447,33 @@ const handleAvatarUploaded = (avatarData: any) => {
                                 <FormLabel>Nationality</FormLabel>
                                 <FormControl>
                                     <Input v-bind="componentField" placeholder="Enter nationality" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="ethnicity">
+                            <FormItem>
+                                <FormLabel>Ethnicity (Dân tộc)</FormLabel>
+                                <FormControl>
+                                    <Combobox v-bind="componentField" v-model:search-term="ethnicitySearch">
+                                        <ComboboxAnchor>
+                                            <div class="relative w-full items-center">
+                                                <ComboboxInput v-model="ethnicitySearch" placeholder="Search ethnicity..." :display-value="(value) => capitalizeFirst(value) || ''" />
+                                                <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                                    <ChevronsUpDown class="text-muted-foreground size-4" />
+                                                </ComboboxTrigger>
+                                            </div>
+                                        </ComboboxAnchor>
+                                        <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                            <ComboboxViewport>
+                                                <ComboboxEmpty v-if="filteredEthnicities.length === 0">No ethnicity found</ComboboxEmpty>
+                                                <ComboboxItem v-for="ethnicity in filteredEthnicities" :key="ethnicity" :value="ethnicity" class="cursor-pointer">
+                                                    {{ capitalizeFirst(ethnicity) }}
+                                                </ComboboxItem>
+                                            </ComboboxViewport>
+                                        </ComboboxList>
+                                    </Combobox>
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -423,90 +489,82 @@ const handleAvatarUploaded = (avatarData: any) => {
                             </FormItem>
                         </FormField>
                     </div>
-
-                    <FormField v-slot="{ componentField }" name="status">
-                        <FormItem>
-                            <FormLabel>Status *</FormLabel>
-                            <Select v-bind="componentField">
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select status" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="inactive">Inactive</SelectItem>
-                                    <SelectItem value="suspended">Suspended</SelectItem>
-                                    <SelectItem value="graduated">Graduated</SelectItem>
-                                    <SelectItem value="intake_pre_uni_gc">Intake Pre-Uni GC</SelectItem>
-                                    <SelectItem value="intake_course">Intake Course</SelectItem>
-                                    <SelectItem value="deferred">Deferred</SelectItem>
-                                    <SelectItem value="dropout">Dropout</SelectItem>
-                                    <SelectItem value="dropout_transfer">Dropout Transfer</SelectItem>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
                 </div>
 
-                <!-- GC Level Information (only shown if has values or status is intake_pre_uni_gc) -->
-                <div v-if="values.status === 'intake_pre_uni_gc' || student.gc_starting_level || student.gc_current_level || student.gc_total_levels" class="space-y-4 border-t pt-4">
-                    <h3 class="text-sm font-semibold text-gray-700">GC Levels</h3>
+                <!-- Current Address Information -->
+                <div class="space-y-4 border-t pt-4">
+                    <h3 class="text-sm font-semibold text-gray-700">Current Address</h3>
 
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <FormField v-slot="{ componentField }" name="gc_starting_level">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FormField v-slot="{ componentField }" name="current_address_line">
                             <FormItem>
-                                <FormLabel>Starting Level {{ values.status === 'intake_pre_uni_gc' ? '*' : '' }}</FormLabel>
-                                <Select v-bind="componentField" :disabled="values.status !== 'intake_pre_uni_gc'">
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select level" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="0">Level 0</SelectItem>
-                                        <SelectItem value="1">Level 1</SelectItem>
-                                        <SelectItem value="2">Level 2</SelectItem>
-                                        <SelectItem value="3">Level 3</SelectItem>
-                                        <SelectItem value="4">Level 4</SelectItem>
-                                        <SelectItem value="5">Level 5</SelectItem>
-                                        <SelectItem value="6">Level 6</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="gc_current_level">
-                            <FormItem>
-                                <FormLabel>Current Level {{ values.status === 'intake_pre_uni_gc' ? '*' : '' }}</FormLabel>
-                                <Select v-bind="componentField" :disabled="values.status !== 'intake_pre_uni_gc'">
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select level" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="0">Level 0</SelectItem>
-                                        <SelectItem value="1">Level 1</SelectItem>
-                                        <SelectItem value="2">Level 2</SelectItem>
-                                        <SelectItem value="3">Level 3</SelectItem>
-                                        <SelectItem value="4">Level 4</SelectItem>
-                                        <SelectItem value="5">Level 5</SelectItem>
-                                        <SelectItem value="6">Level 6</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        </FormField>
-
-                        <FormField v-slot="{ componentField }" name="gc_total_levels">
-                            <FormItem>
-                                <FormLabel>Total Levels</FormLabel>
+                                <FormLabel>Address Line (Số nhà, tên đường)</FormLabel>
                                 <FormControl>
-                                    <Input v-bind="componentField" placeholder="Total levels" :disabled="true" />
+                                    <Input v-bind="componentField" placeholder="Enter address line" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="current_province">
+                            <FormItem>
+                                <FormLabel>Province (Tỉnh / Thành phố)</FormLabel>
+                                <FormControl>
+                                    <Combobox v-bind="componentField" v-model:search-term="currentProvinceSearch">
+                                        <ComboboxAnchor>
+                                            <div class="relative w-full items-center">
+                                                <ComboboxInput v-model="currentProvinceSearch" placeholder="Search province..." :display-value="(value) => capitalizeFirst(value) || ''" />
+                                                <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                                    <ChevronsUpDown class="text-muted-foreground size-4" />
+                                                </ComboboxTrigger>
+                                            </div>
+                                        </ComboboxAnchor>
+                                        <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                            <ComboboxViewport>
+                                                <ComboboxEmpty v-if="filteredCurrentProvinces.length === 0">No province found</ComboboxEmpty>
+                                                <ComboboxItem v-for="province in filteredCurrentProvinces" :key="province.code" :value="province.name" class="cursor-pointer">
+                                                    {{ capitalizeFirst(province.name) }}
+                                                </ComboboxItem>
+                                            </ComboboxViewport>
+                                        </ComboboxList>
+                                    </Combobox>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="current_ward">
+                            <FormItem>
+                                <FormLabel>Ward (Xã / Phường)</FormLabel>
+                                <FormControl>
+                                    <Combobox v-bind="componentField" v-model:search-term="currentWardSearch" :disabled="!values.current_province">
+                                        <ComboboxAnchor>
+                                            <div class="relative w-full items-center">
+                                                <ComboboxInput v-model="currentWardSearch" placeholder="Search ward..." :display-value="(value) => capitalizeFirst(value) || ''" />
+                                                <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                                    <ChevronsUpDown class="text-muted-foreground size-4" />
+                                                </ComboboxTrigger>
+                                            </div>
+                                        </ComboboxAnchor>
+                                        <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                            <ComboboxViewport>
+                                                <ComboboxEmpty v-if="currentWards.length === 0">No ward found</ComboboxEmpty>
+                                                <ComboboxItem v-for="ward in currentWards" :key="ward.code" :value="ward.name" class="cursor-pointer">
+                                                    {{ capitalizeFirst(ward.name) }}
+                                                </ComboboxItem>
+                                            </ComboboxViewport>
+                                        </ComboboxList>
+                                    </Combobox>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+
+                        <FormField v-slot="{ componentField }" name="current_country">
+                            <FormItem>
+                                <FormLabel>Country</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter country" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -514,145 +572,85 @@ const handleAvatarUploaded = (avatarData: any) => {
                     </div>
                 </div>
 
-                <!-- Address Information -->
+                <!-- CCCD Address Information -->
                 <div class="space-y-4 border-t pt-4">
-                    <h3 class="text-sm font-semibold text-gray-700">Address Information</h3>
+                    <h3 class="text-sm font-semibold text-gray-700">CCCD Address</h3>
 
-                    <FormField v-slot="{ componentField }" name="address">
-                        <FormItem>
-                            <FormLabel>Current Address</FormLabel>
-                            <FormControl>
-                                <Textarea v-bind="componentField" placeholder="Enter full address" rows="2" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField v-slot="{ componentField }" name="cccd_address">
-                        <FormItem>
-                            <FormLabel>CCCD Address</FormLabel>
-                            <FormControl>
-                                <Textarea v-bind="componentField" placeholder="Enter CCCD address" rows="2" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-                </div>
-            </CardContent>
-        </Card>
-
-        <!-- Academic Information -->
-        <Card>
-            <CardHeader>
-                <CardTitle class="flex items-center gap-2">
-                    <GraduationCap class="h-5 w-5" />
-                    Academic Information
-                </CardTitle>
-            </CardHeader>
-            <CardContent class="space-y-4">
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField v-slot="{ componentField }" name="campus_id">
-                        <FormItem>
-                            <FormLabel class="flex items-center gap-2">
-                                <Building class="h-4 w-4" />
-                                Campus *
-                            </FormLabel>
-                            <Select v-bind="componentField">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FormField v-slot="{ componentField }" name="cccd_address_line">
+                            <FormItem>
+                                <FormLabel>Address Line (Số nhà, tên đường)</FormLabel>
                                 <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select campus" />
-                                    </SelectTrigger>
+                                    <Input v-bind="componentField" placeholder="Enter CCCD address line" />
                                 </FormControl>
-                                <SelectContent>
-                                    <SelectItem v-for="campus in campuses" :key="campus.id" :value="campus.id.toString()">
-                                        {{ campus.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                    <FormField v-slot="{ componentField }" name="program_id">
-                        <FormItem>
-                            <FormLabel>Program *</FormLabel>
-                            <Select v-bind="componentField">
+                        <FormField v-slot="{ componentField }" name="cccd_province">
+                            <FormItem>
+                                <FormLabel>Province (Tỉnh / Thành phố)</FormLabel>
                                 <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select program" />
-                                    </SelectTrigger>
+                                    <Combobox v-bind="componentField" v-model:search-term="cccdProvinceSearch">
+                                        <ComboboxAnchor>
+                                            <div class="relative w-full items-center">
+                                                <ComboboxInput v-model="cccdProvinceSearch" placeholder="Search province..." :display-value="(value) => capitalizeFirst(value) || ''" />
+                                                <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                                    <ChevronsUpDown class="text-muted-foreground size-4" />
+                                                </ComboboxTrigger>
+                                            </div>
+                                        </ComboboxAnchor>
+                                        <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                            <ComboboxViewport>
+                                                <ComboboxEmpty v-if="filteredCccdProvinces.length === 0">No province found</ComboboxEmpty>
+                                                <ComboboxItem v-for="province in filteredCccdProvinces" :key="province.code" :value="province.name" class="cursor-pointer">
+                                                    {{ capitalizeFirst(province.name) }}
+                                                </ComboboxItem>
+                                            </ComboboxViewport>
+                                        </ComboboxList>
+                                    </Combobox>
                                 </FormControl>
-                                <SelectContent>
-                                    <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
-                                        {{ program.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-                </div>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <!--                    <FormField v-slot="{ componentField }" name="specialization_id">-->
-                    <!--                        <FormItem>-->
-                    <!--                            <FormLabel>Specialization</FormLabel>-->
-                    <!--                            <Select v-bind="componentField" :disabled="!filteredSpecializations.length">-->
-                    <!--                                <FormControl>-->
-                    <!--                                    <SelectTrigger>-->
-                    <!--                                        <SelectValue placeholder="Select specialization" />-->
-                    <!--                                    </SelectTrigger>-->
-                    <!--                                </FormControl>-->
-                    <!--                                <SelectContent>-->
-                    <!--                                    <SelectItem v-for="specialization in filteredSpecializations" :key="specialization.id" :value="specialization.id.toString()">-->
-                    <!--                                        {{ specialization.name }}-->
-                    <!--                                    </SelectItem>-->
-                    <!--                                </SelectContent>-->
-                    <!--                            </Select>-->
-                    <!--                            <FormMessage />-->
-                    <!--                        </FormItem>-->
-                    <!--                    </FormField>-->
-
-                    <FormField v-slot="{ componentField }" name="curriculum_version_id">
-                        <FormItem>
-                            <FormLabel>Curriculum Version *</FormLabel>
-                            <Select v-bind="componentField" :disabled="loadingCurriculumVersions || !availableCurriculumVersions.length">
+                        <FormField v-slot="{ componentField }" name="cccd_ward">
+                            <FormItem>
+                                <FormLabel>Ward (Xã / Phường)</FormLabel>
                                 <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select curriculum version" />
-                                    </SelectTrigger>
+                                    <Combobox v-bind="componentField" v-model:search-term="cccdWardSearch" :disabled="!values.cccd_province">
+                                        <ComboboxAnchor>
+                                            <div class="relative w-full items-center">
+                                                <ComboboxInput v-model="cccdWardSearch" placeholder="Search ward..." :display-value="(value) => capitalizeFirst(value) || ''" />
+                                                <ComboboxTrigger class="absolute inset-y-0 end-0 flex items-center justify-center px-3">
+                                                    <ChevronsUpDown class="text-muted-foreground size-4" />
+                                                </ComboboxTrigger>
+                                            </div>
+                                        </ComboboxAnchor>
+                                        <ComboboxList class="max-h-64 w-[var(--reka-combobox-trigger-width)] overflow-y-auto">
+                                            <ComboboxViewport>
+                                                <ComboboxEmpty v-if="cccdWards.length === 0">No ward found</ComboboxEmpty>
+                                                <ComboboxItem v-for="ward in cccdWards" :key="ward.code" :value="ward.name" class="cursor-pointer">
+                                                    {{ capitalizeFirst(ward.name) }}
+                                                </ComboboxItem>
+                                            </ComboboxViewport>
+                                        </ComboboxList>
+                                    </Combobox>
                                 </FormControl>
-                                <SelectContent>
-                                    <SelectItem v-for="version in availableCurriculumVersions" :key="version.id" :value="version.id.toString()">
-                                        {{ version.version_code }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-                </div>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
 
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <FormField v-slot="{ componentField }" name="admission_date">
-                        <FormItem>
-                            <FormLabel>Admission Date *</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" type="date" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
-
-                    <FormField v-slot="{ componentField }" name="expected_graduation_date">
-                        <FormItem>
-                            <FormLabel>Expected Graduation Date</FormLabel>
-                            <FormControl>
-                                <Input v-bind="componentField" type="date" />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    </FormField>
+                        <FormField v-slot="{ componentField }" name="cccd_country">
+                            <FormItem>
+                                <FormLabel>Country</FormLabel>
+                                <FormControl>
+                                    <Input v-bind="componentField" placeholder="Enter CCCD country" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        </FormField>
+                    </div>
                 </div>
             </CardContent>
         </Card>

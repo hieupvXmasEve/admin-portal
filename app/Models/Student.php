@@ -120,15 +120,24 @@ class Student extends StudentAuditableModel
             'date_of_birth' => ['nullable', 'date'],
             'gender' => ['nullable', 'in:male,female,other'],
             'nationality' => ['nullable', 'string', 'max:100'],
+            'ethnicity' => ['nullable', 'string', 'max:100'],
             'national_id' => ['nullable', 'string', 'max:20', 'unique:students'],
             'address' => ['nullable', 'string'],
+            'current_address_line' => ['nullable', 'string', 'max:255'],
+            'current_ward' => ['nullable', 'string', 'max:100'],
+            'current_province' => ['nullable', 'string', 'max:100'],
+            'current_country' => ['nullable', 'string', 'max:30'],
             'cccd_address' => ['nullable', 'string'],
+            'cccd_address_line' => ['nullable', 'string', 'max:255'],
+            'cccd_ward' => ['nullable', 'string', 'max:100'],
+            'cccd_province' => ['nullable', 'string', 'max:100'],
+            'cccd_country' => ['nullable', 'string', 'max:100'],
             'campus_id' => ['required', 'exists:campuses,id'],
             'program_id' => ['required', 'exists:programs,id'],
             'specialization_id' => ['nullable', 'exists:specializations,id'],
             'curriculum_version_id' => ['required', 'exists:curriculum_versions,id'],
-            'intake_semester_id' => ['required', 'exists:semesters,id'],
-            'intake_mode' => ['required', 'in:sequential,parallel'],
+            // 'intake_semester_id' => ['required', 'exists:semesters,id'],
+            // 'intake_mode' => ['required', 'in:sequential,parallel'],
             'admission_date' => ['required', 'date'],
             'expected_graduation_date' => ['nullable', 'date', 'after:admission_date'],
             'emergency_contact_name' => ['nullable', 'string', 'max:255'],
@@ -140,12 +149,10 @@ class Student extends StudentAuditableModel
             'emergency_contact_phone_1' => ['nullable', 'string', 'max:20'],
             'emergency_contact_relationship_1' => ['nullable', 'string', 'max:100'],
             'high_school_name' => ['nullable', 'string', 'max:255'],
-            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
+            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
             'status' => ['nullable', 'in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending'],
-            'intake_semester_id' => ['nullable', 'exists:semesters,id'],
-            'intake_mode' => ['nullable', 'in:sequential,parallel'],
         ];
     }
 
@@ -164,8 +171,8 @@ class Student extends StudentAuditableModel
             'curriculum_version_id.exists' => 'Selected curriculum version does not exist',
             'admission_date.required' => 'Admission date is required',
             'expected_graduation_date.after' => 'Expected graduation date must be after admission date',
-            'intake_semester_id.exists' => 'Selected intake semester does not exist',
-            'intake_mode.in' => 'Invalid intake mode',
+            // 'intake_semester_id.exists' => 'Selected intake semester does not exist',
+            // 'intake_mode.in' => 'Invalid intake mode',
         ];
     }
 
@@ -373,7 +380,7 @@ class Student extends StudentAuditableModel
 
     public function generateStudentId(string $campusCode, int $year): string
     {
-        $lastStudent = static::where('student_id', 'like', $campusCode.$year.'%')
+        $lastStudent = static::where('student_id', 'like', $campusCode . $year . '%')
             ->orderBy('student_id', 'desc')
             ->first();
 
@@ -384,7 +391,7 @@ class Student extends StudentAuditableModel
             $newNumber = 1;
         }
 
-        return $campusCode.$year.str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
+        return $campusCode . $year . str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
     }
 
     // New Review Management methods
