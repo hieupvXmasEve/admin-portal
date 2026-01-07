@@ -92,6 +92,7 @@ export interface ScheduleFilters {
   semester_id?: number
   lecturer_id?: number
   room_id?: number
+  unit_type?: string
   date_range?: {
     start: string
     end: string
@@ -123,6 +124,7 @@ export interface FilterOptions {
       name: string
     }
   }>
+  unit_types: string[]
 }
 
 export interface SessionUpdateData {
@@ -134,6 +136,12 @@ export interface SessionUpdateData {
 
 export interface WeeklyGridData {
   [date: string]: ScheduleSession[]
+}
+
+export interface ScheduleMatrix {
+  [date: string]: {
+    [hour: number]: ScheduleSession[]
+  }
 }
 
 export interface TimeSlot {

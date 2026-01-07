@@ -29,6 +29,7 @@ class AdminScheduleController extends Controller
                 'semester_id' => 'nullable|integer|exists:semesters,id',
                 'lecturer_id' => 'nullable|integer|exists:lectures,id',
                 'room_id' => 'nullable|integer|exists:rooms,id',
+                'unit_type' => 'nullable|string',
                 'date_range.start' => 'nullable|date',
                 'date_range.end' => 'nullable|date|after_or_equal:date_range.start',
             ]);

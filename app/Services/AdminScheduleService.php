@@ -8,6 +8,7 @@ use App\Models\ClassSession;
 use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
+use App\Models\Unit;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -21,17 +22,32 @@ class AdminScheduleService
      */
     public function getScheduleData(array $filters): Collection
     {
-        $query = ClassSession::with([
-            'courseOffering.unit',
-            'courseOffering.semester',
-            'lecture',
-            'room.campus',
+        $query = ClassSession::select([
+            'id',
+            'course_offering_id',
+            'lecture_id',
+            'room_id',
+            'session_title',
+            'session_date',
+            'start_time',
+            'end_time',
+            'status',
+            'session_type',
+            'delivery_mode',
+        ])->with([
+            'courseOffering:id,unit_id,semester_id,section_code',
+            'courseOffering.unit:id,code',
+            'lecture:id,first_name,last_name',
+            'room:id,campus_id,name',
+            'room.campus:id,name',
         ]);
 
         $this->applyFilters($query, $filters);
 
         $sessions = $query->orderBy('session_date')
             ->orderBy('start_time')
+            ->orderBy('session_title')
+            ->orderBy('id')
             ->get();
 
         return $this->formatSessionsForGrid($sessions);
@@ -147,6 +163,11 @@ class AdminScheduleService
                 })
                 ->sortBy('name')
                 ->values(),
+            'unit_types' => Unit::select('unit_type')
+                ->distinct()
+                ->whereNotNull('unit_type')
+                ->orderBy('unit_type')
+                ->pluck('unit_type'),
         ];
     }
 
@@ -167,6 +188,12 @@ class AdminScheduleService
 
         if (! empty($filters['room_id'])) {
             $query->where('room_id', $filters['room_id']);
+        }
+
+        if (! empty($filters['unit_type'])) {
+            $query->whereHas('courseOffering.unit', function ($q) use ($filters) {
+                $q->where('unit_type', $filters['unit_type']);
+            });
         }
 
         // Always filter by current campus
@@ -205,7 +232,7 @@ class AdminScheduleService
                 'id' => $session->id,
                 'title' => $session->session_title,
                 'unitCode' => $session->courseOffering->unit->code ?? 'N/A',
-                'section' => $session->courseOffering->section ?? 'A',
+                'section' => $session->courseOffering->section_code ?? 'A',
                 'lecturer' => $session->lecture->full_name ?? 'TBA',
                 'room' => $session->room->name ?? 'TBA',
                 'startTime' => $session->start_time->format('H:i'),

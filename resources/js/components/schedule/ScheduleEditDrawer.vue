@@ -106,6 +106,7 @@ const loadSessionDetails = async () => {
             setFieldValue('end_time', detailedSession.value.schedule.endTime);
             setFieldValue('room_id', detailedSession.value.room.id || 0);
         }
+        console.log('%c detailedSession.value', 'color: green', detailedSession.value);
     } catch (error) {
         console.error('Error loading session details:', error);
     } finally {

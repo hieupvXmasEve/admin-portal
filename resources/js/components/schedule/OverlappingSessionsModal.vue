@@ -76,7 +76,7 @@ const formatTimeRange = (startTime: string, endTime: string) => {
 
 <template>
     <Dialog :open="isOpen" @update:open="isOpen = $event">
-        <DialogContent class="max-h-[90vh] max-w-2xl">
+        <DialogContent class="!max-h-[90vh] !max-w-3xl">
             <DialogHeader>
                 <DialogTitle class="flex items-center space-x-2">
                     <Users class="h-5 w-5" />
@@ -100,7 +100,7 @@ const formatTimeRange = (startTime: string, endTime: string) => {
                 </div>
 
                 <!-- Sessions List -->
-                <ScrollArea class="h-[400px]" type="auto">
+                <ScrollArea class="h-[600px] max-h-[600px]" type="auto">
                     <div class="space-y-3 px-2">
                         <Card
                             v-for="session in sortedSessions"
@@ -119,7 +119,7 @@ const formatTimeRange = (startTime: string, endTime: string) => {
                                     <!-- Header with unit code and status -->
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center space-x-2">
-                                            <h3 class="text-base font-semibold">{{ session.unitCode }}-{{ session.section }}</h3>
+                                            <h3 class="text-base font-semibold">{{ session.unitCode }} - {{ session.section }}</h3>
                                             <Badge :variant="getSessionBadgeColor(session.status)" class="text-xs">
                                                 {{ session.status }}
                                             </Badge>

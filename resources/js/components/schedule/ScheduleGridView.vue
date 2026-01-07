@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAdminSchedule } from '@/composables/useAdminSchedule';
 import { useScheduleManagement } from '@/composables/useScheduleManagement';
 import type { ScheduleSession } from '@/types/schedule';
 import { useDebounceFn } from '@vueuse/core';
 import { addDays, format, startOfWeek } from 'date-fns';
-import { Calendar, ChevronLeft, ChevronRight, User, Users } from 'lucide-vue-next';
-import { onMounted, ref, watch } from 'vue';
+import { Calendar, ChevronLeft, ChevronRight, Users } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
 import OverlappingSessionsModal from './OverlappingSessionsModal.vue';
 
 const scheduleApi = useAdminSchedule();
@@ -44,9 +44,23 @@ watch(
     { immediate: true },
 );
 
+// Unit Type Filtering
+const selectedUnitType = computed({
+    get: () => scheduleApi.filters.value.unit_type || 'all',
+    set: (value: string) => {
+        const type = value === 'all' ? undefined : value;
+        scheduleApi.applyFilters({ unit_type: type });
+    },
+});
+
+// Computed Schedule Matrix for O(1) access
+const scheduleMatrix = computed(() => {
+    return scheduleUtils.buildScheduleMatrix(scheduleApi.sessions.value);
+});
+
 // Use utility functions from schedule management composable
 const getSessionsForSlot = (dateString: string, hour: number) => {
-    return scheduleUtils.getSessionsForSlot(scheduleApi.sessionsByDate.value, dateString, hour);
+    return scheduleUtils.getSessionsFromMatrix(scheduleMatrix.value, dateString, hour);
 };
 
 // Get sessions that actually start at this time slot (for width calculation)
@@ -56,7 +70,27 @@ const getSessionsStartingAtSlot = (dateString: string, hour: number) => {
 };
 
 const getSessionSpan = scheduleUtils.getSessionSpan;
-const sessionStartsAtSlot = scheduleUtils.sessionStartsAtSlot;
+
+// Calculate style for session card
+const getSessionStyle = (session: ScheduleSession) => {
+    const { colStart, totalCols } = scheduleUtils.getSessionVisualState(session, scheduleMatrix.value);
+    const span = getSessionSpan(session);
+
+    // Basic height calculation (60px per hour row - 8px spacing)
+    const height = `${span * 60 - 8}px`;
+
+    // Width and Position
+    // We want some padding/margin for visual separation
+    const leftPercent = ((colStart - 1) / totalCols) * 100;
+    const widthPercent = (1 / totalCols) * 100;
+
+    return {
+        height,
+        minHeight: '52px',
+        left: `calc(${leftPercent}% + 2px)`,
+        width: `calc(${widthPercent}% - 4px)`,
+    };
+};
 
 // Local state for overlapping sessions modal
 const overlappingModalOpen = ref(false);
@@ -122,16 +156,21 @@ const debouncedFetchSessions = useDebounceFn(async (newWeek: Date) => {
     const startDate = startOfWeek(newWeek, { weekStartsOn: 1 });
     const endDate = addDays(startDate, 6);
 
+    const range = {
+        start: format(startDate, 'yyyy-MM-dd'),
+        end: format(endDate, 'yyyy-MM-dd'),
+    };
+
+    // Update filters in store so they persist for other filter operations
+    scheduleApi.setFilters({ date_range: range });
+
     // Create new abort controller for this request
     currentAbortController = new AbortController();
 
     try {
         await scheduleApi.fetchSessions(
             {
-                date_range: {
-                    start: format(startDate, 'yyyy-MM-dd'),
-                    end: format(endDate, 'yyyy-MM-dd'),
-                },
+                date_range: range,
             },
             { force: true, signal: currentAbortController.signal },
         );
@@ -173,41 +212,67 @@ onMounted(async () => {
                     <Button variant="outline" size="sm" @click="navigatePrevWeek" :disabled="scheduleApi.isWeekTransitionLoading.value">
                         <ChevronLeft class="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="sm" @click="navigateNextWeek" :disabled="scheduleApi.isWeekTransitionLoading.value">
-                        <ChevronRight class="h-4 w-4" />
-                    </Button>
                     <Button variant="outline" size="sm" @click="goToToday" :disabled="scheduleApi.isWeekTransitionLoading.value">
                         <Calendar class="mr-2 h-4 w-4" />
                         Today
                     </Button>
+                    <Button variant="outline" size="sm" @click="navigateNextWeek" :disabled="scheduleApi.isWeekTransitionLoading.value">
+                        <ChevronRight class="h-4 w-4" />
+                    </Button>
+
+                    <div class="bg-border mx-2 h-8 w-px"></div>
+
+                    <!-- Unit Type Filter -->
+                    <Select v-model="selectedUnitType" :disabled="scheduleApi.isWeekTransitionLoading.value || scheduleApi.isLoading.value">
+                        <SelectTrigger class="h-9 w-[160px]">
+                            <SelectValue placeholder="Filter by Unit Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectLabel>Unit Type</SelectLabel>
+                                <SelectItem value="all">All Types</SelectItem>
+                                <SelectItem v-for="type in scheduleApi.filterOptions.value?.unit_types || []" :key="type" :value="type">
+                                    {{ type }}
+                                </SelectItem>
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
 
             <div class="text-muted-foreground flex items-center space-x-2 text-sm">
                 <span>{{ scheduleApi.sessionsCount.value }} sessions this week</span>
-                <div v-if="scheduleApi.isWeekTransitionLoading.value" class="flex items-center space-x-1">
+                <div v-if="scheduleApi.isWeekTransitionLoading.value || scheduleApi.isLoading.value" class="flex items-center space-x-1">
                     <div class="border-primary h-3 w-3 animate-spin rounded-full border-b-2"></div>
                     <span class="text-xs">Loading...</span>
                 </div>
             </div>
         </div>
 
-        <!-- Loading State -->
-        <div v-if="scheduleApi.isLoading.value" class="flex items-center justify-center py-8">
-            <div class="flex items-center space-x-2">
-                <div class="border-primary h-4 w-4 animate-spin rounded-full border-b-2"></div>
-                <span class="text-muted-foreground">Loading schedule...</span>
-            </div>
-        </div>
-
         <!-- Error State -->
-        <div v-else-if="scheduleApi.hasError.value" class="py-8 text-center">
+        <div v-if="scheduleApi.hasError.value" class="py-8 text-center">
             <p class="text-destructive">{{ scheduleApi.error.value }}</p>
             <Button variant="outline" size="sm" class="mt-2" @click="scheduleApi.clearError"> Dismiss </Button>
         </div>
 
         <!-- Schedule Grid -->
-        <div v-else class="overflow-hidden rounded-lg border transition-opacity duration-200" :class="{ 'opacity-75': scheduleApi.isWeekTransitionLoading.value }">
+        <div v-else class="bg-background relative overflow-hidden rounded-lg border">
+            <!-- Loading Overlay -->
+            <div v-if="scheduleApi.isLoading.value || scheduleApi.isWeekTransitionLoading.value" class="bg-background/60 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-[1px]">
+                <div class="bg-background/95 flex items-center space-x-3 rounded-full border px-4 py-2 shadow-sm">
+                    <div class="border-primary h-4 w-4 animate-spin rounded-full border-b-2"></div>
+                    <span class="text-muted-foreground text-sm font-medium">Loading schedule...</span>
+                </div>
+            </div>
+
+            <!-- Empty State Overlay -->
+            <div v-if="!scheduleApi.isLoading.value && !scheduleApi.isWeekTransitionLoading.value && scheduleApi.sessionsCount.value === 0" class="bg-background/40 absolute inset-0 z-40 flex flex-col items-center justify-center">
+                <div class="bg-background/90 text-muted-foreground flex flex-col items-center rounded-xl border p-6 text-center shadow-sm">
+                    <Calendar class="mx-auto mb-3 h-10 w-10 opacity-50" />
+                    <p class="font-medium">No sessions scheduled</p>
+                    <p class="text-xs">Sessions will appear here when scheduled</p>
+                </div>
+            </div>
             <!-- Header with days -->
             <div class="bg-muted/50 grid grid-cols-8">
                 <div class="border-r p-3 font-medium">Time</div>
@@ -223,101 +288,41 @@ onMounted(async () => {
             <div class="relative">
                 <div v-for="(timeSlot, slotIndex) in timeSlots" :key="timeSlot.hour" class="grid grid-cols-8 border-b last:border-b-0" :class="{ 'bg-muted/20': slotIndex % 2 === 1 }">
                     <!-- Time column -->
-                    <div class="text-muted-foreground border-r p-3 font-mono text-sm">
+                    <div class="text-muted-foreground my-auto border-r p-3 text-center font-mono text-sm">
                         {{ timeSlot.displayTime }}
                     </div>
 
                     <!-- Day columns -->
-                    <div v-for="day in weekDays" :key="`${day.dateString}-${timeSlot.hour}`" class="relative min-h-[60px] border-r last:border-r-0">
+                    <div v-for="day in weekDays" :key="`${day.dateString}-${timeSlot.hour}`" class="relative min-h-[80px] border-r last:border-r-0">
                         <!-- Check for overlapping sessions -->
-                        <template v-if="scheduleUtils.shouldShowOverlapIndicator(scheduleApi.sessionsByDate.value, day.dateString, timeSlot.hour)">
-                            <!-- Overlap indicator for multiple sessions -->
+                        <template v-if="scheduleUtils.shouldShowOverlapIndicator(getSessionsForSlot(day.dateString, timeSlot.hour))">
+                            <!-- Overlap indicator for multiple sessions - STATIC POSITIONING to allow expansion -->
                             <div
-                                class="bg-primary/10 border-primary/30 hover:bg-primary/20 absolute inset-1 z-20 flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed transition-colors"
+                                class="bg-primary/10 border-primary/30 hover:bg-primary/20 m-1 flex cursor-pointer flex-col overflow-hidden rounded-lg border-2 border-dashed p-1 transition-colors"
                                 @click="handleOverlappingSessionsClick(getSessionsForSlot(day.dateString, timeSlot.hour), day.dateString, timeSlot.displayTime)"
                             >
-                                <div class="text-center">
-                                    <Users class="text-primary mx-auto mb-1 h-6 w-6" />
-                                    <div class="text-primary text-sm font-semibold">{{ scheduleUtils.getOverlappingSessionsCount(scheduleApi.sessionsByDate.value, day.dateString, timeSlot.hour) }} sessions</div>
-                                    <div class="text-muted-foreground text-xs">Click to view</div>
+                                <div class="border-primary/20 mb-0.5 flex items-center justify-between border-b pb-0.5">
+                                    <div class="text-primary flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase">
+                                        <Users class="h-3 w-3" />
+                                        <span>Total ({{ scheduleUtils.getOverlappingSessionsCount(getSessionsForSlot(day.dateString, timeSlot.hour)) }})</span>
+                                    </div>
                                 </div>
-                            </div>
-                        </template>
-
-                        <template v-else>
-                            <!-- Regular sessions display (1-2 sessions) -->
-                            <div
-                                v-for="(session, sessionIndex) in getSessionsStartingAtSlot(day.dateString, timeSlot.hour)"
-                                :key="session.id"
-                                class="absolute top-1 z-10"
-                                :class="{
-                                    'inset-x-1': getSessionsStartingAtSlot(day.dateString, timeSlot.hour).length === 1,
-                                    'right-1/2 left-1 mr-0.5': getSessionsStartingAtSlot(day.dateString, timeSlot.hour).length === 2 && sessionIndex === 0,
-                                    'right-1 left-1/2 ml-0.5': getSessionsStartingAtSlot(day.dateString, timeSlot.hour).length === 2 && sessionIndex === 1,
-                                }"
-                                :style="{
-                                    height: `${getSessionSpan(session) * 60 - 8}px`,
-                                    minHeight: '52px',
-                                }"
-                            >
-                                <Card
-                                    class="h-full cursor-pointer border-l-4 p-1 transition-all hover:scale-[1.02] hover:shadow-md"
-                                    :class="{
-                                        'border-l-blue-500 bg-blue-50 hover:bg-blue-100': session.status === 'scheduled',
-                                        'border-l-yellow-500 bg-yellow-50 hover:bg-yellow-100': session.status === 'in_progress',
-                                        'border-l-green-500 bg-green-50 hover:bg-green-100': session.status === 'completed',
-                                        'border-l-red-500 bg-red-50 hover:bg-red-100': session.status === 'cancelled',
-                                    }"
-                                    @click="handleSessionClick(session)"
-                                >
-                                    <CardContent class="flex h-full items-center gap-2 p-2">
-                                        <!-- Unit code and section -->
-                                        <div class="flex items-center justify-between">
-                                            <div class="truncate text-sm font-semibold">{{ session.unitCode }}-{{ session.section }}</div>
-                                            <!--                        <Badge-->
-                                            <!--                          :variant="getSessionBadgeColor(session.status)"-->
-                                            <!--                          class="text-xs"-->
-                                            <!--                        >-->
-                                            <!--                          {{ session.status }}-->
-                                            <!--                        </Badge>-->
-                                        </div>
-
-                                        <!-- Session title -->
-                                        <div class="text-muted-foreground truncate text-xs" :title="session.title">
-                                            {{ session.title }}
-                                        </div>
-
-                                        <!-- Time -->
-                                        <!--                      <div class="flex items-center text-xs text-muted-foreground">-->
-                                        <!--                        <Clock class="h-3 w-3 mr-1" />-->
-                                        <!--                        {{ session.startTime }}-{{ session.endTime }}-->
-                                        <!--                      </div>-->
-
-                                        <!-- Lecturer -->
-                                        <div class="text-muted-foreground flex items-center truncate text-xs">
-                                            <User class="mr-1 h-3 w-3" />
-                                            <span :title="session.lecturer">{{ session.lecturer }}</span>
-                                        </div>
-
-                                        <!-- Room -->
-                                        <!--                      <div class="flex items-center text-xs text-muted-foreground truncate">-->
-                                        <!--                        <MapPin class="h-3 w-3 mr-1" />-->
-                                        <!--                        <span :title="session.room">{{ session.room }}</span>-->
-                                        <!--                      </div>-->
-                                    </CardContent>
-                                </Card>
+                                <div class="flex flex-col gap-0.5">
+                                    <div
+                                        v-for="session in getSessionsForSlot(day.dateString, timeSlot.hour).slice(0, 10)"
+                                        :key="session.id"
+                                        class="bg-background/60 text-primary truncate rounded px-1 py-0.5 text-[10px] font-medium shadow-sm"
+                                        :title="`${session.unitCode} - ${session.section}`"
+                                    >
+                                        {{ session.unitCode }} - {{ session.section }}
+                                    </div>
+                                    <div v-if="getSessionsForSlot(day.dateString, timeSlot.hour).length > 10" class="text-primary text-center text-[10px] italic">+{{ getSessionsForSlot(day.dateString, timeSlot.hour).length - 10 }} more...</div>
+                                </div>
                             </div>
                         </template>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Empty state -->
-        <div v-if="!scheduleApi.isLoading.value && !scheduleApi.hasError.value && scheduleApi.sessionsCount.value === 0" class="text-muted-foreground py-12 text-center">
-            <Calendar class="mx-auto mb-4 h-12 w-12 opacity-50" />
-            <p class="text-lg">No sessions scheduled for this week</p>
-            <p class="text-sm">Sessions will appear here when they are scheduled</p>
         </div>
 
         <!-- Overlapping Sessions Modal -->

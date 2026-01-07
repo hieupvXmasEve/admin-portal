@@ -1,4 +1,5 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useUrlSearchParams } from '@vueuse/core'
 import { useApi } from '@/composables/useApiRequest'
 import { route } from 'ziggy-js'
 import type { ScheduleSession, DetailedScheduleSession, ScheduleFilters, FilterOptions } from '@/types/schedule'
@@ -12,16 +13,37 @@ import type { ScheduleSession, DetailedScheduleSession, ScheduleFilters, FilterO
 function createScheduleStore() {
   const api = useApi()
 
+  // URL Params sync
+  const params = useUrlSearchParams('history')
+
   // State management
   const sessions = ref<ScheduleSession[]>([])
   const selectedSession = ref<DetailedScheduleSession | null>(null)
   const filterOptions = ref<FilterOptions | null>(null)
+
   const filters = ref<ScheduleFilters>({
-    semester_id: undefined,
-    lecturer_id: undefined,
-    room_id: undefined,
+    semester_id: params.semester_id ? Number(params.semester_id) : undefined,
+    lecturer_id: params.lecturer_id ? Number(params.lecturer_id) : undefined,
+    room_id: params.room_id ? Number(params.room_id) : undefined,
+    unit_type: params.unit_type ? String(params.unit_type) : undefined,
     date_range: undefined,
   })
+
+  // Watch for filter changes to update URL
+  watch(filters, (newVal) => {
+    // Sync to URL params
+    if (newVal.semester_id) params.semester_id = String(newVal.semester_id)
+    else delete params.semester_id
+
+    if (newVal.lecturer_id) params.lecturer_id = String(newVal.lecturer_id)
+    else delete params.lecturer_id
+
+    if (newVal.room_id) params.room_id = String(newVal.room_id)
+    else delete params.room_id
+
+    if (newVal.unit_type) params.unit_type = newVal.unit_type
+    else delete params.unit_type
+  }, { deep: true })
 
   // Loading states
   const loading = ref(false)
@@ -133,7 +155,7 @@ function createScheduleStore() {
       // Build query parameters
       const queryParams: Record<string, string> = {}
       Object.entries(queryFilters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
+        if (value !== undefined && value !== null && value !== '') {
           if (key === 'date_range' && typeof value === 'object' && value !== null) {
             if (value.start) queryParams[`${key}[start]`] = value.start
             if (value.end) queryParams[`${key}[end]`] = value.end
@@ -294,6 +316,7 @@ function createScheduleStore() {
       semester_id: undefined,
       lecturer_id: undefined,
       room_id: undefined,
+      unit_type: undefined,
       date_range: undefined,
     }
   }
