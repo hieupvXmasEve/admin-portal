@@ -20,6 +20,7 @@ class CourseRankingController extends Controller
     public function index(Request $request): Response
     {
         $activeSemester = Semester::where('is_active', true)->first();
+        $campusId = session('current_campus_id');
 
         $validated = $request->validate([
             'semester_id' => ['nullable', 'integer'],
@@ -30,8 +31,8 @@ class CourseRankingController extends Controller
             : $activeSemester?->id;
 
         $rankingData = null;
-        if ($semesterId) {
-            $rankingData = $this->getCourseRankings($semesterId);
+        if ($semesterId && $campusId) {
+            $rankingData = $this->getCourseRankings($semesterId, (int) $campusId);
         }
 
         return Inertia::render('Academic/CourseRanking/Index', [
@@ -50,19 +51,21 @@ class CourseRankingController extends Controller
     }
 
     /**
-     * Get course rankings for a given semester.
+     * Get course rankings for a given semester and campus.
      *
      * @param int $semesterId
+     * @param int $campusId
      * @return array
      */
-    private function getCourseRankings(int $semesterId): array
+    private function getCourseRankings(int $semesterId, int $campusId): array
     {
-        // Get all units that have academic records in this semester
-        $units = Unit::whereHas('academicRecords', function ($query) use ($semesterId) {
-            $query->where('semester_id', $semesterId)
-                ->whereNotNull('final_percentage')
-                ->where('unit_type', '!=', 'egc');
-        })
+        // Get all units that have academic records in this semester and campus
+        $units = Unit::where('unit_type', '!=', 'egc')
+            ->whereHas('academicRecords', function ($query) use ($semesterId, $campusId) {
+                $query->where('semester_id', $semesterId)
+                    ->where('campus_id', $campusId)
+                    ->whereNotNull('final_percentage');
+            })
             ->orderBy('code')
             ->get(['id', 'code', 'name']);
 
@@ -72,6 +75,7 @@ class CourseRankingController extends Controller
             // Get top 10 students for this unit, ordered by final_percentage DESC, then attendance_percentage DESC
             $topStudents = AcademicRecord::where('unit_id', $unit->id)
                 ->where('semester_id', $semesterId)
+                ->where('campus_id', $campusId)
                 ->whereNotNull('final_percentage')
                 ->with(['student:id,student_id,full_name'])
                 ->orderBy('final_percentage', 'desc')
