@@ -102,9 +102,9 @@ class GPACalculationService
                 return [
                     'semester' => $calculation->semester->name,
                     'semester_code' => $calculation->semester->code,
-                    'gpa' => round($calculation->semester_gpa, 2),
-                    'cumulative_gpa' => round($calculation->cumulative_gpa, 2),
-                    'credit_hours' => $calculation->semester_credits_earned,
+                    'gpa' => round((float) $calculation->semester_gpa, 2),
+                    'cumulative_gpa' => round((float) $calculation->cumulative_gpa, 2),
+                    'credit_hours' => $calculation->semester_credit_points_earned,
                     'academic_standing' => $calculation->academic_standing,
                     'date' => $calculation->created_at->toDateString(),
                 ];
@@ -166,15 +166,18 @@ class GPACalculationService
             ];
         }
 
-        $standing = $this->determineAcademicStanding($latestGPA->cumulative_gpa);
+        $cumulativeGpa = (float) $latestGPA->cumulative_gpa;
+        $semesterGpa = (float) $latestGPA->semester_gpa;
+
+        $standing = $this->determineAcademicStanding($cumulativeGpa);
 
         return [
             'standing' => $standing,
-            'semester_gpa' => round($latestGPA->semester_gpa, 2),
-            'cumulative_gpa' => round($latestGPA->cumulative_gpa, 2),
+            'semester_gpa' => round($semesterGpa, 2),
+            'cumulative_gpa' => round($cumulativeGpa, 2),
             'required_gpa' => 2.0, // Default for now
-            'meets_requirement' => $latestGPA->cumulative_gpa >= 2.0,
-            'warning_level' => $this->getWarningLevel($latestGPA->cumulative_gpa),
+            'meets_requirement' => $cumulativeGpa >= 2.0,
+            'warning_level' => $this->getWarningLevel($cumulativeGpa),
         ];
     }
 
@@ -191,7 +194,7 @@ class GPACalculationService
             ];
         }
 
-        $gpas = $gpaCalculations->pluck('semester_gpa');
+        $gpas = $gpaCalculations->pluck('semester_gpa')->map(fn($gpa) => (float) $gpa);
         $latest = $gpas->last();
         $previous = $gpas->get($gpas->count() - 2);
 
