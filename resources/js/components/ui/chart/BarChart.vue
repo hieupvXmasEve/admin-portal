@@ -11,12 +11,14 @@ interface Props extends BarChartProps {
     height?: string;
     width?: string;
     class?: string;
+    plugins?: any[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
     height: '300px',
     width: '100%',
     class: '',
+    plugins: () => [],
 });
 
 const defaultOptions: DefaultChartOptions = {

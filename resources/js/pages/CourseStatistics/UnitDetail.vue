@@ -2,6 +2,7 @@
 import DataTable from '@/components/DataTable.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import BarChart from '@/components/ui/chart/BarChart.vue';
 import DoughnutChart from '@/components/ui/chart/DoughnutChart.vue';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,6 +34,7 @@ interface Props {
     semesters: Array<{ id: number; name: string; code: string }>;
     filters: {
         semester_id?: number;
+        course_offering_id?: number;
     };
 }
 
@@ -40,12 +42,16 @@ const props = defineProps<Props>();
 
 const filters = ref({
     semester_id: props.filters.semester_id || 'all',
+    course_offering_id: props.filters.course_offering_id || 'all',
 });
 
 const applyFilters = () => {
     const queryParams: Record<string, any> = {};
     if (filters.value.semester_id && filters.value.semester_id !== 'all') {
         queryParams.semester_id = filters.value.semester_id;
+    }
+    if (filters.value.course_offering_id && filters.value.course_offering_id !== 'all') {
+        queryParams.course_offering_id = filters.value.course_offering_id;
     }
 
     router.get(route('course-statistics.units.show', { unitId: props.data.unit.id }), queryParams, {
@@ -103,6 +109,7 @@ const gradeChartData = computed(() => {
         }),
         datasets: [
             {
+                label: 'Students',
                 data,
                 backgroundColor: backgroundColors,
                 percentages,
@@ -117,7 +124,26 @@ const gradeChartOptions = {
     maintainAspectRatio: false,
     plugins: {
         legend: {
-            position: 'right' as const,
+            display: false,
+        },
+        tooltip: {
+            callbacks: {
+                label: function (context: any) {
+                    const value = context.parsed.y;
+                    const dataset = context.dataset;
+                    // Provide a fallback if percentages are not available
+                    const percentage = dataset.percentages && dataset.percentages[context.dataIndex] !== undefined ? dataset.percentages[context.dataIndex] + '%' : '';
+                    return `Count: ${value} ${percentage ? '(' + percentage + ')' : ''}`;
+                },
+            },
+        },
+    },
+    scales: {
+        y: {
+            beginAtZero: true,
+            ticks: {
+                stepSize: 1,
+            },
         },
     },
 };
@@ -260,7 +286,55 @@ const doughnutLabelPlugin = {
     },
 };
 
+const barLabelPlugin = {
+    id: 'barLabel',
+    afterDatasetsDraw(chart: any) {
+        const { ctx } = chart;
+
+        chart.data.datasets.forEach((dataset: any, i: number) => {
+            const meta = chart.getDatasetMeta(i);
+            if (!meta.hidden) {
+                meta.data.forEach((element: any, index: number) => {
+                    const value = dataset.data[index];
+
+                    if (value > 0) {
+                        const { x, y, base } = element;
+                        const barHeight = Math.abs(base - y); // Ensure positive height
+
+                        // Get percentage
+                        let percentage = '';
+                        if (dataset.percentages && dataset.percentages[index] !== undefined) {
+                            percentage = dataset.percentages[index] + '%';
+                        }
+
+                        const text = `${value} (${percentage})`;
+
+                        ctx.save();
+                        ctx.textAlign = 'center';
+                        ctx.font = 'bold 11px sans-serif';
+
+                        // If bar is tall enough (approx 20px), draw inside (white)
+                        // Otherwise draw above (slate)
+                        if (barHeight > 20) {
+                            ctx.fillStyle = '#ffffff';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(text, x, y + barHeight / 2);
+                        } else {
+                            ctx.fillStyle = '#64748b'; // Slate-500
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillText(text, x, y - 5);
+                        }
+
+                        ctx.restore();
+                    }
+                });
+            }
+        });
+    },
+};
+
 const doughnutPlugins = [doughnutLabelPlugin];
+const barPlugins = [barLabelPlugin];
 </script>
 
 <template>
@@ -287,7 +361,7 @@ const doughnutPlugins = [doughnutLabelPlugin];
             <CardHeader class="pb-3">
                 <CardTitle class="flex items-center gap-2 text-sm font-medium">
                     <Calendar class="h-4 w-4" />
-                    Semester Filter
+                    Filters
                 </CardTitle>
             </CardHeader>
             <CardContent>
@@ -299,6 +373,7 @@ const doughnutPlugins = [doughnutLabelPlugin];
                             @update:model-value="
                                 (val) => {
                                     filters.semester_id = val === 'all' ? 'all' : Number(val);
+                                    filters.course_offering_id = 'all'; // Reset offering filter when semester changes
                                     applyFilters();
                                 }
                             "
@@ -311,6 +386,27 @@ const doughnutPlugins = [doughnutLabelPlugin];
                                 <SelectItem v-for="s in semesters" :key="s.id" :value="String(s.id)">
                                     {{ s.name }}
                                 </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div class="w-full max-w-xs space-y-2">
+                        <Label>Course Offering (Section)</Label>
+                        <Select
+                            :model-value="String(filters.course_offering_id)"
+                            @update:model-value="
+                                (val) => {
+                                    filters.course_offering_id = val === 'all' ? 'all' : Number(val);
+                                    applyFilters();
+                                }
+                            "
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="All sections" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All sections</SelectItem>
+                                <SelectItem v-for="o in data.offerings" :key="o.id" :value="String(o.id)"> {{ o.section }} ({{ o.lecturer }}) </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -329,7 +425,7 @@ const doughnutPlugins = [doughnutLabelPlugin];
                     </CardTitle>
                 </CardHeader>
                 <CardContent class="flex items-center justify-center">
-                    <DoughnutChart :data="gradeChartData" :options="gradeChartOptions" :plugins="doughnutPlugins" height="350px" />
+                    <BarChart :data="gradeChartData" :options="gradeChartOptions" :plugins="barPlugins" height="350px" />
                 </CardContent>
             </Card>
 

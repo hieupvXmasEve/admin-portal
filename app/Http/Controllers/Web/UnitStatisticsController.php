@@ -23,6 +23,7 @@ class UnitStatisticsController extends Controller
     public function show(Request $request, int $unitId): Response
     {
         $semesterId = $request->input('semester_id');
+        $offeringId = $request->input('course_offering_id');
 
         if (! $semesterId) {
             $activeSemester = Semester::getActiveSemester();
@@ -31,7 +32,10 @@ class UnitStatisticsController extends Controller
             }
         }
 
-        $filters = ['semester_id' => $semesterId];
+        $filters = [
+            'semester_id' => $semesterId,
+            'course_offering_id' => $offeringId,
+        ];
 
         $data = $this->getUnitStatisticsAction->execute($unitId, $filters);
 

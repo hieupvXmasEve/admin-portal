@@ -19,12 +19,17 @@ class GetUnitStatisticsAction
         $unit = Unit::findOrFail($unitId);
         $campusId = session('current_campus_id');
         $semesterId = $filters['semester_id'] ?? null;
+        $offeringId = $filters['course_offering_id'] ?? null;
 
         $query = AcademicRecord::where('unit_id', $unitId)
             ->where('campus_id', $campusId);
 
         if ($semesterId) {
             $query->where('semester_id', $semesterId);
+        }
+
+        if ($offeringId) {
+            $query->where('course_offering_id', $offeringId);
         }
 
         $gradeQuery = clone $query;
