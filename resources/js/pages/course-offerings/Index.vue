@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import HeadlessToastWithProps from '@/components/ui/sonner/HeadlessToastWithProps.vue';
 import { useApi } from '@/composables/useApiRequest';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
@@ -263,12 +264,18 @@ const updateCourseStatus = async () => {
     isLoading.value = false;
     console.log('apiData.value', apiData.value);
     if (apiData.value?.success) {
-        toast.success(apiData.value.message);
+        const message = apiData.value.data?.message || 'Course status updated successfully';
+        toast.success('Course status updated successfully', {
+            description: h(HeadlessToastWithProps, { message }),
+        });
         closeStatusDialog();
         router.reload();
         loadStatistics();
     } else {
-        toast.error(apiData.value?.message || 'Failed to update course status');
+        const errorMessage = apiData.value?.data?.message || 'Failed to update course status';
+        toast.error('Failed to update course status', {
+            description: h(HeadlessToastWithProps, { message: errorMessage }),
+        });
     }
 };
 
