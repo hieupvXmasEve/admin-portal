@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Form;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class SubmitFormRequest extends FormRequest
 {
@@ -36,7 +35,7 @@ class SubmitFormRequest extends FormRequest
             'answers.*.selected_options' => ['nullable', 'array'],
             'answers.*.selected_options.*' => ['required', 'array'],
             'answers.*.selected_options.*.option_id' => ['required', 'exists:options,id'],
-            'answers.*.selected_options.*.free_text' => ['nullable', 'string', 'max:500'],
+            'answers.*.selected_options.*.free_text' => ['nullable', 'string', 'max:65535'],
 
             // Query-specific fields
             'query' => ['nullable', 'array'],
@@ -61,7 +60,7 @@ class SubmitFormRequest extends FormRequest
             'answers.*.comment.max' => 'Comment cannot exceed 1,000 characters.',
             'answers.*.selected_options.*.option_id.required' => 'Option ID is required for selected options.',
             'answers.*.selected_options.*.option_id.exists' => 'Invalid option ID provided.',
-            'answers.*.selected_options.*.free_text.max' => 'Free text cannot exceed 500 characters.',
+            'answers.*.selected_options.*.free_text.max' => 'Free text cannot exceed 65,535 characters.',
             'query.topic_id.exists' => 'Invalid query topic selected.',
             'query.custom_topic_text.max' => 'Custom topic text cannot exceed 255 characters.',
             'query.priority.in' => 'Priority must be low, normal, or high.',
@@ -94,7 +93,7 @@ class SubmitFormRequest extends FormRequest
             $isQueryForm = ($form instanceof \App\Models\Form && $form->type === 'query');
 
             // Validate that if scope_type is not global, scope_id is required (unless it's a query form)
-            if (!$isQueryForm && in_array($this->input('target_scope_type'), ['course', 'section', 'class_session', 'department', 'semester'])) {
+            if (! $isQueryForm && in_array($this->input('target_scope_type'), ['course', 'section', 'class_session', 'department', 'semester'])) {
                 if (empty($this->input('target_scope_id'))) {
                     $validator->errors()->add('target_scope_id', 'Scope ID is required when scope type is not global.');
                 }
