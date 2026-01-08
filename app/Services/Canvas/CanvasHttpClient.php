@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Canvas;
 
+use App\Exceptions\CanvasConnectionException;
 use App\Models\CanvasIntegration;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 
@@ -15,11 +17,16 @@ class CanvasHttpClient
     private CanvasIntegration $integration;
     private ?CanvasTokenService $tokenService = null;
 
+    /**
+     * Maximum retries for API requests on timeout
+     */
+    private const MAX_API_RETRIES = 2;
+
     public function __construct(CanvasIntegration $integration, ?CanvasTokenService $tokenService = null)
     {
         $this->integration = $integration;
         $this->tokenService = $tokenService;
-        
+
         $this->client = new Client([
             'base_uri' => rtrim($integration->canvas_url, '/') . '/',
             'timeout' => config('services.canvas.timeout', 120), // Increased for bulk operations
@@ -33,6 +40,21 @@ class CanvasHttpClient
                 CURLOPT_DNS_CACHE_TIMEOUT => 120, // Cache DNS for 2 minutes
             ],
         ]);
+    }
+
+    /**
+     * Check if the integration is active before making requests
+     *
+     * @throws CanvasConnectionException
+     */
+    public function ensureIntegrationActive(): void
+    {
+        // Refresh the integration to get the latest status
+        $this->integration->refresh();
+
+        if (!$this->integration->is_active) {
+            throw CanvasConnectionException::integrationInactive($this->integration->id);
+        }
     }
 
     /**
@@ -68,10 +90,16 @@ class CanvasHttpClient
     }
 
     /**
-     * Make request with auto token refresh on 401
+     * Make request with auto token refresh on 401 and retry on timeout
+     *
+     * @throws CanvasConnectionException
+     * @throws GuzzleException
      */
     private function request(string $method, string $endpoint, array $options = []): array
     {
+        // Check if integration is still active before making request
+        $this->ensureIntegrationActive();
+
         // Refresh token if expired
         if ($this->tokenService && $this->integration->isTokenExpired()) {
             $this->tokenService->refreshIfNeeded($this->integration);
@@ -86,49 +114,97 @@ class CanvasHttpClient
             ]
         );
 
-        try {
-            $response = $this->client->request($method, $endpoint, $options);
-            $body = (string) $response->getBody();
-            
-            return json_decode($body, true) ?? [];
-        } catch (GuzzleException $e) {
-            // If 401, try to refresh token once
-            if ($e->getCode() === 401 && $this->tokenService) {
-                Log::warning('Canvas API returned 401, attempting token refresh', [
+        $lastException = null;
+
+        for ($attempt = 1; $attempt <= self::MAX_API_RETRIES; $attempt++) {
+            try {
+                $response = $this->client->request($method, $endpoint, $options);
+                $body = (string) $response->getBody();
+
+                return json_decode($body, true) ?? [];
+            } catch (ConnectException $e) {
+                $lastException = $e;
+                $isTimeout = str_contains($e->getMessage(), 'cURL error 28') ||
+                    str_contains($e->getMessage(), 'Connection timed out');
+
+                Log::warning('Canvas API connection failed', [
                     'integration_id' => $this->integration->id,
+                    'method' => $method,
                     'endpoint' => $endpoint,
+                    'attempt' => $attempt,
+                    'is_timeout' => $isTimeout,
+                    'error' => $e->getMessage(),
                 ]);
 
-                try {
-                    $this->tokenService->refreshToken($this->integration);
-                    $this->integration->refresh();
+                if ($attempt < self::MAX_API_RETRIES) {
+                    // Wait before retry (exponential backoff)
+                    sleep($attempt * 2);
+                    continue;
+                }
 
-                    // Retry request with new token
-                    $options['headers']['Authorization'] = 'Bearer ' . $this->integration->access_token;
-                    $response = $this->client->request($method, $endpoint, $options);
-                    $body = (string) $response->getBody();
-                    
-                    return json_decode($body, true) ?? [];
-                } catch (\Exception $retryException) {
-                    Log::error('Canvas API retry failed after token refresh', [
+                // All retries exhausted - deactivate integration if timeout
+                if ($isTimeout && $this->tokenService) {
+                    $this->tokenService->deactivateIntegration(
+                        $this->integration,
+                        "API request timed out after {$attempt} attempts on endpoint: {$endpoint}"
+                    );
+                    throw CanvasConnectionException::timeout(
+                        $this->integration->id,
+                        $endpoint,
+                        config('services.canvas.timeout', 120)
+                    );
+                }
+
+                throw $e;
+            } catch (GuzzleException $e) {
+                // If 401, try to refresh token once
+                if ($e->getCode() === 401 && $this->tokenService) {
+                    Log::warning('Canvas API returned 401, attempting token refresh', [
                         'integration_id' => $this->integration->id,
                         'endpoint' => $endpoint,
-                        'error' => $retryException->getMessage(),
                     ]);
-                    throw $retryException;
+
+                    try {
+                        $this->tokenService->refreshToken($this->integration);
+                        $this->integration->refresh();
+
+                        // Retry request with new token
+                        $options['headers']['Authorization'] = 'Bearer ' . $this->integration->access_token;
+                        $response = $this->client->request($method, $endpoint, $options);
+                        $body = (string) $response->getBody();
+
+                        return json_decode($body, true) ?? [];
+                    } catch (CanvasConnectionException $tokenException) {
+                        // Token refresh failed and integration was deactivated
+                        throw $tokenException;
+                    } catch (\Exception $retryException) {
+                        Log::error('Canvas API retry failed after token refresh', [
+                            'integration_id' => $this->integration->id,
+                            'endpoint' => $endpoint,
+                            'error' => $retryException->getMessage(),
+                        ]);
+                        throw $retryException;
+                    }
                 }
+
+                Log::error('Canvas API request failed', [
+                    'integration_id' => $this->integration->id,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'error' => $e->getMessage(),
+                    'code' => $e->getCode(),
+                ]);
+
+                throw $e;
             }
-
-            Log::error('Canvas API request failed', [
-                'integration_id' => $this->integration->id,
-                'method' => $method,
-                'endpoint' => $endpoint,
-                'error' => $e->getMessage(),
-                'code' => $e->getCode(),
-            ]);
-
-            throw $e;
         }
+
+        // Should not reach here, but just in case
+        if ($lastException) {
+            throw $lastException;
+        }
+
+        return [];
     }
 
     /**

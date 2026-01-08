@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Exceptions\CanvasConnectionException;
 use App\Models\CanvasCourseMapping;
 use App\Services\Canvas\CanvasGradeSyncService;
 use Illuminate\Console\Command;
@@ -46,11 +47,14 @@ class SyncAcademicRecordsCommand extends Command
         $memoryStart = memory_get_usage(true);
 
         try {
-            // Get all mapped Canvas courses with canvas sync enabled
+            // Get all mapped Canvas courses with canvas sync enabled AND active integrations
             $query = CanvasCourseMapping::where('sync_status', 'mapped')
                 ->whereNotNull('course_offering_id')
                 ->whereHas('courseOffering', function ($q) {
                     $q->where('is_canvas_synced', true);
+                })
+                ->whereHas('canvasIntegration', function ($q) {
+                    $q->where('is_active', true);
                 })
                 ->with(['courseOffering', 'canvasIntegration']);
 
@@ -62,12 +66,12 @@ class SyncAcademicRecordsCommand extends Command
             $totalMappings = $query->count();
 
             if ($totalMappings === 0) {
-                $this->warn('No mapped Canvas courses found.');
+                $this->warn('No mapped Canvas courses found with active integrations.');
 
                 return self::SUCCESS;
             }
 
-            $this->info("Found {$totalMappings} mapped course(s) to sync");
+            $this->info("Found {$totalMappings} mapped course(s) with active integrations to sync");
             $this->newLine();
 
             // Get chunk size from option
@@ -80,19 +84,44 @@ class SyncAcademicRecordsCommand extends Command
                 'courses_processed' => 0,
                 'courses_success' => 0,
                 'courses_failed' => 0,
+                'courses_skipped' => 0,
                 'students_synced' => 0,
                 'students_skipped' => 0,
                 'total_errors' => 0,
+                'integrations_deactivated' => 0,
             ];
 
             $progressBar = $this->output->createProgressBar($totalMappings);
             $progressBar->setFormat('verbose');
 
+            // Track deactivated integrations to skip them
+            $deactivatedIntegrationIds = [];
+
             // Process in chunks to manage memory
-            $query->chunk($chunkSize, function ($mappings) use (&$totalStats, $progressBar, $memoryLimitBytes) {
+            $query->chunk($chunkSize, function ($mappings) use (&$totalStats, $progressBar, $memoryLimitBytes, &$deactivatedIntegrationIds) {
                 foreach ($mappings as $mapping) {
                     $courseOfferingName = $mapping->courseOffering->course_code ?? "ID:{$mapping->course_offering_id}";
                     $progressBar->setMessage("Syncing: {$courseOfferingName}");
+
+                    // Skip if this integration was already deactivated in this run
+                    if (in_array($mapping->canvas_integration_id, $deactivatedIntegrationIds)) {
+                        $this->newLine();
+                        $this->warn("⏭ Skipping {$courseOfferingName} - Canvas integration was deactivated");
+                        $totalStats['courses_skipped']++;
+                        $progressBar->advance();
+                        continue;
+                    }
+
+                    // Double-check integration is still active (may have been deactivated by another process)
+                    $mapping->canvasIntegration->refresh();
+                    if (!$mapping->canvasIntegration->is_active) {
+                        $this->newLine();
+                        $this->warn("⏭ Skipping {$courseOfferingName} - Canvas integration is inactive");
+                        $totalStats['courses_skipped']++;
+                        $deactivatedIntegrationIds[] = $mapping->canvas_integration_id;
+                        $progressBar->advance();
+                        continue;
+                    }
 
                     try {
                         $result = $this->gradeSyncService->syncCourseGrades($mapping);
@@ -107,12 +136,25 @@ class SyncAcademicRecordsCommand extends Command
                         }
 
                         $totalStats['courses_processed']++;
+                    } catch (CanvasConnectionException $e) {
+                        $totalStats['courses_failed']++;
+                        $totalStats['courses_processed']++;
+
+                        $this->newLine();
+
+                        if ($e->shouldDeactivate) {
+                            $this->error("✗ Canvas integration deactivated for {$courseOfferingName}: {$e->getMessage()}");
+                            $deactivatedIntegrationIds[] = $mapping->canvas_integration_id;
+                            $totalStats['integrations_deactivated']++;
+                        } else {
+                            $this->warn("⚠ Canvas connection issue for {$courseOfferingName}: {$e->getMessage()}");
+                        }
                     } catch (\Exception $e) {
                         $totalStats['courses_failed']++;
                         $totalStats['courses_processed']++;
 
                         $this->newLine();
-                        $this->error("Failed to sync course {$courseOfferingName}: {$e->getMessage()}");
+                        $this->error("✗ Failed to sync course {$courseOfferingName}: {$e->getMessage()}");
                     }
 
                     $progressBar->advance();
@@ -124,7 +166,7 @@ class SyncAcademicRecordsCommand extends Command
                     if ($memoryPercentage > 80) {
                         $this->newLine();
                         $this->warn(sprintf(
-                            '⚠️  High memory usage: %.1f%% (%dMB / %dMB)',
+                            'High memory usage: %.1f%% (%dMB / %dMB)',
                             $memoryPercentage,
                             round($currentMemory / 1024 / 1024, 2),
                             round($memoryLimitBytes / 1024 / 1024, 2)
@@ -149,24 +191,30 @@ class SyncAcademicRecordsCommand extends Command
             $memoryPeak = round(memory_get_peak_usage(true) / 1024 / 1024, 2);
 
             $this->newLine();
-            $this->info("✓ Sync completed in {$executionTime} seconds");
-            $this->info("📊 Memory used: {$memoryUsed}MB | Peak: {$memoryPeak}MB");
+            $this->info("Sync completed in {$executionTime} seconds");
+            $this->info("Memory used: {$memoryUsed}MB | Peak: {$memoryPeak}MB");
 
             // Show summary
             if ($totalStats['courses_success'] > 0) {
-                $this->info("✓ Successfully synced {$totalStats['courses_success']} course(s)");
+                $this->info("Successfully synced {$totalStats['courses_success']} course(s)");
             }
             if ($totalStats['students_synced'] > 0) {
-                $this->info("✓ Synced grades for {$totalStats['students_synced']} student(s)");
+                $this->info("Synced grades for {$totalStats['students_synced']} student(s)");
             }
             if ($totalStats['students_skipped'] > 0) {
-                $this->warn("⚠ Skipped {$totalStats['students_skipped']} student(s) (not found in Canvas)");
+                $this->warn("Skipped {$totalStats['students_skipped']} student(s) (not found in Canvas)");
+            }
+            if ($totalStats['courses_skipped'] > 0) {
+                $this->warn("Skipped {$totalStats['courses_skipped']} course(s) (inactive integration)");
             }
             if ($totalStats['courses_failed'] > 0) {
-                $this->error("✗ Failed to sync {$totalStats['courses_failed']} course(s)");
+                $this->error("Failed to sync {$totalStats['courses_failed']} course(s)");
+            }
+            if ($totalStats['integrations_deactivated'] > 0) {
+                $this->error("Deactivated {$totalStats['integrations_deactivated']} Canvas integration(s) due to connection issues");
             }
             if ($totalStats['total_errors'] > 0) {
-                $this->error("✗ Encountered {$totalStats['total_errors']} error(s) during sync");
+                $this->error("Encountered {$totalStats['total_errors']} error(s) during sync");
             }
 
             return self::SUCCESS;
@@ -186,8 +234,10 @@ class SyncAcademicRecordsCommand extends Command
                 ['Courses Processed', $stats['courses_processed']],
                 ['Courses Success', $stats['courses_success']],
                 ['Courses Failed', $stats['courses_failed']],
+                ['Courses Skipped', $stats['courses_skipped']],
                 ['Students Synced', $stats['students_synced']],
                 ['Students Skipped', $stats['students_skipped']],
+                ['Integrations Deactivated', $stats['integrations_deactivated']],
                 ['Total Errors', $stats['total_errors']],
             ]
         );

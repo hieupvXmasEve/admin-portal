@@ -9,21 +9,33 @@ use App\Http\Controllers\Web\Canvas\CanvasCourseController;
 use App\Http\Controllers\Web\Canvas\CanvasSyllabusController;
 use Illuminate\Support\Facades\Route;
 
+// 'canvas' => [
+//             'view_canvas_integration' => 'view_canvas_integration',
+//             'create_canvas_integration' => 'create_canvas_integration',
+//             'edit_canvas_integration' => 'edit_canvas_integration',
+//             'delete_canvas_integration' => 'delete_canvas_integration',
+//             'sync_canvas_courses' => 'sync_canvas_courses',
+//             'map_canvas_courses' => 'map_canvas_courses',
+//         ],
 Route::prefix('admin/canvas')
     ->middleware(['auth', 'verified', 'campus.selected'])
     ->name('admin.canvas.')
     ->group(function () {
         // Canvas Integrations
         Route::get('/integrations', [CanvasIntegrationController::class, 'index'])
+            ->middleware('can:view_canvas_integration')
             ->name('integrations.index');
 
         Route::post('/integrations', [CanvasIntegrationController::class, 'store'])
+            ->middleware('can:create_canvas_integration')
             ->name('integrations.store');
 
         Route::delete('/integrations/{integration}', [CanvasIntegrationController::class, 'destroy'])
+            ->middleware('can:delete_canvas_integration')
             ->name('integrations.destroy');
 
         Route::post('/integrations/{integration}/toggle', [CanvasIntegrationController::class, 'toggleActive'])
+            ->middleware('can:edit_canvas_integration')
             ->name('integrations.toggle');
 
         // OAuth Flow

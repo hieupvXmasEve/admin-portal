@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Canvas;
 
+use App\Exceptions\CanvasConnectionException;
 use App\Models\AssessmentComponent;
 use App\Models\AssessmentComponentDetail;
 use App\Models\AssessmentComponentDetailScore;
@@ -474,6 +475,9 @@ class CanvasGradeSyncService
                     }
                 }
             }
+        } catch (CanvasConnectionException $e) {
+            // Re-throw connection exceptions to stop the entire sync
+            throw $e;
         } catch (\Exception $e) {
             Log::warning('Failed to sync Canvas total grade', [
                 'student_id' => $student->id,

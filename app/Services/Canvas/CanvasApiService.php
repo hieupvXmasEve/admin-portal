@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Canvas;
 
+use App\Exceptions\CanvasConnectionException;
 use App\Models\CanvasIntegration;
 use Illuminate\Support\Facades\Log;
 
@@ -59,6 +60,8 @@ class CanvasApiService
 
     /**
      * Get all courses from Canvas
+     *
+     * @throws CanvasConnectionException
      */
     public function getCourses(CanvasIntegration $integration, array $filters = []): array
     {
@@ -99,6 +102,9 @@ class CanvasApiService
                     'integration_id' => $integration->id,
                     'count' => count($courses),
                 ]);
+            } catch (CanvasConnectionException $e) {
+                // Re-throw connection exceptions
+                throw $e;
             } catch (\Exception $e) {
                 // Fallback to user courses
                 Log::warning('Account-level courses failed, falling back to user courses', [
@@ -119,6 +125,9 @@ class CanvasApiService
             }
 
             return $courses;
+        } catch (CanvasConnectionException $e) {
+            // Re-throw connection exceptions
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to retrieve courses from Canvas', [
                 'integration_id' => $integration->id,
@@ -131,6 +140,8 @@ class CanvasApiService
 
     /**
      * Get a specific course from Canvas
+     *
+     * @throws CanvasConnectionException
      */
     public function getCourse(CanvasIntegration $integration, string $courseId): ?array
     {
@@ -147,6 +158,8 @@ class CanvasApiService
             ]);
 
             return $course;
+        } catch (CanvasConnectionException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to retrieve course from Canvas', [
                 'integration_id' => $integration->id,
@@ -160,6 +173,8 @@ class CanvasApiService
 
     /**
      * Get course assignments
+     *
+     * @throws CanvasConnectionException
      */
     public function getCourseAssignments(CanvasIntegration $integration, string $courseId, array $params = []): array
     {
@@ -167,6 +182,8 @@ class CanvasApiService
 
         try {
             return $this->client->getPaginated("api/v1/courses/{$courseId}/assignments", $params);
+        } catch (CanvasConnectionException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to retrieve course assignments from Canvas', [
                 'integration_id' => $integration->id,
@@ -180,6 +197,8 @@ class CanvasApiService
 
     /**
      * Get assignment groups with optional assignments
+     *
+     * @throws CanvasConnectionException
      */
     public function getAssignmentGroups(CanvasIntegration $integration, string $courseId, array $params = []): array
     {
@@ -187,6 +206,8 @@ class CanvasApiService
 
         try {
             return $this->client->getPaginated("api/v1/courses/{$courseId}/assignment_groups", $params);
+        } catch (CanvasConnectionException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to retrieve assignment groups from Canvas', [
                 'integration_id' => $integration->id,
@@ -200,6 +221,8 @@ class CanvasApiService
 
     /**
      * Get students enrolled in a course
+     *
+     * @throws CanvasConnectionException
      */
     public function getCourseStudents(CanvasIntegration $integration, string $courseId): array
     {
@@ -210,6 +233,8 @@ class CanvasApiService
                 'enrollment_type[]' => 'student',
                 'include[]' => 'email',
             ]);
+        } catch (CanvasConnectionException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to retrieve students from Canvas', [
                 'integration_id' => $integration->id,
@@ -223,6 +248,8 @@ class CanvasApiService
 
     /**
      * Get student enrollment with grades
+     *
+     * @throws CanvasConnectionException
      */
     public function getStudentEnrollment(CanvasIntegration $integration, string $courseId, string $userId): ?array
     {
@@ -243,6 +270,8 @@ class CanvasApiService
             ]);
 
             return $enrollments[0] ?? null;
+        } catch (CanvasConnectionException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to get student enrollment from Canvas', [
                 'integration_id' => $integration->id,
@@ -257,6 +286,8 @@ class CanvasApiService
 
     /**
      * Get submission for a specific student and assignment
+     *
+     * @throws CanvasConnectionException
      */
     public function getSubmission(CanvasIntegration $integration, string $courseId, string $assignmentId, string $canvasUserId): ?array
     {
@@ -264,6 +295,8 @@ class CanvasApiService
 
         try {
             return $this->client->get("api/v1/courses/{$courseId}/assignments/{$assignmentId}/submissions/{$canvasUserId}");
+        } catch (CanvasConnectionException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to retrieve submission from Canvas', [
                 'integration_id' => $integration->id,
@@ -282,6 +315,8 @@ class CanvasApiService
      * Fetches submissions for each assignment separately (Canvas API limitation)
      *
      * @param  array  $assignmentIds  Array of Canvas assignment IDs to fetch submissions for
+     *
+     * @throws CanvasConnectionException
      */
     public function getAllStudentSubmissions(CanvasIntegration $integration, string $courseId, array $assignmentIds = []): array
     {
@@ -373,6 +408,8 @@ class CanvasApiService
             }
 
             return $allSubmissions;
+        } catch (CanvasConnectionException $e) {
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to retrieve bulk submissions from Canvas', [
                 'integration_id' => $integration->id,
@@ -391,6 +428,8 @@ class CanvasApiService
      * @param  string  $courseId  Canvas course ID
      * @param  array  $assignmentIds  Array of assignment IDs to fetch
      * @return array Associative array: [assignment_id => submissions[]]
+     *
+     * @throws CanvasConnectionException
      */
     private function fetchSubmissionsParallel(string $courseId, array $assignmentIds): array
     {
@@ -404,6 +443,9 @@ class CanvasApiService
                     "api/v1/courses/{$courseId}/assignments/{$assignmentId}/submissions",
                     []
                 );
+            } catch (CanvasConnectionException $e) {
+                // Re-throw connection exceptions to stop the entire sync
+                throw $e;
             } catch (\Exception $e) {
                 Log::error('Failed to fetch submissions for assignment', [
                     'assignment_id' => $assignmentId,

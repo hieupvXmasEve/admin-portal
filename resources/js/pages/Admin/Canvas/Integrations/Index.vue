@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useGlobalConfirmDialog } from '@/composables/useGlobalConfirmDialog';
 import { Head, router } from '@inertiajs/vue3';
-import { Plus, ExternalLink, RefreshCw, Power, Trash2, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-vue-next';
+import { Plus, ExternalLink, RefreshCw, Power, Trash2, CheckCircle2, XCircle, Clock, AlertCircle, Loader2 } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -53,6 +53,25 @@ const { showConfirmDialog } = useGlobalConfirmDialog();
 const showCreateDialog = ref(false);
 const isSubmitting = ref(false);
 
+// Track loading state per integration and action type
+const loadingStates = ref<Record<number, { action: string; loading: boolean }>>({});
+
+const isIntegrationLoading = (integrationId: number): boolean => {
+    return loadingStates.value[integrationId]?.loading ?? false;
+};
+
+const getLoadingAction = (integrationId: number): string => {
+    return loadingStates.value[integrationId]?.action ?? '';
+};
+
+const setLoading = (integrationId: number, action: string, loading: boolean) => {
+    if (loading) {
+        loadingStates.value[integrationId] = { action, loading: true };
+    } else {
+        delete loadingStates.value[integrationId];
+    }
+};
+
 const form = ref({
     canvas_url: '',
     client_id: '',
@@ -93,10 +112,12 @@ const syncCourses = (integration: CanvasIntegration) => {
         return;
     }
 
-    if (integration.sync_status === 'syncing') {
+    if (integration.sync_status === 'syncing' || isIntegrationLoading(integration.id)) {
         toast.warning('Sync already in progress');
         return;
     }
+
+    setLoading(integration.id, 'sync', true);
 
     router.post(`/admin/canvas/sync/${integration.id}`, {}, {
         preserveScroll: true,
@@ -106,18 +127,25 @@ const syncCourses = (integration: CanvasIntegration) => {
         onError: () => {
             toast.error('Failed to start sync');
         },
+        onFinish: () => {
+            setLoading(integration.id, 'sync', false);
+        },
     });
 };
 
 const toggleActive = (integration: CanvasIntegration) => {
+    if (isIntegrationLoading(integration.id)) return;
+
     const action = integration.is_active ? 'deactivate' : 'activate';
-    
+
     showConfirmDialog({
         title: `${action.charAt(0).toUpperCase() + action.slice(1)} Integration`,
         message: `Are you sure you want to ${action} this Canvas integration?`,
         confirmText: action.charAt(0).toUpperCase() + action.slice(1),
     }, {
         onConfirm: () => {
+            setLoading(integration.id, 'toggle', true);
+
             router.post(`/admin/canvas/integrations/${integration.id}/toggle`, {}, {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -126,18 +154,25 @@ const toggleActive = (integration: CanvasIntegration) => {
                 onError: () => {
                     toast.error(`Failed to ${action} integration`);
                 },
+                onFinish: () => {
+                    setLoading(integration.id, 'toggle', false);
+                },
             });
         },
     });
 };
 
 const deleteIntegration = (integration: CanvasIntegration) => {
+    if (isIntegrationLoading(integration.id)) return;
+
     showConfirmDialog({
         title: 'Delete Integration',
         message: 'Are you sure you want to delete this Canvas integration? This action cannot be undone.',
         confirmText: 'Delete',
     }, {
         onConfirm: () => {
+            setLoading(integration.id, 'delete', true);
+
             router.delete(`/admin/canvas/integrations/${integration.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -146,18 +181,25 @@ const deleteIntegration = (integration: CanvasIntegration) => {
                 onError: () => {
                     toast.error('Failed to delete integration');
                 },
+                onFinish: () => {
+                    setLoading(integration.id, 'delete', false);
+                },
             });
         },
     });
 };
 
 const revokeAuthorization = (integration: CanvasIntegration) => {
+    if (isIntegrationLoading(integration.id)) return;
+
     showConfirmDialog({
         title: 'Revoke Authorization',
         message: 'Are you sure you want to revoke Canvas authorization? You will need to re-authorize to sync courses.',
         confirmText: 'Revoke',
     }, {
         onConfirm: () => {
+            setLoading(integration.id, 'revoke', true);
+
             router.post(`/admin/canvas/oauth/revoke/${integration.id}`, {}, {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -165,6 +207,9 @@ const revokeAuthorization = (integration: CanvasIntegration) => {
                 },
                 onError: () => {
                     toast.error('Failed to revoke authorization');
+                },
+                onFinish: () => {
+                    setLoading(integration.id, 'revoke', false);
                 },
             });
         },
@@ -343,11 +388,12 @@ const formatDate = (dateString: string | null) => {
                             size="sm"
                             class="w-full"
                             variant="default"
+                            :disabled="isIntegrationLoading(integration.id)"
                         >
                             <ExternalLink class="mr-2 h-4 w-4" />
                             {{ integration.has_token ? 'Re-authorize' : 'Authorize' }}
                         </Button>
-                        
+
                         <template v-else>
                             <!-- Retry button when sync failed -->
                             <Button
@@ -356,41 +402,47 @@ const formatDate = (dateString: string | null) => {
                                 size="sm"
                                 class="w-full"
                                 variant="default"
+                                :disabled="isIntegrationLoading(integration.id)"
                             >
-                                <RefreshCw class="mr-2 h-4 w-4" />
-                                Retry Sync
+                                <Loader2 v-if="getLoadingAction(integration.id) === 'sync'" class="mr-2 h-4 w-4 animate-spin" />
+                                <RefreshCw v-else class="mr-2 h-4 w-4" />
+                                {{ getLoadingAction(integration.id) === 'sync' ? 'Syncing...' : 'Retry Sync' }}
                             </Button>
-                            
+
                             <!-- Normal sync button -->
                             <Button
                                 v-else
                                 @click="syncCourses(integration)"
                                 size="sm"
                                 class="w-full"
-                                :disabled="integration.sync_status === 'syncing'"
+                                :disabled="integration.sync_status === 'syncing' || isIntegrationLoading(integration.id)"
                             >
-                                <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': integration.sync_status === 'syncing' }" />
-                                {{ integration.sync_status === 'syncing' ? 'Syncing...' : 'Sync Courses' }}
+                                <Loader2 v-if="integration.sync_status === 'syncing' || getLoadingAction(integration.id) === 'sync'" class="mr-2 h-4 w-4 animate-spin" />
+                                <RefreshCw v-else class="mr-2 h-4 w-4" />
+                                {{ integration.sync_status === 'syncing' || getLoadingAction(integration.id) === 'sync' ? 'Syncing...' : 'Sync Courses' }}
                             </Button>
-                            
+
                             <div class="flex gap-2">
                                 <Button
                                     @click="authorizeIntegration(integration)"
                                     size="sm"
                                     variant="outline"
                                     class="flex-1"
+                                    :disabled="isIntegrationLoading(integration.id)"
                                 >
                                     <ExternalLink class="mr-2 h-4 w-4" />
                                     Reconnect
                                 </Button>
-                                
+
                                 <Button
                                     @click="revokeAuthorization(integration)"
                                     size="sm"
                                     variant="outline"
                                     class="flex-1"
+                                    :disabled="isIntegrationLoading(integration.id)"
                                 >
-                                    Revoke
+                                    <Loader2 v-if="getLoadingAction(integration.id) === 'revoke'" class="mr-2 h-4 w-4 animate-spin" />
+                                    {{ getLoadingAction(integration.id) === 'revoke' ? 'Revoking...' : 'Revoke' }}
                                 </Button>
                             </div>
                         </template>
@@ -401,19 +453,28 @@ const formatDate = (dateString: string | null) => {
                                 size="sm"
                                 variant="outline"
                                 class="flex-1"
+                                :disabled="isIntegrationLoading(integration.id)"
                             >
-                                <Power class="mr-2 h-4 w-4" />
-                                {{ integration.is_active ? 'Deactivate' : 'Activate' }}
+                                <Loader2 v-if="getLoadingAction(integration.id) === 'toggle'" class="mr-2 h-4 w-4 animate-spin" />
+                                <Power v-else class="mr-2 h-4 w-4" />
+                                <template v-if="getLoadingAction(integration.id) === 'toggle'">
+                                    {{ integration.is_active ? 'Deactivating...' : 'Activating...' }}
+                                </template>
+                                <template v-else>
+                                    {{ integration.is_active ? 'Deactivate' : 'Activate' }}
+                                </template>
                             </Button>
-                            
+
                             <Button
                                 @click="deleteIntegration(integration)"
                                 size="sm"
                                 variant="destructive"
                                 class="flex-1"
+                                :disabled="isIntegrationLoading(integration.id)"
                             >
-                                <Trash2 class="mr-2 h-4 w-4" />
-                                Delete
+                                <Loader2 v-if="getLoadingAction(integration.id) === 'delete'" class="mr-2 h-4 w-4 animate-spin" />
+                                <Trash2 v-else class="mr-2 h-4 w-4" />
+                                {{ getLoadingAction(integration.id) === 'delete' ? 'Deleting...' : 'Delete' }}
                             </Button>
                         </div>
                     </div>

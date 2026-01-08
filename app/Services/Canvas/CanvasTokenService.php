@@ -4,13 +4,25 @@ declare(strict_types=1);
 
 namespace App\Services\Canvas;
 
+use App\Exceptions\CanvasConnectionException;
 use App\Models\CanvasIntegration;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 
 class CanvasTokenService
 {
+    /**
+     * Maximum retries for token refresh
+     */
+    private const MAX_REFRESH_RETRIES = 2;
+
+    /**
+     * Timeout in seconds for token refresh requests
+     */
+    private const TOKEN_REFRESH_TIMEOUT = 30;
+
     /**
      * Check if token is expired or about to expire (within 5 minutes)
      */
@@ -45,44 +57,125 @@ class CanvasTokenService
 
     /**
      * Refresh the access token using refresh token
+     *
+     * @throws CanvasConnectionException When token refresh fails due to timeout
      */
     public function refreshToken(CanvasIntegration $integration): bool
     {
-        try {
-            $client = new Client([
-                'base_uri' => rtrim($integration->canvas_url, '/') . '/',
-                'timeout' => 30,
-            ]);
+        $lastException = null;
 
-            $response = $client->post('login/oauth2/token', [
-                'form_params' => [
-                    'grant_type' => 'refresh_token',
-                    'client_id' => $integration->client_id,
-                    'client_secret' => $integration->client_secret,
-                    'refresh_token' => $integration->refresh_token,
-                ],
-            ]);
+        for ($attempt = 1; $attempt <= self::MAX_REFRESH_RETRIES; $attempt++) {
+            try {
+                $client = new Client([
+                    'base_uri' => rtrim($integration->canvas_url, '/') . '/',
+                    'timeout' => self::TOKEN_REFRESH_TIMEOUT,
+                    'connect_timeout' => 15,
+                ]);
 
-            $data = json_decode((string) $response->getBody(), true);
+                Log::info('Attempting to refresh Canvas access token', [
+                    'integration_id' => $integration->id,
+                    'attempt' => $attempt,
+                    'max_retries' => self::MAX_REFRESH_RETRIES,
+                ]);
 
-            $integration->update([
-                'access_token' => $data['access_token'],
-                'token_expires_at' => now()->addSeconds($data['expires_in'] ?? 3600),
-            ]);
+                $response = $client->post('login/oauth2/token', [
+                    'form_params' => [
+                        'grant_type' => 'refresh_token',
+                        'client_id' => $integration->client_id,
+                        'client_secret' => $integration->client_secret,
+                        'refresh_token' => $integration->refresh_token,
+                    ],
+                ]);
 
-            Log::info('Canvas access token refreshed successfully', [
-                'integration_id' => $integration->id,
-            ]);
+                $data = json_decode((string) $response->getBody(), true);
 
-            return true;
-        } catch (GuzzleException $e) {
-            Log::error('Failed to refresh Canvas access token', [
-                'integration_id' => $integration->id,
-                'error' => $e->getMessage(),
-            ]);
+                $integration->update([
+                    'access_token' => $data['access_token'],
+                    'token_expires_at' => now()->addSeconds($data['expires_in'] ?? 3600),
+                ]);
 
-            return false;
+                Log::info('Canvas access token refreshed successfully', [
+                    'integration_id' => $integration->id,
+                    'attempt' => $attempt,
+                ]);
+
+                return true;
+            } catch (ConnectException $e) {
+                $lastException = $e;
+                $isTimeout = str_contains($e->getMessage(), 'cURL error 28') ||
+                    str_contains($e->getMessage(), 'Connection timed out');
+
+                Log::warning('Canvas token refresh connection failed', [
+                    'integration_id' => $integration->id,
+                    'attempt' => $attempt,
+                    'is_timeout' => $isTimeout,
+                    'error' => $e->getMessage(),
+                ]);
+
+                if ($attempt < self::MAX_REFRESH_RETRIES) {
+                    // Wait before retry (exponential backoff)
+                    sleep($attempt * 2);
+                    continue;
+                }
+
+                // All retries exhausted - deactivate integration
+                if ($isTimeout) {
+                    $this->deactivateIntegration(
+                        $integration,
+                        "Token refresh timed out after {$attempt} attempts"
+                    );
+                    throw CanvasConnectionException::tokenRefreshFailed(
+                        $integration->id,
+                        "Connection timed out after {$attempt} attempts"
+                    );
+                }
+            } catch (GuzzleException $e) {
+                $lastException = $e;
+
+                Log::error('Failed to refresh Canvas access token', [
+                    'integration_id' => $integration->id,
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                ]);
+
+                // Don't retry on authentication errors
+                if ($e->getCode() === 401 || $e->getCode() === 400) {
+                    $this->deactivateIntegration(
+                        $integration,
+                        "Authentication failed: {$e->getMessage()}"
+                    );
+                    throw CanvasConnectionException::tokenRefreshFailed(
+                        $integration->id,
+                        $e->getMessage()
+                    );
+                }
+
+                if ($attempt < self::MAX_REFRESH_RETRIES) {
+                    sleep($attempt * 2);
+                    continue;
+                }
+            }
         }
+
+        return false;
+    }
+
+    /**
+     * Deactivate a Canvas integration due to persistent failures
+     */
+    public function deactivateIntegration(CanvasIntegration $integration, string $reason): void
+    {
+        Log::warning('Deactivating Canvas integration due to persistent failures', [
+            'integration_id' => $integration->id,
+            'canvas_url' => $integration->canvas_url,
+            'reason' => $reason,
+        ]);
+
+        $integration->update([
+            'is_active' => false,
+            'sync_status' => 'failed',
+            'sync_error' => "Auto-deactivated: {$reason}",
+        ]);
     }
 
     /**
