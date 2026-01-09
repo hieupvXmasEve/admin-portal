@@ -491,7 +491,7 @@ class ClassSessionService
      */
     public function deleteBulk(array $sessionIds): int
     {
-        Log::info('Deleting bulk class sessions: '.implode(',', $sessionIds));
+        Log::info('Deleting bulk class sessions: ' . implode(',', $sessionIds));
 
         return DB::transaction(function () use ($sessionIds) {
             // Delete associated attendance records first
@@ -725,7 +725,7 @@ class ClassSessionService
             $enrolledStudents = $session->courseOffering
                 ->courseRegistrations()
                 ->with('student')
-                ->where('registration_status', 'confirmed')
+                // ->where('registration_status', 'confirmed')
                 ->get()
                 ->pluck('student')
                 ->filter(); // Remove any null students

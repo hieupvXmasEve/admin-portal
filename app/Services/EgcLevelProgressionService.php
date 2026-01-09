@@ -15,9 +15,15 @@ class EgcLevelProgressionService
 {
     /**
      * Process EGC level progression for completed course
+     *
+     * @param  bool  $recalculate  If true, only notify students whose status changed
+     * @param  array  $previousStatusMap  Map of student_id => previous pass status
      */
-    public function processEgcProgression(CourseOffering $courseOffering): array
-    {
+    public function processEgcProgression(
+        CourseOffering $courseOffering,
+        bool $recalculate = false,
+        array $previousStatusMap = []
+    ): array {
         // Check if this is an EGC course
         if ($courseOffering->unit->unit_type !== 'egc') {
             return [
@@ -76,6 +82,7 @@ class EgcLevelProgressionService
                     'unit_code' => $courseOffering->unit->code,
                     'reason' => "Student status is '{$student->status}', expected 'intake_pre_uni_gc'",
                 ];
+
                 continue;
             }
 
@@ -99,7 +106,7 @@ class EgcLevelProgressionService
                     'unit_level' => $unitLevel,
                     'unit_code' => $courseOffering->unit->code,
                     'final_grade' => $record->final_letter_grade,
-                    'reason' => "Level mismatch: Student at level " . ($studentLevel ?? 'N/A') . " passed level {$unitLevel} unit",
+                    'reason' => 'Level mismatch: Student at level '.($studentLevel ?? 'N/A')." passed level {$unitLevel} unit",
                     'action' => 'Grade recorded but level NOT progressed',
                 ];
 
@@ -114,18 +121,28 @@ class EgcLevelProgressionService
                 ]);
 
                 // Send course completion notification (pass but no progression)
-                $this->createNotification(
-                    $student,
-                    new EgcCourseCompletedNotification(
-                        courseCode: $courseOffering->unit->code,
-                        courseName: $courseOffering->unit->name,
-                        grade: $record->final_letter_grade,
-                        passed: true,
-                        levelProgressed: false,
-                        currentLevel: $studentLevel,
-                        message: 'You passed but level mismatch detected. Please contact academic office.'
-                    )
-                );
+                // Only notify if status changed in recalculate mode
+                $shouldNotify = ! $recalculate;
+                if ($recalculate) {
+                    $previousStatus = $previousStatusMap[$student->id] ?? null;
+                    // Notify if: new student (null) OR status changed from fail to pass
+                    $shouldNotify = $previousStatus === null || $previousStatus !== true;
+                }
+
+                if ($shouldNotify) {
+                    $this->createNotification(
+                        $student,
+                        new EgcCourseCompletedNotification(
+                            courseCode: $courseOffering->unit->code,
+                            courseName: $courseOffering->unit->name,
+                            grade: $record->final_letter_grade,
+                            passed: true,
+                            levelProgressed: false,
+                            currentLevel: $studentLevel,
+                            message: 'You passed but level mismatch detected. Please contact academic office.'
+                        )
+                    );
+                }
 
                 continue;
             }
@@ -137,30 +154,40 @@ class EgcLevelProgressionService
                     $results['progressed'][] = $progressResult;
 
                     // Send success notification with level progression
-                    $this->createNotification(
-                        $student,
-                        new EgcCourseCompletedNotification(
-                            courseCode: $courseOffering->unit->code,
-                            courseName: $courseOffering->unit->name,
-                            grade: $record->final_letter_grade,
-                            passed: true,
-                            levelProgressed: true,
-                            currentLevel: $student->gc_current_level,
-                            message: $progressResult['completed_egc_program']
-                                ? 'Congratulations! You completed all EGC levels!'
-                                : "Level progressed: Level {$progressResult['from_level']} → Level {$progressResult['to_level']}"
-                        )
-                    );
+                    // Only notify if status changed in recalculate mode
+                    $shouldNotify = ! $recalculate;
+                    if ($recalculate) {
+                        $previousStatus = $previousStatusMap[$student->id] ?? null;
+                        // Notify if: new student (null) OR status changed from fail to pass
+                        $shouldNotify = $previousStatus === null || $previousStatus !== true;
+                    }
 
-                    // Send program completion notification if applicable
-                    if ($progressResult['completed_egc_program']) {
+                    if ($shouldNotify) {
                         $this->createNotification(
                             $student,
-                            new EgcProgramCompletedNotification(
-                                totalLevels: $progressResult['total_levels'],
-                                newStatus: $student->status
+                            new EgcCourseCompletedNotification(
+                                courseCode: $courseOffering->unit->code,
+                                courseName: $courseOffering->unit->name,
+                                grade: $record->final_letter_grade,
+                                passed: true,
+                                levelProgressed: true,
+                                currentLevel: $student->gc_current_level,
+                                message: $progressResult['completed_egc_program']
+                                    ? 'Congratulations! You completed all EGC levels!'
+                                    : "Level progressed: Level {$progressResult['from_level']} → Level {$progressResult['to_level']}"
                             )
                         );
+
+                        // Send program completion notification if applicable
+                        if ($progressResult['completed_egc_program']) {
+                            $this->createNotification(
+                                $student,
+                                new EgcProgramCompletedNotification(
+                                    totalLevels: $progressResult['total_levels'],
+                                    newStatus: $student->status
+                                )
+                            );
+                        }
                     }
                 } catch (\Exception $e) {
                     $results['errors'][] = [
@@ -186,18 +213,28 @@ class EgcLevelProgressionService
                 ];
 
                 // Send failure notification
-                $this->createNotification(
-                    $student,
-                    new EgcCourseCompletedNotification(
-                        courseCode: $courseOffering->unit->code,
-                        courseName: $courseOffering->unit->name,
-                        grade: $record->final_letter_grade,
-                        passed: false,
-                        levelProgressed: false,
-                        currentLevel: $currentLevel,
-                        message: 'You did not pass this course. Your level remains at Level ' . ($currentLevel ?? 'N/A')
-                    )
-                );
+                // Only notify if status changed in recalculate mode
+                $shouldNotify = ! $recalculate;
+                if ($recalculate) {
+                    $previousStatus = $previousStatusMap[$student->id] ?? null;
+                    // Notify if: new student (null) OR status changed from pass to fail
+                    $shouldNotify = $previousStatus === null || $previousStatus !== false;
+                }
+
+                if ($shouldNotify) {
+                    $this->createNotification(
+                        $student,
+                        new EgcCourseCompletedNotification(
+                            courseCode: $courseOffering->unit->code,
+                            courseName: $courseOffering->unit->name,
+                            grade: $record->final_letter_grade,
+                            passed: false,
+                            levelProgressed: false,
+                            currentLevel: $currentLevel,
+                            message: 'You did not pass this course. Your level remains at Level '.($currentLevel ?? 'N/A')
+                        )
+                    );
+                }
 
                 Log::info('EGC Course Failed - Level Unchanged', [
                     'student_id' => $student->student_id,
@@ -241,7 +278,7 @@ class EgcLevelProgressionService
                 'total_levels' => $student->gc_total_levels ?? 6,
                 'completed_egc_program' => false,
                 'new_status' => $student->status,
-                'message' => 'Student already at level ' . $oldLevel . ', no progression needed',
+                'message' => 'Student already at level '.$oldLevel.', no progression needed',
                 'already_progressed' => true,
             ];
         }
@@ -289,7 +326,7 @@ class EgcLevelProgressionService
 
         $record->update([
             'grade_history' => $gradeHistory,
-            'administrative_notes' => ($record->administrative_notes ? $record->administrative_notes . "\n" : '') . $progressionNote,
+            'administrative_notes' => ($record->administrative_notes ? $record->administrative_notes."\n" : '').$progressionNote,
         ]);
 
         Log::info('EGC Level Progressed', [

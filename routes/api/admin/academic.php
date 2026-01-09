@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Modules\Academic\Http\Api\Admin\MarkCourseCompletedController;
 use App\Http\Controllers\Api\Admin\AcademicReportController;
+use App\Modules\Academic\Http\Api\Admin\MarkCourseCompletedController;
+use App\Modules\Academic\Http\Api\Admin\RecalculateCourseCompletedController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('academic-reports')->name('academic-reports.')->group(function () {
@@ -12,3 +13,6 @@ Route::prefix('academic-reports')->name('academic-reports.')->group(function () 
 
 Route::post('course-offerings/{courseOffering}/complete', MarkCourseCompletedController::class)
     ->name('course-offerings.complete');
+
+Route::post('course-offerings/{courseOffering}/recalculate', RecalculateCourseCompletedController::class)
+    ->name('course-offerings.recalculate');

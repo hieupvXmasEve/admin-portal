@@ -13,12 +13,11 @@ class MarkCourseOfferingCompletedAction
     /**
      * Mark a course offering as completed.
      *
-     * @param  CourseOffering  $courseOffering
-     * @return array
+     * @param  bool  $recalculate  If true, allows recalculating already completed courses
      *
      * @throws RuntimeException
      */
-    public static function run(CourseOffering $courseOffering): array
+    public static function run(CourseOffering $courseOffering, bool $recalculate = false): array
     {
         // Ensure the course offering belongs to current campus
         // Note: In an API context, middleware usually handles campus scope,
@@ -27,8 +26,8 @@ class MarkCourseOfferingCompletedAction
             throw new RuntimeException('Course offering not found in current campus.', 404);
         }
 
-        // Check if course is already completed - cannot modify
-        if ($courseOffering->course_status === 'completed') {
+        // Check if course is already completed - cannot modify unless recalculating
+        if ($courseOffering->course_status === 'completed' && ! $recalculate) {
             throw new RuntimeException('Course is already completed.');
         }
 
@@ -47,6 +46,7 @@ class MarkCourseOfferingCompletedAction
             // Check 1: Unmarked attendance
             if ($session->attendances->isEmpty()) {
                 $unmarkedSessions[] = "{$session->session_title} ({$session->formatted_date})";
+
                 continue;
             }
 
@@ -69,15 +69,17 @@ class MarkCourseOfferingCompletedAction
         }
 
         try {
-            return DB::transaction(function () use ($courseOffering) {
+            return DB::transaction(function () use ($courseOffering, $recalculate) {
                 // Load necessary relationships
                 $courseOffering->load(['unit', 'semester']);
 
                 // Finalize course with all validations and EGC progression
-                $result = app(CourseCompletionService::class)->finalizeCourse($courseOffering);
+                $result = app(CourseCompletionService::class)->finalizeCourse($courseOffering, $recalculate);
 
-                // Update course offering status
-                $courseOffering->update(['course_status' => 'completed']);
+                // Update course offering status (only if not already completed)
+                if ($courseOffering->course_status !== 'completed') {
+                    $courseOffering->update(['course_status' => 'completed']);
+                }
 
                 Log::info('Course status updated to completed', [
                     'course_offering_id' => $courseOffering->id,

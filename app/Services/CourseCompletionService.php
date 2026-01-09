@@ -11,7 +11,6 @@ use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
 use App\Models\Notification;
 use App\Notifications\CourseCompletedNotification;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class CourseCompletionService
@@ -23,8 +22,10 @@ class CourseCompletionService
 
     /**
      * Finalize a course offering when marked as completed
+     *
+     * @param  bool  $recalculate  If true, allows recalculating already completed courses
      */
-    public function finalizeCourse(CourseOffering $courseOffering): array
+    public function finalizeCourse(CourseOffering $courseOffering, bool $recalculate = false): array
     {
         // 1. Validate prerequisites
         $this->validateAcademicRecordsExist($courseOffering);
@@ -36,6 +37,17 @@ class CourseCompletionService
 
         $this->validateGradesExist($courseOffering);
 
+        // Store previous pass/fail status before finalizing (for recalculate mode)
+        $previousStatusMap = [];
+        if ($recalculate) {
+            $previousRecords = AcademicRecord::where('course_offering_id', $courseOffering->id)
+                ->whereNotNull('final_letter_grade')
+                ->get();
+            foreach ($previousRecords as $record) {
+                $previousStatusMap[$record->student_id] = (bool) ($record->is_passed ?? false);
+            }
+        }
+
         // 2. Finalize academic records
         $this->finalizeAcademicRecords($courseOffering);
 
@@ -43,16 +55,18 @@ class CourseCompletionService
         $this->updateCourseRegistrations($courseOffering);
 
         // 4. Process EGC level progression if applicable
-        $egcResult = $this->egcService->processEgcProgression($courseOffering);
+        $egcResult = $this->egcService->processEgcProgression($courseOffering, $recalculate, $previousStatusMap);
 
-        // 5. Automatically attach survey to completed course
-        $this->courseSurveyService->attachSurveyToCompletedCourse($courseOffering);
+        // 5. Automatically attach survey to completed course (only if not already attached)
+        if (! $recalculate) {
+            $this->courseSurveyService->attachSurveyToCompletedCourse($courseOffering);
+        }
 
         // 6. Send notifications to students for non-EGC courses
         // (EGC courses send notifications in EgcLevelProgressionService)
         $nonEgcResult = null;
         if (! $egcResult['processed']) {
-            $nonEgcResult = $this->notifyStudentsNonEgcCompletion($courseOffering);
+            $nonEgcResult = $this->notifyStudentsNonEgcCompletion($courseOffering, $recalculate, $previousStatusMap);
         }
 
         Log::info('Course Finalized', [
@@ -166,7 +180,7 @@ class CourseCompletionService
             // If student previously failed attendance but now meets it (after a re-run),
             // we should remove the failure note to avoid confusion.
             $cleanNotes = $record->administrative_notes;
-            if ($cleanNotes && str_contains($cleanNotes, "FAILED: Attendance requirement not met")) {
+            if ($cleanNotes && str_contains($cleanNotes, 'FAILED: Attendance requirement not met')) {
                 $cleanNotes = preg_replace('/^FAILED: Attendance requirement not met.*$/m', '', $cleanNotes);
                 $cleanNotes = trim($cleanNotes);
             }
@@ -339,10 +353,10 @@ class CourseCompletionService
                 ->implode(', ');
 
             throw new \Exception(
-                "Cannot complete course: " . count($missingRecordStudents) . " registered student(s) missing academic records. " .
-                    "Students: {$studentDetails}" .
-                    (count($missingRecordStudents) > 5 ? ' and others...' : '') .
-                    " Please ensure all registered students have academic records before marking course as completed."
+                'Cannot complete course: '.count($missingRecordStudents).' registered student(s) missing academic records. '.
+                    "Students: {$studentDetails}".
+                    (count($missingRecordStudents) > 5 ? ' and others...' : '').
+                    ' Please ensure all registered students have academic records before marking course as completed.'
             );
         }
 
@@ -386,8 +400,8 @@ class CourseCompletionService
                 ->implode(', ');
 
             throw new \Exception(
-                "Cannot complete course: {$missingGrades} student(s) are missing final grades. " .
-                    "Students: {$studentsWithoutGrades}" .
+                "Cannot complete course: {$missingGrades} student(s) are missing final grades. ".
+                    "Students: {$studentsWithoutGrades}".
                     ($missingGrades > 5 ? ' and others...' : '')
             );
         }
@@ -456,7 +470,7 @@ class CourseCompletionService
         $warnings = [];
 
         if ($registeredCount !== $recordsCount) {
-            $warnings[] = "Missing academic records for " . ($registeredCount - $recordsCount) . " student(s)";
+            $warnings[] = 'Missing academic records for '.($registeredCount - $recordsCount).' student(s)';
         }
 
         if ($missingGrades > 0) {
@@ -464,7 +478,7 @@ class CourseCompletionService
         }
 
         if ($courseOffering->unit->unit_type === 'egc') {
-            $warnings[] = "This is an EGC course - level progression will be processed";
+            $warnings[] = 'This is an EGC course - level progression will be processed';
         }
 
         return $warnings;
@@ -473,9 +487,15 @@ class CourseCompletionService
     /**
      * Send notifications to students for non-EGC course completion
      * Returns array with pass/fail statistics
+     *
+     * @param  bool  $recalculate  If true, only notify students whose status changed
+     * @param  array  $previousStatusMap  Map of student_id => previous pass status
      */
-    private function notifyStudentsNonEgcCompletion(CourseOffering $courseOffering): array
-    {
+    private function notifyStudentsNonEgcCompletion(
+        CourseOffering $courseOffering,
+        bool $recalculate = false,
+        array $previousStatusMap = []
+    ): array {
         $courseOffering->load('unit');
 
         $records = AcademicRecord::where('course_offering_id', $courseOffering->id)
@@ -486,6 +506,7 @@ class CourseCompletionService
         $notifiedCount = 0;
         $passedCount = 0;
         $failedCount = 0;
+        $skippedCount = 0;
 
         foreach ($records as $record) {
             $student = $record->student;
@@ -501,6 +522,19 @@ class CourseCompletionService
                 $passedCount++;
             } else {
                 $failedCount++;
+            }
+
+            // In recalculate mode, only notify if status changed
+            if ($recalculate) {
+                $previousStatus = $previousStatusMap[$student->id] ?? null;
+
+                // Skip only if status hasn't changed (previous status exists and matches current)
+                // Note: If previousStatus is null (new student), we still notify
+                if ($previousStatus !== null && $previousStatus === $isPassing) {
+                    $skippedCount++;
+
+                    continue;
+                }
             }
 
             // Create notification using custom method (compatible with custom Notification model)
@@ -529,12 +563,15 @@ class CourseCompletionService
             'total_notifications' => $notifiedCount,
             'passed' => $passedCount,
             'failed' => $failedCount,
+            'recalculate_mode' => $recalculate,
+            'skipped' => $skippedCount,
         ]);
 
         return [
             'total_notified' => $notifiedCount,
             'passed' => $passedCount,
             'failed' => $failedCount,
+            'skipped' => $skippedCount,
         ];
     }
 

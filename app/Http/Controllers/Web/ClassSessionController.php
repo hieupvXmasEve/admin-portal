@@ -135,8 +135,8 @@ class ClassSessionController extends Controller
         // Get all enrolled students for this course offering with their attendance
         $enrolledStudentsQuery = $session->courseOffering
             ->courseRegistrations()
-            ->with(['student'])
-            ->where('registration_status', 'confirmed');
+            ->with(['student']);
+        // ->where('registration_status', 'confirmed');
 
         // Get attendance data with filtering (no pagination)
         $attendanceQuery = $session->attendances()

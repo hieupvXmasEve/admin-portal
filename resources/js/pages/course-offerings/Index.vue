@@ -17,7 +17,7 @@ import type { PaginatedResponse } from '@/types';
 import type { CourseOffering, Semester } from '@/types/models';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ColumnDef } from '@tanstack/vue-table';
-import { BarChart3, CheckCircle, Copy, Edit, Eye, MoreHorizontal, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
+import { BarChart3, Calculator, CheckCircle, Copy, Edit, Eye, MoreHorizontal, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
 import { h, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 
@@ -54,7 +54,7 @@ interface Props {
 }
 const props = defineProps<Props>();
 
-const { filters, handleSearch, handleSelectFilter, handleSortChange, handlePaginationNavigate, handlePageSizeChange } = useInertiaFilters<CourseOfferingFilters>({
+const { filters, handleSearch, handlePaginationNavigate, handlePageSizeChange } = useInertiaFilters<CourseOfferingFilters>({
     baseUrl: '/course-offerings',
     initialFilters: {
         ...props.filters,
@@ -354,6 +354,47 @@ const getDeliveryModeBadge = (mode: string) => {
     }
 };
 
+const recalculateCourseResult = (course: CourseOffering) => {
+    confirmDialog.showConfirmDialog(
+        {
+            title: 'Recalculate Course Results',
+            message: `Are you sure you want to recalculate results for "${course.unit?.code || course.course_code}"? This will update student grades and only send notifications to students whose pass/fail status has changed.`,
+            confirmText: 'Recalculate',
+        },
+        {
+            onConfirm: async () => {
+                isLoading.value = true;
+                try {
+                    const { data: apiData } = await api.post(`/api/course-offerings/${course.id}/recalculate`, {});
+
+                    if (apiData.value?.success) {
+                        const message = apiData.value.data?.message || 'Course results recalculated successfully';
+                        toast.success('Course results recalculated successfully', {
+                            description: h(HeadlessToastWithProps, { message }),
+                        });
+                        router.reload();
+                        loadStatistics();
+                    } else {
+                        console.log('apiData.value', apiData.value);
+                        const errorMessage = apiData.value?.message || 'Failed to recalculate course results';
+                        toast.error('Failed to recalculate course results', {
+                            description: h(HeadlessToastWithProps, { message: errorMessage }),
+                        });
+                    }
+                } catch (error: any) {
+                    console.log('error', error);
+                    const errorMessage = error?.response?.data?.message || error?.message || 'Failed to recalculate course results';
+                    toast.error('Failed to recalculate course results', {
+                        description: h(HeadlessToastWithProps, { message: errorMessage }),
+                    });
+                } finally {
+                    isLoading.value = false;
+                }
+            },
+        },
+    );
+};
+
 // Table columns definition
 const columns: ColumnDef<CourseOffering>[] = [
     // No number
@@ -529,6 +570,15 @@ const columns: ColumnDef<CourseOffering>[] = [
                     },
                     () => [h(Copy, { class: 'mr-2 h-4 w-4' }), 'Duplicate'],
                 ),
+                // Recalculate Course Result (if course is completed)
+                isCompleted &&
+                    h(
+                        DropdownMenuItem,
+                        {
+                            onClick: () => recalculateCourseResult(course),
+                        },
+                        () => [h(Calculator, { class: 'mr-2 h-4 w-4' }), 'Recalculate Course Result'],
+                    ),
             ];
 
             if (canModify) {
