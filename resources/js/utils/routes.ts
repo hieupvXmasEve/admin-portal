@@ -163,7 +163,6 @@ export const studentRoutes = {
 
     // Student Management Features - General Access (for menu)
     newStudents: () => route('students.new-students.index'),
-    academicRecords: () => route('academic-records.index'),
     programChange: () => route('program-changes.index'),
     repeatCourses: () => route('course-retakes.index'),
     academicStanding: () => route('academic-standings.index'),
@@ -180,6 +179,12 @@ export const studentRoutes = {
 
     // Student Academic Summary Routes
     studentAcademicSummary: (id: number) => route('students.academic-summary.show', { student: id }),
+
+    studentStatusActionIndex: (id: number) => route('students.actions.index', { student: id }),
+    studentStatusAction: () => route('reports.student-actions.index'),
+    studentStatusActionShow: (id: number) => route('reports.student-actions.show', { actionLog: id }),
+    studentStatusActionUpdate: (id: number) => route('reports.student-actions.update', { actionLog: id }),
+    studentStatusActionAttachmentsStore: (id: number) => route('reports.student-actions.attachments.store', { actionLog: id }),
 } as const;
 
 // Lecturer Management Routes

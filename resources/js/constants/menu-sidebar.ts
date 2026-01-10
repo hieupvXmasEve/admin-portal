@@ -186,49 +186,12 @@ export const mainNavItems: NavItem[] = [
                 icon: Users,
                 requiredPermissions: ['view_student'],
             },
-            // {
-            //     title: 'New Students',
-            //     href: studentRoutes.newStudents(),
-            //     icon: UserPlus,
-            //     requiredPermissions: ['view_student'],
-            // },
             {
                 title: 'Enrollments & Holds',
                 href: studentRoutes.enrollments(), // Placeholder
                 icon: ClipboardList,
                 requiredPermissions: ['view_student'], // Will be implemented later
             },
-            {
-                title: 'Academic Records',
-                href: studentRoutes.academicRecords(), // Placeholder
-                icon: FileText,
-                requiredPermissions: ['view_student'], // Will be implemented later
-            },
-            // {
-            //     title: 'Program/Specialization Change',
-            //     href: '#', // Placeholder
-            //     icon: RefreshCw,
-            //     requiredPermissions: ['edit_student'], // Will be implemented later
-            // },
-            // {
-            //     title: 'Repeat/Retake Courses',
-            //     href: '#', // Placeholder
-            //     icon: Repeat,
-            //     requiredPermissions: ['edit_student'], // Will be implemented later
-            // },
-            // {
-            //     title: 'Academic Standing',
-            //     href: '#', // Placeholder
-            //     icon: TrendingUp,
-            //     requiredPermissions: ['view_student'], // Will be implemented later
-            // },
-
-            // {
-            //     title: 'Student Status Tracking',
-            //     href: studentRoutes.statusTracking(),
-            //     icon: UserCheck,
-            //     requiredPermissions: ['view_student'], // Will be implemented later
-            // },
             {
                 title: 'Student Applications',
                 href: '/student-applications',
@@ -274,12 +237,6 @@ export const mainNavItems: NavItem[] = [
                 icon: BookOpen,
                 requiredPermissions: ['view_course_offering'],
             },
-            // {
-            //     title: 'Room & Instructor Assignment',
-            //     href: courseRoutes.roomAssignment(),
-            //     icon: MapPin,
-            //     requiredPermissions: ['edit_course_offering'], // Will be implemented later
-            // },
             {
                 title: 'Class Schedule',
                 href: courseRoutes.classSchedule(),
@@ -359,6 +316,13 @@ export const mainNavItems: NavItem[] = [
                 href: academicSummaryRoutes.courseRanking(),
                 icon: Trophy,
                 requiredPermissions: ['view_grade'],
+            },
+            // Student Actions
+            {
+                title: 'Student Actions',
+                href: studentRoutes.studentStatusAction(),
+                icon: ClipboardCheck,
+                requiredPermissions: ['view_student_action'],
             },
         ],
     },

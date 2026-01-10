@@ -23,54 +23,6 @@ class AcademicRecordController extends Controller
     ) {}
 
     /**
-     * Display global academic records overview (for menu access)
-     */
-    public function globalIndex(Request $request): Response|RedirectResponse
-    {
-        $campusId = session()->get('current_campus_id');
-
-        if (! $campusId) {
-            return redirect()->route('select-campus.index')
-                ->with('error', 'Please select a campus first');
-        }
-
-        $validated = $request->validate([
-            'search' => 'nullable|string|max:255',
-            'semester_id' => 'nullable|exists:semesters,id',
-            'program_id' => 'nullable|exists:programs,id',
-        ]);
-
-        // Get students from the current campus
-        $studentsQuery = Student::with(['program', 'specialization', 'academicRecords'])
-            ->where('campus_id', $campusId);
-
-        if (! empty($validated['search'])) {
-            $search = $validated['search'];
-            $studentsQuery->where(function ($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        if (! empty($validated['program_id'])) {
-            $studentsQuery->where('program_id', $validated['program_id']);
-        }
-
-        $students = $studentsQuery->orderBy('created_at', 'desc')->paginate(15);
-
-        $programs = Program::get();
-        $semesters = Semester::orderBy('start_date', 'desc')->get();
-
-        return Inertia::render('students/academic-records/GlobalIndex', [
-            'students' => $students,
-            'programs' => $programs,
-            'semesters' => $semesters,
-            'filters' => $validated,
-        ]);
-    }
-
-    /**
      * Display academic records for a student
      */
     public function index(Student $student, Request $request): Response

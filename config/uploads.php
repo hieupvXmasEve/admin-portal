@@ -108,6 +108,24 @@ return [
             'public' => false,
             'disk' => env('FORM_ATTACHMENT_STORAGE_DRIVER', 'local'),
         ],
+        'action_attachment' => [
+            'max_size' => env('ACTION_ATTACHMENT_MAX_SIZE', 10240), // KB (10MB)
+            'allowed_types' => [
+                'image/jpeg',
+                'image/png',
+                'application/pdf',
+            ],
+            'allowed_extensions' => [
+                'jpg',
+                'jpeg',
+                'png',
+                'pdf',
+            ],
+            'directory' => '',
+            'generate_thumbnails' => false,
+            'public' => true,
+            'disk' => 'action-attachments',
+        ],
     ],
 
     /*

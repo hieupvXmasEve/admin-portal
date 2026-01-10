@@ -183,6 +183,9 @@ return [
             'view_report' => 'view_report',
             'create_report' => 'create_report',
             'export_report' => 'export_report',
+
+            // Student action audit page
+            'view_student_action' => 'view_student_action',
         ],
         'events' => [
             'view_event' => 'view_event',

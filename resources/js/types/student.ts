@@ -9,6 +9,7 @@ export enum StudentStatus {
     Dropout = 'dropout',
     DropoutTransfer = 'dropout_transfer',
     Pending = 'pending',
+    AdmissionDeferred = 'admission_deferred',
 }
 
 export const STUDENT_STATUS_LABELS: Record<StudentStatus, string> = {
@@ -22,6 +23,7 @@ export const STUDENT_STATUS_LABELS: Record<StudentStatus, string> = {
     [StudentStatus.Dropout]: 'Dropout',
     [StudentStatus.DropoutTransfer]: 'Dropout Transfer',
     [StudentStatus.Pending]: 'Pending',
+    [StudentStatus.AdmissionDeferred]: 'Admission Deferred',
 };
 
 // Tailwind badge classes
@@ -36,6 +38,7 @@ export const STUDENT_STATUS_BADGE_CLASSES: Record<StudentStatus, string> = {
     [StudentStatus.Dropout]: 'bg-red-100 text-red-800',
     [StudentStatus.DropoutTransfer]: 'bg-red-100 text-red-800',
     [StudentStatus.Pending]: 'bg-yellow-100 text-yellow-800',
+    [StudentStatus.AdmissionDeferred]: 'bg-orange-100 text-orange-800',
 };
 
 export function getStudentStatusLabel(status: string): string {
@@ -60,6 +63,7 @@ export const STUDENT_STATUS_DESCRIPTIONS: Record<StudentStatus, string> = {
     [StudentStatus.Dropout]: 'Bỏ học hẳn, không quay lại',
     [StudentStatus.DropoutTransfer]: 'Bỏ vì chuyển sang nơi khác',
     [StudentStatus.Graduated]: 'Tốt nghiệp',
+    [StudentStatus.AdmissionDeferred]: 'Hoãn nhập học hoặc không đến nhập học',
 };
 
 export function getStudentStatusDescription(status: string): string {

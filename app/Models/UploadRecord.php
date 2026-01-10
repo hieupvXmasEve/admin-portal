@@ -111,14 +111,12 @@ class UploadRecord extends Model
 
     /**
      * Get the URL for the uploaded file.
-     * This overrides the database column if you want to provide a fallback.
+     * Always generate URL from service to ensure it's correct.
      */
     public function getUrlAttribute(?string $value): string
     {
-        if ($value) {
-            return $value;
-        }
-
+        // Always generate URL from service to ensure it's correct
+        // This fixes cases where URL in database might be incorrect
         return app(\App\Services\UploadUrlService::class)->generateUrl($this);
     }
 
@@ -195,7 +193,7 @@ class UploadRecord extends Model
     public function scopeExpired($query)
     {
         return $query->whereNotNull('expires_at')
-                    ->where('expires_at', '<', now());
+            ->where('expires_at', '<', now());
     }
 
     /**
@@ -205,7 +203,7 @@ class UploadRecord extends Model
     {
         return $query->where(function ($query) {
             $query->whereNull('expires_at')
-                  ->orWhere('expires_at', '>=', now());
+                ->orWhere('expires_at', '>=', now());
         });
     }
 }

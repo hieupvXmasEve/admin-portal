@@ -73,14 +73,12 @@ class ImageUploadService
         ?int $userId = null,
         ?int $studentId = null,
         array $metadata = []
-    ): UploadRecord
-    {
+    ): UploadRecord {
         // Validate context
         $this->validateContext($context);
 
         // Get context configuration
         $config = $this->getContextConfig($context);
-
         // Validate file using comprehensive validation service
         $this->validationService->validateFile($file, $config);
 
@@ -99,7 +97,6 @@ class ImageUploadService
         if (!$storedPath) {
             throw new RuntimeException('Failed to store uploaded file');
         }
-
         // Generate URL
         $url = $this->generateUrl($storedPath, $disk, $config);
 
@@ -148,8 +145,7 @@ class ImageUploadService
         ?int $userId = null,
         ?int $studentId = null,
         array $metadata = []
-    ): array
-    {
+    ): array {
         $uploadRecords = [];
         $failedUploads = [];
 

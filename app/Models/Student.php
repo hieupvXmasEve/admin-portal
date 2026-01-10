@@ -24,11 +24,12 @@ class Student extends StudentAuditableModel
      */
     public const BLOCKED_STATUSES = [
         'inactive',
-        'deferred',
+        // 'deferred',
         'dropout',
         'dropout_transfer',
         'graduated',
         'pending',
+        // 'admission_deferred',
     ];
 
     protected $guard = 'student';
@@ -152,7 +153,7 @@ class Student extends StudentAuditableModel
             'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending'],
+            'status' => ['nullable', 'in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending,admission_deferred'],
         ];
     }
 
@@ -343,6 +344,14 @@ class Student extends StudentAuditableModel
         return $this->hasMany(EgcStudentProgress::class);
     }
 
+    /**
+     * Get the student's action logs (administrative actions history).
+     */
+    public function actionLogs(): HasMany
+    {
+        return $this->hasMany(StudentActionLog::class);
+    }
+
     public function hasActiveHolds(): bool
     {
         return $this->academicHolds()->where('status', 'active')->exists();
@@ -441,6 +450,7 @@ class Student extends StudentAuditableModel
             'dropout' => 'Dropout',
             'dropout_transfer' => 'Dropout Transfer',
             'pending' => 'Pending',
+            'admission_deferred' => 'Admission Deferred',
             default => 'Unknown',
         };
     }
@@ -458,6 +468,7 @@ class Student extends StudentAuditableModel
             'dropout' => 'red',
             'dropout_transfer' => 'red',
             'pending' => 'yellow',
+            'admission_deferred' => 'orange',
             default => 'gray',
         };
     }
@@ -487,89 +498,11 @@ class Student extends StudentAuditableModel
     }
 
     /**
-     * Get the student's current EGC progress record.
-     */
-    public function currentEgcProgress(): ?EgcStudentProgress
-    {
-        return $this->egcProgress()
-            ->whereIn('status', [EgcStudentProgress::STATUS_ASSIGNED, EgcStudentProgress::STATUS_IN_PROGRESS])
-            ->latest('assigned_date')
-            ->first();
-    }
-
-    /**
      * Check if the student is an EGC student.
      */
     public function isEgcStudent(): bool
     {
         return $this->status === 'intake_pre_uni_gc';
-    }
-
-    /**
-     * Check if the student can transition to intake_course status.
-     */
-    public function canTransitionToIntakeCourse(): bool
-    {
-        return $this->isEgcStudent() && $this->hasCompletedAllRequiredEgcLevels();
-    }
-
-    /**
-     * Check if the student has completed all required EGC levels.
-     */
-    public function hasCompletedAllRequiredEgcLevels(): bool
-    {
-        // Get the highest EGC level (ENG_LV6)
-        $highestLevel = EgcLevel::where('is_active', true)
-            ->orderByDesc('sequence_order')
-            ->first();
-
-        if (! $highestLevel) {
-            return false;
-        }
-
-        // Check if student has completed the highest level
-        return $this->egcProgress()
-            ->where('egc_level_id', $highestLevel->id)
-            ->where('status', EgcStudentProgress::STATUS_COMPLETED)
-            ->exists();
-    }
-
-    /**
-     * Get the student's current EGC level.
-     */
-    public function getCurrentEgcLevel(): ?EgcLevel
-    {
-        $currentProgress = $this->currentEgcProgress();
-
-        return $currentProgress?->egcLevel;
-    }
-
-    /**
-     * Get the student's next required EGC level.
-     */
-    public function getNextRequiredEgcLevel(): ?EgcLevel
-    {
-        $currentLevel = $this->getCurrentEgcLevel();
-
-        if (! $currentLevel) {
-            // Return the first level if no current level
-            return EgcLevel::where('is_active', true)
-                ->orderBy('sequence_order')
-                ->first();
-        }
-
-        return $currentLevel->getNextLevel();
-    }
-
-    /**
-     * Get all completed EGC levels for this student.
-     */
-    public function getCompletedEgcLevels(): \Illuminate\Database\Eloquent\Collection
-    {
-        return EgcLevel::whereHas('studentProgress', function ($query) {
-            $query->where('student_id', $this->id)
-                ->where('status', EgcStudentProgress::STATUS_COMPLETED);
-        })->orderBy('sequence_order')->get();
     }
 
     protected static function boot()

@@ -41,7 +41,7 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => env('APP_URL').'/storage',
+            'url' => env('APP_URL') . '/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
@@ -74,7 +74,7 @@ return [
         'images' => [
             'driver' => env('IMAGE_STORAGE_DRIVER', 'local'),
             'root' => storage_path('app/public/images'),
-            'url' => env('APP_URL').'/storage/images',
+            'url' => env('APP_URL') . '/storage/images',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
@@ -91,7 +91,7 @@ return [
         'avatars' => [
             'driver' => env('AVATAR_STORAGE_DRIVER', 'local'),
             'root' => storage_path('app/public/avatars'),
-            'url' => env('AVATAR_URL', env('APP_URL').'/storage/avatars'),
+            'url' => env('AVATAR_URL', env('APP_URL') . '/storage/avatars'),
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
@@ -121,6 +121,23 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
         ],
 
+        'action-attachments' => [
+            'driver' => env('ACTION_ATTACHMENT_STORAGE_DRIVER', 'local'),
+            'root' => storage_path('app/public/action-attachments'),
+            'url' => env('APP_URL') . '/storage/action-attachments',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+            // S3 configuration (used when driver is 's3')
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_BUCKET'),
+            // 'url' => env('AWS_URL'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+        ],
+
     ],
 
     /*
@@ -138,6 +155,8 @@ return [
         public_path('storage') => storage_path('app/public'),
         public_path('storage/images') => storage_path('app/public/images'),
         public_path('storage/avatars') => storage_path('app/public/avatars'),
+        public_path('storage/assignments') => storage_path('app/private/assignments'),
+        public_path('storage/action-attachments') => storage_path('app/public/action-attachments'),
     ],
 
 ];

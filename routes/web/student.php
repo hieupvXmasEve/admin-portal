@@ -9,6 +9,8 @@ use App\Http\Controllers\Web\ProgramChangeController;
 use App\Http\Controllers\Web\StudentAcademicSummaryController;
 use App\Http\Controllers\Web\StudentController;
 use App\Http\Controllers\Web\StudentStatusController;
+use App\Modules\Academic\Http\Web\Admin\StudentActionAuditController;
+use App\Modules\Academic\Http\Web\Admin\StudentActionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -135,11 +137,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name(StudentRoutes::ACADEMIC_SUMMARY_COURSE_SCORES);
     });
 
-    // Academic Records Management - General Access (for menu)
-    Route::prefix('academic-records')->name('academic-records.')->group(function () {
-        Route::get('/', [AcademicRecordController::class, 'globalIndex'])->name('index');
-        Route::get('/analytics', [AcademicRecordController::class, 'analytics'])->name('analytics');
-    });
 
     // Academic Records Management - Student Specific
     Route::prefix('students/{student}/academic-records')->name('students.academic-records.')->group(function () {
@@ -200,4 +197,45 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Grade Distribution API
     Route::get('/units/{unit}/grade-distribution', [AcademicRecordController::class, 'gradeDistribution'])
         ->name('units.grade-distribution');
+
+    // ==========================================================
+    // Student Administrative Actions (Audit & Status Changes)
+    // ==========================================================
+
+    // Student Action History (within student context)
+    Route::prefix('students/{student}/actions')->name('students.actions.')->group(function () {
+        Route::get('/', [StudentActionController::class, 'index'])
+            ->middleware('can:view_student_action')
+            ->name('index');
+
+        Route::post('/', [StudentActionController::class, 'store'])
+            ->middleware('can:change_student_status')
+            ->name('store');
+    });
+
+    // Individual action log routes
+
+
+    // Student Actions Audit/Reports
+    Route::prefix('reports/student-actions')->name('reports.student-actions.')->group(function () {
+        Route::get('/', [StudentActionAuditController::class, 'index'])
+            ->middleware('can:view_student_action')
+            ->name('index');
+
+        Route::get('/export', [StudentActionAuditController::class, 'export'])
+            ->middleware('can:view_student_action')
+            ->name('export');
+
+        Route::get('/{actionLog}', [StudentActionController::class, 'show'])
+            ->middleware('can:view_student_action')
+            ->name('show');
+
+        Route::put('/{actionLog}', [StudentActionController::class, 'update'])
+            ->middleware('can:change_student_status')
+            ->name('update');
+
+        Route::post('/{actionLog}/attachments', [StudentActionController::class, 'uploadAttachment'])
+            ->middleware('can:change_student_status')
+            ->name('attachments.store');
+    });
 });
