@@ -94,55 +94,55 @@ class StudentService
 
             // Handle parent user update/creation
             // Rule: One user can only be parent of one student
-            if ($parentName !== null || $parentEmail !== null) {
-                if ($student->parent_user_id) {
-                    // Student has a parent user - update it
-                    $parentUser = $student->parentUser;
-                    if ($parentUser) {
-                        $updateData = [];
+            if ($parentEmail !== null) {
+                // Find or create parent user based on email
+                $parentUser = User::where('email', $parentEmail)->first();
 
-                        // Update email if provided and different
-                        if ($parentEmail !== null && $parentEmail !== $parentUser->email) {
-                            $updateData['email'] = $parentEmail;
-                        }
-
-                        // Update name if provided
-                        if ($parentName !== null) {
-                            $updateData['name'] = $parentName;
-                        }
-
-                        // Apply updates if any
-                        if (!empty($updateData)) {
-                            $parentUser->update($updateData);
-                        }
-                    }
-                } elseif ($parentEmail !== null) {
-                    // Student doesn't have a parent user - find or create one
-                    $parentUser = User::where('email', $parentEmail)->first();
-
-                    if (!$parentUser) {
-                        // Create new parent user
-                        $parentUser = User::create([
-                            'name' => $parentName ?? 'Parent',
-                            'email' => $parentEmail,
-                            'status' => User::STATUS_ACTIVE,
-                        ]);
-                    } else {
-                        // Check if this user is already a parent of another student
-                        $existingStudent = Student::where('parent_user_id', $parentUser->id)->first();
-
-                        if ($existingStudent) {
-                            throw new \Exception('This email is already linked to another student as parent.');
-                        }
-
-                        // Update existing user if name is provided
-                        if ($parentName !== null) {
-                            $parentUser->update(['name' => $parentName]);
-                        }
+                if ($parentUser) {
+                    // Prevent using a student account as parent
+                    if ($parentUser->isStudent()) {
+                        throw new \Exception('Cannot use a student account as parent. The email belongs to a student.');
                     }
 
-                    // Link parent user to student
-                    $student->update(['parent_user_id' => $parentUser->id]);
+                    // Prevent student from assigning themselves as parent
+                    if ($student->user_id && $parentUser->id === $student->user_id) {
+                        throw new \Exception('A student cannot be assigned as their own parent.');
+                    }
+
+                    // Check if this user is already a parent of another student
+                    $existingStudent = Student::where('parent_user_id', $parentUser->id)
+                        ->where('id', '!=', $student->id)
+                        ->first();
+
+                    if ($existingStudent) {
+                        throw new \Exception('This email is already linked to another student as parent.');
+                    }
+
+                    // Update existing user if name is provided
+                    if ($parentName !== null) {
+                        $parentUser->update(['name' => $parentName]);
+                    }
+
+                    // Ensure user type is set to PARENT if not already set
+                    if (! $parentUser->isParent()) {
+                        $parentUser->update(['type' => \App\Shared\Support\Enums\UserType::PARENT]);
+                    }
+                } else {
+                    // Create new parent user
+                    $parentUser = User::create([
+                        'name' => $parentName ?? 'Parent',
+                        'email' => $parentEmail,
+                        'status' => User::STATUS_ACTIVE,
+                        'type' => \App\Shared\Support\Enums\UserType::PARENT,
+                    ]);
+                }
+
+                // Link parent user to student
+                $student->update(['parent_user_id' => $parentUser->id]);
+            } elseif ($parentName !== null && $student->parent_user_id) {
+                // If only name provided and parent exists, update name of existing parent
+                if ($student->parentUser) {
+                    $student->parentUser->update(['name' => $parentName]);
                 }
             }
 
@@ -215,7 +215,7 @@ class StudentService
             // Log the creation and admission
             Log::info('Student created and admitted', [
                 'student_id' => $student->id,
-                'student_id' => $student->student_id,
+                'student_code' => $student->student_id,
                 'campus_id' => $campusId,
                 'admission_date' => $data['admission_date'],
             ]);
