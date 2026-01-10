@@ -153,7 +153,7 @@ class Student extends StudentAuditableModel
             'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending,admission_deferred'],
+            'status' => ['nullable', 'suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending,admission_deferred'],
         ];
     }
 
@@ -440,8 +440,8 @@ class Student extends StudentAuditableModel
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
-            'active' => 'Active',
-            'inactive' => 'Inactive',
+            // 'active' => 'Active',
+            // 'inactive' => 'Inactive',
             'suspended' => 'Suspended',
             'graduated' => 'Graduated',
             'intake_pre_uni_gc' => 'Intake Pre-Uni GC',
@@ -458,8 +458,8 @@ class Student extends StudentAuditableModel
     public function getStatusColorAttribute(): string
     {
         return match ($this->status) {
-            'active' => 'green',
-            'inactive' => 'gray',
+            // 'active' => 'green',
+            // 'inactive' => 'gray',
             'suspended' => 'red',
             'graduated' => 'blue',
             'intake_pre_uni_gc' => 'yellow',

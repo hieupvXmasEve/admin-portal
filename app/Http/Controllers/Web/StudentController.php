@@ -46,7 +46,7 @@ class StudentController extends Controller
         $validated = $request->validate([
             'search' => 'nullable|string|max:255',
             'program_id' => 'nullable|integer|exists:programs,id',
-            'status' => 'nullable|string|in:active,inactive,suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending',
+            'status' => 'nullable|string|in:suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending,admission_deferred',
             'sort' => 'nullable|string|in:student_id,full_name,email,admission_date,created_at,gc_starting_level,gc_current_level,gc_total_levels',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:5|max:100',
@@ -604,7 +604,7 @@ class StudentController extends Controller
     /**
      * Export students to Excel or CSV
      */
-    public function export(Request $request): BinaryFileResponse|JsonResponse
+    public function export(Request $request): BinaryFileResponse|JsonResponse|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
 

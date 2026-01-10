@@ -4,17 +4,18 @@ namespace App\Exports;
 
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class StudentExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
+class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping, WithStyles
 {
     protected Builder $query;
+
     protected array $filters;
 
     public function __construct(Builder $query, array $filters = [])
@@ -32,7 +33,7 @@ class StudentExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoS
             'curriculumVersion:id,version_code',
             'curriculumVersion.curriculumUnits.unit:id,credit_points',
             'curriculumVersion.curriculumUnits.semester:id',
-            'statusChangedBy:id,full_name',
+            'statusChangedBy:id,name',
             'intakeSemester:id,name,code',
             'scholarshipAward.scholarship:code,name',
         ]);
@@ -51,6 +52,7 @@ class StudentExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoS
             'Current Ward',
             'Current Province',
             'Current Country',
+            'National ID',
             'CCCD Address Line',
             'CCCD Ward',
             'CCCD Province',
@@ -126,6 +128,7 @@ class StudentExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoS
             $student->current_ward ?? '',
             $student->current_province ?? '',
             $student->current_country ?? '',
+            $student->national_id ?? '',
             $student->cccd_address_line ?? '',
             $student->cccd_ward ?? '',
             $student->cccd_province ?? '',

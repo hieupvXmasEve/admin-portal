@@ -471,13 +471,12 @@ const exportStudents = async () => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="active">Active</SelectItem>
-                                <SelectItem value="inactive">Inactive</SelectItem>
                                 <SelectItem value="suspended">Suspended</SelectItem>
                                 <SelectItem value="graduated">Graduated</SelectItem>
                                 <SelectItem value="intake_pre_uni_gc">Intake Pre-Uni GC</SelectItem>
                                 <SelectItem value="intake_course">Intake Course</SelectItem>
                                 <SelectItem value="deferred">Deferred</SelectItem>
+                                <SelectItem value="admission_deferred">Admission Deferred</SelectItem>
                                 <SelectItem value="dropout">Dropout</SelectItem>
                                 <SelectItem value="dropout_transfer">Dropout Transfer</SelectItem>
                                 <SelectItem value="pending">Pending</SelectItem>
