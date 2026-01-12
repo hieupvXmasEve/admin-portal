@@ -21,7 +21,7 @@ return [
 
     'allowed_origins' => [env('VITE_APP_URL_FE', 'http://localhost:3000'), env('VITE_APP_URL_FE_LECTURE', 'http://localhost:3001'), 'http://localhost:3000'],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => ['#^https?://.*\.asia-vn\.edu\.vn$#', '#^https?://.*\.metropolia\.edu\.vn$#'],
 
     'allowed_headers' => ['*'],
 
