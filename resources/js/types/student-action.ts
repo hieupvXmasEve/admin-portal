@@ -130,7 +130,6 @@ export interface StudentActionLog {
     action_type_label_en?: string;
     formatted_changed_at?: string;
     formatted_signed_at?: string;
-    formatted_effective_at?: string;
     summary?: string;
 }
 

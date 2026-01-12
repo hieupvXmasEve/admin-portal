@@ -9,6 +9,8 @@ use App\Http\Controllers\Web\ProgramChangeController;
 use App\Http\Controllers\Web\StudentAcademicSummaryController;
 use App\Http\Controllers\Web\StudentController;
 use App\Http\Controllers\Web\StudentStatusController;
+use App\Modules\Academic\Http\Web\Admin\AcademicPlacementController;
+use App\Modules\Academic\Http\Web\Admin\AcademicProgressionAuditController;
 use App\Modules\Academic\Http\Web\Admin\StudentActionAuditController;
 use App\Modules\Academic\Http\Web\Admin\StudentActionController;
 use Illuminate\Support\Facades\Route;
@@ -197,6 +199,53 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Grade Distribution API
     Route::get('/units/{unit}/grade-distribution', [AcademicRecordController::class, 'gradeDistribution'])
         ->name('units.grade-distribution');
+
+    // ==========================================================
+    // Academic Placement & Progression
+    // ==========================================================
+
+    // Student Placement & Progression (within student context)
+    Route::prefix('students/{student}/placement')->name('students.placement.')->group(function () {
+        Route::get('/', [AcademicPlacementController::class, 'show'])
+            ->middleware('can:view_student')
+            ->name('index');
+
+        Route::post('/initialize', [AcademicPlacementController::class, 'initializePlacement'])
+            ->middleware('can:change_student_status')
+            ->name('initialize');
+
+        Route::post('/ielts', [AcademicPlacementController::class, 'recordIelts'])
+            ->middleware('can:change_student_status')
+            ->name('ielts.store');
+
+        Route::post('/level', [AcademicPlacementController::class, 'updateLevel'])
+            ->middleware('can:change_student_status')
+            ->name('level.update');
+
+        Route::post('/transition', [AcademicPlacementController::class, 'transitionToIntake'])
+            ->middleware('can:change_student_status')
+            ->name('transition');
+    });
+
+    // IELTS Certificate document upload
+    Route::post('/ielts-certificates/{certificate}/document', [AcademicPlacementController::class, 'uploadIeltsDocument'])
+        ->middleware('can:change_student_status')
+        ->name('students.ielts-certificates.document.upload');
+
+    // Academic Progression Audit Reports
+    Route::prefix('reports/academic-progression')->name('reports.academic-progression.')->group(function () {
+        Route::get('/', [AcademicProgressionAuditController::class, 'index'])
+            ->middleware('can:view_student_action')
+            ->name('index');
+
+        Route::get('/missing-documents', [AcademicProgressionAuditController::class, 'missingDocuments'])
+            ->middleware('can:view_student_action')
+            ->name('missing-documents');
+
+        Route::get('/export', [AcademicProgressionAuditController::class, 'export'])
+            ->middleware('can:view_student_action')
+            ->name('export');
+    });
 
     // ==========================================================
     // Student Administrative Actions (Audit & Status Changes)

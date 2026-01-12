@@ -185,6 +185,19 @@ export const studentRoutes = {
     studentStatusActionShow: (id: number) => route('reports.student-actions.show', { actionLog: id }),
     studentStatusActionUpdate: (id: number) => route('reports.student-actions.update', { actionLog: id }),
     studentStatusActionAttachmentsStore: (id: number) => route('reports.student-actions.attachments.store', { actionLog: id }),
+
+    // Academic Placement & Progression
+    studentPlacement: (id: number) => route('students.placement.index', { student: id }),
+    studentPlacementInitialize: (id: number) => route('students.placement.initialize', { student: id }),
+    studentPlacementIeltsStore: (id: number) => route('students.placement.ielts.store', { student: id }),
+    studentPlacementLevelUpdate: (id: number) => route('students.placement.level.update', { student: id }),
+    studentPlacementTransition: (id: number) => route('students.placement.transition', { student: id }),
+    ieltsCertificateDocumentUpload: (id: number) => route('students.ielts-certificates.document.upload', { certificate: id }),
+
+    // Academic Progression Audit Reports
+    academicProgressionAudit: () => route('reports.academic-progression.index'),
+    academicProgressionMissingDocuments: () => route('reports.academic-progression.missing-documents'),
+    academicProgressionExport: () => route('reports.academic-progression.export'),
 } as const;
 
 // Lecturer Management Routes

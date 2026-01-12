@@ -126,6 +126,24 @@ return [
             'public' => true,
             'disk' => 'action-attachments',
         ],
+        'ielts_certificate' => [
+            'max_size' => env('ACTION_ATTACHMENT_MAX_SIZE', 10240), // KB (10MB)
+            'allowed_types' => [
+                'image/jpeg',
+                'image/png',
+                'application/pdf',
+            ],
+            'allowed_extensions' => [
+                'jpg',
+                'jpeg',
+                'png',
+                'pdf',
+            ],
+            'directory' => '',
+            'generate_thumbnails' => false,
+            'public' => true,
+            'disk' => 'ielts-certificates',
+        ],
     ],
 
     /*

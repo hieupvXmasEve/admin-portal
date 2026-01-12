@@ -138,6 +138,23 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
         ],
 
+        'ielts-certificates' => [
+            'driver' => env('ACTION_ATTACHMENT_STORAGE_DRIVER', 'local'),
+            'root' => storage_path('app/public/ielts-certificates'),
+            'url' => env('APP_URL') . '/storage/ielts-certificates',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+            // S3 configuration (used when driver is 's3')
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_BUCKET'),
+            // 'url' => env('AWS_URL'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+        ],
+
     ],
 
     /*

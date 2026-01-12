@@ -32,6 +32,7 @@ import {
     Settings2,
     ShieldCheck,
     Ticket,
+    TrendingUp,
     Trophy,
     User,
     UserPlus,
@@ -322,6 +323,13 @@ export const mainNavItems: NavItem[] = [
                 title: 'Student Actions',
                 href: studentRoutes.studentStatusAction(),
                 icon: ClipboardCheck,
+                requiredPermissions: ['view_student_action'],
+            },
+            // Academic Progression Audit
+            {
+                title: 'Academic Progression',
+                href: studentRoutes.academicProgressionAudit(),
+                icon: TrendingUp,
                 requiredPermissions: ['view_student_action'],
             },
         ],

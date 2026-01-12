@@ -352,6 +352,61 @@ class Student extends StudentAuditableModel
         return $this->hasMany(StudentActionLog::class);
     }
 
+    /**
+     * Get the student's IELTS certificates.
+     */
+    public function ieltsCertificates(): HasMany
+    {
+        return $this->hasMany(IeltsCertificate::class);
+    }
+
+    /**
+     * Get the student's academic progression events.
+     */
+    public function academicProgressionEvents(): HasMany
+    {
+        return $this->hasMany(AcademicProgressionEvent::class);
+    }
+
+    /**
+     * Get the latest IELTS certificate for the student.
+     */
+    public function getLatestIeltsCertificate(): ?IeltsCertificate
+    {
+        return $this->ieltsCertificates()->latestFirst()->first();
+    }
+
+    /**
+     * Check if student has valid IELTS score for intake_course.
+     */
+    public function hasValidIeltsForIntakeCourse(): bool
+    {
+        return $this->ieltsCertificates()
+            ->meetsThreshold()
+            ->exists();
+    }
+
+    /**
+     * Get the course stage label.
+     */
+    public function getCourseStageAttribute(): ?string
+    {
+        return match ($this->status) {
+            'intake_pre_uni_gc' => 'intake_pre_uni_gc',
+            'intake_course' => 'intake_course',
+            default => null,
+        };
+    }
+
+    /**
+     * Check if student can transition to intake_course.
+     */
+    public function canTransitionToIntakeCourse(): bool
+    {
+        return $this->status === 'intake_pre_uni_gc'
+            && $this->hasValidIeltsForIntakeCourse();
+    }
+
     public function hasActiveHolds(): bool
     {
         return $this->academicHolds()->where('status', 'active')->exists();
