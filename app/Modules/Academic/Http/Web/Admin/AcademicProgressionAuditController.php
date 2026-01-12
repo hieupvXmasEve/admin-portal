@@ -35,7 +35,6 @@ class AcademicProgressionAuditController extends Controller
             'ielts_score_min' => ['nullable', 'numeric', 'min:0', 'max:9'],
             'ielts_score_max' => ['nullable', 'numeric', 'min:0', 'max:9'],
             'missing_documents' => ['nullable', 'boolean'],
-            'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
@@ -46,7 +45,7 @@ class AcademicProgressionAuditController extends Controller
         // Get statistics if semester is selected
         $statistics = null;
         if (! empty($validated['semester_id'])) {
-            $statistics = $this->auditQuery->getStatistics($validated['semester_id']);
+            $statistics = $this->auditQuery->getStatistics((int) $validated['semester_id']);
         }
 
         return Inertia::render('Admin/Reports/AcademicProgressionAudit/Index', [
@@ -76,7 +75,7 @@ class AcademicProgressionAuditController extends Controller
     public function missingDocuments(Request $request): Response
     {
         $validated = $request->validate([
-            'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
+            'search' => ['nullable', 'string', 'max:255'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -85,14 +84,8 @@ class AcademicProgressionAuditController extends Controller
         return Inertia::render('Admin/Reports/AcademicProgressionAudit/MissingDocuments', [
             'certificates' => $missingDocs,
             'filters' => [
-                'campus_id' => $validated['campus_id'] ?? null,
+                'search' => $validated['search'] ?? null,
                 'per_page' => $validated['per_page'] ?? 25,
-            ],
-            'options' => [
-                'campuses' => Campus::query()
-                    ->select('id', 'name', 'code')
-                    ->orderBy('name')
-                    ->get(),
             ],
         ]);
     }

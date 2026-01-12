@@ -88,7 +88,7 @@ const navigateQuestion = (direction: 'prev' | 'next') => {
     const idx = currentQuestionIndex.value;
     if (idx === -1) return;
 
-    let newIdx = direction === 'next' ? idx + 1 : idx - 1;
+    const newIdx = direction === 'next' ? idx + 1 : idx - 1;
     if (newIdx >= 0 && newIdx < allQuestions.value.length) {
         selectedQuestionId.value = String(allQuestions.value[newIdx].id);
     }

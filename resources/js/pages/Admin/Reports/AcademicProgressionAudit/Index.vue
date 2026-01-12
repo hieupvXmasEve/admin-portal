@@ -7,11 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { useTableFilters } from '@/composables/useFilters';
+import type { PaginatedResponse } from '@/types';
 import { formatDateToShort } from '@/utils/date';
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
-import { AlertCircle, Download, FileText, Filter, RefreshCw, Search, TrendingUp, Users } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { AlertCircle, Download, FileText, Filter, RefreshCw, TrendingUp, Users } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 
 interface Semester {
@@ -42,8 +43,10 @@ interface IeltsCertificate {
 
 interface ProgressionEvent {
     id: number;
-    event_type: { value: string; labelEn: string };
-    trigger_source: { value: string; label: string };
+    event_type: string;
+    event_type_label_en: string;
+    trigger_source: string;
+    trigger_source_label: string;
     from_course_stage: string | null;
     to_course_stage: string | null;
     from_english_level: number | null;
@@ -68,113 +71,54 @@ interface Statistics {
     missing_ielts_docs: number;
 }
 
+interface AuditFilters {
+    semester_id: number | null;
+    event_type: string | null;
+    trigger_source: string | null;
+    from_course_stage: string | null;
+    to_course_stage: string | null;
+    ielts_score_min: number | null;
+    ielts_score_max: number | null;
+    missing_documents: boolean | null;
+    from_date: string | null;
+    to_date: string | null;
+    per_page: number;
+}
+
 interface Props {
-    progressionEvents: {
-        data: ProgressionEvent[];
-        links: any;
-        meta: any;
-    };
+    progressionEvents: PaginatedResponse<ProgressionEvent>;
     statistics: Statistics | null;
-    filters: {
-        semester_id: number | null;
-        event_type: string | null;
-        trigger_source: string | null;
-        from_course_stage: string | null;
-        to_course_stage: string | null;
-        ielts_score_min: number | null;
-        ielts_score_max: number | null;
-        missing_documents: boolean | null;
-        campus_id: number | null;
-        from_date: string | null;
-        to_date: string | null;
-        per_page: number;
-    };
+    filters: AuditFilters;
     options: {
         eventTypes: { value: string; label: string; labelEn: string }[];
         triggerSources: { value: string; label: string }[];
         semesters: Semester[];
-        campuses: Campus[];
         courseStages: { value: string; label: string }[];
     };
 }
 
 const props = defineProps<Props>();
 
-// Local filter state
-const localFilters = ref({
-    semester_id: props.filters.semester_id ? String(props.filters.semester_id) : 'all',
-    event_type: props.filters.event_type ?? 'all',
-    trigger_source: props.filters.trigger_source ?? 'all',
-    to_course_stage: props.filters.to_course_stage ?? 'all',
-    campus_id: props.filters.campus_id ? String(props.filters.campus_id) : 'all',
-    ielts_score_min: props.filters.ielts_score_min ? String(props.filters.ielts_score_min) : '',
-    ielts_score_max: props.filters.ielts_score_max ? String(props.filters.ielts_score_max) : '',
-    from_date: props.filters.from_date ?? '',
-    to_date: props.filters.to_date ?? '',
-});
-
-const isFiltering = ref(false);
-
-// Helper to convert 'all' to undefined for API
-const filterValue = (value: string) => (value === 'all' || value === '' ? undefined : value);
-
-// Apply filters
-const applyFilters = () => {
-    isFiltering.value = true;
-    router.visit(studentRoutes.academicProgressionAudit(), {
-        data: {
-            semester_id: filterValue(localFilters.value.semester_id),
-            event_type: filterValue(localFilters.value.event_type),
-            trigger_source: filterValue(localFilters.value.trigger_source),
-            to_course_stage: filterValue(localFilters.value.to_course_stage),
-            campus_id: filterValue(localFilters.value.campus_id),
-            ielts_score_min: localFilters.value.ielts_score_min || undefined,
-            ielts_score_max: localFilters.value.ielts_score_max || undefined,
-            from_date: localFilters.value.from_date || undefined,
-            to_date: localFilters.value.to_date || undefined,
-        },
-        preserveState: true,
-        preserveScroll: true,
-        onFinish: () => {
-            isFiltering.value = false;
-        },
-    });
-};
-
-const resetFilters = () => {
-    localFilters.value = {
-        semester_id: 'all',
-        event_type: 'all',
-        trigger_source: 'all',
-        to_course_stage: 'all',
-        campus_id: 'all',
-        ielts_score_min: '',
-        ielts_score_max: '',
-        from_date: '',
-        to_date: '',
-    };
-    applyFilters();
-};
+const { filters, applyFilters, clearFilters, handlePaginationNavigate, handlePageSizeChange, updateFieldDebounced } = useTableFilters<AuditFilters>(studentRoutes.academicProgressionAudit(), props.filters, [
+    'progressionEvents',
+    'statistics',
+    'filters',
+]);
 
 const handleExport = () => {
-    if (localFilters.value.semester_id === 'all') {
+    if (!filters.value.semester_id) {
         toast.error('Please select a semester before exporting');
         return;
     }
 
     const params = new URLSearchParams({
-        semester_id: localFilters.value.semester_id,
+        semester_id: String(filters.value.semester_id),
     });
 
-    if (localFilters.value.event_type) params.append('event_type', localFilters.value.event_type);
-    if (localFilters.value.trigger_source) params.append('trigger_source', localFilters.value.trigger_source);
-    if (localFilters.value.campus_id) params.append('campus_id', localFilters.value.campus_id);
+    if (filters.value.event_type) params.append('event_type', filters.value.event_type);
+    if (filters.value.trigger_source) params.append('trigger_source', filters.value.trigger_source);
 
     window.location.href = `${studentRoutes.academicProgressionExport()}?${params.toString()}`;
-};
-
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, { preserveState: true, preserveScroll: true });
 };
 
 const getEventTypeBadgeVariant = (eventType: string) => {
@@ -209,7 +153,7 @@ const goToStudentPlacement = (studentId: number) => {
             </div>
 
             <div class="flex gap-2">
-                <Button variant="outline" @click="handleExport" :disabled="!localFilters.semester_id">
+                <Button variant="outline" @click="handleExport" :disabled="!filters.semester_id">
                     <Download class="mr-2 h-4 w-4" />
                     Export CSV
                 </Button>
@@ -285,7 +229,7 @@ const goToStudentPlacement = (studentId: number) => {
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <div class="space-y-2">
                         <Label>Semester</Label>
-                        <Select v-model="localFilters.semester_id">
+                        <Select :model-value="filters.semester_id?.toString() ?? 'all'" @update:model-value="(val) => applyFilters({ semester_id: val === 'all' ? null : Number(val) })">
                             <SelectTrigger>
                                 <SelectValue placeholder="All semesters" />
                             </SelectTrigger>
@@ -300,7 +244,7 @@ const goToStudentPlacement = (studentId: number) => {
 
                     <div class="space-y-2">
                         <Label>Event Type</Label>
-                        <Select v-model="localFilters.event_type">
+                        <Select :model-value="filters.event_type ?? 'all'" @update:model-value="(val) => applyFilters({ event_type: val === 'all' ? null : val })">
                             <SelectTrigger>
                                 <SelectValue placeholder="All types" />
                             </SelectTrigger>
@@ -315,7 +259,7 @@ const goToStudentPlacement = (studentId: number) => {
 
                     <div class="space-y-2">
                         <Label>Trigger Source</Label>
-                        <Select v-model="localFilters.trigger_source">
+                        <Select :model-value="filters.trigger_source ?? 'all'" @update:model-value="(val) => applyFilters({ trigger_source: val === 'all' ? null : val })">
                             <SelectTrigger>
                                 <SelectValue placeholder="All sources" />
                             </SelectTrigger>
@@ -329,23 +273,8 @@ const goToStudentPlacement = (studentId: number) => {
                     </div>
 
                     <div class="space-y-2">
-                        <Label>Campus</Label>
-                        <Select v-model="localFilters.campus_id">
-                            <SelectTrigger>
-                                <SelectValue placeholder="All campuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All campuses</SelectItem>
-                                <SelectItem v-for="campus in options.campuses" :key="campus.id" :value="String(campus.id)">
-                                    {{ campus.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div class="space-y-2">
                         <Label>To Stage</Label>
-                        <Select v-model="localFilters.to_course_stage">
+                        <Select :model-value="filters.to_course_stage ?? 'all'" @update:model-value="(val) => applyFilters({ to_course_stage: val === 'all' ? null : val })">
                             <SelectTrigger>
                                 <SelectValue placeholder="All stages" />
                             </SelectTrigger>
@@ -361,25 +290,21 @@ const goToStudentPlacement = (studentId: number) => {
                     <div class="space-y-2">
                         <Label>IELTS Score Range</Label>
                         <div class="flex gap-2">
-                            <Input v-model="localFilters.ielts_score_min" type="number" step="0.5" min="0" max="9" placeholder="Min" />
-                            <Input v-model="localFilters.ielts_score_max" type="number" step="0.5" min="0" max="9" placeholder="Max" />
+                            <Input :model-value="filters.ielts_score_min ?? ''" @update:model-value="(val) => updateFieldDebounced('ielts_score_min', val ? Number(val) : null)" type="number" step="0.5" min="0" max="9" placeholder="Min" />
+                            <Input :model-value="filters.ielts_score_max ?? ''" @update:model-value="(val) => updateFieldDebounced('ielts_score_max', val ? Number(val) : null)" type="number" step="0.5" min="0" max="9" placeholder="Max" />
                         </div>
                     </div>
 
                     <div class="space-y-2">
                         <Label>Date Range</Label>
                         <div class="flex gap-2">
-                            <Input v-model="localFilters.from_date" type="date" />
-                            <Input v-model="localFilters.to_date" type="date" />
+                            <Input :model-value="filters.from_date ?? ''" @update:model-value="(val) => updateFieldDebounced('from_date', String(val))" type="date" />
+                            <Input :model-value="filters.to_date ?? ''" @update:model-value="(val) => updateFieldDebounced('to_date', String(val))" type="date" />
                         </div>
                     </div>
 
                     <div class="flex items-end gap-2">
-                        <Button @click="applyFilters" :disabled="isFiltering">
-                            <Search class="mr-2 h-4 w-4" />
-                            Apply
-                        </Button>
-                        <Button variant="outline" @click="resetFilters">
+                        <Button variant="outline" @click="clearFilters">
                             <RefreshCw class="mr-2 h-4 w-4" />
                             Reset
                         </Button>
@@ -392,7 +317,7 @@ const goToStudentPlacement = (studentId: number) => {
         <Card>
             <CardHeader>
                 <CardTitle>Progression Events</CardTitle>
-                <CardDescription> {{ progressionEvents.meta?.total ?? progressionEvents.data.length }} events found </CardDescription>
+                <CardDescription> {{ progressionEvents.total }} events found </CardDescription>
             </CardHeader>
             <CardContent>
                 <div v-if="progressionEvents.data.length === 0" class="py-12 text-center">
@@ -424,12 +349,12 @@ const goToStudentPlacement = (studentId: number) => {
                                 </td>
                                 <td class="px-4 py-3">
                                     <Badge :variant="getEventTypeBadgeVariant(event.event_type)">
-                                        {{ event.event_type }}
+                                        {{ event.event_type_label_en }}
                                     </Badge>
                                 </td>
                                 <td class="px-4 py-3">
                                     <p>{{ event.summary }}</p>
-                                    <Badge variant="outline" class="mt-1">{{ event.trigger_source }}</Badge>
+                                    <Badge variant="outline" class="mt-1">{{ event.trigger_source_label }}</Badge>
                                 </td>
                                 <td class="px-4 py-3">
                                     <template v-if="event.ielts_certificate">
@@ -448,7 +373,7 @@ const goToStudentPlacement = (studentId: number) => {
 
                 <Separator class="my-4" />
 
-                <DataPagination :pagination-data="progressionEvents" @navigate="handlePaginationNavigate" />
+                <DataPagination :pagination-data="progressionEvents" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
             </CardContent>
         </Card>
     </div>

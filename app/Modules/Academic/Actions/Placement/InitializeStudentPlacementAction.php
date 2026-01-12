@@ -60,13 +60,13 @@ class InitializeStudentPlacementAction
                 $ieltsScore = (float) $data['ielts_score'];
 
                 if ($ieltsScore >= IeltsCertificate::SCORE_THRESHOLD_INTAKE_COURSE) {
-                    // Case A or B: IELTS >= 6.5
+                    // Case A or B: IELTS >= 5.5
                     $courseStage = 'intake_course';
                     $triggerSource = ProgressionTriggerSource::IELTS;
                 } else {
-                    // Case C: IELTS < 6.5
+                    // Case C: IELTS < 5.5
                     $courseStage = 'intake_pre_uni_gc';
-                    $englishLevel = $data['english_level'] ?? self::mapIeltsToLevel($ieltsScore);
+                    $englishLevel = $data['english_level'] ?? 0;
                     $triggerSource = ProgressionTriggerSource::IELTS;
                 }
             } else {
@@ -170,11 +170,11 @@ class InitializeStudentPlacementAction
     private static function mapIeltsToLevel(float $score): int
     {
         return match (true) {
-            $score >= 6.0 => 5,
-            $score >= 5.5 => 4,
-            $score >= 5.0 => 3,
-            $score >= 4.5 => 2,
-            $score >= 4.0 => 1,
+            $score >= 5.5 => 5,
+            $score >= 5.0 => 4,
+            $score >= 4.5 => 3,
+            $score >= 4.0 => 2,
+            $score >= 3.5 => 1,
             default => 0,
         };
     }

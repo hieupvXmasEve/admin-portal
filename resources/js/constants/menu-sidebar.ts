@@ -318,20 +318,43 @@ export const mainNavItems: NavItem[] = [
                 icon: Trophy,
                 requiredPermissions: ['view_grade'],
             },
+            // Group menu Student Lifecycle
+            {
+                title: 'Student Status',
+                href: '#',
+                icon: Users,
+                children: [
+                    {
+                        title: 'Student Actions',
+                        href: studentRoutes.studentStatusAction(),
+                        icon: ClipboardCheck,
+                        requiredPermissions: ['view_student_action'],
+                    },
+                ],
+            },
+            // Group menu Progression Audit
+            {
+                title: 'Progression Audit',
+                href: '#',
+                icon: Users,
+                children: [
+                    // Academic Progression Audit
+                    {
+                        title: 'Academic Progression',
+                        href: studentRoutes.academicProgressionAudit(),
+                        icon: TrendingUp,
+                        requiredPermissions: ['view_student_action'],
+                    },
+                    // Missing Documents
+                    {
+                        title: 'Missing Documents',
+                        href: studentRoutes.academicProgressionMissingDocuments(),
+                        icon: ClipboardCheck,
+                        requiredPermissions: ['view_student_action'],
+                    },
+                ],
+            },
             // Student Actions
-            {
-                title: 'Student Actions',
-                href: studentRoutes.studentStatusAction(),
-                icon: ClipboardCheck,
-                requiredPermissions: ['view_student_action'],
-            },
-            // Academic Progression Audit
-            {
-                title: 'Academic Progression',
-                href: studentRoutes.academicProgressionAudit(),
-                icon: TrendingUp,
-                requiredPermissions: ['view_student_action'],
-            },
         ],
     },
 

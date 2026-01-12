@@ -214,8 +214,10 @@ const handlePlacementSubmit = () => {
             placementForm.reset();
             placementUploadedFiles.value = [];
         },
-        onError: () => {
-            toast.error('Failed to initialize placement');
+        onError: (errors) => {
+            console.log(errors);
+            console.log('ok');
+            toast.error('Failed to initialize placement. ' + (errors.english_level ?? errors.semester_id ?? errors.ielts_score));
         },
     });
 };
@@ -329,7 +331,7 @@ const getStageBadgeVariant = (stage: string) => {
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <Button variant="outline" size="icon" as-child>
-                    <Link :href="studentRoutes.show(student.id)">
+                    <Link :href="studentRoutes.list()">
                         <ArrowLeft class="h-4 w-4" />
                     </Link>
                 </Button>
@@ -369,7 +371,7 @@ const getStageBadgeVariant = (stage: string) => {
                             </div>
 
                             <div class="flex items-center space-x-2">
-                                <Switch id="has_ielts" v-model:checked="placementForm.has_ielts" />
+                                <Switch id="has_ielts" v-model:model-value="placementForm.has_ielts" />
                                 <Label for="has_ielts">Student has IELTS certificate</Label>
                             </div>
 
@@ -385,7 +387,7 @@ const getStageBadgeVariant = (stage: string) => {
                                 </div>
 
                                 <div class="flex items-center space-x-2">
-                                    <Switch id="missing_documents" v-model:checked="placementForm.missing_documents" :disabled="placementUploadedFiles.length > 0" />
+                                    <Switch id="missing_documents" v-model:model-value="placementForm.missing_documents" :disabled="placementUploadedFiles.length > 0" />
                                     <Label for="missing_documents" :class="{ 'text-muted-foreground': placementUploadedFiles.length > 0 }">Missing IELTS file scan (exception)</Label>
                                 </div>
                             </template>
@@ -463,7 +465,7 @@ const getStageBadgeVariant = (stage: string) => {
                             </div>
 
                             <div class="flex items-center space-x-2">
-                                <Switch id="ielts_missing" v-model:checked="ieltsForm.missing_documents" :disabled="ieltsUploadedFiles.length > 0" />
+                                <Switch id="ielts_missing" v-model:model-value="ieltsForm.missing_documents" :disabled="ieltsUploadedFiles.length > 0" />
                                 <Label for="ielts_missing" :class="{ 'text-muted-foreground': ieltsUploadedFiles.length > 0 }">Missing file scan (exception)</Label>
                             </div>
 
@@ -601,7 +603,7 @@ const getStageBadgeVariant = (stage: string) => {
                     <div class="space-y-2">
                         <p class="text-muted-foreground text-sm">Course Stage</p>
                         <Badge :variant="getStageBadgeVariant(student.status)" class="text-sm">
-                            {{ student.status_label }}
+                            {{ student.status }}
                         </Badge>
                     </div>
 

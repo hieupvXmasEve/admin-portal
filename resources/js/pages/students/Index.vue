@@ -2,7 +2,6 @@
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
 import DebouncedInput from '@/components/DebouncedInput.vue';
-import ChangeStudentStatusDialog from '@/components/students/ChangeStudentStatusDialog.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -281,9 +280,8 @@ const openChangeDialog = (student: Student) => {
 const goToStudentActions = (student: Student) => {
     router.visit(studentRoutes.studentStatusActionIndex(student.id));
 };
-const closeChangeDialog = () => {
-    showChangeDialog.value = false;
-    selectedStudent.value = null;
+const goToStudentPlacementAndProgression = (student: Student) => {
+    router.visit(studentRoutes.studentPlacement(student.id));
 };
 
 // Export functions
@@ -525,11 +523,11 @@ const exportStudents = async () => {
                                     </Tooltip>
                                     <Tooltip v-if="can('change_student_status')">
                                         <TooltipTrigger as-child>
-                                            <Button variant="ghost" size="icon" @click="openChangeDialog(row.original)">
+                                            <Button variant="ghost" size="icon" @click="goToStudentPlacementAndProgression(row.original)">
                                                 <RotateCw class="h-4 w-4" />
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent> Change Status/GC Level </TooltipContent>
+                                        <TooltipContent> Placement & Progression </TooltipContent>
                                     </Tooltip>
                                     <Tooltip v-if="can('view_student_action')">
                                         <TooltipTrigger as-child>
@@ -640,7 +638,4 @@ const exportStudents = async () => {
             </DialogFooter>
         </DialogContent>
     </Dialog>
-
-    <!-- Change Status/GC Level Dialog -->
-    <ChangeStudentStatusDialog v-if="selectedStudent" :open="showChangeDialog" :student="selectedStudent" @close="closeChangeDialog" @success="closeChangeDialog" />
 </template>

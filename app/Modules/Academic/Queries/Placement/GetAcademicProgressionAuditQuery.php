@@ -24,15 +24,18 @@ class GetAcademicProgressionAuditQuery
      *     ielts_score_max: ?float,
      *     missing_documents: ?bool,
      *     trigger_source: ?string,
-     *     campus_id: ?int,
      *     per_page: ?int,
      * }
      */
     public function handle(array $filters = []): LengthAwarePaginator
     {
+        $currentCampusId = session('current_campus_id');
         $query = AcademicProgressionEvent::query()
             ->with(['student.campus', 'semester', 'createdBy', 'ieltsCertificate'])
-            ->latestFirst();
+            ->latestFirst()
+            ->whereHas('student', function ($q) use ($currentCampusId) {
+                $q->where('campus_id', $currentCampusId);
+            });
 
         // Filter by semester (required for reports)
         if (! empty($filters['semester_id'])) {
@@ -58,12 +61,6 @@ class GetAcademicProgressionAuditQuery
             $query->where('to_course_stage', $filters['to_course_stage']);
         }
 
-        // Filter by campus through student relationship
-        if (! empty($filters['campus_id'])) {
-            $query->whereHas('student', function ($q) use ($filters) {
-                $q->where('campus_id', $filters['campus_id']);
-            });
-        }
 
         // Filter by IELTS score range (through ielts_certificate)
         if (! empty($filters['ielts_score_min']) || ! empty($filters['ielts_score_max'])) {
@@ -164,9 +161,19 @@ class GetAcademicProgressionAuditQuery
             })
             ->latestFirst();
 
-        if (! empty($filters['campus_id'])) {
+        // Filter by current campus
+        $currentCampusId = session('current_campus_id');
+        $query->whereHas('student', function ($q) use ($currentCampusId) {
+            $q->where('campus_id', $currentCampusId);
+        });
+
+        // Filter by search term (student name or ID)
+        if (! empty($filters['search'])) {
             $query->whereHas('student', function ($q) use ($filters) {
-                $q->where('campus_id', $filters['campus_id']);
+                $q->where(function ($subQ) use ($filters) {
+                    $subQ->where('full_name', 'like', '%' . $filters['search'] . '%')
+                        ->orWhere('student_id', 'like', '%' . $filters['search'] . '%');
+                });
             });
         }
 

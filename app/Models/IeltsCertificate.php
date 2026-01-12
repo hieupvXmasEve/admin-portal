@@ -13,7 +13,11 @@ class IeltsCertificate extends Model
 {
     use HasFactory;
 
-    public const SCORE_THRESHOLD_INTAKE_COURSE = 6.5;
+    public const SCORE_THRESHOLD_INTAKE_COURSE = 5.5;
+
+    protected $appends = [
+        'formatted_submitted_at',
+    ];
 
     protected $fillable = [
         'student_id',

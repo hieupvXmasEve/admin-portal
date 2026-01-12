@@ -39,6 +39,8 @@ class AcademicProgressionEvent extends Model
 
     protected $with = ['createdBy'];
 
+    protected $appends = ['summary', 'event_type_label_en', 'trigger_source_label'];
+
     // =====================
     // Relationships
     // =====================

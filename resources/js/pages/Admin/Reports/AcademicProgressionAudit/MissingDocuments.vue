@@ -3,13 +3,14 @@ import DataPagination from '@/components/DataPagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { useTableFilters } from '@/composables/useFilters';
+import type { PaginatedResponse } from '@/types';
 import { studentRoutes } from '@/utils/routes';
 import { Head, router } from '@inertiajs/vue3';
-import { AlertCircle, Upload, Users } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { AlertCircle, Filter, RefreshCw, Search, Upload, Users } from 'lucide-vue-next';
 
 interface Campus {
     id: number;
@@ -37,43 +38,30 @@ interface IeltsCertificate {
     upload_record: { id: number; url: string } | null;
 }
 
+interface MissingDocsFilters {
+    search: string | null;
+    per_page: number;
+}
+
 interface Props {
-    certificates: {
-        data: IeltsCertificate[];
-        links: any;
-        meta: any;
-    };
-    filters: {
-        campus_id: number | null;
-        per_page: number;
-    };
-    options: {
-        campuses: Campus[];
-    };
+    certificates: PaginatedResponse<IeltsCertificate>;
+    filters: MissingDocsFilters;
 }
 
 const props = defineProps<Props>();
 
-const localFilters = ref({
-    campus_id: props.filters.campus_id ? String(props.filters.campus_id) : 'all',
-});
-
-// Helper to convert 'all' to undefined for API
-const filterValue = (value: string) => (value === 'all' || value === '' ? undefined : value);
-
-const applyFilters = () => {
-    router.visit(studentRoutes.academicProgressionMissingDocuments(), {
-        data: {
-            campus_id: filterValue(localFilters.value.campus_id),
-        },
-        preserveState: true,
-        preserveScroll: true,
-    });
-};
-
-const handlePaginationNavigate = (url: string) => {
-    router.visit(url, { preserveState: true, preserveScroll: true });
-};
+const {
+    filters,
+    applyFilters,
+    clearFilters,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    updateFieldDebounced,
+} = useTableFilters<MissingDocsFilters>(
+    studentRoutes.academicProgressionMissingDocuments(),
+    props.filters,
+    ['certificates', 'filters']
+);
 
 const goToStudentPlacement = (studentId: number) => {
     router.visit(studentRoutes.studentPlacement(studentId));
@@ -92,7 +80,7 @@ const goToStudentPlacement = (studentId: number) => {
             </div>
 
             <div>
-                <Badge variant="destructive" class="text-lg"> {{ certificates.meta?.total ?? certificates.data.length }} records </Badge>
+                <Badge variant="destructive" class="text-lg"> {{ certificates.total }} records </Badge>
             </div>
         </div>
 
@@ -110,24 +98,30 @@ const goToStudentPlacement = (studentId: number) => {
         <!-- Filters -->
         <Card>
             <CardHeader>
-                <CardTitle>Filters</CardTitle>
+                <CardTitle class="flex items-center gap-2">
+                    <Filter class="h-5 w-5" />
+                    Filters
+                </CardTitle>
             </CardHeader>
             <CardContent>
-                <div class="flex items-end gap-4">
-                    <div class="w-64 space-y-2">
-                        <Label>Campus</Label>
-                        <Select v-model="localFilters.campus_id" @update:model-value="applyFilters">
-                            <SelectTrigger>
-                                <SelectValue placeholder="All campuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All campuses</SelectItem>
-                                <SelectItem v-for="campus in options.campuses" :key="campus.id" :value="String(campus.id)">
-                                    {{ campus.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
+                    <div class="w-full space-y-2 sm:w-64">
+                        <Label>Search Student</Label>
+                        <div class="relative">
+                            <Search class="text-muted-foreground absolute left-2 top-2.5 h-4 w-4" />
+                            <Input
+                                :model-value="filters.search ?? ''"
+                                @update:model-value="(val) => updateFieldDebounced('search', String(val))"
+                                placeholder="Search by name or ID..."
+                                class="pl-8"
+                            />
+                        </div>
                     </div>
+
+                    <Button variant="outline" @click="clearFilters">
+                        <RefreshCw class="mr-2 h-4 w-4" />
+                        Reset
+                    </Button>
                 </div>
             </CardContent>
         </Card>
@@ -186,7 +180,7 @@ const goToStudentPlacement = (studentId: number) => {
 
                 <Separator class="my-4" />
 
-                <DataPagination :pagination-data="certificates" @navigate="handlePaginationNavigate" />
+                <DataPagination :pagination-data="certificates" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
             </CardContent>
         </Card>
     </div>
