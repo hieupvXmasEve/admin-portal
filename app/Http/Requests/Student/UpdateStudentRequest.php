@@ -18,42 +18,9 @@ class UpdateStudentRequest extends FormRequest
 
     public function rules(): array
     {
-        $rules = Student::validationRules();
-
-        // Modify unique rules to exclude current student
+        // Only allow updating fields that are displayed on the UI
         $studentId = $this->route('student')->id;
-
-        $rules['email'] = [
-            'required',
-            'string',
-            'email',
-            'max:255',
-            Rule::unique('students')->ignore($studentId),
-        ];
-
-        if (isset($rules['national_id'])) {
-            $rules['national_id'] = [
-                'nullable',
-                'string',
-                'max:20',
-                Rule::unique('students')->ignore($studentId),
-            ];
-        }
-
-        // Add GC level fields - nullable by default
-        $rules['gc_starting_level'] = ['nullable', 'integer', 'min:0', 'max:6'];
-        $rules['gc_current_level'] = ['nullable', 'integer', 'min:0', 'max:6'];
-        $rules['gc_total_levels'] = ['nullable', 'integer', 'min:0'];
-
-        // Conditional validation for GC levels when status is intake_pre_uni_gc
-        if ($this->input('status') === 'intake_pre_uni_gc') {
-            $rules['gc_starting_level'] = ['required', 'integer', 'min:0', 'max:6'];
-            $rules['gc_current_level'] = ['required', 'integer', 'min:0', 'max:6'];
-        }
-
-        // Add parent user validation rules
         $student = $this->route('student');
-        $studentId = $student->id;
 
         // Ensure parent_user relationship is loaded
         if (! $student->relationLoaded('parentUser')) {
@@ -62,7 +29,55 @@ class UpdateStudentRequest extends FormRequest
 
         $parentUserId = $student->parent_user_id;
 
-        $rules['parent_name'] = ['nullable', 'string', 'max:255'];
+        $rules = [
+            // Personal Information
+            'full_name' => ['required', 'string', 'max:100'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                Rule::unique('students')->ignore($studentId),
+            ],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'avatar_url' => ['nullable', 'string', 'url', 'max:255'],
+            'date_of_birth' => ['nullable', 'date'],
+            'gender' => ['nullable', 'in:male,female,other'],
+            'nationality' => ['nullable', 'string', 'max:100'],
+            'ethnicity' => ['nullable', 'string', 'max:100'],
+            'national_id' => [
+                'nullable',
+                'string',
+                'max:20',
+                Rule::unique('students')->ignore($studentId),
+            ],
+            // Current Address
+            'current_address_line' => ['nullable', 'string', 'max:255'],
+            'current_ward' => ['nullable', 'string', 'max:100'],
+            'current_province' => ['nullable', 'string', 'max:100'],
+            'current_country' => ['nullable', 'string', 'max:30'],
+            // CCCD Address
+            'cccd_address_line' => ['nullable', 'string', 'max:255'],
+            'cccd_ward' => ['nullable', 'string', 'max:100'],
+            'cccd_province' => ['nullable', 'string', 'max:100'],
+            'cccd_country' => ['nullable', 'string', 'max:100'],
+            // Emergency Contact
+            'emergency_contact_name' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
+            'emergency_contact_email' => ['nullable', 'email', 'max:255'],
+            'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
+            'emergency_contact_name_1' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_phone_1' => ['nullable', 'string', 'max:20'],
+            'emergency_contact_email_1' => ['nullable', 'email', 'max:255'],
+            'emergency_contact_relationship_1' => ['nullable', 'string', 'max:100'],
+            // Academic Background
+            'high_school_name' => ['nullable', 'string', 'max:255'],
+            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
+            'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'admission_notes' => ['nullable', 'string'],
+            // Parent User
+            'parent_name' => ['nullable', 'string', 'max:255'],
+        ];
 
         // Build parent_email validation rules
         // Note: nullable rule must come before unique to skip unique check when value is null
@@ -143,12 +158,6 @@ class UpdateStudentRequest extends FormRequest
             ]);
         }
 
-        if ($this->has('admission_date') && $this->admission_date) {
-            $this->merge([
-                'admission_date' => date('Y-m-d', strtotime($this->admission_date)),
-            ]);
-        }
-
         // Convert empty strings to null for parent user fields
         if ($this->has('parent_email') && $this->parent_email === '') {
             $this->merge([
@@ -182,22 +191,17 @@ class UpdateStudentRequest extends FormRequest
         }
 
         // Convert all string fields to lowercase for data consistency
-        // Exclude fields that should not be lowercase: phone (already cleaned), national_id (already cleaned),
-        // date fields, numeric fields, and fields that are already null
+        // Only process fields that are allowed to be updated (displayed on UI)
         $stringFieldsToLowercase = [
             'email',
             'full_name',
             'nationality',
             'ethnicity',
             'gender',
-            'status',
-            'academic_status',
-            'address',
             'current_address_line',
             'current_ward',
             'current_province',
             'current_country',
-            'cccd_address',
             'cccd_address_line',
             'cccd_ward',
             'cccd_province',
@@ -210,10 +214,8 @@ class UpdateStudentRequest extends FormRequest
             'emergency_contact_relationship_1',
             'high_school_name',
             'admission_notes',
-            'status_reason',
             'parent_email',
             'parent_name',
-            'intake_mode',
         ];
 
         foreach ($stringFieldsToLowercase as $field) {

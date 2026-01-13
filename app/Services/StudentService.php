@@ -81,6 +81,7 @@ class StudentService
 
     /**
      * Update an existing student
+     * Only allows updating fields that are displayed on the UI
      */
     public function updateStudent(Student $student, array $data): Student
     {
@@ -91,6 +92,42 @@ class StudentService
 
             // Remove parent user fields from student data
             unset($data['parent_name'], $data['parent_email']);
+
+            // Define allowed fields that can be updated (only fields displayed on UI)
+            $allowedFields = [
+                'full_name',
+                'email',
+                'phone',
+                'avatar_url',
+                'date_of_birth',
+                'gender',
+                'nationality',
+                'ethnicity',
+                'national_id',
+                'current_address_line',
+                'current_ward',
+                'current_province',
+                'current_country',
+                'cccd_address_line',
+                'cccd_ward',
+                'cccd_province',
+                'cccd_country',
+                'emergency_contact_name',
+                'emergency_contact_phone',
+                'emergency_contact_email',
+                'emergency_contact_relationship',
+                'emergency_contact_name_1',
+                'emergency_contact_phone_1',
+                'emergency_contact_email_1',
+                'emergency_contact_relationship_1',
+                'high_school_name',
+                'high_school_graduation_year',
+                'entrance_exam_score',
+                'admission_notes',
+            ];
+
+            // Filter data to only include allowed fields
+            $filteredData = array_intersect_key($data, array_flip($allowedFields));
 
             // Handle parent user update/creation
             // Rule: One user can only be parent of one student
@@ -146,8 +183,8 @@ class StudentService
                 }
             }
 
-            // Update student data
-            $student->update($data);
+            // Update student data with only allowed fields
+            $student->update($filteredData);
 
             return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion', 'parentUser']);
         });

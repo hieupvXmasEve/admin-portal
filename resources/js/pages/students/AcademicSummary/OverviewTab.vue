@@ -374,7 +374,7 @@ const hasAcademicConcerns = computed(() => {
                                             <User class="text-muted-foreground h-4 w-4 flex-shrink-0" />
                                             <div class="min-w-0 flex-1">
                                                 <p class="text-muted-foreground text-sm">Parent Name</p>
-                                                <p class="font-medium">{{ overview.student_info.parent_user?.name || 'N/A' }}</p>
+                                                <p class="font-medium capitalize">{{ overview.student_info.parent_user?.name || 'N/A' }}</p>
                                             </div>
                                         </div>
                                         <div class="flex items-center gap-3">

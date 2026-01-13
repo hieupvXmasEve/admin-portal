@@ -150,10 +150,10 @@ class Student extends StudentAuditableModel
             'emergency_contact_phone_1' => ['nullable', 'string', 'max:20'],
             'emergency_contact_relationship_1' => ['nullable', 'string', 'max:100'],
             'high_school_name' => ['nullable', 'string', 'max:255'],
-            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
+            'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending,admission_deferred'],
+            'status' => ['nullable', 'in:suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending,admission_deferred'],
         ];
     }
 
@@ -444,7 +444,7 @@ class Student extends StudentAuditableModel
 
     public function generateStudentId(string $campusCode, int $year): string
     {
-        $lastStudent = static::where('student_id', 'like', $campusCode . $year . '%')
+        $lastStudent = static::where('student_id', 'like', $campusCode.$year.'%')
             ->orderBy('student_id', 'desc')
             ->first();
 
@@ -455,7 +455,7 @@ class Student extends StudentAuditableModel
             $newNumber = 1;
         }
 
-        return $campusCode . $year . str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
+        return $campusCode.$year.str_pad((string) $newNumber, 3, '0', STR_PAD_LEFT);
     }
 
     // New Review Management methods

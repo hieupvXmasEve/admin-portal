@@ -43,69 +43,39 @@ const cccdWardSearch = ref('');
 
 // Form validation schema
 const formSchema = toTypedSchema(
-    z
-        .object({
-            full_name: z.string().min(ValidationRules.student.firstName.minLength, 'First name is required').max(ValidationRules.student.firstName.maxLength, 'First name is too long'),
-            email: z.string().email('Invalid email format').max(ValidationRules.student.email.maxLength, 'Email is too long'),
-            phone: z.string().max(ValidationRules.student.phone.maxLength, 'Phone number is too long').optional(),
-            avatar_url: z.string().url('Invalid URL format').optional().or(z.literal('')),
-            date_of_birth: z.string().optional(),
-            gender: z.enum(['male', 'female', 'other']).optional(),
-            nationality: z.string().max(ValidationRules.student.nationality.maxLength, 'Nationality is too long').optional(),
-            ethnicity: z.string().max(100, 'Ethnicity is too long').optional(),
-            national_id: z.string().max(ValidationRules.student.nationalId.maxLength, 'National ID is too long').optional(),
-            current_address_line: z.string().max(255, 'Current address line is too long').optional(),
-            current_ward: z.string().max(100, 'Current ward is too long').optional(),
-            current_province: z.string().max(100, 'Current province is too long').optional(),
-            current_country: z.string().max(30, 'Current country is too long').optional(),
-            cccd_address_line: z.string().max(255, 'CCCD address line is too long').optional(),
-            cccd_ward: z.string().max(100, 'CCCD ward is too long').optional(),
-            cccd_province: z.string().max(100, 'CCCD province is too long').optional(),
-            cccd_country: z.string().max(100, 'CCCD country is too long').optional(),
-            campus_id: z.string().min(1, 'Campus is required'),
-            program_id: z.string().min(1, 'Program is required'),
-            // specialization_id: z.string().optional(),
-            curriculum_version_id: z.string().min(1, 'Curriculum version is required'),
-            admission_date: z.string().min(1, 'Admission date is required'),
-            expected_graduation_date: z.string().optional(),
-            emergency_contact_name: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
-            emergency_contact_phone: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
-            emergency_contact_email: z.string().optional(),
-            emergency_contact_relationship: z.string().max(100, 'Emergency contact relationship is too long').optional(),
-            emergency_contact_name_1: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
-            emergency_contact_phone_1: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
-            emergency_contact_email_1: z.string().optional(),
-            emergency_contact_relationship_1: z.string().max(100, 'Emergency contact relationship is too long').optional(),
-            high_school_name: z.string().max(ValidationRules.student.highSchoolName.maxLength, 'High school name is too long').optional(),
-            high_school_graduation_year: z.string().optional(),
-            entrance_exam_score: z.string().optional(),
-            admission_notes: z.string().optional(),
-            status: z.enum(['active', 'inactive', 'suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'deferred', 'dropout', 'dropout_transfer', 'pending']),
-            gc_starting_level: z.string().optional(),
-            gc_current_level: z.string().optional(),
-            gc_total_levels: z.string().optional(),
-            parent_name: z.string().max(255, 'Parent name is too long').optional(),
-            parent_email: z.string().email('Invalid email format').max(255, 'Parent email is too long').optional(),
-        })
-        .superRefine((data, ctx) => {
-            // Conditional validation for GC levels when status is intake_pre_uni_gc
-            if (data.status === 'intake_pre_uni_gc') {
-                if (!data.gc_starting_level) {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: 'GC Starting Level is required for Intake Pre-Uni GC status',
-                        path: ['gc_starting_level'],
-                    });
-                }
-                if (!data.gc_current_level) {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: 'GC Current Level is required for Intake Pre-Uni GC status',
-                        path: ['gc_current_level'],
-                    });
-                }
-            }
-        }),
+    z.object({
+        full_name: z.string().min(ValidationRules.student.firstName.minLength, 'First name is required').max(ValidationRules.student.firstName.maxLength, 'First name is too long'),
+        email: z.string().email('Invalid email format').max(ValidationRules.student.email.maxLength, 'Email is too long'),
+        phone: z.string().max(ValidationRules.student.phone.maxLength, 'Phone number is too long').optional(),
+        avatar_url: z.string().url('Invalid URL format').optional().or(z.literal('')),
+        date_of_birth: z.string().optional(),
+        gender: z.enum(['male', 'female', 'other']).optional(),
+        nationality: z.string().max(ValidationRules.student.nationality.maxLength, 'Nationality is too long').optional(),
+        ethnicity: z.string().max(100, 'Ethnicity is too long').optional(),
+        national_id: z.string().max(ValidationRules.student.nationalId.maxLength, 'National ID is too long').optional(),
+        current_address_line: z.string().max(255, 'Current address line is too long').optional(),
+        current_ward: z.string().max(100, 'Current ward is too long').optional(),
+        current_province: z.string().max(100, 'Current province is too long').optional(),
+        current_country: z.string().max(30, 'Current country is too long').optional(),
+        cccd_address_line: z.string().max(255, 'CCCD address line is too long').optional(),
+        cccd_ward: z.string().max(100, 'CCCD ward is too long').optional(),
+        cccd_province: z.string().max(100, 'CCCD province is too long').optional(),
+        cccd_country: z.string().max(100, 'CCCD country is too long').optional(),
+        emergency_contact_name: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
+        emergency_contact_phone: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
+        emergency_contact_email: z.string().optional(),
+        emergency_contact_relationship: z.string().max(100, 'Emergency contact relationship is too long').optional(),
+        emergency_contact_name_1: z.string().max(ValidationRules.student.emergencyContactName.maxLength, 'Emergency contact name is too long').optional(),
+        emergency_contact_phone_1: z.string().max(ValidationRules.student.emergencyContactPhone.maxLength, 'Emergency contact phone is too long').optional(),
+        emergency_contact_email_1: z.string().optional(),
+        emergency_contact_relationship_1: z.string().max(100, 'Emergency contact relationship is too long').optional(),
+        high_school_name: z.string().max(ValidationRules.student.highSchoolName.maxLength, 'High school name is too long').optional(),
+        high_school_graduation_year: z.string().optional(),
+        entrance_exam_score: z.string().optional(),
+        admission_notes: z.string().optional(),
+        parent_name: z.string().max(255, 'Parent name is too long').optional(),
+        parent_email: z.string().email('Invalid email format').max(255, 'Parent email is too long').optional(),
+    }),
 );
 
 const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
@@ -128,11 +98,6 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         cccd_ward: props.student.cccd_ward || '',
         cccd_province: props.student.cccd_province || '',
         cccd_country: props.student.cccd_country || '',
-        campus_id: props.student.campus_id.toString(),
-        program_id: props.student.program_id.toString(),
-        // specialization_id: props.student.specialization_id?.toString() || '',
-        curriculum_version_id: props.student.curriculum_version_id.toString(),
-        admission_date: props.student.admission_date || '',
         emergency_contact_name: props.student.emergency_contact_name || '',
         emergency_contact_phone: props.student.emergency_contact_phone || '',
         emergency_contact_email: props.student.emergency_contact_email || '',
@@ -141,10 +106,6 @@ const { handleSubmit, isSubmitting, setFieldValue, values } = useForm({
         high_school_graduation_year: props.student.high_school_graduation_year?.toString() || '',
         entrance_exam_score: props.student.entrance_exam_score?.toString() || '',
         admission_notes: props.student.admission_notes || '',
-        status: props.student.status,
-        gc_starting_level: props.student.gc_starting_level?.toString() || '',
-        gc_current_level: props.student.gc_current_level?.toString() || '',
-        gc_total_levels: props.student.gc_total_levels?.toString() || '',
         parent_name: props.student.parent_user?.name || '',
         parent_email: props.student.parent_user?.email || '',
     },
@@ -236,20 +197,12 @@ watch(
 
 const onSubmit = handleSubmit((formData) => {
     // Convert string values back to appropriate types
+    // Only include fields that are displayed on UI and allowed to be updated
     const submitData = {
-        ...formData,
-        campus_id: parseInt(formData.campus_id),
-        program_id: parseInt(formData.program_id),
-        // specialization_id: formData.specialization_id ? parseInt(formData.specialization_id) : null,
-        curriculum_version_id: parseInt(formData.curriculum_version_id),
-        high_school_graduation_year: formData.high_school_graduation_year ? parseInt(formData.high_school_graduation_year) : null,
-        entrance_exam_score: formData.entrance_exam_score ? parseFloat(formData.entrance_exam_score) : null,
-        gc_starting_level: formData.gc_starting_level ? parseInt(formData.gc_starting_level) : null,
-        gc_current_level: formData.gc_current_level ? parseInt(formData.gc_current_level) : null,
-        gc_total_levels: formData.gc_total_levels ? parseInt(formData.gc_total_levels) : null,
-        // Remove empty strings
+        full_name: formData.full_name,
+        email: formData.email,
         phone: formData.phone || null,
-        avatar_url: formData.avatar_url || null, // Use the form field value directly
+        avatar_url: formData.avatar_url || null,
         date_of_birth: formData.date_of_birth || null,
         gender: formData.gender || null,
         nationality: formData.nationality || null,
@@ -263,7 +216,6 @@ const onSubmit = handleSubmit((formData) => {
         cccd_ward: formData.cccd_ward || null,
         cccd_province: formData.cccd_province || null,
         cccd_country: formData.cccd_country || null,
-        expected_graduation_date: formData.expected_graduation_date || null,
         emergency_contact_name: formData.emergency_contact_name || null,
         emergency_contact_email: formData.emergency_contact_email || null,
         emergency_contact_phone: formData.emergency_contact_phone || null,
@@ -273,6 +225,8 @@ const onSubmit = handleSubmit((formData) => {
         emergency_contact_phone_1: formData.emergency_contact_phone_1 || null,
         emergency_contact_relationship_1: formData.emergency_contact_relationship_1 || null,
         high_school_name: formData.high_school_name || null,
+        high_school_graduation_year: formData.high_school_graduation_year ? parseInt(formData.high_school_graduation_year) : null,
+        entrance_exam_score: formData.entrance_exam_score ? parseFloat(formData.entrance_exam_score) : null,
         admission_notes: formData.admission_notes || null,
         parent_name: formData.parent_name || null,
         parent_email: formData.parent_email || null,
