@@ -49,11 +49,13 @@ class GradeService
         }
 
         // Separate curriculum vs EGC records
-        $curriculumRecords = $academicRecords->filter(fn ($r) => in_array($r->unit_id, $curriculumUnitIds)
+        $curriculumRecords = $academicRecords->filter(
+            fn($r) => in_array($r->unit_id, $curriculumUnitIds)
         );
 
         // EGC = only units with unit_type = 'egc'
-        $egcRecords = $academicRecords->filter(fn ($r) => $r->unit->unit_type === 'egc'
+        $egcRecords = $academicRecords->filter(
+            fn($r) => $r->unit->unit_type === 'egc'
         );
 
         $gradesBySemester = $this->buildGradesBySemester($student, $curriculumRecords);
@@ -348,7 +350,7 @@ class GradeService
 
         if (! empty($filters['unit_code'])) {
             $query->whereHas('unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%'.$filters['unit_code'].'%');
+                $q->where('code', 'like', '%' . $filters['unit_code'] . '%');
             });
         }
 
@@ -380,7 +382,7 @@ class GradeService
 
         if (! empty($filters['course_code'])) {
             $query->whereHas('courseOffering.unit', function ($q) use ($filters) {
-                $q->where('code', 'like', '%'.$filters['course_code'].'%');
+                $q->where('code', 'like', '%' . $filters['course_code'] . '%');
             });
         }
 
@@ -400,10 +402,13 @@ class GradeService
             return 0.0;
         }
 
-        $totalQualityPoints = $completedRecords->sum('quality_points');
-        $totalCreditHours = $completedRecords->sum('credit_hours');
+        // sum of credit points * final percentage
+        $totalQualityPoints = $completedRecords->sum(function ($record) {
+            return $record->credit_points * $record->final_percentage;
+        });
+        $totalCreditPoints = $completedRecords->sum('credit_points');
 
-        return $totalCreditHours > 0 ? round($totalQualityPoints / $totalCreditHours, 2) : 0.0;
+        return $totalCreditPoints > 0 ? round($totalQualityPoints / $totalCreditPoints, 2) : 0.0;
     }
 
     /**
@@ -431,7 +436,7 @@ class GradeService
         }
 
         $mean = $gpas->avg();
-        $variance = $gpas->map(fn ($gpa) => pow($gpa - $mean, 2))->avg();
+        $variance = $gpas->map(fn($gpa) => pow($gpa - $mean, 2))->avg();
         $stdDev = sqrt($variance);
 
         return match (true) {
@@ -511,8 +516,8 @@ class GradeService
 
         $sumX = array_sum($x);
         $sumY = array_sum($y);
-        $sumXY = array_sum(array_map(fn ($i) => $x[$i] * $y[$i], range(0, $n - 1)));
-        $sumX2 = array_sum(array_map(fn ($val) => $val * $val, $x));
+        $sumXY = array_sum(array_map(fn($i) => $x[$i] * $y[$i], range(0, $n - 1)));
+        $sumX2 = array_sum(array_map(fn($val) => $val * $val, $x));
 
         $slope = ($n * $sumXY - $sumX * $sumY) / ($n * $sumX2 - $sumX * $sumX);
         $intercept = ($sumY - $slope * $sumX) / $n;
@@ -634,7 +639,7 @@ class GradeService
         return [
             'performance_level' => $this->getPerformanceLevel($averagePercentage),
             'average_percentage' => round($averagePercentage, 1),
-            'performance_by_type' => $performanceByType->map(fn ($avg) => round($avg, 1))->toArray(),
+            'performance_by_type' => $performanceByType->map(fn($avg) => round($avg, 1))->toArray(),
             'strengths' => $this->identifyStrengths($performanceByType),
             'areas_for_improvement' => $this->identifyWeaknesses($performanceByType),
             'trend' => $this->analyzeAssessmentTrend($completedAssessments),
@@ -805,7 +810,7 @@ class GradeService
      */
     protected function identifyStrengths(Collection $performanceByType): array
     {
-        return $performanceByType->filter(fn ($avg) => $avg >= 75)
+        return $performanceByType->filter(fn($avg) => $avg >= 75)
             ->keys()
             ->toArray();
     }
@@ -815,7 +820,7 @@ class GradeService
      */
     protected function identifyWeaknesses(Collection $performanceByType): array
     {
-        return $performanceByType->filter(fn ($avg) => $avg < 65)
+        return $performanceByType->filter(fn($avg) => $avg < 65)
             ->keys()
             ->toArray();
     }
@@ -874,7 +879,7 @@ class GradeService
 
             // Get academic records for units in this logical semester
             $unitIds = $semesterUnits->pluck('unit_id')->toArray();
-            $semesterRecords = $curriculumRecords->filter(fn ($r) => in_array($r->unit_id, $unitIds));
+            $semesterRecords = $curriculumRecords->filter(fn($r) => in_array($r->unit_id, $unitIds));
 
             // Format all curriculum units (với hoặc không có điểm)
             $allUnits = $semesterUnits->map(function ($cu) use ($semesterRecords) {
@@ -916,9 +921,35 @@ class GradeService
                 ],
                 'curriculum_units' => $allUnits->toArray(),
                 'modules' => $modulesData,
-                'semester_summary' => $this->calculateSemesterSummary($semesterRecords),
+                'semester_summary' => $this->buildSemesterSummary($student, $semester, $semesterRecords),
             ];
         })->sortBy('semester.semester_number')->values()->toArray();
+    }
+
+    /**
+     * Build semester summary, preferring stored GPA calculations when available
+     */
+    protected function buildSemesterSummary(Student $student, Semester $semester, Collection $records): array
+    {
+        $gpaCalculation = GpaCalculation::query()
+            ->where('student_id', $student->id)
+            ->where('semester_id', $semester->id)
+            ->current()
+            ->first();
+
+        if ($gpaCalculation) {
+            $completed = $records->where('completion_status', 'completed');
+
+            return [
+                'total_units' => $records->count(),
+                'completed_units' => $completed->count(),
+                'total_credits' => (float) $gpaCalculation->semester_credit_points,
+                'earned_credits' => (float) $gpaCalculation->semester_credit_points_earned,
+                'semester_gpa' => (float) $gpaCalculation->semester_gpa,
+            ];
+        }
+
+        return $this->calculateSemesterSummary($records);
     }
 
     /**
@@ -927,10 +958,10 @@ class GradeService
     protected function buildSimpleSummary(Student $student, array $gradesBySemester, Collection $egcRecords): array
     {
         // Count all curriculum units (EGC excluded from statistics)
-        $allCurriculumUnits = collect($gradesBySemester)->flatMap(fn ($s) => $s['curriculum_units']);
+        $allCurriculumUnits = collect($gradesBySemester)->flatMap(fn($s) => $s['curriculum_units']);
 
         // Count all modules
-        $allModules = collect($gradesBySemester)->flatMap(fn ($s) => $s['modules'] ?? []);
+        $allModules = collect($gradesBySemester)->flatMap(fn($s) => $s['modules'] ?? []);
 
         // Unit statistics (only curriculum units, EGC not included)
         $totalUnits = $allCurriculumUnits->count();
@@ -1070,10 +1101,11 @@ class GradeService
     protected function calculateModuleGrade($module, Collection $allModuleRecords): ?float
     {
         // Only calculate from graded units with completed status
-        $gradedRecords = $allModuleRecords->filter(fn ($r) => $r->courseOffering &&
-            $r->courseOffering->grading_type === 'grade' &&
-            $r->completion_status === 'completed' &&
-            $r->final_percentage !== null
+        $gradedRecords = $allModuleRecords->filter(
+            fn($r) => $r->courseOffering &&
+                $r->courseOffering->grading_type === 'grade' &&
+                $r->completion_status === 'completed' &&
+                $r->final_percentage !== null
         );
 
         if ($gradedRecords->isEmpty()) {
@@ -1153,7 +1185,7 @@ class GradeService
         $completedRecords = $records->where('completion_status', 'completed');
         $allPassed = $completedRecords->every(function ($record) {
             return $record->final_letter_grade &&
-                   ! in_array(strtoupper($record->final_letter_grade), ['F', 'FAIL', 'N']);
+                ! in_array(strtoupper($record->final_letter_grade), ['F', 'FAIL', 'N']);
         });
 
         return $allPassed ? 'passed' : 'failed';
@@ -1169,8 +1201,8 @@ class GradeService
         return [
             'total_units' => $records->count(),
             'completed_units' => $completed->count(),
-            'total_credits' => $records->sum('credit_hours'),
-            'earned_credits' => $completed->sum('credit_hours_earned') ?? 0,
+            'total_credits' => $records->sum('credit_points'),
+            'earned_credits' => $completed->sum('credit_points_earned') ?? 0,
             'semester_gpa' => $this->calculateSemesterGPA($records),
         ];
     }

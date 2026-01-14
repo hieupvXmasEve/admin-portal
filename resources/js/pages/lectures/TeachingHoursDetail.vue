@@ -6,13 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-// import { MultiSelect } from '@/components/ui/multi-select'; // Assuming this component exists or we use something similar
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import type { PaginatedResponse } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { ArrowLeft, BookOpen, Calendar, Clock, Filter, X } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, Calendar, Clock, X } from 'lucide-vue-next';
 import { computed, h } from 'vue';
 
 interface ClassSession {
@@ -27,16 +26,17 @@ interface ClassSession {
     course_offering_id: number;
     unit_code: string;
     unit_name: string;
+    unit_type: string;
     formatted_time: string;
 }
 
-interface CourseOption {
-    id: number;
-    name: string;
+interface UnitTypeOption {
+    value: string;
+    label: string;
 }
 
 interface TeachingHoursDetailFilters {
-    course_offering_ids?: number[];
+    unit_type?: string;
     date_from?: string;
     date_to?: string;
     sort?: string;
@@ -60,7 +60,7 @@ const props = defineProps<{
         unique_courses: number;
     };
     filters?: TeachingHoursDetailFilters;
-    courses: CourseOption[];
+    unitTypes: UnitTypeOption[];
 }>();
 
 // Reactive data
@@ -89,11 +89,10 @@ const {
     handlePageSizeChange,
     currentSort,
     currentDirection,
-    handleSelectFilter, // Added missing destructure
 } = useInertiaFilters<TeachingHoursDetailFilters>({
     baseUrl: `/lectures/teaching-hours/${props.lecture.id}`,
     initialFilters: {
-        course_offering_ids: Array.isArray(props.filters?.course_offering_ids) ? props.filters.course_offering_ids.map((id) => Number(id)) : props.filters?.course_offering_ids ? [Number(props.filters.course_offering_ids)] : [],
+        unit_type: props.filters?.unit_type || 'all',
         date_from: props.filters?.date_from || defaultDateFrom,
         date_to: props.filters?.date_to || defaultDateTo,
         sort: props.filters?.sort || 'date',
@@ -101,7 +100,7 @@ const {
         per_page: props.filters?.per_page || 15,
     },
     emptyFilters: {
-        course_offering_ids: [],
+        unit_type: 'all',
         date_from: defaultDateFrom,
         date_to: defaultDateTo,
         sort: 'date',
@@ -117,8 +116,7 @@ const {
     transform: (filters) => ({
         ...filters,
         per_page: Number(filters.per_page),
-        // Ensure array is passed correctly
-        course_offering_ids: filters.course_offering_ids?.length ? filters.course_offering_ids : undefined,
+        unit_type: filters.unit_type === 'all' ? undefined : filters.unit_type,
     }),
 });
 
@@ -142,26 +140,6 @@ const handleDateFromChange = (event: Event) => {
 const handleDateToChange = (event: Event) => {
     const target = event.target as HTMLInputElement;
     filters.date_to = target.value;
-};
-
-const handleCourseToggle = (courseId: number) => {
-    const current = filters.course_offering_ids || [];
-    const index = current.indexOf(courseId);
-    let newIds: number[];
-
-    if (index === -1) {
-        newIds = [...current, courseId];
-    } else {
-        newIds = current.filter((id) => id !== courseId);
-    }
-
-    // Use handleSelectFilter to trigger the update
-    // Passing undefined as default value to avoid checking against string 'all' for array
-    handleSelectFilter('course_offering_ids', newIds, undefined);
-};
-
-const isCourseSelected = (courseId: number) => {
-    return (filters.course_offering_ids || []).includes(courseId);
 };
 
 // Column definitions
@@ -200,7 +178,11 @@ const columns: ColumnDef<ClassSession>[] = [
         id: 'course',
         enableSorting: false,
         cell: ({ row }) => {
-            return h('div', { class: 'flex flex-col' }, [h('span', { class: 'font-medium' }, row.original.unit_code), h('span', { class: 'text-xs text-muted-foreground truncated max-w-[200px]' }, row.original.unit_name)]);
+            return h('div', { class: 'flex flex-col' }, [
+                h('span', { class: 'font-medium' }, row.original.unit_code),
+                h('span', { class: 'text-xs text-muted-foreground truncated max-w-[200px]' }, row.original.unit_name),
+                h(Badge, { variant: 'outline', class: 'mt-1 w-fit text-[10px]' }, () => row.original.unit_type ? row.original.unit_type.toUpperCase() : 'N/A')
+            ]);
         },
     },
     {
@@ -309,26 +291,23 @@ const columns: ColumnDef<ClassSession>[] = [
                     </div>
                 </div>
 
-                <!-- Course Filter (Checkbox Dropdown) -->
+                <!-- Unit Type Filter (Single Select) -->
                 <div class="space-y-2">
-                    <Label>Filter Courses</Label>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger as-child>
-                            <Button variant="outline" class="w-full justify-between">
-                                <span class="truncate">
-                                    {{ filters.course_offering_ids?.length ? `${filters.course_offering_ids.length} selected` : 'All Courses' }}
-                                </span>
-                                <Filter class="ml-2 h-4 w-4 opacity-50" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent class="max-h-80 w-72 overflow-y-auto">
-                            <DropdownMenuLabel>Select Courses</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuCheckboxItem v-for="course in courses" :key="course.id" :checked="isCourseSelected(course.id)" :model-value="isCourseSelected(course.id)" @update:model-value="handleCourseToggle(course.id)" @select.prevent>
-                                <span class="truncate">{{ course.name }}</span>
-                            </DropdownMenuCheckboxItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Label>Filter Unit Type</Label>
+                    <Select :model-value="filters.unit_type" @update:model-value="(val) => filters.unit_type = val">
+                        <SelectTrigger class="w-full">
+                            <SelectValue placeholder="Select Unit Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectLabel>Unit Types</SelectLabel>
+                                <SelectItem value="all">All Unit Types</SelectItem>
+                                <SelectItem v-for="type in unitTypes" :key="type.value" :value="type.value">
+                                    {{ type.label }}
+                                </SelectItem>
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 <!-- Clear Filters -->

@@ -465,36 +465,33 @@ class LectureController extends Controller
 
         $results = $action->execute($lecture->id, $validated);
 
-        // Get courses for filter dropdown (based on actual sessions taught)
-        $courses = \App\Models\ClassSession::query()
-            ->select('course_offerings.id', 'units.code', 'units.name', 'course_offerings.section_code')
-            ->join('course_offerings', 'class_sessions.course_offering_id', '=', 'course_offerings.id')
-            ->join('units', 'course_offerings.unit_id', '=', 'units.id')
-            ->where('class_sessions.lecture_id', $lecture->id)
-            ->where('class_sessions.session_date', '>=', $validated['date_from'])
-            ->where('class_sessions.session_date', '<=', $validated['date_to'])
-            ->distinct()
-            ->get()
-            ->map(function ($course) {
-                return [
-                    'id' => $course->id,
-                    'name' => sprintf('%s - %s (%s)', $course->code, $course->name, $course->section_code ?? 'N/A'),
-                ];
-            });
+        // Unit types for filter
+        $unitTypes = [
+            ['value' => 'general', 'label' => 'General'],
+            ['value' => 'egc', 'label' => 'EGC'],
+            ['value' => 'semi', 'label' => 'Semi'],
+            ['value' => 'ai', 'label' => 'AI'],
+            ['value' => 'mkt', 'label' => 'Marketing'],
+            ['value' => 'ba', 'label' => 'Business Analytics'],
+            ['value' => 'cs', 'label' => 'Computer Science'],
+            ['value' => 'ee', 'label' => 'Electrical Engineering'],
+            ['value' => 'me', 'label' => 'Mechanical Engineering'],
+            ['value' => 'fin', 'label' => 'Finance'],
+        ];
 
         return Inertia::render('lectures/TeachingHoursDetail', [
             'lecture' => $lecture->only(['id', 'first_name', 'last_name', 'email', 'employee_id']),
             'sessions' => $results['sessions'],
             'stats' => $results['stats'],
             'filters' => [
-                'course_offering_ids' => $validated['course_offering_ids'] ?? [],
+                'unit_type' => $validated['unit_type'] ?? 'all',
                 'date_from' => $validated['date_from'],
                 'date_to' => $validated['date_to'],
                 'sort' => $validated['sort'] ?? 'date',
                 'direction' => $validated['direction'] ?? 'desc',
                 'per_page' => $validated['per_page'] ?? 15,
             ],
-            'courses' => $courses,
+            'unitTypes' => $unitTypes,
         ]);
     }
 }

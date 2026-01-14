@@ -21,11 +21,7 @@ class ViewLectureTeachingDetailsRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        if ($this->has('course_offering_ids') && ! is_array($this->input('course_offering_ids'))) {
-            $this->merge([
-                'course_offering_ids' => explode(',', (string) $this->input('course_offering_ids')),
-            ]);
-        }
+        // No preparation needed for single select
     }
 
     /**
@@ -36,10 +32,9 @@ class ViewLectureTeachingDetailsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'course_offering_ids' => 'nullable|array',
-            'course_offering_ids.*' => 'integer|exists:course_offerings,id',
-            'date_from' => 'nullable|date|after_or_equal:2025-01-01',
-            'date_to' => 'nullable|date|before_or_equal:today',
+            'unit_type' => 'nullable|string|in:general,egc,semi,ai,mkt,ba,cs,ee,me,fin',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date',
             'sort' => 'nullable|string|in:date,duration',
             'direction' => 'nullable|string|in:asc,desc',
             'per_page' => 'nullable|integer|min:1|max:100',

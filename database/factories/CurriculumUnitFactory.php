@@ -29,9 +29,7 @@ class CurriculumUnitFactory extends Factory
         return [
             'curriculum_version_id' => CurriculumVersion::factory(),
             'unit_id' => Unit::factory(),
-            'type' => $this->faker->randomElement(['core', 'major', 'elective']),
             'semester_number' => $this->faker->optional()->numberBetween(1, 8),
-            'is_compulsory' => $this->faker->boolean(70), // 70% chance of being compulsory
             'note' => $this->faker->optional()->text(200),
         ];
     }

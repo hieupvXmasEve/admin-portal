@@ -16,7 +16,7 @@ class GetLectureTeachingDetailsAction
      *
      * @param int $lectureId
      * @param array{
-     *    course_offering_ids?: array<int>|null,
+     *    unit_type?: string|null,
      *    date_from?: string|null,
      *    date_to?: string|null,
      *    sort?: string|null,
@@ -46,6 +46,7 @@ class GetLectureTeachingDetailsAction
                 'course_offerings.id as course_offering_id',
                 'units.code as unit_code',
                 'units.name as unit_name',
+                'units.unit_type',
                 DB::raw('COALESCE(class_sessions.duration_minutes, TIME_TO_SEC(TIMEDIFF(class_sessions.end_time, class_sessions.start_time)) / 60) as calculated_duration')
             ])
             ->join('course_offerings', 'class_sessions.course_offering_id', '=', 'course_offerings.id')
@@ -54,9 +55,9 @@ class GetLectureTeachingDetailsAction
             ->where('class_sessions.session_date', '>=', $dateFrom)
             ->where('class_sessions.session_date', '<=', $dateTo);
 
-        // Filter by specific course offerings
-        if (!empty($filters['course_offering_ids'])) {
-            $query->whereIn('class_sessions.course_offering_id', $filters['course_offering_ids']);
+        // Filter by unit type
+        if (!empty($filters['unit_type']) && $filters['unit_type'] !== 'all') {
+            $query->where('units.unit_type', $filters['unit_type']);
         }
 
         // Calculate stats before pagination
