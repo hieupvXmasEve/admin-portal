@@ -93,7 +93,7 @@ class ParentStudentAccess
      */
     protected function canParentAccessStudent(User $parent, Student $student): bool
     {
-        // 1. Check new relationship via ParentProfile and pivot table
+        // Check relationship via ParentProfile and parent_student pivot table
         $parentProfile = $parent->parentProfile;
         if ($parentProfile) {
             $hasPivotAccess = $parentProfile->students()
@@ -103,11 +103,6 @@ class ParentStudentAccess
             if ($hasPivotAccess) {
                 return true;
             }
-        }
-
-        // 2. Backward Compatibility: Direct parent relationship on students table
-        if ($student->parent_user_id === $parent->id) {
-            return true;
         }
 
         return false;

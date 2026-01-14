@@ -61,7 +61,7 @@ class LecturerLoginAction
         }
 
         // 6. Update Last Login
-        $lecturer->update(['last_login_at' => now()]);
+        $user->update(['last_login_at' => now()]);
 
         // 7. Generate Token
         // note: We issue the token to the Lecturer model to maintain compatibility

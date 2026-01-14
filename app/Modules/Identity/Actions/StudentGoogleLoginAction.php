@@ -61,15 +61,18 @@ class StudentGoogleLoginAction
                 throw new Exception('This account is not associated with a student profile.');
             }
 
-            // Update OAuth provider data if not already set
-            // Note: Keeping this on Student model for legacy compatibility
-            if (!$student->oauth_provider_id) {
-                $student->update([
+            // Update OAuth provider data if not already set on the User
+            if (!$user->oauth_provider_id) {
+                $user->update([
                     'oauth_provider' => 'google',
                     'oauth_provider_id' => $payload['sub'],
-                    'avatar_url' => $student->avatar_url ?: ($payload['picture'] ?? null),
-                    'email_verified_at' => $student->email_verified_at ?: now(),
+                    'email_verified_at' => $user->email_verified_at ?: now(),
                 ]);
+            }
+
+            // Update avatar if needed (profile specific)
+            if (!$student->avatar_url && ($payload['picture'] ?? null)) {
+                $student->update(['avatar_url' => $payload['picture']]);
             }
 
             // Student active check

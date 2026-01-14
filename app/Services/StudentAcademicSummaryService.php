@@ -53,6 +53,7 @@ class StudentAcademicSummaryService
                 'curriculumVersion.specialization:id,name,code',
                 'curriculumVersion.effectiveFromSemester:id,start_date,code',
                 'intakeSemester:id,code,name',
+                'parentProfiles.user:id,name,email',
             ])->findOrFail($studentId);
 
             // Extract specific filters for each section
@@ -179,10 +180,10 @@ class StudentAcademicSummaryService
                     'type' => $student->scholarshipAward->scholarshipDefinition?->type,
                     'awarded_at' => $student->scholarshipAward->awarded_at?->format('Y-m-d'),
                 ] : null,
-                'parent_user' => $student->parentUser ? [
-                    'id' => $student->parentUser->id,
-                    'name' => $student->parentUser->name,
-                    'email' => $student->parentUser->email,
+                'parent_user' => ($parentProfile = $student->parentProfiles->first()) && $parentProfile->user ? [
+                    'id' => $parentProfile->user->id,
+                    'name' => $parentProfile->user->name,
+                    'email' => $parentProfile->user->email,
                 ] : null,
 
             ],

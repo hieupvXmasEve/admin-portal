@@ -10,8 +10,11 @@ use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\Student;
 use App\Models\StudentApplication;
+use App\Models\User;
+use App\Shared\Support\Enums\UserType;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
@@ -19,7 +22,8 @@ class StudentApplicationService
 {
     public function __construct(
         private StudentCodeGenerationService $codeGenerationService,
-        private ProgramMappingService $programMappingService
+        private ProgramMappingService $programMappingService,
+        private StudentService $studentService
     ) {}
 
     /**
@@ -156,6 +160,22 @@ class StudentApplicationService
                     $existingStudent->update($updateData);
                     $student = $existingStudent;
 
+                    // Ensure user account exists and is linked
+                    if (!$student->user_id) {
+                        $user = User::where('email', $student->email)->first();
+                        if (!$user) {
+                            $user = User::create([
+                                'name' => $student->full_name,
+                                'email' => $student->email,
+                                'password' => Hash::make('123456'),
+                                'type' => UserType::STUDENT,
+                                'status' => User::STATUS_ACTIVE,
+                                'email_verified_at' => now(),
+                            ]);
+                        }
+                        $student->update(['user_id' => $user->id]);
+                    }
+
                     Log::info("Successfully updated existing student", [
                         'student_id' => $student->id,
                         'preserved_student_code' => $student->student_id,
@@ -209,7 +229,22 @@ class StudentApplicationService
                         ];
                     }
 
-                    // Create the student
+                    // 1. Create User account for the student
+                    $user = User::where('email', $studentData['email'])->first();
+                    if (!$user) {
+                        $user = User::create([
+                            'name' => $studentData['full_name'],
+                            'email' => $studentData['email'],
+                            'password' => Hash::make('123456'),
+                            'type' => UserType::STUDENT,
+                            'status' => User::STATUS_ACTIVE,
+                            'email_verified_at' => now(),
+                        ]);
+                    }
+
+                    $studentData['user_id'] = $user->id;
+
+                    // 2. Create the student profile
                     $student = Student::create($studentData);
 
                     Log::info("Successfully created new student", [
@@ -217,6 +252,18 @@ class StudentApplicationService
                         'student_code' => $student->student_id,
                     ]);
                 }
+
+                // Handle parent assignment if available in application
+                if (!empty($application->parent_email)) {
+                    $this->studentService->handleParentAssignment(
+                        $student,
+                        $application->parent_email,
+                        null // Application doesn't have parent name field separately
+                    );
+                }
+
+                // Ensure student role is assigned
+                $this->studentService->assignStudentRole($student);
 
                 // Update the application
                 $application->update([

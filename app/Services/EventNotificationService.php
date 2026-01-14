@@ -27,7 +27,7 @@ class EventNotificationService
             // Get all active students in the campus
             $students = Student::where('campus_id', $event->campus_id)
                 ->active()
-                ->with('parentUser')
+                ->with('parentProfiles.user')
                 ->get();
 
             $notificationsSent = 0;
@@ -242,7 +242,7 @@ class EventNotificationService
         try {
             $participants = $event->participants()
                 ->whereIn('status', ['registered', 'checked_in'])
-                ->with('student.parentUser')
+                ->with('student.parentProfiles.user')
                 ->get();
 
             $notificationsSent = 0;
@@ -375,7 +375,7 @@ class EventNotificationService
             $upcomingEvents = Event::published()
                 ->where('start_time', '>', now())
                 ->where('start_time', '<=', now()->addDay())
-                ->with(['participants.student.parentUser'])
+                ->with(['participants.student.parentProfiles.user'])
                 ->get();
 
             $remindersSent = 0;
@@ -432,7 +432,7 @@ class EventNotificationService
         try {
             $completedParticipants = $event->participants()
                 ->where('status', 'completed')
-                ->with('student.parentUser')
+                ->with('student.parentProfiles.user')
                 ->get();
 
             $notificationsSent = 0;
@@ -523,8 +523,11 @@ class EventNotificationService
      */
     private function canNotifyStudent(Student $student, string $notificationType): bool
     {
+        // Get parent user from parentProfiles relationship
+        $parentUser = $student->parentProfiles()->first()?->user;
+
         // Defer to any linked user preference when available; otherwise allow by default.
-        return $this->canReceiveNotification($student->parentUser, $notificationType);
+        return $this->canReceiveNotification($parentUser, $notificationType);
     }
 
     /**

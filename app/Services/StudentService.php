@@ -8,6 +8,7 @@ use App\Models\Campus;
 use App\Models\CampusUserRole;
 use App\Models\CurriculumVersion;
 use App\Models\GraduationRequirement;
+use App\Models\ParentProfile;
 use App\Models\Program;
 use App\Models\Role;
 use App\Models\Specialization;
@@ -27,6 +28,13 @@ class StudentService
     public function createStudent(array $data): Student
     {
         return DB::transaction(function () use ($data) {
+            // Extract parent user data if provided
+            $parentName = $data['parent_name'] ?? null;
+            $parentEmail = $data['parent_email'] ?? null;
+
+            // Remove parent user fields from student data to avoid issues with fillable/creation if they aren't on student table
+            unset($data['parent_name'], $data['parent_email']);
+
             // Validate data
             $this->validateStudentData($data);
 
@@ -34,9 +42,20 @@ class StudentService
             $campus = Campus::findOrFail($data['campus_id']);
             $studentId = $this->generateStudentId($campus->code);
 
-            // Create student with admitted status by default
+            // 1. Create User account for the student
+            $user = User::create([
+                'name' => $data['full_name'],
+                'email' => $data['email'],
+                'password' => \Illuminate\Support\Facades\Hash::make('123456'), // Default password
+                'type' => \App\Shared\Support\Enums\UserType::STUDENT,
+                'status' => User::STATUS_ACTIVE,
+                'email_verified_at' => now(),
+            ]);
+
+            // 2. Create Student profile linked to User
             $student = Student::create([
                 'student_id' => $studentId,
+                'user_id' => $user->id,
                 'full_name' => $data['full_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'] ?? null,
@@ -58,8 +77,13 @@ class StudentService
                 'high_school_graduation_year' => $data['high_school_graduation_year'] ?? null,
                 'entrance_exam_score' => $data['entrance_exam_score'] ?? null,
                 'admission_notes' => $data['admission_notes'] ?? null,
-                'status' => 'active', // Set to active since that's what the DB supports
+                'status' => 'active',
             ]);
+
+            // Handle parent user creation/linking if email provided
+            if ($parentEmail !== null) {
+                $this->handleParentAssignment($student, $parentEmail, $parentName);
+            }
 
             // Assign student role to the campus
             $this->assignStudentRole($student);
@@ -130,63 +154,25 @@ class StudentService
             $filteredData = array_intersect_key($data, array_flip($allowedFields));
 
             // Handle parent user update/creation
-            // Rule: One user can only be parent of one student
+            // Parent linking is handled via parents + parent_student tables
             if ($parentEmail !== null) {
-                // Find or create parent user based on email
-                $parentUser = User::where('email', $parentEmail)->first();
-
-                if ($parentUser) {
-                    // Prevent using a student account as parent
-                    if ($parentUser->isStudent()) {
-                        throw new \Exception('Cannot use a student account as parent. The email belongs to a student.');
+                $this->handleParentAssignment($student, $parentEmail, $parentName);
+            } elseif ($parentName !== null) {
+                // If only name provided, update name of existing parent profile linked to this student
+                $parentProfile = $student->parentProfiles()->first();
+                if ($parentProfile) {
+                    $parentProfile->update(['full_name' => $parentName]);
+                    // Also update the user name
+                    if ($parentProfile->user) {
+                        $parentProfile->user->update(['name' => $parentName]);
                     }
-
-                    // Prevent student from assigning themselves as parent
-                    if ($student->user_id && $parentUser->id === $student->user_id) {
-                        throw new \Exception('A student cannot be assigned as their own parent.');
-                    }
-
-                    // Check if this user is already a parent of another student
-                    $existingStudent = Student::where('parent_user_id', $parentUser->id)
-                        ->where('id', '!=', $student->id)
-                        ->first();
-
-                    if ($existingStudent) {
-                        throw new \Exception('This email is already linked to another student as parent.');
-                    }
-
-                    // Update existing user if name is provided
-                    if ($parentName !== null) {
-                        $parentUser->update(['name' => $parentName]);
-                    }
-
-                    // Ensure user type is set to PARENT if not already set
-                    if (! $parentUser->isParent()) {
-                        $parentUser->update(['type' => \App\Shared\Support\Enums\UserType::PARENT]);
-                    }
-                } else {
-                    // Create new parent user
-                    $parentUser = User::create([
-                        'name' => $parentName ?? 'Parent',
-                        'email' => $parentEmail,
-                        'status' => User::STATUS_ACTIVE,
-                        'type' => \App\Shared\Support\Enums\UserType::PARENT,
-                    ]);
-                }
-
-                // Link parent user to student
-                $student->update(['parent_user_id' => $parentUser->id]);
-            } elseif ($parentName !== null && $student->parent_user_id) {
-                // If only name provided and parent exists, update name of existing parent
-                if ($student->parentUser) {
-                    $student->parentUser->update(['name' => $parentName]);
                 }
             }
 
             // Update student data with only allowed fields
             $student->update($filteredData);
 
-            return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion', 'parentUser']);
+            return $student->fresh(['campus', 'program', 'specialization', 'curriculumVersion', 'parentProfiles']);
         });
     }
 
@@ -197,6 +183,13 @@ class StudentService
     public function createAdmittedStudent(array $data): Student
     {
         return DB::transaction(function () use ($data) {
+            // Extract parent user data if provided
+            $parentName = $data['parent_name'] ?? null;
+            $parentEmail = $data['parent_email'] ?? null;
+
+            // Remove parent user fields from student data
+            unset($data['parent_name'], $data['parent_email']);
+
             // Ensure campus_id from session if not provided
             $campusId = $data['campus_id'] ?? session()->get('current_campus_id');
 
@@ -211,9 +204,20 @@ class StudentService
             $campus = Campus::findOrFail($campusId);
             $studentId = $this->generateStudentId($campus->code);
 
-            // Create student with active status by default
+            // 1. Create User account for the student
+            $user = User::create([
+                'name' => $data['full_name'],
+                'email' => $data['email'],
+                'password' => \Illuminate\Support\Facades\Hash::make('123456'), // Default password
+                'type' => \App\Shared\Support\Enums\UserType::STUDENT,
+                'status' => User::STATUS_ACTIVE,
+                'email_verified_at' => now(),
+            ]);
+
+            // 2. Create Student profile linked to User
             $student = Student::create([
                 'student_id' => $studentId,
+                'user_id' => $user->id,
                 'full_name' => $data['full_name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'] ?? null,
@@ -221,7 +225,7 @@ class StudentService
                 'program_id' => $data['program_id'],
                 'specialization_id' => $data['specialization_id'] ?? null,
                 'curriculum_version_id' => $data['curriculum_version_id'],
-                'status' => 'active', // Set to active since that's what the DB supports
+                'status' => 'active',
                 'admission_date' => $data['admission_date'],
                 'admission_notes' => $data['admission_notes'] ?? null,
                 'expected_graduation_date' => $data['expected_graduation_date'] ?? null,
@@ -237,6 +241,11 @@ class StudentService
                 'high_school_graduation_year' => $data['high_school_graduation_year'] ?? null,
                 'entrance_exam_score' => $data['entrance_exam_score'] ?? null,
             ]);
+
+            // Handle parent user creation/linking if email provided
+            if ($parentEmail !== null) {
+                $this->handleParentAssignment($student, $parentEmail, $parentName);
+            }
 
             // Assign student role to the campus
             $this->assignStudentRole($student);
@@ -293,13 +302,13 @@ class StudentService
     /**
      * Assign student role in campus
      */
-    private function assignStudentRole(Student $student): void
+    public function assignStudentRole(Student $student): void
     {
         $studentRole = Role::where('code', 'sinh_vien')->first();
 
         if ($studentRole) {
             CampusUserRole::create([
-                'user_id' => $student->id,
+                'user_id' => $student->user_id,
                 'role_id' => $studentRole->id,
                 'campus_id' => $student->campus_id,
                 'assigned_at' => now(),
@@ -836,5 +845,242 @@ class StudentService
 
             return $student->fresh(['campus', 'program', 'specialization']);
         });
+    }
+
+    /**
+     * Handle parent assignment to student
+     * Creates User, ParentProfile, and parent_student pivot record
+     *
+     * Cases handled:
+     * 1. Student has no parent linked yet -> Create new parent
+     * 2. Student already has a parent -> Update or replace
+     * 3. Parent email already used by another user -> Various validation checks
+     */
+    public function handleParentAssignment(Student $student, string $parentEmail, ?string $parentName): void
+    {
+        // Normalize email
+        $parentEmail = strtolower(trim($parentEmail));
+
+        // Prevent student from using their own email as parent email
+        if ($student->email && $parentEmail === strtolower(trim($student->email))) {
+            Log::warning('Student attempted to use their own email as parent email', [
+                'student_id' => $student->id,
+                'email' => $parentEmail,
+            ]);
+            return;
+        }
+
+        // 1. Check if student already has a parent linked
+        $existingParentProfile = $student->parentProfiles()->first();
+
+        if ($existingParentProfile) {
+            $parentUser = $existingParentProfile->user;
+
+            // If we have an existing parent user, update their info
+            if ($parentUser) {
+                // Check if the new email is already taken by ANOTHER user
+                $emailOwner = User::where('email', $parentEmail)
+                    ->where('id', '!=', $parentUser->id)
+                    ->first();
+
+                if ($emailOwner) {
+                    // If the email is taken by another parent, link to that one and we'll handle the old one
+                    $this->linkToExistingParentAndCleanup($student, $existingParentProfile, $emailOwner, $parentName);
+                    return;
+                }
+
+                // Otherwise, update the existing user and profile directly
+                $parentUser->update([
+                    'email' => $parentEmail,
+                    'name' => $parentName ?? $parentUser->name,
+                    'type' => \App\Shared\Support\Enums\UserType::PARENT // Ensure type is correct
+                ]);
+
+                $existingParentProfile->update([
+                    'full_name' => $parentName ?? $existingParentProfile->full_name,
+                    'email_snapshot' => $parentEmail
+                ]);
+
+                Log::info('Updated existing parent info for student', [
+                    'student_id' => $student->id,
+                    'parent_user_id' => $parentUser->id,
+                    'new_email' => $parentEmail
+                ]);
+
+                return;
+            }
+        }
+
+        // 2. Case: No parent linked or something went wrong with the existing one
+        // Fallback to finding by email or creating new
+        $this->assignParentByEmail($student, $parentEmail, $parentName);
+    }
+
+    /**
+     * Internal helper to assign parent by email (find existing or create new)
+     */
+    private function assignParentByEmail(Student $student, string $parentEmail, ?string $parentName): void
+    {
+        $parentUser = User::where('email', $parentEmail)->first();
+
+        if ($parentUser) {
+            $this->validateExistingUserAsParent($student, $parentUser);
+
+            if ($parentName !== null) {
+                $parentUser->update(['name' => $parentName]);
+            }
+
+            if (!$parentUser->isParent()) {
+                $parentUser->update(['type' => \App\Shared\Support\Enums\UserType::PARENT]);
+            }
+        } else {
+            $parentUser = User::create([
+                'name' => $parentName ?? 'Parent',
+                'email' => $parentEmail,
+                'status' => User::STATUS_ACTIVE,
+                'type' => \App\Shared\Support\Enums\UserType::PARENT,
+            ]);
+        }
+
+        $parentProfile = $this->ensureParentProfile($parentUser, $parentName, $parentEmail);
+        $this->linkParentToStudent($parentProfile, $student);
+    }
+
+    /**
+     * Handle switching to an existing user's parent account and cleanup old one if necessary
+     */
+    private function linkToExistingParentAndCleanup(Student $student, ParentProfile $oldProfile, User $newParentUser, ?string $parentName): void
+    {
+        $this->validateExistingUserAsParent($student, $newParentUser);
+
+        // Update name if provided
+        if ($parentName !== null) {
+            $newParentUser->update(['name' => $parentName]);
+        }
+
+        $newProfile = $this->ensureParentProfile($newParentUser, $parentName, $newParentUser->email);
+
+        // Link new, this will automatically delete the old link due to our logic in linkParentToStudent
+        $this->linkParentToStudent($newProfile, $student);
+
+        // Optional: If old parent user has no more students linked, we could cleanup here
+        // But for now we just let them exist as orphaned users.
+    }
+
+    /**
+     * Validate that existing user can be assigned as parent
+     */
+    private function validateExistingUserAsParent(Student $student, User $parentUser): void
+    {
+        // Prevent using a student account as parent
+        if ($parentUser->isStudent()) {
+            throw new Exception(
+                'Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản sinh viên.'
+            );
+        }
+
+        // Prevent student from assigning themselves as parent
+        if ($student->user_id && $parentUser->id === $student->user_id) {
+            throw new Exception(
+                'Sinh viên không thể tự gán chính mình làm phụ huynh.'
+            );
+        }
+
+        // Check if user is a lecturer
+        if ($parentUser->isLecturer()) {
+            throw new Exception(
+                'Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản giảng viên.'
+            );
+        }
+
+        // Check if user is staff
+        if ($parentUser->isStaff()) {
+            throw new Exception(
+                'Không thể sử dụng email này làm phụ huynh. Email này thuộc về tài khoản nhân viên.'
+            );
+        }
+
+        // Check if this parent already exists and is linked to another student (via parent_student table)
+        $parentProfile = ParentProfile::where('user_id', $parentUser->id)->first();
+        if ($parentProfile) {
+            $existingStudentViaParentStudent = DB::table('parent_student')
+                ->where('parent_id', $parentProfile->id)
+                ->where('student_id', '!=', $student->id)
+                ->first();
+
+            if ($existingStudentViaParentStudent) {
+                $linkedStudent = Student::find($existingStudentViaParentStudent->student_id);
+                throw new Exception(
+                    'Email này đã được liên kết với sinh viên khác (Mã SV: ' . ($linkedStudent?->student_id ?? 'N/A') . '). ' .
+                    'Mỗi phụ huynh chỉ có thể liên kết với một sinh viên qua hệ thống này.'
+                );
+            }
+        }
+    }
+
+    /**
+     * Ensure ParentProfile exists for the user
+     */
+    private function ensureParentProfile(User $parentUser, ?string $parentName, string $parentEmail): ParentProfile
+    {
+        $parentProfile = ParentProfile::where('user_id', $parentUser->id)->first();
+
+        if (! $parentProfile) {
+            // Create new ParentProfile
+            $parentProfile = ParentProfile::create([
+                'user_id' => $parentUser->id,
+                'full_name' => $parentName ?? $parentUser->name ?? 'Parent',
+                'email_snapshot' => $parentEmail,
+                'status' => 'active',
+            ]);
+
+            Log::info('Created new parent profile', [
+                'parent_profile_id' => $parentProfile->id,
+                'user_id' => $parentUser->id,
+            ]);
+        } else {
+            // Update existing ParentProfile if name is provided
+            if ($parentName !== null) {
+                $parentProfile->update([
+                    'full_name' => $parentName,
+                ]);
+            }
+        }
+
+        return $parentProfile;
+    }
+
+    /**
+     * Link parent to student via parent_student pivot table
+     */
+    private function linkParentToStudent(ParentProfile $parentProfile, Student $student): void
+    {
+        // Enforcement of "one parent per student" as requested:
+        // Remove any existing links for this student before adding the new one
+        $deleted = DB::table('parent_student')->where('student_id', $student->id)->delete();
+
+        if ($deleted > 0) {
+            Log::info('Removed existing parent links for student to replace with new one', [
+                'student_id' => $student->id,
+                'removed_count' => $deleted
+            ]);
+        }
+
+        // Create new link (always set as primary)
+        DB::table('parent_student')->insert([
+            'parent_id' => $parentProfile->id,
+            'student_id' => $student->id,
+            'relationship' => 'guardian',
+            'is_primary' => true,
+            'access_level' => 'read_only',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Log::info('Linked parent to student', [
+            'parent_profile_id' => $parentProfile->id,
+            'student_id' => $student->id,
+            'is_primary' => true,
+        ]);
     }
 }

@@ -96,6 +96,8 @@ class LecturerSeeder extends Seeder
                 'name' => $lecturer['name'],
                 'email' => $lecturer['email'],
                 'password' => Hash::make('123456'),
+                'type' => \App\Shared\Support\Enums\UserType::LECTURER,
+                'status' => 'active',
                 'email_verified_at' => now(),
             ]);
 
@@ -125,12 +127,12 @@ class LecturerSeeder extends Seeder
         $degrees = ['PhD', 'Master', 'Bachelor'];
 
         Lecture::create([
+            'user_id' => $user->id,
             'employee_id' => 'LEC'.str_pad((string) $index, 4, '0', STR_PAD_LEFT),
             'title' => $this->extractTitle($lecturerData['name']),
             'first_name' => $firstName,
             'last_name' => $lastName,
             'email' => $lecturerData['email'],
-            'password' => Hash::make('1234'),
             'phone' => '+84 '.rand(100000000, 999999999),
             'mobile_phone' => '+84 '.rand(900000000, 999999999),
             'campus_id' => $campus->id,

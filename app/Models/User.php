@@ -30,6 +30,9 @@ class User extends UserAuditableModel
         'status',
         'department_id',
         'type',
+        'last_login_at',
+        'oauth_provider',
+        'oauth_provider_id',
     ];
 
     /**
@@ -49,6 +52,7 @@ class User extends UserAuditableModel
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'last_login_at' => 'datetime',
         'password' => 'hashed',
         'type' => \App\Shared\Support\Enums\UserType::class,
     ];
@@ -282,9 +286,19 @@ class User extends UserAuditableModel
         return $this->hasOne(ParentProfile::class);
     }
 
+    /**
+     * Get children (students) for this parent user via ParentProfile and parent_student pivot
+     */
     public function children()
     {
-        return $this->hasMany(Student::class, 'parent_user_id');
+        // Access students through the parent_student pivot table
+        if ($this->parentProfile) {
+            return $this->parentProfile->students();
+        }
+
+        // Return empty relationship if no parent profile exists
+        return $this->belongsToMany(Student::class, 'parent_student', 'parent_id', 'student_id')
+            ->whereRaw('1 = 0'); // Always return empty
     }
 
     public function student()

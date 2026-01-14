@@ -59,6 +59,8 @@ class ParentLoginAction
 
         RateLimiter::clear($key);
 
+        $user->update(['last_login_at' => now()]);
+
         $deviceName = $data['device_name'] ?? 'Parent Portal';
         $expiresAt = ($data['remember_me'] ?? false) ? now()->addDays(30) : now()->addHours(8);
 

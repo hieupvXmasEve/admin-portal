@@ -7,14 +7,21 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\StudentService;
 use App\Http\Responses\ApiResponse;
+use App\Shared\Support\Enums\UserType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
+    public function __construct(protected StudentService $studentService)
+    {
+    }
+
     /**
      * Student login
      */
@@ -159,39 +166,61 @@ class AuthController extends Controller
 
         $validator = Validator::make($request->all(), [
             'full_name' => 'required|string|max:100',
-            'email' => 'required|email|unique:students,email',
+            'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
             'phone' => 'nullable|string|max:20',
             'date_of_birth' => 'nullable|date',
+            'parent_name' => 'nullable|string|max:100',
+            'parent_email' => 'nullable|email',
         ]);
 
         if ($validator->fails()) {
             return ApiResponse::validationError($validator->errors()->toArray());
         }
 
-        // Create student with minimal information
-        // Admin will need to complete the profile later
-        $student = Student::create([
-            'full_name' => $request->full_name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'phone' => $request->phone,
-            'date_of_birth' => $request->date_of_birth,
-            'status' => 'inactive', // Requires admin activation
-        ]);
+        return DB::transaction(function () use ($request) {
+            // 1. Create User account for the student
+            $user = User::create([
+                'name' => $request->full_name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'type' => UserType::STUDENT,
+                'status' => User::STATUS_INACTIVE, // Requires admin activation
+                'email_verified_at' => null,
+            ]);
 
-        return ApiResponse::success(
-            data: [
-                'student' => [
-                    'id' => $student->id,
-                    'full_name' => $student->full_name,
-                    'email' => $student->email,
-                    'status' => $student->status,
+            // 2. Create Student profile linked to User
+            $student = Student::create([
+                'user_id' => $user->id,
+                'full_name' => $request->full_name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'date_of_birth' => $request->date_of_birth,
+                'status' => 'inactive',
+            ]);
+
+            // 3. Handle parent assignment if provided
+            if ($request->filled('parent_email')) {
+                $this->studentService->handleParentAssignment(
+                    $student,
+                    $request->parent_email,
+                    $request->parent_name
+                );
+            }
+
+            return ApiResponse::success(
+                data: [
+                    'student' => [
+                        'id' => $student->id,
+                        'full_name' => $student->full_name,
+                        'email' => $student->email,
+                        'status' => $student->status,
+                    ],
                 ],
-            ],
-            message: 'Registration successful. Please wait for admin approval.',
-            status: 201
-        );
+                message: 'Registration successful. Please wait for admin approval.',
+                status: 201
+            );
+        });
     }
 
     /**
@@ -200,7 +229,7 @@ class AuthController extends Controller
     public function forgotPassword(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:students,email',
+            'email' => 'required|email|exists:users,email',
         ]);
 
         if ($validator->fails()) {
@@ -222,7 +251,7 @@ class AuthController extends Controller
     public function resetPassword(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:students,email',
+            'email' => 'required|email|exists:users,email',
             'token' => 'required|string',
             'password' => 'required|string|min:8|confirmed',
         ]);

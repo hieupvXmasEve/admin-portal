@@ -93,7 +93,7 @@ class StudentAcademicSummaryController extends Controller
             'intakeSemester:id,code,name',
             'scholarshipAward',
             'scholarshipAward.scholarshipDefinition:code,name,amount,type',
-            'parentUser:id,name,email',
+            'parentProfiles.user:id,name,email',
         ]);
 
         $overviewData = $this->academicSummaryService->getOverviewData($student);

@@ -32,8 +32,6 @@ class Lecture extends Authenticatable
         'email',
         'phone',
         'mobile_phone',
-        'oauth_provider',
-        'oauth_provider_id',
         'avatar_url',
         'campus_id',
         'department',
@@ -69,13 +67,9 @@ class Lecture extends Authenticatable
         'can_teach_online',
         'is_available_for_assignment',
         'notes',
-        'password',
-        'last_login_at',
-        'email_verified_at',
     ];
 
     protected $hidden = [
-        'password',
         'remember_token',
     ];
 
@@ -97,8 +91,6 @@ class Lecture extends Authenticatable
         'is_active' => 'boolean',
         'can_teach_online' => 'boolean',
         'is_available_for_assignment' => 'boolean',
-        'last_login_at' => 'datetime',
-        'email_verified_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -119,8 +111,6 @@ class Lecture extends Authenticatable
             'email' => ['required', 'email', 'unique:lectures,email'],
             'phone' => ['nullable', 'string', 'max:20'],
             'mobile_phone' => ['nullable', 'string', 'max:20'],
-            'oauth_provider' => ['nullable', 'string', 'in:google'],
-            'oauth_provider_id' => ['nullable', 'string'],
             'avatar_url' => ['nullable', 'string', 'url'],
             'campus_id' => ['required', 'exists:campuses,id'],
             'department' => ['nullable', 'string', 'max:100'],

@@ -62,7 +62,7 @@ class StudentLoginAction
 
         RateLimiter::clear($key);
 
-        $student->update(['last_login_at' => now()]);
+        $user->update(['last_login_at' => now()]);
 
         $deviceName = $data['device_name'] ?? 'Student Portal';
         $expiresAt = ($data['remember_me'] ?? false) ? now()->addDays(30) : now()->addHours(8);

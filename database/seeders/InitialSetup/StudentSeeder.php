@@ -433,13 +433,23 @@ class StudentSeeder extends Seeder
             // Generate student ID
             $studentId = $this->generateStudentId($campus->code, 2024);
 
+            // 1. Create User account
+            $user = \App\Models\User::create([
+                'name' => $studentData['full_name'],
+                'email' => $studentData['email'],
+                'password' => Hash::make('123456'), // Default password
+                'type' => \App\Shared\Support\Enums\UserType::STUDENT,
+                'status' => 'active',
+                'email_verified_at' => now(),
+            ]);
+
+            // 2. Create Student profile
             $student = Student::create([
                 'student_id' => $studentId,
+                'user_id' => $user->id,
                 'full_name' => $studentData['full_name'],
                 'email' => $studentData['email'],
                 'phone' => $studentData['phone'],
-                'password' => Hash::make('123456'), // Default password
-                'oauth_provider' => 'manual',
                 'date_of_birth' => $studentData['date_of_birth'],
                 'gender' => $studentData['gender'],
                 'nationality' => $studentData['nationality'],
@@ -454,7 +464,6 @@ class StudentSeeder extends Seeder
                 'high_school_graduation_year' => $studentData['high_school_graduation_year'],
                 'entrance_exam_score' => $studentData['entrance_exam_score'],
                 'status' => $studentData['status'],
-                'email_verified_at' => now(),
             ]);
 
             // Create student wallet

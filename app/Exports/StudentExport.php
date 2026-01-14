@@ -36,6 +36,7 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
             'statusChangedBy:id,name',
             'intakeSemester:id,name,code',
             'scholarshipAward.scholarship:code,name',
+            'user:id,last_login_at,email_verified_at',
         ]);
     }
 
@@ -168,8 +169,8 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
             $totalCredit,
             // $semesterCredit,
             // $student->admission_notes ?? '',
-            // $student->last_login_at ? $student->last_login_at->format('Y-m-d H:i:s') : 'Never',
-            // $student->email_verified_at ? 'Verified' : 'Not Verified',
+            // $student->user?->last_login_at ? $student->user->last_login_at->format('Y-m-d H:i:s') : 'Never',
+            // $student->user?->email_verified_at ? 'Verified' : 'Not Verified',
             // $student->created_at->format('Y-m-d H:i:s'),
             // $student->updated_at->format('Y-m-d H:i:s'),
         ];

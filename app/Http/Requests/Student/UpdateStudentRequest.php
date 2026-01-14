@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Student;
 
+use App\Models\ParentProfile;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class UpdateStudentRequest extends FormRequest
@@ -21,13 +23,6 @@ class UpdateStudentRequest extends FormRequest
         // Only allow updating fields that are displayed on the UI
         $studentId = $this->route('student')->id;
         $student = $this->route('student');
-
-        // Ensure parent_user relationship is loaded
-        if (! $student->relationLoaded('parentUser')) {
-            $student->load('parentUser');
-        }
-
-        $parentUserId = $student->parent_user_id;
 
         $rules = [
             // Personal Information
@@ -88,9 +83,12 @@ class UpdateStudentRequest extends FormRequest
             'max:255',
         ];
 
+        // Get current parent user ID from parent_student table
+        $currentParentUserId = $this->getCurrentParentUserId($student);
+
         // Custom validation: Check if email is already used by another student's parent
         // One user can only be parent of one student
-        $parentEmailRules[] = function ($attribute, $value, $fail) use ($studentId, $parentUserId) {
+        $parentEmailRules[] = function ($attribute, $value, $fail) use ($studentId) {
             if (empty($value)) {
                 return; // Skip validation if empty (nullable)
             }
@@ -99,36 +97,41 @@ class UpdateStudentRequest extends FormRequest
             $user = User::where('email', $value)->first();
 
             if ($user) {
-                // Check if this user is already a parent of another student
-                $existingStudent = \App\Models\Student::where('parent_user_id', $user->id)
-                    ->where('id', '!=', $studentId)
-                    ->first();
+                // Check if this user already has a ParentProfile linked to another student
+                $parentProfile = ParentProfile::where('user_id', $user->id)->first();
 
-                if ($existingStudent) {
-                    $fail('This email is already linked to another student as parent.');
-                }
+                if ($parentProfile) {
+                    $existingLink = DB::table('parent_student')
+                        ->where('parent_id', $parentProfile->id)
+                        ->where('student_id', '!=', $studentId)
+                        ->first();
 
-                // If student has a parent_user_id, allow updating the same parent
-                // But if trying to change to a different user that's already linked, reject
-                if ($parentUserId && $parentUserId !== $user->id && $existingStudent) {
-                    $fail('This email is already linked to another student as parent.');
+                    if ($existingLink) {
+                        $fail('Email này đã được liên kết với sinh viên khác làm phụ huynh.');
+                    }
                 }
             }
         };
 
         // Validate email uniqueness in users table (but allow if it's the current parent)
-        if ($parentUserId) {
+        if ($currentParentUserId) {
             // Student has a parent user - validate unique but ignore current parent
-            $parentEmailRules[] = Rule::unique('users', 'email')->ignore($parentUserId);
-        } else {
-            // If no parent_user_id, still validate unique in users table
-            // But the custom validation above will check if it's already linked to another student
-            $parentEmailRules[] = Rule::unique('users', 'email');
+            $parentEmailRules[] = Rule::unique('users', 'email')->ignore($currentParentUserId);
         }
 
         $rules['parent_email'] = $parentEmailRules;
 
         return $rules;
+    }
+
+    /**
+     * Get the current parent user ID from parent_student table
+     */
+    private function getCurrentParentUserId(Student $student): ?int
+    {
+        $parentProfile = $student->parentProfiles()->first();
+
+        return $parentProfile?->user_id;
     }
 
     public function messages(): array

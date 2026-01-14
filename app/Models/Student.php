@@ -40,8 +40,6 @@ class Student extends StudentAuditableModel
         'full_name',
         'email',
         'phone',
-        'oauth_provider',
-        'oauth_provider_id',
         'avatar_url',
         'date_of_birth',
         'gender',
@@ -87,17 +85,12 @@ class Student extends StudentAuditableModel
         'status_change_date',
         'status_reason',
         'status_changed_by',
-        'last_login_at',
-        'email_verified_at',
-        'parent_user_id',
         'gc_starting_level',
         'gc_current_level',
         'gc_total_levels',
     ];
 
-    protected $hidden = [
-        'remember_token',
-    ];
+    protected $hidden = [];
 
     protected $casts = [
         'date_of_birth' => 'date:Y-m-d',
@@ -105,8 +98,6 @@ class Student extends StudentAuditableModel
         'expected_graduation_date' => 'date:Y-m-d',
         'status_change_date' => 'date:Y-m-d',
         'entrance_exam_score' => 'decimal:2',
-        'last_login_at' => 'datetime',
-        'email_verified_at' => 'datetime',
         'intake' => 'integer',
     ];
 
@@ -200,9 +191,12 @@ class Student extends StudentAuditableModel
             ->withTimestamps();
     }
 
-    public function parentUser(): BelongsTo
+    /**
+     * Get the primary parent profile for this student
+     */
+    public function primaryParentProfile(): ?\App\Models\ParentProfile
     {
-        return $this->belongsTo(User::class, 'parent_user_id');
+        return $this->parentProfiles()->wherePivot('is_primary', true)->first();
     }
 
     public function program(): BelongsTo

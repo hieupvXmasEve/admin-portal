@@ -176,7 +176,7 @@ Authorization: Bearer {parent_token}
 
 ## Security & Permissions
 
-1. **Relationship Verification**: Parents can only access data for students where `students.parent_user_id` matches the parent's user ID.
+1. **Relationship Verification**: Parents can only access data for students linked to them through the `parent_student` pivot table and `parents` profile table.
 
 2. **Campus Scoping**: Parent roles are assigned per campus, following the existing campus-scoped permission system.
 

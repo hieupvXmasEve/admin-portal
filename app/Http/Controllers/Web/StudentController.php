@@ -221,7 +221,7 @@ class StudentController extends Controller
 
     public function edit(Student $student): Response
     {
-        $student->load(['campus', 'program', 'specialization', 'parentUser']);
+        $student->load(['campus', 'program', 'specialization', 'parentProfiles.user']);
 
         $campuses = Campus::orderBy('name')->get(['id', 'name', 'code']);
         $programs = Program::with('specializations')->orderBy('name')->get();
@@ -234,6 +234,10 @@ class StudentController extends Controller
             ->orderBy('created_at', 'desc')
             ->get(['id', 'version_code']);
 
+        // Get primary parent info for the form
+        $primaryParent = $student->parentProfiles->first();
+        $student->setAttribute('parent_user', $primaryParent?->user);
+
         return Inertia::render('students/Edit', [
             'student' => $student,
             'campuses' => $campuses,
@@ -242,15 +246,10 @@ class StudentController extends Controller
         ]);
     }
 
-    public function update(UpdateStudentRequest $request, Student $student): RedirectResponse|StudentResource|JsonResponse
+    public function update(UpdateStudentRequest $request, Student $student): RedirectResponse
     {
         try {
             $updatedStudent = $this->studentService->updateStudent($student, $request->validated());
-
-            // Return JSON response for API requests
-            if ($request->expectsJson()) {
-                return new StudentResource($updatedStudent);
-            }
 
             // Return redirect for web requests
             return redirect()
@@ -262,12 +261,6 @@ class StudentController extends Controller
                 'error' => $e->getMessage(),
                 'data' => $request->validated(),
             ]);
-
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'error' => $e->getMessage(),
-                ], 422);
-            }
 
             return back()
                 ->withInput()

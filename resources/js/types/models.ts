@@ -136,6 +136,23 @@ export interface User {
     updated_at: string;
 }
 
+export interface ParentProfile {
+    id: number;
+    user_id: number;
+    full_name: string;
+    phone?: string;
+    email_snapshot?: string;
+    status: 'active' | 'inactive';
+    created_at: string;
+    updated_at: string;
+    user?: User;
+    pivot?: {
+        relationship: 'father' | 'mother' | 'guardian' | 'other';
+        is_primary: boolean;
+        access_level: 'read_only';
+    };
+}
+
 export interface Lecture {
     id: number;
     employee_id: string;
@@ -314,9 +331,9 @@ export interface Student {
     gc_current_level?: number;
     gc_total_levels?: number;
 
-    // Parent user
-    parent_user_id?: number | null;
+    // Parent user (via parent_student pivot table)
     parent_user?: User | null;
+    parent_profiles?: ParentProfile[];
 
     // Timestamps
     created_at: string;

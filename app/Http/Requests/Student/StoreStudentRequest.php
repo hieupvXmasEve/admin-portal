@@ -37,6 +37,8 @@ class StoreStudentRequest extends FormRequest
             'high_school_graduation_year' => ['required', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
+            'parent_name' => ['nullable', 'string', 'max:255'],
+            'parent_email' => ['nullable', 'string', 'email', 'max:255'],
         ];
     }
 
@@ -93,6 +95,13 @@ class StoreStudentRequest extends FormRequest
         if ($this->has('date_of_birth') && $this->date_of_birth) {
             $this->merge([
                 'date_of_birth' => date('Y-m-d', strtotime($this->date_of_birth)),
+            ]);
+        }
+
+        // Clean parent email
+        if ($this->has('parent_email') && $this->parent_email) {
+            $this->merge([
+                'parent_email' => strtolower(trim($this->parent_email)),
             ]);
         }
 

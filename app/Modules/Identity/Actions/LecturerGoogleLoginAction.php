@@ -70,15 +70,18 @@ class LecturerGoogleLoginAction
                 ]);
             }
 
-            // 4. Update OAuth provider data on Lecturer model (Legacy compatibility)
-            // Ideally this should be on User, but schema changes are out of scope unless specified.
-            if (!$lecturer->oauth_provider_id) {
-                $lecturer->update([
+            // 4. Update OAuth provider data on User model
+            if (!$user->oauth_provider_id) {
+                $user->update([
                     'oauth_provider' => 'google',
                     'oauth_provider_id' => $payload['sub'],
-                    'avatar_url' => $lecturer->avatar_url ?: ($payload['picture'] ?? null),
-                    'email_verified_at' => $lecturer->email_verified_at ?: now(),
+                    'email_verified_at' => $user->email_verified_at ?: now(),
                 ]);
+            }
+
+            // Update avatar if needed (profile specific)
+            if (!$lecturer->avatar_url && ($payload['picture'] ?? null)) {
+                $lecturer->update(['avatar_url' => $payload['picture']]);
             }
 
             // 5. Check Lecturer Status
@@ -96,7 +99,7 @@ class LecturerGoogleLoginAction
             }
 
             // 6. Update Last Login
-            $lecturer->update(['last_login_at' => now()]);
+            $user->update(['last_login_at' => now()]);
 
             // 7. Generate Token
             $deviceName = $deviceName ?? 'Lecturer Portal (Google)';

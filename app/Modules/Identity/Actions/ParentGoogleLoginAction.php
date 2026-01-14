@@ -77,6 +77,17 @@ class ParentGoogleLoginAction
                 throw new Exception('Parent account is not active. Please contact administration.');
             }
 
+            // Update OAuth provider data if not already set on the User
+            if (!$user->oauth_provider_id) {
+                $user->update([
+                    'oauth_provider' => 'google',
+                    'oauth_provider_id' => $payload['sub'],
+                    'email_verified_at' => $user->email_verified_at ?: now(),
+                ]);
+            }
+
+            $user->update(['last_login_at' => now()]);
+
             $deviceName = $deviceName ?? 'Parent Portal (Google)';
             $expiresAt = $rememberMe ? now()->addDays(30) : now()->addHours(8);
 
