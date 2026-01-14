@@ -84,6 +84,8 @@ class Lecture extends Authenticatable
         'contract_end_date' => 'date',
         'preferred_start_time' => 'datetime',
         'preferred_end_time' => 'datetime',
+        'last_login_at' => 'datetime',
+        'email_verified_at' => 'datetime',
         'graduation_year' => 'integer',
         'max_teaching_hours_per_week' => 'integer',
         'hourly_rate' => 'decimal:2',
@@ -121,7 +123,7 @@ class Lecture extends Authenticatable
             'highest_degree' => ['nullable', 'string', 'max:50'],
             'degree_field' => ['nullable', 'string', 'max:255'],
             'alma_mater' => ['nullable', 'string', 'max:255'],
-            'graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 10)],
+            'graduation_year' => ['nullable', 'integer', 'min:1900', 'max:' . (date('Y') + 10)],
             'hire_date' => ['required', 'date'],
             'contract_start_date' => ['nullable', 'date'],
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
@@ -204,14 +206,14 @@ class Lecture extends Authenticatable
     // Computed Properties / Accessors
     public function getFullNameAttribute(): string
     {
-        return trim($this->first_name.' '.$this->last_name);
+        return trim($this->first_name . ' ' . $this->last_name);
     }
 
     public function getDisplayNameAttribute(): string
     {
         $name = $this->full_name;
         if ($this->title) {
-            $name = $this->title.' '.$name;
+            $name = $this->title . ' ' . $name;
         }
 
         return $name;

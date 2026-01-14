@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Lecturer;
 
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -77,8 +79,8 @@ class LecturerResource extends JsonResource
             // Status Information
             'is_active' => $this->is_active,
             'is_available_for_assignment' => $this->is_available_for_assignment,
-            'last_login_at' => $this->last_login_at?->toISOString(),
-            'email_verified_at' => $this->email_verified_at?->toISOString(),
+            'last_login_at' => self::toIsoString($this->last_login_at),
+            'email_verified_at' => self::toIsoString($this->email_verified_at),
 
             // Course Offerings (when loaded)
             'current_courses' => $this->whenLoaded('courseOfferings', function () {
@@ -107,8 +109,29 @@ class LecturerResource extends JsonResource
             }),
 
             // Timestamps
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'created_at' => self::toIsoString($this->created_at),
+            'updated_at' => self::toIsoString($this->updated_at),
         ];
+    }
+
+    private static function toIsoString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if ($value instanceof CarbonInterface) {
+            return $value->toISOString();
+        }
+
+        if (is_string($value) && $value !== '') {
+            try {
+                return Carbon::parse($value)->toISOString();
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        return null;
     }
 }
