@@ -389,6 +389,7 @@ const exportStudents = async () => {
 </script>
 
 <template>
+
     <Head title="Students Management" />
 
     <div class="space-y-4">
@@ -400,16 +401,20 @@ const exportStudents = async () => {
             <div class="flex items-center space-x-2">
                 <Popover v-model:open="helpPopoverOpen">
                     <PopoverTrigger as-child>
-                        <Button variant="ghost" size="icon" class="h-9 w-9" @mouseenter="helpPopoverOpen = true" @mouseleave="helpPopoverOpen = false">
+                        <Button variant="ghost" size="icon" class="h-9 w-9" @mouseenter="helpPopoverOpen = true"
+                            @mouseleave="helpPopoverOpen = false">
                             <CircleHelp class="h-4 w-4" />
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent class="max-h-[500px] w-96 overflow-y-auto p-4" side="bottom" align="end" @mouseenter="helpPopoverOpen = true" @mouseleave="helpPopoverOpen = false">
+                    <PopoverContent class="max-h-[500px] w-96 overflow-y-auto p-4" side="bottom" align="end"
+                        @mouseenter="helpPopoverOpen = true" @mouseleave="helpPopoverOpen = false">
                         <div class="space-y-3">
                             <h4 class="text-sm font-semibold">Giải thích các trạng thái sinh viên</h4>
                             <div class="space-y-2">
-                                <div v-for="status in statusList" :key="status.value" class="flex items-start gap-2 rounded-md border bg-gray-50 p-2">
-                                    <span :class="`inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.badgeClass}`">
+                                <div v-for="status in statusList" :key="status.value"
+                                    class="flex items-start gap-2 rounded-md border bg-gray-50 p-2">
+                                    <span
+                                        :class="`inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.badgeClass}`">
                                         {{ status.label }}
                                     </span>
                                     <p class="text-sm text-gray-600">{{ status.description }}</p>
@@ -451,14 +456,18 @@ const exportStudents = async () => {
             <CardContent class="p-4">
                 <div class="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex w-full items-center gap-2 md:w-auto">
-                        <DebouncedInput :model-value="filters.search" placeholder="Search by name, email or student ID..." class="w-full md:w-64" @update:model-value="handleSearch" />
-                        <Select v-model="filters.program_id" @update:model-value="(v) => handleSelectFilter('program_id', v)">
+                        <DebouncedInput :model-value="filters.search"
+                            placeholder="Search by name, email or student ID..." class="w-full md:w-64"
+                            @update:model-value="handleSearch" />
+                        <Select v-model="filters.program_id"
+                            @update:model-value="(v) => handleSelectFilter('program_id', v)">
                             <SelectTrigger class="w-full md:w-48">
                                 <SelectValue placeholder="Filter by program..." />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Programs</SelectItem>
-                                <SelectItem v-for="program in programs" :key="program.id" :value="program.id.toString()">
+                                <SelectItem v-for="program in programs" :key="program.id"
+                                    :value="program.id.toString()">
                                     {{ program.name }}
                                 </SelectItem>
                             </SelectContent>
@@ -487,12 +496,14 @@ const exportStudents = async () => {
                     </div>
                 </div>
                 <div class="mt-4">
-                    <DataTable :columns="columns" :data="data" enable-server-sorting :initial-sort="currentSort" :initial-direction="currentDirection" @sort-change="handleSortChange">
+                    <DataTable :columns="columns" :data="data" enable-server-sorting :initial-sort="currentSort"
+                        :initial-direction="currentDirection" @sort-change="handleSortChange">
                         <template #cell-status="{ row }">
                             <TooltipProvider :delay-duration="0">
                                 <Tooltip>
                                     <TooltipTrigger as-child>
-                                        <span :class="`inline-flex cursor-help items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStudentStatusBadgeClass(row.original.status as string)}`">
+                                        <span
+                                            :class="`inline-flex cursor-help items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStudentStatusBadgeClass(row.original.status as string)}`">
                                             {{ getStudentStatusLabel(row.original.status as string) }}
                                         </span>
                                     </TooltipTrigger>
@@ -523,15 +534,17 @@ const exportStudents = async () => {
                                     </Tooltip>
                                     <Tooltip v-if="can('change_student_status')">
                                         <TooltipTrigger as-child>
-                                            <Button variant="ghost" size="icon" @click="goToStudentPlacementAndProgression(row.original)">
+                                            <Button variant="ghost" size="icon"
+                                                @click="goToStudentPlacementAndProgression(row.original)">
                                                 <RotateCw class="h-4 w-4" />
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent> Placement & Progression </TooltipContent>
+                                        <TooltipContent>EGC Placement & Progression</TooltipContent>
                                     </Tooltip>
                                     <Tooltip v-if="can('view_student_action')">
                                         <TooltipTrigger as-child>
-                                            <Button variant="ghost" size="icon" @click="goToStudentActions(row.original)">
+                                            <Button variant="ghost" size="icon"
+                                                @click="goToStudentActions(row.original)">
                                                 <ClipboardCheck class="h-4 w-4" />
                                             </Button>
                                         </TooltipTrigger>
@@ -553,7 +566,8 @@ const exportStudents = async () => {
             </CardContent>
         </Card>
 
-        <DataPagination :pagination-data="students" item-name="students" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+        <DataPagination :pagination-data="students" item-name="students" @navigate="handlePaginationNavigate"
+            @page-size-change="handlePageSizeChange" />
     </div>
 
     <!-- Export Dialog -->
@@ -609,7 +623,8 @@ const exportStudents = async () => {
                             <SelectItem value="all">
                                 <div>
                                     <div class="font-medium">All Students</div>
-                                    <div class="text-muted-foreground text-xs">Export all students from current campus</div>
+                                    <div class="text-muted-foreground text-xs">Export all students from current campus
+                                    </div>
                                 </div>
                             </SelectItem>
                         </SelectContent>
@@ -619,9 +634,12 @@ const exportStudents = async () => {
                 <div class="bg-muted rounded-lg p-3">
                     <div class="mb-2 text-sm font-medium">Export Information</div>
                     <ul class="text-muted-foreground space-y-1 text-xs">
-                        <li v-if="exportForm.scope === 'filtered' && filters.search">• Search: "{{ filters.search }}"</li>
-                        <li v-if="exportForm.scope === 'filtered' && filters.program_id !== 'all'">• Program: {{ programs.find((p) => p.id.toString() === filters.program_id)?.name || 'Unknown' }}</li>
-                        <li v-if="exportForm.scope === 'filtered' && filters.status !== 'all'">• Status: {{ getStatusDisplayText(filters.status) }}</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.search">• Search: "{{ filters.search }}"
+                        </li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.program_id !== 'all'">• Program: {{
+                            programs.find((p) => p.id.toString() === filters.program_id)?.name || 'Unknown' }}</li>
+                        <li v-if="exportForm.scope === 'filtered' && filters.status !== 'all'">• Status: {{
+                            getStatusDisplayText(filters.status) }}</li>
                         <li v-if="exportForm.scope === 'all'">• All students from current campus will be exported</li>
                         <li>• Format: {{ exportForm.format === 'xlsx' ? 'Excel (.xlsx)' : 'CSV (.csv)' }}</li>
                     </ul>

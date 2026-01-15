@@ -142,6 +142,7 @@ const goToStudentPlacement = (studentId: number) => {
 </script>
 
 <template>
+
     <Head title="Academic Progression Audit" />
 
     <div class="space-y-6">
@@ -229,13 +230,15 @@ const goToStudentPlacement = (studentId: number) => {
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <div class="space-y-2">
                         <Label>Semester</Label>
-                        <Select :model-value="filters.semester_id?.toString() ?? 'all'" @update:model-value="(val) => applyFilters({ semester_id: val === 'all' ? null : Number(val) })">
+                        <Select :model-value="filters.semester_id?.toString() ?? 'all'"
+                            @update:model-value="(val) => applyFilters({ semester_id: val === 'all' ? null : Number(val) })">
                             <SelectTrigger>
                                 <SelectValue placeholder="All semesters" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All semesters</SelectItem>
-                                <SelectItem v-for="semester in options.semesters" :key="semester.id" :value="String(semester.id)">
+                                <SelectItem v-for="semester in options.semesters" :key="semester.id"
+                                    :value="String(semester.id)">
                                     {{ semester.name }}
                                 </SelectItem>
                             </SelectContent>
@@ -244,7 +247,8 @@ const goToStudentPlacement = (studentId: number) => {
 
                     <div class="space-y-2">
                         <Label>Event Type</Label>
-                        <Select :model-value="filters.event_type ?? 'all'" @update:model-value="(val) => applyFilters({ event_type: val === 'all' ? null : val })">
+                        <Select :model-value="filters.event_type ?? 'all'"
+                            @update:model-value="(val) => applyFilters({ event_type: val === 'all' ? null : val })">
                             <SelectTrigger>
                                 <SelectValue placeholder="All types" />
                             </SelectTrigger>
@@ -259,13 +263,15 @@ const goToStudentPlacement = (studentId: number) => {
 
                     <div class="space-y-2">
                         <Label>Trigger Source</Label>
-                        <Select :model-value="filters.trigger_source ?? 'all'" @update:model-value="(val) => applyFilters({ trigger_source: val === 'all' ? null : val })">
+                        <Select :model-value="filters.trigger_source ?? 'all'"
+                            @update:model-value="(val) => applyFilters({ trigger_source: val === 'all' ? null : val })">
                             <SelectTrigger>
                                 <SelectValue placeholder="All sources" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All sources</SelectItem>
-                                <SelectItem v-for="source in options.triggerSources" :key="source.value" :value="source.value">
+                                <SelectItem v-for="source in options.triggerSources" :key="source.value"
+                                    :value="source.value">
                                     {{ source.label }}
                                 </SelectItem>
                             </SelectContent>
@@ -274,13 +280,15 @@ const goToStudentPlacement = (studentId: number) => {
 
                     <div class="space-y-2">
                         <Label>To Stage</Label>
-                        <Select :model-value="filters.to_course_stage ?? 'all'" @update:model-value="(val) => applyFilters({ to_course_stage: val === 'all' ? null : val })">
+                        <Select :model-value="filters.to_course_stage ?? 'all'"
+                            @update:model-value="(val) => applyFilters({ to_course_stage: val === 'all' ? null : val })">
                             <SelectTrigger>
                                 <SelectValue placeholder="All stages" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All stages</SelectItem>
-                                <SelectItem v-for="stage in options.courseStages" :key="stage.value" :value="stage.value">
+                                <SelectItem v-for="stage in options.courseStages" :key="stage.value"
+                                    :value="stage.value">
                                     {{ stage.label }}
                                 </SelectItem>
                             </SelectContent>
@@ -290,16 +298,24 @@ const goToStudentPlacement = (studentId: number) => {
                     <div class="space-y-2">
                         <Label>IELTS Score Range</Label>
                         <div class="flex gap-2">
-                            <Input :model-value="filters.ielts_score_min ?? ''" @update:model-value="(val) => updateFieldDebounced('ielts_score_min', val ? Number(val) : null)" type="number" step="0.5" min="0" max="9" placeholder="Min" />
-                            <Input :model-value="filters.ielts_score_max ?? ''" @update:model-value="(val) => updateFieldDebounced('ielts_score_max', val ? Number(val) : null)" type="number" step="0.5" min="0" max="9" placeholder="Max" />
+                            <Input :model-value="filters.ielts_score_min ?? ''"
+                                @update:model-value="(val) => updateFieldDebounced('ielts_score_min', val ? Number(val) : null)"
+                                type="number" step="0.5" min="0" max="9" placeholder="Min" />
+                            <Input :model-value="filters.ielts_score_max ?? ''"
+                                @update:model-value="(val) => updateFieldDebounced('ielts_score_max', val ? Number(val) : null)"
+                                type="number" step="0.5" min="0" max="9" placeholder="Max" />
                         </div>
                     </div>
 
                     <div class="space-y-2">
                         <Label>Date Range</Label>
                         <div class="flex gap-2">
-                            <Input :model-value="filters.from_date ?? ''" @update:model-value="(val) => updateFieldDebounced('from_date', String(val))" type="date" />
-                            <Input :model-value="filters.to_date ?? ''" @update:model-value="(val) => updateFieldDebounced('to_date', String(val))" type="date" />
+                            <Input :model-value="filters.from_date ?? ''"
+                                @update:model-value="(val) => updateFieldDebounced('from_date', String(val))"
+                                type="date" />
+                            <Input :model-value="filters.to_date ?? ''"
+                                @update:model-value="(val) => updateFieldDebounced('to_date', String(val))"
+                                type="date" />
                         </div>
                     </div>
 
@@ -323,7 +339,8 @@ const goToStudentPlacement = (studentId: number) => {
                 <div v-if="progressionEvents.data.length === 0" class="py-12 text-center">
                     <Users class="text-muted-foreground mx-auto h-12 w-12" />
                     <p class="text-muted-foreground mt-4">No progression events found matching your filters.</p>
-                    <p class="text-muted-foreground text-sm">Try adjusting your filters or selecting a different semester.</p>
+                    <p class="text-muted-foreground text-sm">Try adjusting your filters or selecting a different
+                        semester.</p>
                 </div>
 
                 <div v-else class="overflow-x-auto">
@@ -340,7 +357,9 @@ const goToStudentPlacement = (studentId: number) => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="event in progressionEvents.data" :key="event.id" class="hover:bg-muted/50 cursor-pointer border-b" @click="goToStudentPlacement(event.student.id)">
+                            <tr v-for="event in progressionEvents.data" :key="event.id"
+                                class="hover:bg-muted/50 cursor-pointer border-b"
+                                @click="goToStudentPlacement(event.student.id)">
                                 <td class="px-4 py-3">
                                     <div>
                                         <p class="font-medium">{{ event.student.full_name }}</p>
@@ -359,7 +378,8 @@ const goToStudentPlacement = (studentId: number) => {
                                 <td class="px-4 py-3">
                                     <template v-if="event.ielts_certificate">
                                         <Badge variant="secondary">{{ event.ielts_certificate.overall_score }}</Badge>
-                                        <AlertCircle v-if="event.ielts_certificate.missing_documents" class="ml-1 inline h-4 w-4 text-orange-500" />
+                                        <AlertCircle v-if="event.ielts_certificate.missing_documents"
+                                            class="ml-1 inline h-4 w-4 text-orange-500" />
                                     </template>
                                     <span v-else class="text-muted-foreground">-</span>
                                 </td>
@@ -373,7 +393,8 @@ const goToStudentPlacement = (studentId: number) => {
 
                 <Separator class="my-4" />
 
-                <DataPagination :pagination-data="progressionEvents" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+                <DataPagination :pagination-data="progressionEvents" @navigate="handlePaginationNavigate"
+                    @page-size-change="handlePageSizeChange" />
             </CardContent>
         </Card>
     </div>

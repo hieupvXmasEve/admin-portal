@@ -79,13 +79,13 @@ class DashboardService
             //     'semester_number' => $enrollment->semester_number,
             // ] : null,
             'registered_courses' => $registrations->count(),
-            'total_credits' => $registrations->sum('credit_hours'),
+            'total_credits' => $registrations->sum('credit_points'),
             'courses' => $registrations->map(function ($registration) {
                 return [
                     'id' => $registration->id,
                     'course_code' => $registration->courseOffering->unit->code,
                     'course_name' => $registration->courseOffering->unit->name,
-                    'credits' => $registration->credit_hours,
+                    'credits' => $registration->credit_points,
                     'status' => $registration->registration_status,
                 ];
             }),
@@ -241,6 +241,7 @@ class DashboardService
     {
         // Simple logic - can be enhanced
         $latestGPA = GpaCalculation::where('student_id', $student->id)
+            ->current()
             ->orderBy('created_at', 'desc')
             ->first();
 
@@ -253,6 +254,7 @@ class DashboardService
     protected function getProjectedGraduation(Student $student): ?string
     {
         $latestGPA = GpaCalculation::where('student_id', $student->id)
+            ->current()
             ->orderBy('created_at', 'desc')
             ->first();
 

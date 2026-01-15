@@ -12,11 +12,29 @@ use Illuminate\Support\Facades\DB;
 
 class GPACalculationService
 {
-    /**
-     * Calculate current GPA for student
-     */
     public function calculateCurrentGPA(Student $student): array
     {
+        $gpaCalculation = GpaCalculation::query()
+            ->where('student_id', $student->id)
+            ->current()
+            ->orderBy('semester_id', 'desc')
+            ->first();
+        
+        if ($gpaCalculation) {
+            \Log::info($gpaCalculation);
+            return [
+                'gpa' => (float) $gpaCalculation->cumulative_gpa,
+                'quality_points' => (float) $gpaCalculation->cumulative_quality_points,
+                'credit_hours_attempted' => (float) $gpaCalculation->cumulative_credit_points,
+                'credit_hours_earned' => (float) $gpaCalculation->cumulative_credit_points_earned,
+                'total_courses' => $student->academicRecords()
+                    ->where('completion_status', 'completed')
+                    ->where('excluded_from_gpa', false)
+                    ->count(),
+                'from_stored_calculation' => true,
+            ];
+        }
+
         $academicRecords = $student->academicRecords()
             ->where('completion_status', 'completed')
             ->where('excluded_from_gpa', false)
@@ -33,25 +51,46 @@ class GPACalculationService
         }
 
         $totalQualityPoints = $academicRecords->sum('quality_points');
-        $totalCreditHours = $academicRecords->sum('credit_hours');
-        $totalCreditHoursEarned = $academicRecords->sum('credit_hours_earned');
+        $totalCreditPoints = $academicRecords->sum('credit_points');
+        $totalCreditPointsEarned = $academicRecords->sum('credit_points_earned');
 
-        $gpa = $totalCreditHours > 0 ? $totalQualityPoints / $totalCreditHours : 0.0;
+        $gpa = $totalCreditPoints > 0 ? $totalQualityPoints / $totalCreditPoints : 0.0;
 
         return [
             'gpa' => round($gpa, 2),
             'quality_points' => $totalQualityPoints,
-            'credit_hours_attempted' => $totalCreditHours,
-            'credit_hours_earned' => $totalCreditHoursEarned,
+            'credit_hours_attempted' => $totalCreditPoints,
+            'credit_hours_earned' => $totalCreditPointsEarned,
             'total_courses' => $academicRecords->count(),
+            'from_stored_calculation' => false,
         ];
     }
 
-    /**
-     * Calculate semester GPA for student
-     */
     public function calculateSemesterGPA(Student $student, Semester $semester): array
     {
+        $gpaCalculation = GpaCalculation::query()
+            ->where('student_id', $student->id)
+            ->where('semester_id', $semester->id)
+            ->current()
+            ->first();
+
+        if ($gpaCalculation) {
+            return [
+                'semester_id' => $semester->id,
+                'semester_name' => $semester->name,
+                'gpa' => (float) $gpaCalculation->semester_gpa,
+                'quality_points' => (float) $gpaCalculation->semester_quality_points,
+                'credit_hours' => (float) $gpaCalculation->semester_credit_points,
+                'earned_credits' => (float) $gpaCalculation->semester_credit_points_earned,
+                'courses_completed' => $student->academicRecords()
+                    ->where('semester_id', $semester->id)
+                    ->where('completion_status', 'completed')
+                    ->where('excluded_from_gpa', false)
+                    ->count(),
+                'from_stored_calculation' => true,
+            ];
+        }
+
         $academicRecords = $student->academicRecords()
             ->where('semester_id', $semester->id)
             ->where('completion_status', 'completed')
@@ -65,22 +104,26 @@ class GPACalculationService
                 'gpa' => 0.0,
                 'quality_points' => 0.0,
                 'credit_hours' => 0.0,
+                'earned_credits' => 0.0,
                 'courses_completed' => 0,
             ];
         }
 
         $totalQualityPoints = $academicRecords->sum('quality_points');
-        $totalCreditHours = $academicRecords->sum('credit_hours');
+        $totalCreditPoints = $academicRecords->sum('credit_points');
+        $totalCreditPointsEarned = $academicRecords->sum('credit_points_earned');
 
-        $gpa = $totalCreditHours > 0 ? $totalQualityPoints / $totalCreditHours : 0.0;
+        $gpa = $totalCreditPoints > 0 ? $totalQualityPoints / $totalCreditPoints : 0.0;
 
         return [
             'semester_id' => $semester->id,
             'semester_name' => $semester->name,
             'gpa' => round($gpa, 2),
             'quality_points' => $totalQualityPoints,
-            'credit_hours' => $totalCreditHours,
+            'credit_hours' => $totalCreditPoints,
+            'earned_credits' => $totalCreditPointsEarned,
             'courses_completed' => $academicRecords->count(),
+            'from_stored_calculation' => false,
         ];
     }
 

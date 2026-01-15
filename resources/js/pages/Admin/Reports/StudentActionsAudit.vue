@@ -123,6 +123,14 @@ const columns: ColumnDef<StudentActionLog>[] = [
         cell: ({ row }) => h('span', { class: 'truncate max-w-[150px] block' }, row.original.student?.full_name ?? '-'),
     },
     {
+        accessorKey: 'previous_status',
+        header: 'Previous Type',
+        cell: ({ row }) => {
+            const previous_status = row.original.previous_status || 'none';
+            return h(Badge, { class: getActionTypeBadgeClass(previous_status) }, () => getActionTypeLabel(previous_status));
+        },
+    },
+    {
         accessorKey: 'action_type',
         header: 'Action Type',
         cell: ({ row }) => {
@@ -177,6 +185,7 @@ const columns: ColumnDef<StudentActionLog>[] = [
 </script>
 
 <template>
+
     <Head title="Student Actions Audit" />
 
     <div class="space-y-6">
@@ -195,29 +204,34 @@ const columns: ColumnDef<StudentActionLog>[] = [
         <Card>
             <CardHeader>
                 <CardTitle>Action Logs</CardTitle>
-                <CardDescription> Complete audit trail of all student administrative actions. Use filters to find specific records. </CardDescription>
+                <CardDescription> Complete audit trail of all student administrative actions. Use filters to find
+                    specific records. </CardDescription>
             </CardHeader>
             <CardContent>
                 <!-- Filters Row 1 -->
                 <div class="mb-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <div class="relative">
                         <Search class="text-muted-foreground absolute top-2.5 left-2 h-4 w-4" />
-                        <Input placeholder="Search student..." class="pl-8" :model-value="filters.search" @update:model-value="handleSearch" />
+                        <Input placeholder="Search student..." class="pl-8" :model-value="filters.search"
+                            @update:model-value="handleSearch" />
                     </div>
 
-                    <Select :model-value="filters.action_type ?? 'all'" @update:model-value="(v) => (filters.action_type = v === 'all' ? null : v)">
+                    <Select :model-value="filters.action_type ?? 'all'"
+                        @update:model-value="(v) => (filters.action_type = v === 'all' ? null : v)">
                         <SelectTrigger>
                             <SelectValue placeholder="Action Type" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Action Types</SelectItem>
-                            <SelectItem v-for="actionType in options.actionTypes" :key="actionType.value" :value="actionType.value">
+                            <SelectItem v-for="actionType in options.actionTypes" :key="actionType.value"
+                                :value="actionType.value">
                                 {{ actionType.label }}
                             </SelectItem>
                         </SelectContent>
                     </Select>
 
-                    <Select :model-value="filters.semester_id ? String(filters.semester_id) : 'all'" @update:model-value="(v) => (filters.semester_id = v === 'all' ? null : Number(v))">
+                    <Select :model-value="filters.semester_id ? String(filters.semester_id) : 'all'"
+                        @update:model-value="(v) => (filters.semester_id = v === 'all' ? null : Number(v))">
                         <SelectTrigger>
                             <SelectValue placeholder="Semester" />
                         </SelectTrigger>
@@ -229,7 +243,8 @@ const columns: ColumnDef<StudentActionLog>[] = [
                         </SelectContent>
                     </Select>
 
-                    <Select :model-value="filters.actor_id ? String(filters.actor_id) : 'all'" @update:model-value="(v) => (filters.actor_id = v === 'all' ? null : Number(v))">
+                    <Select :model-value="filters.actor_id ? String(filters.actor_id) : 'all'"
+                        @update:model-value="(v) => (filters.actor_id = v === 'all' ? null : Number(v))">
                         <SelectTrigger>
                             <SelectValue placeholder="Changed By" />
                         </SelectTrigger>
@@ -253,7 +268,8 @@ const columns: ColumnDef<StudentActionLog>[] = [
                         <Input type="date" v-model="filters.date_to" />
                     </div>
 
-                    <Select :model-value="filters.missing_documents ?? 'all'" @update:model-value="(v) => (filters.missing_documents = v === 'all' ? null : v)">
+                    <Select :model-value="filters.missing_documents ?? 'all'"
+                        @update:model-value="(v) => (filters.missing_documents = v === 'all' ? null : v)">
                         <SelectTrigger>
                             <SelectValue placeholder="Missing Documents" />
                         </SelectTrigger>
@@ -264,7 +280,8 @@ const columns: ColumnDef<StudentActionLog>[] = [
                         </SelectContent>
                     </Select>
 
-                    <Select :model-value="filters.campus_id ? String(filters.campus_id) : 'all'" @update:model-value="(v) => (filters.campus_id = v === 'all' ? null : Number(v))">
+                    <Select :model-value="filters.campus_id ? String(filters.campus_id) : 'all'"
+                        @update:model-value="(v) => (filters.campus_id = v === 'all' ? null : Number(v))">
                         <SelectTrigger>
                             <SelectValue placeholder="Campus" />
                         </SelectTrigger>
@@ -277,17 +294,20 @@ const columns: ColumnDef<StudentActionLog>[] = [
                     </Select>
                 </div>
 
-                <div v-if="filters.action_type || filters.semester_id || filters.actor_id || filters.missing_documents || filters.search || filters.date_from || filters.date_to" class="mb-4 flex items-center gap-2">
+                <div v-if="filters.action_type || filters.semester_id || filters.actor_id || filters.missing_documents || filters.search || filters.date_from || filters.date_to"
+                    class="mb-4 flex items-center gap-2">
                     <Button variant="ghost" size="sm" class="h-8 px-2 lg:px-3" @click="clearFilters">
                         Reset Filters
                         <X class="ml-2 h-4 w-4" />
                     </Button>
                 </div>
 
-                <DataTable :data="actionLogs.data" :columns="columns" :loading="false" empty-message="No action logs found matching your filters." />
+                <DataTable :data="actionLogs.data" :columns="columns" :loading="false"
+                    empty-message="No action logs found matching your filters." />
 
                 <div class="mt-4">
-                    <DataPagination :pagination-data="actionLogs" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+                    <DataPagination :pagination-data="actionLogs" @navigate="handlePaginationNavigate"
+                        @page-size-change="handlePageSizeChange" />
                 </div>
             </CardContent>
         </Card>

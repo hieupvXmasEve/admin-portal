@@ -334,7 +334,7 @@ export const mainNavItems: NavItem[] = [
             },
             // Group menu Progression Audit
             {
-                title: 'Progression Audit',
+                title: 'English certificate audit',
                 href: '#',
                 icon: Users,
                 children: [

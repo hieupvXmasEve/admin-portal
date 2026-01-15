@@ -30,7 +30,7 @@ class DashboardStatsService
     public function getStats(): array
     {
         $campusId = $this->getCampusId();
-        $cacheKey = "dashboard_stats_campus_{$campusId}";
+        // $cacheKey = "dashboard_stats_campus_{$campusId}";
 
         // return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($campusId) {
         return [

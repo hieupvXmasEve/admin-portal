@@ -103,7 +103,7 @@ class LecturerGoogleLoginAction
 
             // 7. Generate Token
             $deviceName = $deviceName ?? 'Lecturer Portal (Google)';
-            $expiresAt = $rememberMe ? now()->addDays(30) : now()->addHours(8);
+            $expiresAt = $rememberMe ? now()->addDays(30) : now()->addDays(30);
 
             $token = $lecturer->createToken($deviceName, ['lecturer:access'], $expiresAt)->plainTextToken;
 
