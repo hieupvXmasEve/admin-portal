@@ -66,7 +66,7 @@ export interface Question {
     options?: Option[];
 }
 
-export type QuestionType = 'short_text' | 'long_text' | 'single_choice' | 'multi_choice' | 'likert' | 'rating' | 'date' | 'number' | 'file' | 'matrix' | 'yes_no';
+export type QuestionType = 'short_text' | 'long_text' | 'single_choice' | 'multi_choice' | 'rating' | 'date' | 'number' | 'file';
 
 export interface Option {
     id: number;

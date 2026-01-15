@@ -189,6 +189,7 @@ const publishVersion = (versionId: number) => {
 </script>
 
 <template>
+
     <Head :title="`Form: ${form.title}`" />
 
     <div>
@@ -253,12 +254,11 @@ const publishVersion = (versionId: number) => {
             <!-- Main Content -->
             <div class="lg:col-span-3">
                 <Tabs v-model:default-value="currentTab" class="w-full">
-                    <TabsList class="grid w-full grid-cols-5">
+                    <TabsList class="grid w-full grid-cols-4">
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="structure">Structure</TabsTrigger>
                         <TabsTrigger value="versions">Versions</TabsTrigger>
                         <TabsTrigger value="targeting">Targeting</TabsTrigger>
-                        <TabsTrigger value="analytics">Analytics</TabsTrigger>
                     </TabsList>
 
                     <!-- Overview Tab -->
@@ -285,13 +285,15 @@ const publishVersion = (versionId: number) => {
                                         </div>
                                         <div>
                                             <p class="text-sm font-medium">Created</p>
-                                            <p class="text-muted-foreground text-sm">{{ new Date(form.created_at).toLocaleDateString() }}</p>
+                                            <p class="text-muted-foreground text-sm">{{ new
+                                                Date(form.created_at).toLocaleDateString() }}</p>
                                         </div>
                                     </div>
                                     <Separator />
                                     <div>
                                         <p class="text-sm font-medium">Created By</p>
-                                        <p class="text-muted-foreground text-sm">{{ form.creator?.name || 'Unknown' }}</p>
+                                        <p class="text-muted-foreground text-sm">{{ form.creator?.name || 'Unknown' }}
+                                        </p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -312,7 +314,8 @@ const publishVersion = (versionId: number) => {
                                             <p class="text-muted-foreground text-sm">Approved</p>
                                         </div>
                                         <div class="text-center">
-                                            <p class="text-2xl font-bold text-yellow-600">{{ statistics.pending_review }}</p>
+                                            <p class="text-2xl font-bold text-yellow-600">{{ statistics.pending_review
+                                            }}</p>
                                             <p class="text-muted-foreground text-sm">Pending Review</p>
                                         </div>
                                         <div class="text-center">
@@ -334,7 +337,8 @@ const publishVersion = (versionId: number) => {
                                     <div>
                                         <p class="mb-2 text-sm font-medium">Who can submit this form:</p>
                                         <div class="flex flex-wrap gap-2">
-                                            <Badge v-for="role in form.visibility_roles" :key="role.id" variant="secondary">
+                                            <Badge v-for="role in form.visibility_roles" :key="role.id"
+                                                variant="secondary">
                                                 {{ role.name }}
                                             </Badge>
                                         </div>
@@ -343,7 +347,8 @@ const publishVersion = (versionId: number) => {
                                     <div>
                                         <p class="mb-2 text-sm font-medium">Result visibility:</p>
                                         <div class="space-y-2">
-                                            <div v-for="visibility in form.result_visibility" :key="visibility.id" class="bg-muted/50 flex items-center justify-between rounded-lg px-3 py-2">
+                                            <div v-for="visibility in form.result_visibility" :key="visibility.id"
+                                                class="bg-muted/50 flex items-center justify-between rounded-lg px-3 py-2">
                                                 <span class="text-sm">{{ visibility.role?.name }}</span>
                                                 <Badge variant="outline">{{ visibility.visibility_level }}</Badge>
                                             </div>
@@ -359,8 +364,10 @@ const publishVersion = (versionId: number) => {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Form Structure</CardTitle>
-                                <CardDescription v-if="publishedVersion"> Published version: {{ publishedVersion.version_no }} </CardDescription>
-                                <CardDescription v-else class="text-amber-600"> No published version available </CardDescription>
+                                <CardDescription v-if="publishedVersion"> Published version: {{
+                                    publishedVersion.version_no }} </CardDescription>
+                                <CardDescription v-else class="text-amber-600"> No published version available
+                                </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div v-if="publishedVersion" class="space-y-6">
@@ -368,18 +375,24 @@ const publishVersion = (versionId: number) => {
                                     <div v-if="publishedVersion.sections && publishedVersion.sections.length > 0">
                                         <h3 class="mb-4 font-medium">Sections</h3>
                                         <div class="space-y-4">
-                                            <div v-for="section in publishedVersion.sections" :key="section.id" class="rounded-lg border p-4">
+                                            <div v-for="section in publishedVersion.sections" :key="section.id"
+                                                class="rounded-lg border p-4">
                                                 <div class="mb-3">
                                                     <h4 class="font-medium">{{ section.title }}</h4>
-                                                    <p v-if="section.description" class="text-muted-foreground text-sm">{{ section.description }}</p>
+                                                    <p v-if="section.description" class="text-muted-foreground text-sm">
+                                                        {{ section.description }}</p>
                                                 </div>
-                                                <div v-if="section.questions && section.questions.length > 0" class="space-y-2">
-                                                    <div v-for="question in section.questions" :key="question.id" class="bg-muted/50 flex items-center justify-between rounded px-3 py-2">
+                                                <div v-if="section.questions && section.questions.length > 0"
+                                                    class="space-y-2">
+                                                    <div v-for="question in section.questions" :key="question.id"
+                                                        class="bg-muted/50 flex items-center justify-between rounded px-3 py-2">
                                                         <div>
                                                             <p class="text-sm font-medium">{{ question.text }}</p>
-                                                            <p class="text-muted-foreground text-xs">{{ getQuestionTypeLabel(question.type) }}</p>
+                                                            <p class="text-muted-foreground text-xs">{{
+                                                                getQuestionTypeLabel(question.type) }}</p>
                                                         </div>
-                                                        <Badge v-if="question.is_required" variant="outline" size="sm">Required</Badge>
+                                                        <Badge v-if="question.is_required" variant="outline" size="sm">
+                                                            Required</Badge>
                                                     </div>
                                                 </div>
                                             </div>
@@ -390,18 +403,23 @@ const publishVersion = (versionId: number) => {
                                     <div v-if="publishedQuestions.filter((q) => !q.section).length > 0">
                                         <h3 class="mb-4 font-medium">Questions</h3>
                                         <div class="space-y-2">
-                                            <div v-for="question in publishedQuestions.filter((q) => !q.section)" :key="question.id" class="flex items-center justify-between rounded-lg border px-3 py-2">
+                                            <div v-for="question in publishedQuestions.filter((q) => !q.section)"
+                                                :key="question.id"
+                                                class="flex items-center justify-between rounded-lg border px-3 py-2">
                                                 <div>
                                                     <p class="text-sm font-medium">{{ question.text }}</p>
-                                                    <p class="text-muted-foreground text-xs">{{ getQuestionTypeLabel(question.type) }}</p>
+                                                    <p class="text-muted-foreground text-xs">{{
+                                                        getQuestionTypeLabel(question.type) }}</p>
                                                 </div>
-                                                <Badge v-if="question.is_required" variant="outline" size="sm">Required</Badge>
+                                                <Badge v-if="question.is_required" variant="outline" size="sm">Required
+                                                </Badge>
                                             </div>
                                         </div>
                                     </div>
 
                                     <!-- Empty State for Published Version -->
-                                    <div v-if="publishedQuestions.length === 0" class="text-muted-foreground py-8 text-center">
+                                    <div v-if="publishedQuestions.length === 0"
+                                        class="text-muted-foreground py-8 text-center">
                                         <p>No questions in published version</p>
                                         <p class="text-sm">The published version does not contain any questions</p>
                                     </div>
@@ -431,19 +449,23 @@ const publishVersion = (versionId: number) => {
                             </CardHeader>
                             <CardContent>
                                 <div class="space-y-4">
-                                    <div v-for="version in form.versions" :key="version.id" class="flex items-center justify-between rounded-lg border p-4">
+                                    <div v-for="version in form.versions" :key="version.id"
+                                        class="flex items-center justify-between rounded-lg border p-4">
                                         <div class="flex items-center space-x-4">
                                             <Badge variant="outline">v{{ version.version_no }}</Badge>
                                             <div>
                                                 <p class="text-sm font-medium">
                                                     Version {{ version.version_no }}
-                                                    <Badge v-if="version.is_published" variant="default" size="sm" class="ml-2">Published</Badge>
+                                                    <Badge v-if="version.is_published" variant="default" size="sm"
+                                                        class="ml-2">Published</Badge>
                                                 </p>
-                                                <p class="text-muted-foreground text-xs">Created {{ new Date(version.created_at).toLocaleDateString() }}</p>
+                                                <p class="text-muted-foreground text-xs">Created {{ new
+                                                    Date(version.created_at).toLocaleDateString() }}</p>
                                             </div>
                                         </div>
                                         <div class="flex space-x-2">
-                                            <Button v-if="!version.is_published" variant="outline" size="sm" @click="publishVersion(version.id)"> Publish </Button>
+                                            <Button v-if="!version.is_published" variant="outline" size="sm"
+                                                @click="publishVersion(version.id)"> Publish </Button>
                                         </div>
                                     </div>
                                 </div>
@@ -464,7 +486,9 @@ const publishVersion = (versionId: number) => {
                                         <div class="grid grid-cols-2 gap-4">
                                             <div>
                                                 <p class="text-sm font-medium">Campus</p>
-                                                <p class="text-muted-foreground text-sm">{{ target.campus_name || 'All Campuses' }}</p>
+                                                <p class="text-muted-foreground text-sm">
+                                                    {{ target.campus_name || 'All Campuses' }}
+                                                </p>
                                             </div>
                                             <div>
                                                 <p class="text-sm font-medium">Scope</p>
@@ -472,96 +496,21 @@ const publishVersion = (versionId: number) => {
                                             </div>
                                             <div>
                                                 <p class="text-sm font-medium">Start Date</p>
-                                                <p class="text-muted-foreground text-sm">{{ new Date(target.start_at).toLocaleString() }}</p>
+                                                <p class="text-muted-foreground text-sm">{{ new
+                                                    Date(target.start_at).toLocaleString() }}</p>
                                             </div>
                                             <div>
                                                 <p class="text-sm font-medium">End Date</p>
-                                                <p class="text-muted-foreground text-sm">{{ target.end_at ? new Date(target.end_at).toLocaleString() : 'No end date' }}</p>
+                                                <p class="text-muted-foreground text-sm">{{ target.end_at ? new
+                                                    Date(target.end_at).toLocaleString() : 'No end date' }}</p>
                                             </div>
                                         </div>
                                         <div class="mt-2 flex items-center justify-between">
-                                            <p class="text-muted-foreground text-sm">Submission limit: {{ target.submission_limit_per_user }} per user</p>
+                                            <p class="text-muted-foreground text-sm">Submission limit: {{
+                                                target.submission_limit_per_user }} per user</p>
                                             <Badge :variant="target.is_active ? 'default' : 'secondary'">
                                                 {{ target.is_active ? 'Active' : 'Inactive' }}
                                             </Badge>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    <!-- Analytics Tab -->
-                    <TabsContent value="analytics" class="space-y-6">
-                        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle class="text-base">Submission Rate</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div class="text-center">
-                                        <p class="text-2xl font-bold">{{ statistics.total_responses }}</p>
-                                        <p class="text-muted-foreground text-sm">Total Submissions</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle class="text-base">Approval Rate</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div class="text-center">
-                                        <p class="text-2xl font-bold text-green-600">{{ statistics.total_responses > 0 ? Math.round((statistics.approved / statistics.total_responses) * 100) : 0 }}%</p>
-                                        <p class="text-muted-foreground text-sm">{{ statistics.approved }} / {{ statistics.total_responses }}</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle class="text-base">Anonymous</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div class="text-center">
-                                        <p class="text-2xl font-bold text-blue-600">{{ statistics.anonymous_responses }}</p>
-                                        <p class="text-muted-foreground text-sm">Anonymous Responses</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Response Status Breakdown</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div class="space-y-4">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-sm">Submitted</span>
-                                        <div class="flex items-center space-x-2">
-                                            <div class="bg-muted h-2 w-20 rounded-full">
-                                                <div class="h-2 rounded-full bg-blue-500" :style="{ width: `${statistics.total_responses > 0 ? (statistics.submitted / statistics.total_responses) * 100 : 0}%` }"></div>
-                                            </div>
-                                            <span class="text-muted-foreground text-sm">{{ statistics.submitted }}</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-sm">Approved</span>
-                                        <div class="flex items-center space-x-2">
-                                            <div class="bg-muted h-2 w-20 rounded-full">
-                                                <div class="h-2 rounded-full bg-green-500" :style="{ width: `${statistics.total_responses > 0 ? (statistics.approved / statistics.total_responses) * 100 : 0}%` }"></div>
-                                            </div>
-                                            <span class="text-muted-foreground text-sm">{{ statistics.approved }}</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-sm">Rejected</span>
-                                        <div class="flex items-center space-x-2">
-                                            <div class="bg-muted h-2 w-20 rounded-full">
-                                                <div class="h-2 rounded-full bg-red-500" :style="{ width: `${statistics.total_responses > 0 ? (statistics.rejected / statistics.total_responses) * 100 : 0}%` }"></div>
-                                            </div>
-                                            <span class="text-muted-foreground text-sm">{{ statistics.rejected }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -616,7 +565,8 @@ const publishVersion = (versionId: number) => {
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-sm">Latest Version</span>
-                            <span class="text-muted-foreground text-sm">v{{ form?.latest_published_version?.version_no || 1 }}</span>
+                            <span class="text-muted-foreground text-sm">v{{ form?.latest_published_version?.version_no
+                                || 1 }}</span>
                         </div>
                     </CardContent>
                 </Card>

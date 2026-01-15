@@ -287,12 +287,10 @@ class FormController extends Controller
             'long_text' => 'Long Text',
             'single_choice' => 'Single Choice',
             'multi_choice' => 'Multiple Choice',
-            'likert' => 'Likert Scale',
             'rating' => 'Rating',
             'date' => 'Date',
             'number' => 'Number',
             'file' => 'File Upload',
-            'matrix' => 'Matrix',
             'yes_no' => 'Yes/No',
         ];
     }
