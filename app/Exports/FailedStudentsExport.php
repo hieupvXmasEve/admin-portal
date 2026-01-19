@@ -40,7 +40,7 @@ class FailedStudentsExport implements FromArray, WithHeadings, WithStyles, WithT
                 $student['final_letter_grade'] ?? 'F',
                 number_format((float) $student['attendance_percentage'], 2).'%',
                 $student['attempt_number'] ?? 1,
-                $student['retake_eligible'] ? 'Yes' : 'No',
+                // $student['retake_eligible'] ? 'Yes' : 'No',
                 $student['semester_name'] ?? 'N/A',
             ];
         }
@@ -64,7 +64,7 @@ class FailedStudentsExport implements FromArray, WithHeadings, WithStyles, WithT
             'Letter Grade',
             'Attendance %',
             'Attempt Number',
-            'Retake Eligible',
+            // 'Retake Eligible',
             'Semester',
         ];
     }
