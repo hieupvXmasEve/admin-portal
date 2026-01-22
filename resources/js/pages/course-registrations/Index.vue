@@ -84,6 +84,8 @@ const getStatusVariant = (status: string) => {
         case 'dropped':
         case 'withdrawn':
             return 'destructive';
+        case 'defer':
+            return 'secondary';
         default:
             return 'outline';
     }
@@ -133,6 +135,7 @@ const hasActiveFilters = computed(() => {
 </script>
 
 <template>
+
     <Head title="Course Registrations" />
     <!-- Header -->
     <div class="flex items-center justify-between">
@@ -192,7 +195,8 @@ const hasActiveFilters = computed(() => {
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Search</label>
-                    <DebouncedInput v-model="filters.search" @debounced="handleSearch" placeholder="Search students or courses..." :debounce="300" />
+                    <DebouncedInput v-model="filters.search" @debounced="handleSearch"
+                        placeholder="Search students or courses..." :debounce="300" />
                 </div>
 
                 <div class="space-y-2">
@@ -203,7 +207,8 @@ const hasActiveFilters = computed(() => {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Semesters</SelectItem>
-                            <SelectItem v-for="semester in semesters" :key="semester.id" :value="semester.id.toString()">
+                            <SelectItem v-for="semester in semesters" :key="semester.id"
+                                :value="semester.id.toString()">
                                 {{ semester.name }}
                             </SelectItem>
                         </SelectContent>
@@ -212,13 +217,15 @@ const hasActiveFilters = computed(() => {
 
                 <div class="space-y-2">
                     <label class="text-sm font-medium">Course Offering</label>
-                    <Select v-model="filters.course_offering_id" @update:model-value="() => applyFilters(filters)" :disabled="filters.semester_id === 'all'">
+                    <Select v-model="filters.course_offering_id" @update:model-value="() => applyFilters(filters)"
+                        :disabled="filters.semester_id === 'all'">
                         <SelectTrigger>
                             <SelectValue placeholder="All Course Offerings" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Course Offerings</SelectItem>
-                            <SelectItem v-for="offering in courseOfferings" :key="offering.value" :value="offering.value.toString()">
+                            <SelectItem v-for="offering in courseOfferings" :key="offering.value"
+                                :value="offering.value.toString()">
                                 {{ offering.label }}
                             </SelectItem>
                         </SelectContent>
@@ -260,7 +267,8 @@ const hasActiveFilters = computed(() => {
                             <h3 class="text-lg font-semibold">Student ID: {{ registration.student_id }}</h3>
                             <Badge variant="outline">Registration #{{ registration.id }}</Badge>
                         </div>
-                        <h4 class="text-muted-foreground text-base">{{ registration.course_offering?.course_code }} - {{ registration.course_offering?.course_title }}</h4>
+                        <h4 class="text-muted-foreground text-base">{{ registration.course_offering?.course_code }} - {{
+                            registration.course_offering?.course_title }}</h4>
                         <div class="flex items-center gap-2 text-sm">
                             <span>{{ registration.semester?.name }}</span>
                             <span>•</span>
@@ -288,7 +296,8 @@ const hasActiveFilters = computed(() => {
                             <Link :href="`/course-registrations/${registration.id}/edit`">
                                 <Button variant="outline" size="sm">Edit</Button>
                             </Link>
-                            <Button variant="outline" size="sm" @click="deleteRegistration(registration)" class="text-destructive hover:text-destructive"> Delete </Button>
+                            <Button variant="outline" size="sm" @click="deleteRegistration(registration)"
+                                class="text-destructive hover:text-destructive"> Delete </Button>
                         </div>
                     </div>
                 </div>
@@ -307,5 +316,6 @@ const hasActiveFilters = computed(() => {
     </Card>
 
     <!-- Pagination -->
-    <DataPagination v-if="registrations.data.length > 0" :pagination-data="registrations" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+    <DataPagination v-if="registrations.data.length > 0" :pagination-data="registrations"
+        @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 </template>

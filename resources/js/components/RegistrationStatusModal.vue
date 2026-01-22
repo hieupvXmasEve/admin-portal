@@ -45,6 +45,7 @@ const registrationStatuses = [
     { value: 'dropped', label: 'Dropped' },
     { value: 'withdrawn', label: 'Withdrawn' },
     { value: 'completed', label: 'Completed' },
+    { value: 'defer', label: 'Deferred' },
 ];
 
 // Form schema
@@ -150,6 +151,8 @@ const getRegistrationStatusVariant = (status: string) => {
             return 'secondary';
         case 'completed':
             return 'outline';
+        case 'defer':
+            return 'secondary';
         default:
             return 'outline';
     }
@@ -194,7 +197,8 @@ const handleClose = () => {
                     <UserCheck class="h-5 w-5" />
                     Bulk Registration Status Update
                 </DialogTitle>
-                <DialogDescription> Update registration status for multiple students in {{ courseOffering.course_code }} - {{ courseOffering.course_title }} </DialogDescription>
+                <DialogDescription> Update registration status for multiple students in {{ courseOffering.course_code }}
+                    - {{ courseOffering.course_title }} </DialogDescription>
             </DialogHeader>
 
             <form @submit="onSubmit" class="flex flex-1 flex-col space-y-6 overflow-hidden">
@@ -209,7 +213,8 @@ const handleClose = () => {
                                         <SelectValue placeholder="Select current status" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="status in registrationStatuses" :key="status.value" :value="status.value">
+                                        <SelectItem v-for="status in registrationStatuses" :key="status.value"
+                                            :value="status.value">
                                             {{ status.label }}
                                         </SelectItem>
                                     </SelectContent>
@@ -229,7 +234,8 @@ const handleClose = () => {
                                         <SelectValue placeholder="Select target status" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem v-for="status in registrationStatuses" :key="status.value" :value="status.value">
+                                        <SelectItem v-for="status in registrationStatuses" :key="status.value"
+                                            :value="status.value">
                                             {{ status.label }}
                                         </SelectItem>
                                     </SelectContent>
@@ -243,7 +249,8 @@ const handleClose = () => {
                 <!-- Student Selection -->
                 <div v-if="values.fromStatus" class="flex flex-1 flex-col overflow-hidden">
                     <div class="mb-4">
-                        <h3 class="text-lg font-semibold">Students with {{ registrationStatuses.find((s) => s.value === values.fromStatus)?.label }} status ({{ filteredStudents.length }})</h3>
+                        <h3 class="text-lg font-semibold">Students with {{registrationStatuses.find((s) => s.value ===
+                            values.fromStatus)?.label}} status ({{ filteredStudents.length }})</h3>
                     </div>
 
                     <FormField name="studentIds">
@@ -255,18 +262,14 @@ const handleClose = () => {
                                         <h3 class="mt-2 text-sm font-semibold text-gray-900">No students found</h3>
                                         <p class="text-muted-foreground mt-1 text-sm">
                                             No students have
-                                            {{ registrationStatuses.find((s) => s.value === values.fromStatus)?.label.toLowerCase() }} status.
+                                            {{registrationStatuses.find((s) => s.value ===
+                                                values.fromStatus)?.label.toLowerCase()}} status.
                                         </p>
                                     </div>
-                                    <DataTable
-                                        v-else
-                                        :data="filteredStudents"
-                                        :columns="columns"
-                                        :enable-row-selection="true"
-                                        :show-column-toggle="false"
+                                    <DataTable v-else :data="filteredStudents" :columns="columns"
+                                        :enable-row-selection="true" :show-column-toggle="false"
                                         empty-message="No students found with the selected status."
-                                        @selection-change="handleSelectionChange"
-                                    />
+                                        @selection-change="handleSelectionChange" />
                                 </div>
                             </FormControl>
                             <FormMessage />
@@ -276,8 +279,10 @@ const handleClose = () => {
 
                 <DialogFooter>
                     <Button type="button" variant="outline" @click="handleClose"> Cancel </Button>
-                    <Button type="submit" :disabled="loading || selectedStudentsCount === 0 || !values.fromStatus || !values.toStatus">
-                        {{ loading ? 'Updating...' : `Update ${selectedStudentsCount} Student${selectedStudentsCount !== 1 ? 's' : ''}` }}
+                    <Button type="submit"
+                        :disabled="loading || selectedStudentsCount === 0 || !values.fromStatus || !values.toStatus">
+                        {{ loading ? 'Updating...' : `Update ${selectedStudentsCount} Student${selectedStudentsCount !==
+                            1 ? 's' : ''}` }}
                     </Button>
                 </DialogFooter>
             </form>

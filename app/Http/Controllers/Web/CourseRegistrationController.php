@@ -311,7 +311,7 @@ class CourseRegistrationController extends Controller
     public function update(Request $request, CourseRegistration $adminCourseRegistration): RedirectResponse
     {
         $request->validate([
-            'registration_status' => 'required|in:registered,confirmed,dropped,withdrawn,completed',
+            'registration_status' => 'required|in:registered,confirmed,dropped,withdrawn,completed,defer',
             'notes' => 'nullable|string|max:1000',
         ]);
 
@@ -630,7 +630,7 @@ class CourseRegistrationController extends Controller
     private function validateAdminRegistration(Student $student, CourseOffering $courseOffering): void
     {
         // Check if student is active
-        if (!$student->isActive()) {
+        if (! $student->isActive()) {
             throw new \Exception('Student is not active.');
         }
 
@@ -666,7 +666,7 @@ class CourseRegistrationController extends Controller
         $reasons = [];
 
         // Check if student is active
-        if (!$student->isActive()) {
+        if (! $student->isActive()) {
             $eligible = false;
             $reasons[] = 'Student is not active';
         }

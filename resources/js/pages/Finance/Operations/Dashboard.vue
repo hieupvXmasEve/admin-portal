@@ -1,29 +1,29 @@
 <script setup lang="ts">
-import DataTable from '@/components/DataTable.vue';
 import DataPagination from '@/components/DataPagination.vue';
+import DataTable from '@/components/DataTable.vue';
+import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTableFilters } from '@/composables/useFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, type Semester } from '@/types/finance';
 import { Head, Link } from '@inertiajs/vue3';
+import type { ColumnDef } from '@tanstack/vue-table';
 import {
     AlertTriangle,
     ArrowRight,
     CheckCircle2,
-    CreditCard,
     DollarSign,
     FileText,
     Play,
     RotateCcw,
     Wallet,
-    XCircle,
+    XCircle
 } from 'lucide-vue-next';
 import { computed } from 'vue';
-import { useTableFilters } from '@/composables/useFilters';
-import type { ColumnDef } from '@tanstack/vue-table';
 
 interface KpiStats {
     eligible_count: number;
@@ -72,6 +72,7 @@ interface StudentBillingSummary {
     };
     invoice_status: 'paid' | 'partial' | 'unpaid' | 'pending' | null;
     invoice_number: string | null;
+    invoice_id: number | null;
     due_date: string | null;
 }
 
@@ -81,6 +82,7 @@ interface DashboardFilters {
     stage: string;
     defer: string;
     retake: string;
+    search: string;
     per_page: number;
     page: number;
 }
@@ -101,7 +103,7 @@ const {
     handlePaginationNavigate,
     handlePageSizeChange,
     handleSelectFilter,
-    applyFilters,
+    updateFieldDebounced,
 } = useTableFilters<DashboardFilters>(
     route('finance.operations.dashboard'),
     props.filters,
@@ -376,6 +378,11 @@ defineOptions({
 
         <!-- Filters Row -->
         <div class="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg border">
+            <div class="flex-1 min-w-[200px]">
+                <DebouncedInput v-model="filters.search" :debounce="300" placeholder="Tìm theo tên hoặc mã SV"
+                    @debounced="val => updateFieldDebounced('search', val)" />
+            </div>
+
             <div class="flex-1 min-w-[150px]">
                 <Select :model-value="filters.status || 'all'"
                     @update:model-value="val => handleSelectFilter('status', val)">
@@ -451,7 +458,8 @@ defineOptions({
                         <div>
                             <div class="font-medium">{{ row.original.full_name }} </div>
                             <div class="text-muted-foreground text-xs">{{ row.original.student_id }}</div>
-                            <Badge v-if="row.original.stage === 'EGC'" variant="secondary" class="mt-1 text-[10px]">
+                            <Badge v-if="row.original.status === 'intake_pre_uni_gc'" variant="secondary"
+                                class="mt-1 text-[10px]">
                                 EGC {{ row.original.gc_current_level || '' }}
                             </Badge>
                             <Badge v-else-if="row.original.stage === 'Major'" variant="outline"
@@ -538,7 +546,8 @@ defineOptions({
                     <!-- Actions Column -->
                     <template #cell-actions="{ row }">
                         <div class="text-right">
-                            <Link :href="route('finance.students.charges', row.original.id)">
+                            <Link v-if="row.original.invoice_id"
+                                :href="route('finance.invoices.show', { invoice: row.original.invoice_id })">
                                 <Button variant="outline" size="sm">
                                     <ArrowRight class="h-4 w-4" />
                                 </Button>

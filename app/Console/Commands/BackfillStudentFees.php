@@ -8,7 +8,6 @@ use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\TuitionPlan;
 use App\Models\TuitionPlanTerm;
-use App\Models\Unit;
 use App\Models\VoucherApplication;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -55,28 +54,28 @@ class BackfillStudentFees extends Command
             // Case 1: Major Cohort (intake_major = 1, intake_gc IS NULL)
             // Case 2: EGC Cohort (intake_gc = 1)
             // We'll fetch all matching students and process them
-            
+
             $students = Student::query()
                 ->where(function ($query) use ($semesterId) {
                     $query->where(function ($q) use ($semesterId) {
                         $q->where('intake_major', $semesterId)
-                          ->whereNull('intake_gc');
+                            ->whereNull('intake_gc');
                     })
-                    ->orWhere(function ($q) use ($semesterId) {
-                        $q->where('intake_gc', $semesterId);
-                    });
+                        ->orWhere(function ($q) use ($semesterId) {
+                            $q->where('intake_gc', $semesterId);
+                        });
                 })
                 // ->whereNotIn('status', Student::BLOCKED_STATUSES) // Optional: fail-safe
                 ->get();
 
-            $this->info("Found " . $students->count() . " eligible students.");
+            $this->info('Found '.$students->count().' eligible students.');
             $bar = $this->output->createProgressBar($students->count());
             $bar->start();
 
             foreach ($students as $student) {
                 try {
                     $isEgcCohort = $student->intake_gc == $semesterId;
-                    
+
                     // 2. Ensure Invoice Exists
                     $invoice = StudentInvoice::firstOrCreate(
                         [
@@ -84,7 +83,7 @@ class BackfillStudentFees extends Command
                             'semester_id' => $semesterId,
                         ],
                         [
-                            'invoice_number' => 'INV-BF-' . time() . '-' . $student->student_id . '-' . $semesterId,
+                            'invoice_number' => 'INV-BF-'.time().'-'.$student->student_id.'-'.$semesterId,
                             'due_date' => now()->addDays(30),
                             'opened_at' => now(),
                             'status' => 'draft', // or 'issued' if backfilling history? Let's stick to draft/issued
@@ -103,19 +102,17 @@ class BackfillStudentFees extends Command
                     if ($isEgcCohort) {
                         $startLevel = $student->gc_starting_level ?? 0;
                         $totalLevels = $student->gc_total_levels ?? 6;
-                        
+
                         // Charge for Current Level + Next Level (max 2 levels per semester)
-                        // Logic: Semester 1 roughly maps to starting levels. 
+                        // Logic: Semester 1 roughly maps to starting levels.
                         // If we are strict backfilling 'Semester 1' logic:
                         // Level A = startLevel
                         // Level B = startLevel + 1 (if <= totalLevels)
-                        
+
                         $levelsToCharge = [];
-                        if ($startLevel <= 6) { // Sanity check
-                             $levelsToCharge[] = $startLevel;
-                             if (($startLevel + 1) <= $totalLevels) {
-                                 $levelsToCharge[] = $startLevel + 1;
-                             }
+                        $levelsToCharge[] = $startLevel;
+                        if ($startLevel + 1 < $totalLevels) { // Sanity check
+                            $levelsToCharge[] = $startLevel + 1;
                         }
 
                         foreach ($levelsToCharge as $level) {
@@ -130,16 +127,17 @@ class BackfillStudentFees extends Command
                                 "EGC Level {$level} Fee",
                                 "Level {$level} Fee" // Key for idempotency (matches description)
                             );
-                            
-                            if ($charge) $chargesToLink[] = $charge;
-                        }
 
-                    } 
+                            if ($charge) {
+                                $chargesToLink[] = $charge;
+                            }
+                        }
+                    }
                     // === CASE 1: MAJOR COHORT ===
                     else {
                         // Tuition Fee from Plan
                         $amount = $this->getTuitionFee($student, $semesterId);
-                        
+
                         if ($amount > 0) {
                             $charge = $this->createChargeIfNotExists(
                                 $student,
@@ -164,7 +162,7 @@ class BackfillStudentFees extends Command
                                         }
 
                                         if ($discount > 0) {
-                                             $schCharge = $this->createChargeIfNotExists(
+                                            $schCharge = $this->createChargeIfNotExists(
                                                 $student,
                                                 $semesterId,
                                                 FinanceCharge::TYPE_SCHOLARSHIP_CREDIT,
@@ -172,7 +170,9 @@ class BackfillStudentFees extends Command
                                                 "Scholarship Credit ({$scholarshipDef->code})",
                                                 'SCHOLARSHIP'
                                             );
-                                            if ($schCharge) $chargesToLink[] = $schCharge;
+                                            if ($schCharge) {
+                                                $chargesToLink[] = $schCharge;
+                                            }
                                         }
                                     }
                                 }
@@ -184,9 +184,9 @@ class BackfillStudentFees extends Command
                     $voucherApp = VoucherApplication::with('voucherDefinition')
                         ->where('student_id', $student->id)
                         ->whereNull('invoice_id')
-                        ->where(function($q) use ($semesterId) {
-                             $q->where('semester_id', $semesterId)
-                               ->orWhereNull('semester_id');
+                        ->where(function ($q) use ($semesterId) {
+                            $q->where('semester_id', $semesterId)
+                                ->orWhereNull('semester_id');
                         })
                         ->first();
 
@@ -195,7 +195,7 @@ class BackfillStudentFees extends Command
 
                         if ($def->voucher_type === 'discount') {
                             $vAmount = (float) $voucherApp->discount_amount;
-                            
+
                             // Fallback calculation if amount is missing
                             if ($vAmount <= 0) {
                                 if ($def->discount_type === 'fixed_amount') {
@@ -208,7 +208,7 @@ class BackfillStudentFees extends Command
                                         }
                                     }
                                     $vAmount = ($baseAmount * $def->discount_value) / 100;
-                                    
+
                                     if ($def->max_discount_amount && $vAmount > $def->max_discount_amount) {
                                         $vAmount = (float) $def->max_discount_amount;
                                     }
@@ -226,28 +226,28 @@ class BackfillStudentFees extends Command
                                     VoucherApplication::class,
                                     $voucherApp->id
                                 );
-    
+
                                 if ($vCharge) {
                                     $chargesToLink[] = $vCharge;
-                                    
+
                                     $voucherApp->update([
                                         'invoice_id' => $invoice->id,
                                         'finance_charge_id' => $vCharge->id,
                                         'discount_amount' => $vAmount, // Save calculated amount
                                         'applied_at' => now(),
-                                        'status' => 'applied'
+                                        'status' => 'applied',
                                     ]);
                                     $stats['vouchers_applied']++;
                                 }
                             }
                         } elseif ($def->voucher_type === 'informational') {
-                             // Info only voucher: No Finance Charge created
-                             $voucherApp->update([
+                            // Info only voucher: No Finance Charge created
+                            $voucherApp->update([
                                 'invoice_id' => $invoice->id,
                                 'applied_at' => now(),
-                                'status' => 'applied'
-                             ]);
-                             $stats['vouchers_applied']++;
+                                'status' => 'applied',
+                            ]);
+                            $stats['vouchers_applied']++;
                         }
                     }
 
@@ -256,7 +256,7 @@ class BackfillStudentFees extends Command
                         if ($c->wasRecentlyCreated) {
                             $stats['charges_created']++;
                         }
-                        
+
                         InvoiceLine::firstOrCreate([
                             'invoice_id' => $invoice->id,
                             'charge_id' => $c->id,
@@ -268,9 +268,8 @@ class BackfillStudentFees extends Command
 
                     $stats['processed']++;
                     $bar->advance();
-
                 } catch (\Exception $e) {
-                    Log::error("Backfill Error Student {$student->id}: " . $e->getMessage());
+                    Log::error("Backfill Error Student {$student->id}: ".$e->getMessage());
                     $stats['errors']++;
                     $this->error("Error processing student {$student->student_id}: {$e->getMessage()}");
                 }
@@ -278,9 +277,9 @@ class BackfillStudentFees extends Command
 
             $bar->finish();
             $this->newLine();
-            
+
             DB::commit();
-            
+
             $this->table(
                 ['Metric', 'Count'],
                 [
@@ -291,36 +290,38 @@ class BackfillStudentFees extends Command
                     ['Errors', $stats['errors']],
                 ]
             );
-            $this->info("Backfill completed successfully.");
-
+            $this->info('Backfill completed successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->error("Critical Error: " . $e->getMessage());
-            $this->error("Transaction rolled back.");
+            $this->error('Critical Error: '.$e->getMessage());
+            $this->error('Transaction rolled back.');
+
             return 1;
         }
-        
+
         return 0;
     }
 
     private function getTuitionFee(Student $student, int $semesterId): float
     {
         $intakeSemesterId = $student->intake_major ?? $student->intake_gc ?? $student->intake;
-        
-        if (!$student->curriculum_version_id || !$intakeSemesterId) {
-             return 0;
+
+        if (! $student->curriculum_version_id || ! $intakeSemesterId) {
+            return 0;
         }
 
         $plan = TuitionPlan::where('curriculum_version_id', $student->curriculum_version_id)
             ->where('intake_semester_id', $intakeSemesterId)
             ->first();
 
-        if (!$plan) return 0;
+        if (! $plan) {
+            return 0;
+        }
 
         // Assuming standard term logic: Semester 1 of intake = Term 1?
         // Or do we match semester_id directly?
         // TuitionPlanTerm has semester_id.
-        
+
         $term = TuitionPlanTerm::where('tuition_plan_id', $plan->id)
             ->where('semester_id', $semesterId)
             ->first();
@@ -329,35 +330,34 @@ class BackfillStudentFees extends Command
     }
 
     private function createChargeIfNotExists(
-        Student $student, 
-        int $semesterId, 
-        string $type, 
-        float $amount, 
-        string $description, 
+        Student $student,
+        int $semesterId,
+        string $type,
+        float $amount,
+        string $description,
         string $dedupKey = '',
         ?string $sourceType = null,
         ?int $sourceId = null
-    ): ?FinanceCharge
-    {
+    ): ?FinanceCharge {
         // Idempotency: distinct by type + semester + student + amount?
         // Or if dedupKey is provided, use it?
         // Let's use Source for dedupKey if possible, but Source is constrained morph.
         // We will just check existence by Type + Semester + Student (+ approx amount)
-        
+
         $query = FinanceCharge::where('student_id', $student->id)
             ->where('semester_id', $semesterId)
             ->where('charge_type', $type);
 
         // If EGC, we might have multiple charges of same type (Level 1, Level 2).
-        // So we need to distinguish them. Description check? Or Source? 
+        // So we need to distinguish them. Description check? Or Source?
         if ($type === FinanceCharge::TYPE_EGC_LEVEL_FEE && $dedupKey) {
             $query->where('description', 'like', "%$dedupKey%");
         }
-        
+
         // If Voucher/Scholarship, check source to ensure unique application
         if ($sourceType && $sourceId) {
             $query->where('source_type', $sourceType)
-                  ->where('source_id', $sourceId);
+                ->where('source_id', $sourceId);
         }
 
         if ($query->exists()) {

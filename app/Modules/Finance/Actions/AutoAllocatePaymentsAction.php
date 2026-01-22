@@ -76,6 +76,21 @@ class AutoAllocatePaymentsAction
                     continue;
                 }
 
+                $chargeInvoiceMap = InvoiceLine::query()
+                    ->whereIn('charge_id', $charges->pluck('id'))
+                    ->pluck('invoice_id', 'charge_id')
+                    ->toArray();
+
+                $invoiceRemaining = [];
+                $invoiceIds = array_unique(array_values($chargeInvoiceMap));
+                if (! empty($invoiceIds)) {
+                    $invoiceRemaining = StudentInvoice::query()
+                        ->whereIn('id', $invoiceIds)
+                        ->get()
+                        ->mapWithKeys(fn($invoice) => [$invoice->id => $invoice->outstanding_balance])
+                        ->toArray();
+                }
+
                 // Sort charges by priority
                 $charges = $charges->sortBy(function ($charge) use ($priorityOrder) {
                     $index = array_search($charge->charge_type, $priorityOrder);
@@ -105,7 +120,23 @@ class AutoAllocatePaymentsAction
                             continue;
                         }
 
-                        $allocateAmount = min($available, $outstanding);
+                        $invoiceId = $chargeInvoiceMap[$charge->id] ?? null;
+                        $invoiceAvailable = null;
+                        if ($invoiceId) {
+                            $invoiceAvailable = $invoiceRemaining[$invoiceId] ?? 0;
+                            if ($invoiceAvailable <= 0) {
+                                continue;
+                            }
+                        }
+
+                        $allocateAmount = min(
+                            $available,
+                            $outstanding,
+                            $invoiceAvailable ?? $outstanding
+                        );
+                        if ($allocateAmount <= 0) {
+                            continue;
+                        }
 
                         // Create Allocation
                         PaymentAllocation::create([
@@ -121,6 +152,10 @@ class AutoAllocatePaymentsAction
 
                         // Update local variables
                         $available -= $allocateAmount;
+
+                        if ($invoiceId) {
+                            $invoiceRemaining[$invoiceId] -= $allocateAmount;
+                        }
 
                         // Track allocations for this charge within the loop
                         if (! isset($charge->temp_paid)) {

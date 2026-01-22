@@ -73,7 +73,7 @@ class CurriculumBySemesterResource extends JsonResource
      */
     protected function formatTotalGrade(?array $gradeInfo): ?array
     {
-        if (!$gradeInfo) {
+        if (! $gradeInfo) {
             return null;
         }
 
@@ -271,7 +271,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function formatGradeDisplay(?array $gradeInfo): ?string
     {
-        if (!$gradeInfo) {
+        if (! $gradeInfo) {
             return null;
         }
 
@@ -289,7 +289,7 @@ class CurriculumBySemesterResource extends JsonResource
 
     protected function getPerformanceIndicator(?array $gradeInfo): ?array
     {
-        if (!$gradeInfo || !$gradeInfo['grade_points']) {
+        if (! $gradeInfo || ! $gradeInfo['grade_points']) {
             return null;
         }
 
@@ -323,6 +323,7 @@ class CurriculumBySemesterResource extends JsonResource
             'withdrawn' => 'Withdrawn',
             'completed' => 'Completed',
             'failed' => 'Failed',
+            'defer' => 'Deferred',
             default => ucfirst($status),
         };
     }
@@ -337,6 +338,7 @@ class CurriculumBySemesterResource extends JsonResource
             'withdrawn' => 'orange',
             'completed' => 'green',
             'failed' => 'red',
+            'defer' => 'orange',
             default => 'gray',
         };
     }
@@ -351,6 +353,7 @@ class CurriculumBySemesterResource extends JsonResource
             'withdrawn' => 'minus-circle',
             'completed' => 'check-circle',
             'failed' => 'x-circle',
+            'defer' => 'clock',
             default => 'circle',
         };
     }
@@ -363,6 +366,7 @@ class CurriculumBySemesterResource extends JsonResource
 
         // Return the status of the most recent registration
         $latest = collect($registrations)->sortByDesc('registration_date')->first();
+
         return $latest['status'] ?? null;
     }
 
@@ -545,6 +549,7 @@ class CurriculumBySemesterResource extends JsonResource
     protected function calculateRegistrationRate(): float
     {
         $summary = $this->resource['overall_summary'];
+
         return $summary['total_subjects'] > 0
             ? ($summary['registered_subjects'] / $summary['total_subjects']) * 100
             : 0;
