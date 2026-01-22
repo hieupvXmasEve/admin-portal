@@ -10,7 +10,6 @@ use App\Models\CourseOffering;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -516,6 +515,7 @@ class StudentAcademicSummaryService
             'enrolled', 'active', 'registered', 'confirmed' => 'primary',
             'dropped' => 'warning',
             'withdrawn' => 'destructive',
+            'defer' => 'warning',
             default => 'secondary',
         };
     }

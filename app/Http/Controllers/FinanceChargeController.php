@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
+use App\Models\StudentInvoice;
 use App\Modules\Finance\Services\FinanceChargeService;
 use App\Modules\Finance\Services\PaymentService;
 use Illuminate\Http\Request;
@@ -37,7 +38,7 @@ class FinanceChargeController extends Controller
             ->with(['student', 'semester', 'createdBy']);
 
         // Apply search filter
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $query->where(function ($q) use ($validated) {
                 $q->where('description', 'like', "%{$validated['search']}%")
                     ->orWhereHas('student', function ($q) use ($validated) {
@@ -49,17 +50,17 @@ class FinanceChargeController extends Controller
         }
 
         // Apply semester filter
-        if (!empty($validated['semester_id'])) {
+        if (! empty($validated['semester_id'])) {
             $query->where('semester_id', $validated['semester_id']);
         }
 
         // Apply charge type filter
-        if (!empty($validated['charge_type']) && $validated['charge_type'] !== 'all') {
+        if (! empty($validated['charge_type']) && $validated['charge_type'] !== 'all') {
             $query->where('charge_type', $validated['charge_type']);
         }
 
         // Apply status filter
-        if (!empty($validated['status']) && $validated['status'] !== 'all') {
+        if (! empty($validated['status']) && $validated['status'] !== 'all') {
             $query->where('status', $validated['status']);
         }
 
@@ -114,21 +115,43 @@ class FinanceChargeController extends Controller
     public function create(Request $request): Response
     {
         $semesters = Semester::orderBy('start_date', 'desc')->get();
-        
+
         $chargeTypes = collect(FinanceCharge::CHARGE_TYPES)->map(fn($type) => [
             'value' => $type,
             'label' => ucwords(str_replace('_', ' ', $type)),
         ]);
 
         $student = null;
+        $draftInvoices = [];
+
         if ($request->has('student_id')) {
             $student = Student::find($request->get('student_id'));
+
+            // Check if there's a semester selected
+            if ($request->has('semester_id') && $student) {
+                $semesterId = (int) $request->get('semester_id');
+
+                // Find all draft invoices for this student and semester
+                $draftInvoices = StudentInvoice::where('student_id', $student->id)
+                    ->where('semester_id', $semesterId)
+                    ->where('status', 'draft')
+                    ->orderBy('created_at', 'desc')
+                    ->get()
+                    ->map(fn($invoice) => [
+                        'id' => $invoice->id,
+                        'invoice_number' => $invoice->invoice_number,
+                        'status' => $invoice->status,
+                        'created_at' => $invoice->created_at->format('Y-m-d H:i:s'),
+                    ])
+                    ->toArray();
+            }
         }
 
         return Inertia::render('Finance/Charges/Create', [
             'semesters' => $semesters,
             'chargeTypes' => $chargeTypes,
             'student' => $student,
+            'draftInvoices' => $draftInvoices,
         ]);
     }
 
@@ -144,6 +167,7 @@ class FinanceChargeController extends Controller
             'amount' => 'required|numeric',
             'description' => 'required|string|max:500',
             'effective_at' => 'nullable|date',
+            'invoice_id' => 'nullable|integer|exists:student_invoices,id',
         ]);
 
         try {
@@ -191,7 +215,8 @@ class FinanceChargeController extends Controller
         $charges = $this->chargeService->getStudentCharges($student->id, $semesterId);
         $balance = $this->paymentService->getStudentBalance($student->id, $semesterId);
 
-        $semesters = Semester::whereIn('id', 
+        $semesters = Semester::whereIn(
+            'id',
             FinanceCharge::where('student_id', $student->id)
                 ->distinct()
                 ->pluck('semester_id')

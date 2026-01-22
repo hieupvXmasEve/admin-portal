@@ -117,6 +117,7 @@ class StudentDetailResource extends JsonResource
             'waitlisted' => 'Waitlisted',
             'dropped' => 'Dropped',
             'withdrawn' => 'Withdrawn',
+            'defer' => 'Deferred',
             default => 'Unknown',
         };
     }
@@ -131,6 +132,7 @@ class StudentDetailResource extends JsonResource
             'waitlisted' => 'yellow',
             'dropped' => 'red',
             'withdrawn' => 'gray',
+            'defer' => 'orange',
             default => 'gray',
         };
     }

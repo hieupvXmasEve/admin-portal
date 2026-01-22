@@ -6,9 +6,7 @@ namespace App\Modules\Finance\Queries\Operations;
 
 use App\Models\DeferCase;
 use App\Models\FinanceCharge;
-use App\Models\Semester;
 use App\Models\Student;
-use App\Models\StudentInvoice;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -17,9 +15,9 @@ class GetBillingDashboardStatsQuery
     public function handle(?int $semesterId): array
     {
         $campusId = app('campus')?->id;
-        
-        if (!$semesterId) {
-             return [
+
+        if (! $semesterId) {
+            return [
                 'eligible_count' => 0,
                 'charged_count' => 0,
                 'uncharged_count' => 0,
@@ -41,20 +39,23 @@ class GetBillingDashboardStatsQuery
             ->where('intake_semester_id', '<=', $semesterId)
             ->when($campusId, fn($q) => $q->where('campus_id', $campusId))
             ->where(function (Builder $q) use ($semesterId) {
-                $q->whereHas('courseRegistrations', fn($sq) => $sq->where('semester_id', $semesterId));
+                // Just get course registration_status is not 'defer'
+                $q->whereHas('courseRegistrations', fn($sq) => $sq->where('semester_id', $semesterId)->whereNotIn('registration_status', ['defer', 'dropped', 'withdrawn']));
                 $q->orWhereHas('deferCases', fn($sq) => $sq->where('semester_id', $semesterId));
-                $q->orWhereHas('financeCharges', fn($sq) => 
-                    $sq->where('semester_id', $semesterId)->where('status', FinanceCharge::STATUS_ACTIVE)
+                $q->orWhereHas(
+                    'financeCharges',
+                    fn($sq) => $sq->where('semester_id', $semesterId)->where('status', FinanceCharge::STATUS_ACTIVE)
                 );
                 $q->orWhereHas('invoices', fn($sq) => $sq->where('semester_id', $semesterId));
             });
 
         $eligibleCount = $eligibleQuery->count();
-        
+
         // 2. Charged / Uncharged
         $chargedCount = (clone $eligibleQuery)->where(function ($q) use ($semesterId) {
-            $q->whereHas('financeCharges', fn($sq) => 
-                $sq->where('semester_id', $semesterId)->where('status', FinanceCharge::STATUS_ACTIVE)
+            $q->whereHas(
+                'financeCharges',
+                fn($sq) => $sq->where('semester_id', $semesterId)->where('status', FinanceCharge::STATUS_ACTIVE)
             )->orWhereHas('invoices', fn($sq) => $sq->where('semester_id', $semesterId));
         })->count();
 
@@ -63,10 +64,10 @@ class GetBillingDashboardStatsQuery
             ->active()
             ->where('semester_id', $semesterId)
             ->when($campusId, fn($q) => $q->whereHas('student', fn($sq) => $sq->where('campus_id', $campusId)));
-        
+
         $totalCharges = (float) (clone $chargesBase)->charges()->sum('amount');
         $totalCredits = (float) (clone $chargesBase)->credits()->sum(DB::raw('ABS(amount)'));
-        
+
         $totalPaid = (float) DB::table('payment_allocations')
             ->join('finance_charges', 'payment_allocations.charge_id', '=', 'finance_charges.id')
             ->join('students', 'finance_charges.student_id', '=', 'students.id')
@@ -97,22 +98,22 @@ class GetBillingDashboardStatsQuery
             ->when($campusId, fn($q) => $q->where('students.campus_id', $campusId))
             ->groupBy('finance_charges.student_id')
             ->get();
-            
+
         $paidCount = 0;
         $partialCount = 0;
         $unpaidCount = 0;
-        
+
         foreach ($studentBalances as $s) {
-            $netDue = (float)$s->net_due;
-            $paid = (float)$s->paid;
+            $netDue = (float) $s->net_due;
+            $paid = (float) $s->paid;
             $balance = $netDue - $paid;
-            
+
             if ($balance <= 0) {
-                 $paidCount++;
+                $paidCount++;
             } elseif ($paid > 0) {
-                 $partialCount++;
+                $partialCount++;
             } else {
-                 $unpaidCount++;
+                $unpaidCount++;
             }
         }
 
@@ -122,30 +123,32 @@ class GetBillingDashboardStatsQuery
             ->where('fee_policy', DeferCase::POLICY_PRESERVE)
             ->when($campusId, fn($q) => $q->whereHas('student', fn($sq) => $sq->where('campus_id', $campusId)))
             ->count();
-            
+
         $deferForfeitCount = DeferCase::query()
             ->where('semester_id', $semesterId)
             ->where('fee_policy', DeferCase::POLICY_FORFEIT)
             ->when($campusId, fn($q) => $q->whereHas('student', fn($sq) => $sq->where('campus_id', $campusId)))
             ->count();
-            
+
         // 6. Retake Unpaid
         $retakeUnpaidCount = Student::query()
             ->when($campusId, fn($q) => $q->where('campus_id', $campusId))
-            ->whereHas('courseRegistrations', fn($q) => 
-                $q->where('semester_id', $semesterId)->where('is_retake', true)
+            ->whereHas(
+                'courseRegistrations',
+                fn($q) => $q->where('semester_id', $semesterId)->where('is_retake', true)
             )
             ->where(function ($q) use ($semesterId) {
-                $q->whereDoesntHave('financeCharges', fn($sq) => 
-                    $sq->where('semester_id', $semesterId)
-                       ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
-                       ->active()
+                $q->whereDoesntHave(
+                    'financeCharges',
+                    fn($sq) => $sq->where('semester_id', $semesterId)
+                        ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+                        ->active()
                 );
                 $q->orWhereHas('financeCharges', function ($sq) use ($semesterId) {
                     $sq->where('semester_id', $semesterId)
-                       ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
-                       ->active()
-                       ->whereRaw('(amount - (SELECT COALESCE(SUM(allocated_amount), 0) FROM payment_allocations WHERE charge_id = finance_charges.id)) > 0');
+                        ->where('charge_type', FinanceCharge::TYPE_RETAKE_FEE)
+                        ->active()
+                        ->whereRaw('(amount - (SELECT COALESCE(SUM(allocated_amount), 0) FROM payment_allocations WHERE charge_id = finance_charges.id)) > 0');
                 });
             })
             ->count();

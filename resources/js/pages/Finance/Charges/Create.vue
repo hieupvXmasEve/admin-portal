@@ -3,14 +3,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberField, NumberFieldContent, NumberFieldInput } from '@/components/ui/number-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { type ChargeType, type Semester, type StudentBasic } from '@/types/finance';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { useStudentSearch } from '@/composables';
-import { ref, watch } from 'vue';
+import { type ChargeType, type Semester, type StudentBasic } from '@/types/finance';
+import { Head, Link, useForm } from '@inertiajs/vue3';
+import { ArrowLeft, Search } from 'lucide-vue-next';
+import { ref } from 'vue';
 import { toast } from 'vue-sonner';
-import { ArrowLeft } from 'lucide-vue-next';
+
+
 
 interface Props {
     chargeTypes: { value: string; label: string }[];
@@ -27,6 +30,7 @@ const form = useForm({
     amount: null as number | null,
     semester_id: null as number | null,
     due_date: '',
+    invoice_id: null as number | null,
 });
 
 // Student search
@@ -38,6 +42,7 @@ const {
 } = useStudentSearch({ limit: 5 });
 
 const selectedStudent = ref<StudentBasic | null>(props.student ?? null);
+const selectedInvoiceId = ref<number | null>(null);
 
 const selectStudent = (student: any) => {
     selectedStudent.value = student;
@@ -48,7 +53,11 @@ const selectStudent = (student: any) => {
 const clearStudent = () => {
     selectedStudent.value = null;
     form.student_id = null;
+    form.semester_id = null;
+    selectedInvoiceId.value = null;
+    form.invoice_id = null;
 };
+
 
 const handleSubmit = () => {
     form.post(route('finance.charges.store'), {
@@ -147,7 +156,7 @@ const handleSubmit = () => {
                                         form.errors.charge_type }}</p>
                                 </div>
                                 <div class="space-y-2">
-                                    <Label for="semester_id">Học kỳ</Label>
+                                    <Label for="semester_id">Học kỳ *</Label>
                                     <Select v-model="form.semester_id">
                                         <SelectTrigger>
                                             <SelectValue placeholder="Chọn học kỳ" />
@@ -158,6 +167,8 @@ const handleSubmit = () => {
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    <p v-if="form.errors.semester_id" class="text-sm text-red-500">{{
+                                        form.errors.semester_id }}</p>
                                 </div>
                             </div>
 
@@ -171,8 +182,24 @@ const handleSubmit = () => {
 
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <div class="space-y-2">
-                                    <Label for="amount">Số tiền (VNĐ) *</Label>
-                                    <Input v-model.number="form.amount" type="number" placeholder="Nhập số tiền" />
+                                    <NumberField id="amount" :default-value="form.amount ?? 0"
+                                        :model-value="form.amount ?? 0" @update:model-value="(v: number | null) => {
+                                            if (v) { form.amount = v }
+                                            else { form.amount = null }
+                                        }" :format-options="{
+                                            style: 'currency',
+                                            currency: 'VND',
+                                            currencyDisplay: 'code',
+                                            currencySign: 'accounting',
+                                        }">
+                                        <Label for="amount">Số tiền (VNĐ) *</Label>
+                                        <NumberFieldContent>
+                                            <NumberFieldInput />
+                                        </NumberFieldContent>
+                                    </NumberField>
+
+                                    <!-- <Label for="amount">Số tiền (VNĐ) *</Label> -->
+                                    <!-- <Input v-model.number="form.amount" type="number" placeholder="Nhập số tiền" /> -->
                                     <p class="text-muted-foreground text-xs">Số dương = Phí, Số âm = Tín dụng/Hoàn tiền
                                     </p>
                                     <p v-if="form.errors.amount" class="text-sm text-red-500">{{ form.errors.amount }}
@@ -195,7 +222,7 @@ const handleSubmit = () => {
                         </CardHeader>
                         <CardContent class="space-y-3">
                             <Button type="submit" class="w-full"
-                                :disabled="form.processing || !form.student_id || !form.charge_type">
+                                :disabled="form.processing || !form.student_id || !form.charge_type || !form.semester_id">
                                 Tạo khoản phí
                             </Button>
                             <Link :href="route('finance.charges.index')">
@@ -211,7 +238,8 @@ const handleSubmit = () => {
                         <CardContent class="text-muted-foreground space-y-2 text-sm">
                             <p>• Số tiền <strong>dương</strong>: Khoản phí sinh viên cần đóng</p>
                             <p>• Số tiền <strong>âm</strong>: Tín dụng/hoàn tiền cho sinh viên</p>
-                            <p>• Học kỳ là tùy chọn nhưng nên chọn để dễ quản lý</p>
+                            <p>• Mọi khoản phí sẽ được gán vào hóa đơn của học kỳ</p>
+                            <p>• Nếu chưa có hóa đơn, hệ thống sẽ tự động tạo mới</p>
                         </CardContent>
                     </Card>
                 </div>

@@ -514,7 +514,7 @@ export interface CourseRegistrationRecord {
     academic_year: string;
     semester_start_date: string | null;
     semester_end_date: string | null;
-    registration_status: 'enrolled' | 'active' | 'registered' | 'confirmed' | 'completed' | 'dropped' | 'withdrawn';
+    registration_status: 'enrolled' | 'active' | 'registered' | 'confirmed' | 'completed' | 'dropped' | 'withdrawn' | 'defer';
     registration_date: string;
     registration_method: string;
     final_grade: string | null;
@@ -865,7 +865,7 @@ export interface CourseRegistration {
     student_id: number;
     course_offering_id: number;
     semester_id: number;
-    registration_status: 'registered' | 'confirmed' | 'dropped' | 'withdrawn' | 'completed';
+    registration_status: 'registered' | 'confirmed' | 'dropped' | 'withdrawn' | 'completed' | 'defer';
     registration_date: string;
     registration_method: 'online' | 'advisor' | 'admin_override';
     credit_hours: number;

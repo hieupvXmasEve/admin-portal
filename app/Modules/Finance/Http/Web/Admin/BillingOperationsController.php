@@ -17,7 +17,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class   BillingOperationsController extends Controller
+class BillingOperationsController extends Controller
 {
     public function dashboard(
         Request $request,
@@ -30,14 +30,15 @@ class   BillingOperationsController extends Controller
             'stage' => 'nullable|string',
             'defer' => 'nullable|string',
             'retake' => 'nullable|string',
+            'search' => 'nullable|string',
             'per_page' => 'nullable|integer',
             'page' => 'nullable|integer',
         ]);
 
         $currentSemester = Semester::where('is_active', true)->first();
-        
-        $semesterId = isset($validated['semester_id']) 
-            ? (int) $validated['semester_id'] 
+
+        $semesterId = isset($validated['semester_id'])
+            ? (int) $validated['semester_id']
             : ($currentSemester?->id);
 
         $currentSemesterObj = $semesterId ? Semester::find($semesterId) : $currentSemester;
@@ -57,6 +58,7 @@ class   BillingOperationsController extends Controller
                 'stage' => $validated['stage'] ?? 'all',
                 'defer' => $validated['defer'] ?? 'all',
                 'retake' => $validated['retake'] ?? 'all',
+                'search' => $validated['search'] ?? '',
                 'per_page' => isset($validated['per_page']) ? (int) $validated['per_page'] : 20,
             ],
         ]);

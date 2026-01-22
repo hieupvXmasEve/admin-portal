@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CourseRegistration extends AuditableModel
 {
@@ -56,7 +55,7 @@ class CourseRegistration extends AuditableModel
             'student_id' => ['required', 'exists:students,id'],
             'course_offering_id' => ['required', 'exists:course_offerings,id'],
             'semester_id' => ['required', 'exists:semesters,id'],
-            'registration_status' => ['nullable', 'in:pending,registered,confirmed,dropped,withdrawn,completed,waitlisted,failed'],
+            'registration_status' => ['nullable', 'in:pending,registered,confirmed,dropped,withdrawn,completed,waitlisted,failed,defer'],
             'registration_method' => ['nullable', 'in:online,advisor,admin_override'],
             'credit_points' => ['required', 'numeric', 'min:0', 'max:24'],
             'credit_hours' => ['required', 'numeric', 'min:0', 'max:10'],
