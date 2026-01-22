@@ -4,13 +4,18 @@
 
 `useFilters` là một composable mạnh mẽ và đơn giản để quản lý filtering, pagination, và URL synchronization trong ứng dụng Vue.js với Inertia.js.
 
+## Ưu tiên sử dụng (DataTable + DataPagination)
+
+- Khi dùng `DataTable` và `DataPagination`, **ưu tiên `useInertiaFilters`** theo tài liệu `RULES_useInertiaFilters.md`.
+- `useTableFilters` chỉ dùng cho trang legacy chưa chuyển đổi.
+
 ### Tính năng chính
 
 ✅ **URL Synchronization**: Tự động sync filters với URL  
 ✅ **Filter Preservation**: Giữ nguyên filters khi pagination/page size change  
 ✅ **Type Safety**: Hỗ trợ TypeScript với generic types  
 ✅ **Debounced Filtering**: Tối ưu hiệu suất với debounced input  
-✅ **Easy API**: Interface đơn giản, dễ sử dụng  
+✅ **Easy API**: Interface đơn giản, dễ sử dụng
 
 ## Cài đặt và Import
 
@@ -53,14 +58,14 @@ interface Props {
 const props = defineProps<Props>();
 
 // Khởi tạo composable với type safety
-const { 
-    filters, 
-    hasActiveFilters, 
-    debouncedApplyFilters, 
-    clearFilters, 
-    handlePaginationNavigate, 
-    handlePageSizeChange, 
-    updateFieldDebounced 
+const {
+    filters,
+    hasActiveFilters,
+    debouncedApplyFilters,
+    clearFilters,
+    handlePaginationNavigate,
+    handlePageSizeChange,
+    updateFieldDebounced
 } = useTableFilters<UnitsFilters>(
     route('units.index'), // Base URL
     props.filters || {},  // Initial filters from backend
@@ -79,26 +84,16 @@ const updateSearchFilter = (value: string) => {
 ```vue
 <template>
     <!-- Search Input -->
-    <Input 
-        placeholder="Search units..." 
-        :model-value="filters.search" 
-        @update:model-value="updateSearchFilter" 
-    />
+    <Input placeholder="Search units..." :model-value="filters.search" @update:model-value="updateSearchFilter" />
 
     <!-- Clear Filters Button -->
-    <Button v-if="hasActiveFilters" @click="clearFilters">
-        Clear Filters
-    </Button>
+    <Button v-if="hasActiveFilters" @click="clearFilters"> Clear Filters </Button>
 
     <!-- Data Table -->
     <DataTable :data="data" :columns="columns" />
 
     <!-- Pagination -->
-    <DataPagination 
-        :pagination-data="units" 
-        @navigate="handlePaginationNavigate" 
-        @page-size-change="handlePageSizeChange" 
-    />
+    <DataPagination :pagination-data="units" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
 </template>
 ```
 
@@ -107,20 +102,19 @@ const updateSearchFilter = (value: string) => {
 ### useTableFilters
 
 **Signature:**
+
 ```typescript
-function useTableFilters<T>(
-    baseIndexUrl: string,
-    initialFilters?: Record<string, any>,
-    only?: string[]
-): FilterComposableReturn<T>
+function useTableFilters<T>(baseIndexUrl: string, initialFilters?: Record<string, any>, only?: string[]): FilterComposableReturn<T>;
 ```
 
 **Parameters:**
+
 - `baseIndexUrl`: URL cơ sở cho trang index (ví dụ: `/units`)
 - `initialFilters`: Giá trị filters ban đầu từ backend props
 - `only`: Array các keys để Inertia.js chỉ reload (default: `['items', 'filters']`)
 
 **Return Object:**
+
 ```typescript
 {
     // State
@@ -131,12 +125,12 @@ function useTableFilters<T>(
     applyFilters: (newFilters: Partial<T>) => void;         // Apply filters ngay lập tức
     debouncedApplyFilters: (newFilters: Partial<T>) => void; // Apply filters với debounce (500ms)
     clearFilters: () => void;                               // Reset tất cả filters
-    
+
     // Pagination
     handlePaginationNavigate: (url: string) => void;        // Xử lý pagination navigation
     handlePageSizeChange: (size: number) => void;           // Xử lý thay đổi page size
-    
-    // Helpers  
+
+    // Helpers
     updateField: (key: keyof T, value: any) => void;        // Update 1 field ngay lập tức
     updateFieldDebounced: (key: keyof T, value: any) => void; // Update 1 field với debounce
     appendCurrentQueryTo: (url: string) => string;          // Append current query to URL
@@ -171,6 +165,10 @@ const handleDirectionChange = (direction: 'asc' | 'desc') => {
 };
 ```
 
+### 2.1. DataTable Sorting (Khuyến nghị)
+
+- Nếu cần sort từ `DataTable`, chuyển sang `useInertiaFilters` để dùng `@sort-change` + `currentSort/currentDirection`.
+
 ### 3. Boolean Filters
 
 ```typescript
@@ -183,9 +181,9 @@ const togglePrerequisites = (hasPrerequisites: boolean) => {
 
 ```typescript
 const handleCreditPointsChange = (min: number, max: number) => {
-    applyFilters({ 
-        min_credit_points: min, 
-        max_credit_points: max 
+    applyFilters({
+        min_credit_points: min,
+        max_credit_points: max,
     });
 };
 ```
@@ -197,7 +195,7 @@ const applyAdvancedFilters = () => {
     applyFilters({
         credit_points: 15,
         has_prerequisites: true,
-        in_curriculum: true
+        in_curriculum: true,
     });
 };
 ```
@@ -212,15 +210,11 @@ const applyAdvancedFilters = () => {
         <!-- Search -->
         <div class="search-input">
             <Search class="search-icon" />
-            <Input 
-                placeholder="Tìm kiếm units..." 
-                :model-value="filters.search" 
-                @update:model-value="updateSearchFilter" 
-            />
+            <Input placeholder="Tìm kiếm units..." :model-value="filters.search" @update:model-value="updateSearchFilter" />
         </div>
 
         <!-- Sort -->
-        <Select :model-value="filters.sort" @update:model-value="val => applyFilters({ sort: val })">
+        <Select :model-value="filters.sort" @update:model-value="(val) => applyFilters({ sort: val })">
             <SelectTrigger>
                 <SelectValue placeholder="Sắp xếp theo" />
             </SelectTrigger>
@@ -232,7 +226,7 @@ const applyAdvancedFilters = () => {
         </Select>
 
         <!-- Direction -->
-        <Select :model-value="filters.direction" @update:model-value="val => applyFilters({ direction: val })">
+        <Select :model-value="filters.direction" @update:model-value="(val) => applyFilters({ direction: val })">
             <SelectTrigger>
                 <SelectValue placeholder="Thứ tự" />
             </SelectTrigger>
@@ -244,19 +238,9 @@ const applyAdvancedFilters = () => {
 
         <!-- Boolean Filters -->
         <div class="boolean-filters">
-            <Button 
-                :variant="filters.has_prerequisites ? 'default' : 'outline'"
-                @click="applyFilters({ has_prerequisites: !filters.has_prerequisites })"
-            >
-                Có điều kiện tiên quyết
-            </Button>
-            
-            <Button 
-                :variant="filters.has_equivalents ? 'default' : 'outline'"
-                @click="applyFilters({ has_equivalents: !filters.has_equivalents })"
-            >
-                Có môn tương đương
-            </Button>
+            <Button :variant="filters.has_prerequisites ? 'default' : 'outline'" @click="applyFilters({ has_prerequisites: !filters.has_prerequisites })"> Có điều kiện tiên quyết </Button>
+
+            <Button :variant="filters.has_equivalents ? 'default' : 'outline'" @click="applyFilters({ has_equivalents: !filters.has_equivalents })"> Có môn tương đương </Button>
         </div>
 
         <!-- Clear Filters -->
@@ -327,6 +311,7 @@ class UnitsController extends Controller
 ## Best Practices
 
 ### 1. **Type Safety**
+
 ```typescript
 // ✅ Luôn định nghĩa interface cho filters
 interface MyFilters {
@@ -340,6 +325,7 @@ const { filters } = useTableFilters<MyFilters>(...);
 ```
 
 ### 2. **Performance**
+
 ```typescript
 // ✅ Sử dụng debounced cho text input
 const updateSearchFilter = (value: string) => {
@@ -353,16 +339,18 @@ const handleStatusChange = (status: string) => {
 ```
 
 ### 3. **URL Structure**
+
 ```typescript
 // ✅ Đảm bảo 'only' parameter khớp với backend response structure
 const filters = useTableFilters(
     '/units',
     initialFilters,
-    ['units', 'filters'] // Backend trả về { units: {...}, filters: {...} }
+    ['units', 'filters'], // Backend trả về { units: {...}, filters: {...} }
 );
 ```
 
 ### 4. **Error Handling**
+
 ```typescript
 // Composable đã tự động handle các lỗi URL parsing
 // Không cần thêm try-catch khi sử dụng
@@ -371,17 +359,21 @@ const filters = useTableFilters(
 ## Troubleshooting
 
 ### 1. **Filters không được preserve khi pagination**
+
 **Nguyên nhân:** Sai `only` parameter  
 **Giải pháp:** Đảm bảo `only` array khớp với backend response keys
 
 ### 2. **URL không sync với filters**
+
 **Nguyên nhân:** Backend không trả về filters trong response  
 **Giải pháp:** Đảm bảo controller trả về filters trong Inertia response
 
 ### 3. **Type errors với filters**
+
 **Nguyên nhân:** Không định nghĩa interface hoặc sai generic type  
 **Giải pháp:** Định nghĩa interface chi tiết và sử dụng generic type
 
 ### 4. **Performance issues với search**
+
 **Nguyên nhân:** Không sử dụng debounce  
 **Giải pháp:** Sử dụng `updateFieldDebounced` cho text input

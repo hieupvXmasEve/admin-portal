@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: manual
 ---
 
 # Filtering & Pagination Rules (Inertia + Laravel)

@@ -435,10 +435,10 @@ class InvoiceService
         $scholarship = $award->scholarship;
 
         // Check if scholarship is valid for the invoice date
-        $invoiceDate = $invoice->created_at ?? now();
-        if (! $this->isScholarshipValid($scholarship, $invoiceDate)) {
-            return;
-        }
+        // $invoiceDate = $invoice->created_at ?? now();
+        // if (! $this->isScholarshipValid($scholarship, $invoiceDate)) {
+        //     return;
+        // }
 
         // Calculate total from tuition items only (not entire subtotal)
         $tuitionTotal = $invoice->items()

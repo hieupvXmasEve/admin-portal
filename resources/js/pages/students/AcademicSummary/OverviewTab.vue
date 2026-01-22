@@ -436,19 +436,20 @@ const hasAcademicConcerns = computed(() => {
                                 </div>
                             </div>
 
-                            <div v-if="overview.program_info.semester" class="flex items-center gap-3">
+                            <div v-if="overview.academic_info.intake_school" class="flex items-center gap-3">
                                 <BookOpen class="text-muted-foreground h-4 w-4 flex-shrink-0" />
                                 <div class="min-w-0 flex-1">
-                                    <p class="text-muted-foreground text-sm">Intake Year</p>
-                                    <p class="font-medium">{{ overview.program_info.semester.code }}</p>
-                                    <p class="font-medium">{{ overview.program_info.semester.intake_year }}</p>
+                                    <p class="text-muted-foreground text-sm">Intake School</p>
+                                    <p class="font-medium">{{ overview.academic_info.intake_school.code }}</p>
+                                    <!-- <p class="font-medium">{{ overview.academic_info.intake_school_semester.name }}</p> -->
                                 </div>
                             </div>
-                            <div v-if="overview.program_info.semester" class="flex items-center gap-3">
+                            <div v-if="overview.academic_info.intake_major" class="flex items-center gap-3">
                                 <BookOpen class="text-muted-foreground h-4 w-4 flex-shrink-0" />
                                 <div class="min-w-0 flex-1">
-                                    <p class="text-muted-foreground text-sm">Intake Course</p>
-                                    <p class="font-medium">{{ overview.student_info.intake_semester.code }}</p>
+                                    <p class="text-muted-foreground text-sm">Intake Major</p>
+                                    <p class="font-medium">{{ overview.academic_info.intake_major.code }}</p>
+                                    <!-- <p class="font-medium">{{ overview.academic_info.intake_major.name }}</p> -->
                                 </div>
                             </div>
 

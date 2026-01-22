@@ -101,6 +101,11 @@ class RecordStudentActionAction
                 $actionLog->attachments()->sync($data['attachment_ids']);
             }
 
+            // 5. Create DeferCase for ACADEMIC_DEFER
+            if ($actionType === StudentActionType::ACADEMIC_DEFER) {
+                self::createDeferCase($actionLog, $student, $data, $userId);
+            }
+
             Log::info("Student action recorded", [
                 'student_id' => $student->id,
                 'action_type' => $actionType->value,
@@ -109,7 +114,7 @@ class RecordStudentActionAction
                 'changed_by' => $userId,
             ]);
 
-            return $actionLog->load(['student', 'changedBy', 'attachments']);
+            return $actionLog->load(['student', 'changedBy', 'attachments', 'deferCase']);
         });
     }
 
@@ -251,5 +256,49 @@ class RecordStudentActionAction
                 'changed_at' => $now,
             ]);
         }
+    }
+
+    /**
+     * Create a DeferCase record linked to the action log.
+     */
+    private static function createDeferCase(
+        StudentActionLog $actionLog,
+        Student $student,
+        array $data,
+        int $userId
+    ): void {
+        $deferCaseService = app(\App\Modules\Finance\Services\DeferCaseService::class);
+
+        // Create the defer case
+        $deferCase = $deferCaseService->createDeferCase($actionLog, [
+            'student_id' => $student->id,
+            'semester_id' => $data['from_semester_id'],
+            'scope_type' => $data['defer_scope_type'] ?? 'FULL',
+            'fee_policy' => $data['defer_fee_policy'] ?? 'FORFEIT',
+            'preserve_amount' => $data['defer_preserve_amount'] ?? null,
+            'signed_at' => $data['signed_at'] ?? null,
+            'changed_by_user_id' => $userId,
+        ]);
+
+        // Add course items if COURSES scope
+        if (($data['defer_scope_type'] ?? 'FULL') === 'COURSES'
+            && !empty($data['defer_course_registration_ids'])) {
+            $items = array_map(fn($regId) => [
+                'course_registration_id' => $regId,
+                'fee_policy' => $data['defer_fee_policy'] ?? 'FORFEIT',
+            ], $data['defer_course_registration_ids']);
+
+            $deferCaseService->addDeferCaseItems($deferCase, $items);
+        }
+
+        // Process fee policy (auto-creates DEFER_CREDIT charges if PRESERVE/PARTIAL)
+        $deferCaseService->processFeePolicy($deferCase);
+
+        Log::info("DeferCase created for student action", [
+            'action_log_id' => $actionLog->id,
+            'defer_case_id' => $deferCase->id,
+            'scope_type' => $deferCase->scope_type,
+            'fee_policy' => $deferCase->fee_policy,
+        ]);
     }
 }

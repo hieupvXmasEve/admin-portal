@@ -1,5 +1,6 @@
 import type { NavItem } from '@/types';
 import {
+    AlertCircle,
     Award,
     BarChart3,
     Bell,
@@ -26,6 +27,7 @@ import {
     Mail,
     MailPlus,
     Package,
+    Play,
     Receipt,
     School,
     Settings,
@@ -37,7 +39,6 @@ import {
     User,
     UserPlus,
     Users,
-    Wallet,
 } from 'lucide-vue-next';
 
 import { academicSummaryRoutes, attendanceRoutes, courseRoutes, curriculumRoutes, lecturerRoutes, studentRoutes, systemRoutes } from '@/utils/routes';
@@ -479,23 +480,76 @@ export const mainNavItems: NavItem[] = [
         icon: DollarSign,
         children: [
             {
-                title: 'Billing Cycles',
-                href: '/billing-cycles',
-                icon: Clock,
-                requiredPermissions: ['view_billing_cycle'],
+                title: 'Operations',
+                href: '#',
+                icon: BarChart3,
+                children: [
+                    {
+                        title: 'Billing Dashboard',
+                        href: '/finance/operations/dashboard',
+                        icon: LayoutDashboard,
+                        // requiredPermissions: ['view_billing_dashboard'],
+                    },
+                    {
+                        title: 'Generate Charges',
+                        href: '/finance/operations/generate-charges',
+                        icon: Play,
+                        // requiredPermissions: ['generate_charges'],
+                    },
+                    {
+                        title: 'Exceptions Queue',
+                        href: '/finance/operations/exceptions',
+                        icon: AlertCircle,
+                        // requiredPermissions: ['view_billing_exceptions'],
+                    },
+                    {
+                        title: 'Due Calendar',
+                        href: '/finance/operations/due-calendar',
+                        icon: CalendarIcon,
+                        // requiredPermissions: ['view_due_calendar'],
+                    },
+                ],
             },
+            // Group: charges, invoices, payments
             {
-                title: 'Invoices',
-                href: '/invoices',
-                icon: Receipt,
-                requiredPermissions: ['view_invoice'],
+                title: 'Billing Operations',
+                href: '#',
+                icon: BarChart3,
+                children: [
+                    {
+                        title: 'Charge Ledger (Global)',
+                        href: '/finance/charges',
+                        icon: BarChart3,
+                        // requiredPermissions: ['view_billing_dashboard'],
+                    },
+                    {
+                        title: 'Invoices',
+                        href: '/finance/invoices',
+                        icon: Receipt,
+                        requiredPermissions: ['view_invoice'],
+                    },
+                    {
+                        title: 'Payments',
+                        href: '/finance/payments',
+                        icon: BarChart3,
+                        // requiredPermissions: ['view_payment'],
+                    },
+                ],
             },
-            {
-                title: 'Student Wallets',
-                href: '/wallets',
-                icon: Wallet,
-                requiredPermissions: ['view_student_wallet'],
-            },
+
+            // {
+            //     title: 'Billing Cycles',
+            //     href: '/billing-cycles',
+            //     icon: Clock,
+            //     requiredPermissions: ['view_billing_cycle'],
+            // },
+
+            // {
+            //     title: 'Student Wallets',
+            //     href: '/wallets',
+            //     icon: Wallet,
+            //     requiredPermissions: ['view_student_wallet'],
+            // },
             {
                 title: 'Tuition Plans',
                 href: '/tuition-plans',
@@ -522,6 +576,7 @@ export const mainNavItems: NavItem[] = [
             },
         ],
     },
+
     {
         title: 'Clubs',
         href: '#',

@@ -1,0 +1,199 @@
+/**
+ * Finance Module Types
+ */
+
+export interface FinanceCharge {
+    id: number;
+    student_id: number;
+    student?: StudentBasic;
+    semester_id?: number;
+    semester?: Semester;
+    billing_cycle_id?: number;
+    charge_type: ChargeType;
+    description: string;
+    amount: number;
+    status: ChargeStatus;
+    due_date?: string;
+    source_type?: string;
+    source_id?: number;
+    voided_at?: string;
+    voided_by_user_id?: number;
+    voided_by?: User;
+    void_reason?: string;
+    created_by_user_id?: number;
+    created_by?: User;
+    created_at: string;
+    updated_at: string;
+
+    // Computed
+    is_charge?: boolean;
+    is_credit?: boolean;
+    paid_amount?: number;
+    balance?: number;
+    is_fully_paid?: boolean;
+}
+
+export interface Payment {
+    id: number;
+    student_id: number;
+    student?: StudentBasic;
+    amount: number;
+    method: PaymentMethod;
+    source?: string;
+    external_ref?: string;
+    paid_at: string;
+    status: PaymentStatus;
+    received_by_user_id?: number;
+    received_by?: User;
+    notes?: string;
+    created_at: string;
+    updated_at: string;
+
+    // Computed
+    allocated_amount?: number;
+    unapplied_amount?: number;
+    is_fully_allocated?: boolean;
+    has_unapplied_credit?: boolean;
+}
+
+export interface PaymentAllocation {
+    id: number;
+    payment_id: number;
+    payment?: Payment;
+    finance_charge_id: number;
+    charge?: FinanceCharge;
+    allocated_amount: number;
+    allocated_at: string;
+}
+
+export interface StudentBasic {
+    id: number;
+    student_id: string;
+    full_name: string;
+    email: string;
+    status?: string;
+}
+
+export interface Semester {
+    id: number;
+    name: string;
+    code: string;
+}
+
+export interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
+// Enums
+export type ChargeType = 'tuition_term' | 'egc_level_fee' | 'retake_fee' | 'course_fee' | 'manual_fee' | 'defer_credit' | 'egc_exempt_credit' | 'scholarship_credit' | 'voucher_credit' | 'adjustment';
+
+export type ChargeStatus = 'active' | 'voided' | 'transferred';
+
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'gateway' | 'wallet' | 'import' | 'other';
+
+export type PaymentStatus = 'pending' | 'completed' | 'refunded' | 'cancelled';
+
+// Labels
+export const CHARGE_TYPE_LABELS: Record<ChargeType, string> = {
+    tuition_term: 'Học phí kỳ (Tuition)',
+    egc_level_fee: 'Phí EGC (EGC Level Fee)',
+    retake_fee: 'Phí học lại (Retake Fee)',
+    course_fee: 'Phí môn học (Course Fee)',
+    manual_fee: 'Phí thủ công (Manual Fee)',
+    defer_credit: 'Hoàn phí bảo lưu (Defer Credit)',
+    egc_exempt_credit: 'Miễn EGC (EGC Exempt)',
+    scholarship_credit: 'Học bổng (Scholarship)',
+    voucher_credit: 'Voucher',
+    adjustment: 'Điều chỉnh (Adjustment)',
+};
+
+export const CHARGE_STATUS_LABELS: Record<ChargeStatus, string> = {
+    active: 'Hoạt động (Active)',
+    voided: 'Đã hủy (Voided)',
+    transferred: 'Đã chuyển (Transferred)',
+};
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+    cash: 'Tiền mặt (Cash)',
+    bank_transfer: 'Chuyển khoản (Bank Transfer)',
+    gateway: 'Cổng thanh toán (Gateway)',
+    wallet: 'Ví điện tử (Wallet)',
+    import: 'Nhập từ file (Import)',
+    other: 'Khác (Other)',
+};
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+    pending: 'Chờ xử lý (Pending)',
+    completed: 'Hoàn thành (Completed)',
+    refunded: 'Hoàn tiền (Refunded)',
+    cancelled: 'Đã hủy (Cancelled)',
+};
+
+// Badge classes
+export const CHARGE_TYPE_BADGE_CLASSES: Record<ChargeType, string> = {
+    tuition_term: 'bg-blue-100 text-blue-800',
+    egc_level_fee: 'bg-indigo-100 text-indigo-800',
+    retake_fee: 'bg-orange-100 text-orange-800',
+    course_fee: 'bg-cyan-100 text-cyan-800',
+    manual_fee: 'bg-gray-100 text-gray-800',
+    defer_credit: 'bg-green-100 text-green-800',
+    egc_exempt_credit: 'bg-emerald-100 text-emerald-800',
+    scholarship_credit: 'bg-teal-100 text-teal-800',
+    voucher_credit: 'bg-lime-100 text-lime-800',
+    adjustment: 'bg-yellow-100 text-yellow-800',
+};
+
+export const CHARGE_STATUS_BADGE_CLASSES: Record<ChargeStatus, string> = {
+    active: 'bg-green-100 text-green-800',
+    voided: 'bg-red-100 text-red-800',
+    transferred: 'bg-purple-100 text-purple-800',
+};
+
+export const PAYMENT_STATUS_BADGE_CLASSES: Record<PaymentStatus, string> = {
+    pending: 'bg-yellow-100 text-yellow-800',
+    completed: 'bg-green-100 text-green-800',
+    refunded: 'bg-purple-100 text-purple-800',
+    cancelled: 'bg-red-100 text-red-800',
+};
+
+// Helper functions
+export function getChargeTypeLabel(type: ChargeType): string {
+    return CHARGE_TYPE_LABELS[type] ?? type;
+}
+
+export function getChargeTypeBadgeClass(type: ChargeType): string {
+    return CHARGE_TYPE_BADGE_CLASSES[type] ?? 'bg-gray-100 text-gray-800';
+}
+
+export function getChargeStatusLabel(status: ChargeStatus): string {
+    return CHARGE_STATUS_LABELS[status] ?? status;
+}
+
+export function getChargeStatusBadgeClass(status: ChargeStatus): string {
+    return CHARGE_STATUS_BADGE_CLASSES[status] ?? 'bg-gray-100 text-gray-800';
+}
+
+export function getPaymentMethodLabel(method: PaymentMethod): string {
+    return PAYMENT_METHOD_LABELS[method] ?? method;
+}
+
+export function getPaymentStatusLabel(status: PaymentStatus): string {
+    return PAYMENT_STATUS_LABELS[status] ?? status;
+}
+
+export function getPaymentStatusBadgeClass(status: PaymentStatus): string {
+    return PAYMENT_STATUS_BADGE_CLASSES[status] ?? 'bg-gray-100 text-gray-800';
+}
+
+export function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+    }).format(amount);
+}
+
+export function isCredit(chargeType: ChargeType): boolean {
+    return ['defer_credit', 'egc_exempt_credit', 'scholarship_credit', 'voucher_credit'].includes(chargeType);
+}

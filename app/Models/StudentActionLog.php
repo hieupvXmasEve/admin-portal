@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class StudentActionLog extends Model
 {
@@ -107,6 +108,15 @@ class StudentActionLog extends Model
             'student_action_log_id',
             'upload_record_id'
         )->withTimestamps();
+    }
+
+    /**
+     * Get the defer case linked to this action log.
+     * Only applicable for ACADEMIC_DEFER action type.
+     */
+    public function deferCase(): HasOne
+    {
+        return $this->hasOne(DeferCase::class, 'student_action_log_id');
     }
 
     // =====================

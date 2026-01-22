@@ -32,3 +32,5 @@ export { useAddressData } from './useAddressData';
 // Add other composables here as they are created
 // export { useAuth } from './useAuth';
 // export { useNotifications } from './useNotifications';
+export { useStudentSearch } from './useStudentSearch';
+export type { StudentSearchItem, StudentSearchOptions, StudentSearchResponse } from './useStudentSearch';

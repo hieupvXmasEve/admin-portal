@@ -15,6 +15,9 @@ class VoucherDefinition extends Model
         'voucher_type',
         'discount_type',
         'discount_value',
+        'max_discount_amount',
+        'is_stackable',
+        'max_uses_per_student',
         'valid_from',
         'valid_until',
         'is_active',
@@ -24,11 +27,21 @@ class VoucherDefinition extends Model
         'valid_from' => 'date:Y-m-d',
         'valid_until' => 'date:Y-m-d',
         'is_active' => 'boolean',
-        'discount_value' => 'decimal:0',
+        'is_stackable' => 'boolean',
+        'discount_value' => 'decimal:2',
+        'max_discount_amount' => 'decimal:2',
     ];
 
     /**
-     * Get all redemptions for this voucher
+     * Get all applications for this voucher
+     */
+    public function applications(): HasMany
+    {
+        return $this->hasMany(VoucherApplication::class, 'voucher_definition_id');
+    }
+
+    /**
+     * Get all redemptions for this voucher (Legacy)
      */
     public function redemptions(): HasMany
     {

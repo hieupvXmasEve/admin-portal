@@ -18,7 +18,8 @@ class Student extends StudentAuditableModel
     use HasApiTokens, HasFactory, HasNotifications, Notifiable {
         HasNotifications::notifications insteadof Notifiable;
     }
-
+    // enum ('active', 'inactive', 'suspended', 'graduated', 'intake_pre_uni_gc', 'intake_course', 'deferred', 'dropout', 'dropout_transfer', 'pending', 'admission_deferred')
+    
     /**
      * Statuses that are blocked from active operations (e.g., login)
      */
@@ -30,6 +31,15 @@ class Student extends StudentAuditableModel
         'graduated',
         'pending',
         // 'admission_deferred',
+    ];
+
+    /**
+     * Trạng thái để tạo phí cho kì học
+     */
+    public const FINANCIAL_STATUSES = [
+        'intake_pre_uni_gc',
+        'intake_course',
+        'intake_major',
     ];
 
     protected $guard = 'student';
@@ -65,6 +75,7 @@ class Student extends StudentAuditableModel
         'intake_mode',
         'intake_gc',
         'intake_course',
+        'intake_major',
         'gc_to_course_transition_semester',
         'admission_date',
         'expected_graduation_date',
@@ -99,6 +110,8 @@ class Student extends StudentAuditableModel
         'status_change_date' => 'date:Y-m-d',
         'entrance_exam_score' => 'decimal:2',
         'intake' => 'integer',
+        'intake_gc' => 'integer',
+        'intake_major' => 'integer',
     ];
 
     // Validation Rules
@@ -144,7 +157,7 @@ class Student extends StudentAuditableModel
             'high_school_graduation_year' => ['nullable', 'integer', 'min:1900', 'max:'.(date('Y') + 1)],
             'entrance_exam_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'admission_notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:suspended,graduated,intake_pre_uni_gc,intake_course,deferred,dropout,dropout_transfer,pending,admission_deferred'],
+            'status' => ['nullable', 'in:suspended,graduated,intake_pre_uni_gc,intake_course,intake_major,deferred,dropout,dropout_transfer,pending,admission_deferred'],
         ];
     }
 
@@ -182,6 +195,16 @@ class Student extends StudentAuditableModel
     public function intakeSemester(): BelongsTo
     {
         return $this->belongsTo(Semester::class, 'intake_semester_id');
+    }
+
+    public function intakeGcSemester(): BelongsTo
+    {
+        return $this->belongsTo(Semester::class, 'intake_gc');
+    }
+
+    public function intakeMajorSemester(): BelongsTo
+    {
+        return $this->belongsTo(Semester::class, 'intake_major');
     }
 
     public function parentProfiles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
@@ -363,6 +386,46 @@ class Student extends StudentAuditableModel
     }
 
     /**
+     * Get the student's finance charges (tuition, fees, credits).
+     */
+    public function financeCharges(): HasMany
+    {
+        return $this->hasMany(FinanceCharge::class);
+    }
+
+    /**
+     * Get the student's voucher applications.
+     */
+    public function voucherApplications(): HasMany
+    {
+        return $this->hasMany(VoucherApplication::class);
+    }
+
+    /**
+     * Get the student's payments.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Get the student's defer cases.
+     */
+    public function deferCases(): HasMany
+    {
+        return $this->hasMany(DeferCase::class);
+    }
+
+    /**
+     * Get the student's invoices.
+     */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(StudentInvoice::class);
+    }
+
+    /**
      * Get the latest IELTS certificate for the student.
      */
     public function getLatestIeltsCertificate(): ?IeltsCertificate
@@ -388,6 +451,7 @@ class Student extends StudentAuditableModel
         return match ($this->status) {
             'intake_pre_uni_gc' => 'intake_pre_uni_gc',
             'intake_course' => 'intake_course',
+            'intake_major' => 'intake_major',
             default => null,
         };
     }
@@ -495,6 +559,7 @@ class Student extends StudentAuditableModel
             'graduated' => 'Graduated',
             'intake_pre_uni_gc' => 'Intake Pre-Uni GC',
             'intake_course' => 'Intake Course',
+            'intake_major' => 'Intake Major',
             'deferred' => 'Deferred',
             'dropout' => 'Dropout',
             'dropout_transfer' => 'Dropout Transfer',
@@ -513,6 +578,7 @@ class Student extends StudentAuditableModel
             'graduated' => 'blue',
             'intake_pre_uni_gc' => 'yellow',
             'intake_course' => 'indigo',
+            'intake_major' => 'green',
             'deferred' => 'orange',
             'dropout' => 'red',
             'dropout_transfer' => 'red',

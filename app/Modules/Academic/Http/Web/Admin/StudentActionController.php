@@ -43,7 +43,7 @@ class StudentActionController extends Controller
                 'action_type' => $validated['action_type'] ?? null,
                 'per_page' => $validated['per_page'] ?? 10,
             ],
-            'options' => $this->getFormOptions(),
+            'options' => $this->getFormOptions($student),
         ]);
     }
 
@@ -114,9 +114,9 @@ class StudentActionController extends Controller
     /**
      * Get form options for creating actions.
      */
-    protected function getFormOptions(): array
+    protected function getFormOptions(?Student $student = null): array
     {
-        return [
+        $options = [
             'actionTypes' => StudentActionType::options(),
             'semesters' => Semester::query()
                 ->select('id', 'name', 'code', 'start_date', 'end_date')
@@ -126,6 +126,36 @@ class StudentActionController extends Controller
                 ->select('id', 'name', 'code')
                 ->orderBy('name')
                 ->get(),
+            'deferScopeTypes' => [
+                ['value' => 'FULL', 'label' => 'Toàn kỳ (Full Semester)'],
+                ['value' => 'COURSES', 'label' => 'Theo môn (Specific Courses)'],
+            ],
+            'deferFeePolicies' => [
+                ['value' => 'PRESERVE', 'label' => 'Bảo lưu học phí (Preserve Fee)'],
+                ['value' => 'FORFEIT', 'label' => 'Mất học phí (Forfeit Fee)'],
+                ['value' => 'PARTIAL', 'label' => 'Bảo lưu một phần (Partial Preserve)'],
+            ],
         ];
+
+        // Add course registrations for the student (for COURSES scope selection)
+        if ($student) {
+            $options['courseRegistrations'] = $student->courseRegistrations()
+                ->with(['courseOffering.unit', 'courseOffering.semester'])
+                ->whereHas('courseOffering', function ($query) {
+                    $query->whereHas('semester', function ($q) {
+                        $q->where('end_date', '>=', now()->subMonths(6));
+                    });
+                })
+                ->get()
+                ->map(fn($reg) => [
+                    'id' => $reg->id,
+                    'course_code' => $reg->courseOffering?->unit?->code ?? 'N/A',
+                    'course_name' => $reg->courseOffering?->unit?->name ?? 'N/A',
+                    'semester_name' => $reg->courseOffering?->semester?->name ?? 'N/A',
+                    'semester_id' => $reg->courseOffering?->semester_id,
+                ]);
+        }
+
+        return $options;
     }
 }
