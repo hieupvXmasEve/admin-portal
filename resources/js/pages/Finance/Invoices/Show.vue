@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Table,
     TableBody,
@@ -13,18 +11,18 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatCurrency, formatDate } from '@/utils/format';
+import { Head, Link } from '@inertiajs/vue3';
 import {
+    AlertCircle,
     ChevronLeft,
-    Download,
-    Receipt,
     CreditCard,
     DollarSign,
-    User as UserIcon,
-    School as SchoolIcon,
-    AlertCircle,
+    Receipt,
+    User as UserIcon
 } from 'lucide-vue-next';
-import { formatCurrency } from '@/types/finance';
-import { formatDate } from '@/utils/date';
+import { route } from 'ziggy-js';
 
 interface Charge {
     id: number;
@@ -41,9 +39,9 @@ interface Charge {
         allocated_amount: number;
         payment: {
             id: number;
-            payment_number: string;
+            amount: number;
             paid_at: string;
-            payment_method: string;
+            method: string;
         }
     }>;
 }
@@ -80,7 +78,7 @@ interface Invoice {
     charges: Charge[];
 }
 
-const props = defineProps<{
+defineProps<{
     invoice: Invoice;
 }>();
 
@@ -284,11 +282,13 @@ const getChargeTypeLabel = (type: string) => {
                                     <TableCell class="font-medium">
                                         <Link :href="route('finance.payments.show', allocation.payment.id)"
                                             class="hover:underline text-primary">
-                                            {{ allocation.payment.payment_number }}
+                                            {{ allocation.payment.id }}
                                         </Link>
                                     </TableCell>
                                     <TableCell>{{ formatDate(allocation.payment.paid_at) }}</TableCell>
-                                    <TableCell>{{ allocation.payment.payment_method }}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline">{{ allocation.payment.method }}</Badge>
+                                    </TableCell>
                                     <TableCell>
                                         <span class="text-sm text-muted-foreground">Charge:</span> {{
                                             charge.description }}

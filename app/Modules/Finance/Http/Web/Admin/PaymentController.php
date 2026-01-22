@@ -3,6 +3,7 @@
 namespace App\Modules\Finance\Http\Web\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Responses\ApiResponse;
 use App\Models\FinanceCharge as FinanceChargeModel;
 use App\Models\Payment;
 use App\Modules\Finance\Actions\AllocatePaymentAction;
@@ -45,7 +46,7 @@ class PaymentController extends Controller
 
         $result = $action->run($request->file('file'));
 
-        return response()->json($result);
+        return ApiResponse::success($result, [], 'File preview generated successfully');
     }
 
     public function storeImport(Request $request, StorePaymentImportAction $action)
@@ -60,7 +61,9 @@ class PaymentController extends Controller
 
         $result = $action->run($request->input('rows'), $request->user()->id);
 
-        return response()->json($result);
+        $importedCount = $result['imported_count'] ?? 0;
+
+        return ApiResponse::success($result, [], "Successfully imported {$importedCount} payments");
     }
 
     public function allocate(int $id, Request $request, AllocatePaymentAction $action)

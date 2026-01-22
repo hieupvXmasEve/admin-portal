@@ -29,20 +29,35 @@ class Payment extends Model
         'raw_payload' => 'array',
     ];
 
+    protected $appends = [
+        'allocated_amount',
+        'unapplied_amount',
+        'is_fully_allocated',
+        'has_unapplied_credit',
+    ];
+
     // =====================
     // Constants
     // =====================
 
     public const METHOD_CASH = 'cash';
+
     public const METHOD_BANK_TRANSFER = 'bank_transfer';
+
     public const METHOD_GATEWAY = 'gateway';
+
     public const METHOD_WALLET = 'wallet';
+
     public const METHOD_IMPORT = 'import';
+
     public const METHOD_OTHER = 'other';
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_REFUNDED = 'refunded';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     public const PAYMENT_METHODS = [
@@ -93,6 +108,11 @@ class Payment extends Model
 
     public function getAllocatedAmountAttribute(): float
     {
+        // Use loaded relationship if available, otherwise query
+        if ($this->relationLoaded('allocations')) {
+            return (float) $this->allocations->sum('allocated_amount');
+        }
+
         return (float) $this->allocations()->sum('allocated_amount');
     }
 

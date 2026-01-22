@@ -10,18 +10,18 @@ class ListPaymentsQuery
     public function handle(Request $request)
     {
         $query = Payment::query()
-            ->with(['student']);
+            ->with(['student', 'allocations']);
 
         // Filter by Search (External Ref, Student: Name, ID, Email)
         if ($request->filled('search')) {
             $term = $request->input('search');
             $query->where(function ($q) use ($term) {
                 $q->where('external_ref', 'like', "%{$term}%")
-                  ->orWhereHas('student', function ($subQ) use ($term) {
-                      $subQ->where('full_name', 'like', "%{$term}%")
-                           ->orWhere('student_id', 'like', "%{$term}%")
-                           ->orWhere('email', 'like', "%{$term}%");
-                  });
+                    ->orWhereHas('student', function ($subQ) use ($term) {
+                        $subQ->where('full_name', 'like', "%{$term}%")
+                            ->orWhere('student_id', 'like', "%{$term}%")
+                            ->orWhere('email', 'like', "%{$term}%");
+                    });
             });
         }
 
@@ -49,7 +49,7 @@ class ListPaymentsQuery
         // Sorting
         $sort = $request->input('sort', 'paid_at');
         $direction = $request->input('direction', 'desc');
-        
+
         // Allowed sort columns
         if (in_array($sort, ['amount', 'paid_at', 'status', 'created_at'])) {
             $query->orderBy($sort, $direction === 'asc' ? 'asc' : 'desc');

@@ -439,9 +439,8 @@ const hasAcademicConcerns = computed(() => {
                             <div v-if="overview.academic_info.intake_school" class="flex items-center gap-3">
                                 <BookOpen class="text-muted-foreground h-4 w-4 flex-shrink-0" />
                                 <div class="min-w-0 flex-1">
-                                    <p class="text-muted-foreground text-sm">Intake School</p>
-                                    <p class="font-medium">{{ overview.academic_info.intake_school.code }}</p>
-                                    <!-- <p class="font-medium">{{ overview.academic_info.intake_school_semester.name }}</p> -->
+                                    <p class="text-muted-foreground text-sm">Intake University</p>
+                                    <p class="font-medium">{{ overview.academic_info.intake_school.code }} - {{ overview.academic_info.intake_school.intake_year }}</p>
                                 </div>
                             </div>
                             <div v-if="overview.academic_info.intake_major" class="flex items-center gap-3">
