@@ -53,6 +53,12 @@ class StoreStudentActionRequest extends FormRequest
                 'exists:semesters,id',
                 'different:from_semester_id',
             ],
+            // Defer Case fields
+            'defer_scope_type' => ['required', 'string', 'in:FULL,COURSES'],
+            'defer_fee_policy' => ['required', 'string', 'in:PRESERVE,FORFEIT,PARTIAL'],
+            'defer_preserve_amount' => ['nullable', 'numeric', 'min:0', 'required_if:defer_fee_policy,PARTIAL'],
+            'defer_course_registration_ids' => ['nullable', 'array', 'required_if:defer_scope_type,COURSES'],
+            'defer_course_registration_ids.*' => ['integer', 'exists:course_registrations,id'],
         ];
     }
 
@@ -117,6 +123,16 @@ class StoreStudentActionRequest extends FormRequest
             'to_campus_id.different' => 'Target campus must be different from current campus.',
             'effective_at.required' => 'Effective date is required for campus transfer.',
             'effective_at.date' => 'Effective date must be a valid date.',
+            // Defer case messages
+            'defer_scope_type.required' => 'Defer scope type is required.',
+            'defer_scope_type.in' => 'Defer scope type must be FULL or COURSES.',
+            'defer_fee_policy.required' => 'Fee policy is required.',
+            'defer_fee_policy.in' => 'Fee policy must be PRESERVE, FORFEIT, or PARTIAL.',
+            'defer_preserve_amount.required_if' => 'Preserve amount is required when fee policy is PARTIAL.',
+            'defer_preserve_amount.numeric' => 'Preserve amount must be a number.',
+            'defer_preserve_amount.min' => 'Preserve amount must be at least 0.',
+            'defer_course_registration_ids.required_if' => 'Course selection is required when scope is COURSES.',
+            'defer_course_registration_ids.*.exists' => 'One or more selected courses do not exist.',
         ];
     }
 

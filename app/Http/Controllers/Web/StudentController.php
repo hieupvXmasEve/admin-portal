@@ -459,7 +459,7 @@ class StudentController extends Controller
         if ($validated['status'] ?? null) {
             $query->where('status', $validated['status']);
         } else {
-            $query->active(); // Default to active students
+            // $query->active(); // Default to active students
         }
 
         // Apply search query

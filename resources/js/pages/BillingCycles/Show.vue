@@ -646,7 +646,7 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
                 h(
                     Link,
                     {
-                        href: route('invoices.show', invoice.id),
+                        href: route('finance.invoices.show', invoice.id),
                     },
                     () =>
                         h(
@@ -683,6 +683,7 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
 </script>
 
 <template>
+
     <Head :title="`Billing Cycle: ${billingCycle.name}`" />
 
     <div class="space-y-6">
@@ -695,12 +696,14 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
                 <Link :href="route('billing-cycles.index')">
                     <Button variant="outline">Back to List</Button>
                 </Link>
-                <Button v-if="can('view_billing_cycle')" variant="outline" :disabled="isExporting" @click="handleExport">
+                <Button v-if="can('view_billing_cycle')" variant="outline" :disabled="isExporting"
+                    @click="handleExport">
                     <Loader2 v-if="isExporting" class="mr-2 h-4 w-4 animate-spin" />
                     <Download v-else class="mr-2 h-4 w-4" />
                     Export to Excel
                 </Button>
-                <Link v-if="can('edit_billing_cycle') && billingCycle.status === 'draft'" :href="route('billing-cycles.edit', billingCycle.id)">
+                <Link v-if="can('edit_billing_cycle') && billingCycle.status === 'draft'"
+                    :href="route('billing-cycles.edit', billingCycle.id)">
                     <Button variant="outline">
                         <Edit class="mr-2 h-4 w-4" />
                         Edit
@@ -746,15 +749,18 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
                     <CardDescription>Manage the billing cycle status</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-3">
-                    <Button v-if="can('activate_billing_cycle') && billingCycle.status === 'draft'" class="w-full" :disabled="isActivating" @click="handleActivate">
+                    <Button v-if="can('activate_billing_cycle') && billingCycle.status === 'draft'" class="w-full"
+                        :disabled="isActivating" @click="handleActivate">
                         <Loader2 v-if="isActivating" class="mr-2 h-4 w-4 animate-spin" />
                         Activate Billing Cycle
                     </Button>
-                    <Button v-if="can('close_billing_cycle') && billingCycle.status === 'active'" class="w-full" variant="secondary" :disabled="isClosing" @click="handleClose">
+                    <Button v-if="can('close_billing_cycle') && billingCycle.status === 'active'" class="w-full"
+                        variant="secondary" :disabled="isClosing" @click="handleClose">
                         <Loader2 v-if="isClosing" class="mr-2 h-4 w-4 animate-spin" />
                         Close Billing Cycle
                     </Button>
-                    <Button v-if="can('delete_billing_cycle') && billingCycle.status === 'draft'" class="w-full" variant="destructive" :disabled="isDeleting" @click="handleDelete">
+                    <Button v-if="can('delete_billing_cycle') && billingCycle.status === 'draft'" class="w-full"
+                        variant="destructive" :disabled="isDeleting" @click="handleDelete">
                         <Loader2 v-if="isDeleting" class="mr-2 h-4 w-4 animate-spin" />
                         Delete Billing Cycle
                     </Button>
@@ -770,8 +776,10 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
                 <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <div class="space-y-2">
                         <Label for="invoice-search">Search</Label>
-                        <Input id="invoice-search" v-model="searchInput" placeholder="Search by invoice number, student ID, or name" />
-                        <p class="text-muted-foreground text-xs">Filters by invoice number, student ID, or full name.</p>
+                        <Input id="invoice-search" v-model="searchInput"
+                            placeholder="Search by invoice number, student ID, or name" />
+                        <p class="text-muted-foreground text-xs">Filters by invoice number, student ID, or full name.
+                        </p>
                     </div>
 
                     <div class="space-y-2">
@@ -781,7 +789,8 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
                                 <SelectValue placeholder="All Statuses" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem v-for="option in statusFilterOptions" :key="option.value" :value="option.value">
+                                <SelectItem v-for="option in statusFilterOptions" :key="option.value"
+                                    :value="option.value">
                                     {{ option.label }}
                                 </SelectItem>
                             </SelectContent>
@@ -795,7 +804,8 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
                                 <SelectValue placeholder="All Campuses" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem v-for="option in campusFilterOptions" :key="option.value" :value="option.value">
+                                <SelectItem v-for="option in campusFilterOptions" :key="option.value"
+                                    :value="option.value">
                                     {{ option.label }}
                                 </SelectItem>
                             </SelectContent>
@@ -812,7 +822,8 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
                         <CardTitle>Invoices ({{ totalInvoices }})</CardTitle>
                         <CardDescription>Invoices generated for this billing cycle</CardDescription>
                     </div>
-                    <Button v-if="can('pay_invoice') && hasInvoices" :disabled="isBulkPaying" @click="handleBulkPayInvoices">
+                    <Button v-if="can('pay_invoice') && hasInvoices" :disabled="isBulkPaying"
+                        @click="handleBulkPayInvoices">
                         <Loader2 v-if="isBulkPaying" class="mr-2 h-4 w-4 animate-spin" />
                         <Wallet v-else class="mr-2 h-4 w-4" />
                         Bulk Pay All Invoices
@@ -824,9 +835,11 @@ const invoiceColumns: ColumnDef<Invoice>[] = [
                 <div v-else class="flex flex-col items-center justify-center py-12 text-center">
                     <AlertCircle class="text-muted-foreground h-12 w-12" />
                     <h3 class="mt-4 text-lg font-semibold">No invoices yet</h3>
-                    <p class="text-muted-foreground mt-2 text-sm">Invoices will appear here once they are generated for this billing cycle.</p>
+                    <p class="text-muted-foreground mt-2 text-sm">Invoices will appear here once they are generated for
+                        this billing cycle.</p>
                 </div>
-                <DataPagination v-if="hasInvoices" :pagination-data="invoices" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+                <DataPagination v-if="hasInvoices" :pagination-data="invoices" @navigate="handlePaginationNavigate"
+                    @page-size-change="handlePageSizeChange" />
             </CardContent>
         </Card>
     </div>

@@ -7,6 +7,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CourseRegistration extends AuditableModel
@@ -96,6 +98,22 @@ class CourseRegistration extends AuditableModel
     public function semester(): BelongsTo
     {
         return $this->belongsTo(Semester::class);
+    }
+
+    /**
+     * Get defer case items for this registration.
+     */
+    public function deferCaseItems(): HasMany
+    {
+        return $this->hasMany(DeferCaseItem::class);
+    }
+
+    /**
+     * Get finance charges (typically retake fees) linked to this registration.
+     */
+    public function financeCharges(): MorphMany
+    {
+        return $this->morphMany(FinanceCharge::class, 'source');
     }
 
     // Helper Methods

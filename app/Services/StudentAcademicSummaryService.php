@@ -187,6 +187,16 @@ class StudentAcademicSummaryService
                 ] : null,
 
             ],
+            'academic_info' => [
+                'intake_school' => $student->intakeSemester ? [
+                    'code' => $student->intakeSemester->code,
+                    'name' => $student->intakeSemester->name,
+                ] : null,
+                'intake_major' => $student->intakeMajorSemester ? [
+                    'code' => $student->intakeMajorSemester->code,
+                    'name' => $student->intakeMajorSemester->name,
+                ] : null,
+            ],
             'program_info' => [
                 'campus' => $student->campus ? [
                     'id' => $student->campus->id,
@@ -211,10 +221,6 @@ class StudentAcademicSummaryService
                     'specialization_name' => $student->curriculumVersion->specialization?->name,
                     'specialization_code' => $student->curriculumVersion->specialization?->code,
                 ] : null,
-                'semester' => [
-                    'code' => $student->curriculumVersion->effectiveFromSemester?->code,
-                    'intake_year' => Carbon::parse($student->curriculumVersion->effectiveFromSemester?->start_date)->year,
-                ],
 
             ],
             'academic_stats' => [

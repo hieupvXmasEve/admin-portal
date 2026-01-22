@@ -437,6 +437,16 @@ export interface StudentOverview {
             email: string;
         } | null;
     };
+    academic_info: {
+        intake_school?: {
+            code: string;
+            name: string;
+        };
+        intake_major?: {
+            code: string;
+            name: string;
+        };
+    };
     program_info: {
         campus?: {
             id: number;

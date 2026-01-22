@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { getActionTypeBadgeClass, getActionTypeLabel, StudentActionType, type ActionTypeOption, type Campus, type Semester, type StoreStudentActionForm, type StudentActionLog } from '@/types/student-action';
+import { getActionTypeBadgeClass, getActionTypeLabel, StudentActionType, type ActionTypeOption, type Campus, type CourseRegistrationPreview, type Semester, type StoreStudentActionForm, type StudentActionLog } from '@/types/student-action';
 import { studentRoutes } from '@/utils/routes';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ArrowRight, Calendar, Eye, FileText, Paperclip, Plus, Upload, User } from 'lucide-vue-next';
@@ -41,6 +41,9 @@ interface Props {
         actionTypes: ActionTypeOption[];
         semesters: Semester[];
         campuses: Campus[];
+        deferScopeTypes?: { value: string; label: string }[];
+        deferFeePolicies?: { value: string; label: string }[];
+        courseRegistrations?: CourseRegistrationPreview[];
     };
 }
 
@@ -64,6 +67,11 @@ const form = useForm<StoreStudentActionForm>({
     to_campus_id: null,
     effective_at: '',
     effective_semester_id: null,
+    // Defer case fields
+    defer_scope_type: 'FULL',
+    defer_fee_policy: 'FORFEIT',
+    defer_preserve_amount: null,
+    defer_course_registration_ids: [],
 });
 
 const selectedActionType = computed(() => {
@@ -83,8 +91,20 @@ watch(
         form.effective_semester_id = null;
         // Keep from_campus_id as student's current campus
         form.from_campus_id = props.student.campus_id;
+        // Reset defer case fields
+        form.defer_scope_type = 'FULL';
+        form.defer_fee_policy = 'FORFEIT';
+        form.defer_preserve_amount = null;
+        form.defer_course_registration_ids = [];
     },
 );
+
+// Computed: filter course registrations by selected from_semester_id
+const filteredCourseRegistrations = computed(() => {
+    if (!props.options.courseRegistrations) return [];
+    if (!form.from_semester_id) return props.options.courseRegistrations;
+    return props.options.courseRegistrations.filter((reg) => reg.semester_id === form.from_semester_id);
+});
 
 const handleSubmit = () => {
     form.post(route('students.actions.store', { student: props.student.id }), {
@@ -152,6 +172,7 @@ const getSummary = (log: StudentActionLog): string => {
 </script>
 
 <template>
+
     <Head :title="`Actions - ${student.full_name}`" />
 
     <div class="space-y-6">
@@ -186,12 +207,14 @@ const getSummary = (log: StudentActionLog): string => {
                                     <SelectValue placeholder="Select action type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem v-for="actionType in options.actionTypes" :key="actionType.value" :value="actionType.value">
+                                    <SelectItem v-for="actionType in options.actionTypes" :key="actionType.value"
+                                        :value="actionType.value">
                                         {{ actionType.label }}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
-                            <p v-if="form.errors.action_type" class="text-sm text-red-500">{{ form.errors.action_type }}</p>
+                            <p v-if="form.errors.action_type" class="text-sm text-red-500">{{ form.errors.action_type }}
+                            </p>
                         </div>
 
                         <!-- ACADEMIC_DEFER fields -->
@@ -209,7 +232,8 @@ const getSummary = (log: StudentActionLog): string => {
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <p v-if="form.errors.from_semester_id" class="text-sm text-red-500">{{ form.errors.from_semester_id }}</p>
+                                    <p v-if="form.errors.from_semester_id" class="text-sm text-red-500">{{
+                                        form.errors.from_semester_id }}</p>
                                 </div>
                                 <div class="space-y-2">
                                     <Label for="return_semester_id">Return Semester *</Label>
@@ -223,7 +247,92 @@ const getSummary = (log: StudentActionLog): string => {
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <p v-if="form.errors.return_semester_id" class="text-sm text-red-500">{{ form.errors.return_semester_id }}</p>
+                                    <p v-if="form.errors.return_semester_id" class="text-sm text-red-500">{{
+                                        form.errors.return_semester_id }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Finance Section -->
+                            <div class="border-border mt-4 rounded-lg border bg-muted/30 p-4">
+                                <h4 class="mb-3 font-semibold text-primary">💰 Tài chính (Finance)</h4>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <!-- Scope Type -->
+                                    <div class="space-y-2">
+                                        <Label for="defer_scope_type">Phạm vi bảo lưu *</Label>
+                                        <Select v-model="form.defer_scope_type">
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Chọn phạm vi" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem v-for="scope in options.deferScopeTypes" :key="scope.value"
+                                                    :value="scope.value">
+                                                    {{ scope.label }}
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p v-if="form.errors.defer_scope_type" class="text-sm text-red-500">{{
+                                            form.errors.defer_scope_type }}</p>
+                                    </div>
+
+                                    <!-- Fee Policy -->
+                                    <div class="space-y-2">
+                                        <Label for="defer_fee_policy">Chính sách học phí *</Label>
+                                        <Select v-model="form.defer_fee_policy">
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Chọn chính sách" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem v-for="policy in options.deferFeePolicies"
+                                                    :key="policy.value" :value="policy.value">
+                                                    {{ policy.label }}
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p v-if="form.errors.defer_fee_policy" class="text-sm text-red-500">{{
+                                            form.errors.defer_fee_policy }}</p>
+                                    </div>
+                                </div>
+
+                                <!-- Preserve Amount (visible when PARTIAL) -->
+                                <div v-if="form.defer_fee_policy === 'PARTIAL'" class="mt-4 space-y-2">
+                                    <Label for="defer_preserve_amount">Số tiền bảo lưu (VNĐ) *</Label>
+                                    <Input v-model.number="form.defer_preserve_amount" type="number" min="0"
+                                        placeholder="Nhập số tiền bảo lưu" />
+                                    <p v-if="form.errors.defer_preserve_amount" class="text-sm text-red-500">{{
+                                        form.errors.defer_preserve_amount }}</p>
+                                </div>
+
+                                <!-- Course Selection (visible when COURSES scope) -->
+                                <div v-if="form.defer_scope_type === 'COURSES'" class="mt-4 space-y-2">
+                                    <Label>Chọn môn học bảo lưu *</Label>
+                                    <div v-if="filteredCourseRegistrations.length === 0"
+                                        class="text-muted-foreground text-sm">
+                                        Không có môn học nào trong kỳ đã chọn.
+                                    </div>
+                                    <div v-else class="max-h-48 space-y-2 overflow-y-auto rounded border p-2">
+                                        <div v-for="reg in filteredCourseRegistrations" :key="reg.id"
+                                            class="flex items-center space-x-2">
+                                            <Checkbox :id="`course-${reg.id}`"
+                                                :model-value="form.defer_course_registration_ids?.includes(reg.id)"
+                                                @update:model-value="(checked) => {
+                                                    if (!form.defer_course_registration_ids) form.defer_course_registration_ids = [];
+                                                    if (checked) {
+                                                        form.defer_course_registration_ids.push(reg.id);
+                                                    } else {
+                                                        form.defer_course_registration_ids = form.defer_course_registration_ids.filter(id => id !== reg.id);
+                                                    }
+                                                }" />
+                                            <Label :for="`course-${reg.id}`" class="cursor-pointer text-sm">
+                                                <span class="font-medium">{{ reg.course_code }}</span> - {{
+                                                reg.course_name }}
+                                                <span class="text-muted-foreground text-xs">({{ reg.semester_name
+                                                    }})</span>
+                                            </Label>
+                                        </div>
+                                    </div>
+                                    <p v-if="form.errors.defer_course_registration_ids" class="text-sm text-red-500">{{
+                                        form.errors.defer_course_registration_ids }}</p>
                                 </div>
                             </div>
                         </template>
@@ -242,7 +351,8 @@ const getSummary = (log: StudentActionLog): string => {
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <p v-if="form.errors.return_semester_id" class="text-sm text-red-500">{{ form.errors.return_semester_id }}</p>
+                                <p v-if="form.errors.return_semester_id" class="text-sm text-red-500">{{
+                                    form.errors.return_semester_id }}</p>
                             </div>
                         </template>
 
@@ -260,7 +370,8 @@ const getSummary = (log: StudentActionLog): string => {
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <p v-if="form.errors.intended_intake_semester_id" class="text-sm text-red-500">{{ form.errors.intended_intake_semester_id }}</p>
+                                <p v-if="form.errors.intended_intake_semester_id" class="text-sm text-red-500">{{
+                                    form.errors.intended_intake_semester_id }}</p>
                             </div>
                         </template>
 
@@ -278,7 +389,8 @@ const getSummary = (log: StudentActionLog): string => {
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <p v-if="form.errors.dropout_semester_id" class="text-sm text-red-500">{{ form.errors.dropout_semester_id }}</p>
+                                <p v-if="form.errors.dropout_semester_id" class="text-sm text-red-500">{{
+                                    form.errors.dropout_semester_id }}</p>
                             </div>
                         </template>
 
@@ -292,7 +404,8 @@ const getSummary = (log: StudentActionLog): string => {
                                             <SelectValue placeholder="Current campus" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem v-for="campus in options.campuses" :key="campus.id" :value="campus.id">
+                                            <SelectItem v-for="campus in options.campuses" :key="campus.id"
+                                                :value="campus.id">
                                                 {{ campus.name }}
                                             </SelectItem>
                                         </SelectContent>
@@ -305,19 +418,23 @@ const getSummary = (log: StudentActionLog): string => {
                                             <SelectValue placeholder="Select target campus" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem v-for="campus in options.campuses.filter((c) => c.id !== student.campus_id)" :key="campus.id" :value="campus.id">
+                                            <SelectItem
+                                                v-for="campus in options.campuses.filter((c) => c.id !== student.campus_id)"
+                                                :key="campus.id" :value="campus.id">
                                                 {{ campus.name }}
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <p v-if="form.errors.to_campus_id" class="text-sm text-red-500">{{ form.errors.to_campus_id }}</p>
+                                    <p v-if="form.errors.to_campus_id" class="text-sm text-red-500">{{
+                                        form.errors.to_campus_id }}</p>
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="space-y-2">
                                     <Label for="effective_at">Effective Date *</Label>
                                     <Input type="datetime-local" v-model="form.effective_at" />
-                                    <p v-if="form.errors.effective_at" class="text-sm text-red-500">{{ form.errors.effective_at }}</p>
+                                    <p v-if="form.errors.effective_at" class="text-sm text-red-500">{{
+                                        form.errors.effective_at }}</p>
                                 </div>
                                 <div class="space-y-2">
                                     <Label for="effective_semester_id">Effective Semester (Optional)</Label>
@@ -338,7 +455,8 @@ const getSummary = (log: StudentActionLog): string => {
                         <!-- Common fields -->
                         <div class="space-y-2">
                             <Label for="reason">Reason *</Label>
-                            <Textarea v-model="form.reason" placeholder="Enter the reason for this action..." rows="3" />
+                            <Textarea v-model="form.reason" placeholder="Enter the reason for this action..."
+                                rows="3" />
                             <p v-if="form.errors.reason" class="text-sm text-red-500">{{ form.errors.reason }}</p>
                         </div>
 
@@ -355,12 +473,14 @@ const getSummary = (log: StudentActionLog): string => {
 
                         <div class="flex items-center space-x-2">
                             <Checkbox id="missing_documents" v-model:model-value="form.missing_documents" />
-                            <Label for="missing_documents" class="cursor-pointer">Bổ sung hồ sơ sau (Missing documents)</Label>
+                            <Label for="missing_documents" class="cursor-pointer">Bổ sung hồ sơ sau (Missing
+                                documents)</Label>
                         </div>
 
                         <DialogFooter>
                             <Button type="button" variant="outline" @click="isDialogOpen = false"> Cancel </Button>
-                            <Button type="submit" :disabled="form.processing || !form.action_type"> Record Action </Button>
+                            <Button type="submit" :disabled="form.processing || !form.action_type"> Record Action
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -386,7 +506,9 @@ const getSummary = (log: StudentActionLog): string => {
                                     <Badge :class="getActionTypeBadgeClass(log.action_type)">
                                         {{ getActionTypeLabel(log.action_type) }}
                                     </Badge>
-                                    <span v-if="log.missing_documents" class="text-xs text-amber-600"> (Missing Documents) </span>
+                                    <span v-if="log.missing_documents" class="text-xs text-amber-600"> (Missing
+                                        Documents)
+                                    </span>
                                 </div>
                                 <p class="mt-2 text-sm font-medium">{{ getSummary(log) }}</p>
                                 <p class="text-muted-foreground mt-1 text-sm">{{ log.reason }}</p>
@@ -404,13 +526,15 @@ const getSummary = (log: StudentActionLog): string => {
                                         <FileText class="mr-1 h-3 w-3" />
                                         Signed: {{ formatDateOnly(log.signed_at) }}
                                     </span>
-                                    <span v-if="log.attachments && log.attachments.length > 0" class="flex items-center">
+                                    <span v-if="log.attachments && log.attachments.length > 0"
+                                        class="flex items-center">
                                         <Paperclip class="mr-1 h-3 w-3" />
                                         {{ log.attachments.length }} file(s)
                                     </span>
                                 </div>
 
-                                <div v-if="log.previous_status && log.new_status" class="mt-2 flex items-center gap-2 text-xs">
+                                <div v-if="log.previous_status && log.new_status"
+                                    class="mt-2 flex items-center gap-2 text-xs">
                                     <Badge variant="outline">{{ log.previous_status }}</Badge>
                                     <ArrowRight class="h-3 w-3" />
                                     <Badge variant="outline">{{ log.new_status }}</Badge>
@@ -425,7 +549,8 @@ const getSummary = (log: StudentActionLog): string => {
                                         View
                                     </Button>
                                 </Link>
-                                <Link v-if="log.missing_documents" :href="studentRoutes.studentStatusActionShow(log.id)">
+                                <Link v-if="log.missing_documents"
+                                    :href="studentRoutes.studentStatusActionShow(log.id)">
                                     <Button variant="default" size="sm" class="bg-amber-600 hover:bg-amber-700">
                                         <Upload class="mr-1 h-3 w-3" />
                                         Upload Docs
@@ -437,7 +562,8 @@ const getSummary = (log: StudentActionLog): string => {
                 </div>
 
                 <div class="mt-4">
-                    <DataPagination :pagination-data="actionLogs" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
+                    <DataPagination :pagination-data="actionLogs" @navigate="handlePaginationNavigate"
+                        @page-size-change="handlePageSizeChange" />
                 </div>
             </CardContent>
         </Card>

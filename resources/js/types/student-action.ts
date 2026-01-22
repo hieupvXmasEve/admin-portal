@@ -157,6 +157,20 @@ export interface StoreStudentActionForm {
     to_campus_id?: number | null;
     effective_at?: string;
     effective_semester_id?: number | null;
+
+    // Defer Case fields (for ACADEMIC_DEFER)
+    defer_scope_type?: 'FULL' | 'COURSES' | null;
+    defer_fee_policy?: 'PRESERVE' | 'FORFEIT' | 'PARTIAL' | null;
+    defer_preserve_amount?: number | null;
+    defer_course_registration_ids?: number[];
+}
+
+export interface CourseRegistrationPreview {
+    id: number;
+    course_code: string;
+    course_name: string;
+    semester_name: string;
+    semester_id?: number;
 }
 
 export interface StudentActionFilters {

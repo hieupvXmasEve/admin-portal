@@ -1,0 +1,67 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class DeferCaseItem extends Model
+{
+    protected $fillable = [
+        'defer_case_id',
+        'course_registration_id',
+        'fee_policy',
+        'preserve_amount',
+    ];
+
+    protected $casts = [
+        'preserve_amount' => 'decimal:2',
+    ];
+
+    // =====================
+    // Constants
+    // =====================
+
+    public const POLICY_PRESERVE = 'PRESERVE';
+    public const POLICY_FORFEIT = 'FORFEIT';
+
+    // =====================
+    // Relationships
+    // =====================
+
+    public function deferCase(): BelongsTo
+    {
+        return $this->belongsTo(DeferCase::class);
+    }
+
+    public function courseRegistration(): BelongsTo
+    {
+        return $this->belongsTo(CourseRegistration::class);
+    }
+
+    // =====================
+    // Accessors
+    // =====================
+
+    public function getStudentAttribute(): ?Student
+    {
+        return $this->deferCase?->student;
+    }
+
+    public function getCourseOfferingAttribute(): ?CourseOffering
+    {
+        return $this->courseRegistration?->courseOffering;
+    }
+
+    public function getEffectiveFeePolicyAttribute(): string
+    {
+        return $this->fee_policy ?? $this->deferCase?->fee_policy ?? DeferCase::POLICY_FORFEIT;
+    }
+
+    public function getIsPreservedAttribute(): bool
+    {
+        return $this->effective_fee_policy === self::POLICY_PRESERVE;
+    }
+}

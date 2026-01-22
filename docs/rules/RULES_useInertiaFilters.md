@@ -70,6 +70,14 @@ const { filters, hasActiveFilters, clearFilters, handleSearch, handleSelectFilte
     <DataPagination :pagination-data="items" @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
     ```
 
+### 2.4. DataTable + DataPagination Rules
+
+1.  **Server Sorting**: Always enable `enable-server-sorting` when using `useInertiaFilters`.
+2.  **Sort State Source**: Use `currentSort` and `currentDirection` from the composable as the table source of truth.
+3.  **Pagination Events**: Route pagination through `handlePaginationNavigate` and `handlePageSizeChange`.
+4.  **Data Contract**: Pass `items.data` to `DataTable` and the full paginator object to `DataPagination`.
+5.  **Consistent Keys**: Match `sort`, `direction`, `page`, and `per_page` with backend validation and filters payload.
+
 ## 3. Backend Pattern (Laravel Controller)
 
 ### 3.1. Validation & Querying
