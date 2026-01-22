@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
+import { route } from 'ziggy-js';
 import AutoAllocateDialog from './Components/AutoAllocateDialog.vue';
 import { Sparkles } from 'lucide-vue-next';
 import { ref } from 'vue';
@@ -24,7 +25,8 @@ import { Badge } from '@/components/ui/badge';
 import DataPagination from '@/components/DataPagination.vue';
 import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import { formatCurrency, formatDate } from '@/utils/format';
-import { debounce } from 'lodash';
+import { debounce } from 'lodash-es';
+import { PaginatedResponse } from '@/types';
 
 interface Payment {
     id: number;
@@ -52,13 +54,7 @@ interface PaymentFilters {
 }
 
 const props = defineProps<{
-    items: {
-        data: Payment[];
-        current_page: number;
-        last_page: number;
-        total: number;
-        per_page: number;
-    };
+    items: PaginatedResponse<Payment>;
     filters?: Partial<PaymentFilters>;
 }>();
 
@@ -66,11 +62,8 @@ const {
     filters,
     handleSearch,
     handleSelectFilter,
-    handleSortChange,
     handlePageSizeChange,
     handlePaginationNavigate,
-    currentSort,
-    currentDirection,
 } = useInertiaFilters<PaymentFilters>({
     baseUrl: route('finance.payments.index'),
     initialFilters: {
@@ -177,20 +170,17 @@ const showAutoAllocateDialog = ref(false);
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead class="cursor-pointer" @click="handleSortChange('paid_at')">
+                        <TableHead class="cursor-pointer">
                             Date
-                            <span v-if="currentSort === 'paid_at'">
-                                {{ currentDirection === 'asc' ? '↑' : '↓' }}
-                            </span>
                         </TableHead>
                         <TableHead>Student</TableHead>
                         <TableHead>Ref</TableHead>
-                        <TableHead class="cursor-pointer" @click="handleSortChange('amount')">
+                        <TableHead class="cursor-pointer">
                             Amount
                         </TableHead>
                         <TableHead>Unallocated</TableHead>
                         <TableHead>Source</TableHead>
-                        <TableHead class="cursor-pointer" @click="handleSortChange('status')">
+                        <TableHead class="cursor-pointer">
                             Status
                         </TableHead>
                         <TableHead class="text-right">Actions</TableHead>
@@ -239,7 +229,7 @@ const showAutoAllocateDialog = ref(false);
         </div>
 
         <div class="mt-4">
-            <DataPagination :pagination-data="{ ...items, meta: items, links: items.links }"
+            <DataPagination :pagination-data="items"
                 @navigate="handlePaginationNavigate" @page-size-change="handlePageSizeChange" />
         </div>
     </div>

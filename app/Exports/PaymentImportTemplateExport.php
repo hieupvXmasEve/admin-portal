@@ -19,7 +19,7 @@ class PaymentImportTemplateExport implements FromArray, WithHeadings, WithStyles
         return [
             'Student Code',
             'Amount',
-            'Paid At (Y-m-d)',
+            'Paid At (dd-mm-yyyy)',
             'External Ref',
             'Notes',
         ];

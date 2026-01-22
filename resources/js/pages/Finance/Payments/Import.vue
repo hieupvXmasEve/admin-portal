@@ -19,10 +19,11 @@ import {
 } from '@/components/ui/table';
 import { formatCurrency } from '@/utils/format';
 import { Head, Link, router } from '@inertiajs/vue3';
-import axios from 'axios';
 import { Download, FileUp, Loader2 } from 'lucide-vue-next';
-import { computed, ref, } from 'vue';
-import { toast } from 'vue-sonner'; // Assuming project uses vue-sonner based on conventions
+import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
+import { route } from 'ziggy-js';
+import { useApi } from '@/composables/useApiRequest';
 
 // Types
 interface ImportRow {
@@ -47,6 +48,7 @@ interface PreviewResult {
     };
 }
 
+const api = useApi();
 const fileInput = ref<HTMLInputElement | null>(null);
 const previewData = ref<PreviewResult | null>(null);
 const isPreviewing = ref(false);
@@ -67,15 +69,18 @@ const uploadForPreview = async (file: File) => {
     formData.append('file', file);
 
     try {
-        const response = await axios.post(route('finance.payments.import.preview'), formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
-        previewData.value = response.data;
+        const { data: apiData } = await api.post<PreviewResult>(route('finance.payments.import.preview'), formData);
+
+        if (apiData.value?.success) {
+            previewData.value = apiData.value.data;
+        } else {
+            toast.error('Failed to preview file', {
+                description: apiData.value?.message || 'An error occurred during upload.',
+            });
+        }
     } catch (error: any) {
         toast.error('Failed to preview file', {
-            description: error.response?.data?.message || 'An error occurred during upload.',
+            description: 'An error occurred during upload.',
         });
     } finally {
         isPreviewing.value = false;
@@ -94,17 +99,23 @@ const handleImport = async () => {
     isImporting.value = true;
 
     try {
-        const response = await axios.post(route('finance.payments.import.store'), {
-            rows: validRows.value
+        const { data: apiData } = await api.post<{ imported_count: number }>(route('finance.payments.import.store'), {
+            rows: validRows.value,
         });
 
-        toast.success(`Successfully imported ${response.data.imported_count} payments.`);
+        if (apiData.value?.success) {
+            toast.success(`Successfully imported ${apiData.value.data.imported_count} payments.`);
 
-        // Redirect to Index
-        router.visit(route('finance.payments.index'));
+            // Redirect to Index
+            router.visit(route('finance.payments.index'));
+        } else {
+            toast.error('Import failed', {
+                description: apiData.value?.message || 'An unknown error occurred.',
+            });
+        }
     } catch (error: any) {
         toast.error('Import failed', {
-            description: error.response?.data?.message || 'An unknown error occurred.',
+            description: 'An unknown error occurred.',
         });
     } finally {
         isImporting.value = false;
@@ -120,7 +131,7 @@ const handleImport = async () => {
             <h2 class="text-xl font-semibold leading-tight text-gray-800">
                 Import Payments
             </h2>
-            <Link :href="route('finance.payments.index')">
+            <Link :href="(route as any)('finance.payments.index')">
                 <Button variant="outline">Back to List</Button>
             </Link>
         </div>
@@ -136,7 +147,7 @@ const handleImport = async () => {
                         Columns should be: Student Code, Amount, Paid Date, External Ref, Notes.
                     </CardDescription>
                 </div>
-                <Button variant="outline" as="a" :href="route('finance.payments.import.template')">
+                <Button variant="outline" as="a" :href="(route as any)('finance.payments.import.template')">
                     <Download class="w-4 h-4 mr-2" />
                     Download Template
                 </Button>

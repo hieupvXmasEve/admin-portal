@@ -441,11 +441,12 @@ export interface StudentOverview {
         intake_school?: {
             code: string;
             name: string;
-        };
+            intake_year: string;
+        } | null;
         intake_major?: {
             code: string;
             name: string;
-        };
+        } | null;
     };
     program_info: {
         campus?: {

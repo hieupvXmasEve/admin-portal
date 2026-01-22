@@ -12,9 +12,12 @@ const useApiRequest = createFetch({
         beforeFetch({ options }) {
             const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
+            // Don't set Content-Type for FormData - browser will set it with boundary
+            const isFormData = options.body instanceof FormData;
+
             options.headers = {
                 ...options.headers,
-                'Content-Type': 'application/json',
+                ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': token || '',
                 'X-Requested-With': 'XMLHttpRequest', // Laravel SPA authentication requirement

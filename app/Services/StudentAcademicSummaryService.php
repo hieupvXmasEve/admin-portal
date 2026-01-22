@@ -191,6 +191,7 @@ class StudentAcademicSummaryService
                 'intake_school' => $student->intakeSemester ? [
                     'code' => $student->intakeSemester->code,
                     'name' => $student->intakeSemester->name,
+                    'intake_year' => \Carbon\Carbon::parse($student->intakeSemester->start_date)->year,
                 ] : null,
                 'intake_major' => $student->intakeMajorSemester ? [
                     'code' => $student->intakeMajorSemester->code,
