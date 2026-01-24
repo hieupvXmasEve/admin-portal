@@ -62,7 +62,7 @@ const tabs = [
     { key: 'attendance', label: 'Attendance', icon: Users, route: 'students.academic-summary.attendance' },
     // { key: 'gpa', label: 'GPA', icon: BarChart3, route: 'students.academic-summary.gpa' },
     { key: 'graduation', label: 'Graduation', icon: GraduationCap, route: 'students.academic-summary.graduation' },
-    { key: 'tuition-plan', label: 'Tuition Plan', icon: Receipt, route: 'students.academic-summary.tuition-plan' },
+    { key: 'fees', label: 'Fees', icon: Receipt, route: 'students.academic-summary.fees' },
     { key: 'gold', label: 'Gold', icon: Wallet, route: 'students.academic-summary.gold' },
     { key: 'wallet', label: 'Cash wallet', icon: Wallet, route: 'students.academic-summary.wallet' },
 ];
@@ -80,7 +80,8 @@ const tabs = [
                 <div>
                     <h1 class="text-2xl font-bold">Academic Summary</h1>
                     <div class="mt-1 flex items-center gap-2">
-                        <span class="text-muted-foreground">{{ student.full_name }} - {{ student.student_id }} - K{{ student.intake }}</span>
+                        <span class="text-muted-foreground">{{ student.full_name }} - {{ student.student_id }} - K{{
+                            student.intake }}</span>
                         <Badge :variant="getStatusBadgeVariant(student.status) as any">
                             {{ formatStatus(student.status) }}
                         </Badge>
@@ -89,7 +90,8 @@ const tabs = [
             </div>
 
             <div class="flex items-center gap-2">
-                <Button variant="outline" size="sm" @click="() => loginAsStudent(student as Student)" class="flex items-center gap-2">
+                <Button variant="outline" size="sm" @click="() => loginAsStudent(student as Student)"
+                    class="flex items-center gap-2">
                     <LogIn class="h-4 w-4" />
                     Login as student
                 </Button>
@@ -108,15 +110,10 @@ const tabs = [
         <Card>
             <CardHeader class="pb-0">
                 <nav class="grid w-full grid-cols-8 gap-2">
-                    <Link
-                        v-for="tab in tabs"
-                        :key="tab.key"
-                        :href="route(tab.route, student.id)"
-                        :class="[
-                            'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                            currentTab === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                        ]"
-                    >
+                    <Link v-for="tab in tabs" :key="tab.key" :href="route(tab.route, student.id)" :class="[
+                        'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                        currentTab === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                    ]">
                         <component :is="tab.icon" class="h-4 w-4" />
                         <span class="hidden sm:inline">{{ tab.label }}</span>
                     </Link>
@@ -137,7 +134,7 @@ const tabs = [
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .grid-cols-8 > :nth-child(n + 4) {
+    .grid-cols-8> :nth-child(n + 4) {
         grid-column: span 1;
         margin-top: 0.5rem;
     }

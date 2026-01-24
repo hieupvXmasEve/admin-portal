@@ -65,10 +65,10 @@ class BillingInvoiceController extends Controller
         $invoice->load([
             'student.program',
             'semester',
-            'lines.charge', // Load charge details
+            'invoiceLines.charge', // Load charge details
             'billingCycle'
         ]);
-        
+
         // Eager load payments via charges -> allocations
         // Since we don't have a direct relation from Invoice to Allocations easily without Deep nesting,
         // We might want to fetch allocations derived from charges.
@@ -90,7 +90,7 @@ class BillingInvoiceController extends Controller
         // For now, simple export placeholder or real implementation if simple.
         // We need an Export class. I will stub this out or skip if not in immediate scope of a simple file writer.
         // The requirement says "Export to Excel". I should probably create an export class.
-        
+
         return Excel::download(new InvoiceExport($request->all()), 'invoices.xlsx');
     }
 }

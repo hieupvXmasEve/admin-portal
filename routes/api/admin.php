@@ -10,7 +10,7 @@ use App\Http\Controllers\Api\V1\Admin\EmailConfigurationController;
 use App\Http\Controllers\Api\V1\Admin\EmailController;
 use App\Http\Controllers\Api\V1\Admin\EmailTemplateController;
 use App\Http\Controllers\Web\StudentApplicationController as WebStudentApplicationController;
-use App\Http\Controllers\Web\StudentController as WebStudentController;
+use App\Modules\Academic\Http\Web\Admin\StudentController as WebStudentController;
 use App\Http\Controllers\Web\FormController;
 use App\Http\Controllers\Api\StudentWalletController;
 use Illuminate\Support\Facades\Route;
@@ -149,7 +149,7 @@ Route::middleware(['web'])->name('api.admin.')->group(function () {
         });
         // Student cash wallet here
     });
-    
+
     // API for Web Modals
     require __DIR__ . '/admin/buildings.php';
     require __DIR__ . '/admin/academic.php';
@@ -183,6 +183,6 @@ Route::middleware(['web'])->prefix('dashboard')->name('api.admin.dashboard.')->g
     Route::get('/recent-activities', [\App\Http\Controllers\Web\DashboardController::class, 'recentActivities'])->name('recent-activities');
 });
 
-Route::middleware(['web'])->prefix('admin')->name('api.admin.')->group(function(){
+Route::middleware(['web'])->prefix('admin')->name('api.admin.')->group(function () {
     require __DIR__ . '/admin/notification.php';
 });

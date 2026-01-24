@@ -178,7 +178,7 @@ export const studentRoutes = {
     studentAcademicStanding: (id: number) => route('students.standing.index', { student: id }),
 
     // Student Academic Summary Routes
-    studentAcademicSummary: (id: number) => route('students.academic-summary.show', { student: id }),
+    studentAcademicSummary: (id: number) => route('students.academic-summary.overview', { student: id }),
 
     studentStatusActionIndex: (id: number) => route('students.actions.index', { student: id }),
     studentStatusAction: () => route('reports.student-actions.index'),

@@ -10,12 +10,13 @@ interface Props {
 }
 
 defineProps<Props>();
+
 </script>
 
 <template>
     <div>
-        <Head :title="`Academic Summary - Overview - ${student.full_name}`" />
 
+        <Head :title="`Academic Summary - Overview - ${student.full_name}`" />
         <StudentLayout :student="student" current-tab="overview">
             <OverviewTab :overview="overview" :loading="false" />
         </StudentLayout>
