@@ -13,6 +13,8 @@ class StudentRoutes
     // Main Student Routes
     public const INDEX = 'students.index';
 
+    public const EXPORT = 'students.export';
+
     public const CREATE = 'students.create';
 
     public const STORE = 'students.store';
@@ -37,9 +39,6 @@ class StudentRoutes
     // Academic Summary Routes
     public const ACADEMIC_SUMMARY_SHOW = 'students.academic-summary.show';
 
-    public const ACADEMIC_SUMMARY_FILTER_BY_SEMESTER = 'students.academic-summary.filter-by-semester';
-
-    public const ACADEMIC_SUMMARY_FILTER_BY_COURSE_OFFERING = 'students.academic-summary.filter-by-course-offering';
 
     public const ACADEMIC_SUMMARY_ATTENDANCE_DETAILS = 'students.academic-summary.attendance-details';
 

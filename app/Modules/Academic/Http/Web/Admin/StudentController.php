@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Web;
+namespace App\Modules\Academic\Http\Web\Admin;
 
 use App\Constants\StudentRoutes;
 use App\Exports\StudentExport;
@@ -312,132 +312,6 @@ class StudentController extends Controller
         }
     }
 
-    /**
-     * Get students by IDs (API endpoint)
-     */
-    public function getByIds(Request $request): AnonymousResourceCollection
-    {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'integer|exists:students,id',
-        ]);
-
-        $students = Student::with(['campus', 'program'])
-            ->whereIn('id', $request->ids)
-            ->get();
-
-        return StudentResource::collection($students);
-    }
-
-    /**
-     * Update student status
-     */
-    public function updateStatus(Request $request, Student $student): RedirectResponse
-    {
-        $validated = $request->validate([
-            'status' => 'required|string|in:active,inactive,suspended,graduated',
-            'reason' => 'nullable|string|max:500',
-        ]);
-
-        try {
-            $updatedStudent = $this->studentService->updateStudentStatus(
-                $student,
-                $validated['status'],
-                $validated['reason'] ?? null
-            );
-
-            return redirect()
-                ->route(StudentRoutes::ACADEMIC_SUMMARY_SHOW, $updatedStudent)
-                ->with('success', 'Student status updated successfully');
-        } catch (\Exception $e) {
-            Log::error('Failed to update student status', [
-                'student_id' => $student->id,
-                'error' => $e->getMessage(),
-                'data' => $validated,
-            ]);
-
-            return back()
-                ->withErrors(['error' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Assign program to student
-     */
-    public function assignProgram(Request $request, Student $student): RedirectResponse
-    {
-        $validated = $request->validate([
-            'program_id' => 'required|integer|exists:programs,id',
-            'specialization_id' => 'nullable|integer|exists:specializations,id',
-            'curriculum_version_id' => 'required|integer|exists:curriculum_versions,id',
-        ]);
-
-        try {
-            $updatedStudent = $this->studentService->assignProgram(
-                $student,
-                $validated['program_id'],
-                $validated['specialization_id'],
-                $validated['curriculum_version_id']
-            );
-
-            return redirect()
-                ->route(StudentRoutes::SHOW, $updatedStudent)
-                ->with('success', 'Student program assigned successfully');
-        } catch (\Exception $e) {
-            Log::error('Failed to assign program to student', [
-                'student_id' => $student->id,
-                'error' => $e->getMessage(),
-                'data' => $validated,
-            ]);
-
-            return back()
-                ->withErrors(['error' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Get specializations for a program (AJAX)
-     */
-    public function getSpecializations(Request $request): array
-    {
-        $validated = $request->validate([
-            'program_id' => 'required|exists:programs,id',
-        ]);
-
-        return Specialization::where('program_id', $validated['program_id'])
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->toArray();
-    }
-
-    /**
-     * Get curriculum versions for program/specialization (AJAX)
-     */
-    public function getCurriculumVersions(Request $request): array
-    {
-        $validated = $request->validate([
-            'program_id' => 'required|exists:programs,id',
-            'specialization_id' => 'nullable|exists:specializations,id',
-        ]);
-
-        $query = CurriculumVersion::where('program_id', $validated['program_id']);
-
-        if ($validated['specialization_id']) {
-            $query->where('specialization_id', $validated['specialization_id']);
-        } else {
-            $query->whereNull('specialization_id');
-        }
-
-        return $query->orderBy('created_at', 'desc')
-            ->get(['id', 'version_code'])
-            ->map(function ($version) {
-                return [
-                    'id' => $version->id,
-                    'version_code' => $version->version_code,
-                ];
-            })
-            ->toArray();
-    }
 
     /**
      * Search students (API endpoint)
@@ -685,33 +559,6 @@ class StudentController extends Controller
             }
 
             return back()->withErrors(['error' => 'Export failed: ' . $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Change student status and GC level
-     */
-    public function changeStatusAndGcLevel(ChangeStudentStatusRequest $request, Student $student): RedirectResponse
-    {
-        try {
-            $validated = $request->validated();
-            $reason = $validated['reason'];
-            unset($validated['reason']);
-
-            $updatedStudent = $this->studentService->changeStatusAndGcLevel(
-                $student,
-                $validated,
-                $reason
-            );
-
-            return back()->with('success', 'Student status and GC level updated successfully');
-        } catch (\Exception $e) {
-            Log::error('Failed to change student status/GC level', [
-                'student_id' => $student->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
 }

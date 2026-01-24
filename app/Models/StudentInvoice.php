@@ -61,7 +61,7 @@ class StudentInvoice extends Model
     /**
      * Get all invoice lines (charge-based) for this invoice.
      */
-    public function lines(): HasMany
+    public function invoiceLines(): HasMany
     {
         return $this->hasMany(InvoiceLine::class, 'invoice_id');
     }
@@ -86,7 +86,7 @@ class StudentInvoice extends Model
      */
     public function getTotalAmountAttribute(): float
     {
-        return (float) $this->lines()->sum('amount_snapshot');
+        return (float) $this->invoiceLines()->sum('amount_snapshot');
     }
 
     /**
@@ -144,11 +144,11 @@ class StudentInvoice extends Model
     {
         return $query->where(function ($q) use ($term) {
             $q->where('invoice_number', 'like', "%{$term}%")
-              ->orWhereHas('student', function ($subQ) use ($term) {
-                  $subQ->where('full_name', 'like', "%{$term}%")
-                       ->orWhere('student_id', 'like', "%{$term}%")
-                       ->orWhere('email', 'like', "%{$term}%");
-              });
+                ->orWhereHas('student', function ($subQ) use ($term) {
+                    $subQ->where('full_name', 'like', "%{$term}%")
+                        ->orWhere('student_id', 'like', "%{$term}%")
+                        ->orWhere('email', 'like', "%{$term}%");
+                });
         });
     }
 
@@ -170,41 +170,41 @@ class StudentInvoice extends Model
 
         // Strategy: We will use the 'status' column which should be kept in sync by observers/actions,
         // BUT for 'overdue', we can check the due_date.
-        
+
         // Actually, requirements say "system SHALL calculate status in real-time".
         // Doing this in SQL for large datasets:
         // Invoice -> hasMany Lines -> sum(amount).
         // Invoice -> hasManyCharges -> hasManyAllocations.
         // This is too complex for a fast scope without materialized views or cached columns.
-        
+
         // RECOMMENDATION: We will trust the accessors for display. 
         // For filtering, we might need to rely on the stored 'status' column OR 
         // perform a check. 
-        
+
         // Let's implement a best-effort SQL filter.
         switch ($status) {
             case 'zero_amount':
                 // Total amount is 0 (no lines or sum of lines is 0)
                 return $query->where(function ($q) {
-                    $q->whereDoesntHave('lines')
-                      ->orWhereIn('id', function ($sub) {
-                          $sub->select('invoice_id')
-                              ->from('invoice_lines')
-                              ->groupBy('invoice_id')
-                              ->havingRaw('SUM(amount_snapshot) = 0');
-                      });
+                    $q->whereDoesntHave('invoiceLines')
+                        ->orWhereIn('id', function ($sub) {
+                            $sub->select('invoice_id')
+                                ->from('invoice_lines')
+                                ->groupBy('invoice_id')
+                                ->havingRaw('SUM(amount_snapshot) = 0');
+                        });
                 });
 
             case 'overdue':
                 return $query->where('due_date', '<', now())
-                             ->where('status', '!=', 'paid');
+                    ->where('status', '!=', 'paid');
 
             case 'paid':
                 return $query->where('status', 'paid');
 
             case 'open':
                 return $query->where('due_date', '>=', now())
-                             ->where('status', '!=', 'paid');
+                    ->where('status', '!=', 'paid');
 
             default:
                 return $query->where('status', $status);

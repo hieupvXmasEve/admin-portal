@@ -79,10 +79,6 @@ const props = defineProps<Props>();
 const { loginAsStudent } = useStudentImpersonation();
 const { can } = usePermission();
 
-// Change Status Dialog state
-const showChangeDialog = ref(false);
-const selectedStudent = ref<Student | null>(null);
-
 // Export state
 const showExportDialog = ref(false);
 const exportForm = ref({
@@ -271,11 +267,6 @@ const editStudent = (student: Student) => {
     router.visit(studentRoutes.edit(student.id));
 };
 
-// Change status dialog functions
-const openChangeDialog = (student: Student) => {
-    selectedStudent.value = student;
-    showChangeDialog.value = true;
-};
 // Go to student actions page
 const goToStudentActions = (student: Student) => {
     router.visit(studentRoutes.studentStatusActionIndex(student.id));
@@ -637,7 +628,7 @@ const exportStudents = async () => {
                         <li v-if="exportForm.scope === 'filtered' && filters.search">• Search: "{{ filters.search }}"
                         </li>
                         <li v-if="exportForm.scope === 'filtered' && filters.program_id !== 'all'">• Program: {{
-                            programs.find((p) => p.id.toString() === filters.program_id)?.name || 'Unknown' }}</li>
+                            programs.find((p) => p.id.toString() === filters.program_id)?.name || 'Unknown'}}</li>
                         <li v-if="exportForm.scope === 'filtered' && filters.status !== 'all'">• Status: {{
                             getStatusDisplayText(filters.status) }}</li>
                         <li v-if="exportForm.scope === 'all'">• All students from current campus will be exported</li>

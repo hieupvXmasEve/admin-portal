@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
-import { useTableFilters } from '@/composables/useFilters';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import DataPagination from '@/components/DataPagination.vue';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -20,17 +18,19 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { Search, FileDown, Eye } from 'lucide-vue-next';
-import DataPagination from '@/components/DataPagination.vue';
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { useTableFilters } from '@/composables/useFilters';
+import { PaginatedResponse } from '@/types';
 import { formatCurrency } from '@/types/finance';
 import { formatDate } from '@/utils/date';
-import { PaginatedResponse } from '@/types';
+import { Head, Link } from '@inertiajs/vue3';
+import { Eye, FileDown, Search } from 'lucide-vue-next';
 interface Invoice {
     id: number;
     invoice_number: string;

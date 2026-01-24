@@ -120,9 +120,11 @@ const columns: ColumnDef<StudentBillingSummary>[] = [
         accessorKey: 'program_code',
         header: 'Chương trình',
     },
+    // header align right
     {
         accessorKey: 'total_charged',
         header: () => 'Charged',
+
     },
     {
         accessorKey: 'total_paid',
@@ -479,7 +481,7 @@ defineOptions({
 
                     <!-- Charged Column -->
                     <template #cell-total_charged="{ row }">
-                        <div class="text-right font-medium text-red-600"
+                        <div class="text-left font-medium text-red-600"
                             :title="`Major: ${formatCurrency(row.original.breakdown.major)}\nEGC: ${formatCurrency(row.original.breakdown.egc)}\nRetake: ${formatCurrency(row.original.breakdown.retake)}`">
                             {{ formatCurrency(row.original.total_charged) }}
                         </div>
@@ -487,14 +489,14 @@ defineOptions({
 
                     <!-- Paid Column -->
                     <template #cell-total_paid="{ row }">
-                        <div class="text-right font-medium text-green-600">
+                        <div class="text-left font-medium text-green-600">
                             {{ formatCurrency(row.original.total_paid) }}
                         </div>
                     </template>
 
                     <!-- Balance Column -->
                     <template #cell-balance="{ row }">
-                        <div class="text-right font-medium">
+                        <div class="text-left font-medium">
                             <span :class="row.original.balance > 0 ? 'text-orange-600' : ''">
                                 {{ formatCurrency(row.original.balance) }}
                             </span>
@@ -546,8 +548,7 @@ defineOptions({
                     <!-- Actions Column -->
                     <template #cell-actions="{ row }">
                         <div class="text-right">
-                            <Link v-if="row.original.invoice_id"
-                                :href="route('finance.invoices.show', { invoice: row.original.invoice_id })">
+                            <Link :href="route('students.academic-summary.fees', { student: row.original.id })">
                                 <Button variant="outline" size="sm">
                                     <ArrowRight class="h-4 w-4" />
                                 </Button>

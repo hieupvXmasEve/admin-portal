@@ -74,7 +74,7 @@ require __DIR__ . '/web/curriculum.php';
 require __DIR__ . '/web/course-offerings.php';
 require __DIR__ . '/web/course-registrations.php';
 require __DIR__ . '/web/lectures.php';
-require __DIR__ . '/web/student.php';
+// require __DIR__ . '/web/student.php';
 require __DIR__ . '/web/class-sessions.php';
 require __DIR__ . '/web/attendance.php';
 require __DIR__ . '/web/course-statistics.php';
