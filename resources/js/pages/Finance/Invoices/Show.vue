@@ -52,7 +52,7 @@ interface Invoice {
     student: {
         id: number;
         full_name: string;
-        student_code: string;
+        student_id: string;
         email: string;
         program: {
             name: string;
@@ -142,7 +142,7 @@ const getChargeTypeLabel = (type: string) => {
                 </div>
                 <div>
                     <p class="text-sm font-medium text-muted-foreground">Student ID</p>
-                    <p class="text-lg">{{ invoice.student.student_code }}</p>
+                    <p class="text-lg">{{ invoice.student.student_id }}</p>
                 </div>
                 <div>
                     <p class="text-sm font-medium text-muted-foreground">Program</p>
