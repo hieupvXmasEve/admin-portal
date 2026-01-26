@@ -181,8 +181,26 @@ class GetBillingDashboardStudentsQuery
         // Load intake semester name
         $studentsQuery->with('intakeSemester:id,name');
 
-        return $studentsQuery->orderBy('students.full_name')
-            ->paginate(20)
+        // 4. Apply Sorting
+        $sort = $filters['sort'] ?? null;
+        $direction = $filters['direction'] ?? 'asc';
+
+        if ($sort === 'full_name') {
+            $studentsQuery->orderBy('students.full_name', $direction);
+        } elseif ($sort === 'total_charged') {
+            $studentsQuery->orderBy('total_charged', $direction);
+        } elseif ($sort === 'total_paid') {
+            $studentsQuery->orderBy('total_paid', $direction);
+        } elseif ($sort === 'balance') {
+            // Balance = Charged - Credits - Paid
+            // Using DB::raw because we are sorting by a calculated expression using aliases
+            $studentsQuery->orderByRaw("(total_charged - total_credits - total_paid) $direction");
+        } else {
+            // Default sort
+            $studentsQuery->orderBy('students.full_name', 'asc');
+        }
+
+        return $studentsQuery->paginate($perPage)
             ->through(function ($student) use ($semesterId) {
                 $totalCharged = (float) $student->total_charged;
                 $totalCredits = (float) $student->total_credits;
