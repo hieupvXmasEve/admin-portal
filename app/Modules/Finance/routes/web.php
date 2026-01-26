@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\FinanceChargeController;
+use App\Modules\Finance\Http\Web\Admin\FinanceChargeController;
 use App\Modules\Finance\Http\Web\Admin\BillingInvoiceController;
 use App\Modules\Finance\Http\Web\Admin\BillingOperationsController;
 use App\Modules\Finance\Http\Web\Admin\PaymentController;

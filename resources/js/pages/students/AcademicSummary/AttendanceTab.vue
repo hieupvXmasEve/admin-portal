@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import type { AttendanceData, UnitAttendance, AttendanceSession } from '@/types/models';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import type { AttendanceData, UnitAttendance } from '@/types/models';
 import {
     AlertTriangle,
     Calendar,
@@ -17,10 +15,7 @@ import {
     ChevronRight,
     Clock,
     Eye,
-    Filter,
-    Search,
     Users,
-    X,
     XCircle,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -35,40 +30,10 @@ const props = withDefaults(defineProps<Props>(), {
     loading: false,
 });
 
-// Reactive filters
-const searchQuery = ref('');
-const selectedSemester = ref<string>('');
-const selectedStatus = ref<string>('');
+// Reactive state
 const expandedUnits = ref<Set<number>>(new Set());
 const selectedAttendanceDetails = ref<UnitAttendance | null>(null);
 const isDetailsOpen = ref(false);
-
-// Computed filtered data
-const filteredAttendance = computed(() => {
-    let filtered = props.attendance.data;
-
-    // Search filter
-    if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase();
-        filtered = filtered.filter(unit =>
-            unit.unit_name.toLowerCase().includes(query) ||
-            unit.unit_code.toLowerCase().includes(query) ||
-            unit.semester.toLowerCase().includes(query)
-        );
-    }
-
-    // Semester filter
-    if (selectedSemester.value) {
-        filtered = filtered.filter(unit => unit.semester === selectedSemester.value);
-    }
-
-    // Status filter
-    if (selectedStatus.value) {
-        filtered = filtered.filter(unit => unit.attendance_status === selectedStatus.value);
-    }
-
-    return filtered;
-});
 
 // Toggle unit expansion
 const toggleUnitExpansion = (unitId: number) => {
@@ -139,22 +104,6 @@ const formatTime = (time: string) => {
 const formatStatus = (status: string) => {
     return status.replace(/_/g, ' ').toUpperCase();
 };
-
-const clearFilters = () => {
-    searchQuery.value = '';
-    selectedSemester.value = '';
-    selectedStatus.value = '';
-};
-
-const hasActiveFilters = computed(() => {
-    return searchQuery.value || selectedSemester.value || selectedStatus.value;
-});
-
-// Get unique semesters for filter dropdown
-const availableSemesters = computed(() => {
-    const semesters = new Set(props.attendance.data.map(unit => unit.semester));
-    return Array.from(semesters).sort();
-});
 
 // Get units at risk
 const unitsAtRisk = computed(() => {
@@ -254,86 +203,15 @@ const openAttendanceDetails = (unit: UnitAttendance) => {
                 </Card>
             </div>
 
-            <!-- Filters -->
-            <Card class="mb-6">
-                <CardHeader>
-                    <CardTitle class="flex items-center justify-between">
-                        <span class="flex items-center gap-2">
-                            <Filter class="h-5 w-5" />
-                            Filters
-                        </span>
-                        <Button
-                            v-if="hasActiveFilters"
-                            variant="outline"
-                            size="sm"
-                            @click="clearFilters"
-                            class="flex items-center gap-2"
-                        >
-                            <X class="h-4 w-4" />
-                            Clear
-                        </Button>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <!-- Search -->
-                        <div class="relative">
-                            <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                            <Input
-                                v-model="searchQuery"
-                                placeholder="Search units..."
-                                class="pl-10"
-                            />
-                        </div>
-
-                        <!-- Semester Filter -->
-                        <Select v-model="selectedSemester">
-                            <SelectTrigger>
-                                <SelectValue placeholder="All Semesters" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Semesters</SelectItem>
-                                <SelectItem
-                                    v-for="semester in availableSemesters"
-                                    :key="semester"
-                                    :value="semester"
-                                >
-                                    {{ semester }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <!-- Status Filter -->
-                        <Select v-model="selectedStatus">
-                            <SelectTrigger>
-                                <SelectValue placeholder="All Statuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
-                                <SelectItem value="excellent">Excellent (90%+)</SelectItem>
-                                <SelectItem value="good">Good (80-89%)</SelectItem>
-                                <SelectItem value="warning">Warning (70-79%)</SelectItem>
-                                <SelectItem value="critical">Critical (<70%)</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <!-- Results Count -->
-                        <div class="flex items-center text-sm text-muted-foreground">
-                            {{ filteredAttendance.length }} of {{ attendance.data.length }} units
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
             <!-- Attendance List -->
             <div class="space-y-4">
-                <div v-if="filteredAttendance.length === 0" class="text-center py-12">
+                <div v-if="attendance.data.length === 0" class="text-center py-12">
                     <Users class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <h3 class="text-lg font-semibold mb-2">No Attendance Records Found</h3>
-                    <p class="text-muted-foreground">No attendance records match your current filters.</p>
+                    <p class="text-muted-foreground">No attendance records found for this student.</p>
                 </div>
 
-                <Card v-for="unit in filteredAttendance" :key="unit.unit_id">
+                <Card v-for="unit in attendance.data" :key="unit.unit_id">
                     <CardHeader>
                         <div class="flex items-center justify-between">
                             <div class="flex-1">

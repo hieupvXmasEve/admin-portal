@@ -37,11 +37,6 @@ class TuitionPlanService
             ]);
         }
 
-        // Validate terms for duplicate semesters
-        if (isset($data['terms']) && is_array($data['terms'])) {
-            $this->validateTermsSemesterUniqueness($data['terms']);
-        }
-
         // Set default values
         $data['currency'] = $data['currency'] ?? 'VND';
         $data['is_active'] = $data['is_active'] ?? true;
@@ -92,11 +87,6 @@ class TuitionPlanService
             throw ValidationException::withMessages([
                 'total_amount' => ['The total amount must be greater than or equal to zero.']
             ]);
-        }
-
-        // Validate terms for duplicate semesters
-        if (isset($data['terms']) && is_array($data['terms'])) {
-            $this->validateTermsSemesterUniqueness($data['terms']);
         }
 
         return DB::transaction(function () use ($plan, $data) {
@@ -295,41 +285,5 @@ class TuitionPlanService
         }
 
         return !$query->exists();
-    }
-
-    /**
-     * Validate that no semester is used more than once in terms.
-     *
-     * @param array $terms
-     * @return void
-     * @throws ValidationException
-     */
-    private function validateTermsSemesterUniqueness(array $terms): void
-    {
-        $semesterIds = [];
-        $duplicates = [];
-
-        foreach ($terms as $index => $term) {
-            if (!isset($term['semester_id'])) {
-                continue;
-            }
-
-            $semesterId = $term['semester_id'];
-
-            if (in_array($semesterId, $semesterIds)) {
-                $duplicates[] = $index;
-            } else {
-                $semesterIds[] = $semesterId;
-            }
-        }
-
-        if (!empty($duplicates)) {
-            $errors = [];
-            foreach ($duplicates as $index) {
-                $errors["terms.{$index}.semester_id"] = 'This semester has already been used in another term.';
-            }
-
-            throw ValidationException::withMessages($errors);
-        }
     }
 }

@@ -7,11 +7,16 @@ namespace App\Modules\Finance\Services;
 use App\Models\FinanceCharge;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Modules\Finance\Queries\GetStudentBalanceQuery;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class PaymentService
 {
+    public function __construct(
+        protected GetStudentBalanceQuery $getStudentBalanceQuery
+    ) {}
+
     /**
      * Record a new payment.
      */
@@ -132,35 +137,7 @@ class PaymentService
      */
     public function getStudentBalance(int $studentId, ?int $semesterId = null): array
     {
-        $chargeQuery = FinanceCharge::where('student_id', $studentId)
-            ->where('status', FinanceCharge::STATUS_ACTIVE);
-
-        if ($semesterId) {
-            $chargeQuery->where('semester_id', $semesterId);
-        }
-
-        $totalCharges = (float) (clone $chargeQuery)->where('amount', '>', 0)->sum('amount');
-        $totalCredits = abs((float) (clone $chargeQuery)->where('amount', '<', 0)->sum('amount'));
-        $netCharges = $totalCharges - $totalCredits;
-
-        // Get total paid
-        $chargeIds = (clone $chargeQuery)->pluck('id');
-        $totalPaid = (float) PaymentAllocation::whereIn('charge_id', $chargeIds)->sum('allocated_amount');
-
-        // Get unapplied credit from payments
-        $unappliedCredit = $this->getUnappliedCredits($studentId);
-
-        $balance = $netCharges - $totalPaid;
-
-        return [
-            'total_charges' => $totalCharges,
-            'total_credits' => $totalCredits,
-            'net_charges' => $netCharges,
-            'total_paid' => $totalPaid,
-            'balance' => $balance,
-            'unapplied_credit' => $unappliedCredit,
-            'status' => $this->determineBalanceStatus($balance),
-        ];
+        return $this->getStudentBalanceQuery->handle($studentId, $semesterId);
     }
 
     /**
