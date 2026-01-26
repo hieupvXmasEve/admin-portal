@@ -92,12 +92,9 @@ require __DIR__ . '/web/scholarships.php';
 require __DIR__ . '/web/canvas.php';
 require __DIR__ . '/web/student-scholarships.php';
 require __DIR__ . '/web/tuition-plans.php';
-require __DIR__ . '/web/billing-cycles.php';
-require __DIR__ . '/web/wallets.php';
 require __DIR__ . '/web/vouchers.php';
 // require __DIR__ . '/web/surveys.php';
 require __DIR__ . '/web/room-bookings.php';
 require __DIR__ . '/web/departments.php';
 require __DIR__ . '/web/notifications.php';
 require __DIR__ . '/web/academic.php';
-

@@ -11,8 +11,6 @@ use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Modules\Finance\Actions\CreateFinanceChargeAction;
 use App\Modules\Finance\Actions\VoidFinanceChargeAction;
-use App\Modules\Finance\Queries\GetStudentBalanceQuery;
-use App\Modules\Finance\Queries\GetStudentChargesQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,8 +20,6 @@ class FinanceChargeController extends Controller
     public function __construct(
         private CreateFinanceChargeAction $createChargeAction,
         private VoidFinanceChargeAction $voidChargeAction,
-        private GetStudentChargesQuery $getStudentChargesQuery,
-        private GetStudentBalanceQuery $getStudentBalanceQuery
     ) {}
 
     /**
@@ -204,37 +200,5 @@ class FinanceChargeController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
-    }
-
-    /**
-     * Display student charges summary.
-     */
-    public function studentCharges(Student $student, Request $request): Response
-    {
-        $validated = $request->validate([
-            'semester_id' => 'nullable|integer|exists:semesters,id',
-        ]);
-
-        $semesterId = $validated['semester_id'] ?? null;
-
-        $charges = $this->getStudentChargesQuery->handle($student->id, $semesterId);
-        $balance = $this->getStudentBalanceQuery->handle($student->id, $semesterId);
-
-        $semesters = Semester::whereIn(
-            'id',
-            FinanceCharge::where('student_id', $student->id)
-                ->distinct()
-                ->pluck('semester_id')
-        )->orderBy('start_date', 'desc')->get();
-
-        return Inertia::render('Finance/StudentCharges', [
-            'student' => $student->load('campus', 'program'),
-            'charges' => $charges,
-            'balance' => $balance,
-            'semesters' => $semesters,
-            'filters' => [
-                'semester_id' => $semesterId,
-            ],
-        ]);
     }
 }

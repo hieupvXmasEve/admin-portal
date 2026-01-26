@@ -299,12 +299,6 @@ return [
             'view_form_analytics' => 'view_form_analytics'
         ],
 
-        // Student Wallet Management
-        'student_wallets' => [
-            'view_student_wallet' => 'view_student_wallet',
-            'adjust_wallet_balance' => 'adjust_wallet_balance',
-            'deposit_wallet_balance' => 'deposit_wallet_balance'
-        ],
         'gold_transactions' => [
             'view_gold_transaction' => 'view_gold_transaction',
             'view_any_gold_transaction' => 'view_any_gold_transaction',
@@ -326,21 +320,23 @@ return [
             'edit_tuition_plan' => 'edit_tuition_plan',
             'delete_tuition_plan' => 'delete_tuition_plan',
         ],
-        'billing-cycles' => [
-            'view_billing_cycle' => 'view_billing_cycle',
-            'create_billing_cycle' => 'create_billing_cycle',
-            'edit_billing_cycle' => 'edit_billing_cycle',
-            'delete_billing_cycle' => 'delete_billing_cycle',
-            'activate_billing_cycle' => 'activate_billing_cycle',
-            'close_billing_cycle' => 'close_billing_cycle',
-        ],
-        'invoices' => [
-            'view_invoice' => 'view_invoice',
-            'create_invoice' => 'create_invoice',
-            'edit_invoice' => 'edit_invoice',
-            'delete_invoice' => 'delete_invoice',
-            'generate_invoice' => 'generate_invoice',
-            'pay_invoice' => 'pay_invoice',
+        'finances' => [
+            'view_finance_operations_dashboard' => 'view_finance_operations_dashboard',
+            'view_finance_operations_generate_charges' => 'view_finance_operations_generate_charges',
+            'view_finance_operations_exceptions' => 'view_finance_operations_exceptions',
+            'view_finance_operations_due_calendar' => 'view_finance_operations_due_calendar',
+            // Invoices
+            'view_finance_invoices' => 'view_finance_invoices',
+            'view_finance_export_invoices' => 'view_finance_export_invoices',
+            // Charges
+            'view_finance_charges' => 'view_finance_charges',
+            'create_finance_charges' => 'create_finance_charges',
+            'void_finance_charges' => 'void_finance_charges',
+            // Payments
+            'view_finance_payments' => 'view_finance_payments',
+            'import_finance_payments' => 'import_finance_payments',
+            'allocate_finance_payment' => 'allocate_finance_payment',
+            'view_finance_payment_details' => 'view_finance_payment_details',
         ],
         'modules' => [
             'view_module' => 'view_module',
