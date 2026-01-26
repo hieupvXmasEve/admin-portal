@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
 use App\Http\Controllers\Api\V1\Student\EventController;
+use App\Http\Controllers\Api\V1\Student\FinanceController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\ModuleController;
 use App\Http\Controllers\Api\V1\Student\QueryTicketController;
@@ -256,6 +257,12 @@ Route::middleware([
                 Route::get('/{invoice}', [CashWalletController::class, 'invoiceDetail'])->name('show');
             });
         });
+        // Finance
+        Route::prefix('finance')->name('finance.')->group(function () {
+            Route::get('/', [FinanceController::class, 'index'])->name('index');
+            Route::get('/{semester}', [FinanceController::class, 'semester'])->name('semester');
+        });
+        
 
         // Club endpoints
         Route::prefix('clubs')->name('clubs.')->group(function () {
