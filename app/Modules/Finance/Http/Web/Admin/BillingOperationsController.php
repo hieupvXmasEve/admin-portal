@@ -33,6 +33,8 @@ class BillingOperationsController extends Controller
             'search' => 'nullable|string',
             'per_page' => 'nullable|integer',
             'page' => 'nullable|integer',
+            'sort' => 'nullable|string',
+            'direction' => 'nullable|string|in:asc,desc',
         ]);
 
         $currentSemester = Semester::where('is_active', true)->first();
@@ -60,6 +62,8 @@ class BillingOperationsController extends Controller
                 'retake' => $validated['retake'] ?? 'all',
                 'search' => $validated['search'] ?? '',
                 'per_page' => isset($validated['per_page']) ? (int) $validated['per_page'] : 20,
+                'sort' => $validated['sort'] ?? null,
+                'direction' => $validated['direction'] ?? null,
             ],
         ]);
     }

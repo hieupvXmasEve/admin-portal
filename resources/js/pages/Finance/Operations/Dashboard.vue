@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import DataPagination from '@/components/DataPagination.vue';
 import DataTable from '@/components/DataTable.vue';
-import DebouncedInput from '@/components/DebouncedInput.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useTableFilters } from '@/composables/useFilters';
+import { useInertiaFilters } from '@/composables/useInertiaFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { PaginatedResponse } from '@/types';
 import { formatCurrency, type Semester } from '@/types/finance';
@@ -85,36 +85,63 @@ interface DashboardFilters {
     search: string;
     per_page: number;
     page: number;
+    sort: string | null;
+    direction: 'asc' | 'desc' | null;
 }
 
 interface Props {
     kpiStats: KpiStats;
     students: PaginatedResponse<StudentBillingSummary>;
     semesters: Semester[];
-    filters: DashboardFilters;
+    filters: Partial<DashboardFilters>;
     currentSemester: Semester | null;
 }
 
 const props = defineProps<Props>();
 
-// Use table filters composable
+// Use Inertia filters composable
 const {
     filters,
+    handleSelectFilter,
+    handleSortChange,
     handlePaginationNavigate,
     handlePageSizeChange,
-    handleSelectFilter,
-    updateFieldDebounced,
-} = useTableFilters<DashboardFilters>(
-    route('finance.operations.dashboard'),
-    props.filters,
-    ['students', 'filters', 'kpiStats']
-);
+    currentSort,
+    currentDirection,
+} = useInertiaFilters<DashboardFilters>({
+    baseUrl: route('finance.operations.dashboard'),
+    initialFilters: {
+        semester_id: (typeof props.filters?.semester_id === 'string' ? props.filters.semester_id : null),
+        status: (typeof props.filters?.status === 'string' ? props.filters.status : 'all') || 'all',
+        stage: (typeof props.filters?.stage === 'string' ? props.filters.stage : 'all') || 'all',
+        defer: (typeof props.filters?.defer === 'string' ? props.filters.defer : 'all') || 'all',
+        retake: (typeof props.filters?.retake === 'string' ? props.filters.retake : 'all') || 'all',
+        search: (typeof props.filters?.search === 'string' ? props.filters.search : '') || '',
+        per_page: props.filters?.per_page || 20,
+        sort: (typeof props.filters?.sort === 'string' ? props.filters.sort : 'full_name') || 'full_name',
+        direction: (props.filters?.direction as 'asc' | 'desc') || 'asc',
+        page: props.students.current_page || 1,
+    },
+    defaultValues: {
+        semester_id: null,
+        status: 'all',
+        stage: 'all',
+        defer: 'all',
+        retake: 'all',
+        per_page: 20,
+        sort: null,
+        direction: 'asc',
+    },
+    only: ['students', 'filters', 'kpiStats'],
+    debounce: 400,
+});
 
 // Define columns for DataTable
 const columns: ColumnDef<StudentBillingSummary>[] = [
     {
         accessorKey: 'full_name',
         header: 'Sinh viên',
+        enableSorting: true,
     },
     {
         accessorKey: 'program_code',
@@ -124,15 +151,17 @@ const columns: ColumnDef<StudentBillingSummary>[] = [
     {
         accessorKey: 'total_charged',
         header: () => 'Charged',
-
+        enableSorting: true
     },
     {
         accessorKey: 'total_paid',
         header: () => 'Paid',
+        enableSorting: true,
     },
     {
         accessorKey: 'balance',
         header: () => 'Balance',
+        enableSorting: true,
     },
     {
         id: 'flags',
@@ -381,8 +410,7 @@ defineOptions({
         <!-- Filters Row -->
         <div class="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg border">
             <div class="flex-1 min-w-[200px]">
-                <DebouncedInput v-model="filters.search" :debounce="300" placeholder="Tìm theo tên hoặc mã SV"
-                    @debounced="val => updateFieldDebounced('search', val)" />
+                <Input v-model="filters.search" placeholder="Tìm theo tên hoặc mã SV" />
             </div>
 
             <div class="flex-1 min-w-[150px]">
@@ -454,7 +482,8 @@ defineOptions({
                 </div>
             </CardHeader>
             <CardContent class="p-0">
-                <DataTable :data="students.data" :columns="columns" :show-column-toggle="false">
+                <DataTable :data="students.data" :columns="columns" :show-column-toggle="false"
+                    :initial-sort="currentSort" :initial-direction="currentDirection" enable-server-sorting @sort-change="handleSortChange">
                     <!-- Student Column -->
                     <template #cell-full_name="{ row }">
                         <div>
