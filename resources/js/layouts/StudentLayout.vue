@@ -61,10 +61,10 @@ const tabs = [
     { key: 'scores', label: 'Scores', icon: Target, route: 'students.academic-summary.scores' },
     { key: 'attendance', label: 'Attendance', icon: Users, route: 'students.academic-summary.attendance' },
     // { key: 'gpa', label: 'GPA', icon: BarChart3, route: 'students.academic-summary.gpa' },
-    { key: 'graduation', label: 'Graduation', icon: GraduationCap, route: 'students.academic-summary.graduation' },
+    // { key: 'graduation', label: 'Graduation', icon: GraduationCap, route: 'students.academic-summary.graduation' },
     { key: 'fees', label: 'Fees', icon: Receipt, route: 'students.academic-summary.fees' },
     { key: 'gold', label: 'Gold', icon: Wallet, route: 'students.academic-summary.gold' },
-    { key: 'wallet', label: 'Cash wallet', icon: Wallet, route: 'students.academic-summary.wallet' },
+    // { key: 'wallet', label: 'Cash wallet', icon: Wallet, route: 'students.academic-summary.wallet' },
 ];
 </script>
 
@@ -109,7 +109,7 @@ const tabs = [
         <!-- Main Content -->
         <Card>
             <CardHeader class="pb-0">
-                <nav class="grid w-full grid-cols-8 gap-2">
+                <nav class="grid w-full grid-cols-6 gap-2">
                     <Link v-for="tab in tabs" :key="tab.key" :href="route(tab.route, student.id)" :class="[
                         'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                         currentTab === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',

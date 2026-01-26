@@ -130,12 +130,12 @@ class StudentAcademicSummaryController extends Controller
      * Display the attendance tab for academic summary
      *
      * @param  Student  $student  The student to display attendance for
+     * @param  \App\Modules\Academic\Queries\GetStudentAttendanceQuery $query
      * @return Response Inertia response with attendance data
      */
-    public function attendance(Student $student): Response
+    public function attendance(Student $student, \App\Modules\Academic\Queries\GetStudentAttendanceQuery $query): Response
     {
-
-        $attendanceData = $this->academicSummaryService->getAttendanceData($student);
+        $attendanceData = $query->execute($student);
 
         return Inertia::render('students/AcademicSummary/Attendance', [
             'student' => $student->only(['id', 'student_id', 'full_name', 'status', 'email', 'intake']),
@@ -299,20 +299,20 @@ class StudentAcademicSummaryController extends Controller
      *
      * @param  Student  $student  The student to get attendance for
      * @param  Request  $request  Request containing unit filter
+     * @param  \App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery $query
      * @return JsonResponse Detailed attendance data
      */
-    public function getAttendanceDetails(Student $student, Request $request): JsonResponse
+    public function getAttendanceDetails(Student $student, Request $request, \App\Modules\Academic\Queries\GetStudentAttendanceDetailsQuery $query): JsonResponse
     {
-
         $validated = $request->validate([
             'unit_id' => 'required|exists:units,id',
             'semester_id' => 'nullable|exists:semesters,id',
         ]);
 
-        $attendanceDetails = $this->academicSummaryService->getAttendanceDetails(
+        $attendanceDetails = $query->execute(
             $student->id,
-            $validated['unit_id'],
-            $validated['semester_id'] ?? null
+            (int) $validated['unit_id'],
+            isset($validated['semester_id']) ? (int) $validated['semester_id'] : null
         );
 
         return response()->json([

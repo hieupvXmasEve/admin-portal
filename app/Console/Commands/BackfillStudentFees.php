@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\FinanceCharge;
 use App\Models\InvoiceLine;
+use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
 use App\Models\TuitionPlan;
@@ -68,7 +69,7 @@ class BackfillStudentFees extends Command
                 // ->whereNotIn('status', Student::BLOCKED_STATUSES) // Optional: fail-safe
                 ->get();
 
-            $this->info('Found '.$students->count().' eligible students.');
+            $this->info('Found ' . $students->count() . ' eligible students.');
             $bar = $this->output->createProgressBar($students->count());
             $bar->start();
 
@@ -83,7 +84,7 @@ class BackfillStudentFees extends Command
                             'semester_id' => $semesterId,
                         ],
                         [
-                            'invoice_number' => 'INV-BF-'.time().'-'.$student->student_id.'-'.$semesterId,
+                            'invoice_number' => 'INV-BF-' . time() . '-' . $student->student_id . '-' . $semesterId,
                             'due_date' => now()->addDays(30),
                             'opened_at' => now(),
                             'status' => 'draft', // or 'issued' if backfilling history? Let's stick to draft/issued
@@ -144,7 +145,7 @@ class BackfillStudentFees extends Command
                                 $semesterId,
                                 FinanceCharge::TYPE_TUITION_TERM,
                                 $amount,
-                                'Tuition Fee'
+                                'Major Tuition (Installment 1)'
                             );
                             if ($charge) {
                                 $chargesToLink[] = $charge;
@@ -269,7 +270,7 @@ class BackfillStudentFees extends Command
                     $stats['processed']++;
                     $bar->advance();
                 } catch (\Exception $e) {
-                    Log::error("Backfill Error Student {$student->id}: ".$e->getMessage());
+                    Log::error("Backfill Error Student {$student->id}: " . $e->getMessage());
                     $stats['errors']++;
                     $this->error("Error processing student {$student->student_id}: {$e->getMessage()}");
                 }
@@ -293,7 +294,7 @@ class BackfillStudentFees extends Command
             $this->info('Backfill completed successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->error('Critical Error: '.$e->getMessage());
+            $this->error('Critical Error: ' . $e->getMessage());
             $this->error('Transaction rolled back.');
 
             return 1;
@@ -318,12 +319,25 @@ class BackfillStudentFees extends Command
             return 0;
         }
 
-        // Assuming standard term logic: Semester 1 of intake = Term 1?
-        // Or do we match semester_id directly?
-        // TuitionPlanTerm has semester_id.
+        // Calculate Term Number based on semester progression
+        $intakeSemester = Semester::find($intakeSemesterId);
+        $targetSemester = Semester::find($semesterId);
 
+        if (! $intakeSemester || ! $targetSemester) {
+            return 0;
+        }
+
+        // If target is before intake, no fee
+        if ($targetSemester->start_date < $intakeSemester->start_date) {
+            return 0;
+        }
+
+        // Count semesters started between intake and target (inclusive)
+        $termNumber = Semester::where('start_date', '>=', $intakeSemester->start_date)
+            ->where('start_date', '<=', $targetSemester->start_date)
+            ->count();
         $term = TuitionPlanTerm::where('tuition_plan_id', $plan->id)
-            ->where('semester_id', $semesterId)
+            ->where('term_number', $termNumber)
             ->first();
 
         return $term ? (float) $term->amount : 0;

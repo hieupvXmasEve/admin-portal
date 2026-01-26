@@ -143,7 +143,7 @@ const defaultOpenSemesters = computed(() => {
 <template>
     <div class="space-y-8">
         <!-- 1) HEADER: Overall Totals -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
                 <CardHeader class="pb-2">
                     <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Total Charged</CardTitle>
@@ -170,21 +170,16 @@ const defaultOpenSemesters = computed(() => {
                     </div>
                 </CardContent>
             </Card>
-            <Card class="lg:col-span-2">
+            <Card>
                 <CardHeader class="pb-2">
                     <CardTitle class="text-sm font-medium text-muted-foreground uppercase">Outstanding Balance
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div class="flex items-center justify-between gap-4">
-                        <div class="text-3xl font-bold"
+                        <div class="text-2xl font-bold"
                             :class="feeSummary.summary.remaining > 0 ? 'text-red-600' : 'text-gray-600'">
                             {{ formatCurrency(feeSummary.summary.remaining) }}
-                        </div>
-                        <div class="flex-1 max-w-[150px] flex flex-col items-end gap-1">
-                            <span class=" text-muted-foreground">{{ Math.round(feeSummary.summary.progress) }}%
-                                Paid</span>
-                            <Progress :model-value="feeSummary.summary.progress" class="h-2 w-full" />
                         </div>
                     </div>
                 </CardContent>
@@ -297,7 +292,7 @@ const defaultOpenSemesters = computed(() => {
                                                         <span class="block  font-medium">{{ line.item }}</span>
                                                         <span
                                                             class="text-[10px] text-muted-foreground bg-muted px-1 rounded">{{
-                                                            line.category }}</span>
+                                                                line.category }}</span>
                                                     </div>
                                                     <span class="font-mono "
                                                         :class="line.amount < 0 ? 'text-green-600' : ''">

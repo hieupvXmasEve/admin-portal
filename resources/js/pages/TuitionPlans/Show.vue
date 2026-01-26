@@ -36,11 +36,9 @@ interface Semester {
 
 interface TuitionPlanTerm {
     id: number;
-    semester_id: number;
     term_number: number;
     amount: number;
     due_date: string | null;
-    semester: Semester;
 }
 
 interface TuitionPlan {
@@ -86,6 +84,7 @@ const handleDelete = () => {
 </script>
 
 <template>
+
     <Head title="Tuition Plan Details" />
 
     <div class="space-y-6">
@@ -115,7 +114,8 @@ const handleDelete = () => {
                         <AlertDialogHeader>
                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the tuition plan and all its terms.
+                                This action cannot be undone. This will permanently delete the tuition plan and all its
+                                terms.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -147,7 +147,8 @@ const handleDelete = () => {
                     </div>
                     <div>
                         <p class="text-sm font-medium text-muted-foreground">Total Amount</p>
-                        <p class="text-lg font-semibold">{{ formatCurrency(tuitionPlan.total_amount, tuitionPlan.currency) }}</p>
+                        <p class="text-lg font-semibold">{{ formatCurrency(tuitionPlan.total_amount,
+                            tuitionPlan.currency) }}</p>
                     </div>
                     <div>
                         <p class="text-sm font-medium text-muted-foreground">Currency</p>
@@ -169,23 +170,16 @@ const handleDelete = () => {
                 <CardDescription>Breakdown of tuition payments across semesters</CardDescription>
             </CardHeader>
             <CardContent>
-                <div v-if="tuitionPlan.terms.length === 0" class="text-center py-8 text-muted-foreground">
+                <div v-if="tuitionPlan.terms?.length === 0" class="text-center py-8 text-muted-foreground">
                     No payment terms defined for this tuition plan.
                 </div>
                 <div v-else class="space-y-4">
-                    <div
-                        v-for="term in tuitionPlan.terms"
-                        :key="term.id"
-                        class="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                        <div class="flex-1 grid gap-4 md:grid-cols-4">
+                    <div v-for="term in tuitionPlan.terms" :key="term.id"
+                        class="flex items-center justify-between p-4 border rounded-lg">
+                        <div class="flex-1 grid gap-4 md:grid-cols-3">
                             <div>
                                 <p class="text-sm font-medium text-muted-foreground">Term</p>
                                 <p class="text-lg font-semibold">Term {{ term.term_number }}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-muted-foreground">Semester</p>
-                                <p class="text-lg">{{ term.semester.name }}</p>
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-muted-foreground">Amount</p>

@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Modules\Finance\Http\Web\Admin;
 
+use App\Http\Controllers\Controller;
 use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentInvoice;
-use App\Modules\Finance\Services\FinanceChargeService;
-use App\Modules\Finance\Services\PaymentService;
+use App\Modules\Finance\Actions\CreateFinanceChargeAction;
+use App\Modules\Finance\Actions\VoidFinanceChargeAction;
+use App\Modules\Finance\Queries\GetStudentBalanceQuery;
+use App\Modules\Finance\Queries\GetStudentChargesQuery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,8 +20,10 @@ use Inertia\Response;
 class FinanceChargeController extends Controller
 {
     public function __construct(
-        private FinanceChargeService $chargeService,
-        private PaymentService $paymentService
+        private CreateFinanceChargeAction $createChargeAction,
+        private VoidFinanceChargeAction $voidChargeAction,
+        private GetStudentChargesQuery $getStudentChargesQuery,
+        private GetStudentBalanceQuery $getStudentBalanceQuery
     ) {}
 
     /**
@@ -171,7 +176,7 @@ class FinanceChargeController extends Controller
         ]);
 
         try {
-            $charge = $this->chargeService->createCharge($validated);
+            $charge = $this->createChargeAction->handle($validated);
 
             return redirect()
                 ->route('finance.charges.show', $charge)
@@ -193,7 +198,7 @@ class FinanceChargeController extends Controller
         ]);
 
         try {
-            $this->chargeService->voidCharge($charge->id, $validated['void_reason']);
+            $this->voidChargeAction->handle($charge->id, $validated['void_reason']);
 
             return back()->with('success', 'Charge voided successfully.');
         } catch (\Exception $e) {
@@ -212,8 +217,8 @@ class FinanceChargeController extends Controller
 
         $semesterId = $validated['semester_id'] ?? null;
 
-        $charges = $this->chargeService->getStudentCharges($student->id, $semesterId);
-        $balance = $this->paymentService->getStudentBalance($student->id, $semesterId);
+        $charges = $this->getStudentChargesQuery->handle($student->id, $semesterId);
+        $balance = $this->getStudentBalanceQuery->handle($student->id, $semesterId);
 
         $semesters = Semester::whereIn(
             'id',

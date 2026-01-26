@@ -63,7 +63,7 @@ class InvoiceGenerationService
 
         DB::transaction(function () use ($invoice, $charges) {
             // Get existing line charge IDs
-            $existingChargeIds = $invoice->lines()->pluck('charge_id')->toArray();
+            $existingChargeIds = $invoice->invoiceLines()->pluck('charge_id')->toArray();
             $newChargeIds = $charges->pluck('id')->toArray();
 
             // Remove lines for charges no longer active
@@ -107,7 +107,7 @@ class InvoiceGenerationService
      */
     protected function recalculateInvoiceTotals(StudentInvoice $invoice): void
     {
-        $lines = $invoice->lines()->get();
+        $lines = $invoice->invoiceLines()->get();
 
         $subtotal = $lines->where('amount_snapshot', '>', 0)->sum('amount_snapshot');
         $credits = abs($lines->where('amount_snapshot', '<', 0)->sum('amount_snapshot'));

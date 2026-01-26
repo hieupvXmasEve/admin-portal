@@ -963,7 +963,6 @@ class StudentAcademicSummaryService
             ->orderBy('class_sessions.session_date', 'desc')
             ->get()
             ->groupBy('unit_id');
-
         $attendanceSummary = $attendanceData->map(function ($unitAttendance, $unitId) {
             $totalSessions = $unitAttendance->count();
             $presentCount = $unitAttendance->where('status', 'present')->count();

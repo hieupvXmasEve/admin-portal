@@ -47,7 +47,6 @@ const tuitionPlanSchema = z.object({
     currency: z.string().length(3).default('VND'),
     is_active: z.boolean().default(true),
     terms: z.array(z.object({
-        semester_id: z.number({ required_error: 'Semester is required' }),
         term_number: z.number().min(1, 'Term number must be greater than zero'),
         amount: z.number().min(0, 'Amount must be greater than or equal to zero'),
         due_date: z.string().nullable().optional(),
@@ -80,7 +79,6 @@ const isSubmitting = ref(false);
 
 const addTerm = () => {
     push({
-        semester_id: undefined as any,
         term_number: terms.value.length + 1,
         amount: 0,
         due_date: null,
@@ -104,7 +102,6 @@ const onSubmit = handleSubmit(async (formValues, actions) => {
         total_amount: Number(formValues.total_amount),
         is_active: Boolean(formValues.is_active),
         terms: formValues.terms?.map(term => ({
-            semester_id: Number(term.semester_id),
             term_number: Number(term.term_number),
             amount: Number(term.amount),
             due_date: term.due_date || null,
@@ -269,36 +266,13 @@ const onSubmit = handleSubmit(async (formValues, actions) => {
                             :key="field.key"
                             class="flex gap-4 items-start p-4 border rounded-lg"
                         >
-                            <div class="flex-1 grid gap-4 md:grid-cols-4">
+                            <div class="flex-1 grid gap-4 md:grid-cols-3">
                                 <FormField v-slot="{ componentField }" :name="`terms[${index}].term_number`">
                                     <FormItem>
                                         <FormLabel>Term Number</FormLabel>
                                         <FormControl>
                                             <Input type="number" v-bind="componentField" disabled />
                                         </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                </FormField>
-
-                                <FormField v-slot="{ componentField }" :name="`terms[${index}].semester_id`">
-                                    <FormItem>
-                                        <FormLabel>Semester <span class="text-destructive">*</span></FormLabel>
-                                        <Select v-bind="componentField">
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select semester" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem
-                                                    v-for="semester in semesters"
-                                                    :key="semester.id"
-                                                    :value="semester.id"
-                                                >
-                                                    {{ semester.name }}
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 </FormField>

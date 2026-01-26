@@ -17,7 +17,6 @@ class TuitionPlanTerm extends Model
      */
     protected $fillable = [
         'tuition_plan_id',
-        'semester_id',
         'term_number',
         'amount',
         'due_date',
@@ -39,14 +38,6 @@ class TuitionPlanTerm extends Model
     public function tuitionPlan(): BelongsTo
     {
         return $this->belongsTo(TuitionPlan::class);
-    }
-
-    /**
-     * Get the semester that owns the term.
-     */
-    public function semester(): BelongsTo
-    {
-        return $this->belongsTo(Semester::class);
     }
 
     /**

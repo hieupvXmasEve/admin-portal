@@ -40,9 +40,9 @@ class TuitionPlanController extends Controller
                 $q->whereHas('curriculumVersion', function ($q) use ($validated) {
                     $q->where('name', 'like', "%{$validated['search']}%");
                 })
-                ->orWhereHas('curriculumVersion.program', function ($q) use ($validated) {
-                    $q->where('name', 'like', "%{$validated['search']}%");
-                });
+                    ->orWhereHas('curriculumVersion.program', function ($q) use ($validated) {
+                        $q->where('name', 'like', "%{$validated['search']}%");
+                    });
             });
         }
 
@@ -132,7 +132,7 @@ class TuitionPlanController extends Controller
         $tuitionPlan->load([
             'curriculumVersion.program',
             'intakeSemester',
-            'terms.semester'
+            'terms',
         ]);
 
         return Inertia::render('TuitionPlans/Show', [

@@ -86,7 +86,11 @@ class StudentInvoice extends Model
      */
     public function getTotalAmountAttribute(): float
     {
-        return (float) $this->invoiceLines()->sum('amount_snapshot');
+        return (float) $this->invoiceLines()
+            ->whereHas('charge', function ($q) {
+                $q->where('status', FinanceCharge::STATUS_ACTIVE);
+            })
+            ->sum('amount_snapshot');
     }
 
     /**

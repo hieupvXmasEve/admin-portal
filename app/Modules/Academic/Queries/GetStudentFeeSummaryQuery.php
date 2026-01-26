@@ -19,7 +19,7 @@ class GetStudentFeeSummaryQuery
         $tuitionPlan = TuitionPlan::where('curriculum_version_id', $student->curriculum_version_id)
             ->where('intake_semester_id', $student->intake_semester_id)
             ->where('is_active', true)
-            ->with(['terms.semester', 'curriculumVersion.program'])
+            ->with(['terms', 'curriculumVersion.program'])
             ->first();
 
         // 2. Get All Invoices (Actual Billing)
@@ -105,7 +105,21 @@ class GetStudentFeeSummaryQuery
 
         $checklist = null;
         if ($tuitionPlan) {
-            $terms = $tuitionPlan->terms->map(function ($term) use ($charges, $invoices) {
+            // Get semesters sequence for inferring term semesters
+            $intakeSemester = \App\Models\Semester::find($student->intake_semester_id);
+            $semestersSequence = collect();
+            if ($intakeSemester) {
+                // Get enough semesters forward
+                $semestersSequence = \App\Models\Semester::where('start_date', '>=', $intakeSemester->start_date)
+                    ->orderBy('start_date')
+                    ->limit(20) // Limit to reasonable amount
+                    ->get();
+            }
+
+            $terms = $tuitionPlan->terms->map(function ($term) use ($charges, $invoices, $semestersSequence) {
+                // Inferred semester for this term
+                $inferredSemester = $semestersSequence->get($term->term_number - 1);
+
                 // Find charge linked to this term
                 // Priority 1: Strict match by source (if populated)
                 $linkedCharge = $charges->first(function ($c) use ($term) {
@@ -113,10 +127,10 @@ class GetStudentFeeSummaryQuery
                 });
 
                 // Priority 2: Fallback match by Type + Semester (for legacy/imported data)
-                if (!$linkedCharge) {
-                    $linkedCharge = $charges->first(function ($c) use ($term) {
+                if (!$linkedCharge && $inferredSemester) {
+                    $linkedCharge = $charges->first(function ($c) use ($term, $inferredSemester) {
                         return $c->charge_type === FinanceCharge::TYPE_TUITION_TERM 
-                            && $c->semester_id === $term->semester_id;
+                            && $c->semester_id === $inferredSemester->id;
                     });
                 }
 
@@ -161,7 +175,7 @@ class GetStudentFeeSummaryQuery
 
                 return [
                     'term_number' => $term->term_number,
-                    'semester_name' => $term->semester->name,
+                    'semester_name' => $inferredSemester ? $inferredSemester->name : "Term " . $term->term_number,
                     'required_amount' => $term->amount,
                     'generated' => $generated,
                     'charge_id' => $linkedCharge?->id,
