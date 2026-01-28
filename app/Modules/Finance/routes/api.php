@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Finance\Http\Api\Student\StudentFinanceController;
+use App\Modules\Finance\Http\Api\Admin\BillingOperationsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -26,4 +27,18 @@ Route::prefix('api/v1/student/finance')
 
         // Payment history
         Route::get('/payments', [StudentFinanceController::class, 'payments'])->name('payments');
+    });
+/*
+|--------------------------------------------------------------------------
+| Admin Finance API Routes
+|--------------------------------------------------------------------------
+*/
+Route::prefix('api/v1/finance/operations')
+    ->middleware(['web', 'auth']) // Assuming sanctum for admin API access
+    ->name('api.finance.operations.')
+    ->group(function () {
+        Route::post('/preview-charges', [BillingOperationsController::class, 'previewCharges'])->name('preview-charges');
+        Route::post('/run-generate', [BillingOperationsController::class, 'runGenerate'])->name('run-generate');
+        Route::post('/exceptions/{exceptionId}/fix', [BillingOperationsController::class, 'fixException'])->name('fix-exception');
+        Route::post('/send-reminders', [BillingOperationsController::class, 'sendReminders'])->name('send-reminders');
     });
