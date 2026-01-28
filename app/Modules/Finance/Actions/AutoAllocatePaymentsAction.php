@@ -37,6 +37,16 @@ class AutoAllocatePaymentsAction
         $allocatedChargeIds = [];
 
         DB::transaction(function () use ($priorityOrder, $userId, &$stats, &$allocatedChargeIds) {
+            // 0. Handle 0-amount invoices (mark as paid)
+            $zeroAmountInvoices = StudentInvoice::where('status', '!=', 'paid')
+                ->filterByStatus('zero_amount')
+                ->get();
+
+            foreach ($zeroAmountInvoices as $invoice) {
+                $invoice->update(['status' => 'paid']);
+                $stats['invoices_updated']++;
+            }
+
             // 1. Find all students with unallocated payments (amount > 0)
             // We verify 'amount > 0' and check unapplied amount effectively via code logic below
             // But to optimize, we can filter students who have payments with unapplied amount.
