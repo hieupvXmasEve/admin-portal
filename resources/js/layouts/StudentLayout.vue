@@ -2,11 +2,13 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { usePermission } from '@/composables/usePermission';
 import { useStudentImpersonation } from '@/composables/useStudentImpersonation';
 import type { Student } from '@/types/models';
 import { studentRoutes } from '@/utils/routes';
 import { Link, router } from '@inertiajs/vue3';
-import { ArrowLeft, BookOpen, Download, Edit, GraduationCap, LogIn, Receipt, Target, User, Users, Wallet } from 'lucide-vue-next';
+import { ArrowLeft, BookOpen, ChevronDown, ClipboardCheck, Download, Edit, LogIn, Receipt, RotateCw, Target, User, Users, Wallet } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 import { route } from 'ziggy-js';
 
@@ -21,7 +23,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Student impersonation composable
 const { loginAsStudent } = useStudentImpersonation();
-
+const { can } = usePermission();
 const goBack = () => {
     router.visit(studentRoutes.list());
 };
@@ -35,7 +37,12 @@ const exportSummary = () => {
 const editStudent = (student: Pick<Student, 'id'>) => {
     router.visit(studentRoutes.edit(student.id));
 };
-
+const goToStudentPlacementAndProgression = (student: Pick<Student, 'id'>) => {
+    router.visit(studentRoutes.studentPlacement(student.id));
+};
+const goToStudentActions = (student: Pick<Student, 'id'>) => {
+    router.visit(studentRoutes.studentStatusActionIndex(student.id));
+};
 const getStatusBadgeVariant = (status: string) => {
     const variants: Record<string, string> = {
         admitted: 'secondary',
@@ -75,13 +82,12 @@ const tabs = [
             <div class="flex items-center gap-4">
                 <Button variant="ghost" size="sm" @click="goBack" class="flex items-center gap-2">
                     <ArrowLeft class="h-4 w-4" />
-                    Back to Student
+                    Back to list
                 </Button>
                 <div>
                     <h1 class="text-2xl font-bold">Academic Summary</h1>
                     <div class="mt-1 flex items-center gap-2">
-                        <span class="text-muted-foreground">{{ student.full_name }} - {{ student.student_id }} - K{{
-                            student.intake }}</span>
+                        <span class="text-muted-foreground">{{ student.full_name }} - {{ student.student_id }} - K{{ student.intake }}</span>
                         <Badge :variant="getStatusBadgeVariant(student.status) as any">
                             {{ formatStatus(student.status) }}
                         </Badge>
@@ -90,19 +96,36 @@ const tabs = [
             </div>
 
             <div class="flex items-center gap-2">
-                <Button variant="outline" size="sm" @click="() => loginAsStudent(student as Student)"
-                    class="flex items-center gap-2">
-                    <LogIn class="h-4 w-4" />
-                    Login as student
-                </Button>
-                <Button variant="outline" size="sm" @click="() => editStudent(student)" class="flex items-center gap-2">
-                    <Edit class="h-4 w-4" />
-                    Edit
-                </Button>
-                <Button variant="outline" size="sm" @click="exportSummary" class="flex items-center gap-2">
-                    <Download class="h-4 w-4" />
-                    Export
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="outline" size="sm" class="flex items-center gap-2">
+                            Actions
+                            <ChevronDown class="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem @click="() => loginAsStudent(student as Student)" class="flex items-center gap-2">
+                            <LogIn class="h-4 w-4" />
+                            Login as student
+                        </DropdownMenuItem>
+                        <DropdownMenuItem @click="() => editStudent(student)" class="flex items-center gap-2">
+                            <Edit class="h-4 w-4" />
+                            Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem v-if="can('change_student_status')" @click="() => goToStudentPlacementAndProgression(student)" class="flex items-center gap-2">
+                            <RotateCw class="h-4 w-4" />
+                            EGC Placement & Progression
+                        </DropdownMenuItem>
+                        <DropdownMenuItem v-if="can('change_student_status')" @click="() => goToStudentActions(student)" class="flex items-center gap-2">
+                            <ClipboardCheck class="h-4 w-4" />
+                            View Student Actions
+                        </DropdownMenuItem>
+                        <DropdownMenuItem @click="exportSummary" class="flex items-center gap-2">
+                            <Download class="h-4 w-4" />
+                            Export
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </div>
 
@@ -110,10 +133,15 @@ const tabs = [
         <Card>
             <CardHeader class="pb-0">
                 <nav class="grid w-full grid-cols-6 gap-2">
-                    <Link v-for="tab in tabs" :key="tab.key" :href="route(tab.route, student.id)" :class="[
-                        'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                        currentTab === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                    ]">
+                    <Link
+                        v-for="tab in tabs"
+                        :key="tab.key"
+                        :href="route(tab.route, student.id)"
+                        :class="[
+                            'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                            currentTab === tab.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                        ]"
+                    >
                         <component :is="tab.icon" class="h-4 w-4" />
                         <span class="hidden sm:inline">{{ tab.label }}</span>
                     </Link>
@@ -134,7 +162,7 @@ const tabs = [
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .grid-cols-8> :nth-child(n + 4) {
+    .grid-cols-8 > :nth-child(n + 4) {
         grid-column: span 1;
         margin-top: 0.5rem;
     }

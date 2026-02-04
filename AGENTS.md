@@ -1,519 +1,159 @@
-# Repository Guidelines
-
-## Project Structure & Module Organization
-- app/: Laravel application logic (models, controllers, policies, jobs).
-- routes/: HTTP routes split by domain; entry points `web.php`, `api.php`.
-- resources/js/: Vue 3 + Inertia app (components, pages, layouts, stores, composables, utils).
-- resources/css, images/: Frontend assets managed by Vite.
-- database/: Migrations, seeders, factories.
-- tests/: Pest tests (`Feature/`, `Unit/`, optional `Browser/`).
-- public/: Public assets and entry HTML.
-- config/, bootstrap/, storage/: Standard Laravel dirs.
-- docker/, scripts/: Local dev, CI, and deployment helpers.
-
-## Vue.js Conventions
-
-### Component Structure
-
-- Use `<script setup>` syntax for all new components
-- Order script blocks: imports, props, emits, composables, reactive data, computed, methods
-- Use PascalCase for component names and file names
-- Prefer composition API over options API
-
-### Template Guidelines
-
-- Use kebab-case for HTML attributes and event handlers
-- Prefer `v-show` for conditional rendering that toggles frequently
-- Use `v-if` for conditional rendering that rarely changes
-- Always use `:key` with `v-for` loops
-
-### Reka-UI Components
-
-- Verify component exists in `@/components/ui/` before use
-- Add TODO comment if component needs installation: `<!-- TODO: Run npx shadcn-vue add [component] -->`
-- Always import components explicitly
-- Use proper TypeScript props interface
-
-### DataTable & Pagination Pattern
-
-For list/index pages, use these components:
-- `DataTable` from `@/components/DataTable.vue` - table component
-- `DataPagination` from `@/components/DataPagination.vue` - pagination component
-- Props type: `PaginatedResponse<T>` from `@/types`
-- Columns: `ColumnDef<T>[]` from `@tanstack/vue-table`
-
-**Pattern:**
-- Use `reactive()` for filter form state
-- Debounce search with `debounce()` from `lodash-es` (300ms)
-- Apply filters via `router.visit()` with `preserveState` and `preserveScroll`
-- Custom cells: use `<template #cell-columnName="{ row }">` slots
-- Handlers: `handlePaginationNavigate(url)` and `handlePageSizeChange(pageSize)`
-
-**Reference:** `resources/js/pages/Scholarships/Index.vue` or `StudentScholarships/Index.vue`
-
-### Form Validation Pattern (vee-validate + Zod)
-
-For create/edit forms, use vee-validate with Zod schema:
-
-**Components:**
-- `useForm` from `vee-validate` - for validation
-- `useForm as useInertiaForm` from `@inertiajs/vue3` - for submission
-- `toTypedSchema` from `@vee-validate/zod` - convert Zod to vee-validate schema
-- Form components from `@/components/ui/form`: `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage`
-- `toast` from `vue-sonner` - for notifications
-
-**Pattern:**
-1. Define Zod schema in `resources/js/schemas/` (match Laravel validation rules)
-2. Convert with `toTypedSchema(zodSchema)`
-3. Initialize `useForm()` with `validationSchema` and `initialValues`
-4. Initialize `useInertiaForm()` with same initial values
-5. Wrap submit handler with `handleSubmit()`
-6. Use `<FormField v-slot="{ componentField }" name="fieldName">` with `v-bind="componentField"`
-7. Handle `onSuccess` and `onError` callbacks with toast notifications
-8. Convert types before submission (string → number, empty string → null)
-9. For number inputs: `@input="(e) => componentField['onInput'](parseFloat(e.target.value) || 0)"`
-
-**Important:**
-- Never use empty string in `<SelectItem value="">`, use meaningful defaults
-- Keep Zod schema in sync with Laravel FormRequest validation rules
-- Store schemas in `resources/js/schemas/` directory
-
-**Reference:** `resources/js/pages/Scholarships/Create.vue` or `StudentScholarships/Assign.vue`
-
-## Build, Test, and Development Commands
-- composer dev: Run PHP server, queue worker, logs, and Vite concurrently.
-- composer dev:ssr: Start Laravel + Inertia SSR pipeline.
-- npm run dev: Vite dev server for the frontend only.
-- npm run build: Build production assets (client and optional SSR with build:ssr).
-- composer test: Clear config and run the test suite.
-- composer ci: Pint check, Pest, ESLint, Prettier check, and TS type-check.
-- npm run lint | format | format:check | type-check: Frontend quality tasks.
-- npm run docker:up | down | logs: Docker-based development support.
-
-## Coding Style & Naming Conventions
-- PHP: PSR-12 via Laravel Pint (4-space indent). Run `vendor/bin/pint` to fix.
-- JS/TS/Vue: ESLint + Prettier (single quotes, semicolons, 4-space tabs, wide print width). Vue blocks ordered as script → template → style.
-- Vue components: PascalCase files in `resources/js/components` or `pages` (e.g., Dashboard.vue).
-- Composables/Stores: `useX` and `useXStore` naming; keep modules small and focused.
-- Routes: Use dot notation names consistent with `routes/web.php` (e.g., curriculum_version.electives).
-
-## Testing Guidelines
-- Framework: Pest for Unit/Feature tests. Place files under `tests/Unit/*Test.php` and `tests/Feature/*Test.php`.
-- Run: `composer test` (all), `php artisan test --filter=Name` (focused).
-- Keep tests deterministic; prefer factories/seeders over fixtures. Tag slow/browser tests when applicable.
+# AGENTS GUIDE (Laravel 12 + Vue 3 Inertia)
 
-## Commit & Pull Request Guidelines
-- Commits: Imperative, concise, and scoped (e.g., "Refactor authentication and user management features").
-- PRs: Clear description, linked issues, repro steps; include screenshots/GIFs for UI changes.
-- Checks: Ensure Pint, ESLint, Prettier check, type-check, and tests pass locally; CI mirrors these.
-- Branching: Open PRs against `develop` or `main` as requested; keep diffs minimal and focused.
+Purpose: fast instructions for coding agents. Follow repo conventions; prefer facts over guesses.
 
-===
+## Quick Start Commands
 
-<laravel-boost-guidelines>
-=== foundation rules ===
+- `composer dev` – serve app + queue + logs + Vite (no Docker).
+- `composer dev:ssr` – start SSR (build first if needed).
+- `npm run dev` – Vite dev only; `npm run build` / `npm run build:ssr` for assets.
+- `composer test` – clear config then run full PHP suite.
+- `npm run lint` / `npm run format` / `npm run format:check` / `npm run type-check` – JS/TS quality gates.
+- Docker helpers: `npm run docker:up|down|logs`, `npm run docker:test`, `npm run docker:test:down`.
+- Setup/validate: `npm run setup`, `npm run validate`, `npm run pre-push`, `npm run pre-push:docker`.
+
+## Run Single Tests (PHP)
+
+- File: `php artisan test tests/Feature/ExampleTest.php`.
+- Filter method: `php artisan test --filter=methodName`.
+- Pest direct: `./vendor/bin/pest --filter="test name"` (if installed).
+- Keep runs minimal; prefer focused filters during edits.
+
+## Repository Layout (high-level)
+
+- `app/Modules/*` (preferred) and `app/Services/*` (legacy) hold business logic.
+- `app/Http/Controllers/{Web,Api}/`, `app/Http/Requests/*`, `app/Http/Resources/*`, `app/Policies/*`.
+- `resources/js/{pages,components,layouts,composables,stores,types,schemas,constants}` (Vue 3 + TS + Inertia).
+- `database/{migrations,factories,seeders}`, `routes/{web,api,console}.php`, `config/`, `bootstrap/`.
+- `tests/{Feature,Unit}` use Pest.
+
+## Architecture Rules (Cursor pattern)
+
+- Use Action–Request–Resource pattern (see `docs/rules/pattern.md`): Actions own business logic, FormRequests validate, Resources shape API, Controllers are thin adapters.
+- Name Actions `VerbEntityAction` inside domain folders; one use-case per class.
+- Keep controllers free of business logic; call Actions; return Inertia/JSON.
+- Prefer module organization in `app/Modules/{Domain}` when adding new features.
+
+## Laravel Conventions
+
+- Every PHP file: `declare(strict_types=1);`, braces on all control structures.
+- Use constructor property promotion; no empty constructors.
+- Return types and parameter types required everywhere; nullable where appropriate.
+- Validation via FormRequest; align with frontend Zod schemas; guard sort/per_page inputs.
+- Authorization: Spatie permissions, campus-scoped; check policies/gates in controllers and Actions.
+- Database: use Eloquent relationships; avoid `DB::` unless necessary; prevent N+1 with eager loads.
+- Transactions for multi-step writes; log meaningful errors; rethrow domain exceptions when needed.
+- Use named routes (`route('name')`); keep `env()` usage inside config only.
+- Middleware lives in `bootstrap/app.php` (Laravel 12 structure); commands auto-register.
 
-# Laravel Boost Guidelines
+## Frontend Standards
 
-The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to enhance the user's satisfaction building Laravel applications.
+- Vue 3 + TS + Inertia v2; always `<script setup lang="ts">`.
+- Components/pages in PascalCase; single root element; prefer composition API.
+- Forms: vee-validate + Zod + `toTypedSchema`; `useForm` (validation) + `useForm` from Inertia for submits; sync schemas with FormRequests.
+- Tables: use `DataTable.vue` + `DataPagination.vue`; column defs via `@tanstack/vue-table`; data type `PaginatedResponse<T>`.
+- Filters: follow `docs/rules/filtering.md` `useInertiaFilters` contract (defaults, transform to numbers/booleans, `only` props, debounce, clear behaviour).
+- Reka-UI/shadcn components from `@/components/ui`; ensure component exists; checkbox uses `:model-value` + `@update:model-value`.
+- Tailwind v4 only: import via `@import "tailwindcss";`; avoid deprecated utilities; prefer gaps over margins; support dark mode if present.
+- Icons: `lucide-vue-next`; state: Pinia; routing: `<Link>` / `router.visit`.
 
-## Foundational Context
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
+## TypeScript & Imports
 
-- php - 8.4.8
-- inertiajs/inertia-laravel (INERTIA) - v2
-- laravel/framework (LARAVEL) - v12
-- laravel/prompts (PROMPTS) - v0
-- laravel/sanctum (SANCTUM) - v4
-- laravel/socialite (SOCIALITE) - v5
-- laravel/telescope (TELESCOPE) - v5
-- tightenco/ziggy (ZIGGY) - v2
-- laravel/mcp (MCP) - v0
-- laravel/pint (PINT) - v1
-- laravel/sail (SAIL) - v1
-- pestphp/pest (PEST) - v3
-- phpunit/phpunit (PHPUNIT) - v11
-- @inertiajs/vue3 (INERTIA) - v2
-- laravel-echo (ECHO) - v2
-- tailwindcss (TAILWINDCSS) - v4
-- vue (VUE) - v3
-- eslint (ESLINT) - v9
-- prettier (PRETTIER) - v3
+- Prefer `const`; avoid `var`; narrow `let` scope.
+- Import types with `import type { ... }` to trim bundles.
+- Organize imports via Prettier + `prettier-plugin-organize-imports`; keep side-effect imports separate.
+- Use interfaces for object shapes; keep literal unions for enums; convert server numbers/booleans explicitly.
+- Avoid `any`; use `unknown` + narrowing when needed.
+- For events/handlers, type the payloads (e.g., `MouseEvent`, `FormEvent`).
 
+## Formatting & Style
 
-## Conventions
-- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, naming.
-- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
-- Check for existing components to reuse before writing a new one.
+- Formatting enforced by Prettier/ESLint + `.editorconfig` (4-space indent, LF, final newline). Do not reformat to 2 spaces even though some Cursor notes mention Airbnb.
+- JS/TS/Vue: semicolons required; single quotes; trailing commas where valid; keep import order automatic.
+- PHP: PSR-12 via Pint (`vendor/bin/pint --dirty` before finish); 4 spaces; docblocks for public APIs/array shapes.
+- Markdown: keep trailing spaces when intentional; `.editorconfig` leaves md whitespace intact.
 
-## Verification Scripts
-- Do not create verification scripts or tinker when tests cover that functionality and prove it works. Unit and feature tests are more important.
+## Naming
 
-## Application Structure & Architecture
-- Stick to existing directory structure - don't create new base folders without approval.
-- Do not change the application's dependencies without approval.
+- PHP: Classes PascalCase; methods camelCase verbs; models singular; tables snake_case plural.
+- Frontend: components PascalCase (`UserForm.vue`); composables `useSomething`; stores `useSomethingStore`; types PascalCase; variables camelCase.
+- Routes: dot notation (`identity.login.show`); API/web paths kebab-case.
 
-## Frontend Bundling
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+## Error Handling
 
-## Replies
-- Be concise in your explanations - focus on what's important rather than explaining obvious details.
+- Validate inputs early (FormRequests/Zod). Guard sort/per_page whitelists.
+- Wrap fallible IO (files, HTTP, DB transactions) in try/catch; log context-rich errors; surface user-safe messages (toasts/Inertia errors).
+- For async frontend calls, handle `form.errors` and `form.processing`; show optimistic UI only when safe.
 
-## Documentation Files
-- You must only create documentation files if explicitly requested by the user.
+## Testing Expectations
 
+- Pest only. Place Feature tests under `tests/Feature/{Domain}`; Unit under `tests/Unit` (actions, helpers).
+- Patterns in `docs/rules/testing.md`: list endpoints need action + controller coverage; validation tests live with controller tests.
+- Use factories + `RefreshDatabase`; avoid fixtures; mock only in unit tests.
+- Status assertions: use helpers (`assertForbidden`, `assertNotFound`, etc.).
+- Prefer smallest scope run: `php artisan test --filter=Name` or file path; run full `composer test` before PRs if time permits.
 
-=== boost rules ===
+## Build & CI Signals
 
-## Laravel Boost
-- Laravel Boost is an MCP server that comes with powerful tools designed specifically for this application. Use them.
+- CI pipeline (`composer ci`): Pint test, Pest, ESLint, Prettier check, TS type-check. Match locally before pushing.
+- Git commits: imperative, scoped; avoid committing secrets. Respect existing branches; no force-push unless asked.
+- Hooks: `npm run pre-push` (or `pre-push:docker`) mirrors CI tasks.
 
-## Artisan
-- Use the `list-artisan-commands` tool when you need to call an Artisan command to double check the available parameters.
+## Cursor Rules Summary (must honor)
 
-## URLs
-- Whenever you share a project URL with the user you should use the `get-absolute-url` tool to ensure you're using the correct scheme, domain / IP, and port.
+- `.claude/rules/naming.md`: short naming guardrails.
+- `.claude/rules/pattern.md`: short architecture pattern guardrails.
+- `.claude/rules/code-style.md`: short formatting guardrails.
+- `.claude/rules/checklist.md`: short pre-flight checklist.
+- `docs/rules/tech.md`: stack overview + common commands; align docs with PHP 8.4+, Laravel 12, Vue 3, Tailwind 4, Sanctum/Socialite.
+- `docs/rules/code-style.md`: lint/format rules, TS/Vue conventions, checkbox binding, error handling.
+- `docs/rules/pattern.md`: enforce Action–Request–Resource; controllers thin; Actions single use-case; routes wired to controllers; web uses Inertia.
+- `docs/rules/filtering.md`: standardized filter contract with `useInertiaFilters` (defaults, transform, clear, pagination, sort wiring).
+- `docs/rules/testing.md`: action + controller test layout for filterable lists; validation assertions with controller tests.
+- `docs/rules/structure.md`: directory and naming map; permission helpers, validation alignment, data tables guidance.
+- `docs/rules/laravel-boost.md`: Boost tools + Laravel/Tailwind/Pest conventions; use `search-docs` before guessing.
+- No `.cursorrules` or Copilot instructions found; nothing extra to import.
 
-## Tinker / Debugging
-- You should use the `tinker` tool when you need to execute PHP to debug code or query Eloquent models directly.
-- Use the `database-query` tool when you only need to read from the database.
+## Inertia/Vue Patterns
 
-## Reading Browser Logs With the `browser-logs` Tool
-- You can read browser logs, errors, and exceptions using the `browser-logs` tool from Boost.
-- Only recent browser logs will be useful - ignore old logs.
+- Always return props from controllers with nullable defaults so `useInertiaFilters` can drop defaults from URLs.
+- Debounce search inputs (~300–400ms) and manual numeric filters; use `clearFilters` to reset to defaults.
+- For selects, use meaningful default values (`'all'`) and strip them via `transform` before hitting backend.
+- Pagination: keep `withQueryString()` on Laravel paginators; front hooks `handlePaginationNavigate` & `handlePageSizeChange`.
+- Provide skeleton/empty states for deferred props or loading lists.
 
-## Searching Documentation (Critically Important)
-- Boost comes with a powerful `search-docs` tool you should use before any other approaches. This tool automatically passes a list of installed packages and their versions to the remote Boost API, so it returns only version-specific documentation specific for the user's circumstance. You should pass an array of packages to filter on if you know you need docs for particular packages.
-- The 'search-docs' tool is perfect for all Laravel related packages, including Laravel, Inertia, Livewire, Filament, Tailwind, Pest, Nova, Nightwatch, etc.
-- You must use this tool to search for Laravel-ecosystem documentation before falling back to other approaches.
-- Search the documentation before making code changes to ensure we are taking the correct approach.
-- Use multiple, broad, simple, topic based queries to start. For example: `['rate limiting', 'routing rate limiting', 'routing']`.
-- Do not add package names to queries - package information is already shared. For example, use `test resource table`, not `filament 4 test resource table`.
+## Styling & UI
 
-### Available Search Syntax
-- You can and should pass multiple queries at once. The most relevant results will be returned first.
+- Tailwind class order: layout → spacing → typography → color → state; remove redundancy; favor `gap-*` over margin spacing between siblings.
+- Backgrounds: prefer gradients/textures when designing new views; keep within existing design language.
+- Dark mode: mirror existing pattern using `dark:` utilities where present.
 
-1. Simple Word Searches with auto-stemming - query=authentication - finds 'authenticate' and 'auth'
-2. Multiple Words (AND Logic) - query=rate limit - finds knowledge containing both "rate" AND "limit"
-3. Quoted Phrases (Exact Position) - query="infinite scroll" - Words must be adjacent and in that order
-4. Mixed Queries - query=middleware "rate limit" - "middleware" AND exact phrase "rate limit"
-5. Multiple Queries - queries=["authentication", "middleware"] - ANY of these terms
+## Data & Types Sync
 
+- Keep TS interfaces in `resources/js/types`; mirror Laravel Resources/models.
+- Convert numbers/booleans before sending to backend; avoid empty strings for nullable fields—use `null`.
+- Keep `PaginatedResponse<T>` typed for tables; align filter keys across TS, controller validation, and query builder.
 
-=== php rules ===
+## Logging & Monitoring
 
-## PHP
+- Use Laravel logging for backend errors; avoid dumping. Telescope available for debugging.
+- On frontend, avoid console noise; use toast notifications (`vue-sonner`) for user feedback.
 
-- Always use strict typing at the head of a `.php` file: `declare(strict_types=1);`.
-- Always use curly braces for control structures, even if it has one line.
+## Deliverables Expectations for Agents
 
-### Constructors
-- Use PHP 8 constructor property promotion in `__construct()`.
-    - <code-snippet>public function __construct(public GitHub $github) { }</code-snippet>
-- Do not allow empty `__construct()` methods with zero parameters.
+- Touch one concern per turn; summarize plan then deliver diff/full file.
+- Do not invent DB fields/routes/props; verify in schema/models. Ask for schema only if missing.
+- Avoid destructive git commands; never revert user changes. No new docs unless requested (this file is requested).
+- Before finalizing PHP, run `vendor/bin/pint --dirty` when you change backend code. For frontend, ensure Prettier/ESLint pass locally.
 
-### Type Declarations
-- Always use explicit return type declarations for methods and functions.
-- Use appropriate PHP type hints for method parameters.
+## Reference Commands Cheat Sheet
 
-<code-snippet name="Explicit Return Types and Method Params" lang="php">
-protected function isAccessible(User $user, ?string $path = null): bool
-{
-    ...
-}
-</code-snippet>
+- Full PHP tests: `composer test` or `php artisan test`.
+- Single PHP test: `php artisan test --filter=Name` or `php artisan test tests/Feature/FileTest.php`.
+- Pint fix: `vendor/bin/pint --dirty`.
+- Lint/format JS: `npm run lint && npm run format:check`.
+- Type-check: `npm run type-check` (vue-tsc no emit).
+- Asset build: `npm run build` (client), `npm run build:ssr` (client + SSR).
+- Dev stack: `composer dev` (serves + queue + logs + vite) or `npm run dev` for frontend only.
 
-## Comments
-- Prefer PHPDoc blocks over comments. Never use comments within the code itself unless there is something _very_ complex going on.
-
-## PHPDoc Blocks
-- Add useful array shape type definitions for arrays when appropriate.
-
-## Enums
-- Typically, keys in an Enum should be TitleCase. For example: `FavoritePerson`, `BestLake`, `Monthly`.
-
-
-=== inertia-laravel/core rules ===
-
-## Inertia Core
-
-- Inertia.js components should be placed in the `resources/js/Pages` directory unless specified differently in the JS bundler (vite.config.js).
-- Use `Inertia::render()` for server-side routing instead of traditional Blade views.
-- Use `search-docs` for accurate guidance on all things Inertia.
-
-<code-snippet lang="php" name="Inertia::render Example">
-// routes/web.php example
-Route::get('/users', function () {
-    return Inertia::render('Users/Index', [
-        'users' => User::all()
-    ]);
-});
-</code-snippet>
-
-
-=== inertia-laravel/v2 rules ===
-
-## Inertia v2
-
-- Make use of all Inertia features from v1 & v2. Check the documentation before making any changes to ensure we are taking the correct approach.
-
-### Inertia v2 New Features
-- Polling
-- Prefetching
-- Deferred props
-- Infinite scrolling using merging props and `WhenVisible`
-- Lazy loading data on scroll
-
-### Deferred Props & Empty States
-- When using deferred props on the frontend, you should add a nice empty state with pulsing / animated skeleton.
-
-### Inertia Form General Guidance
-- Build forms using the `useForm` helper. Use the code examples and `search-docs` tool with a query of `useForm helper` for guidance.
-
-
-=== laravel/core rules ===
-
-## Do Things the Laravel Way
-
-- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using the `list-artisan-commands` tool.
-- If you're creating a generic PHP class, use `artisan make:class`.
-- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
-
-### Database
-- Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries or manual joins.
-- Use Eloquent models and relationships before suggesting raw database queries
-- Avoid `DB::`; prefer `Model::query()`. Generate code that leverages Laravel's ORM capabilities rather than bypassing them.
-- Generate code that prevents N+1 query problems by using eager loading.
-- Use Laravel's query builder for very complex database operations.
-
-### Model Creation
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `list-artisan-commands` to check the available options to `php artisan make:model`.
-
-### APIs & Eloquent Resources
-- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
-
-### Controllers & Validation
-- Always create Form Request classes for validation rather than inline validation in controllers. Include both validation rules and custom error messages.
-- Check sibling Form Requests to see if the application uses array or string based validation rules.
-
-### Queues
-- Use queued jobs for time-consuming operations with the `ShouldQueue` interface.
-
-### Authentication & Authorization
-- Use Laravel's built-in authentication and authorization features (gates, policies, Sanctum, etc.).
-
-### URL Generation
-- When generating links to other pages, prefer named routes and the `route()` function.
-
-### Configuration
-- Use environment variables only in configuration files - never use the `env()` function directly outside of config files. Always use `config('app.name')`, not `env('APP_NAME')`.
-
-### Testing
-- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
-- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `php artisan make:test [options] <name>` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
-
-### Vite Error
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
-
-
-=== laravel/v12 rules ===
-
-## Laravel 12
-
-- Use the `search-docs` tool to get version specific documentation.
-- Since Laravel 11, Laravel has a new streamlined file structure which this project uses.
-
-### Laravel 12 Structure
-- No middleware files in `app/Http/Middleware/`.
-- `bootstrap/app.php` is the file to register middleware, exceptions, and routing files.
-- `bootstrap/providers.php` contains application specific service providers.
-- **No app\Console\Kernel.php** - use `bootstrap/app.php` or `routes/console.php` for console configuration.
-- **Commands auto-register** - files in `app/Console/Commands/` are automatically available and do not require manual registration.
-
-### Database
-- When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
-- Laravel 11 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
-
-### Models
-- Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models.
-
-
-=== pint/core rules ===
-
-## Laravel Pint Code Formatter
-
-- You must run `vendor/bin/pint --dirty` before finalizing changes to ensure your code matches the project's expected style.
-- Do not run `vendor/bin/pint --test`, simply run `vendor/bin/pint` to fix any formatting issues.
-
-
-=== pest/core rules ===
-
-## Pest
-
-### Testing
-- If you need to verify a feature is working, write or update a Unit / Feature test.
-
-### Pest Tests
-- All tests must be written using Pest. Use `php artisan make:test --pest <name>`.
-- You must not remove any tests or test files from the tests directory without approval. These are not temporary or helper files - these are core to the application.
-- Tests should test all of the happy paths, failure paths, and weird paths.
-- Tests live in the `tests/Feature` and `tests/Unit` directories.
-- Pest tests look and behave like this:
-<code-snippet name="Basic Pest Test Example" lang="php">
-it('is true', function () {
-    expect(true)->toBeTrue();
-});
-</code-snippet>
-
-### Running Tests
-- Run the minimal number of tests using an appropriate filter before finalizing code edits.
-- To run all tests: `php artisan test`.
-- To run all tests in a file: `php artisan test tests/Feature/ExampleTest.php`.
-- To filter on a particular test name: `php artisan test --filter=testName` (recommended after making a change to a related file).
-- When the tests relating to your changes are passing, ask the user if they would like to run the entire test suite to ensure everything is still passing.
-
-### Pest Assertions
-- When asserting status codes on a response, use the specific method like `assertForbidden` and `assertNotFound` instead of using `assertStatus(403)` or similar, e.g.:
-<code-snippet name="Pest Example Asserting postJson Response" lang="php">
-it('returns all', function () {
-    $response = $this->postJson('/api/docs', []);
-
-    $response->assertSuccessful();
-});
-</code-snippet>
-
-### Mocking
-- Mocking can be very helpful when appropriate.
-- When mocking, you can use the `Pest\Laravel\mock` Pest function, but always import it via `use function Pest\Laravel\mock;` before using it. Alternatively, you can use `$this->mock()` if existing tests do.
-- You can also create partial mocks using the same import or self method.
-
-### Datasets
-- Use datasets in Pest to simplify tests which have a lot of duplicated data. This is often the case when testing validation rules, so consider going with this solution when writing tests for validation rules.
-
-<code-snippet name="Pest Dataset Example" lang="php">
-it('has emails', function (string $email) {
-    expect($email)->not->toBeEmpty();
-})->with([
-    'james' => 'james@laravel.com',
-    'taylor' => 'taylor@laravel.com',
-]);
-</code-snippet>
-
-
-=== inertia-vue/core rules ===
-
-## Inertia + Vue
-
-- Vue components must have a single root element.
-- Use `router.visit()` or `<Link>` for navigation instead of traditional links.
-
-<code-snippet name="Inertia Client Navigation" lang="vue">
-
-    import { Link } from '@inertiajs/vue3'
-    <Link href="/">Home</Link>
-
-</code-snippet>
-
-
-=== inertia-vue/v2/forms rules ===
-
-## Inertia + Vue Forms
-
-<code-snippet name="Inertia Vue useForm example" lang="vue">
-
-<script setup>
-    import { useForm } from '@inertiajs/vue3'
-
-    const form = useForm({
-        email: null,
-        password: null,
-        remember: false,
-    })
-</script>
-
-<template>
-    <form @submit.prevent="form.post('/login')">
-        <!-- email -->
-        <input type="text" v-model="form.email">
-        <div v-if="form.errors.email">{{ form.errors.email }}</div>
-        <!-- password -->
-        <input type="password" v-model="form.password">
-        <div v-if="form.errors.password">{{ form.errors.password }}</div>
-        <!-- remember me -->
-        <input type="checkbox" v-model="form.remember"> Remember Me
-        <!-- submit -->
-        <button type="submit" :disabled="form.processing">Login</button>
-    </form>
-</template>
-
-</code-snippet>
-
-
-=== tailwindcss/core rules ===
-
-## Tailwind Core
-
-- Use Tailwind CSS classes to style HTML, check and use existing tailwind conventions within the project before writing your own.
-- Offer to extract repeated patterns into components that match the project's conventions (i.e. Blade, JSX, Vue, etc..)
-- Think through class placement, order, priority, and defaults - remove redundant classes, add classes to parent or child carefully to limit repetition, group elements logically
-- You can use the `search-docs` tool to get exact examples from the official documentation when needed.
-
-### Spacing
-- When listing items, use gap utilities for spacing, don't use margins.
-
-    <code-snippet name="Valid Flex Gap Spacing Example" lang="html">
-        <div class="flex gap-8">
-            <div>Superior</div>
-            <div>Michigan</div>
-            <div>Erie</div>
-        </div>
-    </code-snippet>
-
-
-### Dark Mode
-- If existing pages and components support dark mode, new pages and components must support dark mode in a similar way, typically using `dark:`.
-
-
-=== tailwindcss/v4 rules ===
-
-## Tailwind 4
-
-- Always use Tailwind CSS v4 - do not use the deprecated utilities.
-- `corePlugins` is not supported in Tailwind v4.
-- In Tailwind v4, you import Tailwind using a regular CSS `@import` statement, not using the `@tailwind` directives used in v3:
-
-<code-snippet name="Tailwind v4 Import Tailwind Diff" lang="diff">
-   - @tailwind base;
-   - @tailwind components;
-   - @tailwind utilities;
-   + @import "tailwindcss";
-</code-snippet>
-
-
-### Replaced Utilities
-- Tailwind v4 removed deprecated utilities. Do not use the deprecated option - use the replacement.
-- Opacity values are still numeric.
-
-| Deprecated |	Replacement |
-|------------+--------------|
-| bg-opacity-* | bg-black/* |
-| text-opacity-* | text-black/* |
-| border-opacity-* | border-black/* |
-| divide-opacity-* | divide-black/* |
-| ring-opacity-* | ring-black/* |
-| placeholder-opacity-* | placeholder-black/* |
-| flex-shrink-* | shrink-* |
-| flex-grow-* | grow-* |
-| overflow-ellipsis | text-ellipsis |
-| decoration-slice | box-decoration-slice |
-| decoration-clone | box-decoration-clone |
-
-
-=== tests rules ===
-
-## Test Enforcement
-
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test` with a specific filename or filter.
-</laravel-boost-guidelines>
+Stay concise, follow these defaults, and keep Laravel/Vue patterns consistent across modules.

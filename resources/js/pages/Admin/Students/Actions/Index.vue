@@ -98,7 +98,7 @@ watch(
         form.defer_course_registration_ids = [];
     },
 );
-
+console.log('props', props.options.courseRegistrations)
 // Computed: filter course registrations by selected from_semester_id
 const filteredCourseRegistrations = computed(() => {
     if (!props.options.courseRegistrations) return [];
