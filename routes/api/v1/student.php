@@ -2,26 +2,25 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\Student\AttendanceController;
+use App\Http\Controllers\Api\GoldTransactionController;
+use App\Http\Controllers\Api\ImageUploadController;
+use App\Http\Controllers\Api\StudentWalletController;
 use App\Http\Controllers\Api\V1\Student\AcademicRecordController;
+use App\Http\Controllers\Api\V1\Student\AttendanceController;
 use App\Http\Controllers\Api\V1\Student\CalendarController;
+use App\Http\Controllers\Api\V1\Student\CashWalletController;
 use App\Http\Controllers\Api\V1\Student\ClubController;
 use App\Http\Controllers\Api\V1\Student\ClubManagementController;
 use App\Http\Controllers\Api\V1\Student\CourseRegistrationController;
 use App\Http\Controllers\Api\V1\Student\CurriculumController;
 use App\Http\Controllers\Api\V1\Student\DashboardController;
-use App\Http\Controllers\Api\V1\Student\EventController;
 use App\Http\Controllers\Api\V1\Student\FinanceController;
 use App\Http\Controllers\Api\V1\Student\GradeController;
 use App\Http\Controllers\Api\V1\Student\ModuleController;
-use App\Http\Controllers\Api\V1\Student\QueryTicketController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\ProfileController;
+use App\Http\Controllers\Api\V1\Student\QueryTicketController;
 use App\Http\Controllers\Api\V1\Student\TimetableController;
-use App\Http\Controllers\Api\V1\Student\CashWalletController;
-use App\Http\Controllers\Api\StudentWalletController;
-use App\Http\Controllers\Api\GoldTransactionController;
-use App\Http\Controllers\Api\ImageUploadController;
 use Illuminate\Support\Facades\Route;
 
 // Protected student API routes
@@ -111,7 +110,7 @@ Route::middleware([
         });
 
         // Academic Records & GPA Summary
-        Route::get('/academic-records', [AcademicRecordController::class, 'index'])->name('academic-records');
+        Route::get('/academic-records', [AcademicRecordController::class, 'index'])->name('academic-records.index');
 
         // Module progress endpoints (Finland campus modular system)
         Route::prefix('modules')->name('modules.')->group(function () {
@@ -211,8 +210,6 @@ Route::middleware([
         //     Route::get('/{survey}/responses', [\App\Http\Controllers\Api\V1\Student\SurveyController::class, 'responses'])->name('responses');
         // });
 
-
-
         // Student-controlled uploads
         Route::prefix('uploads')->name('uploads.')->group(function () {
             Route::post('/', [ImageUploadController::class, 'upload'])
@@ -262,7 +259,6 @@ Route::middleware([
             Route::get('/', [FinanceController::class, 'index'])->name('index');
             Route::get('/{semester}', [FinanceController::class, 'semester'])->name('semester');
         });
-        
 
         // Club endpoints
         Route::prefix('clubs')->name('clubs.')->group(function () {

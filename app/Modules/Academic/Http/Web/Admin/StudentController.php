@@ -7,7 +7,6 @@ namespace App\Modules\Academic\Http\Web\Admin;
 use App\Constants\StudentRoutes;
 use App\Exports\StudentExport;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Student\ChangeStudentStatusRequest;
 use App\Http\Requests\Student\StoreStudentRequest;
 use App\Http\Requests\Student\UpdateStudentRequest;
 use App\Http\Resources\Student\StudentResource;
@@ -16,11 +15,13 @@ use App\Models\CurriculumVersion;
 use App\Models\Program;
 use App\Models\Specialization;
 use App\Models\Student;
+use App\Modules\Academic\Queries\ExportStudentsQuery;
 use App\Services\StudentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -37,7 +38,7 @@ class StudentController extends Controller
     public function index(Request $request): Response|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
-        Log::info('Current campus ID: ' . $campusId);
+        Log::info('Current campus ID: '.$campusId);
         if (! $campusId) {
             return redirect()->route('select-campus.index')
                 ->with('error', 'Please select a campus first');
@@ -312,7 +313,6 @@ class StudentController extends Controller
         }
     }
 
-
     /**
      * Search students (API endpoint)
      */
@@ -471,7 +471,7 @@ class StudentController extends Controller
     /**
      * Export students to Excel or CSV
      */
-    public function export(Request $request): BinaryFileResponse|JsonResponse|RedirectResponse
+    public function export(Request $request, ExportStudentsQuery $exportQuery): BinaryFileResponse|JsonResponse|RedirectResponse
     {
         $campusId = session()->get('current_campus_id');
 
@@ -496,32 +496,7 @@ class StudentController extends Controller
         ]);
 
         try {
-            // Build the query with campus scoping
-            $query = Student::query()
-                ->where('campus_id', $campusId);
-
-            // Apply filters if scope is filtered
-            if ($validated['scope'] === 'filtered') {
-                if (! empty($validated['search'])) {
-                    $search = $validated['search'];
-                    $query->where(function ($q) use ($search) {
-                        $q->where('student_id', 'like', "%{$search}%")
-                            ->orWhere('full_name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%");
-                    });
-                }
-
-                if (! empty($validated['program_id'])) {
-                    $query->where('program_id', $validated['program_id']);
-                }
-
-                if (! empty($validated['status'])) {
-                    $query->where('status', $validated['status']);
-                }
-            }
-
-            // Order by student_id for consistent export
-            $query->orderBy('student_id');
+            $query = $exportQuery->getBuilder($campusId, $validated);
 
             // Get campus info for filename
             $campus = Campus::findOrFail($campusId);
@@ -538,7 +513,7 @@ class StudentController extends Controller
                 'format' => $validated['format'],
                 'scope' => $validated['scope'],
                 'filters' => $validated,
-                'user_id' => auth()->id(),
+                'user_id' => Auth::id(),
             ]);
 
             // Return the download
@@ -548,17 +523,17 @@ class StudentController extends Controller
                 'campus_id' => $campusId,
                 'error' => $e->getMessage(),
                 'filters' => $validated,
-                'user_id' => auth()->id(),
+                'user_id' => Auth::id(),
             ]);
 
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Export failed: ' . $e->getMessage(),
+                    'message' => 'Export failed: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->withErrors(['error' => 'Export failed: ' . $e->getMessage()]);
+            return back()->withErrors(['error' => 'Export failed: '.$e->getMessage()]);
         }
     }
 }

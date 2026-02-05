@@ -169,14 +169,6 @@ export const studentRoutes = {
     enrollments: () => route('student-enrollments.index'),
     statusTracking: () => route('students.status.index'),
 
-    // Student Management Features - Student Specific
-    studentAcademicRecords: (id: number) => route('students.academic-records.index', { student: id }),
-    studentAcademicRecordsTranscript: (id: number) => route('students.academic-records.transcript', { student: id }),
-    studentAcademicRecordsGpaHistory: (id: number) => route('students.academic-records.gpa-history', { student: id }),
-    studentProgramChange: (id: number) => route('students.program-changes.create', { student: id }),
-    studentRepeatCourses: (id: number) => route('students.retakes.index', { student: id }),
-    studentAcademicStanding: (id: number) => route('students.standing.index', { student: id }),
-
     // Student Academic Summary Routes
     studentAcademicSummary: (id: number) => route('students.academic-summary.overview', { student: id }),
 

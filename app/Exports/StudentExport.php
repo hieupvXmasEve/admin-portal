@@ -35,7 +35,9 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
             'curriculumVersion.curriculumUnits.semester:id',
             'statusChangedBy:id,name',
             'intakeSemester:id,name,code',
-            'scholarshipAward.scholarship:code,name',
+            'intakeGcSemester:id,name,code',
+            'intakeMajorSemester:id,name,code',
+            'scholarshipAward.scholarshipDefinition:code,name,amount,type',
             'user:id,last_login_at,email_verified_at',
         ]);
     }
@@ -69,10 +71,9 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
             'Curriculum Version',
             'Intake Semester',
             'Intake GC',
-            'Intake Course',
+            'Intake Major',
             'GC Starting Level',
             'GC Current Level',
-            'GC to Course Transition Semester',
             // 'Admission Date',
             // 'Expected Graduation Date',
             // 'Emergency Contact Name',
@@ -87,6 +88,7 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
             // 'Status Reason',
             // 'Status Changed By',
             'Scholarship',
+            'Scholarship Amount (%)',
             'Total Credit',
             // 'Semester Credit',
             // 'Admission Notes',
@@ -119,7 +121,8 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
         // }
 
         // Get scholarship name
-        $scholarship = $student->scholarshipAward?->scholarship?->name ?? '';
+        $scholarship = $student->scholarshipAward?->scholarshipDefinition?->name ?? '';
+        $scholarshipAmount = $student->scholarshipAward?->scholarshipDefinition?->amount ?? '';
 
         return [
             $student->student_id,
@@ -147,11 +150,10 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
             $student->specialization?->name ?? '',
             $student->curriculumVersion?->version_code ?? '',
             $student->intakeSemester?->name ?? '',
-            $student->intake_gc ?? '',
-            $student->intake_course ?? '',
+            $student->intakeGcSemester?->name ?? '',
+            $student->intakeMajorSemester?->name ?? '',
             $student->gc_starting_level ?? '',
             $student->gc_current_level ?? '',
-            $student->gc_to_course_transition_semester ?? '',
             // $student->admission_date ? $student->admission_date->format('Y-m-d') : '',
             // $student->expected_graduation_date ? $student->expected_graduation_date->format('Y-m-d') : '',
             // $student->emergency_contact_name ?? '',
@@ -166,6 +168,7 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
             // $student->status_reason ?? '',
             // $student->statusChangedBy?->full_name ?? '',
             $scholarship,
+            $scholarshipAmount,
             $totalCredit,
             // $semesterCredit,
             // $student->admission_notes ?? '',
@@ -179,7 +182,7 @@ class StudentExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapp
     public function styles(Worksheet $sheet)
     {
         // Style the header row
-        $sheet->getStyle('A1:' . $sheet->getHighestColumn() . '1')->applyFromArray([
+        $sheet->getStyle('A1:'.$sheet->getHighestColumn().'1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
