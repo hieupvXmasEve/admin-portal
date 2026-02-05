@@ -16,7 +16,6 @@ class GetStudentActionHistoryQuery
      *
      * @param  int  $studentId  The student ID
      * @param  array  $filters  Optional filters
-     * @return LengthAwarePaginator|Collection
      */
     public function handle(int $studentId, array $filters = [], bool $paginate = true): LengthAwarePaginator|Collection
     {
@@ -31,6 +30,7 @@ class GetStudentActionHistoryQuery
                 'fromCampus:id,name,code',
                 'toCampus:id,name,code',
                 'attachments',
+                'deferCase:id,student_action_log_id,scope_type',
             ])
             ->where('student_id', $studentId)
             // Filter by action type if provided

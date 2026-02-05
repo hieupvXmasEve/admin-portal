@@ -10,15 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { UploadedFile } from '@/types/fileUpload';
-import {
-    getActionTypeBadgeClass,
-    getActionTypeLabel,
-    StudentActionType,
-    type ActionTypeOption,
-    type Campus,
-    type Semester,
-    type StudentActionLog,
-} from '@/types/student-action';
+import { getActionTypeBadgeClass, getActionTypeLabel, StudentActionType, type ActionTypeOption, type Campus, type Semester, type StudentActionLog } from '@/types/student-action';
 import { studentRoutes } from '@/utils/routes';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ArrowLeft, ArrowRight, Calendar, Download, FileText, Loader2, Paperclip, Pencil, Upload, User } from 'lucide-vue-next';
@@ -59,7 +51,10 @@ const formatDateOnly = (dateStr: string | null | undefined): string => {
 const getSummary = (log: StudentActionLog): string => {
     switch (log.action_type) {
         case StudentActionType.ACADEMIC_DEFER:
-            return `Defer from ${log.from_semester?.name ?? 'N/A'} to ${log.return_semester?.name ?? 'N/A'}`;
+            if (log.defer_case?.scope_type === 'COURSES') {
+                return `Defer by courses from ${log.from_semester?.name ?? 'N/A'} to ${log.return_semester?.name ?? 'N/A'}`;
+            }
+            return `Defer full semester from ${log.from_semester?.name ?? 'N/A'} to ${log.return_semester?.name ?? 'N/A'}`;
         case StudentActionType.ACADEMIC_RESUME:
             return `Resume in ${log.return_semester?.name ?? 'N/A'}`;
         case StudentActionType.ADMISSION_DEFERRAL:
@@ -108,9 +103,7 @@ const submitAttachments = () => {
         {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(
-                    markDocumentsComplete.value ? 'Attachments uploaded and documents marked as complete.' : 'Attachments uploaded successfully.',
-                );
+                toast.success(markDocumentsComplete.value ? 'Attachments uploaded and documents marked as complete.' : 'Attachments uploaded successfully.');
                 uploadedFiles.value = [];
                 markDocumentsComplete.value = false;
                 uploadComponentKey.value++; // Reset file upload component
@@ -211,9 +204,14 @@ const handleUpdate = () => {
                 <h1 class="text-3xl font-bold tracking-tight">Action Details</h1>
                 <p class="text-muted-foreground mt-1">{{ actionLog.student?.full_name }} ({{ actionLog.student?.student_id }})</p>
             </div>
-            <Badge :class="getActionTypeBadgeClass(actionLog.action_type)" class="px-4 py-2 text-lg">
-                {{ getActionTypeLabel(actionLog.action_type) }}
-            </Badge>
+            <div class="flex items-center gap-2">
+                <Badge :class="getActionTypeBadgeClass(actionLog.action_type)" class="px-4 py-2 text-lg">
+                    {{ getActionTypeLabel(actionLog.action_type) }}
+                </Badge>
+                <Badge v-if="actionLog.action_type === StudentActionType.ACADEMIC_DEFER && actionLog.defer_case?.scope_type" variant="outline">
+                    {{ actionLog.defer_case.scope_type === 'COURSES' ? 'Course' : 'Toàn kỳ' }}
+                </Badge>
+            </div>
         </div>
 
         <div class="grid gap-6 lg:grid-cols-2">
@@ -272,7 +270,7 @@ const handleUpdate = () => {
                     <CardDescription>Changes applied to the student record</CardDescription>
                 </CardHeader>
                 <CardContent class="space-y-4">
-                    <div v-if="actionLog.previous_status && actionLog.new_status" class="flex items-center gap-4">
+                    <div v-if="actionLog.previous_status && actionLog.new_status && !(actionLog.action_type === StudentActionType.ACADEMIC_DEFER && actionLog.defer_case?.scope_type === 'COURSES')" class="flex items-center gap-4">
                         <div class="text-center">
                             <p class="text-muted-foreground mb-1 text-sm">Previous Status</p>
                             <Badge variant="outline" class="capitalize">{{ actionLog.previous_status }}</Badge>
@@ -346,11 +344,7 @@ const handleUpdate = () => {
             </CardHeader>
             <CardContent>
                 <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    <div
-                        v-for="attachment in actionLog.attachments"
-                        :key="attachment.id"
-                        class="flex items-center justify-between rounded-lg border p-3"
-                    >
+                    <div v-for="attachment in actionLog.attachments" :key="attachment.id" class="flex items-center justify-between rounded-lg border p-3">
                         <div class="flex items-center gap-2 overflow-hidden">
                             <FileText class="text-muted-foreground h-5 w-5 flex-shrink-0" />
                             <div class="overflow-hidden">
@@ -418,7 +412,7 @@ const handleUpdate = () => {
                 <!-- Action Type (Disabled) -->
                 <div class="space-y-2">
                     <Label>Action Type</Label>
-                    <div class="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm ring-offset-background">
+                    <div class="border-input bg-muted ring-offset-background flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
                         {{ getActionTypeLabel(actionLog.action_type) }}
                     </div>
                 </div>

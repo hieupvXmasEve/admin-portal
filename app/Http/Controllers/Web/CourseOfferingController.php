@@ -6,20 +6,26 @@ namespace App\Http\Controllers\Web;
 
 use App\Constants\CourseOfferingRoutes;
 use App\Http\Controllers\Controller;
-use App\Http\Responses\ApiResponse;
 use App\Http\Requests\StoreCourseOfferingRequest;
 use App\Http\Requests\UpdateCourseOfferingRequest;
+use App\Http\Responses\ApiResponse;
 use App\Models\ClassSession;
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
+use App\Models\Form;
 use App\Models\Lecture;
 use App\Models\Room;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\Unit;
+use App\Modules\Academic\Actions\MoveStudentToSectionAction;
+use App\Modules\Academic\Http\Requests\MoveStudentRequest;
+use App\Modules\Finance\Services\DeferChargeResolver;
+use App\Services\CourseSurveyService;
+use App\Services\SystemConfigService;
+use App\Support\CampusLogContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use App\Support\CampusLogContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,22 +34,12 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
-use App\Services\SystemConfigService;
-use App\Models\Form;
-use App\Models\FormSurvey;
-use App\Models\FormVersion;
-
-use App\Services\CourseSurveyService;
-use App\Modules\Academic\Http\Requests\MoveStudentRequest;
-use App\Modules\Academic\Actions\MoveStudentToSectionAction;
-
 class CourseOfferingController extends Controller
 {
     public function __construct(
         protected SystemConfigService $systemConfigService,
         protected CourseSurveyService $courseSurveyService
-    ) {
-    }
+    ) {}
 
     /**
      * Display a listing of course offerings
@@ -275,8 +271,9 @@ class CourseOfferingController extends Controller
             return Redirect::back()->with('success', 'Survey created and assigned to students successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to create survey: ' . $e->getMessage());
-            return Redirect::back()->with('error', 'Failed to create survey: ' . $e->getMessage());
+            Log::error('Failed to create survey: '.$e->getMessage());
+
+            return Redirect::back()->with('error', 'Failed to create survey: '.$e->getMessage());
         }
     }
 
@@ -406,9 +403,9 @@ class CourseOfferingController extends Controller
                 'sunday' => 6,
             ];
             $weekdayIndexes = collect($scheduleDays)
-                ->map(fn($d) => strtolower($d))
-                ->map(fn($d) => $dayToIndex[$d] ?? null)
-                ->filter(static fn($v) => $v !== null)
+                ->map(fn ($d) => strtolower($d))
+                ->map(fn ($d) => $dayToIndex[$d] ?? null)
+                ->filter(static fn ($v) => $v !== null)
                 ->values()
                 ->all();
 
@@ -484,9 +481,9 @@ class CourseOfferingController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
         } catch (\Exception $e) {
-            Log::error('Failed to move student: ' . $e->getMessage());
+            Log::error('Failed to move student: '.$e->getMessage());
 
-            return ApiResponse::error('Failed to move student: ' . $e->getMessage(), [], 500);
+            return ApiResponse::error('Failed to move student: '.$e->getMessage(), [], 500);
         }
     }
 
@@ -556,10 +553,10 @@ class CourseOfferingController extends Controller
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering updated successfully.');
         } catch (\Throwable $th) {
-            Log::error('Failed to update course offering: ' . $th->getMessage());
+            Log::error('Failed to update course offering: '.$th->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to update course offering: ' . $th->getMessage());
+                ->with('error', 'Failed to update course offering: '.$th->getMessage());
         }
     }
 
@@ -623,10 +620,10 @@ class CourseOfferingController extends Controller
                 ->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to delete course offering: ' . $e->getMessage());
+            Log::error('Failed to delete course offering: '.$e->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to delete course offering: ' . $e->getMessage());
+                ->with('error', 'Failed to delete course offering: '.$e->getMessage());
         }
     }
 
@@ -663,7 +660,7 @@ class CourseOfferingController extends Controller
                     }
 
                     $unitCode = $courseOffering->unit?->code ?? 'Unknown';
-                    $cannotDelete[] = "{$unitCode}: " . implode(' and ', $reasons);
+                    $cannotDelete[] = "{$unitCode}: ".implode(' and ', $reasons);
                 }
             }
 
@@ -702,10 +699,10 @@ class CourseOfferingController extends Controller
                 ->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to bulk delete course offerings: ' . $e->getMessage());
+            Log::error('Failed to bulk delete course offerings: '.$e->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to delete course offerings: ' . $e->getMessage());
+                ->with('error', 'Failed to delete course offerings: '.$e->getMessage());
         }
     }
 
@@ -785,11 +782,11 @@ class CourseOfferingController extends Controller
             $updateData = [];
             if (isset($validated['start_time'])) {
                 // Format time string properly for MySQL TIME column (H:i:s format)
-                $updateData['start_time'] = $validated['start_time'] . ':00';
+                $updateData['start_time'] = $validated['start_time'].':00';
             }
             if (isset($validated['end_time'])) {
                 // Format time string properly for MySQL TIME column (H:i:s format)
-                $updateData['end_time'] = $validated['end_time'] . ':00';
+                $updateData['end_time'] = $validated['end_time'].':00';
             }
             if (isset($validated['lecture_id'])) {
                 $updateData['lecture_id'] = $validated['lecture_id'];
@@ -843,9 +840,9 @@ class CourseOfferingController extends Controller
             ], [], "Successfully updated {$sessions->count()} class session(s).");
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to bulk update class sessions: ' . $e->getMessage());
+            Log::error('Failed to bulk update class sessions: '.$e->getMessage());
 
-            return ApiResponse::error('Failed to update class sessions: ' . $e->getMessage(), [], 500);
+            return ApiResponse::error('Failed to update class sessions: '.$e->getMessage(), [], 500);
         }
     }
 
@@ -934,9 +931,9 @@ class CourseOfferingController extends Controller
                 'sunday' => 6,
             ];
             $weekdayIndexes = collect($scheduleDays)
-                ->map(fn($d) => strtolower($d))
-                ->map(fn($d) => $dayToIndex[$d] ?? null)
-                ->filter(static fn($v) => $v !== null)
+                ->map(fn ($d) => strtolower($d))
+                ->map(fn ($d) => $dayToIndex[$d] ?? null)
+                ->filter(static fn ($v) => $v !== null)
                 ->values()
                 ->all();
 
@@ -1453,7 +1450,7 @@ class CourseOfferingController extends Controller
                     $successCount++;
                 } catch (\Exception $e) {
                     // Log detailed error
-                    Log::error("Failed to register student {$studentId}: " . $e->getMessage(), [
+                    Log::error("Failed to register student {$studentId}: ".$e->getMessage(), [
                         'student_id' => $studentId,
                         'course_offering_id' => $courseOffering->id,
                         'exception' => get_class($e),
@@ -1491,9 +1488,9 @@ class CourseOfferingController extends Controller
             ], [], $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Bulk registration failed: ' . $e->getMessage());
+            Log::error('Bulk registration failed: '.$e->getMessage());
 
-            return ApiResponse::error('Bulk registration failed: ' . $e->getMessage(), [], 500);
+            return ApiResponse::error('Bulk registration failed: '.$e->getMessage(), [], 500);
         }
     }
 
@@ -1562,7 +1559,7 @@ class CourseOfferingController extends Controller
 
                 // Find a unique section code
                 do {
-                    $newSectionCode = $baseSectionCode . '_copy' . ($counter > 1 ? $counter : '');
+                    $newSectionCode = $baseSectionCode.'_copy'.($counter > 1 ? $counter : '');
                     $exists = CourseOffering::where('semester_id', $courseOffering->semester_id)
                         ->where('unit_id', $courseOffering->unit_id)
                         ->where('campus_id', $courseOffering->campus_id)
@@ -1580,10 +1577,10 @@ class CourseOfferingController extends Controller
             return Redirect::route(CourseOfferingRoutes::INDEX)
                 ->with('success', 'Course offering duplicated successfully. Please assign an instructor.');
         } catch (\Exception $e) {
-            Log::error('Failed to duplicate course offering: ' . $e->getMessage());
+            Log::error('Failed to duplicate course offering: '.$e->getMessage());
 
             return Redirect::back()
-                ->with('error', 'Failed to duplicate course offering: ' . $e->getMessage());
+                ->with('error', 'Failed to duplicate course offering: '.$e->getMessage());
         }
     }
 
@@ -1680,7 +1677,7 @@ class CourseOfferingController extends Controller
         }
 
         $sections = $request->sections;
-        $totalStudentsAssigned = collect($sections)->sum(fn($section) => count($section['student_ids']));
+        $totalStudentsAssigned = collect($sections)->sum(fn ($section) => count($section['student_ids']));
 
         if ($totalStudentsAssigned !== $courseOffering->current_enrollment) {
             return Redirect::back()
@@ -1756,12 +1753,12 @@ class CourseOfferingController extends Controller
             DB::commit();
 
             return Redirect::route(CourseOfferingRoutes::INDEX)
-                ->with('success', 'Course offering successfully split into ' . count($sections) . ' sections. The original course offering has been deleted.');
+                ->with('success', 'Course offering successfully split into '.count($sections).' sections. The original course offering has been deleted.');
         } catch (\Exception $e) {
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to split course offering: ' . $e->getMessage());
+                ->with('error', 'Failed to split course offering: '.$e->getMessage());
         }
     }
 
@@ -1843,7 +1840,7 @@ class CourseOfferingController extends Controller
             DB::rollBack();
 
             return Redirect::back()
-                ->with('error', 'Failed to assign lectures: ' . $e->getMessage());
+                ->with('error', 'Failed to assign lectures: '.$e->getMessage());
         }
     }
 
@@ -1912,9 +1909,9 @@ class CourseOfferingController extends Controller
             ], [], "Successfully removed {$studentName} ({$studentId}) from the course.");
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to delete student registration: ' . $e->getMessage());
+            Log::error('Failed to delete student registration: '.$e->getMessage());
 
-            return ApiResponse::error('Failed to remove student from course: ' . $e->getMessage(), [], 500);
+            return ApiResponse::error('Failed to remove student from course: '.$e->getMessage(), [], 500);
         }
     }
 
@@ -1971,10 +1968,9 @@ class CourseOfferingController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return ApiResponse::error('Failed to update registration status: ' . $e->getMessage(), [], 500);
+            return ApiResponse::error('Failed to update registration status: '.$e->getMessage(), [], 500);
         }
     }
-
 
     /**
      * Mark course as completed
@@ -1989,12 +1985,6 @@ class CourseOfferingController extends Controller
 
     /**
      * Create invoice item for course registration fee (EGC base_fee or retake_fee)
-     *
-     * @param  Student  $student
-     * @param  CourseOffering  $courseOffering
-     * @param  CourseRegistration  $registration
-     * @param  bool  $isRetake
-     * @return void
      */
     private function createCourseFeeInvoiceItem(
         Student $student,
@@ -2016,7 +2006,7 @@ class CourseOfferingController extends Controller
                 $shouldCharge = true;
                 $itemType = 'retake';
                 $fee = $unit->retake_fee ?? 0;
-                $description = "Retake Fee: {$unit->code} - {$unit->name} (Attempt #" . ($isRetake ? '2+' : '1') . ')';
+                $description = "Retake Fee: {$unit->code} - {$unit->name} (Attempt #".($isRetake ? '2+' : '1').')';
             } else {
                 // First time EGC - charge base_fee
                 $shouldCharge = true;
@@ -2043,6 +2033,25 @@ class CourseOfferingController extends Controller
             ]);
 
             return;
+        }
+
+        $deferChargeResolver = app(DeferChargeResolver::class);
+        $deferCase = $deferChargeResolver->findApplicableFullCase($student, $courseOffering->semester_id);
+
+        if ($deferCase) {
+            $deferChargeResolver->markFullCaseApplied($deferCase, $courseOffering->semester_id);
+
+            return;
+        }
+
+        if ($isRetake) {
+            $deferItem = $deferChargeResolver->findApplicableCourseItem($registration);
+
+            if ($deferItem) {
+                $deferChargeResolver->markItemApplied($deferItem, $courseOffering->semester_id);
+
+                return;
+            }
         }
 
         // Find or create student invoice for current semester
@@ -2077,10 +2086,6 @@ class CourseOfferingController extends Controller
 
     /**
      * Find or create student invoice for given semester
-     *
-     * @param  Student  $student
-     * @param  int  $semesterId
-     * @return \App\Models\StudentInvoice
      */
     private function findOrCreateStudentInvoice(Student $student, int $semesterId): \App\Models\StudentInvoice
     {
@@ -2103,7 +2108,7 @@ class CourseOfferingController extends Controller
             $semester = Semester::find($semesterId);
             $billingCycle = \App\Models\BillingCycle::create([
                 'semester_id' => $semesterId,
-                'name' => 'Default Billing Cycle - ' . $semester->name,
+                'name' => 'Default Billing Cycle - '.$semester->name,
                 'start_date' => $semester->start_date,
                 'end_date' => $semester->end_date,
                 'due_date' => $semester->end_date,
@@ -2146,10 +2151,6 @@ class CourseOfferingController extends Controller
 
     /**
      * Generate unique invoice number for student and semester
-     *
-     * @param  Student  $student
-     * @param  int  $semesterId
-     * @return string
      */
     private function generateInvoiceNumber(Student $student, int $semesterId): string
     {
@@ -2158,14 +2159,11 @@ class CourseOfferingController extends Controller
 
         // Format: INV-{SEMESTER_CODE}-{STUDENT_ID}-{TIMESTAMP}
         // Example: INV-FALL2025-S001-20251027
-        return 'INV-' . $semesterCode . '-' . $student->student_id . '-' . now()->format('YmdHis');
+        return 'INV-'.$semesterCode.'-'.$student->student_id.'-'.now()->format('YmdHis');
     }
 
     /**
      * Parse registration error to user-friendly message
-     *
-     * @param  \Exception  $e
-     * @return string
      */
     private function parseRegistrationError(\Exception $e): string
     {
@@ -2183,7 +2181,7 @@ class CourseOfferingController extends Controller
 
         // Invoice creation failed
         if (str_contains($message, 'invoice') || str_contains($message, 'billing')) {
-            return 'Không thể tạo hóa đơn học phí: ' . $message;
+            return 'Không thể tạo hóa đơn học phí: '.$message;
         }
 
         // Foreign key constraint
@@ -2192,6 +2190,6 @@ class CourseOfferingController extends Controller
         }
 
         // Default: return original message
-        return 'Đăng ký thất bại: ' . $message;
+        return 'Đăng ký thất bại: '.$message;
     }
 }

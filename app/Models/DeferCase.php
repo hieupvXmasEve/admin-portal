@@ -15,11 +15,15 @@ class DeferCase extends Model
         'student_action_log_id',
         'student_id',
         'semester_id',
+        'applies_until_semester_id',
         'scope_type',
         'fee_policy',
+        'applies_once',
         'preserve_amount',
         'effective_at',
         'signed_at',
+        'applied_at',
+        'applied_semester_id',
         'upload_record_id',
         'changed_by_user_id',
         'notes',
@@ -29,6 +33,8 @@ class DeferCase extends Model
         'preserve_amount' => 'decimal:2',
         'effective_at' => 'date',
         'signed_at' => 'date',
+        'applied_at' => 'datetime',
+        'applies_once' => 'boolean',
     ];
 
     // =====================
@@ -36,10 +42,13 @@ class DeferCase extends Model
     // =====================
 
     public const SCOPE_FULL = 'FULL';
+
     public const SCOPE_COURSES = 'COURSES';
 
     public const POLICY_PRESERVE = 'PRESERVE';
+
     public const POLICY_FORFEIT = 'FORFEIT';
+
     public const POLICY_PARTIAL = 'PARTIAL';
 
     // =====================

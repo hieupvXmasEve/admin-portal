@@ -7,6 +7,7 @@ namespace App\Modules\Academic\Http\Web\Admin;
 use App\Enums\StudentActionType;
 use App\Http\Controllers\Controller;
 use App\Models\Campus;
+use App\Models\FinanceCharge;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\StudentActionLog;
@@ -76,6 +77,7 @@ class StudentActionController extends Controller
             'fromCampus',
             'toCampus',
             'attachments',
+            'deferCase:id,student_action_log_id,scope_type',
         ]);
 
         return Inertia::render('Admin/Students/Actions/Show', [
@@ -116,12 +118,15 @@ class StudentActionController extends Controller
      */
     protected function getFormOptions(?Student $student = null): array
     {
+        $activeSemester = Semester::getActiveSemester();
+
         $options = [
             'actionTypes' => StudentActionType::options(),
             'semesters' => Semester::query()
                 ->select('id', 'name', 'code', 'start_date', 'end_date')
                 ->orderBy('start_date', 'desc')
                 ->get(),
+            'activeSemesterId' => $activeSemester?->id,
             'campuses' => Campus::query()
                 ->select('id', 'name', 'code')
                 ->orderBy('name')
@@ -139,20 +144,44 @@ class StudentActionController extends Controller
 
         // Add course registrations for the student (for COURSES scope selection)
         if ($student) {
+            if (! $activeSemester) {
+                $activeSemester = Semester::getActiveSemester();
+            }
+
+            $activeSemesterId = $activeSemester?->id;
             $options['courseRegistrations'] = $student->courseRegistrations()
                 ->with(['courseOffering.unit', 'courseOffering.semester'])
                 ->whereHas('courseOffering', function ($query) {
                     $query->whereHas('semester', function ($q) {
-                        $q->where('end_date', '>=', now()->subMonths(6));
+                        $q->where('is_active', true);
                     });
                 })
+                ->when($activeSemesterId, fn ($query) => $query->where('semester_id', $activeSemesterId))
                 ->get()
-                ->map(fn($reg) => [
+                ->map(fn ($reg) => [
                     'id' => $reg->id,
                     'course_code' => $reg->courseOffering?->unit?->code ?? 'N/A',
                     'course_name' => $reg->courseOffering?->unit?->name ?? 'N/A',
                     'semester_name' => $reg->courseOffering?->semester?->name ?? 'N/A',
                     'semester_id' => $reg->courseOffering?->semester_id,
+                    'registration_status' => $reg->registration_status,
+                ]);
+
+            $options['egcCharges'] = FinanceCharge::query()
+                ->where('student_id', $student->id)
+                ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+                ->where('status', FinanceCharge::STATUS_ACTIVE)
+                ->when($activeSemesterId, fn ($query) => $query->where('semester_id', $activeSemesterId))
+                ->orderBy('effective_at')
+                ->get()
+                ->map(fn (FinanceCharge $charge) => [
+                    'id' => $charge->id,
+                    'semester_id' => $charge->semester_id,
+                    'amount' => $charge->amount,
+                    'description' => $charge->description,
+                    'effective_at' => $charge->effective_at?->toDateString(),
+                    'paid_amount' => $charge->paid_amount,
+                    'is_fully_paid' => $charge->is_fully_paid,
                 ]);
         }
 

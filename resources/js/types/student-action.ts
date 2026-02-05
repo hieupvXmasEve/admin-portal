@@ -124,6 +124,9 @@ export interface StudentActionLog {
     from_campus?: Campus;
     to_campus?: Campus;
     attachments?: UploadRecord[];
+    defer_case?: {
+        scope_type?: 'FULL' | 'COURSES';
+    };
 
     // Computed
     action_type_label?: string;
@@ -163,6 +166,7 @@ export interface StoreStudentActionForm {
     defer_fee_policy?: 'PRESERVE' | 'FORFEIT' | 'PARTIAL' | null;
     defer_preserve_amount?: number | null;
     defer_course_registration_ids?: number[];
+    defer_egc_charge_ids?: number[];
 }
 
 export interface CourseRegistrationPreview {
@@ -171,6 +175,17 @@ export interface CourseRegistrationPreview {
     course_name: string;
     semester_name: string;
     semester_id?: number;
+    registration_status?: string;
+}
+
+export interface EgcChargePreview {
+    id: number;
+    semester_id: number | null;
+    amount: number | string;
+    description?: string | null;
+    effective_at?: string | null;
+    paid_amount?: number | string;
+    is_fully_paid?: boolean;
 }
 
 export interface StudentActionFilters {

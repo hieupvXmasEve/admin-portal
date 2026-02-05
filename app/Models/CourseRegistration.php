@@ -27,6 +27,7 @@ class CourseRegistration extends AuditableModel
         'grade_points',
         'attempt_number',
         'is_retake',
+        'original_registration_id',
         'drop_date',
         'withdrawal_date',
         'completion_date',
@@ -46,6 +47,7 @@ class CourseRegistration extends AuditableModel
         'retake_fee' => 'decimal:2',
         'is_retake' => 'boolean',
         'is_retake_paid' => 'boolean',
+        'original_registration_id' => 'integer',
     ];
 
     // Validation Rules

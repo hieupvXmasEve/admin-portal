@@ -14,10 +14,13 @@ class DeferCaseItem extends Model
         'course_registration_id',
         'fee_policy',
         'preserve_amount',
+        'applied_at',
+        'applied_semester_id',
     ];
 
     protected $casts = [
         'preserve_amount' => 'decimal:2',
+        'applied_at' => 'datetime',
     ];
 
     // =====================
@@ -25,6 +28,7 @@ class DeferCaseItem extends Model
     // =====================
 
     public const POLICY_PRESERVE = 'PRESERVE';
+
     public const POLICY_FORFEIT = 'FORFEIT';
 
     // =====================

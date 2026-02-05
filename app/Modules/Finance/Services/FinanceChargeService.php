@@ -17,7 +17,8 @@ class FinanceChargeService
     public function __construct(
         protected CreateFinanceChargeAction $createChargeAction,
         protected VoidFinanceChargeAction $voidChargeAction,
-        protected GetStudentChargesQuery $getStudentChargesQuery
+        protected GetStudentChargesQuery $getStudentChargesQuery,
+        protected DeferChargeResolver $deferChargeResolver
     ) {}
 
     /**
@@ -79,10 +80,18 @@ class FinanceChargeService
     /**
      * Generate retake fee charge from course registration.
      */
-    public function generateRetakeCharge(CourseRegistration $registration): FinanceCharge
+    public function generateRetakeCharge(CourseRegistration $registration): ?FinanceCharge
     {
         if (! $registration->is_retake) {
             throw new \InvalidArgumentException('Registration is not marked as retake');
+        }
+
+        $deferItem = $this->deferChargeResolver->findApplicableCourseItem($registration);
+
+        if ($deferItem) {
+            $this->deferChargeResolver->markItemApplied($deferItem, $registration->semester_id);
+
+            return null;
         }
 
         $amount = $registration->retake_fee ?? 0;

@@ -24,7 +24,7 @@ class DeferCaseService
     public function createDeferCase(StudentActionLog $actionLog, array $data): DeferCase
     {
         // Validate action type is a defer action
-        if (!in_array($actionLog->action_type->value, ['academic_defer', 'ACADEMIC_DEFER'])) {
+        if (! in_array($actionLog->action_type->value, ['academic_defer', 'ACADEMIC_DEFER'])) {
             throw new \InvalidArgumentException('Action log must be a defer action');
         }
 
@@ -38,8 +38,10 @@ class DeferCaseService
                 'student_action_log_id' => $actionLog->id,
                 'student_id' => $actionLog->student_id,
                 'semester_id' => $actionLog->from_semester_id,
+                'applies_until_semester_id' => $data['applies_until_semester_id'] ?? $actionLog->return_semester_id,
                 'scope_type' => $data['scope_type'] ?? DeferCase::SCOPE_FULL,
                 'fee_policy' => $data['fee_policy'] ?? DeferCase::POLICY_FORFEIT,
+                'applies_once' => $data['applies_once'] ?? true,
                 'preserve_amount' => $data['preserve_amount'] ?? null,
                 'effective_at' => $data['effective_at'] ?? $actionLog->effective_at ?? now(),
                 'signed_at' => $data['signed_at'] ?? $actionLog->signed_at,
@@ -49,7 +51,7 @@ class DeferCaseService
             ]);
 
             // Create course-level items if scope is COURSES
-            if ($deferCase->scope_type === DeferCase::SCOPE_COURSES && !empty($data['course_registration_ids'])) {
+            if ($deferCase->scope_type === DeferCase::SCOPE_COURSES && ! empty($data['course_registration_ids'])) {
                 $this->addDeferCaseItems($deferCase, $data['course_registration_ids'], $data['course_fee_policies'] ?? []);
             }
 
@@ -66,16 +68,35 @@ class DeferCaseService
     public function addDeferCaseItems(DeferCase $deferCase, array $courseRegistrationIds, array $feePolicies = []): Collection
     {
         $items = collect();
+        $registrationIdsToUpdate = [];
 
-        foreach ($courseRegistrationIds as $registrationId) {
+        foreach ($courseRegistrationIds as $key => $value) {
+            if (is_array($value)) {
+                $registrationId = $value['course_registration_id'] ?? null;
+                $feePolicy = $value['fee_policy'] ?? null;
+            } else {
+                $registrationId = $value;
+                $feePolicy = $feePolicies[$value] ?? null;
+            }
+
+            if (! $registrationId) {
+                continue;
+            }
+
             $item = DeferCaseItem::create([
                 'defer_case_id' => $deferCase->id,
                 'course_registration_id' => $registrationId,
-                'fee_policy' => $feePolicies[$registrationId] ?? null,
-                'preserve_amount' => null, // Can be calculated later
+                'fee_policy' => $feePolicy,
+                'preserve_amount' => null,
             ]);
 
             $items->push($item);
+            $registrationIdsToUpdate[] = $registrationId;
+        }
+
+        if (! empty($registrationIdsToUpdate)) {
+            CourseRegistration::whereIn('id', array_unique($registrationIdsToUpdate))
+                ->update(['registration_status' => 'defer']);
         }
 
         return $items;
@@ -86,19 +107,16 @@ class DeferCaseService
      */
     public function processFeePolicy(DeferCase $deferCase): ?FinanceCharge
     {
-        // Only create credit for PRESERVE or PARTIAL policies
         if ($deferCase->fee_policy === DeferCase::POLICY_FORFEIT) {
             return null;
         }
 
-        // Calculate preserve amount if not already set
         if (is_null($deferCase->preserve_amount)) {
             $preserveAmount = $this->calculatePreserveAmount($deferCase);
             $deferCase->update(['preserve_amount' => $preserveAmount]);
         }
 
-        // Create defer credit charge
-        return $this->chargeService->generateDeferCredit($deferCase);
+        return null;
     }
 
     /**
@@ -170,6 +188,8 @@ class DeferCaseService
             $deferCase->update([
                 'scope_type' => $data['scope_type'] ?? $deferCase->scope_type,
                 'fee_policy' => $data['fee_policy'] ?? $deferCase->fee_policy,
+                'applies_until_semester_id' => $data['applies_until_semester_id'] ?? $deferCase->applies_until_semester_id,
+                'applies_once' => $data['applies_once'] ?? $deferCase->applies_once,
                 'preserve_amount' => $data['preserve_amount'] ?? null,
                 'effective_at' => $data['effective_at'] ?? $deferCase->effective_at,
                 'signed_at' => $data['signed_at'] ?? $deferCase->signed_at,

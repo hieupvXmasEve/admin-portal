@@ -33,7 +33,7 @@ const props = defineProps<Props>();
 const loading = ref(false);
 const isDetailsModalOpen = ref(false);
 const selectedRegistration = ref<CourseRegistrationRecord | null>(null);
-
+console.log('registrations.data', props.registrations.data)
 // Filters using useInertiaFilters
 const {
     filters,
@@ -115,6 +115,13 @@ const columns: ColumnDef<CourseRegistrationRecord>[] = [
         accessorKey: 'semester',
         enableSorting: true,
         cell: 'semester',
+    },
+    {
+        header: 'Registration Status',
+        id: 'registration_status',
+        accessorKey: 'registration_status',
+        enableSorting: false,
+        cell: 'registration_status',
     },
     {
         header: 'Status',
@@ -347,6 +354,12 @@ onMounted(() => {
                     </div>
                 </template>
 
+                <template #cell-registration_status="{ row }">
+                    <Badge :variant="row.original.status_badge_color">
+                        {{ formatStatusName(row.original.registration_status) }}
+                    </Badge>
+                </template>
+                
                 <template #cell-completion_status="{ row }">
                     <Badge :variant="row.original.status_badge_color">
                         {{ formatStatusName(row.original.completion_status) }}

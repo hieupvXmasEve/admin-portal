@@ -6,8 +6,9 @@ namespace App\Console\Commands;
 
 use App\Models\CourseOffering;
 use App\Models\CourseRegistration;
-use App\Models\Student;
 use App\Models\Semester;
+use App\Models\Student;
+use App\Modules\Finance\Services\DeferChargeResolver;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -98,7 +99,7 @@ class UpdateCourseOfferingInvoices extends Command
                         $successCount++;
                     }
                 } catch (\Exception $e) {
-                    Log::error("Failed to create invoice for {$student->student_id}: " . $e->getMessage());
+                    Log::error("Failed to create invoice for {$student->student_id}: ".$e->getMessage());
                     $errorCount++;
                     $errorDetails[] = [
                         'student_id' => $student->student_id,
@@ -126,7 +127,7 @@ class UpdateCourseOfferingInvoices extends Command
                 $this->warn('Skipped Details:');
                 $this->table(
                     ['Student ID', 'Name', 'Reason', 'Existing Invoice'],
-                    array_map(fn($item) => [
+                    array_map(fn ($item) => [
                         $item['student_id'],
                         $item['name'],
                         $item['reason'],
@@ -140,7 +141,7 @@ class UpdateCourseOfferingInvoices extends Command
                 $this->error('Error Details:');
                 $this->table(
                     ['Student ID', 'Name', 'Error'],
-                    array_map(fn($item) => [
+                    array_map(fn ($item) => [
                         $item['student_id'],
                         $item['name'],
                         $item['error'],
@@ -151,7 +152,7 @@ class UpdateCourseOfferingInvoices extends Command
             return $errorCount > 0 ? self::FAILURE : self::SUCCESS;
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->error('Failed: ' . $e->getMessage());
+            $this->error('Failed: '.$e->getMessage());
 
             return self::FAILURE;
         }
@@ -193,6 +194,25 @@ class UpdateCourseOfferingInvoices extends Command
             return false;
         }
 
+        $deferChargeResolver = app(DeferChargeResolver::class);
+        $deferCase = $deferChargeResolver->findApplicableFullCase($student, $courseOffering->semester_id);
+
+        if ($deferCase) {
+            $deferChargeResolver->markFullCaseApplied($deferCase, $courseOffering->semester_id);
+
+            return false;
+        }
+
+        if ($isRetake) {
+            $deferItem = $deferChargeResolver->findApplicableCourseItem($registration);
+
+            if ($deferItem) {
+                $deferChargeResolver->markItemApplied($deferItem, $courseOffering->semester_id);
+
+                return false;
+            }
+        }
+
         $invoice = $this->findOrCreateStudentInvoice($student, $courseOffering->semester_id);
 
         \App\Models\InvoiceItem::create([
@@ -226,7 +246,7 @@ class UpdateCourseOfferingInvoices extends Command
             $semester = Semester::find($semesterId);
             $billingCycle = \App\Models\BillingCycle::create([
                 'semester_id' => $semesterId,
-                'name' => 'Default Billing Cycle - ' . $semester->name,
+                'name' => 'Default Billing Cycle - '.$semester->name,
                 'start_date' => $semester->start_date,
                 'end_date' => $semester->end_date,
                 'due_date' => $semester->end_date,
@@ -235,7 +255,7 @@ class UpdateCourseOfferingInvoices extends Command
         }
 
         return \App\Models\StudentInvoice::create([
-            'invoice_number' => 'INV-' . ($billingCycle->semester->code ?? 'SEM') . '-' . $student->student_id . '-' . now()->format('YmdHis'),
+            'invoice_number' => 'INV-'.($billingCycle->semester->code ?? 'SEM').'-'.$student->student_id.'-'.now()->format('YmdHis'),
             'student_id' => $student->id,
             'billing_cycle_id' => $billingCycle->id,
             'semester_id' => $semesterId,

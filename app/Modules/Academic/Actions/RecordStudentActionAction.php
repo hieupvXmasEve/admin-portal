@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Academic\Actions;
 
 use App\Enums\StudentActionType;
+use App\Models\FinanceCharge;
 use App\Models\Student;
 use App\Models\StudentActionLog;
 use App\Models\StudentChange;
+use App\Modules\Finance\Services\FinanceChargeService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -53,6 +55,8 @@ class RecordStudentActionAction
         return DB::transaction(function () use ($student, $actionType, $targetStatus, $data, $userId) {
             $previousStatus = $student->status;
             $previousCampusId = $student->campus_id;
+            $shouldUpdateStatus = self::shouldUpdateStatus($actionType, $data);
+            $isEgcDefer = $previousStatus === 'intake_pre_uni_gc';
 
             // 1. Create action log
             $actionLog = StudentActionLog::create([
@@ -77,8 +81,8 @@ class RecordStudentActionAction
                 'effective_at' => $data['effective_at'] ?? null,
 
                 // Snapshot
-                'previous_status' => $previousStatus,
-                'new_status' => $targetStatus ?? $previousStatus,
+                'previous_status' => $shouldUpdateStatus ? $previousStatus : null,
+                'new_status' => $shouldUpdateStatus ? ($targetStatus ?? $previousStatus) : null,
                 'previous_campus_id' => $actionType->changesCampus() ? $previousCampusId : null,
             ]);
 
@@ -92,7 +96,7 @@ class RecordStudentActionAction
                 $targetStatus,
                 $previousStatus,
                 $previousCampusId,
-                $data['reason'],
+                $data,
                 $userId
             );
 
@@ -103,10 +107,14 @@ class RecordStudentActionAction
 
             // 5. Create DeferCase for ACADEMIC_DEFER
             if ($actionType === StudentActionType::ACADEMIC_DEFER) {
-                self::createDeferCase($actionLog, $student, $data, $userId);
+                $deferCase = self::createDeferCase($actionLog, $student, $data, $userId);
+
+                if ($isEgcDefer) {
+                    self::createEgcDeferCredits($deferCase, $student, $data, $userId);
+                }
             }
 
-            Log::info("Student action recorded", [
+            Log::info('Student action recorded', [
                 'student_id' => $student->id,
                 'action_type' => $actionType->value,
                 'action_log_id' => $actionLog->id,
@@ -127,7 +135,7 @@ class RecordStudentActionAction
         array $data
     ): void {
         match ($actionType) {
-            StudentActionType::ACADEMIC_DEFER => self::validateDeferAction($data),
+            StudentActionType::ACADEMIC_DEFER => self::validateDeferAction($student, $data),
             StudentActionType::ACADEMIC_RESUME => self::validateResumeAction($student, $data),
             StudentActionType::ADMISSION_DEFERRAL => null, // No special validation
             StudentActionType::ACADEMIC_DROPOUT => null, // No special validation
@@ -138,16 +146,29 @@ class RecordStudentActionAction
     /**
      * Validate ACADEMIC_DEFER action.
      */
-    private static function validateDeferAction(array $data): void
+    private static function validateDeferAction(Student $student, array $data): void
     {
         $fromSemesterId = $data['from_semester_id'] ?? null;
         $returnSemesterId = $data['return_semester_id'] ?? null;
+        $scopeType = $data['defer_scope_type'] ?? 'FULL';
 
-        if ($fromSemesterId && $returnSemesterId && $fromSemesterId >= $returnSemesterId) {
+        if ($student->status === 'intake_pre_uni_gc' && $scopeType !== 'FULL') {
+            throw ValidationException::withMessages([
+                'defer_scope_type' => 'EGC defer must be full semester.',
+            ]);
+        }
+
+        if ($fromSemesterId && $returnSemesterId && $returnSemesterId < $fromSemesterId) {
             throw ValidationException::withMessages([
                 'return_semester_id' => 'Return semester must be after the from semester.',
             ]);
         }
+
+        // if ($fromSemesterId && $returnSemesterId && $fromSemesterId === $returnSemesterId && $scopeType !== 'COURSES') {
+        //     throw ValidationException::withMessages([
+        //         'return_semester_id' => 'Return semester must be different from from semester.',
+        //     ]);
+        // }
     }
 
     /**
@@ -158,7 +179,7 @@ class RecordStudentActionAction
         // Soft warning: student should be in deferred status
         // We don't block this in Phase 1 for flexibility
         if ($student->status !== 'deferred') {
-            Log::warning("Student resuming but not in deferred status", [
+            Log::warning('Student resuming but not in deferred status', [
                 'student_id' => $student->id,
                 'current_status' => $student->status,
             ]);
@@ -200,7 +221,7 @@ class RecordStudentActionAction
         $updateData = [];
 
         // Update status if action changes it
-        if ($actionType->changesStatus()) {
+        if (self::shouldUpdateStatus($actionType, $data)) {
             $updateData['status'] = $targetStatus ?? $actionType->targetStatus();
             $updateData['status_change_date'] = now()->toDateString();
             $updateData['status_reason'] = $data['reason'];
@@ -226,20 +247,20 @@ class RecordStudentActionAction
         ?string $targetStatus,
         ?string $previousStatus,
         ?int $previousCampusId,
-        string $reason,
+        array $data,
         int $userId
     ): void {
         $now = now();
 
         // Record status change
-        if ($actionType->changesStatus()) {
+        if (self::shouldUpdateStatus($actionType, $data)) {
             StudentChange::create([
                 'student_id' => $student->id,
                 'user_id' => $userId,
                 'field_name' => 'status',
                 'old_value' => $previousStatus,
                 'new_value' => $targetStatus ?? $actionType->targetStatus(),
-                'reason' => $reason,
+                'reason' => $data['reason'],
                 'changed_at' => $now,
             ]);
         }
@@ -252,10 +273,25 @@ class RecordStudentActionAction
                 'field_name' => 'campus_id',
                 'old_value' => (string) $previousCampusId,
                 'new_value' => (string) $student->campus_id,
-                'reason' => $reason,
+                'reason' => $data['reason'],
                 'changed_at' => $now,
             ]);
         }
+    }
+
+    private static function shouldUpdateStatus(StudentActionType $actionType, array $data): bool
+    {
+        if (! $actionType->changesStatus()) {
+            return false;
+        }
+
+        if ($actionType === StudentActionType::ACADEMIC_DEFER) {
+            $scopeType = $data['defer_scope_type'] ?? 'FULL';
+
+            return $scopeType !== 'COURSES';
+        }
+
+        return true;
     }
 
     /**
@@ -266,13 +302,14 @@ class RecordStudentActionAction
         Student $student,
         array $data,
         int $userId
-    ): void {
+    ): \App\Models\DeferCase {
         $deferCaseService = app(\App\Modules\Finance\Services\DeferCaseService::class);
 
         // Create the defer case
         $deferCase = $deferCaseService->createDeferCase($actionLog, [
             'student_id' => $student->id,
             'semester_id' => $data['from_semester_id'],
+            'applies_until_semester_id' => $data['return_semester_id'] ?? null,
             'scope_type' => $data['defer_scope_type'] ?? 'FULL',
             'fee_policy' => $data['defer_fee_policy'] ?? 'FORFEIT',
             'preserve_amount' => $data['defer_preserve_amount'] ?? null,
@@ -282,8 +319,8 @@ class RecordStudentActionAction
 
         // Add course items if COURSES scope
         if (($data['defer_scope_type'] ?? 'FULL') === 'COURSES'
-            && !empty($data['defer_course_registration_ids'])) {
-            $items = array_map(fn($regId) => [
+            && ! empty($data['defer_course_registration_ids'])) {
+            $items = array_map(fn ($regId) => [
                 'course_registration_id' => $regId,
                 'fee_policy' => $data['defer_fee_policy'] ?? 'FORFEIT',
             ], $data['defer_course_registration_ids']);
@@ -294,11 +331,63 @@ class RecordStudentActionAction
         // Process fee policy (auto-creates DEFER_CREDIT charges if PRESERVE/PARTIAL)
         $deferCaseService->processFeePolicy($deferCase);
 
-        Log::info("DeferCase created for student action", [
+        Log::info('DeferCase created for student action', [
             'action_log_id' => $actionLog->id,
             'defer_case_id' => $deferCase->id,
             'scope_type' => $deferCase->scope_type,
             'fee_policy' => $deferCase->fee_policy,
         ]);
+
+        return $deferCase;
+    }
+
+    private static function createEgcDeferCredits(
+        \App\Models\DeferCase $deferCase,
+        Student $student,
+        array $data,
+        int $userId
+    ): void {
+        $chargeIds = array_values(array_unique($data['defer_egc_charge_ids'] ?? []));
+        if (empty($chargeIds)) {
+            return;
+        }
+
+        $charges = FinanceCharge::query()
+            ->whereIn('id', $chargeIds)
+            ->where('student_id', $student->id)
+            ->where('semester_id', $data['from_semester_id'] ?? null)
+            ->where('charge_type', FinanceCharge::TYPE_EGC_LEVEL_FEE)
+            ->where('status', FinanceCharge::STATUS_ACTIVE)
+            ->get();
+
+        if ($charges->isEmpty()) {
+            return;
+        }
+
+        $chargeService = app(FinanceChargeService::class);
+
+        foreach ($charges as $charge) {
+            $exists = FinanceCharge::query()
+                ->where('charge_type', FinanceCharge::TYPE_DEFER_CREDIT)
+                ->where('source_type', FinanceCharge::class)
+                ->where('source_id', $charge->id)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            $chargeService->createCharge([
+                'student_id' => $student->id,
+                'semester_id' => $charge->semester_id,
+                'charge_type' => FinanceCharge::TYPE_DEFER_CREDIT,
+                'amount' => -abs((float) $charge->amount),
+                'description' => 'EGC Defer Credit: '.($charge->description ?? 'EGC Level Fee'),
+                'effective_at' => $deferCase->effective_at ?? now(),
+                'source_type' => FinanceCharge::class,
+                'source_id' => $charge->id,
+                'created_by_user_id' => $userId,
+            ]);
+        }
     }
 }

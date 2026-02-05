@@ -42,13 +42,23 @@ class UpdateStudentActionRequest extends FormRequest
 
     protected function deferRules(): array
     {
+        /** @var StudentActionLog $actionLog */
+        $actionLog = $this->route('actionLog');
+
         return [
             'from_semester_id' => ['required', 'integer', 'exists:semesters,id'],
             'return_semester_id' => [
                 'required',
                 'integer',
                 'exists:semesters,id',
-                'different:from_semester_id',
+                // function (string $attribute, mixed $value, \Closure $fail) use ($actionLog): void {
+                //     $scopeType = $actionLog->deferCase?->scope_type ?? 'FULL';
+                //     $fromSemesterId = $this->input('from_semester_id');
+
+                //     if ($scopeType !== 'COURSES' && $fromSemesterId && (int) $value === (int) $fromSemesterId) {
+                //         $fail('Return semester must be different from from semester.');
+                //     }
+                // },
             ],
         ];
     }
