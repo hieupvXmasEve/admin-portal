@@ -1,134 +1,130 @@
 # Project Overview and PDR
 
-Last updated: 2026-02-23
-Scope baseline: repository state in `main` workspace
+Last updated: 2026-02-25  
+Owner: Platform Team  
+Status: Current-state baseline (evidence-first)  
+Source of truth: code in `app/`, `routes/`, `resources/` + scout reports in `plans/reports/`
 
 ## 1) Product Summary
 
-Swinx is a multi-role education operations system with:
-- Admin/staff web workflows (Laravel + Inertia)
-- Student API workflows (`/api/v1/student/*`)
-- Lecturer API workflows (`/api/v1/lecturer/*`)
-- Domain modules for Identity, Academic, and Finance
+Swinx is a multi-role university operations system delivered as:
+- Web admin/staff app (Laravel + Inertia)
+- Student API surface (`/api/v1/student/*`)
+- Lecturer API surface (`/api/v1/lecturer/*`)
+- Parent-linked access to selected student API routes
 
-Primary objectives:
-- Manage student lifecycle and academic records
-- Support finance operations (charges, invoices, payments)
-- Provide role-based, campus-aware access
-- Expose API surfaces for portal/mobile integrations
+Core active domains:
+- Identity
+- Academic
+- Finance
 
-## 2) Users and Personas
+## 2) Stakeholders and Ownership
 
-- Admin/Operations staff: manage master data, student records, finance operations, reporting
-- Lecturers: course, attendance, assessment, timetable workflows via API
-- Students: profile, timetable, grades, finance, clubs/events/forms via API
-- Parents: indirect student-context access where allowed via `parent.student.access`
+- Product owner: internal operations and academic administration
+- Engineering owner: Platform Team
+- Documentation owner: Platform Team (update with each route/contract/auth change)
 
-## 3) In-Scope Functional Requirements (Initial Baseline)
+## 3) Functional Requirements (Current State)
 
-### FR-01 Identity and Authentication
+### FR-01 Authentication and Actor Segmentation
 
-- Web authentication and campus selection are handled through Identity module routes.
-- Student auth endpoints exist under module routes and API v1 routes.
-- Lecturer auth endpoints exist under module routes and API v1 routes.
-- Sanctum-based API auth is required for protected API groups.
-
-Acceptance criteria:
-- Web login and logout routes resolve.
-- Student and lecturer login/logout/refresh routes resolve.
-- Protected API groups enforce `auth:sanctum`.
-
-### FR-02 Campus Context and Authorization
-
-- Web requests append `CheckCampusSelected` and `SetCampus` middleware.
-- Permission checks exist in many admin web routes via `can:*` middleware.
-- Student and lecturer API middleware enforce actor-specific authorization.
+Code baseline:
+- Sanctum token auth is active for student/lecturer v1 APIs.
+- Actor policies are enforced via `api.actor` middleware for:
+  - `student_or_parent`
+  - `parent`
+  - `lecturer`
+- Parent proxy access uses `either:parent.student.access,student.api.auth` on student routes.
 
 Acceptance criteria:
-- Authenticated web users without campus context are redirected to campus selection.
-- Admin pages and APIs require relevant permissions where configured.
-- Student/lecturer API requests fail with authorization errors when role mismatch occurs.
+- Protected student and lecturer route groups reject unauthenticated requests.
+- Actor mismatch fails authorization.
 
-### FR-03 Academic Domain Workflows
+### FR-02 Token Lifecycle Hardening
 
-- Student management and academic summaries are present in web routes and Academic module.
-- Student API includes dashboard, timetable, grades, attendance, curriculum, calendar, and forms.
-- Lecturer API includes dashboard, courses, attendance, timetable, sessions, students, and assessments.
-
-Acceptance criteria:
-- Route groups for these areas resolve from `routes/web.php` + module routes + API v1 routes.
-- Controllers exist for key student/lecturer API endpoints.
-
-### FR-04 Finance Domain Workflows
-
-- Finance module provides admin web routes for operations dashboard, charges, invoices, and payments.
-- Student finance endpoints exist in API v1 student routes and module finance routes.
+Code baseline:
+- Identity login/refresh actions issue 8-hour tokens (`now()->addHours(8)`).
+- Lecturer refresh endpoint is in protected middleware group.
+- Parent refresh endpoint exists in protected group.
+- Refresh flow in current controllers issues new token then deletes current token.
 
 Acceptance criteria:
-- Finance web and API route groups resolve.
-- Finance actions/queries/services exist under `app/Modules/Finance/` and `app/Services/`.
+- `/api/v1/student/auth/refresh`, `/api/v1/lecturer/auth/refresh`, `/api/v1/student/parent/auth/refresh` require auth.
+- Refresh returns a new token and revokes the old one.
 
-### FR-05 Notifications and Realtime
+### FR-03 Student Action Import (Academic)
 
-- Broadcasting routes are configured with Sanctum middleware for API auth context.
-- Frontend has Echo setup (`resources/js/lib/echo.ts`) and realtime composables.
+Code baseline (`app/Modules/Academic/routes/web.php`):
+- Import page
+- Template download
+- Preview import
+- Execute import
+
+Behavior baseline:
+- Anti-tamper preview/execute token + file hash + `shared_upload_record_id` matching.
+- `ADMISSION_DEFERRAL` excluded from import flow.
+- Append rules limited to same student + same action type + same period.
+- Per-row transaction on execution.
 
 Acceptance criteria:
-- Broadcast channels are defined.
-- Frontend can initialize Echo when env keys are provided.
+- Tampered payloads are rejected at execute step.
+- Unsupported action type is blocked from import path.
 
-### FR-06 Operational Tooling
+### FR-04 API Surface Consistency
 
-- Deployment, backup, monitoring, and environment scripts exist under `scripts/`.
-- Docker assets exist under `docker/` for dev/local-prod/prod variants.
+Code baseline:
+- Student and lecturer v1 routes are mostly consistent with sanctum + actor + logging.
+- Finance module API routes currently use `web` + `auth` middleware.
+- Root `/api/system-config*` routes are public in `routes/api.php`.
 
 Acceptance criteria:
-- Scripts and compose assets are documented with current known limitations.
+- Document auth behavior by route group as implemented.
+- Do not claim unified API auth model while drift remains.
 
 ## 4) Non-Functional Requirements
 
 - Security:
-  - Sanctum auth for API endpoints
-  - middleware-driven authorization
-  - centralized API error envelope via `App\Http\Responses\ApiResponse`
+  - middleware/policy-based authorization
+  - explicit actor segregation for major public API surfaces
 - Maintainability:
-  - domain modules under `app/Modules/*`
-  - frontend feature grouping under `resources/js/pages/*`
-- Performance:
-  - Laravel caching/optimization commands available
-  - queue and scheduler hooks present in `routes/console.php`
-- Observability:
-  - logging middleware and monitoring scripts exist
+  - modular + shared-layer hybrid architecture documented and enforced by standards
+- Reliability:
+  - deployment and CI risks tracked as current-state gaps
+- Documentation quality:
+  - evidence-first claims only
+  - explicit owner/status/last-updated discipline
 
-## 5) Technical Constraints and Dependencies
+## 5) Technical Constraints
 
-- PHP: Composer currently requires `^8.2`
-- Framework: Laravel `^12.0`
-- Frontend runtime: Node/npm + Vite
-- DB/cache dependencies: MySQL/MariaDB + Redis
-- API consumers must handle mixed auth context patterns (`web` middleware in some admin APIs vs Sanctum in external APIs)
+- PHP `^8.2`, Laravel `^12.0`
+- Node/npm frontend toolchain
+- Sanctum for token auth surfaces
+- MySQL/MariaDB + Redis expected by active workflows
 
-## 6) Risks and Current Gaps
+## 6) Current Risks
 
-- Some student/lecturer API endpoints are intentionally TODO/commented.
-- Rate-limit middleware is partially commented in API v1 route files.
-- Environment and deployment scripts contain path assumptions that are currently inconsistent with repository layout.
-- CI workflow definitions exist but are disabled (commented out).
-- Test coverage is minimal relative to application size.
+- Public `system-config` endpoints allow unauthenticated read/write/upload at `/api/system-config*`.
+- Finance API auth style drift (`web` + `auth`) vs actor-based API model.
+- CI workflows are present but disabled (commented out).
+- Scripts and compose paths are inconsistent across repo.
+- Deployment artifacts include credentials/secrets exposure risk.
+- Frontend still has literal URL pockets despite heavy route helper usage.
 
-## 7) Success Metrics for Baseline Phase
+## 7) Success Metrics (Current-State Tracking)
 
-- Baseline docs exist for overview, architecture, standards, roadmap, deployment, and design.
-- README is aligned with verified repository state.
-- Known gaps are explicitly documented for stabilization planning.
+- Documentation freshness: core docs updated when route/auth/contracts change.
+- Security posture: count of unresolved high-risk auth/deploy issues trends down.
+- Delivery posture: CI workflows re-enabled with required checks.
+- Contract stability: fewer literal URL hotspots in frontend and fewer route drift incidents.
 
 ## 8) Version History
 
-- 2026-02-23: Initial baseline PDR created from repository audit + repomix snapshot.
+- 2026-02-25: Updated with Phase 1 + 1.5 scout/doc-reader context; aligned auth hardening and open risk statements.
+- 2026-02-23: Initial baseline version.
 
 ## Unresolved Questions
 
-- Which PHP version should be treated as canonical for this repo: `8.2+` (Composer) or `8.4+` (some existing docs/rules)?
-- Which Docker workflow is intended as canonical: direct `docker compose -f docker/...` usage or script wrappers in `scripts/`?
-- Should admin internal APIs keep `web` middleware dependency, or migrate to fully token-based access?
-- Which TODO endpoints in student/lecturer APIs are planned for near-term completion?
+- Should `/api/system-config*` be moved behind admin auth/authorization?
+- Should Finance module APIs migrate to Sanctum + actor middleware?
+- Which API surfaces are external client contracts vs internal web AJAX contracts?
+- Should `EitherMiddleware` be replaced with explicit route group middleware composition?

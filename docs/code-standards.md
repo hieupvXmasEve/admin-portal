@@ -1,134 +1,106 @@
 # Code Standards
 
-Last updated: 2026-02-23
-Applies to: backend, frontend, API contracts, tests, and docs updates
+Last updated: 2026-02-25  
+Owner: Platform Team  
+Status: Active baseline (enforced by convention; CI currently inactive)  
+Source of truth: repository code and route/contracts in this workspace
 
 ## 1) Core Principles
 
-- YAGNI: implement only currently required behavior.
-- KISS: prefer simple, explicit logic over abstractions.
-- DRY: reuse shared logic when duplication becomes operationally costly.
-- Evidence-first docs: document only what is verified in code.
+- YAGNI
+- KISS
+- DRY
+- Evidence-first documentation (no unverified claims)
 
-## 2) Repository Structure Standards
+## 2) Structure Standards
 
 ### Backend
 
-- Keep domain-oriented code in `app/Modules/{Domain}/` when introducing or extending major business capabilities.
-- Keep cross-domain technical plumbing in `app/Http`, `app/Models`, `app/Providers`, `app/Console`.
-- Avoid adding new business-heavy classes in global `app/Services` unless extending existing service-centric areas.
+- Prefer new business logic in `app/Modules/{Domain}`.
+- Keep shared framework plumbing in Laravel standard folders.
+- Extend `app/Services/*` only when modifying an existing service-led area.
 
 ### Frontend
 
-- Keep Inertia pages in `resources/js/pages/{Feature}/`.
-- Keep reusable UI in `resources/js/components/`.
-- Keep reusable stateful logic in `resources/js/composables/`.
-- Keep shared types in `resources/js/types/`.
+- Pages: `resources/js/pages/{Feature}`
+- Shared components: `resources/js/components`
+- Reusable logic: `resources/js/composables`
+- Shared contracts/types: `resources/js/types`
+- Route helpers/constants should be preferred over literal paths.
 
-## 3) Naming and File Conventions
+## 3) Naming and Contract Rules
 
-- PHP classes: PascalCase.
-- Vue components: PascalCase filenames.
-- Composables: `useXxx.ts` naming.
-- Database tables/columns: snake_case.
-- Route names: dot notation where named.
-- Route paths: kebab-case segments for readability.
+- PHP classes: PascalCase
+- Vue component files: PascalCase
+- Composables: `useXxx.ts`
+- DB tables/columns: snake_case
+- Route names: dot notation
+- URL segments: kebab-case
 
-## 4) Backend Implementation Standards
+For student action logs/import contracts keep exact fields:
+- `decision_number`
+- `decision_signed_at`
+- `decision_signer`
+- `missing_documents`
+- `shared_upload_record_id`
 
-### Controllers
+## 4) Backend Implementation Rules
 
-- Controllers should remain orchestration layers:
-  - accept request
-  - authorize
-  - call action/query/service
-  - return response
+- Controllers orchestrate; they do not contain heavy business logic.
+- Use FormRequest for request validation.
+- Use transactions for multi-write flows.
+- Keep auth/authorization explicit in middleware/policies.
+- For token refresh, keep current rotation pattern consistent unless intentionally migrated.
 
-### Validation
+## 5) API Security and Auth Standards
 
-- Use FormRequest classes for request validation.
-- Keep validation rules out of controllers where feasible.
+Current enforced baseline:
+- Student/Lecturer v1 APIs: Sanctum + actor middleware chain.
+- Parent access to student APIs: explicit parent proxy middleware path.
 
-### Business Logic Placement
+Current known exceptions (must be documented, not ignored):
+- Public `system-config` API routes.
+- Finance API route groups using `web` + `auth`.
 
-Current codebase has mixed patterns:
-- `app/Modules/*/Actions/*` (often static `run`)
-- `app/Actions/*` and some queries using `execute`
-- heavy business/services in `app/Services/*`
+## 6) Frontend Contract Standards
 
-Baseline rule for new work:
-- Prefer domain `Actions` for write use-cases.
-- Prefer domain `Queries` for read/reporting use-cases.
-- Use `app/Services/*` only when extending existing service-led flows.
+- Prefer `route(...)` helpers and typed route constants.
+- Avoid introducing new literal endpoint strings when a helper exists.
+- Prefer shared API wrappers/composables for consistent envelope/error handling.
+- Keep auth-sensitive calls aligned with backend middleware expectations.
 
-### Transactions and Side Effects
+## 7) Testing and Quality Gates
 
-- Use DB transactions for multi-write operations that must stay consistent.
-- Log operationally significant failures and state transitions.
+Current status:
+- Local quality scripts exist.
+- GitHub workflow enforcement is disabled (commented workflow files).
 
-### Authorization and Security
-
-- Enforce access via middleware + `can:*` or policies.
-- For API actor separation, use dedicated middleware (`student.api.auth`, `lecturer.api.auth`).
-- Never commit secrets or credentials in source/docs.
-
-### API Response Contract
-
-- Prefer unified JSON envelopes through `App\Http\Responses\ApiResponse` for new/updated API endpoints.
-- Keep error structure stable (`success`, `message`, `errors`, `timestamp`).
-
-## 5) Frontend Standards
-
-### Inertia and Layout
-
-- Use Inertia page components as route-level views.
-- Keep auth/campus selection exceptions explicit in layout resolver logic.
-
-### Type Safety
-
-- Maintain strict TypeScript compatibility (`npm run type-check`).
-- Define explicit interfaces/types for API payloads.
-
-### UI Patterns
-
-- Use existing design tokens and theme variables in `resources/css/app.css`.
-- Reuse existing UI primitives and sidebar/menu patterns.
-- Avoid introducing parallel UI systems when current components can be extended.
-
-### API Consumption
-
-- Prefer existing composables/utilities for request logic.
-- Keep client permission checks aligned with backend-provided permission props.
-
-## 6) Testing Standards (Current Baseline)
-
-Current state has limited automated tests. Baseline standard:
-- Add or update tests for behavior-critical backend changes.
-- Prioritize unit tests for finance/academic calculations and workflow edge cases.
-- Add feature tests for critical route/controller behaviors.
-
-Minimum quality checks before merge:
+Minimum expected checks before merge:
 - `php artisan test`
 - `npm run type-check`
 - `npm run lint`
 
-## 7) Documentation Standards
+If checks cannot be run, record the gap in the change summary.
 
-- Keep operational docs in `docs/`.
-- Keep each markdown file concise and below 800 LOC.
-- Update docs when route structure, scripts, env contracts, or architecture decisions change.
-- Add an `Unresolved Questions` section whenever uncertainty remains.
+## 8) Documentation Standards
 
-## 8) Definition of Done (Engineering + Docs)
+- `docs/` is the source-of-truth directory for engineering docs.
+- Core docs must include:
+  - last updated date
+  - owner
+  - status
+  - unresolved questions (if decisions pending)
+- Keep docs under 800 LOC and remove stale claims quickly.
 
-A change is complete only when:
-- behavior works and is authorized correctly,
-- validation and error handling are present,
-- tests/checks are updated at least for the touched critical paths,
-- relevant docs in `docs/` are updated.
+## 9) Definition of Done
+
+A change is complete when:
+- implementation behavior is correct
+- auth/validation/error paths are handled
+- quality checks are run or explicitly tracked as not-run
+- impacted docs are updated in the same change window
 
 ## Unresolved Questions
 
-- Should the team standardize one method name for actions/queries (`run` vs `execute`) for new code?
-- Should new domain logic in `app/Services/*` be blocked in favor of `app/Modules/*`?
-- What minimum test coverage target should be enforced per module?
+- Should `run` and `execute` action method naming be standardized repo-wide?
+- Which checks become hard merge blockers once CI is re-enabled?

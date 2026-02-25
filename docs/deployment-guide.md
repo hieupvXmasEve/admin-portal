@@ -1,12 +1,11 @@
 # Deployment Guide (Current Baseline)
 
-Last updated: 2026-02-23
+Last updated: 2026-02-25  
+Owner: Platform Team  
+Status: Risk-tracked baseline (not fully normalized)
 
-This guide documents the repository's current deployment assets and their current reliability status. It does not assume all scripts are production-ready.
+## 1) Existing Deployment Assets
 
-## 1) What Exists Today
-
-Deployment-related assets:
 - Dockerfiles:
   - `docker/Dockerfile`
   - `docker/Dockerfile.production`
@@ -14,18 +13,18 @@ Deployment-related assets:
   - `docker/docker-compose.dev.yml`
   - `docker/docker-compose.local-prod.yml`
   - `docker/docker-compose.production.yml`
-- Runtime/server configs:
+- Caddy/runtime configs:
   - `docker/Caddyfile.dev`
   - `docker/Caddyfile.local-prod`
   - `docker/Caddyfile.prod`
-- Operational scripts:
+- Scripts:
   - `scripts/dev.sh`, `scripts/local-prod.sh`, `scripts/prod.sh`
   - `scripts/deploy.sh`, `scripts/deploy-production.sh`
   - `scripts/backup-database.sh`, `scripts/monitor-production.sh`
 
-## 2) Recommended Safe Workflow Right Now
+## 2) Reliable Local Path Today
 
-Until script/path drift is resolved, treat native app boot as the reliable baseline:
+Use native app bootstrap for predictable local run:
 
 ```bash
 composer install
@@ -36,55 +35,51 @@ php artisan migrate
 composer dev
 ```
 
-Use this for local validation and feature testing.
+## 3) Verified Drift and Security Risks
 
-## 3) Known Deployment/Script Drift
+### Script and path drift
 
-The following are verified mismatches and should be fixed before relying on automated deploy scripts:
+- Missing scripts referenced by `package.json` and setup/pre-push flows:
+  - `scripts/test-local.sh`
+  - `scripts/docker-compose-dev.sh`
+- Multiple scripts expect compose files at repo root while actual compose files are under `docker/`.
 
-- `package.json` references `./scripts/test-local.sh`, but this file is missing.
-- `scripts/pre-push.sh` calls `./scripts/test-local.sh` (missing).
-- `scripts/setup-project.sh` calls `./scripts/docker-compose-dev.sh` (missing).
-- `scripts/validate-setup.sh` expects root-level files such as:
-  - `docker-compose.yml`
-  - `docker-compose.dev.yml`
-  - `docker-compose.test.yml`
-  - `Dockerfile`
-  - `env.docker.example`
-  These files are not present at root.
-- Several scripts expect compose files at root (`docker-compose.production.yml`) while actual files are under `docker/`.
+### CI status
 
-## 4) Production Readiness Checklist (Before Go-Live)
+- `.github/workflows/deploy.yml`, `lint.yml`, `tests.yml` are fully commented out (disabled).
 
-1. Standardize file paths in all deployment scripts.
-2. Define canonical env file locations and sample files.
-3. Re-enable and verify CI workflows in `.github/workflows/`.
-4. Verify queue workers, scheduler, and backup/restore routines.
-5. Run end-to-end smoke checks on:
-   - web login and campus selection
-   - student/lecturer API auth
-   - finance and academic critical flows
+### Security exposure risks in deployment artifacts
 
-## 5) Suggested Canonical Deployment Contract
+- Hardcoded credentials/defaults remain in deploy/runtime scripts and compose fallbacks.
+- Production compose files publish DB port (`3306:3306`) by default.
+- Production startup logic and runtime assumptions are inconsistent across scripts.
 
-Adopt one source of truth for each concern:
-- Compose files: keep under `docker/`.
-- Wrapper scripts: keep under `scripts/` and reference `docker/*` explicitly.
-- Env files: define and document one canonical location per environment.
-- CI: enforce lint/type-check/tests before deployment.
+## 4) Minimum Readiness Checklist Before Production Use
+
+1. Standardize script paths to `docker/*` assets.
+2. Remove hardcoded credentials and weak default secrets.
+3. Restrict or remove public DB port exposure for production.
+4. Re-enable CI with required lint/type/test gates.
+5. Run smoke checks for web auth, student/lecturer auth, and finance/academic critical flows.
+
+## 5) Canonical Deployment Contract (Pending Decision)
+
+Target contract after normalization:
+- Compose files remain under `docker/`.
+- Scripts under `scripts/` reference only canonical compose paths.
+- Environment file locations are explicitly defined per environment.
+- Deploy pipeline requires passing CI checks before rollout.
 
 ## 6) Rollback and Backup Expectations
 
-Existing backup/monitor scripts exist but include hardcoded assumptions and should be reviewed before production usage.
-
-Minimum rollback policy to document in implementation phase:
-- database backup before deploy
-- image/version pinning
-- health check gate before switch-over
-- rollback command path tested in staging
+Required baseline policy:
+- backup before deploy
+- deterministic version/image pinning
+- health-check gate before traffic cutover
+- tested rollback command in staging
 
 ## Unresolved Questions
 
-- Which deployment path should be canonical: `scripts/prod.sh`, `scripts/deploy.sh`, or `scripts/deploy-production.sh`?
-- Should Docker files be moved to root-compatible paths, or should scripts be updated to `docker/*` paths?
-- Which environments are officially supported today: native only, Docker dev, local-prod, production, or all?
+- Which script is canonical for production deployment?
+- Should production DB ever be host-exposed, or only internal-network reachable?
+- Should `Caddyfile.prod` features be reduced to guaranteed baseline compatibility?

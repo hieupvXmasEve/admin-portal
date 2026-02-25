@@ -1,129 +1,134 @@
 # Project Roadmap
 
-Last updated: 2026-02-23
-Planning horizon: next 2-3 quarters
+Last updated: 2026-02-25  
+Owner: Platform Team  
+Status: Active planning baseline  
+Horizon: next 2-3 quarters
 
-## 1) Roadmap Goals
+## 1) Objectives
 
-- Stabilize engineering workflow and deployment reliability.
-- Clarify and harden public/internal API contracts.
-- Reduce regression risk in academic and finance domains.
-- Consolidate documentation into a reliable source of truth.
+- Stabilize API security and auth consistency.
+- Restore delivery confidence (CI + deployment path normalization).
+- Reduce contract drift between backend routes and frontend integrations.
+- Keep documentation synchronized with code changes.
 
-## 2) Current Baseline Status
+## 2) Current Baseline
 
-- Core platform exists and is feature-rich across Identity, Academic, and Finance.
-- Documentation exists but is fragmented and partially stale.
-- CI pipelines are present but disabled.
-- Several scripts and Docker references are inconsistent.
-- Test footprint is low for current codebase size.
+- Platform is operational with hybrid architecture (`app/Modules/*` + `app/Services/*`).
+- Auth hardening landed for student/parent/lecturer actor middleware and protected refresh routes.
+- Token TTL is aligned to 8 hours across current Identity login/refresh actions.
+- Critical unresolved risks remain:
+  - public `/api/system-config*`
+  - finance API auth model drift
+  - disabled CI workflows
+  - deployment/script/security drift
 
-## 3) Phases and Milestones
+## 3) Phase Plan
 
-## Phase 0: Documentation Baseline (Completed)
+### Phase 0: Core Documentation Alignment
 
-Status: Completed (2026-02-23)
+Status: Completed  
+Completed date: 2026-02-25
 
-Deliverables:
-- Updated `README.md`
-- Created baseline docs:
-  - `docs/project-overview-pdr.md`
-  - `docs/codebase-summary.md`
-  - `docs/code-standards.md`
-  - `docs/system-architecture.md`
-  - `docs/project-roadmap.md`
-  - `docs/deployment-guide.md`
-  - `docs/design-guidelines.md`
+Outcome:
+- Core docs aligned to current code-verified state.
+- Removed aspirational phrasing from quality/security posture.
 
-## Phase 1: Environment and Deployment Stabilization
+### Phase 1: Deploy/Script Normalization
 
-Status: Planned
-Target window: 1-2 sprints
-
-Scope:
-- Normalize Docker compose/script paths and env file conventions.
-- Decide one canonical local-dev command set.
-- Decide one canonical production deployment path.
-- Re-enable CI workflows with minimum required checks.
-
-Success criteria:
-- Clean local setup path documented and reproducible.
-- CI runs lint + type-check + tests on PRs.
-- Deployment script references match actual repository paths.
-
-## Phase 2: API Contract Hardening
-
-Status: Planned
-Target window: 1-2 sprints after Phase 1
+Status: Planned  
+Target: 1-2 sprints
 
 Scope:
-- Resolve TODO/commented endpoint decisions in student/lecturer API routes.
-- Normalize rate-limit middleware usage by endpoint category.
-- Document campus-context behavior clearly for admin/internal APIs.
-- Publish a stable API index map in `docs/api/`.
+- choose one canonical deploy entrypoint
+- align script references to actual `docker/*` layout
+- remove references to missing helper scripts
 
-Success criteria:
-- No ambiguous TODO route blocks in critical API files.
-- Auth and rate-limit behavior documented per route group.
+Exit criteria:
+- no broken script references in normal dev/deploy paths
+- deployment guide maps exactly to runnable script flow
 
-## Phase 3: Testing and Quality Coverage
+### Phase 2: CI Reactivation
 
-Status: Planned
-Target window: 2-3 sprints
-
-Scope:
-- Add feature tests for critical auth + route access + high-risk endpoints.
-- Add unit/integration tests for finance charge/invoice flows and academic progression logic.
-- Add regression checks for critical middleware and permission paths.
-
-Success criteria:
-- Meaningful increase in backend test coverage for critical modules.
-- CI fails reliably on regressions in protected areas.
-
-## Phase 4: Architecture Consolidation
-
-Status: Planned
-Target window: ongoing
+Status: Planned  
+Target: after Phase 1
 
 Scope:
-- Define policy for future logic placement (`Modules` vs `Services`).
-- Incrementally reduce service-layer hotspots when touching related code.
-- Standardize action/query method conventions for new code.
+- uncomment and modernize `.github/workflows/*`
+- enforce minimum checks on PRs
 
-Success criteria:
-- Documented architecture decision record for layering.
-- Reduced ambiguity in contribution patterns.
+Minimum gate target:
+- lint
+- type-check
+- backend tests
 
-## Phase 5: Documentation Consolidation
+Exit criteria:
+- required checks run automatically and block on failure
 
-Status: Planned
-Target window: ongoing
+### Phase 3: API Security Hardening
+
+Status: Planned  
+Target: overlaps with Phase 2 when feasible
 
 Scope:
-- Clean stale indexes and overlapping docs.
-- Add role-based doc navigation (admin, student API, lecturer API, ops).
-- Keep baseline docs in sync with code and release milestones.
+- secure or relocate public `system-config` routes
+- resolve finance API auth drift (`web` + `auth` vs Sanctum actor model)
+- document stable auth matrix by route group
 
-Success criteria:
-- `docs/README.md` accurately links active docs.
-- Reduced duplicate/conflicting doc pages.
+Exit criteria:
+- no high-risk public config mutation/read routes without explicit approval rationale
+- finance API auth model decision implemented and documented
 
-## 4) Dependencies and Sequencing
+### Phase 4: Frontend Contract Stabilization
 
-- Phase 1 should precede broad CI/deployment changes.
-- Phase 2 should precede major external API consumer onboarding.
-- Phase 3 should start with highest business-risk flows, not broad low-value coverage.
-- Phase 5 is continuous and should be updated every phase.
+Status: Planned  
+Target: ongoing
+
+Scope:
+- reduce literal URL pockets in frontend pages/composables
+- standardize route helper usage and API wrapper usage in high-churn pages
+
+Exit criteria:
+- measurable reduction in literal path usage on critical flows
+- route contract changes require single-source updates
+
+### Phase 5: Architecture Consolidation
+
+Status: Planned  
+Target: ongoing
+
+Scope:
+- define explicit policy for `Modules` vs `Services`
+- apply policy incrementally on touched hotspots
+
+Exit criteria:
+- reduced placement ambiguity for new domain logic
+- documented ownership by domain/module
+
+## 4) Dependencies
+
+- Phase 1 before Phase 2
+- Phase 2 before strict merge-gate enforcement policy
+- Phase 3 and Phase 4 can overlap after baseline CI is active
+- Documentation updates are required in every phase
 
 ## 5) Tracking Metrics
 
-- Build reliability: CI pass rate and runtime stability.
-- API stability: number of unresolved TODO/undocumented behaviors.
-- Test health: count of critical-path tests and failure detection effectiveness.
-- Docs health: stale-link count and update latency after code changes.
+- CI status: active/inactive + pass rate
+- Script drift count: missing scripts/path mismatches
+- API risk count: unresolved high-risk auth exposures
+- Frontend contract drift: literal path usage in high-risk areas
+- Docs hygiene: stale claim/link count in core docs
+
+## 6) Immediate Decisions
+
+1. Canonical deploy script and environment contract.
+2. Minimum required CI gates for merge.
+3. Final auth model for finance API routes.
+4. Ownership and timeline for public system-config hardening.
 
 ## Unresolved Questions
 
-- Which team owns Phase 1 script/deployment normalization?
-- What is the required minimum CI gate for merge (lint/type-check/test subsets)?
-- Which API surfaces are considered externally committed contracts vs internal-only?
+- Who is accountable for Phase 1 execution window and sign-off?
+- Which API endpoints are external-facing contracts vs internal web support APIs?
+- What is the acceptable grace period between code change and required doc update?

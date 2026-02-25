@@ -1,86 +1,64 @@
 # Design Guidelines
 
-Last updated: 2026-02-23
-
-This document captures the current UI/UX implementation conventions used in the Vue + Inertia frontend.
+Last updated: 2026-02-25  
+Owner: Frontend Team  
+Status: Active baseline
 
 ## 1) UI Stack
 
 - Vue 3 + TypeScript
-- Inertia page model
+- Inertia.js page model
 - Tailwind CSS v4
-- Theme tokens and CSS variables in `resources/css/app.css`
-- Reka UI + shadcn-style component primitives
-- Lucide icons
-- `vue-sonner` for toast notifications
+- Theme tokens in `resources/css/app.css`
+- Existing shared component primitives and icon/toast tooling
 
-## 2) Layout and Navigation
+## 2) Layout and Navigation Standards
 
-### Default App Layout
+- Main app boot and page resolution: `resources/js/app.ts`
+- Default layout convention: `resources/js/layouts/AppLayout.vue`
+- Keep auth/campus-selection layout exceptions explicit
+- Preserve permission-aware menu rendering behavior
 
-- Global app layout is wired in `resources/js/app.ts`.
-- Most pages use `resources/js/layouts/AppLayout.vue`.
-- Auth and campus-selection pages are explicit layout exceptions.
+## 3) Routing and Integration Standards
 
-### Sidebar and Permission-Aware Menus
+- Prefer `route(...)` helpers and shared route constants.
+- Use shared route helper modules before adding literal paths.
+- Current codebase still has literal URL pockets; treat them as drift-risk and reduce when touching those screens.
+- Keep frontend route names aligned with backend route names/constants.
 
-- Sidebar component: `resources/js/components/AppSidebar.vue`.
-- Menu definitions: `resources/js/constants/menu-sidebar.ts`.
-- Menu visibility should be filtered by permissions from shared Inertia props.
+## 4) Theming and Visual Consistency
 
-## 3) Theming
+- Reuse existing design tokens/CSS variables.
+- Avoid hardcoding palette values when token exists.
+- Keep spacing, typography, and icon semantics consistent with existing pages.
 
-- Theme behavior is handled by `resources/js/composables/useAppearance.ts`.
-- Light/dark/system mode is supported.
-- Core tokens are defined as CSS variables (`--background`, `--primary`, `--sidebar-*`, etc.).
+## 5) Forms and Interaction Patterns
 
-Guideline:
-- Reuse existing token variables instead of hardcoding palette values.
+- Use typed props/interfaces for component contracts.
+- Keep loading/error/empty states explicit.
+- Reuse existing modal/confirm/toast behavior rather than introducing parallel patterns.
 
-## 4) Page Composition
+## 6) API Interaction Standards
 
-- Organize pages by feature under `resources/js/pages/`.
-- Keep pages focused on composition and orchestration.
-- Move reusable behavior to composables under `resources/js/composables/`.
-- Keep shared primitives/components in `resources/js/components/`.
+- Prefer shared API wrappers/composables for consistency.
+- If raw `fetch` is used, keep request/response handling aligned with current API envelope behavior.
+- When updating high-risk pages, prioritize replacing new literal endpoints with helper/centralized contract usage.
 
-## 5) Form and Interaction Patterns
+## 7) Accessibility and Responsiveness
 
-- Prefer typed props and explicit interfaces for component contracts.
-- Use existing confirmation/modal/toast patterns instead of introducing new interaction systems.
-- Keep loading/error/empty states explicit in feature pages.
+- Preserve keyboard and focus behavior of shared components.
+- Validate desktop and mobile layout when touching major pages.
 
-## 6) Realtime UX
+## 8) Definition of Done for UI Changes
 
-- Realtime wiring is centralized in `resources/js/lib/echo.ts`.
-- Notification listeners are implemented through composables (for example `useRealtimeNotifications`).
-
-Guideline:
-- Initialize realtime only when required env keys exist.
-- Keep user-facing notification copy concise and actionable.
-
-## 7) Accessibility and Responsiveness Baseline
-
-- Reuse existing accessible primitives from UI library wrappers.
-- Preserve keyboard and focus behavior when customizing components.
-- Validate layouts for desktop and mobile breakpoints when updating major pages.
-
-## 8) Design Consistency Rules
-
-- Do not introduce parallel button/input/table systems if an existing component already covers the use-case.
-- Use existing spacing and typography scales from global styles.
-- Keep icon usage semantically consistent (same icon for same action category).
-
-## 9) Definition of Done for UI Changes
-
-UI work is complete only when:
-- it follows current layout/navigation conventions,
-- it respects existing theme tokens,
-- permission-aware navigation behavior remains intact,
-- no regressions are introduced in primary admin workflows.
+UI changes are done when:
+- they follow existing layout/navigation conventions,
+- route and API contracts remain aligned with backend,
+- theme/token consistency is preserved,
+- permission-sensitive behavior does not regress.
 
 ## Unresolved Questions
 
-- Should a formal design token reference page be generated from `resources/css/app.css`?
-- Which pages are considered canonical visual references for future UI updates?
-- Should dark mode be treated as mandatory parity for all newly built screens?
+- Should helper-based route usage become mandatory lint policy?
+- Should API wrapper usage be enforced for all authenticated JSON calls?
+- Which pages are canonical UI references for future redesign/refactor work?

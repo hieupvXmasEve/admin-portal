@@ -1,116 +1,115 @@
 # Swinx
 
-Swinx is a university operations platform built on Laravel + Vue + Inertia. It supports web-based administration and API-based student/lecturer workflows across identity, academic, and finance domains.
+Swinx is a university operations platform built as a Laravel 12 + Vue 3 + Inertia monolith.
 
-## Current Baseline
+Last updated: 2026-02-25  
+Owner: Platform Team  
+Status: Current-state baseline (code-verified)
 
-This repository currently contains:
-- Laravel 12 backend with module-oriented domain code in `app/Modules/`
-- Vue 3 + Inertia frontend in `resources/js/`
-- Student and lecturer API surfaces under `routes/api/v1/`
-- Extensive existing docs under `docs/` plus product specs under `prd/`
+## Source of Truth
 
-This README is an initial accurate baseline as of `2026-02-23`.
+- Canonical project docs: `docs/`
+- Baseline architecture and standards:
+  - `docs/system-architecture.md`
+  - `docs/code-standards.md`
+  - `docs/project-overview-pdr.md`
 
-## Tech Stack
+## Current Baseline (Code-Verified)
 
-- Backend: Laravel 12, Sanctum, Socialite, Telescope, PHP (Composer constraint: `^8.2`)
-- Frontend: Vue 3, Inertia, TypeScript, Tailwind CSS v4, Pinia, Vite
-- Data: MySQL/MariaDB, Redis
-- Runtime/Infra assets: FrankenPHP + Docker Compose files under `docker/`
+- Backend: Laravel 12 hybrid monolith
+  - modular domains: `app/Modules/*`
+  - shared legacy/business services: `app/Services/*`
+- Frontend: Vue 3 + TypeScript + Inertia (`resources/js/*`)
+- API surfaces:
+  - Student v1: `routes/api/v1/student.php`
+  - Lecturer v1: `routes/api/v1/lecturer.php`
+  - Identity module auth/context routes: `app/Modules/Identity/routes/api.php`
 
-## Repository Structure
+## Entry Points
 
-```text
-app/
-  Modules/                 # Domain modules: Identity, Academic, Finance
-  Http/                    # Controllers, middleware, requests, resources
-  Services/                # Service-heavy legacy/shared business logic
-resources/
-  js/
-    app.ts                 # Inertia SPA entry
-    ssr.ts                 # Inertia SSR entry
-    pages/                 # Feature pages
-    components/            # Shared UI
-    composables/           # Reusable logic hooks
-routes/
-  web.php
-  api.php
-  api/v1/student.php
-  api/v1/lecturer.php
-scripts/                   # Environment/deploy/monitor scripts (see known gaps)
-docker/                    # Dockerfiles + compose variants + Caddy configs
-docs/                      # Documentation source of truth
-prd/                       # Product requirement/domain notes
-```
+- App bootstrap: `bootstrap/app.php`
+- Web routes: `routes/web.php`
+- API routes: `routes/api.php`
+- Frontend app entry: `resources/js/app.ts`
+- Frontend SSR entry: `resources/js/ssr.ts`
 
-## Verified Entry Points
+Health endpoints in code:
+- `GET /up`
+- `GET /health`
+- `GET /api/health`
 
-- Web app boot: `resources/js/app.ts`
-- SSR boot: `resources/js/ssr.ts`
-- Main web routes: `routes/web.php`
-- Main API routes: `routes/api.php`
-- Student API routes: `routes/api/v1/student.php`
-- Lecturer API routes: `routes/api/v1/lecturer.php`
+## Authentication and API Security (Current State)
 
-Health endpoints currently present:
-- `/up` (Laravel health route from `bootstrap/app.php`)
-- `/health` (web route)
-- `/api/health` (API route)
+- Sanctum remains default token auth for student/lecturer API groups.
+- Actor middleware is in use for student/parent/lecturer segmentation:
+  - `api.actor:student_or_parent`
+  - `api.actor:parent`
+  - `api.actor:lecturer`
+- Identity lecturer refresh is in a protected middleware group.
+- Parent refresh endpoint exists and is protected.
+- Token TTL is standardized to 8 hours in current Identity login/refresh actions.
+- Refresh rotation pattern is currently "issue new token, then revoke old token" in controllers.
+
+Known open security drift (not fixed in this update):
+- `routes/api.php` exposes public `system-config` endpoints (GET/PUT/POST).
+- Finance API auth style differs (`web` + `auth` in `app/Modules/Finance/routes/api.php`) from Sanctum + actor model.
+
+## Student Action Import (Academic Module)
+
+Implemented under `app/Modules/Academic/routes/web.php`:
+- `GET reports/student-actions/import`
+- `GET reports/student-actions/import/template`
+- `POST reports/student-actions/import/preview`
+- `POST reports/student-actions/import/execute`
+
+Verified behavior:
+- Preview/execute anti-tamper check binds user + preview token + file hash + `shared_upload_record_id`.
+- `ADMISSION_DEFERRAL` is excluded from template/import mapping.
+- Append mode only allows same student + same action type + same period.
+- Execute uses per-row DB transaction.
+- Decision fields are persisted on action logs:
+  - `decision_number`
+  - `decision_signed_at`
+  - `decision_signer`
 
 ## Local Development
-
-### Option 1: Native (most reliable currently)
-
-1. Install dependencies:
 
 ```bash
 composer install
 npm ci
-```
-
-2. Prepare environment:
-
-```bash
 cp .env.example .env
 php artisan key:generate
 php artisan migrate
-```
-
-3. Start app:
-
-```bash
 composer dev
 ```
-
-### Option 2: Docker assets exist but need alignment
-
-Docker files exist under `docker/`, but script/compose path assumptions are not fully aligned yet. See `docs/deployment-guide.md` before using Docker workflows.
 
 ## Common Commands
 
 ```bash
-# Backend/frontend dev loop
 composer dev
-
-# Frontend only
 npm run dev
-
-# Build assets
 npm run build
-
-# Static checks
 npm run lint
 npm run format:check
 npm run type-check
-
-# PHP tests
 php artisan test
 ```
 
-## Documentation
+## Current Quality Gates Status
 
-Primary baseline docs:
+- GitHub workflows exist but are fully commented out (disabled):
+  - `.github/workflows/lint.yml`
+  - `.github/workflows/tests.yml`
+  - `.github/workflows/deploy.yml`
+- Local checks are available, but CI-enforced merge gates are currently inactive.
+
+## Known Operational Risks
+
+- Script/path drift in `scripts/*` (missing helper scripts and root-vs-`docker/` compose path mismatch).
+- Deployment artifacts still include secrets-exposure risks (hardcoded defaults/credentials and exposed DB ports in production compose files).
+
+## Documentation Index
+
 - `docs/project-overview-pdr.md`
 - `docs/codebase-summary.md`
 - `docs/code-standards.md`
@@ -119,22 +118,14 @@ Primary baseline docs:
 - `docs/deployment-guide.md`
 - `docs/design-guidelines.md`
 
-Additional module/API docs are in `docs/api/`, `docs/modules/`, `docs/rules/`, and related subfolders.
+## Contribution Rules
 
-## Known Gaps (Current State)
+- Keep docs evidence-first: only document what current code verifies.
+- Update docs in the same change window when routes, middleware, contracts, or deploy behavior changes.
+- Keep unresolved decisions explicitly tracked in `Unresolved Questions` sections.
 
-- Several script references are stale or missing (for example `scripts/test-local.sh`, `scripts/docker-compose-dev.sh`, root-level `dev.sh`/`prod.sh` used by older docs).
-- GitHub Actions workflow files exist but are fully commented out.
-- `routes/api/v1/student.php` and `routes/api/v1/lecturer.php` include TODO/commented route sections and commented rate-limit middleware.
-- Documentation index files include stale links and overlap between `docs/` and `prd/`.
+## Unresolved Questions
 
-## Contribution Guidance
-
-- Keep docs under `docs/` as source of truth.
-- Prefer updating existing files over creating duplicate variants.
-- Verify implementation facts against code before documenting.
-- Keep markdown docs concise and maintainable.
-
-## License
-
-Proprietary software for internal academic operations.
+- Should `/api/system-config*` move behind authenticated admin middleware?
+- Should Finance API routes migrate from `web` + `auth` to Sanctum + actor model?
+- Which deploy script becomes canonical (`scripts/prod.sh`, `scripts/deploy.sh`, or `scripts/deploy-production.sh`)?

@@ -1,128 +1,121 @@
 # System Architecture
 
-Last updated: 2026-02-23
-Architecture type: Laravel monolith + Inertia SPA + API surfaces
+Last updated: 2026-02-25  
+Owner: Platform Team  
+Status: Current-state architecture map  
+Source of truth: route files, middleware, module providers, runtime entrypoints
 
 ## 1) Architecture Overview
 
-Swinx is a modular Laravel application with two primary delivery modes:
-- Server-rendered web app via Inertia (admin/staff workflows)
-- JSON APIs for student/lecturer flows
+Swinx is a Laravel 12 monolith with Vue 3 + Inertia frontend and mixed web/API surfaces.
 
-High-level runtime:
+High-level flow:
 
 ```text
-Browser / Mobile Client
-  -> Laravel HTTP Layer (routes + middleware)
-    -> Domain Logic (Modules + Services + Actions/Queries)
-      -> MySQL/MariaDB
-      -> Redis
-  -> Optional Realtime (Broadcast channels / Echo)
+Client (Web SPA / API)
+  -> Routes + Middleware (web/api groups)
+    -> Controllers
+      -> Module Actions/Queries or Shared Services
+        -> Eloquent Models
+          -> MySQL/MariaDB
+        -> Redis (cache/queue)
 ```
 
-## 2) Major Components
+## 2) Core Layers
 
-### 2.1 Presentation Layer
+### 2.1 Entry and Routing
 
-- Web entry points: `routes/web.php` + route files in `routes/web/`
-- Inertia middleware + shared props: `app/Http/Middleware/HandleInertiaRequests.php`
-- Frontend runtime:
-  - `resources/js/app.ts` (SPA boot)
-  - `resources/js/ssr.ts` (SSR boot)
-  - `resources/js/layouts/*`, `resources/js/components/*`, `resources/js/pages/*`
-
-### 2.2 API Layer
-
+- Bootstrap: `bootstrap/app.php`
+- Web routes: `routes/web.php` + `routes/web/*`
 - API root: `routes/api.php`
-- Student APIs: `routes/api/v1/student.php`
-- Lecturer APIs: `routes/api/v1/lecturer.php`
-- Admin/internal APIs: `routes/api/admin.php`, `routes/api/modules.php`
+- Student API v1: `routes/api/v1/student.php`
+- Lecturer API v1: `routes/api/v1/lecturer.php`
 
-### 2.3 Domain Layer
+### 2.2 Domain Modules
 
-- `app/Modules/Identity`: authentication flows, campus selection, context endpoints
-- `app/Modules/Academic`: student academic/placement/action workflows
-- `app/Modules/Finance`: billing, charges, payments, finance operations
+- Identity: `app/Modules/Identity`
+- Academic: `app/Modules/Academic`
+- Finance: `app/Modules/Finance`
 
-### 2.4 Shared Application Layer
+### 2.3 Shared Layer
 
-- `app/Services/*`: broad service layer with many high-complexity classes
-- `app/Models/*`: Eloquent models and relationships
-- `app/Http/Requests/*`: validation
-- `app/Http/Resources/*`: resource transforms
+- `app/Services/*` (large shared business logic)
+- `app/Models/*`
+- shared HTTP middleware/controllers/requests/resources under `app/Http/*`
 
-### 2.5 Infrastructure Layer
+### 2.4 Frontend
 
-- Database connections configured in `config/database.php`
-- Queue configured in `config/queue.php`
-- Broadcasting configured in `config/broadcasting.php`
-- Docker assets in `docker/` (dev/local-prod/prod variants)
+- App entry: `resources/js/app.ts`
+- SSR entry: `resources/js/ssr.ts`
+- pages/components/composables/types under `resources/js/*`
 
-## 3) Request Flow Patterns
+## 3) Auth and Middleware Surface Map
 
-### 3.1 Web Flow (Admin/Staff)
+### Student API surface
 
-1. Request enters web routes.
-2. Web middleware stack applies, including campus context middleware.
-3. Controller resolves permissions and builds Inertia response.
-4. Frontend page receives shared props (`auth`, permissions, campus context).
+- Main middleware chain: `auth:sanctum`, `api.logging`, `api.actor:student_or_parent`
+- Additional branch: `either:parent.student.access,student.api.auth`
 
-### 3.2 Student API Flow
+### Lecturer API surface
 
-1. Request enters `api/v1/student` route group.
-2. `auth:sanctum` + API auth middleware run.
-3. `either:parent.student.access,student.api.auth` may gate access.
-4. Controller executes domain logic and returns JSON.
+- Main middleware chain: `auth:sanctum`, `api.actor:lecturer`, `lecturer.api.auth`, `api.logging`
 
-### 3.3 Lecturer API Flow
+### Parent auth/context surface
 
-1. Request enters `api/v1/lecturer` route group.
-2. `auth:sanctum` + `lecturer.api.auth` + logging middleware run.
-3. Controller executes lecturer domain logic and returns JSON.
+- Routes under `/api/v1/student/parent/*`
+- Protected chain: `auth:sanctum`, `api.logging`, `api.actor:parent`
 
-## 4) Authorization Model
+### Known mixed-auth exceptions
 
-- Permission checks are widespread via route-level `can:*` middleware in web/admin flows.
-- Campus context for web flows is derived from session (`current_campus_id`).
-- API actor restrictions are middleware-driven (`student.api.auth`, `lecturer.api.auth`).
+- `routes/api.php` exposes `/api/system-config*` without auth middleware.
+- Finance module API routes (`app/Modules/Finance/routes/api.php`) use `web` + `auth` middleware.
 
-Architectural implication:
-- Some admin API endpoints rely on `web` middleware and session context, which may block pure token clients unless adapted.
+## 4) Identity Token Lifecycle (Current)
 
-## 5) Data and Background Work
+- Login/refresh actions issue 8-hour tokens.
+- Student, lecturer, and parent refresh endpoints are protected routes.
+- Refresh controller pattern is issue new token then revoke current token.
 
-- MySQL/MariaDB stores transactional domain data.
-- Redis is configured for caching/queue backends.
-- Scheduler tasks are defined in `routes/console.php` (attendance, events, academic sync jobs).
-- Queue worker usage is expected for asynchronous workloads (mail/notifications/jobs).
+## 5) Student Action Import Sub-Architecture
 
-## 6) Realtime and Notifications
+Route cluster (`app/Modules/Academic/routes/web.php`):
+- import page
+- template download
+- preview import
+- execute import
 
-- Broadcast channels in `routes/channels.php`.
-- Broadcast auth routes enabled in API routing context.
-- Frontend Echo setup in `resources/js/lib/echo.ts`.
+Flow:
+1. Preview parses and validates uploaded rows.
+2. Preview returns token and stores anti-tamper context (hash + optional attachment id).
+3. Execute verifies preview token and anti-tamper data.
+4. Execute writes row-by-row with DB transaction boundaries.
 
-## 7) Operational Architecture Notes
+Constraints:
+- `ADMISSION_DEFERRAL` excluded from import path.
+- append is limited to same student + same type + same period.
 
-- CI workflow definitions are present but currently disabled (commented).
-- Deployment and environment scripts exist but include path/reference drift that should be stabilized before relying on them.
+## 6) Operational Architecture Status
 
-## 8) Current Architecture Risks
+- Docker assets are maintained in `docker/`.
+- Scripts in `scripts/` still contain path and runtime drift.
+- CI workflow YAML files exist but are disabled.
 
-- Mixed architectural styles (module actions/queries + service-heavy legacy layer) increase maintenance complexity.
-- Session-dependent campus context in some API routes complicates external integrations.
-- Partial TODO/commented API routes create contract uncertainty for client teams.
-- Minimal test coverage increases regression risk for high-complexity domain logic.
+## 7) Architecture Risks
 
-## 9) Target Near-Term Architecture Direction
+- Hybrid layering (`Modules` + large shared `Services`) creates ownership ambiguity.
+- API auth model is not fully uniform across all route groups.
+- Public config endpoints create configuration exposure/tampering risk.
+- CI disabled + script drift increases deployment and regression risk.
 
-- Keep modules as primary domain boundary for new business logic.
-- Normalize API contracts and middleware expectations by consumer type.
-- Stabilize deployment workflow and CI activation.
-- Increase automated coverage around finance and academic critical paths.
+## 8) Near-Term Decisions Required
+
+1. Standardize API auth model for finance and other mixed groups.
+2. Resolve public `system-config` exposure strategy.
+3. Select canonical deployment workflow and align scripts.
+4. Reactivate CI with minimum required gates.
 
 ## Unresolved Questions
 
-- Should admin API routes move from `web` middleware to strict token-based middleware for consistency?
-- What is the intended long-term split between `app/Modules/*` and `app/Services/*`?
-- Is SSR required in production by default, or optional per environment?
+- Which API groups are official external contracts vs internal web-support endpoints?
+- Should finance APIs migrate to actor-based Sanctum protection?
+- Should campus-sensitive permission checks rely less on session-only context for API calls?
