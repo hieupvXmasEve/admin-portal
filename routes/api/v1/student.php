@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware([
     'auth:sanctum',
     'api.logging',
+    'api.actor:student_or_parent',
 ])->group(function () {
 
     // Sub-group with either middleware requirement

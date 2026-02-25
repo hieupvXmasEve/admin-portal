@@ -16,7 +16,7 @@ class StudentGoogleLoginAction
     /**
      * @throws Exception
      */
-    public static function run(string $idToken, string $ip, ?string $deviceName = null, bool $rememberMe = false): array
+    public static function run(string $idToken, string $ip, ?string $deviceName = null): array
     {
         $key = 'google-login:' . $ip;
 
@@ -93,7 +93,7 @@ class StudentGoogleLoginAction
             $student->update(['last_login_at' => now()]);
 
             $deviceName = $deviceName ?? 'Student Portal (Google)';
-            $expiresAt = $rememberMe ? now()->addDays(30) : now()->addDays(30);
+            $expiresAt = now()->addHours(8);
             $token = $student->createToken($deviceName, ['student'], $expiresAt)->plainTextToken;
 
             return [

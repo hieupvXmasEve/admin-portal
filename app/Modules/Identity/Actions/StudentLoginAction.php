@@ -65,7 +65,7 @@ class StudentLoginAction
         $user->update(['last_login_at' => now()]);
 
         $deviceName = $data['device_name'] ?? 'Student Portal';
-        $expiresAt = ($data['remember_me'] ?? false) ? now()->addDays(30) : now()->addHours(8);
+        $expiresAt = now()->addHours(8);
 
         $token = $student->createToken($deviceName, ['student'], $expiresAt)->plainTextToken;
 

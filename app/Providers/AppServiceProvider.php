@@ -6,8 +6,10 @@ use App\Models\Lecture;
 use App\Models\RoomBooking;
 use App\Models\Student;
 use App\Models\User;
+use App\Policies\ApiActorPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -28,8 +30,16 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         umask(0002);
+        $this->registerApiActorGates();
         $this->configureRateLimiting();
         $this->configureMorphMap();
+    }
+
+    protected function registerApiActorGates(): void
+    {
+        Gate::define('api.actor.student_or_parent', [ApiActorPolicy::class, 'accessStudentOrParent']);
+        Gate::define('api.actor.parent', [ApiActorPolicy::class, 'accessParent']);
+        Gate::define('api.actor.lecturer', [ApiActorPolicy::class, 'accessLecturer']);
     }
 
     /**

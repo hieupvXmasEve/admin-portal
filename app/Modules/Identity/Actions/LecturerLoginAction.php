@@ -67,7 +67,7 @@ class LecturerLoginAction
         // note: We issue the token to the Lecturer model to maintain compatibility
         // with existing routes that expect $request->user() to be a Lecture instance.
         $deviceName = $data['device_name'] ?? 'Lecturer Device';
-        $expiresAt = ($data['remember_me'] ?? false) ? now()->addDays(30) : now()->addHours(8);
+        $expiresAt = now()->addHours(8);
 
         $token = $lecturer->createToken(
             $deviceName,

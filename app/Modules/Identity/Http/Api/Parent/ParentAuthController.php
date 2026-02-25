@@ -8,6 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Modules\Identity\Actions\ParentLoginAction;
 use App\Modules\Identity\Actions\ParentLogoutAction;
 use App\Modules\Identity\Actions\ParentGoogleLoginAction;
+use App\Modules\Identity\Actions\ParentRefreshTokenAction;
+use App\Modules\Identity\Http\Requests\Identity\RefreshTokenRequest;
 use App\Modules\Identity\Http\Requests\Identity\ParentLoginRequest;
 use App\Modules\Identity\Http\Requests\Identity\GoogleLoginRequest;
 use App\Http\Responses\ApiResponse;
@@ -47,5 +49,20 @@ class ParentAuthController extends Controller
     {
         ParentLogoutAction::run($request);
         return ApiResponse::success(null, [], 'Logged out successfully');
+    }
+
+    public function refresh(RefreshTokenRequest $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $currentToken = $user->currentAccessToken();
+
+            $result = ParentRefreshTokenAction::run($user, $request->device_name);
+            $currentToken?->delete();
+
+            return ApiResponse::success($result, [], 'Token refreshed successfully');
+        } catch (\Exception $e) {
+            return ApiResponse::authenticationError($e->getMessage());
+        }
     }
 }

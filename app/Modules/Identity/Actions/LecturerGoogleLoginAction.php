@@ -15,7 +15,7 @@ class LecturerGoogleLoginAction
      * @throws ValidationException
      * @throws Exception
      */
-    public static function run(string $idToken, string $ip, ?string $deviceName = null, bool $rememberMe = false): array
+    public static function run(string $idToken, string $ip, ?string $deviceName = null): array
     {
         try {
             // Initialize Google Client
@@ -103,7 +103,7 @@ class LecturerGoogleLoginAction
 
             // 7. Generate Token
             $deviceName = $deviceName ?? 'Lecturer Portal (Google)';
-            $expiresAt = $rememberMe ? now()->addDays(30) : now()->addDays(30);
+            $expiresAt = now()->addHours(8);
 
             $token = $lecturer->createToken($deviceName, ['lecturer:access'], $expiresAt)->plainTextToken;
 

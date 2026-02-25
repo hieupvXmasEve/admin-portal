@@ -62,7 +62,7 @@ class ParentLoginAction
         $user->update(['last_login_at' => now()]);
 
         $deviceName = $data['device_name'] ?? 'Parent Portal';
-        $expiresAt = ($data['remember_me'] ?? false) ? now()->addDays(30) : now()->addHours(8);
+        $expiresAt = now()->addHours(8);
 
         // 6. Create Token with 'parent' ability
         $token = $user->createToken($deviceName, ['parent'], $expiresAt)->plainTextToken;

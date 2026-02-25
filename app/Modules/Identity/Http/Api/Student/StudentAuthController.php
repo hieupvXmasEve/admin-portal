@@ -34,8 +34,7 @@ class StudentAuthController extends Controller
             $result = StudentGoogleLoginAction::run(
                 $request->id_token,
                 $request->ip(),
-                $request->device_name,
-                (bool)$request->remember_me
+                $request->device_name
             );
             return ApiResponse::success($result, [], 'Google login successful');
         } catch (\Exception $e) {
@@ -47,10 +46,10 @@ class StudentAuthController extends Controller
     {
         try {
             $student = $request->user();
-            // Revoke current token
-            $student->currentAccessToken()->delete();
+            $currentToken = $student->currentAccessToken();
 
             $result = RefreshTokenAction::run($student, $request->device_name);
+            $currentToken?->delete();
             return ApiResponse::success($result, [], 'Token refreshed successfully');
         } catch (\Exception $e) {
             return ApiResponse::authenticationError($e->getMessage());

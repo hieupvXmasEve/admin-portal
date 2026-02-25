@@ -41,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'lecturer.api.auth' => \App\Http\Middleware\LecturerApiAuthorization::class,
             'lecturer.api.rate' => \App\Http\Middleware\LecturerApiRateLimiter::class,
             'parent.student.access' => \App\Http\Middleware\ParentStudentAccess::class,
+            'api.actor' => \App\Http\Middleware\ApiActorAuthorize::class,
             'api.logging' => \App\Http\Middleware\ApiLogging::class,
             'either' => EitherMiddleware::class,
         ]);

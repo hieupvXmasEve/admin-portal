@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Route;
 // Protected lecturer API routes
 Route::middleware([
     'auth:sanctum',
+    'api.actor:lecturer',
     'lecturer.api.auth',
     //    'lecturer.api.rate:lecturer-api',
     'api.logging',

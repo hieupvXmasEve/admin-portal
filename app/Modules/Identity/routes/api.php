@@ -20,7 +20,7 @@ Route::prefix('v1/student')->name('api.student.')->group(function () {
     });
 
     // Protected routes
-    Route::middleware(['auth:sanctum', 'api.logging'])->group(function () {
+    Route::middleware(['auth:sanctum', 'api.logging', 'api.actor:student_or_parent'])->group(function () {
         Route::middleware(['either:parent.student.access,student.api.auth'])->group(function () {
             Route::prefix('auth')->name('auth.')->group(function () {
                 Route::post('/logout', [StudentAuthController::class, 'logout'])->name('logout');
@@ -42,9 +42,10 @@ Route::prefix('v1/student')->name('api.student.')->group(function () {
         });
 
         // Protected routes
-        Route::middleware(['auth:sanctum', 'api.logging'])->group(function () {
+        Route::middleware(['auth:sanctum', 'api.logging', 'api.actor:parent'])->group(function () {
             Route::prefix('auth')->name('auth.')->group(function () {
                 Route::post('/logout', [ParentAuthController::class, 'logout'])->name('logout');
+                Route::post('/refresh', [ParentAuthController::class, 'refresh'])->name('refresh');
             });
 
             Route::get('/context', [ParentContextController::class, 'index'])->name('context');
@@ -60,17 +61,18 @@ Route::prefix('v1/lecturer')->name('api.lecturer.')->group(function () {
     Route::prefix('auth')->name('auth.')->group(function () {
         Route::post('/login', [LecturerAuthController::class, 'login'])->name('login');
         Route::post('/login/google', [LecturerAuthController::class, 'loginWithGoogle'])->name('login.google');
-        Route::post('/refresh', [LecturerAuthController::class, 'refresh'])->name('refresh');
         Route::get('/check-science', [LecturerAuthController::class, 'checkScience'])->name('check-science');
     });
 
     // Protected routes
     Route::middleware([
         'auth:sanctum',
+        'api.actor:lecturer',
         'lecturer.api.auth',
         'api.logging',
     ])->group(function () {
         Route::prefix('auth')->name('auth.')->group(function () {
+            Route::post('/refresh', [LecturerAuthController::class, 'refresh'])->name('refresh');
             Route::post('/logout', [LecturerAuthController::class, 'logout'])->name('logout');
             Route::get('/me', [LecturerAuthController::class, 'me'])->name('me');
         });

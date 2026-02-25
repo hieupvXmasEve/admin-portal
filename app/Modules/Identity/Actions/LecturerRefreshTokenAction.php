@@ -37,14 +37,8 @@ class LecturerRefreshTokenAction
         }
 
         $deviceName = $deviceName ?? 'Lecturer Portal';
-        // Match existing AuthController expiration logic (525600 minutes / 1 year default in sanctum config, or custom)
-        // The legacy controller used config('sanctum.expiration', 525600) for response but didn't set it on createToken explicitly (defaulting to config).
-        // Let's stick to a reasonable default or configuration.
-        // Legacy login set it to 30 days (remember) or 8 hours.
-        // Legacy refresh didn't specify expiration on createToken, so it used sanctum.expiration.
-
-        $expirationMinutes = config('sanctum.expiration', 525600);
-        $expiresAt = now()->addMinutes($expirationMinutes);
+        $expirationMinutes = 8 * 60;
+        $expiresAt = now()->addHours(8);
 
         $token = $lecturer->createToken($deviceName, ['lecturer:access'], $expiresAt)->plainTextToken;
 

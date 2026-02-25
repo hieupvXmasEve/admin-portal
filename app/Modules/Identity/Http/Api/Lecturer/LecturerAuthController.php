@@ -42,7 +42,7 @@ class LecturerAuthController extends Controller
 
                      'token' => $result['token'],
                      'token_type' => 'Bearer',
-                     'expires_in' => config('sanctum.expiration', 525600), // minutes
+                     'expires_in' => 8 * 60, // minutes
                 ],
                 message: 'Login successful'
             );
@@ -80,10 +80,10 @@ class LecturerAuthController extends Controller
         }
 
         try {
-             // Revoke current token
-            $request->user()->currentAccessToken()->delete();
+            $currentToken = $request->user()->currentAccessToken();
 
             $result = LecturerRefreshTokenAction::run($lecturer, $request->device_name);
+            $currentToken?->delete();
 
             return ApiResponse::success(
                 data: [
@@ -142,8 +142,7 @@ class LecturerAuthController extends Controller
             $result = LecturerGoogleLoginAction::run(
                 $request->id_token,
                 $request->ip(),
-                $request->device_name,
-                (bool) $request->remember_me
+                $request->device_name
             );
 
             return ApiResponse::success(
@@ -151,7 +150,7 @@ class LecturerAuthController extends Controller
                     'lecturer' => new LecturerResource($result['lecturer']),
                     'token' => $result['token'],
                     'token_type' => 'Bearer',
-                    'expires_in' => config('sanctum.expiration', 1440), // minutes
+                    'expires_in' => 8 * 60, // minutes
                 ],
                 message: 'Google login successful'
             );

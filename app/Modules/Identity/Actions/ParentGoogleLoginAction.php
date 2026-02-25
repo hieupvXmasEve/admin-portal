@@ -22,7 +22,6 @@ class ParentGoogleLoginAction
         $idToken = $data['id_token'];
         $ip = $data['ip'] ?? request()->ip();
         $deviceName = $data['device_name'] ?? 'Parent Portal (Google)';
-        $rememberMe = $data['remember_me'] ?? false;
 
         $key = 'google-login:' . $ip;
 
@@ -89,7 +88,7 @@ class ParentGoogleLoginAction
             $user->update(['last_login_at' => now()]);
 
             $deviceName = $deviceName ?? 'Parent Portal (Google)';
-            $expiresAt = $rememberMe ? now()->addDays(30) : now()->addDays(30);
+            $expiresAt = now()->addHours(8);
 
             // 6. Create Token with 'parent' ability
             $token = $user->createToken($deviceName, ['parent'], $expiresAt)->plainTextToken;
