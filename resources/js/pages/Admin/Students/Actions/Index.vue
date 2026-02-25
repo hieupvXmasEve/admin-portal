@@ -69,7 +69,9 @@ const form = useForm<StoreStudentActionForm>({
     action_type: '',
     reason: '',
     notes: '',
-    signed_at: '',
+    decision_number: '',
+    decision_signed_at: '',
+    decision_signer: '',
     missing_documents: true,
     attachment_ids: [],
     from_semester_id: props.options.activeSemesterId ?? null,
@@ -103,6 +105,9 @@ watch(
         form.to_campus_id = null;
         form.effective_at = '';
         form.effective_semester_id = null;
+        form.decision_number = '';
+        form.decision_signed_at = '';
+        form.decision_signer = '';
         // Keep from_campus_id as student's current campus
         form.from_campus_id = props.student.campus_id;
         // Reset defer case fields
@@ -555,13 +560,25 @@ const getSummary = (log: StudentActionLog): string => {
 
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-2">
-                                <Label for="signed_at">Signed Date (Optional)</Label>
-                                <Input type="date" v-model="form.signed_at" />
+                                <Label for="decision_signed_at">Decision Signed Date (Optional)</Label>
+                                <Input type="date" v-model="form.decision_signed_at" />
                             </div>
                             <div class="space-y-2">
-                                <Label for="notes">Notes (Optional)</Label>
-                                <Input v-model="form.notes" placeholder="Internal notes..." />
+                                <Label for="decision_number">Decision Number (Optional)</Label>
+                                <Input v-model="form.decision_number" placeholder="Decision number..." />
                             </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-2">
+                                <Label for="decision_signer">Decision Signer (Optional)</Label>
+                                <Input v-model="form.decision_signer" placeholder="Signer name..." />
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="notes">Notes (Optional)</Label>
+                            <Input v-model="form.notes" placeholder="Internal notes..." />
                         </div>
 
                         <div class="flex items-center space-x-2">
@@ -614,9 +631,14 @@ const getSummary = (log: StudentActionLog): string => {
                                         <User class="mr-1 h-3 w-3" />
                                         {{ log.changed_by?.name ?? 'Unknown' }}
                                     </span>
-                                    <span v-if="log.signed_at" class="flex items-center">
-                                        <FileText class="mr-1 h-3 w-3" />
-                                        Signed: {{ formatDateOnly(log.signed_at) }}
+                                    <span v-if="log.decision_number" class="flex items-center">
+                                        Decision No: {{ log.decision_number }}
+                                    </span>
+                                    <span v-if="log.decision_signed_at" class="flex items-center">
+                                        Decision Signed: {{ formatDateOnly(log.decision_signed_at) }}
+                                    </span>
+                                    <span v-if="log.decision_signer" class="flex items-center">
+                                        Signer: {{ log.decision_signer }}
                                     </span>
                                     <span v-if="log.attachments && log.attachments.length > 0" class="flex items-center">
                                         <Paperclip class="mr-1 h-3 w-3" />

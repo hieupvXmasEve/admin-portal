@@ -89,6 +89,9 @@ export interface StudentActionLog {
     reason: string;
     notes?: string;
     signed_at?: string;
+    decision_number?: string;
+    decision_signed_at?: string;
+    decision_signer?: string;
     missing_documents: boolean;
     changed_by_user_id: number;
 
@@ -142,6 +145,9 @@ export interface StoreStudentActionForm {
     reason: string;
     notes?: string;
     signed_at?: string;
+    decision_number?: string;
+    decision_signed_at?: string;
+    decision_signer?: string;
     missing_documents: boolean;
     attachment_ids?: number[];
 

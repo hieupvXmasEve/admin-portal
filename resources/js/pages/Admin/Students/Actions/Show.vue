@@ -124,7 +124,9 @@ const isEditOpen = ref(false);
 const editForm = useForm({
     reason: '',
     notes: '',
-    signed_at: '',
+    decision_number: '',
+    decision_signed_at: '',
+    decision_signer: '',
     missing_documents: false,
     from_semester_id: null as number | null,
     return_semester_id: null as number | null,
@@ -152,7 +154,9 @@ const toDateTimeLocal = (dateStr: string | null | undefined) => {
 const openEdit = () => {
     editForm.reason = props.actionLog.reason;
     editForm.notes = props.actionLog.notes || '';
-    editForm.signed_at = props.actionLog.signed_at ? props.actionLog.signed_at.toString().substring(0, 10) : '';
+    editForm.decision_number = props.actionLog.decision_number || '';
+    editForm.decision_signed_at = props.actionLog.decision_signed_at ? props.actionLog.decision_signed_at.toString().substring(0, 10) : '';
+    editForm.decision_signer = props.actionLog.decision_signer || '';
     editForm.missing_documents = !!props.actionLog.missing_documents;
     editForm.from_semester_id = props.actionLog.from_semester_id;
     editForm.return_semester_id = props.actionLog.return_semester_id;
@@ -239,12 +243,19 @@ const handleUpdate = () => {
                         </div>
                     </div>
 
-                    <div v-if="actionLog.signed_at">
-                        <p class="text-muted-foreground text-sm">Signed At</p>
-                        <p class="flex items-center font-medium">
-                            <FileText class="mr-2 h-4 w-4" />
-                            {{ formatDateOnly(actionLog.signed_at) }}
-                        </p>
+                    <div v-if="actionLog.decision_number">
+                        <p class="text-muted-foreground text-sm">Decision Number</p>
+                        <p class="font-medium">{{ actionLog.decision_number }}</p>
+                    </div>
+
+                    <div v-if="actionLog.decision_signed_at">
+                        <p class="text-muted-foreground text-sm">Decision Signed Date</p>
+                        <p class="font-medium">{{ formatDateOnly(actionLog.decision_signed_at) }}</p>
+                    </div>
+
+                    <div v-if="actionLog.decision_signer">
+                        <p class="text-muted-foreground text-sm">Decision Signer</p>
+                        <p class="font-medium">{{ actionLog.decision_signer }}</p>
                     </div>
 
                     <div>
@@ -569,13 +580,22 @@ const handleUpdate = () => {
 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2">
-                        <Label for="signed_at">Signed Date (Optional)</Label>
-                        <Input type="date" v-model="editForm.signed_at" />
+                        <Label for="decision_signed_at">Decision Signed Date (Optional)</Label>
+                        <Input type="date" v-model="editForm.decision_signed_at" />
                     </div>
                     <div class="space-y-2">
-                        <Label for="notes">Notes (Optional)</Label>
-                        <Input v-model="editForm.notes" placeholder="Internal notes..." />
+                        <Label for="decision_number">Decision Number (Optional)</Label>
+                        <Input v-model="editForm.decision_number" placeholder="Decision number..." />
                     </div>
+                    <div class="space-y-2">
+                        <Label for="decision_signer">Decision Signer (Optional)</Label>
+                        <Input v-model="editForm.decision_signer" placeholder="Signer name..." />
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <Label for="notes">Notes (Optional)</Label>
+                    <Input v-model="editForm.notes" placeholder="Internal notes..." />
                 </div>
 
                 <div class="flex items-center space-x-2">

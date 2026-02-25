@@ -184,6 +184,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('can:view_student_action')
             ->name('index');
 
+        Route::get('/import', [StudentActionAuditController::class, 'importPage'])
+            ->middleware('can:change_student_status')
+            ->name('import');
+
+        Route::get('/import/template', [StudentActionAuditController::class, 'downloadImportTemplate'])
+            ->middleware('can:change_student_status')
+            ->name('import.template');
+
+        Route::post('/import/preview', [StudentActionAuditController::class, 'previewImport'])
+            ->middleware('can:change_student_status')
+            ->name('import.preview');
+
+        Route::post('/import/execute', [StudentActionAuditController::class, 'executeImport'])
+            ->middleware('can:change_student_status')
+            ->name('import.execute');
+
         Route::get('/export', [StudentActionAuditController::class, 'export'])
             ->middleware('can:view_student_action')
             ->name('export');

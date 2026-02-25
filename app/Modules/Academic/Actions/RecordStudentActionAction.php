@@ -65,6 +65,9 @@ class RecordStudentActionAction
                 'reason' => $data['reason'],
                 'notes' => $data['notes'] ?? null,
                 'signed_at' => $data['signed_at'] ?? null,
+                'decision_number' => $data['decision_number'] ?? null,
+                'decision_signed_at' => $data['decision_signed_at'] ?? null,
+                'decision_signer' => $data['decision_signer'] ?? null,
                 'missing_documents' => $data['missing_documents'] ?? false,
                 'changed_by_user_id' => $userId,
 
@@ -134,6 +137,8 @@ class RecordStudentActionAction
         StudentActionType $actionType,
         array $data
     ): void {
+        self::validateStatusTransitionPolicy($student, $actionType);
+
         match ($actionType) {
             StudentActionType::ACADEMIC_DEFER => self::validateDeferAction($student, $data),
             StudentActionType::ACADEMIC_RESUME => self::validateResumeAction($student, $data),
@@ -141,6 +146,36 @@ class RecordStudentActionAction
             StudentActionType::ACADEMIC_DROPOUT => null, // No special validation
             StudentActionType::CAMPUS_TRANSFER => self::validateCampusTransferAction($student, $data),
         };
+    }
+
+    /**
+     * Validate status transition policy before action-specific validation.
+     */
+    private static function validateStatusTransitionPolicy(Student $student, StudentActionType $actionType): void
+    {
+        $currentStatus = (string) $student->status;
+
+        $terminalStatuses = ['dropout', 'dropout_transfer', 'graduated'];
+        if (in_array($currentStatus, $terminalStatuses, true)) {
+            throw ValidationException::withMessages([
+                'action_type' => sprintf(
+                    'Student status "%s" is terminal. No further status actions are allowed.',
+                    $currentStatus
+                ),
+            ]);
+        }
+
+        if ($actionType === StudentActionType::ACADEMIC_RESUME && $currentStatus !== 'deferred') {
+            throw ValidationException::withMessages([
+                'action_type' => 'ACADEMIC_RESUME is only allowed when current status is deferred.',
+            ]);
+        }
+
+        if ($actionType === StudentActionType::ADMISSION_DEFERRAL && $currentStatus !== 'pending') {
+            throw ValidationException::withMessages([
+                'action_type' => 'ADMISSION_DEFERRAL is only allowed when current status is pending.',
+            ]);
+        }
     }
 
     /**

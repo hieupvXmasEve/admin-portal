@@ -174,6 +174,10 @@ export const studentRoutes = {
 
     studentStatusActionIndex: (id: number) => route('students.actions.index', { student: id }),
     studentStatusAction: () => route('reports.student-actions.index'),
+    studentStatusActionImport: () => route('reports.student-actions.import'),
+    studentStatusActionImportTemplate: () => route('reports.student-actions.import.template'),
+    studentStatusActionImportPreview: () => route('reports.student-actions.import.preview'),
+    studentStatusActionImportExecute: () => route('reports.student-actions.import.execute'),
     studentStatusActionShow: (id: number) => route('reports.student-actions.show', { actionLog: id }),
     studentStatusActionUpdate: (id: number) => route('reports.student-actions.update', { actionLog: id }),
     studentStatusActionAttachmentsStore: (id: number) => route('reports.student-actions.attachments.store', { actionLog: id }),

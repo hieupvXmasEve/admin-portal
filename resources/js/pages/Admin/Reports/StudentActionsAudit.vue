@@ -11,7 +11,7 @@ import { getActionTypeBadgeClass, getActionTypeLabel, type ActionTypeOption, typ
 import { studentRoutes } from '@/utils/routes';
 import { Head, Link } from '@inertiajs/vue3';
 import type { ColumnDef } from '@tanstack/vue-table';
-import { Download, ExternalLink, FileWarning, Loader2, Search, X } from 'lucide-vue-next';
+import { Download, ExternalLink, FileWarning, Loader2, Search, Upload, X } from 'lucide-vue-next';
 import { h, ref } from 'vue';
 
 interface Props {
@@ -47,7 +47,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { filters, handleSearch, handleSortChange, handlePaginationNavigate, handlePageSizeChange, clearFilters } = useInertiaFilters({
+const { filters, handleSearch, handlePaginationNavigate, handlePageSizeChange, clearFilters } = useInertiaFilters({
     baseUrl: route('reports.student-actions.index'),
     initialFilters: props.filters,
     defaultValues: {
@@ -149,9 +149,19 @@ const columns: ColumnDef<StudentActionLog>[] = [
         cell: ({ row }) => row.original.changed_by?.name ?? '-',
     },
     {
-        accessorKey: 'signed_at',
-        header: 'Signed At',
-        cell: ({ row }) => formatDateOnly(row.original.signed_at),
+        accessorKey: 'decision_number',
+        header: 'Decision No.',
+        cell: ({ row }) => row.original.decision_number ?? '-',
+    },
+    {
+        accessorKey: 'decision_signed_at',
+        header: 'Decision Signed At',
+        cell: ({ row }) => formatDateOnly(row.original.decision_signed_at),
+    },
+    {
+        accessorKey: 'decision_signer',
+        header: 'Decision Signer',
+        cell: ({ row }) => row.original.decision_signer ?? '-',
     },
     {
         accessorKey: 'reason',
@@ -162,7 +172,10 @@ const columns: ColumnDef<StudentActionLog>[] = [
         accessorKey: 'missing_documents',
         header: 'Missing Docs',
         cell: ({ row }) => {
-            if (row.original.missing_documents) {
+            const hasDocuments = (row.original.attachments?.length ?? 0) > 0;
+            const isMissingDocuments = row.original.missing_documents && !hasDocuments;
+
+            if (isMissingDocuments) {
                 return h('div', { class: 'flex items-center text-amber-600' }, [h(FileWarning, { class: 'h-4 w-4 mr-1' }), 'Yes']);
             }
             return h('span', { class: 'text-muted-foreground' }, 'No');
@@ -194,11 +207,19 @@ const columns: ColumnDef<StudentActionLog>[] = [
                 <h1 class="text-3xl font-bold tracking-tight">Student Actions Audit</h1>
                 <p class="text-muted-foreground mt-1">View and export student administrative action history.</p>
             </div>
-            <Button variant="outline" @click="handleExport" :disabled="isExporting">
-                <Loader2 v-if="isExporting" class="mr-2 h-4 w-4 animate-spin" />
-                <Download v-else class="mr-2 h-4 w-4" />
-                Export CSV
-            </Button>
+            <div class="flex items-center gap-2">
+                <Link :href="studentRoutes.studentStatusActionImport()">
+                    <Button variant="outline">
+                        <Upload class="mr-2 h-4 w-4" />
+                        Import Excel
+                    </Button>
+                </Link>
+                <Button variant="outline" @click="handleExport" :disabled="isExporting">
+                    <Loader2 v-if="isExporting" class="mr-2 h-4 w-4 animate-spin" />
+                    <Download v-else class="mr-2 h-4 w-4" />
+                    Export Excel
+                </Button>
+            </div>
         </div>
 
         <Card>

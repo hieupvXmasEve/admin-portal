@@ -25,6 +25,9 @@ class UpdateStudentActionAction
                 'reason',
                 'notes',
                 'signed_at',
+                'decision_number',
+                'decision_signed_at',
+                'decision_signer',
                 'missing_documents',
                 // Semester fields
                 'from_semester_id',

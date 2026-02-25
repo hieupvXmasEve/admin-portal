@@ -22,6 +22,9 @@ class StudentActionLog extends Model
         'reason',
         'notes',
         'signed_at',
+        'decision_number',
+        'decision_signed_at',
+        'decision_signer',
         'missing_documents',
         'changed_by_user_id',
         'from_semester_id',
@@ -40,6 +43,7 @@ class StudentActionLog extends Model
     protected $casts = [
         'action_type' => StudentActionType::class,
         'signed_at' => 'date',
+        'decision_signed_at' => 'date',
         'missing_documents' => 'boolean',
         'effective_at' => 'datetime',
     ];
