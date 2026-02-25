@@ -1,0 +1,115 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Academic\Http\Web\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Semester;
+use App\Modules\Academic\Exports\StudentLifecycleStatusExport;
+use App\Modules\Academic\Queries\Reporting\GetStudentLifecycleYearlyAnalysisQuery;
+use App\Modules\Academic\Queries\Reporting\GetStudentStatusBySemesterQuery;
+use App\Services\ExcelExportService;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+
+class StudentLifecycleYearlyAnalysisController extends Controller
+{
+    public function __construct(
+        private readonly GetStudentLifecycleYearlyAnalysisQuery $yearlyQuery,
+        private readonly GetStudentStatusBySemesterQuery $statusBySemesterQuery
+    ) {}
+
+    public function index(Request $request): Response
+    {
+        $validated = $request->validate([
+            'selected_semester_id' => ['nullable', 'integer', 'exists:semesters,id'],
+            'current_status' => ['nullable', 'string', 'max:50'],
+            'status_per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $currentCampusId = session('current_campus_id');
+        $rows = $this->yearlyQuery->handle($currentCampusId);
+
+        $semesterOptions = Semester::query()
+            ->select('id', 'name', 'code', 'start_date', 'is_active')
+            ->orderBy('start_date', 'desc')
+            ->get();
+
+        $defaultSemesterId = Semester::query()
+            ->where('is_active', true)
+            ->value('id');
+
+        if (! $defaultSemesterId) {
+            $defaultSemesterId = Semester::query()->orderByDesc('start_date')->value('id');
+        }
+
+        $selectedSemesterId = (int) ($validated['selected_semester_id'] ?? $defaultSemesterId ?? 0);
+        $currentStatus = $validated['current_status'] ?? null;
+        $statusPerPage = (int) ($validated['status_per_page'] ?? 25);
+
+        $statusTable = $selectedSemesterId > 0
+            ? $this->statusBySemesterQuery->handle($selectedSemesterId, $currentCampusId, $currentStatus, $statusPerPage)
+            : null;
+
+        return Inertia::render('Admin/Reports/StudentLifecycleYearlyAnalysis/Index', [
+            'rows' => $rows->values()->all(),
+            'statusTable' => $statusTable,
+            'statusFilters' => [
+                'selected_semester_id' => $selectedSemesterId > 0 ? $selectedSemesterId : null,
+                'current_status' => $currentStatus,
+                'status_per_page' => $statusPerPage,
+                'page' => (int) ($validated['page'] ?? 1),
+            ],
+            'statusOptions' => [
+                'semesters' => $semesterOptions,
+                'statuses' => [
+                    ['value' => 'pending', 'label' => 'Pending'],
+                    ['value' => 'admission_deferred', 'label' => 'Admission Deferred'],
+                    ['value' => 'intake_pre_uni_gc', 'label' => 'Intake Pre-Uni GC'],
+                    ['value' => 'intake_course', 'label' => 'Intake Course'],
+                    ['value' => 'deferred', 'label' => 'Deferred'],
+                    ['value' => 'dropout', 'label' => 'Dropout'],
+                    ['value' => 'dropout_transfer', 'label' => 'Dropout Transfer'],
+                    ['value' => 'graduated', 'label' => 'Graduated'],
+                    ['value' => 'active', 'label' => 'Active'],
+                    ['value' => 'inactive', 'label' => 'Inactive'],
+                    ['value' => 'suspended', 'label' => 'Suspended'],
+                ],
+            ],
+            'meta' => [
+                'campus_id' => $currentCampusId,
+                'generated_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
+    public function export(Request $request, ExcelExportService $excelService): BinaryFileResponse
+    {
+        $validated = $request->validate([
+            'selected_semester_id' => ['required', 'integer', 'exists:semesters,id'],
+            'current_status' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $selectedSemester = Semester::query()->select('id', 'code')->findOrFail($validated['selected_semester_id']);
+        $currentCampusId = session('current_campus_id');
+        $currentStatus = $validated['current_status'] ?? null;
+
+        $rows = $this->statusBySemesterQuery->handleExport(
+            (int) $validated['selected_semester_id'],
+            $currentCampusId,
+            $currentStatus
+        );
+
+        $filename = sprintf(
+            'student_lifecycle_status_%s_%s',
+            $selectedSemester->code,
+            now()->format('Y-m-d_H-i')
+        );
+
+        return $excelService->download(new StudentLifecycleStatusExport($rows), $filename);
+    }
+}

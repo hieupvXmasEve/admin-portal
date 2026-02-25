@@ -8,6 +8,7 @@ use App\Modules\Academic\Http\Web\Admin\StudentController;
 use App\Modules\Academic\Http\Web\Admin\StudentStatusController;
 use App\Modules\Academic\Http\Web\Admin\AcademicPlacementController;
 use App\Modules\Academic\Http\Web\Admin\AcademicProgressionAuditController;
+use App\Modules\Academic\Http\Web\Admin\StudentLifecycleYearlyAnalysisController;
 use App\Modules\Academic\Http\Web\Admin\StudentActionAuditController;
 use App\Modules\Academic\Http\Web\Admin\StudentActionController;
 use Illuminate\Support\Facades\Route;
@@ -198,5 +199,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{actionLog}/attachments', [StudentActionController::class, 'uploadAttachment'])
             ->middleware('can:change_student_status')
             ->name('attachments.store');
+    });
+
+    // Student Lifecycle Yearly Analysis
+    Route::prefix('reports/student-lifecycle-yearly')->name('reports.student-lifecycle-yearly.')->group(function () {
+        Route::get('/', [StudentLifecycleYearlyAnalysisController::class, 'index'])
+            ->middleware('can:view_student_action')
+            ->name('index');
+
+        Route::get('/export', [StudentLifecycleYearlyAnalysisController::class, 'export'])
+            ->middleware('can:view_student_action')
+            ->name('export');
     });
 });

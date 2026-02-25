@@ -190,6 +190,8 @@ export const studentRoutes = {
     academicProgressionAudit: () => route('reports.academic-progression.index'),
     academicProgressionMissingDocuments: () => route('reports.academic-progression.missing-documents'),
     academicProgressionExport: () => route('reports.academic-progression.export'),
+    studentLifecycleYearlyAnalysis: () => route('reports.student-lifecycle-yearly.index'),
+    studentLifecycleYearlyAnalysisExport: () => route('reports.student-lifecycle-yearly.export'),
 } as const;
 
 // Lecturer Management Routes

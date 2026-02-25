@@ -331,6 +331,12 @@ export const mainNavItems: NavItem[] = [
                         icon: ClipboardCheck,
                         requiredPermissions: ['view_student_action'],
                     },
+                    {
+                        title: 'Lifecycle Yearly Analysis',
+                        href: studentRoutes.studentLifecycleYearlyAnalysis(),
+                        icon: TrendingUp,
+                        requiredPermissions: ['view_student_action'],
+                    },
                 ],
             },
             // Group menu Progression Audit
